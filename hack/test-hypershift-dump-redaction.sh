@@ -84,6 +84,139 @@ done
 unset lower_path_fixture_seed
 commit="0123456789abcdef0123456789abcdef01234567"
 digest="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+short_fixture_token="${opaque_fixture_token:0:12}"
+
+# Shapes observed in published dumps. Keep these separate so parser failures
+# cannot hide which preservation contract broke. Sensitive values are generated
+# at runtime, including short values that cannot rely on entropy redaction.
+cat > "${fixture_dir}/cluster-scoped-resources/core/certificate-descriptions.yaml" <<EOF
+apiVersion: v1
+kind: Example
+spec:
+  literal: |
+    Begin with -----BEGIN CERTIFICATE-----
+    and finish with -----END CERTIFICATE----- before the trailing diagnostic.
+  folded: >
+    Begin with -----BEGIN CERTIFICATE-----
+    and finish with -----END CERTIFICATE----- before the trailing diagnostic.
+  plain: Begin with -----BEGIN CERTIFICATE-----
+    and finish with -----END CERTIFICATE----- before the trailing diagnostic.
+  quoted: "Begin with -----BEGIN CERTIFICATE-----
+    and finish with -----END CERTIFICATE----- before the trailing diagnostic."
+  repeated: |
+    -----BEGIN CERTIFICATE-----
+    description -----END CERTIFICATE----- between -----BEGIN CERTIFICATE-----
+    description -----END CERTIFICATE----- before the trailing diagnostic.
+  material: |
+    -----BEGIN PRIVATE KEY-----
+    ${short_fixture_token}
+    -----END PRIVATE KEY-----
+  following: retained
+EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/field-ownership.yaml" <<EOF
+apiVersion: v1
+kind: Example
+metadata:
+  managedFields:
+  - manager: fixture
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+# Ownership note: comments do not change the surrounding YAML ancestry.
+        f:token:
+          .: {}
+          f:server: {}
+        'f:password': {}
+        "f:client-secret":
+          f:name: {}
+        f:diagnosticToken: ${short_fixture_token}
+        f:inlineToken: {password: ${short_fixture_token}, keep: retained}
+  - manager: another
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:spec:
+        f:api-key: {}
+spec:
+  token: ${short_fixture_token}
+  f:token: ${short_fixture_token}
+  following: retained
+EOF
+
+cat > "${fixture_dir}/cluster-scoped-resources/core/resource-kinds.yaml" <<EOF
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: examples.example.invalid
+spec:
+  names:
+    kind: DiagnosticResourceDefinition
+  items:
+  - - "kind": "CustomResourceDefinition" # CustomResourceDefinition ${opaque_fixture_token}
+  notkind: CustomResourceDefinition
+  message: "kind: CustomResourceDefinition"
+  doubleQuoted: "Diagnostic detail:
+    kind: Z${opaque_fixture_token}
+    password: ${short_fixture_token}
+    done"
+  singleQuoted: 'Diagnostic detail:
+    kind: Z${opaque_fixture_token}
+    token: ${short_fixture_token}
+    done'
+  unrelated: ${opaque_fixture_token}
+EOF
+printf '{"kind":"CustomResourceDefinition","notkind":"CustomResourceDefinition","message":"kind: CustomResourceDefinition","unrelated":"%s"}\n' \
+  "${opaque_fixture_token}" > "${fixture_dir}/cluster-scoped-resources/core/resource-kinds.json"
+cp "${fixture_dir}/cluster-scoped-resources/core/resource-kinds.json" "${fixture_dir}/cluster-scoped-resources/core/resource-kinds.jsonl"
+jq -n --arg opaque "${opaque_fixture_token}" '{kind: "CustomResourceDefinition", "prefix\"kind": ("Z" + $opaque), diagnostics: [{kind: ("diagnostic \"Z" + $opaque)}, {kind: "diagnostic \"CustomResourceDefinition"}]}' > "${fixture_dir}/cluster-scoped-resources/core/kind-boundaries.json"
+jq -c '.' "${fixture_dir}/cluster-scoped-resources/core/kind-boundaries.json" > "${fixture_dir}/cluster-scoped-resources/core/kind-boundaries.jsonl"
+cat > "${fixture_dir}/cluster-scoped-resources/core/plain-quoted-continuations.yaml" <<EOF
+double:
+  message: normal diagnostic
+    "quoted fragment
+  kind: CustomResourceDefinition
+  token: |
+    ${short_fixture_token}
+  following: retained
+single:
+  message: normal diagnostic
+    'quoted fragment
+  kind: CustomResourceDefinition
+  token: |
+    ${short_fixture_token}
+  following: retained
+listLike:
+  message: normal diagnostic
+    - "quoted fragment
+  kind: CustomResourceDefinition
+  token: |
+    ${short_fixture_token}
+  following: retained
+deferred:
+  message:
+    normal diagnostic
+    - "quoted fragment
+  kind: CustomResourceDefinition
+  token: |
+    ${short_fixture_token}
+  following: retained
+EOF
+cat > "${fixture_dir}/cluster-scoped-resources/core/quoted-scalar-starts.yaml" <<EOF
+deferred:
+  "diagnostic
+  kind: Z${opaque_fixture_token}
+  done"
+anchored: &detail "diagnostic
+  kind: Z${opaque_fixture_token}
+  done"
+items:
+- "diagnostic
+  kind: Z${opaque_fixture_token}
+  done"
+kind: CustomResourceDefinition
+password: ${short_fixture_token}
+following: retained
+EOF
 
 cat > "${fixture_dir}/cluster-scoped-resources/core/nodes.yaml" <<EOF
 apiVersion: v1
@@ -544,6 +677,42 @@ azure_extract_dir="${work_dir}/azure-extracted"
 mkdir -p "${azure_extract_dir}"
 tar -xzf "${azure_archive}" -C "${azure_extract_dir}" || fail "Azure archive extraction failed"
 diff -r "${extract_dir}/output" "${azure_extract_dir}/output" > /dev/null || fail "AWS and Azure sanitized dump contents differ"
+
+# Verify semantic content on BOTH extracted archives, not just tar readability.
+# Collect all three findings so one parser failure cannot mask the others.
+content_failures=0
+for provider_output in "${extract_dir}/output" "${azure_extract_dir}/output"; do
+  content_dir="${provider_output}/cluster-scoped-resources/core"
+  if ! yq -e '.spec.literal | contains("before the trailing diagnostic.")' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1 ||
+     ! yq -e '.spec.folded | contains("before the trailing diagnostic.")' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1 ||
+     ! yq -e '.spec.plain | contains("before the trailing diagnostic.")' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1 ||
+     ! yq -e '.spec.quoted | contains("before the trailing diagnostic.")' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1 ||
+     ! yq -e '.spec.repeated | (contains("between") and contains("before the trailing diagnostic."))' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1 ||
+     ! yq -e '.spec.following == "retained" and (.spec.material | contains("REDACTED_PEM"))' "${content_dir}/certificate-descriptions.yaml" > /dev/null 2>&1; then
+    echo "FAIL: certificate-description YAML structure or siblings were damaged" >&2
+    content_failures=$((content_failures + 1))
+  fi
+  if ! yq -o=json '.' "${content_dir}/field-ownership.yaml" 2> /dev/null | jq -e '.metadata.managedFields[0].fieldsV1."f:spec"."f:token" == {".": {}, "f:server": {}} and .metadata.managedFields[0].fieldsV1."f:spec"."f:password" == {} and .metadata.managedFields[0].fieldsV1."f:spec"."f:client-secret" == {"f:name": {}} and .metadata.managedFields[0].fieldsV1."f:spec"."f:diagnosticToken" == "REDACTED" and .metadata.managedFields[0].fieldsV1."f:spec"."f:inlineToken" == {"password": "REDACTED", "keep": "retained"} and .metadata.managedFields[1].fieldsV1."f:spec"."f:api-key" == {} and .spec.token == "REDACTED" and .spec."f:token" == "REDACTED" and .spec.following == "retained"' > /dev/null 2>&1; then
+    echo "FAIL: field-ownership keys were damaged or credential values escaped redaction" >&2
+    content_failures=$((content_failures + 1))
+  fi
+  if ! yq -e '.kind == "CustomResourceDefinition" and .spec.names.kind == "DiagnosticResourceDefinition" and .spec.items[0][0].kind == "CustomResourceDefinition" and .spec.notkind == "REDACTED_HIGH_ENTROPY" and .spec.message == "kind: REDACTED_HIGH_ENTROPY" and .spec.unrelated == "REDACTED_HIGH_ENTROPY"' "${content_dir}/resource-kinds.yaml" > /dev/null 2>&1 ||
+     ! jq -e '.kind == "CustomResourceDefinition" and .notkind == "REDACTED_HIGH_ENTROPY" and .message == "kind: REDACTED_HIGH_ENTROPY" and .unrelated == "REDACTED_HIGH_ENTROPY"' "${content_dir}/resource-kinds.json" > /dev/null 2>&1 ||
+     ! jq -e '.kind == "CustomResourceDefinition" and .notkind == "REDACTED_HIGH_ENTROPY" and .message == "kind: REDACTED_HIGH_ENTROPY" and .unrelated == "REDACTED_HIGH_ENTROPY"' "${content_dir}/resource-kinds.jsonl" > /dev/null 2>&1; then
+    echo "FAIL: resource kinds were damaged or exempted unrelated tokens" >&2
+    content_failures=$((content_failures + 1))
+  fi
+  assert_contains "${content_dir}/resource-kinds.yaml" '# REDACTED_HIGH_ENTROPY REDACTED_HIGH_ENTROPY'
+  yq -e '.spec.doubleQuoted | (contains("kind: REDACTED_HIGH_ENTROPY") and contains("password: REDACTED") and contains("done"))' "${content_dir}/resource-kinds.yaml" > /dev/null || fail "double-quoted diagnostic text acquired a structural exemption"
+  yq -e '.spec.singleQuoted | (contains("kind: REDACTED_HIGH_ENTROPY") and contains("token: REDACTED") and contains("done"))' "${content_dir}/resource-kinds.yaml" > /dev/null || fail "single-quoted diagnostic text acquired a structural exemption"
+  for kind_format in json jsonl; do
+    jq -e '.kind == "CustomResourceDefinition" and ."prefix\"kind" == "REDACTED_HIGH_ENTROPY" and (.diagnostics | all(.kind == "diagnostic \"REDACTED_HIGH_ENTROPY"))' "${content_dir}/kind-boundaries.${kind_format}" > /dev/null || fail "escaped JSON quote was mistaken for a kind key/value boundary"
+  done
+  yq -o=json '.' "${content_dir}/plain-quoted-continuations.yaml" | jq -e 'all(.[]; .kind == "CustomResourceDefinition" and .token == "REDACTED" and .following == "retained" and (.message | contains("quoted fragment")))' > /dev/null || fail "plain scalar text disabled subsequent credential redaction"
+  yq -o=json '.' "${content_dir}/quoted-scalar-starts.yaml" | jq -e '.kind == "CustomResourceDefinition" and .password == "REDACTED" and .following == "retained" and ([.deferred, .anchored, .items[0]] | all(contains("kind: REDACTED_HIGH_ENTROPY") and contains("done")))' > /dev/null || fail "quoted scalar lifecycle damaged diagnostics or exempted a token"
+  assert_not_contains "${provider_output}" "${short_fixture_token}"
+done
+[[ "${content_failures}" -eq 0 ]] || fail "${content_failures} archive content-integrity checks failed"
 
 # Inject a find failure only for the synchronous -print0 discovery. The step
 # must fail closed without publishing an archive or exposing raw dump files.

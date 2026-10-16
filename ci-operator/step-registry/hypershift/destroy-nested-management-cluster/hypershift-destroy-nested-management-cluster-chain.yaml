@@ -109,6 +109,11 @@ chain:
           args_indent = -1
           args_pending_secret = 0
           yaml_scalar_indent = -1
+          yaml_path_depth = 0
+          yaml_scalar_quote = ""
+          yaml_plain_scalar_indent = -2
+          yaml_node_pending = 1
+          yaml_pending_indent = -1
           flow_capture = 0
           flow_depth = 0
           flow_quote = ""
@@ -149,7 +154,7 @@ chain:
         }
         function quote_context(line, position, format, quote, i, character) {
           if (format != "yaml" && format != "json") return ""
-          quote = ""
+          quote = format == "yaml" ? yaml_scalar_quote : ""
           for (i = 1; i < position; i++) {
             character = substr(line, i, 1)
             if (quote == "\"" && character == "\\") {
@@ -172,6 +177,7 @@ chain:
           mapping_key = ""
           mapping_key_indent = -1
           mapping_value_start = 0
+          if (format == "yaml" && yaml_scalar_quote != "") return 0
           position = 1
           while (substr(line, position, 1) ~ /[[:space:]]/ && position <= length(line)) position++
           # Nested YAML sequences can repeat list markers before a mapping key.
@@ -193,9 +199,13 @@ chain:
             while (substr(line, colon, 1) ~ /[[:space:]]/ && colon <= length(line)) colon++
             if (substr(line, colon, 1) != ":") return 0
           } else {
-            colon = index(substr(line, position), ":")
-            if (colon == 0) return 0
-            colon += position - 1
+            # A colon inside a plain YAML key (for example f:token) is not
+            # the mapping separator unless followed by whitespace or EOF.
+            for (colon = position; colon <= length(line); colon++) {
+              next_character = substr(line, colon + 1, 1)
+              if (substr(line, colon, 1) == ":" && (next_character == "" || next_character ~ /[[:space:]]/)) break
+            }
+            if (colon > length(line)) return 0
             key = trim(substr(line, position, colon - position))
             if (key == "") return 0
           }
@@ -203,6 +213,65 @@ chain:
           mapping_value_start = colon + 1
           while (substr(line, mapping_value_start, 1) ~ /[[:space:]]/ && mapping_value_start <= length(line)) mapping_value_start++
           return 1
+        }
+        function update_yaml_path(line, indent) {
+          if (format != "yaml" || line ~ /^[[:space:]]*#/) return
+          if (line ~ /^(---|\.\.\.)[[:space:]]*(#.*)?$/) yaml_path_depth = 0
+          if (!parse_mapping(line)) return
+          indent = mapping_key_indent
+          while (yaml_path_depth > 0 && yaml_path_indent[yaml_path_depth] >= indent) yaml_path_depth--
+          yaml_path_name[++yaml_path_depth] = mapping_key
+          yaml_path_indent[yaml_path_depth] = indent
+        }
+        function yaml_open_scalar_quote(line, position, quote, scalar_indent, list_item) {
+          if (line ~ /^[[:space:]]*(#.*)?$/) return ""
+          if (line ~ /^(---|\.\.\.)[[:space:]]*(#.*)?$/) {
+            yaml_plain_scalar_indent = -2
+            yaml_node_pending = 1
+            yaml_pending_indent = -1
+            return ""
+          }
+          # A quote (or list marker) on a continuation of a plain scalar is
+          # ordinary text, not the start of a new YAML node.
+          if (yaml_plain_scalar_indent >= -1) {
+            if (indentation(line) > yaml_plain_scalar_indent) return ""
+            yaml_plain_scalar_indent = -2
+          }
+          if (parse_mapping(line)) {
+            position = mapping_value_start
+            scalar_indent = mapping_key_indent
+          } else {
+            scalar_indent = indentation(line)
+            position = scalar_indent + 1
+            list_item = 0
+            while (substr(line, position, 1) == "-" && (position == length(line) || substr(line, position + 1, 1) ~ /[[:space:]]/)) {
+              list_item = 1
+              scalar_indent = position - 1
+              position++
+              while (position <= length(line) && substr(line, position, 1) ~ /[[:space:]]/) position++
+            }
+            if (!list_item && !yaml_node_pending) return ""
+            # A deferred scalar belongs to its pending parent, not the
+            # indentation of its first content line.
+            if (!list_item) scalar_indent = yaml_pending_indent
+          }
+          if (match(substr(line, position), /^&[[:alnum:]_-]+([[:space:]]+|$)/)) position += RLENGTH
+          quote = substr(line, position, 1)
+          yaml_node_pending = quote == "" || quote == "#"
+          if (yaml_node_pending) yaml_pending_indent = scalar_indent
+          if ((quote == "\"" || quote == single_quote) && find_quote_end(line, position, quote) == 0) return quote
+          if (!yaml_node_pending && quote != "\"" && quote != single_quote && index("[]{}|>", quote) == 0) yaml_plain_scalar_indent = scalar_indent
+          return ""
+        }
+        function is_yaml_ownership_key(line, i, value) {
+          if (format != "yaml" || !parse_mapping(line) || mapping_key !~ /^f:/) return 0
+          value = trim(substr(line, mapping_value_start))
+          if (value != "" && value !~ /^(\{|#)/) return 0
+          for (i = 3; i < yaml_path_depth; i++) {
+            if (yaml_path_name[i - 2] == "metadata" && yaml_path_name[i - 1] == "managedfields" && \
+                yaml_path_name[i] == "fieldsv1") return 1
+          }
+          return 0
         }
         function yaml_block_scalar_indent(line, indent, position, value) {
           if (parse_mapping(line)) {
@@ -284,7 +353,7 @@ chain:
           value = trim(value)
           return value == "" || value == "sha1:" || value == "sha256:"
         }
-        function json_property_key_at(line, position, in_string, escaped, string_start, i, character, colon, key_end, key_open, key) {
+        function json_string_start_at(line, position, in_string, escaped, string_start, i, character) {
           in_string = 0
           string_start = 0
           escaped = 0
@@ -299,15 +368,18 @@ chain:
               string_start = i
             }
           }
-          if (!in_string) return ""
+          return in_string ? string_start : 0
+        }
+        function json_property_key_at(line, position, string_start, colon, key_end, key_open, key) {
+          string_start = json_string_start_at(line, position)
+          if (string_start == 0) return ""
           colon = string_start - 1
           while (colon > 0 && substr(line, colon, 1) ~ /[[:space:]]/) colon--
           if (substr(line, colon, 1) != ":") return ""
           key_end = colon - 1
           while (key_end > 0 && substr(line, key_end, 1) ~ /[[:space:]]/) key_end--
           if (substr(line, key_end, 1) != "\"") return ""
-          key_open = key_end - 1
-          while (key_open > 0 && substr(line, key_open, 1) != "\"") key_open--
+          key_open = json_string_start_at(line, key_end)
           if (key_open == 0) return ""
           key = substr(line, key_open + 1, key_end - key_open - 1)
           return normalize_json_string(key)
@@ -365,7 +437,23 @@ chain:
             substr(value, 20, 4) ~ /^[[:xdigit:]]+$/ && \
             substr(value, 25, 12) ~ /^[[:xdigit:]]+$/
         }
+        function is_resource_kind_value(value, line, start, value_start, quote) {
+          if (value !~ /^[A-Z][[:alnum:]]*$/) return 0
+          if (format == "yaml" && parse_mapping(line)) {
+            value_start = mapping_value_start
+            quote = substr(line, value_start, 1)
+            if (quote == "\"" || quote == single_quote) value_start++
+            return mapping_key == "kind" && start == value_start && \
+              unquote(substr(line, mapping_value_start)) == value
+          }
+          if (format == "json" || (format == "text" && is_json_line(line))) {
+            return json_property_key_at(line, start) == "kind" && \
+              json_string_start_at(line, start) == start - 1 && substr(line, start + length(value), 1) == "\""
+          }
+          return 0
+        }
         function is_resource_identifier(value, line, start, prefix) {
+          if (is_resource_kind_value(value, line, start)) return 1
           if (value !~ /^[a-z0-9]+(-[a-z0-9]+)+$/) return 0
           prefix = tolower(substr(line, 1, start - 1))
           gsub(/["']/, "", prefix)
@@ -658,7 +746,7 @@ chain:
           scalar_end = i - 1
           return anchor_prefix "REDACTED"
         }
-        function redact_fields(line, format, force, output, lower, offset, start, size, value_start, context, quote, end, direct, key_indent, local_key, local_value_start, value, position, value_prefix, relative, field_start, field_size, flag_start, flag_size, delimiter, character, matched_key) {
+        function redact_fields(line, format, force, output, lower, offset, start, size, value_start, context, quote, end, direct, key_indent, local_key, local_value_start, value, position, value_prefix, relative, field_start, field_size, flag_start, flag_size, delimiter, character, matched_key, ownership_value_start) {
           if (force && format == "yaml" && parse_mapping(line)) {
             value_prefix = substr(line, 1, mapping_value_start - 1)
             if (substr(line, mapping_value_start - 1, 1) == ":") value_prefix = value_prefix " "
@@ -670,7 +758,8 @@ chain:
           offset = 1
           direct = 0
           key_indent = -1
-          if (format == "yaml" && parse_mapping(line) && is_credential_name(mapping_key) && \
+          ownership_value_start = is_yaml_ownership_key(line) ? mapping_value_start : 0
+          if (format == "yaml" && ownership_value_start == 0 && parse_mapping(line) && is_credential_name(mapping_key) && \
               !preserve_diagnostic_field(mapping_key, substr(line, mapping_value_start, 1))) {
             local_key = mapping_key
             local_value_start = mapping_value_start
@@ -699,6 +788,13 @@ chain:
               size = flag_size
             }
             value_start = start + size
+            # fieldsV1 f: keys name owned fields, not credentials. Preserve
+            # only the key span; keep scanning the value and later fields.
+            if (ownership_value_start > 0 && start < ownership_value_start && value_start <= ownership_value_start) {
+              output = output substr(line, offset, ownership_value_start - offset)
+              offset = ownership_value_start
+              continue
+            }
             if (field_start > 0) {
               matched_key = credential_field_name(line, start, value_start)
               if (preserve_diagnostic_field(matched_key, substr(line, value_start, 1))) {
@@ -1082,7 +1178,9 @@ chain:
           }
         }
         function redact_pem(line, output, offset, marker_start, marker_end, begin_marker, marker_type, end_position) {
-          output = ""
+          # A closing marker may be followed by YAML scalar text. Keep that
+          # physical line's indentation when removing a continued PEM span.
+          output = pem_active ? substr(line, 1, indentation(line)) : ""
           offset = 1
           while (offset <= length(line)) {
             if (pem_active) {
@@ -1125,7 +1223,12 @@ chain:
           }
           return substr(line, 1, start - 1) "\"REDACTED\"" (comment > 0 ? " " substr(line, comment) : "")
         }
-        function process_line(line, force, output) {
+        function process_line(line, force, output, opening_quote, closing_quote) {
+          if (format == "yaml") {
+            if (yaml_scalar_quote != "") closing_quote = find_quote_end(line, 0, yaml_scalar_quote)
+            else opening_quote = yaml_open_scalar_quote(line)
+          }
+          update_yaml_path(line)
           output = redact_url_userinfo(line)
           output = redact_bearer(output)
           output = redact_aws_keys(output)
@@ -1138,6 +1241,8 @@ chain:
           # scanning it first could leave PEM state waiting for an unseen END.
           output = redact_pem(output)
           print redact_opaque_tokens(output)
+          if (closing_quote > 0) yaml_scalar_quote = ""
+          else if (opening_quote != "" && quoted_indent < 0 && block_indent < 0) yaml_scalar_quote = opening_quote
         }
         # Block-scalar bodies are literal diagnostic text, not YAML structure;
         # keep them out of flow/env/args state while still sanitizing each line.
@@ -1179,6 +1284,12 @@ chain:
             next
           }
           current_indent = indentation($0)
+          # Quoted continuations are scalar text too. Preserve quote context
+          # for escaping, but never interpret embedded kind/env/fields as YAML.
+          if (format == "yaml" && yaml_scalar_quote != "") {
+            process_line($0, 0)
+            next
+          }
           if (format == "yaml" && yaml_scalar_indent >= 0) {
             if ($0 ~ /^[[:space:]]*$/ || current_indent > yaml_scalar_indent) {
               process_block_scalar_line($0)
