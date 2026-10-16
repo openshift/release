@@ -1,0 +1,1 @@
+../hub-deploy/telcov10n-functional-cnf-ran-hub-deploy-commands.sh
