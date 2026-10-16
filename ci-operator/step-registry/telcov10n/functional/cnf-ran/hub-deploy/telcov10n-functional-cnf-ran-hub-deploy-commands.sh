@@ -7,6 +7,14 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+ECO_CI_CD_ROOT="/eco-ci-cd"
+if [ "${COPY_ECO_CI_CD_TO_TEMP:-false}" = "true" ]; then
+  ECO_CI_CD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/eco-ci-cd.XXXXXX")"
+  cp -R /eco-ci-cd/. "${ECO_CI_CD_ROOT}/"
+  chmod -R u+rwX "${ECO_CI_CD_ROOT}"
+fi
+
+OCP_INVENTORY="${ECO_CI_CD_ROOT}/inventories/ocp-deployment"
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
 process_inventory() {
@@ -35,25 +43,25 @@ process_inventory() {
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 echo "Processing common group_vars"
-mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
+mkdir "${OCP_INVENTORY}/group_vars"
 
 find /var/group_variables/common/ -mindepth 1 -type d | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+  process_inventory "$dir" "${OCP_INVENTORY}/group_vars/$(basename "${dir}")"
 done
 
 echo "Processing cluster group_vars (${CLUSTER_NAME})"
 find "/var/group_variables/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+  process_inventory "$dir" "${OCP_INVENTORY}/group_vars/$(basename "${dir}")"
 done
 
 echo "Processing cluster host_vars (${CLUSTER_NAME})"
-mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
+mkdir "${OCP_INVENTORY}/host_vars"
 
 find "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/" -mindepth 1 -type d | while read -r dir; do
   echo "  host_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
+  process_inventory "$dir" "${OCP_INVENTORY}/host_vars/$(basename "${dir}")"
 done
 
 # fthub-01, kni-qe-106 and kni-qe-110 share the same hypervisor (helix107), but ci-operator
@@ -61,24 +69,24 @@ done
 if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ]; then
   echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from fthub-01 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/fthub-01/hypervisor" \
-    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    "${OCP_INVENTORY}/host_vars/hypervisor"
 fi
 
 # kni-qe-111 uses helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
 if [ "${CLUSTER_NAME}" = "kni-qe-111" ]; then
   echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from kni-qe-108 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-108/hypervisor" \
-    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    "${OCP_INVENTORY}/host_vars/hypervisor"
 fi
 
 # kni-qe-133 uses helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
 if [ "${CLUSTER_NAME}" = "kni-qe-133" ]; then
   echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from kni-qe-108 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-108/hypervisor" \
-    /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    "${OCP_INVENTORY}/host_vars/hypervisor"
 fi
 
-cd /eco-ci-cd
+cd "${ECO_CI_CD_ROOT}"
 
 
 echo "Running deploy-ocp-sno for ${CLUSTER_NAME} (version=${VERSION}) arch=${ARCH}"
@@ -92,8 +100,8 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml \
   --extra-vars "${EXTRA_VARS}"
 
 echo "Copying inventory to SHARED_DIR"
-cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
-cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
+cp -r "${OCP_INVENTORY}/host_vars/"* "${SHARED_DIR}"/
+cp -r "${OCP_INVENTORY}/group_vars/"* "${SHARED_DIR}"/
 
 echo "Preserving seed hub inventory with seed- prefix for later restore"
 for key in bastion hypervisor master0 all bastions hypervisors nodes masters; do
@@ -103,8 +111,8 @@ done
 echo "Getting hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g")
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${OCP_INVENTORY}/host_vars/bastion" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${OCP_INVENTORY}/group_vars/all" | sed "s/'//g")
 
 cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
 chmod 600 "/tmp/temp_ssh_key"
