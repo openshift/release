@@ -2,6 +2,20 @@
 
 set -euo pipefail
 
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+    if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+        echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+        exit 1
+    fi
+    export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+    if [[ ! -s "${KUBECONFIG}" ]]; then
+        echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+        exit 1
+    fi
+elif [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 EXPLAIN="${EXPLAIN:-false}"
 JUNIT_REPORT="${JUNIT_REPORT:-false}"
 
@@ -25,10 +39,6 @@ function set_proxy () {
         echo "no proxy setting."
     fi
 }
-
-if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-fi
 
 set_proxy
 

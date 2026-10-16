@@ -1,0 +1,43 @@
+chain:
+  as: hypershift-e2e-backuprestore-cross-cluster
+  steps:
+  - as: tests
+    cli: latest
+    commands: |-
+      git clone --branch restore_cross_cluster https://github.com/mgencur/hypershift.git /tmp/hypershift-src
+      cd /tmp/hypershift-src
+      GO111MODULE=on GOWORK=off GOFLAGS=-mod=vendor go test -gcflags=all='-N -l' -tags e2ev2,backuprestore -c -o bin/test-backuprestore ./test/e2e/v2/tests
+
+      export PATH="/hypershift/bin:${PATH}"
+      export E2E_HOSTED_CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+      export E2E_HOSTED_CLUSTER_NAMESPACE="${E2E_HOSTED_CLUSTER_NAMESPACE:-clusters}"
+      export KUBECONFIG_SOURCE="${SHARED_DIR}/management_cluster_kubeconfig_source"
+      export KUBECONFIG_TARGET="${SHARED_DIR}/management_cluster_kubeconfig_target"
+      export AWS_GUEST_INFRA_CREDENTIALS_FILE=/etc/hypershift-ci-jobs-awscreds/credentials
+      export AWS_REGION=us-east-1
+      bin/test-backuprestore --ginkgo.v --ginkgo.junit-report=${ARTIFACT_DIR}/junit_cross_cluster_restore_report.xml --ginkgo.label-filter="cross-cluster-restore" --ginkgo.fail-fast=true --ginkgo.timeout=2h --ginkgo.no-color=true
+    timeout: 2h30m
+    grace_period: 5m
+    from: hypershift-tests
+    env:
+    - name: E2E_HOSTED_CLUSTER_NAMESPACE
+      default: clusters
+      documentation: "The namespace where the HostedCluster is restored."
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      group: ops/hypershift-ci-jobs-awscreds
+      collection: hypershift-team
+  - chain: hypershift-conformance
+  documentation: |-
+    Runs the cross-management-cluster HostedCluster backup and restore test.
+    The test creates its own backup on the source manager, pauses source
+    reconciliation, then deletes the source ExternalDNS Deployment and waits
+    for it to stop before restoring on the target manager. The target
+    ExternalDNS Deployment uses the shared TXT owner ID to take over Route 53
+    reconciliation and update DNS targets to its router. AWS guest
+    infrastructure credentials are available through
+    AWS_GUEST_INFRA_CREDENTIALS_FILE.
