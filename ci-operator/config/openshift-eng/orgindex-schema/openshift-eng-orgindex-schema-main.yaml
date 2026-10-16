@@ -8,9 +8,16 @@ images:
   items:
   - dockerfile_literal: |
       FROM src
-      RUN python3.12 -m pip install '.[dev]'
+      RUN python3.12 -m pip install uv '.[dev]'
     from: src
     to: tests-image
+  - dockerfile_literal: |
+      FROM src
+      # Install the package + dev tools resolved to the LOWEST allowed direct
+      # versions (e.g. pydantic==2.7) so the declared floors are actually tested.
+      RUN python3.12 -m pip install uv && uv pip install --system --resolution lowest-direct '.[dev]'
+    from: src
+    to: tests-image-min
 resources:
   '*':
     requests:
@@ -48,6 +55,19 @@ tests:
   commands: |
     export HOME=/tmp
     python3.12 scripts/schema_compat.py
+  container:
+    from: tests-image
+- as: minimum-versions
+  commands: |
+    export HOME=/tmp
+    # Floors are baked into tests-image-min at build time; just run the suite.
+    python3.12 -m pytest
+  container:
+    from: tests-image-min
+- as: lock-check
+  commands: |
+    export HOME=/tmp
+    uv lock --check
   container:
     from: tests-image
 zz_generated_metadata:
