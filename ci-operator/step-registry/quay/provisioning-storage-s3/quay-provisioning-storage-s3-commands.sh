@@ -33,7 +33,8 @@ new_s3_bucket_name() {
   printf 'quayprowci-%s\n' "${suffix}"
 }
 
-mkdir -p QUAY_AWS && cd QUAY_AWS
+WORKDIR="$(mktemp -d)"
+cd "${WORKDIR}"
 cat >variables.tf <<EOF
 variable "region" {
   default = "${S3_REGION}"

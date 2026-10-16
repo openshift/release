@@ -44,6 +44,11 @@ for _ in $(seq 1 30); do
 done
 oc get crd quayregistries.quay.redhat.com &>/dev/null || { echo "ERROR: QuayRegistry CRD not available; is the Quay operator installed?" >&2; exit 1; }
 
+# The image's working directory is not writable, and the bundle carries secrets,
+# so build it in a private scratch dir rather than ARTIFACT_DIR.
+WORKDIR="$(mktemp -d)"
+cd "${WORKDIR}"
+
 # Build the config bundle. Start with the same feature defaults quay-deploy-aws-s3
 # uses (minus the storage block, which the backend fragment owns), then append the
 # storage contract. The two documents have disjoint top-level keys, so a plain
