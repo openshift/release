@@ -175,7 +175,7 @@ function make_up_ansible_playbook {
       - name: Running the ${TELCO_KPI_TEST_NAME} test
         ansible.builtin.shell: |
           mkdir -pv {{ _remote_telco_ran_integration_repo }}
-          podman run --rm -ti \
+          podman run --ulimit nproc=65536:65536 --rm -ti \
               \
               -e KUBECONFIG={{ _remote_kubeconfig }} \
               -e SCRIPTS_DIR="{{ _remote_telco_ran_integration_repo }}/scripts" \
