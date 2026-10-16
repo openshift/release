@@ -21,7 +21,18 @@ PATH="${PATH}:$(pwd)/_output/tools/bin"
 export PATH
 export MCP_CONFIG_DIR=dev/config/mcp-configs
 
-trap 'make stop-server || true' EXIT
+netobserv_mock=false
+netobserv_port_forward=false
+cleanup() {
+    make stop-server || true
+    if [[ "${netobserv_port_forward}" == true ]]; then
+        make stop-netobserv || true
+    fi
+    if [[ "${netobserv_mock}" == true ]]; then
+        make teardown-netobserv || true
+    fi
+}
+trap cleanup EXIT
 
 GOFLAGS='' make mcpchecker
 
@@ -30,6 +41,47 @@ GOFLAGS='' make mcpchecker
 # env signals and pass MCP_EVAL_KUBECONFIG so make run-server targets the IPI cluster 
 unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
 export MCP_EVAL_KUBECONFIG="${KUBECONFIG}"
+
+# Only install prerequisites needed by this suite on the IPI OpenShift cluster.
+# Unset in-cluster env signals before any setup target uses the kubeconfig.
+case "${EVAL_SUITE:-}" in
+    ""|helm|cni-diagnostics) ;;
+    core) ;;
+    argocd)
+        if ! oc get crd applications.argoproj.io appprojects.argoproj.io \
+            applicationsets.argoproj.io argocds.argoproj.io >/dev/null 2>&1; then
+            make argocd-install
+        fi
+        ;;
+    tekton)
+        if ! oc get crd pipelines.tekton.dev >/dev/null 2>&1; then
+            make tekton-install
+        fi
+        ;;
+    netobserv)
+        # Task assertions expect the mock's localhost debug endpoint.
+        if ! oc -n netobserv get deployment/netobserv-plugin >/dev/null 2>&1; then
+            netobserv_mock=true
+            netobserv_port_forward=true
+            make setup-netobserv
+        else
+            oc -n netobserv port-forward svc/netobserv-plugin 9001:9001 >/dev/null 2>&1 &
+            echo $! > .netobserv-pf.pid
+            netobserv_port_forward=true
+        fi
+        ;;
+    ovn-kubernetes)
+        if ! oc -n openshift-ovn-kubernetes get pods -l app=ovnkube-node \
+            --field-selector=status.phase=Running -o name | grep -q .; then
+            echo "ERROR: ovn-kubernetes eval requires running ovnkube-node pods" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "ERROR: unsupported EVAL_SUITE: ${EVAL_SUITE}" >&2
+        exit 1
+        ;;
+esac
 
 GOFLAGS='-mod=readonly' make run-server TOOLSETS="${TOOLSETS}"
 
