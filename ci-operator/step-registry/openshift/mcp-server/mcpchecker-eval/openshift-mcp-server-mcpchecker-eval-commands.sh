@@ -62,9 +62,13 @@ case "${EVAL_SUITE:-}" in
         # Task assertions expect the mock's localhost debug endpoint.
         if ! oc -n netobserv get deployment/netobserv-plugin >/dev/null 2>&1; then
             netobserv_mock=true
+            netobserv_port_forward=true
+            make setup-netobserv
+        else
+            oc -n netobserv port-forward svc/netobserv-plugin 9001:9001 >/dev/null 2>&1 &
+            echo $! > .netobserv-pf.pid
+            netobserv_port_forward=true
         fi
-        netobserv_port_forward=true
-        make setup-netobserv
         ;;
     ovn-kubernetes)
         if ! oc -n openshift-ovn-kubernetes get pods -l app=ovnkube-node \
