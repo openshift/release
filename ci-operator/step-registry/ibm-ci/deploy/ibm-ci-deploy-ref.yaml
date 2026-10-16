@@ -1,0 +1,28 @@
+ref:
+  as: ibm-ci-deploy
+  commands: ibm-ci-deploy-commands.sh
+  credentials:
+  - mount_path: /var/run/ibm-ci
+    name: ibm-ci
+    namespace: test-credentials
+  documentation: |-
+    Deploy IBM Spyre operator to target hardware via Ansible.
+
+    This step:
+    1. Extracts SSH private key from Vault (base64-encoded)
+    2. Copies pull secret from Vault
+    3. Generates Ansible inventory from IBM_HOST env var
+    4. Runs 'make -C ansible install' to deploy the operator
+
+    Required Vault secrets:
+    - /var/run/ibm-ci/private-key: Base64-encoded SSH private key
+    - /var/run/ibm-ci/pull-secret: Pull secret JSON for image registry access
+  env:
+  - default: nvd-srv-38.nvidia.eng.rdu2.dc.redhat.com
+    name: IBM_HOST
+  from: ibm-ci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 3h0m0s
