@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+
+if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+  echo "Skipping work step: skip-work-steps marker is present."
+  exit 0
+fi
 export TEST_FEATURES=nvidiagpu
 export TEST_LABELS=nvidia-ci,gpu
 export TEST_VERBOSE=true
