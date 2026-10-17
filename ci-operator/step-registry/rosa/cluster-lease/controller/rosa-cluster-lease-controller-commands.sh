@@ -1078,7 +1078,7 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     CM=$(echo "${ACTUAL_CMS}" | jq ".items[${i}]")
     CM_NAME=$(echo "${CM}" | jq -r '.metadata.name')
     CLUSTER_ID=$(echo "${CM}" | jq -r '.data["cluster-id"]')
-    ERROR_AT=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-at"] // ""')
+    ERROR_AT=$(echo "${CM}" | jq -r '(.metadata.annotations["rosa-cluster-lease/error-at"] | select(. != "")) // .metadata.creationTimestamp // ""')
 
     if [[ -z "${ERROR_AT}" ]]; then
         continue
