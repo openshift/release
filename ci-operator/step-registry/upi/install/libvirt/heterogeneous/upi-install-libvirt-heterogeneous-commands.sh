@@ -43,15 +43,6 @@ case "${ADDITIONAL_WORKER_ARCHITECTURE:-}" in
     ;;
 esac
 
-# DOMAIN_MEMORY is shared with upi-install-libvirt, which expects MiB. This step's
-# cluster-profile domain templates historically expect KiB (default 25156824).
-# Values below 1e6 are treated as MiB and converted; larger values are left as KiB.
-if [[ -n "${DOMAIN_MEMORY:-}" && "${DOMAIN_MEMORY}" =~ ^[0-9]+$ && "${DOMAIN_MEMORY}" -lt 1000000 ]]; then
-  echo "DOMAIN_MEMORY=${DOMAIN_MEMORY} looks like MiB (shared with primary install); converting to KiB for domain templates"
-  DOMAIN_MEMORY="$((DOMAIN_MEMORY * 1024))"
-  export DOMAIN_MEMORY
-fi
-
 # Ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "ERROR: Failed to acquire lease (LEASED_RESOURCE is unset)"
@@ -118,6 +109,29 @@ fi
 if ! grep -q "${STREAM_ARCH}" "${RUN_TEMPLATE}"; then
   echo "ERROR: ${RUN_TEMPLATE} does not contain arch='${STREAM_ARCH}'"
   exit 1
+fi
+
+# DOMAIN_MEMORY is shared with upi-install-libvirt (MiB). Domain templates may use
+# unit=MiB (amd64 VPN) or KiB / unitless (libvirt default). Align the numeric value
+# to the template unit. Values < 1e6 are treated as MiB; larger as KiB.
+if [[ -n "${DOMAIN_MEMORY:-}" && "${DOMAIN_MEMORY}" =~ ^[0-9]+$ ]]; then
+  if grep -Eiq "unit=['\"]MiB['\"]" "${INSTALL_TEMPLATE}"; then
+    if [[ "${DOMAIN_MEMORY}" -ge 1000000 ]]; then
+      echo "INSTALL_TEMPLATE uses unit=MiB; converting DOMAIN_MEMORY=${DOMAIN_MEMORY} KiB → $((DOMAIN_MEMORY / 1024)) MiB"
+      DOMAIN_MEMORY="$((DOMAIN_MEMORY / 1024))"
+      export DOMAIN_MEMORY
+    else
+      echo "INSTALL_TEMPLATE uses unit=MiB; using DOMAIN_MEMORY=${DOMAIN_MEMORY} MiB as-is"
+    fi
+  else
+    if [[ "${DOMAIN_MEMORY}" -lt 1000000 ]]; then
+      echo "INSTALL_TEMPLATE expects KiB; converting DOMAIN_MEMORY=${DOMAIN_MEMORY} MiB → $((DOMAIN_MEMORY * 1024)) KiB"
+      DOMAIN_MEMORY="$((DOMAIN_MEMORY * 1024))"
+      export DOMAIN_MEMORY
+    else
+      echo "INSTALL_TEMPLATE expects KiB; using DOMAIN_MEMORY=${DOMAIN_MEMORY} KiB as-is"
+    fi
+  fi
 fi
 
 HOSTNAME_PRIMARY="$(leaseLookup 'hostname')"
@@ -556,7 +570,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   # Whitelist — cover all network var names used by cluster-profile domain templates.
   TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $ADDITIONAL_NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC'
 
-  echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME}, memory_kib=${DOMAIN_MEMORY}, vcpus=${DOMAIN_VCPUS})..."
+  echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME}, memory=${DOMAIN_MEMORY}, vcpus=${DOMAIN_VCPUS})..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
   envsubst "${TEMPLATE_VARS}" < "${INSTALL_TEMPLATE}" > "${domain_install_xml}"
 
