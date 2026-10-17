@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Run the readiness script with synthetic API reads and accelerated polling time."""
+
 import json
 import os
 from pathlib import Path
@@ -15,6 +17,8 @@ SCRIPT = ROOT / ("ci-operator/step-registry/rosa/cluster/wait-ready/hosted-cp/"
 
 
 class RosaHCPReadinessTests(unittest.TestCase):
+    """Exercise diagnostics without cluster access or production-length waits."""
+
     def setUp(self):
         self.directory = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.directory)
@@ -29,6 +33,7 @@ class RosaHCPReadinessTests(unittest.TestCase):
             "TEST_DIR": str(self.directory),
             "TEST_MODE": "success",
             "TEST_DIAGNOSTIC_STATUS": "0",
+            "TEST_DIAGNOSTIC_DELAY": "0",
             "TEST_TIMEOUT": shutil.which("timeout"),
             "TEST_SLEEP_STATUS": "0",
             "TEST_API_ERROR": "Forbidden: https://synthetic.invalid token=DO-NOT-PRINT",
@@ -61,7 +66,13 @@ exit "${TEST_SLEEP_STATUS}"
 echo "timeout $*" >> "${TEST_DIR}/calls"
 [[ "$1 $2 $3" == "--kill-after=5s 20s oc" ]] || exit 90
 shift 2
-exec "${TEST_TIMEOUT}" --kill-after=1s 0.2s "$@"
+deadline=5s
+[[ "$TEST_DIAGNOSTIC_STATUS" != hang ]] || deadline=0.5s
+echo "diagnostic deadline ${deadline}" >> "${TEST_DIR}/calls"
+"${TEST_TIMEOUT}" --kill-after=1s "$deadline" "$@"
+status=$?
+echo "diagnostic deadline exit ${status}" >> "${TEST_DIR}/calls"
+exit "$status"
 ''')
         self.write_executable("oc", r'''#!/bin/bash
 echo "oc $*" >> "${TEST_DIR}/calls"
@@ -98,6 +109,7 @@ case "$*" in
       echo 'DO-NOT-PRINT diagnostic error' >&2
       exit "$TEST_DIAGNOSTIC_STATUS"
     fi
+    /bin/sleep "${TEST_DIAGNOSTIC_DELAY}"
     if [[ "$*" == *get\ pods* ]]; then
       cat "${TEST_DIR}/pods.json"
     else
@@ -133,10 +145,11 @@ esac
         path.chmod(0o755)
 
     def run_script(self, mode, diagnostic_status=0):
+        """Allow two 5s reads plus 1s kill grace each, with 18s setup/polling slack."""
         self.environment.update(TEST_MODE=mode, TEST_DIAGNOSTIC_STATUS=str(diagnostic_status))
         result = subprocess.run(["bash", str(self.script)], env=self.environment,
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                check=False, timeout=15)
+                                check=False, timeout=30)
         self.assertNotIn("DO-NOT-PRINT", result.stdout)
         self.assertNotIn("synthetic-credential", result.stdout)
         self.assertNotIn("synthetic-kubeconfig", result.stdout)
@@ -175,7 +188,9 @@ esac
 
     def test_api_error_is_sanitized_and_reported_only_once(self):
         for error, category in (("Forbidden", "Forbidden"), ("Unauthorized", "Unauthorized"),
-                                ("timed out", "Timeout"), ("x509: failure", "TLS error"),
+                                ("timed out", "Timeout"), ("i/o timeout", "Timeout"),
+                                ("net/http: TLS handshake timeout", "Timeout"),
+                                ("x509: failure", "TLS error"),
                                 ("no such host", "Connection error"),
                                 ("unexpected failure", "API request failed (details omitted)")):
             with self.subTest(category=category):
@@ -195,6 +210,41 @@ esac
         self.assertIn("Pod diagnostics unavailable", result.stdout)
         self.assertIn("Event diagnostics unavailable", result.stdout)
 
+    def test_absent_diagnostic_reasons_remain_null(self):
+        """Distinguish absent reasons from unknown values without leaking strings."""
+        fixture = self.directory / "pods.json"
+        pod = json.loads(fixture.read_text())["items"][0]
+        pod["status"]["phase"] = "Running"
+        pod["status"]["conditions"] = [
+            {"type": "Ready", "status": "True"},
+            {"type": "ContainersReady", "status": "True", "reason": None},
+            {"type": "Initialized", "status": "True", "reason": "DO-NOT-PRINT"},
+        ]
+        pod["status"]["containerStatuses"] = [
+            {"ready": True, "state": {"running": {}}},
+            {"ready": False, "state": {"waiting": {"reason": "DO-NOT-PRINT"}}},
+        ]
+        fixture.write_text(json.dumps({"items": [pod]}))
+        result = self.run_script("pending")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        summary = next(json.loads(line) for line in result.stdout.splitlines()
+                       if line.startswith('{"totalPods"'))["pods"][0]
+        self.assertIsNone(summary["conditions"][0]["reason"])
+        self.assertIsNone(summary["conditions"][1]["reason"])
+        self.assertIsNone(summary["containers"][0]["waitingReason"])
+        self.assertEqual(summary["conditions"][2]["reason"], "Other")
+        self.assertEqual(summary["containers"][1]["waitingReason"], "Other")
+
+    def test_successful_diagnostic_reads_have_scheduling_slack(self):
+        """Successful 0.4s reads exceed the former 0.2s fixture deadline."""
+        self.environment["TEST_DIAGNOSTIC_DELAY"] = "0.4"
+        result = self.run_script("pending")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn('"totalPods"', result.stdout)
+        self.assertIn('"warningEvents"', result.stdout)
+        self.assertNotIn("diagnostics unavailable", result.stdout)
+        self.assertEqual(self.calls.read_text().count("diagnostic deadline 5s"), 2)
+
     def test_failed_retry_sleep_preserves_original_status(self):
         self.environment["TEST_SLEEP_STATUS"] = "42"
         result = self.run_script("pending", 7)
@@ -212,10 +262,14 @@ esac
         self.assertNotIn("synthetic.invalid", result.stdout)
 
     def test_diagnostic_timeout_preserves_wait_status(self):
+        """Two real deadlines must terminate 30s hangs and preserve wait failure."""
         result = self.run_script("pending", "hang")
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("Pod diagnostics unavailable", result.stdout)
         self.assertIn("Event diagnostics unavailable", result.stdout)
+        calls = self.calls.read_text()
+        self.assertEqual(calls.count("diagnostic deadline 0.5s"), 2)
+        self.assertEqual(calls.count("diagnostic deadline exit 124"), 2)
 
     def test_large_diagnostic_response_is_bounded(self):
         (self.directory / "pods.json").write_text('{"items":[' + ' ' * 1048576)

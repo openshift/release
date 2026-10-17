@@ -134,7 +134,7 @@ pod_api_error() {
   case "${1}" in
     *Forbidden*|*forbidden*) echo "Forbidden" ;;
     *Unauthorized*|*unauthorized*) echo "Unauthorized" ;;
-    *timed\ out*|*Timeout*|*deadline\ exceeded*) echo "Timeout" ;;
+    *timed\ out*|*timeout*|*Timeout*|*deadline\ exceeded*) echo "Timeout" ;;
     *x509:*|*TLS*) echo "TLS error" ;;
     *connection\ refused*|*no\ such\ host*) echo "Connection error" ;;
     *) echo "API request failed (details omitted)" ;;
@@ -144,7 +144,8 @@ pod_api_error() {
 diagnose_pods() (
   set +x
   local sanitize='
-    def allowed($values): . as $value | if ($values | index($value)) != null then $value else "Other" end;
+    def allowed($values): . as $value | if $value == null then null
+      elif ($values | index($value)) != null then $value else "Other" end;
     def numeric: if type == "number" then . else null end;
     def reason: allowed(["BackOff", "Completed", "ContainerCannotRun", "ContainerCreating",
       "ContainersNotReady", "CrashLoopBackOff", "CreateContainerConfigError", "CreateContainerError",
