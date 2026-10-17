@@ -24,6 +24,11 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 trap '_opp_cleanup' EXIT
 
 echo ">>> PHASE: initialization"
@@ -78,7 +83,7 @@ function GenerateJunit () {
     cat > "${junitFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="interop-tests-opp-quay-smoke" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
+  <testsuite name="lp-interop--OPP--quay-smoke" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
 EOF
 
     for t in "${allTests[@]}"; do
@@ -88,11 +93,11 @@ EOF
         escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"lp-interop--OPP--quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"lp-interop--OPP--quay-smoke\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"lp-interop--OPP--quay-smoke\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -110,7 +115,47 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; GenerateJunit; _propagate_junit' EXIT
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_step_quay_smoke.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--quay-smoke" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_step_quay_smoke.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_step_quay_smoke.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_finalize_exit() {
+  local rc=$?
+  set +e
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  (exit "${rc}"); _opp_cleanup
+  GenerateJunit
+  _propagate_junit
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
@@ -603,17 +648,26 @@ function Main () {
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "skipped" "Quay not deployed"
         done
+        _JUNIT_KIND=pass
+        _JUNIT_MESSAGE="Skipped: Quay not deployed"
+        _EXIT_CLASS=success
         exit 0
     elif (( discoverRc != 0 )); then
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "failed" "QuayRegistry API query failed"
         done
+        _JUNIT_KIND="quay-discovery-failed"
+        _JUNIT_MESSAGE="QuayRegistry API query failed"
+        _EXIT_CLASS="infra"
         exit 1
     fi
     if ! GetQuayAuth; then
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "failed" "Quay credential retrieval failed"
         done
+        _JUNIT_KIND="quay-auth-failed"
+        _JUNIT_MESSAGE="Quay credential retrieval failed"
+        _EXIT_CLASS="infra"
         exit 1
     fi
     PreflightCheck || { echo "FATAL: Quay not reachable; skipping all tests" >&2; exit 1; }
@@ -641,6 +695,16 @@ function Main () {
             LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
                 ExitTrap--PostProcessPrep || true
         fi
+    fi
+
+    if (( status == 0 )); then
+        _JUNIT_KIND=pass
+        _JUNIT_MESSAGE="Quay smoke tests passed"
+        _EXIT_CLASS=success
+    else
+        _JUNIT_KIND="test-failures"
+        _JUNIT_MESSAGE="One or more Quay smoke tests failed"
+        _EXIT_CLASS="infra"
     fi
 
     exit "${status}"
