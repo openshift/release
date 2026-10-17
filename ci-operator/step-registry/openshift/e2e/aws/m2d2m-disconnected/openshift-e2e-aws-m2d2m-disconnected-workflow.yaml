@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-aws-m2d2m-disconnected
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-aws-pre-m2d2m-disconnected
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+  documentation: |-
+    The openshift-e2e-aws-m2d2m-disconnected workflow executes the common
+    end-to-end test suite on a disconnected AWS cluster using the two-phase
+    oc-mirror mirror-to-disk/disk-to-mirror (m2d2m) workflow.
+
+    The cluster is installed in a private VPC with no direct internet access.
+    A bastion host on the public subnet provides a mirror registry, egress
+    proxy, and SSH jump host.
+
+    Unlike openshift-e2e-aws-disconnected (which uses a single mirror-to-mirror
+    pass), this workflow first mirrors the release payload to a local disk archive
+    (with internet access), then pushes from the archive into the bastion mirror
+    registry with public internet access blocked via iptables on the bastion,
+    verifying that the import succeeds in a no-public-internet environment before
+    cluster installation proceeds.
