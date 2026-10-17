@@ -10,19 +10,76 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
     curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-)"; EnsureReqs jq
+)"; EnsureReqs jq yq
+
+eval "$(
+    curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+)"
 
 typeset -i startTime=$SECONDS
-
-trap 'DebugOnExit' EXIT
+typeset -r mergedJunitFN="junit--cnv__interop-tests__openshift-virtualization-upgrade-tests.xml"
 
 # shellcheck disable=SC2329
-# DebugOnExit — only triggers on infrastructure failures (non-zero exit before pytest runs).
-# pytest test failures (captured in JUnit XML) do NOT enter this path because the main
-# script body always exits 0 after RunCnvUpgradePytest. The debug hold is only for cases
-# where the step itself dies early (e.g. missing kubeconfig, virtctl install failure).
+# RunPostProcessPrep — merges/archives the JUnit XML(s) under ${ARTIFACT_DIR} and copies the
+# result to ${SHARED_DIR} via the shared library (same mechanism used by e.g. acm-tests-grc and
+# interop-tests-openshift-virtualization-tests), instead of a bespoke yq rename + manual cp.
+# Only set the Component Readiness rename (LP_IO__CR_COMP_NAME) when MAP_TESTS=true; the
+# merge/archive/copy-to-SHARED_DIR itself always runs so behavior is unchanged for callers that
+# don't opt into MAP_TESTS.
+# The library can return 0 ("success") even when it produced nothing at all -- e.g. when no
+# JUnit XML exists under ${ARTIFACT_DIR} (confirmed via local testing of the actual library
+# source) -- so explicitly verify the merged file landed in ${SHARED_DIR} and is well-formed
+# before treating post-processing as successful.
+RunPostProcessPrep() {
+    typeset newTsName=""
+    [[ "${MAP_TESTS}" == "true" ]] && newTsName="${LP_IO__CR_COMP_NAME}--%s"
+    typeset -i ppRC=0
+    LP_IO__ET_PPP__NEW_TS_NAME="${newTsName}" \
+        ExitTrap--PostProcessPrep "${mergedJunitFN}" || ppRC=$?
+    if (( ppRC != 0 )); then
+        : "ExitTrap--PostProcessPrep failed (rc=${ppRC})"
+        return "${ppRC}"
+    fi
+
+    typeset mergedFile="${SHARED_DIR}/${mergedJunitFN}"
+    if [[ ! -s "${mergedFile}" ]]; then
+        : "Merged JUnit XML missing or empty after post-processing: ${mergedFile}"
+        return 1
+    fi
+    if ! yq eval -px -ox '.' "${mergedFile}" 1>/dev/null; then
+        : "Merged JUnit XML failed validity check: ${mergedFile}"
+        return 1
+    fi
+    true
+}
+
+# shellcheck disable=SC2329
+# HandleExit — the EXIT trap handler. Kept as a dedicated function (rather than inlining the
+# variable assignment/use directly in the trap string) because shellcheck's SC2154 cannot track
+# intra-string variable flow within a single-quoted `trap '...' EXIT` body — any variable both
+# assigned and referenced purely inside such a string is flagged as "referenced but not
+# assigned", regardless of typeset/declare/-i/naming (confirmed locally with shellcheck v0.11.0).
+HandleExit() {
+    typeset -i _exitCode=$?
+    typeset -i _ppRC=0
+    RunPostProcessPrep || _ppRC=$?
+    DebugOnExit "${_exitCode}" "${_ppRC}"
+}
+
+trap 'HandleExit' EXIT
+
+# shellcheck disable=SC2329
+# DebugOnExit — exitCode is the script's own (pre-trap) exit status: nonzero only for
+# infrastructure failures that occur before/instead of the pytest run (the main script body
+# always exits 0 after RunCnvUpgradePytest, regardless of test failures, which are recorded in
+# JUnit and handled by Firewatch). ppRC is RunPostProcessPrep's result.
+# An existing primary (exitCode) failure always wins — preserved as-is, and it already triggers
+# the debug-hold path below. If the main script otherwise succeeded but post-processing failed,
+# surface that as the step's final exit status WITHOUT entering the (cluster-health-focused,
+# expensive) debug-hold path, since a reporting/merge failure is not an infrastructure issue.
 DebugOnExit() {
-    typeset -i exitCode=$?
+    typeset -i exitCode="${1:?}"; (($#)) && shift
+    typeset -i ppRC="${1:-0}"; (($#)) && shift
     typeset -i endTime=$SECONDS
     typeset -i executionTime=$((endTime - startTime))
     typeset hcoNamespace="openshift-cnv"
@@ -41,6 +98,9 @@ DebugOnExit() {
             sleep 120
         done
         rm -f /tmp/debug_marker
+    elif (( ppRC != 0 )); then
+        : "Post-processing failed (rc=${ppRC}) though main script otherwise succeeded -- surfacing as step failure"
+        exitCode=${ppRC}
     fi
 
     exit "${exitCode}"
@@ -72,20 +132,6 @@ RunMustGather() {
     mkdir -p "${mustGatherCnvDir}"
     oc adm must-gather --dest-dir="${mustGatherCnvDir}" --image="${image}" \
         -- /usr/bin/gather --vms_details | tee "${mustGatherCnvDir}"/must-gather-cnv.log || true
-    true
-}
-
-MapTestsForComponentReadiness() {
-    [[ "${MAP_TESTS}" != "true" ]] && return
-
-    typeset resultsFile="${1:-}"
-    : "Patching Tests Result File: ${resultsFile}"
-    if [[ -f "${resultsFile}" ]]; then
-        eval "$(
-            curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-        )"; EnsureReqs yq
-        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' "${resultsFile}"
-    fi
     true
 }
 
@@ -215,11 +261,8 @@ typeset -i exitCode=0
 
 RunCnvUpgradePytest "${hcoSubscription}" || exitCode=$?
 
-MapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
-
-if [[ -f "${JUNIT_RESULTS_FILE}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
-fi
+# JUnit XML is merged/archived and copied to ${SHARED_DIR} by RunPostProcessPrep's EXIT trap
+# (ExitTrap--PostProcessPrep), with the Component Readiness rename applied when MAP_TESTS=true.
 
 if (( exitCode != 0 )); then
     : "pytest exited ${exitCode} — test failures recorded in JUnit XML; step exits 0 to allow subsequent steps to run"

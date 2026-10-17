@@ -44,6 +44,9 @@ typeset virtctlBin="" sshKeyFile="" sshReady=false
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX:-}"
 typeset diagDir=""
 typeset pvcCheck="${MTV_PVC_CHECK:-true}"
+# JUnit <testsuite>/<testcase classname>; prefixed with LP_IO__CR_COMP_NAME (when set) so
+# Component Readiness can match this suite against a registered interop prefix.
+typeset junitSuiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}cclm-migration-verify${migrationSuffix}"
 # Unset-only defaults (${VAR-default}): an explicit empty value disables that
 # dest-vs-env assertion, matching the ref.yaml opt-out contract. :- would
 # replace empty with the default and make the documented skip impossible.
@@ -896,12 +899,12 @@ function WriteJunit () {
   {
     printf '<?xml version="1.0" encoding="UTF-8"?>\n'
     printf '<testsuites>\n'
-    printf '  <testsuite name="cclm-migration-verify%s" tests="%d" failures="%d" skipped="%d" time="%d">\n' \
-      "${migrationSuffix}" "${total}" "${failures}" "${skipped}" "${totalTime}"
+    printf '  <testsuite name="%s" tests="%d" failures="%d" skipped="%d" time="%d">\n' \
+      "${junitSuiteName}" "${total}" "${failures}" "${skipped}" "${totalTime}"
     while IFS=$'\t' read -r status name elapsed failMsg; do
       typeset escapedName; escapedName="$(XmlEscape "${name}")"
-      printf '    <testcase name="%s" classname="cclm-migration-verify%s" time="%d">\n' \
-        "${escapedName}" "${migrationSuffix}" "${elapsed}"
+      printf '    <testcase name="%s" classname="%s" time="%d">\n' \
+        "${escapedName}" "${junitSuiteName}" "${elapsed}"
       if [[ "${status}" == "FAIL" ]]; then
         typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
         printf '      <failure message="%s">%s</failure>\n' \
