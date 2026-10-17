@@ -9,7 +9,13 @@ tests:
       # Mailpit stays off and the @feature:MAILING specs self-skip.
       QUAY_DEPLOY_MAILPIT: "false"
 {%- endif %}
+{%- if auth_mode == "ldap" %}
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert_ldap }}'
+{%- elif auth_mode == "oidc" %}
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert_oidc }}'
+{%- else %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+{%- endif %}
 {%- if storage == "odf" %}
       SETUP_NOOBAA: "true"
       QUAY_STORAGE_PROVIDER: odf
@@ -49,6 +55,11 @@ tests:
     - ref: quay-provisioning-builder
     - ref: quay-deploy-mailpit
     - ref: quay-deploy-jaeger
+{%- if auth_mode == "ldap" %}
+    - ref: quay-deploy-openldap
+{%- elif auth_mode == "oidc" %}
+    - ref: quay-deploy-rhbk
+{%- endif %}
 {%- if storage == "odf" %}
     - ref: quay-install-odf-operator
 {%- endif %}

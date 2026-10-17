@@ -367,9 +367,10 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
-# so an explicit override still wins over the service-owned fragments. A
-# missing fragment is a silent no-op, leaving the disabled default above.
+# Merge order: Mailpit fragment -> OTel fragment -> IdP auth fragment ->
+# explicit QUAY_EXTRA_CONFIG, so an explicit override still wins over the
+# service-owned fragments. A missing fragment is a silent no-op, leaving the
+# disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
 	echo "Merging Mailpit config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
@@ -378,6 +379,12 @@ fi
 if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	echo "Merging Jaeger/OTel config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
+# Never print this fragment: an LDAP fragment carries LDAP_ADMIN_PASSWD.
+if [[ -s "${SHARED_DIR}/quay-auth-config.yaml" ]]; then
+	echo "Merging IdP auth config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-auth-config.yaml"
 fi
 
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
@@ -412,6 +419,12 @@ yq -i '
 		.EXTERNAL_TLS_TERMINATION
 	)
 ' config.yaml
+
+# Quay must trust the IdP's CA to reach its discovery/token endpoints.
+CONFIG_BUNDLE_EXTRA_FILES=()
+if [[ -s "${SHARED_DIR}/quay-auth-ca.crt" ]]; then
+  CONFIG_BUNDLE_EXTRA_FILES+=(--from-file extra_ca_cert_quay_auth.crt="${SHARED_DIR}/quay-auth-ca.crt")
+fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -459,10 +472,16 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
     --from-file config.yaml=./config.yaml \
     --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
     --from-file ssl.key="${SHARED_DIR}/ssl.key" \
-    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt" \
+    "${CONFIG_BUNDLE_EXTRA_FILES[@]}"
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret \
+    "${CONFIG_BUNDLE_EXTRA_FILES[@]}"
 fi
+
+# Quay rejects user/initialize unless AUTHENTICATION_TYPE is Database, so the
+# bootstrap below only runs then (or when the key is unset).
+QUAY_AUTH_TYPE="$(yq e '.AUTHENTICATION_TYPE // ""' config.yaml)"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -501,8 +520,12 @@ for i in $(seq 1 90); do
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    if [[ -n "${QUAY_AUTH_TYPE}" && "${QUAY_AUTH_TYPE}" != "Database" ]]; then
+      echo "AUTHENTICATION_TYPE is ${QUAY_AUTH_TYPE}: skipping user/initialize bootstrap; no quay_oauth2_token written" >&2
+    else
+      curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
+           --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    fi
     archive_pod_info
     exit 0
   fi
