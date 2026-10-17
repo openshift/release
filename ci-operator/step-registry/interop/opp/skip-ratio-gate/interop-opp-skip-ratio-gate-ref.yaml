@@ -4,8 +4,20 @@ ref:
   documentation: |-
     Scans JUnit XML files in JUNIT_DIR (or ARTIFACT_DIR) and computes
     the overall skip ratio. Fails the step if the ratio exceeds
-    SKIP_RATIO_THRESHOLD. Produces a summary JUnit XML in ARTIFACT_DIR
-    for Prow/Sippy consumption. Uses only Python stdlib.
+    SKIP_RATIO_THRESHOLD and FAIL_ON_BREACH is true. Produces a
+    summary JUnit XML in ARTIFACT_DIR for Prow/Sippy consumption.
+    Uses only Python stdlib (xml.etree).
+
+    Robust parsing: cross-validates the ``tests`` attribute against
+    actual <testcase> child counts, counts <failure> and <skipped>
+    children directly, and rejects empty files. A suite that declares
+    more tests than it provides <testcase> children is treated as
+    incomplete evidence; its missing cases are not counted as passed.
+
+    When evidence is incomplete or no valid test data is available
+    (no XML files, parse errors, inconsistent suite counts, or zero-test
+    suites), emits an EVIDENCE-INCOMPLETE JUnit result and exits 0 rather
+    than making a skip-ratio judgement on bad data.
   env:
   - default: "false"
     documentation: |-
