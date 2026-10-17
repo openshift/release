@@ -1,0 +1,34 @@
+ref:
+  as: upi-libvirt-cleanup-heterogeneous-pre
+  from: libvirt-installer
+  grace_period: 10m
+  commands: upi-libvirt-cleanup-heterogeneous-pre-commands.sh
+  env:
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+  - name: HTTPD_POOL_NAME
+    default: "httpd"
+  - name: ADDITIONAL_POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: "Pool name on the additional worker hypervisor"
+  - name: ADDITIONAL_LIBVIRT_PORT
+    default: "16509"
+    documentation: "Libvirt port on the additional worker bastion/hypervisor route"
+  - name: VXLAN_ADDITIONAL_BRIDGE
+    default: ""
+    documentation: |-
+      Optional expected additional-host VXLAN bridge when cleaning the lease-owned
+      libvirt network (ocp1-amd / ocp3-amd / ocp2-arm). Lease vxlan.additional-bridge wins.
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 300Mi
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+    - "bastion-ppc64le-libvirt.svc.cluster.local"
+  documentation: |-
+    Pre-cleanup for heterogeneous libvirt clusters covering primary (s390x) and additional
+    (arm64/amd64) hypervisors, including the lease-owned VXLAN bridge-forward network.
