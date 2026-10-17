@@ -1,0 +1,41 @@
+ref:
+  as: azure-il6-deprovision-resources
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-deprovision-resources-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The shared, permanent resource group. This step deletes resources INSIDE it and must never
+      delete the group itself.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The shared, permanent VNet. This step deletes subnets inside it and must never delete the
+      VNet itself.
+  documentation: |-
+    Removes the commercial-plane resources this job created inside the shared emulator resource
+    group: the bastion VM and its NIC, public IPs and OS disk, then the subnets and network
+    security groups that azure-il6-provision-subnets created.
+
+    Everything is matched on the ${NAMESPACE}-${UNIQUE_HASH} prefix recorded in
+    ${SHARED_DIR}/azure_il6_subnet_prefix, and the deletion order matters: a subnet cannot be
+    removed while a NIC is still attached to it.
+
+    This step exists so that the job's post chain never needs azure-deprovision-resourcegroup or
+    ipi-deprovision-azure-resourcegroup. Both of those delete whole resource groups, and in every
+    other Azure job that is correct because the group was created for the run. Here the group is
+    permanent: it holds the VPN gateway and the two IPsec tunnels to the emulator, which cannot be
+    recreated by CI. This step is deliberately incapable of deleting a resource group, a VNet, or
+    anything whose name does not carry this run's prefix.
+
+    Best-effort: every deletion is non-fatal, so a partial cleanup cannot mask the real failure
+    that a job is being torn down for.
