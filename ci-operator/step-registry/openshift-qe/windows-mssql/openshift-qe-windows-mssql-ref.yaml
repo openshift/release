@@ -1,0 +1,101 @@
+ref:
+  as: openshift-qe-windows-mssql
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-windows-mssql-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  - collection: perfci
+    group: benchmark-runner
+    field: windows_url
+    mount_path: /secret-perfci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e-benchmarking version tag to use
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube-burner-ocp version tag to use
+  - name: GC
+    default: "true"
+    documentation: |-
+      Clean up workload resources after run (default true)
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Enable local indexing for artifact collection
+  - name: MSSQL_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags passed to kube-burner-ocp windows-mssql workload
+  - name: STORAGE_CLASS
+    default: "lvms-nvme"
+    documentation: |-
+      StorageClass for DataVolumes (lvms-nvme for LVMS, ocs-storagecluster-ceph-rbd-virtualization for ODF)
+  - name: ACCESS_MODE
+    default: "RWO"
+    documentation: |-
+      PVC access mode: RWO for LVMS, RWX for ODF
+  - name: EVICTION_STRATEGY
+    default: "None"
+    documentation: |-
+      VM eviction strategy: None for LVMS, LiveMigrate for ODF
+  - name: PER_NODE_DV
+    default: "true"
+    documentation: |-
+      Create one source DataVolume per worker node (required for LVMS)
+  - name: USE_SNAPSHOT
+    default: "false"
+    documentation: |-
+      Use VolumeSnapshot API for data disk provisioning (ODF backend)
+  - name: VM_CPUS
+    default: "32"
+    documentation: |-
+      Number of CPUs for the SQL Server VM
+  - name: VM_MEMORY
+    default: "32Gi"
+    documentation: |-
+      Memory allocation for the SQL Server VM
+  - name: VMS_PER_NODE
+    default: "1"
+    documentation: |-
+      Number of SQL Server VMs to create per worker node
+  - name: DATABASE_SIZE
+    default: "96"
+    documentation: |-
+      Number of TPC-C warehouses (database size)
+  - name: WORKER_COUNTS
+    default: "1,2,4,8,16,32"
+    documentation: |-
+      Comma-separated list of HammerDB worker counts to test
+  - name: ITERATIONS
+    default: "2"
+    documentation: |-
+      Number of benchmark iterations per worker count
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      kube-burner indexing profile type
+  - name: WINDOWS_IMAGE_URL
+    default: "http://10.26.8.107:8083/windows_server_2k25.qcow2"
+    documentation: |-
+      Override Windows image URL (read from Vault if not set)
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  documentation: >-
+    This step runs the windows-mssql workload via kube-burner-ocp. Measures SQL Server
+    TPC-C benchmark performance using HammerDB on Windows VMs with LVMS or ODF storage.
+  timeout: 5h
