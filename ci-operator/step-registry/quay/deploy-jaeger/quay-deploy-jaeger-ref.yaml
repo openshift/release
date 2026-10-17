@@ -17,6 +17,8 @@ ref:
     Deployment and a Service exposing the OTLP HTTP receiver (4318) and the query
     UI/API (16686), using in-memory storage. On success writes
     ${SHARED_DIR}/jaeger_deployed so the post-run gather step knows to collect,
+    ${SHARED_DIR}/jaeger_namespace and ${SHARED_DIR}/jaeger_otlp_endpoint (the
+    in-cluster OTLP HTTP base URL) for other steps,
     and ${SHARED_DIR}/quay-otel-config.yaml (FEATURE_OTEL_TRACING and
     OTEL_CONFIG pointed at the in-cluster OTLP HTTP endpoint) for the deploy
     steps to merge into config.yaml.
@@ -26,7 +28,11 @@ ref:
   env:
   - name: QUAYNAMESPACE
     default: "quay-enterprise"
-    documentation: Namespace where Quay (and Jaeger) are deployed.
+    documentation: Namespace where Quay is deployed; also Jaeger's when JAEGER_NAMESPACE is empty.
+  - name: JAEGER_NAMESPACE
+    default: ""
+    documentation: |-
+      Namespace to deploy Jaeger into. Empty means QUAYNAMESPACE.
   - name: JAEGER_IMAGE
     default: "quay.io/jaegertracing/jaeger:2.20.0"
     documentation: |-
