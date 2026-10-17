@@ -43,6 +43,15 @@ case "${ADDITIONAL_WORKER_ARCHITECTURE:-}" in
     ;;
 esac
 
+# DOMAIN_MEMORY is shared with upi-install-libvirt, which expects MiB. This step's
+# cluster-profile domain templates historically expect KiB (default 25156824).
+# Values below 1e6 are treated as MiB and converted; larger values are left as KiB.
+if [[ -n "${DOMAIN_MEMORY:-}" && "${DOMAIN_MEMORY}" =~ ^[0-9]+$ && "${DOMAIN_MEMORY}" -lt 1000000 ]]; then
+  echo "DOMAIN_MEMORY=${DOMAIN_MEMORY} looks like MiB (shared with primary install); converting to KiB for domain templates"
+  DOMAIN_MEMORY="$((DOMAIN_MEMORY * 1024))"
+  export DOMAIN_MEMORY
+fi
+
 # Ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE:-}" ]]; then
   echo "ERROR: Failed to acquire lease (LEASED_RESOURCE is unset)"
