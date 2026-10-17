@@ -128,9 +128,83 @@ check_hostedcontrolplane() {
 wait_for "HostedControlPlane '${CLUSTER_NAME}' in ${HCP_NAMESPACE}" check_hostedcontrolplane
 
 # 3. Check pod status in HCP namespace
+POD_LIST_ERROR=""
+
+pod_api_error() {
+  case "${1}" in
+    *Forbidden*|*forbidden*) echo "Forbidden" ;;
+    *Unauthorized*|*unauthorized*) echo "Unauthorized" ;;
+    *timed\ out*|*timeout*|*Timeout*|*deadline\ exceeded*) echo "Timeout" ;;
+    *x509:*|*TLS*) echo "TLS error" ;;
+    *connection\ refused*|*no\ such\ host*) echo "Connection error" ;;
+    *) echo "API request failed (details omitted)" ;;
+  esac
+}
+
+diagnose_pods() (
+  set +x
+  local sanitize='
+    def allowed($values): . as $value | if $value == null then null
+      elif ($values | index($value)) != null then $value else "Other" end;
+    def numeric: if type == "number" then . else null end;
+    def reason: allowed(["BackOff", "Completed", "ContainerCannotRun", "ContainerCreating",
+      "ContainersNotReady", "CrashLoopBackOff", "CreateContainerConfigError", "CreateContainerError",
+      "DeadlineExceeded", "DisruptionTarget", "ErrImageNeverPull", "ErrImagePull", "Error", "Evicted",
+      "Failed", "FailedAttachVolume", "FailedBinding", "FailedCreatePodSandBox", "FailedKillPod",
+      "FailedMapVolume", "FailedMount", "FailedPostStartHook", "FailedPreStopHook", "FailedScheduling",
+      "FailedSync", "FailedToRetrieveImagePullSecret", "ImagePullBackOff", "InvalidImageName",
+      "Killing", "NetworkNotReady", "NodeNotReady", "OOMKilled", "PodCompleted", "PodInitializing",
+      "RunContainerError", "SchedulingGated", "Shutdown", "UnexpectedAdmissionError", "Unhealthy",
+      "Unschedulable"]);
+    def timestamp: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$")
+      then . else null end;'
+  log "Pod readiness failure diagnostics (up to 100 pods and 20 warning events; identities/messages omitted; unknown values are Other)"
+  if [[ -n "${POD_LIST_ERROR}" ]]; then
+    log "Last pod-list API error: ${POD_LIST_ERROR}"
+  fi
+  if ! KUBECONFIG="${MC_KUBECONFIG}" timeout --kill-after=5s 20s oc get pods -n "${HCP_NAMESPACE}" \
+    --request-timeout=15s -o json 2>/dev/null | head -c 1048576 | jq -c "${sanitize}"'
+      def containers:
+        [(. // []) | to_entries[] | .key as $index | .value | {index: $index, ready: (.ready == true), restartCount: (.restartCount | numeric),
+          waitingReason: (.state.waiting.reason | reason),
+          terminated: (.state.terminated | if . then {reason: (.reason | reason), exitCode: (.exitCode | numeric), signal: (.signal | numeric)} else null end),
+          lastTermination: (.lastState.terminated | if . then {reason: (.reason | reason), exitCode: (.exitCode | numeric), signal: (.signal | numeric)} else null end)}][:20];
+      {totalPods: (.items | length), pods: [.items | sort_by(any(.status.conditions[]?;
+        .type == "Ready" and .status == "True")) | .[:100] | to_entries[] | .key as $index | .value |
+        {index: $index, phase: (.status.phase | allowed(["Pending", "Running", "Succeeded", "Failed", "Unknown"])),
+         conditions: [.status.conditions[]? | {type: (.type | allowed(["Ready", "Initialized", "PodScheduled",
+           "ContainersReady", "PodReadyToStartContainers", "DisruptionTarget"])),
+           status: (.status | allowed(["True", "False", "Unknown"])), reason: (.reason | reason)}][:20],
+         initContainers: (.status.initContainerStatuses | containers),
+         containers: (.status.containerStatuses | containers)}]}' 2>/dev/null; then
+    log "Pod diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
+  fi
+  if ! KUBECONFIG="${MC_KUBECONFIG}" timeout --kill-after=5s 20s oc get events -n "${HCP_NAMESPACE}" \
+    --request-timeout=15s --field-selector=involvedObject.kind=Pod,type=Warning -o json 2>/dev/null \
+    | head -c 1048576 | jq -c "${sanitize}"'
+      {warningEvents: [.items | sort_by(.lastTimestamp // .eventTime // .metadata.creationTimestamp) |
+        .[-20:][] | {reason: (.reason | reason), count: (.count | numeric),
+          lastObserved: (.lastTimestamp // .eventTime // .metadata.creationTimestamp | timestamp)}]}' 2>/dev/null; then
+    log "Event diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
+  fi
+)
+
 check_pods() {
-  local pod_list
-  pod_list=$(KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" --no-headers 2>/dev/null) || return 1
+  local pod_list pod_error_file status was_tracing=false
+  [[ $- == *x* ]] && was_tracing=true
+  set +x
+  pod_error_file=$(mktemp) || return 1
+  if pod_list=$(KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" \
+    --no-headers 2>"${pod_error_file}"); then
+    rm -f "${pod_error_file}"
+    $was_tracing && set -x
+  else
+    status=$?
+    POD_LIST_ERROR="$(pod_api_error "$(head -c 4096 "${pod_error_file}")") (exit ${status})"
+    rm -f "${pod_error_file}"
+    $was_tracing && set -x
+    return 1
+  fi
   if (( $(echo "${pod_list}" | wc -l) < 10 )); then
     log "Too few pods found, expected at least 10"
     return 1
@@ -138,7 +212,17 @@ check_pods() {
   NOT_READY=$(echo "${pod_list}" | grep -v -E "Running|Completed|Succeeded" || true)
   [[ -z "${NOT_READY}" ]]
 }
+pod_readiness_exit() {
+  local status=$?
+  trap - EXIT
+  if (( status != 0 )); then
+    diagnose_pods || true
+  fi
+  exit "${status}"
+}
+trap pod_readiness_exit EXIT
 wait_for "all pods ready in ${HCP_NAMESPACE}" check_pods
+trap - EXIT
 KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" -o wide || true
 
 # 4. Check VpcEndpoint 'private-hcp' in HCP namespace
