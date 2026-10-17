@@ -262,13 +262,26 @@ function wait_for_domain_deletion() {
   local domain="$1"
   # RHCOS live install over VXLAN can exceed 10m; allow 25m before failing (matches arm64).
   local wait_until=$(($(date +%s) + 1500))
+  local next_diag=$(($(date +%s) + 300))
 
   echo "[$(date -Is)] waiting for install domain ${domain} to complete and power off..."
   until [ $((wait_until - $(date +%s))) -le 0 ] || ! (${VIRSH_ADDITIONAL} domid "$domain" > /dev/null 2>&1); do
+    if [ "$(date +%s)" -ge "${next_diag}" ]; then
+      echo "[$(date -Is)] install domain ${domain} still running; state=$(${VIRSH_ADDITIONAL} domstate "${domain}" 2>/dev/null || echo unknown)"
+      next_diag=$(($(date +%s) + 300))
+    fi
     sleep 5
   done
   if [ $((wait_until - $(date +%s))) -le 0 ]; then
     echo "ERROR: install domain ${domain} did not shut down before timeout (1500s)."
+    echo "Dumping install-domain diagnostics (likely live-ISO networking / rootfs+ignition fetch)..."
+    ${VIRSH_ADDITIONAL} domstate "${domain}" 2>/dev/null || true
+    ${VIRSH_ADDITIONAL} dumpxml "${domain}" > "${ARTIFACT_DIR}/domain-${domain}-timeout.xml" 2>/dev/null || true
+    if [[ -f "${ARTIFACT_DIR}/domain-${domain}-timeout.xml" ]]; then
+      echo "Interface PCI addresses from dumpxml:"
+      grep -A6 "<interface" "${ARTIFACT_DIR}/domain-${domain}-timeout.xml" | grep -E 'mac |source |address type|model ' || true
+    fi
+    ${VIRSH_ADDITIONAL} qemu-monitor-command "${domain}" --hmp 'info status' 2>/dev/null || true
     echo "Destroying and undefining timed-out install domain ${domain}..."
     ${VIRSH_ADDITIONAL} destroy "${domain}" >/dev/null 2>&1 || true
     sleep 1s
@@ -531,14 +544,19 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   node_mac="$(leaseLookup "\"additional-compute\"[$idx].mac")"
   node_gw="$(leaseLookup "\"additional-compute\"[$idx].gateway")"
   node_netmask="255.255.255.0"
-  node_nic="enp1s0"
+  # amd64 VPN domain templates often leave the virtio NIC unpinned after the disk, so
+  # libvirt places it on pcie bus 2 (enp2s0) while older arm templates pin bus 1 (enp1s0).
+  # Disable predictable names for the live install only so static IP always hits eth0.
+  node_nic="eth0"
   node_nameserver="${HTTPD_IP}"
   node_fqdn="${node_name}.ci"
 
-  domain_cmdline="rd.neednet=1 coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=${HTTPD_BASE_URL}/${ROOTFS_FILENAME} "
+  domain_cmdline="rd.neednet=1 net.ifnames=0 biosdevname=0 console=ttyS0,115200n8 "
+  domain_cmdline+="coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=${HTTPD_BASE_URL}/${ROOTFS_FILENAME} "
   domain_cmdline+="ip=${node_ip}::${node_gw}:${node_netmask}:${node_fqdn}:${node_nic}:none:1500 "
   domain_cmdline+="nameserver=${node_nameserver} "
   domain_cmdline+="coreos.inst.ignition_url=${HTTPD_BASE_URL}/${LEASE_WORKER_IGN_FILENAME}"
+  echo "Install cmdline for ${node_name}: ${domain_cmdline}"
 
   echo "Creating .qcow2 volume for ${node_name} on additional hypervisor (${ADDITIONAL_POOL})..."
   delete_from_additional_pool_if_exists "${ADDITIONAL_POOL}" "${node_name}.qcow2"
@@ -584,6 +602,13 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
     cp -f "${domain_install_xml}" "${ARTIFACT_DIR}/domain-${node_name}-install-failed.xml" 2>/dev/null || true
     rm -f "${domain_install_xml}"
     exit 1
+  fi
+  cp -f "${domain_install_xml}" "${ARTIFACT_DIR}/domain-${node_name}-install.xml" 2>/dev/null || true
+  # Log where libvirt actually placed the NIC (helps confirm enpXs0 vs eth0 assumptions).
+  ${VIRSH_ADDITIONAL} dumpxml "${node_name}" > "${ARTIFACT_DIR}/domain-${node_name}-running.xml" 2>/dev/null || true
+  if [[ -f "${ARTIFACT_DIR}/domain-${node_name}-running.xml" ]]; then
+    echo "Runtime interface placement for ${node_name}:"
+    grep -A8 "<interface" "${ARTIFACT_DIR}/domain-${node_name}-running.xml" | grep -E 'mac |source |address type|model |mtu ' || true
   fi
   rm -f "${domain_install_xml}"
 
