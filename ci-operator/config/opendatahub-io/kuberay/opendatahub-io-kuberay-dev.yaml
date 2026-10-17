@@ -1,0 +1,99 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - context_dir: ray-operator
+    dockerfile_path: Dockerfile.rhoai
+    to: kuberay-operator-rhoai
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 200Mi
+tests:
+- as: kuberay-rhoai-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: redhat-ods-applications,opendatahub
+      SCANNER_NAMESPACE: opendatahub
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - ref: cert-manager-install-operator
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opendatahub
+        oc label ns opendatahub security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        sed -i "s|odh-kuberay-operator-controller-image=.*|odh-kuberay-operator-controller-image=${KUBERAY_OPERATOR_IMAGE}|g" ray-operator/config/openshift/params.env
+        oc apply --server-side -k ray-operator/config/openshift
+        oc wait --for=condition=Available --timeout=5m -n opendatahub deployment/kuberay-operator
+      dependencies:
+      - env: KUBERAY_OPERATOR_IMAGE
+        name: kuberay-operator-rhoai
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        KUBERAY_SRC=$(pwd)
+        echo "Running kuberay e2e tests..."
+        cd "${KUBERAY_SRC}/ray-operator"
+        # Bump Ray cluster resources to build-image scenario (head: 6G req / 10G limit)
+        go run ../scripts/update-resources.go -scenario build-image test/support/support.go
+        go run ../scripts/update-resources.go -scenario build-image test/e2erayjob/rayjob_lightweight_test.go
+        cp images/tests/.env-odh .
+        bash images/tests/run-tests.sh -testTier=Smoke \
+          2>&1 | tee "${ARTIFACT_DIR}/its-tests.log"
+        TEST_EXIT_CODE=${PIPESTATUS[0]}
+        cp -r results "${ARTIFACT_DIR}/results" 2>/dev/null || true
+
+        if [ "${TEST_EXIT_CODE}" != "0" ]; then
+          echo "Tests failed with exit code ${TEST_EXIT_CODE}"
+          exit 1
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+      timeout: 2h0m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: dev
+  org: opendatahub-io
+  repo: kuberay
