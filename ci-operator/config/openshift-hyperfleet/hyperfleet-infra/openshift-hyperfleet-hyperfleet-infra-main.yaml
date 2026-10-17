@@ -101,10 +101,10 @@ tests:
         eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
 
         # --- Cleanup ---
-        # Uninstall maestro before destroying the cluster
+        # Uninstall the desire delivery stack before destroying the cluster.
         # Tolerate failure in case the cluster isn't reachable
         # (e.g. setup was aborted before provisioning finished).
-        make uninstall-maestro || true
+        HELMFILE_ENV=e2e-gcp make uninstall-desire-delivery || true
 
         # Only drop the GCS state once destroy succeeded, otherwise keep it
         # so the cluster can still be destroyed by hand.
@@ -201,7 +201,7 @@ tests:
         eval $(cd "$TF_DIR" && terraform output -raw connect_command)
 
         # --- Run install tests ---
-        make install-priority-classes install-maestro-all health-check-maestro
+        HELMFILE_ENV=e2e-gcp make install-priority-classes install-desire-delivery health-check-desire-delivery
       credentials:
       - collection: hyperfleet
         group: hyperfleet-e2e

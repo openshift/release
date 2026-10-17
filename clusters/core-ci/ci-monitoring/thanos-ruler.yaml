@@ -1,0 +1,54 @@
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosRuler
+metadata:
+  name: ci-metrics
+  namespace: ci-monitoring
+spec:
+  replicas: 2
+  ruleConfigSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: thanos-operator
+  queryLabelSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: thanos-operator
+  additionalEnv:
+  - name: AWS_ROLE_ARN
+    valueFrom:
+      secretKeyRef:
+        key: role-arn
+        name: thanos-aws-credentials
+  - name: AWS_WEB_IDENTITY_TOKEN_FILE
+    value: /var/run/secrets/aws/token
+  additionalVolumeMounts:
+  - mountPath: /var/run/secrets/aws
+    name: aws-token
+    readOnly: true
+  additionalVolumes:
+  - name: aws-token
+    projected:
+      sources:
+      - serviceAccountToken:
+          audience: sts.amazonaws.com
+          expirationSeconds: 3600
+          path: token
+  objectStorageConfig:
+    name: thanos-object-storage
+    key: thanos.yaml
+  alertmanagerURL: "http://alertmanager-operated.ci-monitoring.svc.cluster.local:9093"
+  evaluationInterval: 1m
+  securityContext: {}
+  retention: 2h
+  storage:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 1m
+      memory: 15Mi
+  logFormat: logfmt
+  imagePullPolicy: IfNotPresent
+  rulerMode:
+    type: Stateful
+    stateful:
+      objectStorageConfig:
+        name: thanos-object-storage
+        key: thanos.yaml

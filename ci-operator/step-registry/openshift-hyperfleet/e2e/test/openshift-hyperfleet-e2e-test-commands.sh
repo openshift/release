@@ -11,7 +11,6 @@ log(){
 }
 
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
-MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 
 cp -r /e2e/ /tmp/
 
@@ -49,7 +48,6 @@ cd /tmp/e2e
 source /tmp/e2e/env/env.ci
 
 export HYPERFLEET_API_URL
-export MAESTRO_URL
 export HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
 export TESTDATA_DIR="${TESTDATA}"
 

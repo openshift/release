@@ -13,23 +13,11 @@ ref:
   - collection: cluster-secrets-rosa-regional-platform-int
     group: rrp-dev-ci-quay
     mount_path: /var/run/quay-push-credentials
+  # Generic image slots. A consumer maps only the slots it needs in its test's
+  # steps.dependencies (e.g. CI_IMAGE_1: hypershift-operator) and references
+  # them from ROSA_REGIONAL_COMPONENTS. Unused slots default to the
+  # job's `src` image and are ignored.
   dependencies:
-  - name: src
-    env: CI_COMPONENT_IMAGE
-  - name: src
-    env: CI_API_IMAGE
-  - name: src
-    env: CI_OPERATOR_IMAGE
-  - name: src
-    env: CI_ZOA_LAMBDA_IMAGE
-  - name: src
-    env: CI_ZOA_RUNNER_IMAGE
-  # Generic image pool: repo-agnostic dependency slots for jobs that need to
-  # push arbitrary CI-built images. A consumer maps only the slots it needs
-  # (e.g. CI_IMAGE_1: hypershift-operator) and references them from
-  # ROSA_REGIONAL_EXTRA_COMPONENTS. Unused slots default to the job's `src`
-  # image and are ignored by the command script. Prefer these over adding new
-  # repo-specific dependency names.
   - name: src
     env: CI_IMAGE_1
   - name: src
@@ -47,27 +35,19 @@ ref:
   - name: src
     env: CI_IMAGE_8
   env:
-  - name: ROSA_REGIONAL_QUAY_DEST_REPO
-    default: ""
-    documentation: |-
-      Quay.io destination repository for the primary component image
-      (e.g., quay.io/rrp-dev-ci/platform-api).
-  - name: ROSA_REGIONAL_EXTRA_COMPONENTS
+  - name: ROSA_REGIONAL_COMPONENTS
     default: ""
     documentation: |-
       YAML list of component images to push. Each entry has 'image'
-      (name of the CI dependency env var holding the source pullspec),
-      'repo' (quay.io destination), 'target' (helm values file path),
-      and 'override' (YAML with IMAGE_REPO/IMAGE_TAG placeholders).
-      Per-image tags are written to SHARED_DIR/extra-component-images
-      for the provision step.
-      For 'image', prefer the generic pool slots CI_IMAGE_1..CI_IMAGE_8
-      (map each slot to a pipeline image via the test's
-      steps.dependencies) instead of adding repo-specific dependency
-      names to this ref. The legacy names (CI_API_IMAGE, CI_OPERATOR_IMAGE,
-      CI_ZOA_*) remain valid for existing consumers.
+      (CI_IMAGE_1..CI_IMAGE_8, mapped to a pipeline image in the test's
+      steps.dependencies) and 'repo' (quay.io destination). Entries may also
+      have 'target' (values file path in rosa-hyperfleet) and 'override'
+      (YAML with IMAGE_REPO/IMAGE_TAG placeholders), which the provision
+      step deploys. Per-image tags are written to
+      SHARED_DIR/component-images for the provision step.
+      On postsubmits (no PULL_NUMBER) each image is also tagged :latest.
       Example:
-        - image: CI_API_IMAGE
+        - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
           target: argocd/config/regional-cluster/platform-api/values.yaml
           override:
@@ -79,7 +59,5 @@ ref:
   documentation: |-
     Copies CI-built component images to public quay.io repositories so
     that ephemeral EKS clusters can pull them without CI registry
-    credentials. Optionally pushes a primary image (CI_COMPONENT_IMAGE
-    to ROSA_REGIONAL_QUAY_DEST_REPO). Images listed in
-    ROSA_REGIONAL_EXTRA_COMPONENTS are pushed with per-image tag
-    tracking via SHARED_DIR/extra-component-images.
+    credentials. Images listed in ROSA_REGIONAL_COMPONENTS are pushed
+    with per-image tag tracking via SHARED_DIR/component-images.

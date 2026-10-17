@@ -552,6 +552,9 @@ CONFIG = {
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
     },
+    'ibmcloud-quay-quota-slice': {
+        'us-east': 4,
+    },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },

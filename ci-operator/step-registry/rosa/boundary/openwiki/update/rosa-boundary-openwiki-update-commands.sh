@@ -47,15 +47,16 @@ jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${S
 printf '%s\n' "$OPENWIKI_MODEL_ID" > "${SHARED_DIR}/openwiki-model-id"
 printf '%s\n' "$OPENWIKI_PROVIDER" > "${SHARED_DIR}/openwiki-provider"
 
-# Only flat files survive between steps in SHARED_DIR. Clone the public repo
-# locally so the model container never receives GitHub App credentials.
+# Clone the prepared bundle so private source is available without passing
+# GitHub App credentials to the model container.
 base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
 if [[ "$base_branch" != "$base" && "$base_branch" != "$branch" ]]; then
   echo 'Unexpected OpenWiki base branch.' >&2
   exit 1
 fi
-git clone "https://github.com/${repo}.git" "$workdir/repo"
+git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
 cd "$workdir/repo"
+git remote set-url origin "https://github.com/${repo}.git"
 git config user.name 'OpenShift CI Bot'
 git config user.email 'ci-bot@redhat.com'
 git switch -c "$branch" "origin/${base_branch}"
