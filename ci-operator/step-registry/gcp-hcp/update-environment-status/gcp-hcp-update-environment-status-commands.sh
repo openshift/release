@@ -11,10 +11,28 @@ if [[ -z "${JOB_SPEC:-}" ]]; then
   exit 1
 fi
 
+# A postsubmit is tied to the pushed promotion commit. Use that event SHA,
+# even if a newer promotion lands before the job starts. The branch drift
+# check below then fails the old run instead of testing a different commit.
+job_type="$(jq -r '.type // empty' <<<"${JOB_SPEC}")"
+if [[ "${job_type}" == "postsubmit" ]]; then
+  if ! jq -e '
+    .refs.org == "openshift-online" and
+    .refs.repo == "gcp-hcp-infra" and
+    (.refs.base_ref | type) == "string" and
+    (.refs.base_sha | type) == "string" and
+    (.refs.base_sha | test("^[0-9a-f]{40}$")) and
+    ((.refs.pulls // []) | length) == 0
+  ' <<<"${JOB_SPEC}" >/dev/null; then
+    echo "ERROR: postsubmit JOB_SPEC must identify an openshift-online/gcp-hcp-infra promotion commit" >&2
+    exit 1
+  fi
+fi
+
 # An ordinary presubmit tests its own source checkout against an already
 # deployed environment. A pj-rehearse run of an HC periodic job also tests
 # that environment, and must exercise the status publication path.
-if ! jq -e --arg periodic_job_prefix "periodic-ci-openshift-online-gcp-hcp-infra-main-e2e-hostedcluster-" '
+if [[ "${job_type}" != "postsubmit" ]] && ! jq -e --arg periodic_job_prefix "periodic-ci-openshift-online-gcp-hcp-infra-main-e2e-hostedcluster-" '
   . as $job |
   $job.type == "periodic" or
   ($job.type == "presubmit" and
@@ -28,8 +46,8 @@ if ! jq -e --arg periodic_job_prefix "periodic-ci-openshift-online-gcp-hcp-infra
   exit 0
 fi
 
-if [[ ! "${PROW_JOB_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  echo "ERROR: PROW_JOB_ID is missing or invalid" >&2
+if [[ ! "${JOB_NAME:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || [[ ! "${BUILD_ID:-}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: JOB_NAME or BUILD_ID is missing or invalid" >&2
   exit 1
 fi
 if [[ ! -s "${token_path}" ]]; then
@@ -69,6 +87,13 @@ if ! jq -e '
   echo "ERROR: E2E_STATUS_TARGETS must list unique promotion branches and deployment statuses or check runs" >&2
   exit 1
 fi
+if [[ "${job_type}" == "postsubmit" ]] && ! jq -e --argjson targets "${E2E_STATUS_TARGETS}" '
+  ($targets | length) == 1 and
+  .refs.base_ref == $targets[0].branch
+' <<<"${JOB_SPEC}" >/dev/null; then
+  echo "ERROR: postsubmit target must be its triggering promotion branch" >&2
+  exit 1
+fi
 
 github_get() {
   curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
@@ -85,13 +110,29 @@ branch_sha() {
   jq -er '.commit.sha | select(test("^[0-9a-f]{40}$"))' <<<"${response}"
 }
 
-readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
+# Spyglass stores PR rehearsal logs separately from periodic and postsubmit logs.
+readonly spyglass_base="https://prow.ci.openshift.org/view/gs/test-platform-results-public"
+if [[ "${job_type}" == "presubmit" ]]; then
+  pull_number="$(jq -r '.refs.pulls[0].number // empty' <<<"${JOB_SPEC}")"
+  if [[ ! "${pull_number}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: rehearsal pull request number is missing or invalid" >&2
+    exit 1
+  fi
+  target_url="${spyglass_base}/pr-logs/pull/openshift_release/${pull_number}/${JOB_NAME}/${BUILD_ID}"
+else
+  target_url="${spyglass_base}/logs/${JOB_NAME}/${BUILD_ID}"
+fi
+readonly target_url
 resolved='[]'
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
   contexts="$(jq -c '.contexts // []' <<<"${target}")"
   check_runs="$(jq -c '.check_runs // []' <<<"${target}")"
-  sha="$(branch_sha "${branch}")"
+  if [[ "${job_type}" == "postsubmit" ]]; then
+    sha="$(jq -r '.refs.base_sha' <<<"${JOB_SPEC}")"
+  else
+    sha="$(branch_sha "${branch}")"
+  fi
   resolved="$(jq -cn --argjson targets "${resolved}" --arg branch "${branch}" \
     --arg sha "${sha}" --argjson contexts "${contexts}" --argjson check_runs "${check_runs}" \
     '$targets + [{branch: $branch, sha: $sha, contexts: $contexts, check_runs: $check_runs}]')"
@@ -99,8 +140,9 @@ done < <(jq -c '.[]' <<<"${E2E_STATUS_TARGETS}")
 
 # Record every target before posting. If any status POST or deployment check
 # fails, the post step can still publish failure to all captured commits.
-jq -cn --arg context "${E2E_STATUS_CONTEXT}" --argjson targets "${resolved}" \
-  '{context: $context, targets: $targets}' >"${targets_path}"
+jq -cn --arg context "${E2E_STATUS_CONTEXT}" --arg target_url "${target_url}" \
+  --argjson targets "${resolved}" \
+  '{context: $context, target_url: $target_url, targets: $targets}' >"${targets_path}"
 
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"

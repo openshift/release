@@ -13,6 +13,7 @@ if [[ -e "${skip_path}" ]]; then
 fi
 if [[ ! -s "${targets_path}" ]] || ! jq -e '
   (.context | type) == "string" and
+  (.target_url // "" | startswith("https://prow.ci.openshift.org/view/gs/test-platform-results-public/")) and
   (.targets | type) == "array" and
   (.targets | length) > 0 and
   all(.targets[]; (.branch | type) == "string" and
@@ -22,10 +23,6 @@ if [[ ! -s "${targets_path}" ]] || ! jq -e '
     ((.contexts | length) + (.check_runs | length) > 0))
 ' "${targets_path}" >/dev/null; then
   echo "ERROR: captured environment status targets are missing or invalid" >&2
-  exit 1
-fi
-if [[ ! "${PROW_JOB_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  echo "ERROR: PROW_JOB_ID is missing or invalid" >&2
   exit 1
 fi
 if [[ ! -s "${token_path}" ]]; then
@@ -114,7 +111,8 @@ if [[ "${state}" == "success" ]]; then
 else
   description="HostedCluster lifecycle failed or deployment changed"
 fi
-readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
+target_url="$(jq -r '.target_url' "${targets_path}")"
+readonly target_url
 context="$(jq -r '.context' "${targets_path}")"
 payload="$(jq -cn --arg state "${state}" --arg context "${context}" \
   --arg description "${description}" --arg target_url "${target_url}" '{
@@ -123,6 +121,11 @@ payload="$(jq -cn --arg state "${state}" --arg context "${context}" \
 }')"
 
 post_error=0
+# If the lifecycle itself passed but the promotion changed, the Prow job must
+# fail as well as publishing a failed status on the captured commit.
+if [[ -e "${tests_passed_path}" && "${state}" != "success" ]]; then
+  post_error=1
+fi
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
   sha="$(jq -r '.sha' <<<"${target}")"
