@@ -34,7 +34,7 @@ _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
 _junit_emit() {
   # Emit a JUnit XML result for the wait-mcp step and propagate
-  # it to SHARED_DIR/junit so downstream steps can aggregate results.
+  # it to SHARED_DIR so downstream steps can aggregate results.
   (( _junit_emitted )) && return 0
   _junit_emitted=1
   local _jr=${1:-0}
@@ -57,8 +57,7 @@ _junit_emit() {
 </testsuite>
 JUNITEOF
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jf}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${_jf}" "${SHARED_DIR}/" 2>/dev/null || true
   fi
 }
 
