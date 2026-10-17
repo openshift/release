@@ -1,0 +1,25 @@
+ref:
+  as: ipi-conf-additional-ca-azureil6
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: ipi-conf-additional-ca-azureil6-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Adds the SHIFT emulator's CA chain to install-config as additionalTrustBundle, so the cluster's
+    own components trust the emulated IL6 ARM endpoint.
+
+    Reads ${SHARED_DIR}/azure_il6_ca_bundle, which azure-il6-bastion-ca writes; that step must run
+    first.
+
+    Appends to the shared ${SHARED_DIR}/additional_trust_bundle accumulator rather than setting
+    additionalTrustBundle directly, so that it composes with ipi-conf-mirror instead of racing it.
+    See the comment in the commands script.
+
+    additionalTrustBundlePolicy is set to "Always" so the CA reaches every node's trust store even
+    though this cluster has no cluster-wide proxy configured.
