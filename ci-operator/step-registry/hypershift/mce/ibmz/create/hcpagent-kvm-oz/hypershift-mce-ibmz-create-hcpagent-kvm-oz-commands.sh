@@ -496,3 +496,9 @@ fi
 
 echo "$(date) All guest ClusterOperators are Available"
 echo "$(date) Successfully attached the KVM guests as agents to the hosted cluster ${HC_NAME}"
+
+# Wait 5 minutes for all ClusterOperators of HCP to fully stabilize
+echo "$(date) Waiting 5 minutes for all ClusterOperators of HCP to come up and stabilize..."
+sleep 300
+echo "$(date) Final ClusterOperator status:"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" get co || true
