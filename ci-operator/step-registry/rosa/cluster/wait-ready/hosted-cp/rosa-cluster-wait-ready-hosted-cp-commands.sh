@@ -143,23 +143,37 @@ pod_api_error() {
 
 diagnose_pods() (
   set +x
-  local sanitize='def text: tostring | .[:160] | gsub("[^a-zA-Z0-9_.:/-]"; "_");'
-  log "Pod readiness failure diagnostics (up to 100 pods and 20 warning events; messages omitted)"
+  local sanitize='
+    def allowed($values): . as $value | if ($values | index($value)) != null then $value else "Other" end;
+    def numeric: if type == "number" then . else null end;
+    def reason: allowed(["BackOff", "Completed", "ContainerCannotRun", "ContainerCreating",
+      "ContainersNotReady", "CrashLoopBackOff", "CreateContainerConfigError", "CreateContainerError",
+      "DeadlineExceeded", "DisruptionTarget", "ErrImageNeverPull", "ErrImagePull", "Error", "Evicted",
+      "Failed", "FailedAttachVolume", "FailedBinding", "FailedCreatePodSandBox", "FailedKillPod",
+      "FailedMapVolume", "FailedMount", "FailedPostStartHook", "FailedPreStopHook", "FailedScheduling",
+      "FailedSync", "FailedToRetrieveImagePullSecret", "ImagePullBackOff", "InvalidImageName",
+      "Killing", "NetworkNotReady", "NodeNotReady", "OOMKilled", "PodCompleted", "PodInitializing",
+      "RunContainerError", "SchedulingGated", "Shutdown", "UnexpectedAdmissionError", "Unhealthy",
+      "Unschedulable"]);
+    def timestamp: if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}([.][0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$")
+      then . else null end;'
+  log "Pod readiness failure diagnostics (up to 100 pods and 20 warning events; identities/messages omitted; unknown values are Other)"
   if [[ -n "${POD_LIST_ERROR}" ]]; then
     log "Last pod-list API error: ${POD_LIST_ERROR}"
   fi
   if ! KUBECONFIG="${MC_KUBECONFIG}" timeout --kill-after=5s 20s oc get pods -n "${HCP_NAMESPACE}" \
     --request-timeout=15s -o json 2>/dev/null | head -c 1048576 | jq -c "${sanitize}"'
       def containers:
-        [.[]? | {name: (.name | text), ready, restartCount,
-          waitingReason: (.state.waiting.reason // "" | text),
-          terminated: (.state.terminated | if . then {reason: (.reason | text), exitCode, signal} else null end),
-          lastTermination: (.lastState.terminated | if . then {reason: (.reason | text), exitCode, signal} else null end)}][:20];
+        [(. // []) | to_entries[] | .key as $index | .value | {index: $index, ready: (.ready == true), restartCount: (.restartCount | numeric),
+          waitingReason: (.state.waiting.reason | reason),
+          terminated: (.state.terminated | if . then {reason: (.reason | reason), exitCode: (.exitCode | numeric), signal: (.signal | numeric)} else null end),
+          lastTermination: (.lastState.terminated | if . then {reason: (.reason | reason), exitCode: (.exitCode | numeric), signal: (.signal | numeric)} else null end)}][:20];
       {totalPods: (.items | length), pods: [.items | sort_by(any(.status.conditions[]?;
-        .type == "Ready" and .status == "True")) | .[:100][] |
-        {name: (.metadata.name | text), phase: (.status.phase | text),
-         conditions: [.status.conditions[]? | {type: (.type | text), status: (.status | text),
-           reason: (.reason // "" | text)}][:20],
+        .type == "Ready" and .status == "True")) | .[:100] | to_entries[] | .key as $index | .value |
+        {index: $index, phase: (.status.phase | allowed(["Pending", "Running", "Succeeded", "Failed", "Unknown"])),
+         conditions: [.status.conditions[]? | {type: (.type | allowed(["Ready", "Initialized", "PodScheduled",
+           "ContainersReady", "PodReadyToStartContainers", "DisruptionTarget"])),
+           status: (.status | allowed(["True", "False", "Unknown"])), reason: (.reason | reason)}][:20],
          initContainers: (.status.initContainerStatuses | containers),
          containers: (.status.containerStatuses | containers)}]}' 2>/dev/null; then
     log "Pod diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
@@ -168,8 +182,8 @@ diagnose_pods() (
     --request-timeout=15s --field-selector=involvedObject.kind=Pod,type=Warning -o json 2>/dev/null \
     | head -c 1048576 | jq -c "${sanitize}"'
       {warningEvents: [.items | sort_by(.lastTimestamp // .eventTime // .metadata.creationTimestamp) |
-        .[-20:][] | {pod: (.involvedObject.name | text), reason: (.reason | text), count,
-          lastObserved: (.lastTimestamp // .eventTime // .metadata.creationTimestamp | text)}]}' 2>/dev/null; then
+        .[-20:][] | {reason: (.reason | reason), count: (.count | numeric),
+          lastObserved: (.lastTimestamp // .eventTime // .metadata.creationTimestamp | timestamp)}]}' 2>/dev/null; then
     log "Event diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
   fi
 )

@@ -31,6 +31,7 @@ class RosaHCPReadinessTests(unittest.TestCase):
             "TEST_DIAGNOSTIC_STATUS": "0",
             "TEST_TIMEOUT": shutil.which("timeout"),
             "TEST_SLEEP_STATUS": "0",
+            "TEST_API_ERROR": "Forbidden: https://synthetic.invalid token=DO-NOT-PRINT",
         }
         (self.directory / "ocm-token").write_text("synthetic-credential")
         (self.directory / "cluster-id").write_text("test-id")
@@ -75,7 +76,7 @@ case "$*" in
   *get\ pods*--no-headers*)
     [[ "$*" != *--request-timeout* ]] || exit 91
     if [[ "$TEST_MODE" == api-error ]]; then
-      echo 'Forbidden: https://synthetic.invalid token=DO-NOT-PRINT' >&2
+      echo "$TEST_API_ERROR" >&2
       exit 7
     fi
     phase=Running
@@ -162,6 +163,8 @@ esac
         events = next(json.loads(line) for line in result.stdout.splitlines()
                       if line.startswith('{"warningEvents"'))
         self.assertEqual(len(events["warningEvents"]), 20)
+        self.assertEqual(events["warningEvents"][0]["lastObserved"], "2026-01-01T00:00:05Z")
+        self.assertEqual(events["warningEvents"][-1]["lastObserved"], "2026-01-01T00:00:24Z")
         calls = self.calls.read_text()
         self.assertEqual(calls.count("sleep 60"), 29)
         self.assertNotIn("get vpcendpoints", calls)
@@ -171,11 +174,20 @@ esac
         self.assertEqual(self.run_script("too-few").returncode, 1)
 
     def test_api_error_is_sanitized_and_reported_only_once(self):
-        result = self.run_script("api-error")
-        self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertEqual(result.stdout.count("Last pod-list API error: Forbidden (exit 7)"), 1)
-        self.assertNotIn("synthetic.invalid", result.stdout)
-        self.assertEqual(self.calls.read_text().count("--no-headers"), 30)
+        for error, category in (("Forbidden", "Forbidden"), ("Unauthorized", "Unauthorized"),
+                                ("timed out", "Timeout"), ("x509: failure", "TLS error"),
+                                ("no such host", "Connection error"),
+                                ("unexpected failure", "API request failed (details omitted)")):
+            with self.subTest(category=category):
+                self.environment["TEST_API_ERROR"] = f"{error}: https://synthetic.invalid DO-NOT-PRINT"
+                (self.directory / "clock").write_text("0")
+                self.calls.write_text("")
+                result = self.run_script("api-error")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                expected = f"Last pod-list API error: {category} (exit 7)"
+                self.assertEqual(result.stdout.count(expected), 1)
+                self.assertNotIn("synthetic.invalid", result.stdout)
+                self.assertEqual(self.calls.read_text().count("--no-headers"), 30)
 
     def test_diagnostic_error_preserves_wait_status(self):
         result = self.run_script("pending", 7)
@@ -216,24 +228,41 @@ esac
     def test_diagnostic_field_sanitization_and_collection_limits(self):
         fixture = self.directory / "pods.json"
         pod = json.loads(fixture.read_text())["items"][0]
-        pod["status"]["conditions"][0]["reason"] = "unsafe\nvalue=" + "x" * 200
+        pod["metadata"]["name"] = "DO-NOT-PRINT"
+        pod["status"]["conditions"][0]["reason"] = "DO-NOT-PRINT"
+        pod["status"]["conditions"][0]["type"] = "DO-NOT-PRINT"
+        pod["status"]["containerStatuses"][0]["name"] = "DO-NOT-PRINT"
+        pod["status"]["containerStatuses"][0]["ready"] = "DO-NOT-PRINT"
+        pod["status"]["containerStatuses"][0]["restartCount"] = "DO-NOT-PRINT"
+        pod["status"]["containerStatuses"][0]["state"]["waiting"]["reason"] = "DO-NOT-PRINT"
         pod["status"]["conditions"] *= 25
         pod["status"]["containerStatuses"] *= 25
         pod["status"]["initContainerStatuses"] *= 25
         other_pod = {"metadata": {"name": "another-pod"}, "status": {"phase": "Pending"}}
-        fixture.write_text(json.dumps({"items": [pod] + [other_pod] * 104}))
+        ready_pod = {"metadata": {"name": "ready-pod"}, "status": {"phase": "Running",
+                     "conditions": [{"type": "Ready", "status": "True"}]}}
+        fixture.write_text(json.dumps({"items": [ready_pod, pod] + [other_pod] * 103}))
+        events_path = self.directory / "events.json"
+        events = json.loads(events_path.read_text())
+        events["items"][-1]["involvedObject"]["name"] = "DO-NOT-PRINT"
+        events["items"][-1]["reason"] = "DO-NOT-PRINT"
+        events["items"][-1]["count"] = "DO-NOT-PRINT"
+        events["items"][-1]["lastTimestamp"] = "DO-NOT-PRINT"
+        events_path.write_text(json.dumps(events))
         result = self.run_script("pending")
         self.assertEqual(result.returncode, 1, result.stdout)
         summary = next(json.loads(line) for line in result.stdout.splitlines()
                        if line.startswith('{"totalPods"'))
         self.assertEqual(summary["totalPods"], 105)
         self.assertEqual(len(summary["pods"]), 100)
+        self.assertNotIn("Running", [entry["phase"] for entry in summary["pods"]])
         selected = summary["pods"][0]
         for field in ("conditions", "containers", "initContainers"):
             self.assertEqual(len(selected[field]), 20)
         reason = selected["conditions"][0]["reason"]
-        self.assertEqual(len(reason), 160)
-        self.assertTrue(reason.startswith("unsafe_value_"))
+        self.assertEqual(reason, "Other")
+        self.assertEqual(selected["conditions"][0]["type"], "Other")
+        self.assertEqual(selected["containers"][0]["waitingReason"], "Other")
 
 
 if __name__ == "__main__":
