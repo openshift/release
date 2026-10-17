@@ -66,10 +66,24 @@ ref:
       Configures a special openshift-tests-private configmap to point
       the osc operator to an existing external Trustee instance
   - name: WORKLOAD_IMAGE
-    default: "quay.io/openshift/origin-hello-openshift"
+    default: "ghcr.io/nginxinc/nginx-unprivileged:alpine@sha256:e234d4f7e346c098f7b22245690372382aded5be988611eb2c53ae62231eece7"
     documentation: |-
       Configures a special openshift-tests-private configmap to use this image
-      for test workloads
+      for test workloads. The image must serve HTTP on port 8080 and run as a
+      non-root user.
+
+      quay.io/openshift/origin-hello-openshift cannot be used at the moment:
+      two of its layers carry empty SCHILY.xattr.user.overlay.origin PAX
+      records, which astral-tokio-tar >= 0.6.3 rejects, so image-rs fails the
+      pull with "Failed to read entries from the tar". Restore it, together
+      with WORKLOAD_MESSAGE, once image-rs picks up a tar reader that accepts
+      empty PAX values.
+  - name: WORKLOAD_MESSAGE
+    default: "Welcome to nginx!"
+    documentation: |-
+      Text WORKLOAD_IMAGE is expected to serve over HTTP; the expose-service
+      test asserts the response body contains it. Always set it together with
+      WORKLOAD_IMAGE ("Hello OpenShift!" for origin-hello-openshift).
   - name: WORKLOAD_TO_TEST
     default: "kata"
     documentation: |-

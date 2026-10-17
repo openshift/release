@@ -12,7 +12,9 @@ if [[ -f "${SHARED_DIR}/disconnected_catalog_source_name" ]]; then
 
     if [[ -f "${SHARED_DIR}/mirror_registry_url" ]]; then
         MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-        WORKLOAD_IMAGE="${MIRROR_REGISTRY_HOST}/extra/origin-hello-openshift"
+        # Keep this in sync with EXTRA_IMAGES_TO_MIRROR: the mirror step copies
+        # each image to /extra/<last path segment>, preserving the source tag.
+        WORKLOAD_IMAGE="${MIRROR_REGISTRY_HOST}/extra/nginx-unprivileged:alpine"
         echo "Disconnected: using mirrored workload image: ${WORKLOAD_IMAGE}"
     fi
 fi
@@ -45,6 +47,7 @@ data:
   credentialsMode: "${CREDENTIALS_MODE:-cco}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
+  workloadMessage: "${WORKLOAD_MESSAGE}"
   installKataRPM: "false"
   workloadToTest: "${WORKLOAD_TO_TEST}"
 EOF
