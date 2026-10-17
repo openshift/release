@@ -68,6 +68,7 @@ JOB_KEYS = {
     "skip_if_only_changed",
     "fips",
     "storage",
+    "upgrade_from",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -402,6 +403,22 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     )
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
+            upgrade_from = _job_str_field(job, "upgrade_from", where)
+            if test == "upgrade":
+                if not upgrade_from:
+                    raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
+                if not re.match(r"^\d+\.\d+$", upgrade_from):
+                    raise ValueError(f"{where} upgrade_from must look like 'X.Y', got {upgrade_from!r}")
+                if quay_version is None:
+                    raise ValueError(
+                        f"{where} test 'upgrade' requires a quay_version-bearing branch; "
+                        f"branch {branch!r} has none"
+                    )
+                # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
+                if fips:
+                    raise ValueError(f"{where}.fips is not supported for test: upgrade")
+            elif upgrade_from is not None:
+                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
                 cells.append(
@@ -427,6 +444,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         skip_if_only_changed=skip_if_only_changed,
                         fips=fips,
                         storage_override=storage,
+                        upgrade_from=upgrade_from,
                     )
                 )
     return cells
