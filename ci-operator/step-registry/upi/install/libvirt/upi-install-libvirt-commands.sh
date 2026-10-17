@@ -100,9 +100,15 @@ ensure_libvirt_network() {
         [[ -z "${net}" ]] && continue
         net_bridge=$(${VIRSH} net-info "${net}" 2>/dev/null | awk '/^Bridge:/{print $2}' || true)
         if [[ "${net_bridge}" == "${bridge_name}" ]]; then
-          echo "Removing stale network '${net}' holding bridge ${bridge_name}..."
-          ${VIRSH} net-destroy "${net}" 2>/dev/null || true
-          ${VIRSH} net-undefine "${net}" 2>/dev/null || true
+          # Only reclaim networks owned by this lease; never destroy a concurrent job's network.
+          if [[ "${net}" == "${LEASED_RESOURCE}" || "${net}" == "${LEASED_RESOURCE}-"* || "${net}" == "${LEASED_RESOURCE}."* ]]; then
+            echo "Removing stale lease network '${net}' holding bridge ${bridge_name}..."
+            ${VIRSH} net-destroy "${net}" 2>/dev/null || true
+            ${VIRSH} net-undefine "${net}" 2>/dev/null || true
+          else
+            echo "ERROR: bridge ${bridge_name} is held by foreign network '${net}'; refusing to reclaim" >&2
+            exit 1
+          fi
         fi
       done
     fi

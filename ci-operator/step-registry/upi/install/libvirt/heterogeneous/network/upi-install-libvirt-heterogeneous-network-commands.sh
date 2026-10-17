@@ -141,9 +141,15 @@ if [[ -n "${BRIDGE_NAME}" ]]; then
     [[ -z "${NET}" ]] && continue
     NET_BRIDGE=$(${VIRSH} net-info "${NET}" 2>/dev/null | awk '/^Bridge:/{print $2}' || true)
     if [[ "${NET_BRIDGE}" == "${BRIDGE_NAME}" ]]; then
-      echo "Removing stale network '${NET}' (bridge ${BRIDGE_NAME})..."
-      ${VIRSH} net-destroy "${NET}" 2>/dev/null || true
-      ${VIRSH} net-undefine "${NET}" 2>/dev/null || true
+      # Only reclaim networks owned by this lease; never destroy a concurrent job's network.
+      if [[ "${NET}" == "${LEASED_RESOURCE}" || "${NET}" == "${LEASED_RESOURCE}-"* || "${NET}" == "${LEASED_RESOURCE}."* ]]; then
+        echo "Removing stale lease network '${NET}' (bridge ${BRIDGE_NAME})..."
+        ${VIRSH} net-destroy "${NET}" 2>/dev/null || true
+        ${VIRSH} net-undefine "${NET}" 2>/dev/null || true
+      else
+        echo "ERROR: bridge ${BRIDGE_NAME} is held by foreign network '${NET}'; refusing to reclaim" >&2
+        exit 1
+      fi
     fi
   done
 fi
