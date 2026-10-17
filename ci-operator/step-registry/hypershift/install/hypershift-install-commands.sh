@@ -175,7 +175,80 @@ if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
   EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
 fi
 
-case "${CLOUD_PROVIDER}" in
+# The AWS branch appends to EXTRA_ARGS. Keep the pre-install value so a retry
+# cannot duplicate those flags.
+BASE_EXTRA_ARGS="${EXTRA_ARGS}"
+
+# etcd_accepts_writes is the gate for retrying hypershift install. The failure
+# mode on small management clusters is an etcd WAL stall (slow fdatasync, leader
+# loss) while ODF/CNV are still reconciling. Re-applying CRDs into that stall
+# times out again, so a retry has to wait until a real write succeeds.
+# OpenShift clusters must also report etcd Available and not Degraded.
+# Management clusters without clusteroperator/etcd (AKS) only take the write probe.
+etcd_accepts_writes() {
+  local co_status co_rc
+  set +e
+  co_status="$(oc get clusteroperator etcd --request-timeout=20s -o jsonpath='{.status.conditions[?(@.type=="Available")].status}{" "}{.status.conditions[?(@.type=="Degraded")].status}' 2>&1)"
+  co_rc=$?
+  set -e
+  if [[ "${co_rc}" -ne 0 ]]; then
+    if grep -Eq "doesn't have a resource type|no matches for kind|NotFound" <<<"${co_status}"; then
+      :
+    else
+      echo "etcd clusteroperator check failed: ${co_status}"
+      return 1
+    fi
+  elif [[ "${co_status}" != "True False" ]]; then
+    echo "etcd clusteroperator is not healthy (${co_status})"
+    return 1
+  fi
+
+  local manifest apply_rc
+  manifest="$(mktemp)"
+  cat > "${manifest}" <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hypershift-install-api-probe
+  namespace: default
+data:
+  probe: "1"
+EOF
+  set +e
+  oc apply --request-timeout=20s -f "${manifest}" >/dev/null 2>&1
+  apply_rc=$?
+  oc delete --request-timeout=20s -f "${manifest}" --ignore-not-found >/dev/null 2>&1
+  set -e
+  rm -f "${manifest}"
+  return "${apply_rc}"
+}
+
+# wait_for_api_writes blocks until three consecutive write probes succeed, or
+# until the caller-supplied budget in seconds is exhausted.
+wait_for_api_writes() {
+  local deadline=$((SECONDS + $1))
+  local stable=0
+  while (( SECONDS < deadline )); do
+    if etcd_accepts_writes; then
+      stable=$((stable + 1))
+      echo "API write probe succeeded (${stable}/3)"
+      if (( stable >= 3 )); then
+        return 0
+      fi
+    else
+      stable=0
+    fi
+    sleep 20
+  done
+  return 1
+}
+
+run_hypershift_install() {
+  # The caller disables set -e around the pipeline. The pipeline runs in a
+  # subshell, so turn it back on here and keep partial failures fatal.
+  set -e
+  EXTRA_ARGS="${BASE_EXTRA_ARGS}"
+  case "${CLOUD_PROVIDER}" in
   AWS)
     if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
       EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
@@ -304,7 +377,55 @@ case "${CLOUD_PROVIDER}" in
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;
-esac
+  esac
+}
+
+# hypershift install is server-side apply, so re-running it after a partial CRD
+# apply is safe. Retry only the etcd/apiserver timeouts seen when the management
+# cluster loses its etcd leader mid-apply. Wait for writes to succeed first so
+# the retry does not add another CRD burst to an already stalled etcd.
+# The happy path is a single attempt. The 30m budget applies only after a
+# transient failure, which on the kubevirt baremetal jobs is enough for etcd to
+# recover from the ODF/CNV reconciliation stall.
+INSTALL_LOG="$(mktemp)"
+INSTALL_ATTEMPTS=3
+INSTALL_RC=1
+RETRY_DEADLINE=0
+for attempt in $(seq 1 "${INSTALL_ATTEMPTS}"); do
+  set +e
+  run_hypershift_install 2>&1 | tee "${INSTALL_LOG}"
+  INSTALL_RC=${PIPESTATUS[0]}
+  set -e
+  if [[ "${INSTALL_RC}" -eq 0 ]]; then
+    break
+  fi
+  if ! grep -Eq 'etcdserver: request timed out|etcdserver: leader changed|context deadline exceeded|the server is currently unable to handle the request|etcdserver: too many requests' "${INSTALL_LOG}"; then
+    echo "HyperShift install failed with a non-retryable error"
+    rm -f "${INSTALL_LOG}"
+    exit "${INSTALL_RC}"
+  fi
+  if [[ "${attempt}" -eq "${INSTALL_ATTEMPTS}" ]]; then
+    echo "HyperShift install failed after ${INSTALL_ATTEMPTS} attempts on a transient etcd/API error"
+    rm -f "${INSTALL_LOG}"
+    exit "${INSTALL_RC}"
+  fi
+  if [[ "${RETRY_DEADLINE}" -eq 0 ]]; then
+    RETRY_DEADLINE=$((SECONDS + 1800))
+  fi
+  remaining=$((RETRY_DEADLINE - SECONDS))
+  if (( remaining <= 0 )); then
+    echo "HyperShift install retry budget exhausted"
+    rm -f "${INSTALL_LOG}"
+    exit "${INSTALL_RC}"
+  fi
+  echo "HyperShift install hit a transient etcd/API error (attempt ${attempt}/${INSTALL_ATTEMPTS}). Waiting up to ${remaining}s for etcd to accept writes before retrying."
+  if ! wait_for_api_writes "${remaining}"; then
+    echo "etcd did not accept writes before the retry budget elapsed"
+    rm -f "${INSTALL_LOG}"
+    exit "${INSTALL_RC}"
+  fi
+done
+rm -f "${INSTALL_LOG}"
 
 # --- Post-install operator image verification ---
 # Update the verification state with data from the live deployment. The EXIT

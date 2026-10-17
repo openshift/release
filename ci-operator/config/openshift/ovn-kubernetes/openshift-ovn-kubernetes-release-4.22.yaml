@@ -519,6 +519,43 @@ tests:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
       TEST_SUITE: ovn-kubernetes/conformance/parallel
     workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: e2e-bm-hypershift-kubevirt-multinet-localnet-ote
+  capabilities:
+  - intranet
+  cluster: build09
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEBUG_WAIT_TIMEOUT: "64800"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-kubevirt-baremetalds-multinet-localnet-conformance
+  timeout: 24h0m0s # TODO(debug): Revert to 8h0m0s after debugging is complete
+- always_run: false
+  as: e2e-bm-hypershift-kubevirt-secondary-localnet-ote
+  capabilities:
+  - intranet
+  cluster: build09
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      # TODO(debug): Remove DEBUG_WAIT_TIMEOUT and revert timeout to 8h0m0s after debugging is complete
+      DEBUG_WAIT_TIMEOUT: "64800"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-kubevirt-baremetalds-secondary-localnet-conformance
+  timeout: 24h0m0s # TODO(debug): Revert to 8h0m0s after debugging is complete
 - as: unit
   commands: |
     cd go-controller

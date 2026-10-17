@@ -1,0 +1,71 @@
+ref:
+  as: hypershift-kubevirt-localnet-secondary-bridge
+  from: cli
+  grace_period: 1m0s
+  timeout: 30m0s
+  env:
+    - name: LOCALNET_SECONDARY_SUBNET
+      documentation: |-
+        IPv4 subnet of the extra network whose interface should be placed on the
+        secondary OVS bridge (e.g. 192.168.221.0/24). The step discovers the
+        matching NIC on each node by IP prefix.
+    - name: LOCALNET_SECONDARY_BRIDGE
+      default: "br-localnet"
+      documentation: "Name of the OVS bridge to create on the secondary interface."
+    - name: LOCALNET_SECONDARY_PHYSNET
+      default: "physnet-localnet"
+      documentation: |-
+        OVN physnet name added to the bridge-mapping on each node. Pass the same
+        value as LOCALNET_MULTI_PHYSNET in the hypershift-kubevirt-create step so
+        that the localnet NAD maps to this bridge.
+    - name: LOCALNET_SECONDARY_ENABLE_FORWARDING
+      default: "true"
+      documentation: |-
+        When true, patch network.operator to set ipForwarding=Global so management
+        nodes forward traffic between the secondary network and the primary network.
+    - name: LOCALNET_SECONDARY_DNSMASQ_ENABLED
+      default: "false"
+      documentation: |-
+        When true, deploy a dnsmasq DHCP server on the secondary OVS bridge on each
+        management node. Required when using subnet-less NADs (LOCALNET_MULTI_DHCP_MODE=
+        external in the create step) so that VMs get DHCP from an external source
+        instead of KubeVirt's internal DHCP (which races with OVN DHCP and wins with
+        incorrect settings). Each node gets a partitioned slice of the DHCP range to
+        avoid IP conflicts on the shared L2 segment.
+    - name: LOCALNET_SECONDARY_DNSMASQ_GATEWAY
+      default: ""
+      documentation: |-
+        Gateway IP advertised via DHCP option 3. Typically the libvirt host's IP on
+        the secondary network (e.g. 192.168.221.1), which can route to the management
+        network for API VIP reachability.
+    - name: LOCALNET_SECONDARY_DNSMASQ_DNS
+      default: ""
+      documentation: |-
+        DNS server IP advertised via DHCP option 6. Should point to a server that can
+        resolve management cluster hostnames (e.g. 192.168.111.1 for the dev-scripts
+        dnsmasq on the primary network).
+    - name: LOCALNET_SECONDARY_DNSMASQ_RANGE_START
+      default: ""
+      documentation: |-
+        First IP in the DHCP allocation range. The range is partitioned evenly across
+        management nodes. Must not overlap with management node IPs on the secondary
+        network.
+    - name: LOCALNET_SECONDARY_DNSMASQ_RANGE_END
+      default: ""
+      documentation: |-
+        Last IP in the DHCP allocation range. The range is partitioned evenly across
+        management nodes.
+  commands: hypershift-kubevirt-localnet-secondary-bridge-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Create an OVS bridge on each management-cluster node's secondary interface
+    (provisioned by baremetalds-devscripts-conf-extranetwork), add the
+    corresponding OVN bridge-mapping, and optionally enable global IP
+    forwarding. When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, also deploy a
+    per-node dnsmasq DHCP server on the bridge for subnet-less NAD topologies
+    where KubeVirt's internal DHCP must be eliminated. Run this step after
+    cluster installation but before hypershift-kubevirt-create so that localnet
+    NADs can reference the secondary bridge and VMs receive DHCP on first boot.
