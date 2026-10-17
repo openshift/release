@@ -13,7 +13,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 export HTTP_PROXY=${proxy}
 export HTTPS_PROXY=${proxy}
-
+sleep 30m
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 PULL_SECRET=$(jq -c -n '{"auths":{"test":{"auth":"dXNlcjpwYXNzCg=="}}}')
