@@ -100,13 +100,11 @@ fi
 set +e
 
 # --- Clean Primary Host ---
-echo "Removing stale domains on primary host matching lease '${LEASED_RESOURCE}'..."
 PRIMARY_INIT_DOMAINS=$(${VIRSH_PRIMARY} list --all --name 2>&1) || {
   echo "ERROR: Failed to list initial domains on primary hypervisor: ${PRIMARY_INIT_DOMAINS}"
   exit 1
 }
 
-# --- Clean Primary Host ---
 echo "Removing stale domains on primary host matching lease '${LEASED_RESOURCE}'..."
 for DOMAIN in $(echo "${PRIMARY_INIT_DOMAINS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)"); do
   ${VIRSH_PRIMARY} destroy "${DOMAIN}" >/dev/null 2>&1 || true
@@ -218,12 +216,15 @@ if [[ $? -ne 0 ]]; then
 fi
 CONFLICTING_DOMAINS_P=$(echo "${PRIMARY_LIST_DOMAINS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" || true)
 
-PRIMARY_VOLS=$(${VIRSH_PRIMARY} vol-list --pool "${POOL_NAME}" 2>&1)
-if [[ $? -ne 0 ]]; then
-  echo "ERROR: Failed to list volumes on primary pool ${POOL_NAME}: ${PRIMARY_VOLS}"
-  exit 1
+CONFLICTING_VOLUMES_P=""
+if ${VIRSH_PRIMARY} pool-list 2>/dev/null | grep -qw "${POOL_NAME}"; then
+  PRIMARY_VOLS=$(${VIRSH_PRIMARY} vol-list --pool "${POOL_NAME}" 2>&1)
+  if [[ $? -ne 0 ]]; then
+    echo "ERROR: Failed to list volumes on primary pool ${POOL_NAME}: ${PRIMARY_VOLS}"
+    exit 1
+  fi
+  CONFLICTING_VOLUMES_P=$(echo "${PRIMARY_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
 fi
-CONFLICTING_VOLUMES_P=$(echo "${PRIMARY_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
 
 CONFLICTING_HTTPD_VOLUMES_P=""
 PRIMARY_VERIFY_ALL_POOLS=$(${VIRSH_PRIMARY} pool-list --all --name 2>&1)
@@ -264,12 +265,15 @@ if [[ $? -ne 0 ]]; then
 fi
 CONFLICTING_DOMAINS_A=$(echo "${ADD_LIST_DOMAINS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" || true)
 
-ADD_VOLS=$(${VIRSH_ADDITIONAL} vol-list --pool "${ADDITIONAL_POOL}" 2>&1)
-if [[ $? -ne 0 ]]; then
-  echo "ERROR: Failed to list volumes on additional pool ${ADDITIONAL_POOL}: ${ADD_VOLS}"
-  exit 1
+CONFLICTING_VOLUMES_A=""
+if ${VIRSH_ADDITIONAL} pool-list 2>/dev/null | grep -qw "${ADDITIONAL_POOL}"; then
+  ADD_VOLS=$(${VIRSH_ADDITIONAL} vol-list --pool "${ADDITIONAL_POOL}" 2>&1)
+  if [[ $? -ne 0 ]]; then
+    echo "ERROR: Failed to list volumes on additional pool ${ADDITIONAL_POOL}: ${ADD_VOLS}"
+    exit 1
+  fi
+  CONFLICTING_VOLUMES_A=$(echo "${ADD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
 fi
-CONFLICTING_VOLUMES_A=$(echo "${ADD_VOLS}" | grep -E "^${LEASED_RESOURCE}([-.]|$)" | awk '{ print $1 }' || true)
 
 ADD_NETS=$(${VIRSH_ADDITIONAL} net-list --all --name 2>&1)
 if [[ $? -ne 0 ]]; then
