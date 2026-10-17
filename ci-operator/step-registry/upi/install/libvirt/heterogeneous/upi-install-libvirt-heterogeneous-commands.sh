@@ -553,7 +553,11 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
 
   domain_cmdline="rd.neednet=1 net.ifnames=0 biosdevname=0 console=ttyS0,115200n8 "
   domain_cmdline+="coreos.inst.install_dev=/dev/vda coreos.live.rootfs_url=${HTTPD_BASE_URL}/${ROOTFS_FILENAME} "
-  domain_cmdline+="ip=${node_ip}::${node_gw}:${node_netmask}:${node_fqdn}:${node_nic}:none:1500 "
+  # Guest MTU 1400: VXLAN underlay often cannot carry 1500-byte frames end-to-end until
+  # infra raises host bridge/VXLAN MTU (same class of issue that blocked arm64 until
+  # ocp2-arm was fixed manually). Domain XML may still advertise 1500; cmdline wins for
+  # the live-ISO NIC used to fetch rootfs/ignition from primary HTTPD.
+  domain_cmdline+="ip=${node_ip}::${node_gw}:${node_netmask}:${node_fqdn}:${node_nic}:none:1400 "
   domain_cmdline+="nameserver=${node_nameserver} "
   domain_cmdline+="coreos.inst.ignition_url=${HTTPD_BASE_URL}/${LEASE_WORKER_IGN_FILENAME}"
   echo "Install cmdline for ${node_name}: ${domain_cmdline}"
