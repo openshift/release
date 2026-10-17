@@ -10,6 +10,11 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+releases:
+  latest:
+    integration:
+      name: "5.1"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -22,6 +27,33 @@ tests:
   commands: make verify OFFLINE=1
   container:
     from: ansible-test-runner
+- always_run: false
+  as: aws-vm-rhel10
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_AMI: ami-0da467f007dfebd6b
+      EC2_INSTANCE_TYPE: m6i.xlarge
+      EC2_REGION: us-west-2
+      REGION: us-west-2
+    post:
+    - ref: aws-deprovision-stacks
+    pre:
+    - chain: openshift-image-based-infra-aws-ec2
+    test:
+    - as: smoke
+      commands: |
+        set -euo pipefail
+        ip=$(cat "${SHARED_DIR}/public_address")
+        user=$(cat "${SHARED_DIR}/ssh_user")
+        ssh -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          "${user}@${ip}" 'cat /etc/os-release && sudo dnf install -y podman && podman version'
+      from: ansible-test-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
