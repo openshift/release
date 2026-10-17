@@ -164,8 +164,25 @@ ${VIRSH} net-define "${SHARED_DIR}/network.xml"
 ${VIRSH} net-autostart "${CLUSTER_NAME}"
 ${VIRSH} net-start "${CLUSTER_NAME}"
 
-if ! ${VIRSH} net-info "${CLUSTER_NAME}" 2>/dev/null | grep -q '^Active:.*yes'; then
-  echo "ERROR: Libvirt network ${CLUSTER_NAME} defined but not active"
+# net-start can return before net-info reports Active=yes (seen in VPN rehearse).
+# Retry briefly; the working non-hetero network step does not hard-fail immediately.
+network_active=false
+for (( i=1; i<=15; i++ )); do
+  active="$(${VIRSH} net-info "${CLUSTER_NAME}" 2>/dev/null | awk '/^Active:/{print $2; exit}' || true)"
+  if [[ "${active}" == "yes" ]]; then
+    network_active=true
+    break
+  fi
+  # Fallback: net-list State column (same truth as Active in practice).
+  if ${VIRSH} net-list --all 2>/dev/null | awk -v n="${CLUSTER_NAME}" '$1==n && $2=="active" {found=1} END{exit !found}'; then
+    network_active=true
+    break
+  fi
+  sleep 1
+done
+
+if [[ "${network_active}" != "true" ]]; then
+  echo "ERROR: Libvirt network ${CLUSTER_NAME} defined but not active after wait"
   ${VIRSH} net-list --all || true
   ${VIRSH} net-info "${CLUSTER_NAME}" || true
   exit 1
