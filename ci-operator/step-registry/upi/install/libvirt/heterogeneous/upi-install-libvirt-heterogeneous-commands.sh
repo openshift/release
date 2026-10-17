@@ -539,11 +539,13 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export DISK_SOURCE_PATH="${domain_qcow2_image_host_path}"
   export MAC_ADDRESS="${node_mac}"
   export NETWORK_NAME="${ADDITIONAL_NETWORK_NAME}"
+  # amd64 VPN domain templates use ${ADDITIONAL_NETWORK_NAME}; arm templates may use NETWORK_NAME/LEASED_RESOURCE.
+  export ADDITIONAL_NETWORK_NAME
   export DOMAIN_MAC="${node_mac}"
   export LEASED_RESOURCE
 
-  # Whitelist — supports templates using either NETWORK_NAME or LEASED_RESOURCE.
-  TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC'
+  # Whitelist — cover all network var names used by cluster-profile domain templates.
+  TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $ADDITIONAL_NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC'
 
   echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME})..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
