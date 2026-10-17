@@ -149,7 +149,22 @@ function RunTestCase1 () {
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
-    sleep 60
+    # Wait for BuildConfig to be created by Quay Bridge Operator
+    : "Waiting for BuildConfig httpd-example to appear in e2e-opp (timeout: 300s)..."
+    typeset -i bcMaxWait=300
+    typeset -i bcWaited=0
+    while ! oc get buildconfig httpd-example -n e2e-opp &>/dev/null; do
+        if ((bcWaited >= bcMaxWait)); then
+            : "ERROR: BuildConfig httpd-example not found after ${bcMaxWait}s"
+            oc get buildconfig -n e2e-opp || true
+            oc get events -n e2e-opp --sort-by='.lastTimestamp' | tail -20 || true
+            return 1
+        fi
+        : "BuildConfig httpd-example not found yet (${bcWaited}s/${bcMaxWait}s)"
+        sleep 15
+        bcWaited=$((bcWaited + 15))
+    done
+    : "BuildConfig httpd-example is available"
 
     # Verify e2e-opp namespace was created
     oc get namespace e2e-opp || return 1
@@ -367,6 +382,60 @@ fi
 
 : "QuayIntegration quay found"
 oc get quayintegration quay -o yaml --ignore-not-found
+
+################################################################################
+# QuayIntegration Readiness Gate
+################################################################################
+: "====== Readiness Gate: Waiting for QuayIntegration / QuayRegistry ======"
+
+typeset -i qiMaxWait=600
+typeset -i qiWaited=0
+typeset qiReady=false
+
+while ((qiWaited < qiMaxWait)); do
+    # Primary signal: QuayRegistry CR is Available (Quay is deployed and operational)
+    typeset qrAvailable=""
+    qrAvailable=$(oc get quayregistry --all-namespaces \
+        -o jsonpath='{.items[0].status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "")
+
+    if [[ "${qrAvailable}" == "True" ]]; then
+        : "QuayRegistry is Available - Quay is operational"
+        qiReady=true
+        break
+    fi
+
+    # Fallback: check QuayIntegration status (handle missing fields gracefully)
+    typeset qiSuccess=""
+    qiSuccess=$(oc get quayintegration quay \
+        -o jsonpath='{.status.conditions[?(@.type=="QuayIntegrationSuccess")].status}' 2>/dev/null || echo "")
+
+    if [[ "${qiSuccess}" == "True" ]]; then
+        : "QuayIntegration reports QuayIntegrationSuccess=True"
+        qiReady=true
+        break
+    fi
+
+    : "Waiting for QuayIntegration readiness... (${qiWaited}s/${qiMaxWait}s)"
+    sleep 15
+    qiWaited=$((qiWaited + 15))
+done
+
+if [[ "${qiReady}" != "true" ]]; then
+    : "ERROR: QuayIntegration CR 'quay' not Ready after ${qiMaxWait}s - Quay chain incomplete"
+
+    # Dump diagnostic info
+    oc get quayintegration quay -o yaml --ignore-not-found || true
+    oc get quayregistry --all-namespaces -o yaml --ignore-not-found || true
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="failed"
+        testFailureMsg["${test}"]="QuayIntegration CR 'quay' not Ready after ${qiMaxWait}s - Quay chain incomplete"
+    done
+
+    exit 0
+fi
+
+: "QuayIntegration readiness gate passed (${qiWaited}s elapsed)"
 
 ################################################################################
 # Execute Test Cases
