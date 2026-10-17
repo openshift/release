@@ -547,13 +547,21 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   # Whitelist — cover all network var names used by cluster-profile domain templates.
   TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $ADDITIONAL_NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC'
 
-  echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME})..."
+  echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME}, memory_kib=${DOMAIN_MEMORY}, vcpus=${DOMAIN_VCPUS})..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
   envsubst "${TEMPLATE_VARS}" < "${INSTALL_TEMPLATE}" > "${domain_install_xml}"
 
   echo "Defining and starting install domain for ${node_name}..."
   CURRENT_INSTALL_DOMAIN="${node_name}"
-  ${VIRSH_ADDITIONAL} create "${domain_install_xml}" --validate
+  if ! ${VIRSH_ADDITIONAL} create "${domain_install_xml}" --validate; then
+    echo "ERROR: Failed to create install domain ${node_name}; dumping memory settings and host free memory..."
+    grep -E '<memory|<currentMemory|vcpu' "${domain_install_xml}" || true
+    ${VIRSH_ADDITIONAL} nodememstats 2>/dev/null || true
+    ${VIRSH_ADDITIONAL} list --all 2>/dev/null || true
+    cp -f "${domain_install_xml}" "${ARTIFACT_DIR}/domain-${node_name}-install-failed.xml" 2>/dev/null || true
+    rm -f "${domain_install_xml}"
+    exit 1
+  fi
   rm -f "${domain_install_xml}"
 
   wait_for_domain_deletion "${node_name}"
