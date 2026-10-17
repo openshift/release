@@ -63,7 +63,7 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.apiFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
 		;;
-	proxy*)
+	proxy*|externallb)
 		yq --yaml-output --in-place ".
 			| .networking.machineNetwork[0].cidr = \"$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)\"
 			| .platform.openstack.apiVIP = \"${API_IP}\"
