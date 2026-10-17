@@ -8,16 +8,15 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 # If `OCP_VERSION` is not set, try to extract it form `JOB_NAME`.
 if [ -z "${OCP_VERSION}" ]; then
-    if [[ "${JOB_NAME}" =~ ocp-([0-9]+\.[0-9]+) ]]; then
+    if [[ "${JOB_NAME}" =~ ocp-?([0-9]+\.[0-9]+) ]]; then
         OCP_VERSION="${BASH_REMATCH[1]}"
     else
         OCP_VERSION="unknown"
     fi
 fi
 
-DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
-    REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
-    REPORTPORTAL_LAUNCH_ATTRIBUTES="$(
+typeset launchAttributes=""
+launchAttributes=$(
         jq -nc \
             --arg jobName "${JOB_NAME}" \
             --arg buildID "${BUILD_ID}" \
@@ -31,7 +30,11 @@ DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
                 {key: "ComponentReadiness_ComponentName", value: $crCompName},
                 {key: "fips_enabled", value: $fipsEnabled}
             ]'
-    )" \
+)
+
+DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
+    REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
+    REPORTPORTAL_LAUNCH_ATTRIBUTES="${launchAttributes}" \
     datarouter-openshift-ci
 
 true
