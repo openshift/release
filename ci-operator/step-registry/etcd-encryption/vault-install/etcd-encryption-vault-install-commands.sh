@@ -769,7 +769,7 @@ initialize_or_unseal_vault() {
   # container picks up the real VAULT_TOKEN. This is separate from the earlier
   # StatefulSet restart that mounts the service-CA TLS certificate.
   echo "Recreating ${pod_name} so init secrets mount and VAULT_TOKEN is refreshed..."
-  oc delete pod "${pod_name}" -n "${namespace}" --wait=false
+  oc delete pod "${pod_name}" -n "${namespace}" --ignore-not-found --wait=true
   wait_for_vault_pod_created "${namespace}" "${pod_name}"
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
   wait_for_vault_listener "${namespace}" "${pod_name}"
@@ -779,10 +779,12 @@ initialize_or_unseal_vault() {
 restart_vault_statefulset() {
   local namespace="$1"
   local release_name="$2"
+  local pod_name="${release_name}-0"
 
   echo "Restarting StatefulSet ${release_name} to mount service-CA TLS..."
   oc patch statefulset "${release_name}" -n "${namespace}" --type merge -p \
     "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"vault.hashicorp.com/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}"
+  oc delete pod "${pod_name}" -n "${namespace}" --ignore-not-found --wait=true
 }
 
 describe_vault_workload() {
