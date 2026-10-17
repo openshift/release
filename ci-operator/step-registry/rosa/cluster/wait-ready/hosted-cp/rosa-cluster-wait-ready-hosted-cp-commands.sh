@@ -128,9 +128,68 @@ check_hostedcontrolplane() {
 wait_for "HostedControlPlane '${CLUSTER_NAME}' in ${HCP_NAMESPACE}" check_hostedcontrolplane
 
 # 3. Check pod status in HCP namespace
+POD_LIST_ERROR=""
+
+pod_api_error() {
+  case "${1}" in
+    *Forbidden*|*forbidden*) echo "Forbidden" ;;
+    *Unauthorized*|*unauthorized*) echo "Unauthorized" ;;
+    *timed\ out*|*Timeout*|*deadline\ exceeded*) echo "Timeout" ;;
+    *x509:*|*TLS*) echo "TLS error" ;;
+    *connection\ refused*|*no\ such\ host*) echo "Connection error" ;;
+    *) echo "API request failed (details omitted)" ;;
+  esac
+}
+
+diagnose_pods() (
+  set +x
+  local sanitize='def text: tostring | .[:160] | gsub("[^a-zA-Z0-9_.:/-]"; "_");'
+  log "Pod readiness failure diagnostics (up to 100 pods and 20 warning events; messages omitted)"
+  if [[ -n "${POD_LIST_ERROR}" ]]; then
+    log "Last pod-list API error: ${POD_LIST_ERROR}"
+  fi
+  if ! KUBECONFIG="${MC_KUBECONFIG}" timeout --kill-after=5s 20s oc get pods -n "${HCP_NAMESPACE}" \
+    --request-timeout=15s -o json 2>/dev/null | head -c 1048576 | jq -c "${sanitize}"'
+      def containers:
+        [.[]? | {name: (.name | text), ready, restartCount,
+          waitingReason: (.state.waiting.reason // "" | text),
+          terminated: (.state.terminated | if . then {reason: (.reason | text), exitCode, signal} else null end),
+          lastTermination: (.lastState.terminated | if . then {reason: (.reason | text), exitCode, signal} else null end)}][:20];
+      {totalPods: (.items | length), pods: [.items | sort_by(any(.status.conditions[]?;
+        .type == "Ready" and .status == "True")) | .[:100][] |
+        {name: (.metadata.name | text), phase: (.status.phase | text),
+         conditions: [.status.conditions[]? | {type: (.type | text), status: (.status | text),
+           reason: (.reason // "" | text)}][:20],
+         initContainers: (.status.initContainerStatuses | containers),
+         containers: (.status.containerStatuses | containers)}]}' 2>/dev/null; then
+    log "Pod diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
+  fi
+  if ! KUBECONFIG="${MC_KUBECONFIG}" timeout --kill-after=5s 20s oc get events -n "${HCP_NAMESPACE}" \
+    --request-timeout=15s --field-selector=involvedObject.kind=Pod,type=Warning -o json 2>/dev/null \
+    | head -c 1048576 | jq -c "${sanitize}"'
+      {warningEvents: [.items | sort_by(.lastTimestamp // .eventTime // .metadata.creationTimestamp) |
+        .[-20:][] | {pod: (.involvedObject.name | text), reason: (.reason | text), count,
+          lastObserved: (.lastTimestamp // .eventTime // .metadata.creationTimestamp | text)}]}' 2>/dev/null; then
+    log "Event diagnostics unavailable (request failed, timed out, or exceeded 1 MiB)"
+  fi
+)
+
 check_pods() {
-  local pod_list
-  pod_list=$(KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" --no-headers 2>/dev/null) || return 1
+  local pod_list pod_error_file status was_tracing=false
+  [[ $- == *x* ]] && was_tracing=true
+  set +x
+  pod_error_file=$(mktemp) || return 1
+  if pod_list=$(KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" \
+    --no-headers 2>"${pod_error_file}"); then
+    rm -f "${pod_error_file}"
+    $was_tracing && set -x
+  else
+    status=$?
+    POD_LIST_ERROR="$(pod_api_error "$(head -c 4096 "${pod_error_file}")") (exit ${status})"
+    rm -f "${pod_error_file}"
+    $was_tracing && set -x
+    return 1
+  fi
   if (( $(echo "${pod_list}" | wc -l) < 10 )); then
     log "Too few pods found, expected at least 10"
     return 1
@@ -138,7 +197,17 @@ check_pods() {
   NOT_READY=$(echo "${pod_list}" | grep -v -E "Running|Completed|Succeeded" || true)
   [[ -z "${NOT_READY}" ]]
 }
+pod_readiness_exit() {
+  local status=$?
+  trap - EXIT
+  if (( status != 0 )); then
+    diagnose_pods || true
+  fi
+  exit "${status}"
+}
+trap pod_readiness_exit EXIT
 wait_for "all pods ready in ${HCP_NAMESPACE}" check_pods
+trap - EXIT
 KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" -o wide || true
 
 # 4. Check VpcEndpoint 'private-hcp' in HCP namespace
