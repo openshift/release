@@ -3,6 +3,19 @@
 set -euo pipefail
 set -x
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Quay/Mailpit route calls (and the
+# Playwright run) can connect; cloud jobs have no such file and skip this.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace while sourcing: proxy-conf.sh exports proxy URLs that may
+  # carry credentials, which `set -x` would echo into the Prow logs.
+  set +x
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
+fi
+
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p "${ARTIFACT_DIR}"
 
