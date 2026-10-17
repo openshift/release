@@ -1046,7 +1046,7 @@ tests:
       timeout: 2h0m0s
     - ref: ipi-install-rbac
     test:
-    - as: grant-network-role
+    - as: route-server-assignee
       cli: latest
       commands: |
         # The principal passthrough hands the operator holds Network Contributor
@@ -1055,20 +1055,11 @@ tests:
         # group this job owns, so the operator is refused when it tries to
         # discover or peer it. Measured, twice.
         #
-        # Granting that principal a role over the network resource group is the
-        # repair, and the cluster profile's principal may make it. This is the
-        # step an ARO job needs that no other cloud's job does.
+        # The Route Server does not exist until the test step creates it, so
+        # this only names the principal; the test grants it Network
+        # Contributor on the Route Server alone, straight after creating it
+        # (hack/azure/grant-route-server-role.sh in bgp-cloud-connector).
         set -euo pipefail
-
-        redact() {
-          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
-        }
-
-        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
-        if [[ -z "${net_rg}" ]]; then
-          net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
-        fi
-        echo "the group holding the estate: ${net_rg}"
 
         # Passthrough hands out the cluster's own principal, so the grant goes to
         # whoever kube-system/azure-credentials names rather than to a principal
@@ -1086,35 +1077,10 @@ tests:
           --username "$(jq -er .clientId "${sp}")" \
           --password="$(jq -er .clientSecret "${sp}")" \
           --tenant "$(jq -er .tenantId "${sp}")" --output none
-        subscription="$(jq -er .subscriptionId "${sp}")"
-        az account set --subscription "${subscription}"
+        az account set --subscription "$(jq -er .subscriptionId "${sp}")"
 
-        object_id="$(az ad sp show --id "${client_id}" --query id -o tsv)"
-        az role assignment create --assignee-object-id "${object_id}" \
-          --assignee-principal-type ServicePrincipal --role "Network Contributor" \
-          --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
-          --output none 2>&1 | redact
-        echo "granted Network Contributor over ${net_rg}"
-
-        # A role assignment is not usable the instant it exists. Measured on
-        # three runs at about twenty seconds, over two minutes, and six minutes,
-        # so this waits for it to be observably usable rather than sleeping a
-        # guess and hoping.
-        echo "waiting for it to become usable..."
-        for attempt in $(seq 1 36); do
-          if az role assignment list --assignee "${object_id}" \
-               --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
-               --query "[?roleDefinitionName=='Network Contributor'] | length(@)" -o tsv 2>/dev/null \
-               | grep -qv '^0$'; then
-            echo "  visible after $(( attempt * 20 )) seconds"
-            break
-          fi
-          if (( attempt == 36 )); then
-            echo "the role assignment never became visible" >&2
-            exit 1
-          fi
-          sleep 20
-        done
+        az ad sp show --id "${client_id}" --query id -o tsv >"${SHARED_DIR}/route-server-assignee"
+        echo "the test grants the cluster principal Network Contributor on the Route Server"
       from: e2e-runner
       grace_period: 10m0s
       resources:
@@ -1195,7 +1161,8 @@ tests:
           memory: 200Mi
     - as: test
       cli: latest
-      commands: hack/ci-e2e-azure.sh
+      commands: ROUTE_SERVER_ASSIGNEE="$(<"${SHARED_DIR}/route-server-assignee")"
+        hack/ci-e2e-azure.sh
       from: e2e-runner
       grace_period: 1h0m0s
       resources:
@@ -1599,8 +1566,8 @@ tests:
         done
         echo "granted Network Contributor over ${RESOURCEGROUP}"
 
-        # Usable is not the same as created; grant-network-role measured
-        # twenty seconds to six minutes.
+        # Usable is not the same as created; on the service principal job a
+        # grant measured twenty seconds to six minutes.
         for attempt in $(seq 1 36); do
           if az role assignment list --assignee "${op_principal}" --scope "${scope}" \
                --query "[?roleDefinitionName=='Network Contributor'] | length(@)" -o tsv 2>/dev/null \
@@ -2183,7 +2150,6 @@ tests:
         cluster="$(<"${SHARED_DIR}/cluster-name")"
         rg="$(<"${SHARED_DIR}/resourcegroup")"
         managed_rg="${rg}-managed"
-        rg_scope="/subscriptions/${subscription}/resourceGroups/${rg}"
         managed_scope="/subscriptions/${subscription}/resourceGroups/${managed_rg}"
         ns=openshift-bgp-cloud-connector
         sa=openshift-bgp-cloud-connector-controller-manager
@@ -2201,23 +2167,32 @@ tests:
         echo "created ${identity}, trusted for ${ns}/${sa}"
 
         # The CI principal is refused Microsoft.Authorization/roleDefinitions/write,
-        # so both roles are built-in rather than custom roles with only the
+        # so every role is built-in rather than a custom role with only the
         # operator's actions. On the managed group, Azure Red Hat OpenShift
         # Network Operator (be7a6435-15ae-4171-8f30-4a343eff9e8f) holds the
         # three actions the operator needs there, which are the ones the ARO
         # HCP deny assignment has to let through: networkInterfaces/read and
         # /write, and loadBalancers/backendAddressPools/join/action. Its other
-        # four are vnet, backend pool and VM reads and the subnet join. No
-        # built-in role narrower than Network Contributor covers the Route
-        # Server's BGP connections, so the cluster's group keeps it.
-        declare -A roles=(
-          ["${rg_scope}"]="Network Contributor"
-          ["${managed_scope}"]="Azure Red Hat OpenShift Network Operator"
-        )
+        # four are vnet, backend pool and VM reads and the subnet join.
+        #
+        # The interface write also checks virtualNetworks/subnets/join/action
+        # on the router nodes' subnet, which is in this cluster's group, so
+        # Network Contributor goes on that subnet alone. The Route Server does
+        # not exist until the test step creates it; the test grants Network
+        # Contributor on it there (hack/azure/grant-route-server-role.sh in
+        # bgp-cloud-connector), since no narrower built-in role covers its BGP
+        # connections.
+        declare -A roles=(["${managed_scope}"]="Azure Red Hat OpenShift Network Operator")
+        while read -r subnet_id; do
+          [[ -n "${subnet_id}" ]] && roles["${subnet_id}"]="Network Contributor"
+        done < <(az network nic list -g "${managed_rg}" \
+                   --query '[].ipConfigurations[].subnet.id' -o tsv | sort -u)
+        (( ${#roles[@]} > 1 )) || { echo "found no subnet for the nodes' interfaces in ${managed_rg}" >&2; exit 1; }
+        echo "${principal_id}" >"${SHARED_DIR}/route-server-assignee"
 
         # A new principal takes a while to replicate; an assignment made too
         # soon fails with PrincipalNotFound.
-        for scope in "${rg_scope}" "${managed_scope}"; do
+        for scope in "${!roles[@]}"; do
           role="${roles[${scope}]}"
           for attempt in $(seq 1 18); do
             if az role assignment create --assignee-object-id "${principal_id}" \
@@ -2303,7 +2278,9 @@ tests:
         # No kube-system/azure-credentials on a hosted cluster, so the suite
         # writes interfaces as the identity the profile names, which here is
         # the operator's own.
-        NETWORK_INTERFACE_CLIENT_ID="$(<"${SHARED_DIR}/operator-client-id")" hack/ci-e2e-azure.sh
+        NETWORK_INTERFACE_CLIENT_ID="$(<"${SHARED_DIR}/operator-client-id")" \
+          ROUTE_SERVER_ASSIGNEE="$(<"${SHARED_DIR}/route-server-assignee")" \
+          hack/ci-e2e-azure.sh
       credentials:
       - collection: hcm-aro
         group: aro-hcp-int-rh
