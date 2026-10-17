@@ -9,6 +9,9 @@ tests:
       # Mailpit stays off and the @feature:MAILING specs self-skip.
       QUAY_DEPLOY_MAILPIT: "false"
 {%- endif %}
+{%- if dualstack %}
+      IP_FAMILY: DualStackIPv6Primary
+{%- endif %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
 {%- if storage == "odf" %}
       SETUP_NOOBAA: "true"
@@ -36,6 +39,9 @@ tests:
 {%- if fips %}
         FEATURE_FIPS: true
 {%- endif %}
+{%- if dualstack %}
+        FEATURE_LISTEN_IP_VERSION: dual-stack
+{%- endif %}
 {%- if quay_version is defined and quay_version.split(".")[0] | int >= 5 %}
         FEATURE_ROBOT_API_TOKENS: true
 {%- endif %}
@@ -53,4 +59,7 @@ tests:
     - ref: quay-install-odf-operator
 {%- endif %}
     - ref: "{{ deploy_ref }}"
+{%- if dualstack %}
+    - ref: quay-check-dualstack
+{%- endif %}
     - ref: quay-test-e2e
