@@ -46,6 +46,33 @@ function set_proxy () {
 }
 set_proxy
 
+query_error=$(mktemp)
+trap 'rm -f "${query_error}"' EXIT
+
+function fail_readiness_access() {
+  log "ERROR: $1"
+  printf '%s\n' "$1" | tee "${ARTIFACT_DIR}/co_status.log" >> "${ARTIFACT_DIR}/co_query.log"
+  exit 1
+}
+
+if [[ -z "${KUBECONFIG:-}" || ! -r "${KUBECONFIG}" || ! -s "${KUBECONFIG}" ]]; then
+  fail_readiness_access "Kubeconfig is missing, empty or unreadable; refusing in-cluster credential fallback"
+fi
+
+if ! config_server=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>"${query_error}") || [[ -z "${config_server}" ]]; then
+  fail_readiness_access "Kubeconfig has no usable current-context server; check the preceding credential handoff"
+fi
+unset config_server
+
+function save_operator_status() {
+  local output
+  if output=$(oc get clusteroperators 2>"${query_error}"); then
+    printf '%s\n' "${output:-No cluster operators returned.}" > "$1"
+  else
+    printf '%s\n' "Failed to query clusteroperators; status is unavailable, not evidence of operator failure." > "$1"
+  fi
+}
+
 # Infer the most likely namespace for a cluster operator.
 # Most operators follow the "openshift-<name>" convention; known
 # exceptions are mapped explicitly.
@@ -81,19 +108,21 @@ function collect_operator_diagnostics() {
   log "  Diagnostics for operator '${operator}' (namespace: ${ns}):"
   log "  --- Pod status ---"
   local pod_output
-  pod_output=$(oc get pods -n "${ns}" --no-headers 2>/dev/null) || true
-  if [[ -n "${pod_output}" ]]; then
+  if ! pod_output=$(oc get pods -n "${ns}" --no-headers 2>"${query_error}"); then
+    log "    (pod query failed; status unavailable)"
+  elif [[ -n "${pod_output}" ]]; then
     while IFS= read -r line; do
       log "    ${line}"
     done <<< "${pod_output}"
   else
-    log "    (namespace ${ns} not found or no pods)"
+    log "    (no pods returned)"
   fi
 
   log "  --- Recent events (last 10) ---"
   local event_output
-  event_output=$(oc get events -n "${ns}" --sort-by='.lastTimestamp' 2>/dev/null | tail -10) || true
-  if [[ -n "${event_output}" ]]; then
+  if ! event_output=$(oc get events -n "${ns}" --sort-by='.lastTimestamp' 2>"${query_error}" | tail -10); then
+    log "    (event query failed; status unavailable)"
+  elif [[ -n "${event_output}" ]]; then
     while IFS= read -r line; do
       log "    ${line}"
     done <<< "${event_output}"
@@ -139,6 +168,7 @@ function wait_for_operator_condition() {
   local iteration=0
   local crashloop_consecutive=0
   local previous_crashloop_operators=""
+  local query_failed=false
 
   log "Waiting for cluster operators: ${condition}=${desired_value} (timeout: $(( timeout / 60 ))m, poll: ${poll_interval}s)"
 
@@ -151,18 +181,36 @@ function wait_for_operator_condition() {
     # ---- Overall timeout check ----
     if (( elapsed >= timeout )); then
       check_failed="${description}"
+      if [[ "${query_failed}" == "true" ]]; then
+        check_failed="Cluster operator readiness query unavailable at timeout (${condition}=${desired_value}); operator status unknown"
+      fi
       log "ERROR: ${check_failed}"
-      oc get clusteroperators 2>/dev/null || true
+      save_operator_status "${ARTIFACT_DIR}/co_status.log"
       return
     fi
 
     # ---- Fetch cluster operator state ----
     local co_json
-    co_json=$(oc get clusteroperators -o json 2>/dev/null) || {
+    co_json=$(oc get clusteroperators -o json 2>"${query_error}") || {
+      query_failed=true
+      if grep -Fq 'Error from server (Forbidden)' "${query_error}"; then
+        fail_readiness_access "Cluster operator query denied (Forbidden); check guest credentials and permissions"
+      elif grep -Eq 'Error from server \(Unauthorized\)|You must be logged in to the server|the server has asked for the client to provide credentials' "${query_error}"; then
+        fail_readiness_access "Cluster operator query denied (Unauthorized); check guest credentials and permissions"
+      fi
+      printf '%s\n' "$(date '+%Y-%m-%dT%H:%M:%S') Cluster operator query failed (retryable or unclassified); operator status unknown." >> "${ARTIFACT_DIR}/co_query.log"
       log "WARNING: Failed to query clusteroperators, will retry in ${poll_interval}s..."
       sleep "${poll_interval}"
       continue
     }
+
+    if ! echo "${co_json}" | jq -e --arg condition "${condition}" '
+      (.items | type == "array" and length > 0) and
+      all(.items[]; .status.conditions | any(.type == $condition and
+        (.status == "True" or .status == "False" or .status == "Unknown")))' >/dev/null 2>&1; then
+      fail_readiness_access "Invalid or empty cluster operator response; readiness cannot be determined"
+    fi
+    query_failed=false
 
     # ---- Identify operators that do NOT yet satisfy the condition ----
     local not_ready_operators
@@ -286,7 +334,7 @@ function wait_for_operator_condition() {
       local snapshot_ts
       snapshot_ts=$(date "+%Y%m%d_%H%M%S")
       local snapshot_file="${ARTIFACT_DIR}/co_status_${snapshot_ts}.log"
-      oc get clusteroperators > "${snapshot_file}" 2>&1 || true
+      save_operator_status "${snapshot_file}"
       log "  Artifact snapshot saved: co_status_${snapshot_ts}.log"
     fi
 
@@ -308,7 +356,7 @@ end_time=$(date +"%s")
 
 # Persist final CO status for artifact collection
 CO_STATUS_LOG="${ARTIFACT_DIR}/co_status.log"
-oc get clusteroperators > "${CO_STATUS_LOG}" 2>&1 || true
+save_operator_status "${CO_STATUS_LOG}"
 
 if [[ -z "${check_failed}" ]]; then
   record_cluster "timers" "co_wait_time" $(( "${end_time}" - "${start_time}" ))
@@ -319,7 +367,7 @@ if [[ -z "${check_failed}" ]]; then
   wait_for_operator_condition "Available" "True" 600 \
     "Some cluster operators are not Available"
   CO_AVAIL_LOG="${ARTIFACT_DIR}/co_available.log"
-  oc get clusteroperators > "${CO_AVAIL_LOG}" 2>&1 || true
+  save_operator_status "${CO_AVAIL_LOG}"
 fi
 
 if [[ -z "${check_failed}" ]]; then
@@ -328,7 +376,7 @@ if [[ -z "${check_failed}" ]]; then
   wait_for_operator_condition "Degraded" "False" 600 \
     "Some cluster operators are Degraded"
   CO_DEGRADED_LOG="${ARTIFACT_DIR}/co_degraded.log"
-  oc get clusteroperators > "${CO_DEGRADED_LOG}" 2>&1 || true
+  save_operator_status "${CO_DEGRADED_LOG}"
 fi
 
 if [[ -z "${check_failed}" ]]; then
@@ -348,7 +396,8 @@ fi
 
 if [[ -n "${check_failed}" ]]; then
   echo "ERROR: ${check_failed}"
-  oc get clusteroperators
+  save_operator_status "${CO_STATUS_LOG}"
+  cat "${CO_STATUS_LOG}"
   if [[ -e "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url" ]]; then
     echo "Meet operator issue. Sleep 3h to call debugging."
     CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
