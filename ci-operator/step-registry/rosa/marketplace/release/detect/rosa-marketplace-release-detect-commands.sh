@@ -296,8 +296,8 @@ main() {
   local lookup_rc=0
   local -a missing=()
 
-  validate_settings
   rm -f -- "${STATE_FILE}" "${OCP_VERSION_FILE}"
+  validate_settings
   WORK_DIR=$(mktemp -d "${TMPDIR:-/tmp}/rosa-marketplace-release-detect.XXXXXX") \
     || fail "failed to create temporary work directory"
   trap cleanup EXIT
