@@ -347,9 +347,6 @@ EOF
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
-if [[ "$JOB_NAME" != *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
-    PLAYBOOK_ARGS+=" -e image_override=quay.io/hypershift/hypershift-operator:latest "
-fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
