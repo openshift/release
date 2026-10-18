@@ -206,8 +206,12 @@ function wait_for_operator_condition() {
 
     if ! echo "${co_json}" | jq -e --arg condition "${condition}" '
       (.items | type == "array" and length > 0) and
-      all(.items[]; .status.conditions | any(.type == $condition and
-        (.status == "True" or .status == "False" or .status == "Unknown")))' >/dev/null 2>&1; then
+      all(.items[]; .status.conditions as $conditions |
+        $conditions == null or (($conditions | type == "array") and
+          all($conditions[]; type == "object" and
+            (.type | type == "string" and length > 0) and
+            (.type != $condition or
+              (.status == "True" or .status == "False" or .status == "Unknown")))))' >/dev/null 2>&1; then
       fail_readiness_access "Invalid or empty cluster operator response; readiness cannot be determined"
     fi
     query_failed=false
@@ -216,8 +220,9 @@ function wait_for_operator_condition() {
     local not_ready_operators
     not_ready_operators=$(echo "${co_json}" | jq -r \
       --arg cond "${condition}" --arg val "${desired_value}" \
-      '.items[] | select(.status.conditions[]? |
-        select(.type==$cond and .status!=$val)) | .metadata.name' \
+      '.items[] | select(
+        [.status.conditions[]? | select(.type == $cond)] |
+        length == 0 or any(.[]; .status != $val)) | .metadata.name' \
       2>/dev/null | sort) || true
 
     local not_ready_count=0
@@ -240,8 +245,9 @@ function wait_for_operator_condition() {
       msg=$(echo "${co_json}" | jq -r \
         --arg name "${op}" --arg cond "${condition}" \
         '.items[] | select(.metadata.name==$name) |
-          .status.conditions[] | select(.type==$cond) |
-          "\(.status): \(.message // "N/A")"' 2>/dev/null | head -1) || msg="(unable to read)"
+          [.status.conditions[]? | select(.type==$cond) |
+            "\(.status): \(.message // "N/A")"] |
+          first // "Pending: condition not yet reported"' 2>/dev/null | head -1) || msg="(unable to read)"
       log "  ${op}: ${condition}=${msg}"
     done <<< "${not_ready_operators}"
 
