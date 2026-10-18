@@ -61,6 +61,11 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
+  amd64-4-22-stable:
+    release:
+      channel: stable
+      image: quay.io/openshift-release-dev/ocp-release:4.22.18-x86_64
+      version: "4.22.18"
   arm64-4-22-latest:
     candidate:
       architecture: arm64
@@ -731,8 +736,6 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-downstream-disruptive
 - as: test-e2e-disconnected
-  capabilities:
-  - arm64
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -742,12 +745,14 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-22-stable
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
       CATSRC_NAME: redhat-operators
-      MIRROR_OPERATORS: "true"
+      ENABLE_IDMS: "yes"
       MUST_GATHER_COMPONENT: kueue-must-gather-main
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
@@ -773,6 +778,7 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
+    - chain: ipi-aws-post-disconnected
     test:
     - chain: cert-manager-install
     - chain: jobset-install
@@ -781,6 +787,10 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
+        if test -s "${SHARED_DIR}/api_hosts_entry" && ! getent hosts "$(awk '{print $2}' "${SHARED_DIR}/api_hosts_entry")" >/dev/null 2>&1; then
+          echo "Cluster API unresolvable; applying fallback hosts entry:"
+          cat "${SHARED_DIR}/api_hosts_entry" >> /etc/hosts
+        fi
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
         make test-e2e
       from: kueue-operator-src
@@ -788,7 +798,44 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+    workflow: openshift-e2e-aws-disconnected
+- as: test-e2e-disconnected-aws
+  optional: true
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    test:
+    - chain: cert-manager-install
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - ref: kueue-operator-mirror-images
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        if test -s "${SHARED_DIR}/api_hosts_entry" && ! getent hosts "$(awk '{print $2}' "${SHARED_DIR}/api_hosts_entry")" >/dev/null 2>&1; then
+          echo "Cluster API unresolvable; applying fallback hosts entry:"
+          cat "${SHARED_DIR}/api_hosts_entry" >> /etc/hosts
+        fi
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        make test-e2e
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: test-e2e-dra-gpu-4-22
   cron: '@daily'

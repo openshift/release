@@ -178,6 +178,20 @@ if test -s "${SHARED_DIR}/env" ; then
     source "${SHARED_DIR}/env"
 fi
 
+# Retry cluster API contact - protects against transient build-farm DNS outages.
+# If the API hostname no longer resolves, pin it to the IP captured by the compute step.
+for i in $(seq 1 90); do
+    oc whoami >/dev/null 2>&1 && break
+    if [[ "${i}" == "1" ]] && [[ -s "${SHARED_DIR}/api_hosts_entry" ]]; then
+        echo "Cluster API unresolvable; applying fallback hosts entry:"
+        cat "${SHARED_DIR}/api_hosts_entry"
+        cat "${SHARED_DIR}/api_hosts_entry" >> /etc/hosts
+    fi
+    echo "Cluster API unreachable (attempt ${i}/90); retrying in 10s..."
+    sleep 10
+done
+oc whoami
+
 export TMP_DIR=/tmp/mirror-operators
 export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
 export XDG_RUNTIME_DIR="${TMP_DIR}/run"

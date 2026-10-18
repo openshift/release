@@ -106,3 +106,16 @@ fi
 
 # Clean up
 rm -rf "${TEMP_BUNDLE_DIR}"
+
+# Capture the cluster API endpoint for DNS-fallback use by later steps
+# (CI build-farm DNS intermittently returns NXDOMAIN for live clusters' API names).
+# Note: assignments carry || true so a failing getent (DNS already broken) cannot
+# kill this step under set -e; the fallback file is simply not written.
+API_HOST=$(awk '/server: https:/ { sub(/.*server: https:\/\//, ""); sub(/:.*/, ""); print; exit }' "${SHARED_DIR}/kubeconfig") || true
+API_IP=$(getent hosts "${API_HOST}" 2>/dev/null | awk 'NR==1 {print $1}') || true
+if [[ -n "${API_IP}" ]]; then
+    echo "${API_IP} ${API_HOST}" > "${SHARED_DIR}/api_hosts_entry"
+    echo "Saved API endpoint for DNS fallback: ${API_IP} ${API_HOST}"
+else
+    echo "WARNING: could not resolve ${API_HOST}; DNS fallback entry not saved"
+fi
