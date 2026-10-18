@@ -48,13 +48,16 @@ reviews:
         - The `commands` field must reference a shell script in the same
           directory following the pattern:
           `interop-tests-<component>[-<variant>]-commands.sh`.
-        - Consider setting `best_effort: true` for tests that should not
-          block payload acceptance.
+        - For steps that should not block the overall job on failure, set `best_effort: true`
+          on the step ref. Note: for post steps, the workflow or job must also set
+          `allow_best_effort_post_steps: true` for this to take effect.
 
         ## Shell Scripts (*-commands.sh)
         - MUST start with `set -euo pipefail` to fail fast on errors.
-        - MUST propagate JUnit XML results to `${SHARED_DIR}/junit` or
-          `${ARTIFACT_DIR}` so CI can ingest test outcomes.
+        - MUST propagate JUnit XML results to `${ARTIFACT_DIR}` (the primary destination for
+          test artifacts). Some existing scripts also copy results to `${SHARED_DIR}` for
+          inter-step data passing (e.g., data router reporter), but `${ARTIFACT_DIR}` is
+          where Prow collects and publishes them.
         - MUST scrub credentials and secrets from logs and artifacts before
           copying files to `${ARTIFACT_DIR}`.
         - SHOULD use proper cleanup traps (`trap '...' EXIT`) to ensure
