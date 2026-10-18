@@ -98,7 +98,25 @@ bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 		--tag bastionproxy-$CLUSTER_NAME \
 		"$OPENSTACK_EXTERNAL_NETWORK")"
 >&2 echo "Created floating IP ${bastion_fip}"
->&2 openstack server add floating ip "$server_id" "$bastion_fip"
+
+# Pin the FIP to the bastion-network NIC. Without --fixed-ip-address, Neutron
+# associates the FIP with the "first available" port. For non-proxy externallb
+# both bastion and machines subnets sit on the external router, so the FIP often
+# lands on the machines-net proxy port (172.16.0.4). Dual-homed return-path
+# asymmetry then black-holes SSH/API to that FIP (connection timed out). Pinning
+# to the bastion NIC keeps ingress/egress on the same path.
+fip_associate_args=("$server_id" "$bastion_fip")
+if [[ -n "${BASTION_NET_ID:-}" ]]; then
+  bastion_port_id="$(openstack port list --server "${server_id}" --network "${BASTION_NET_ID}" -f value -c ID | head -n1)"
+  if [[ -n "${bastion_port_id}" ]]; then
+    bastion_fixed_ip="$(openstack port show -f json "${bastion_port_id}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["fixed_ips"][0]["ip_address"])')"
+    >&2 echo "Associating FIP ${bastion_fip} with bastion NIC ${bastion_fixed_ip} (port ${bastion_port_id})"
+    fip_associate_args=(--fixed-ip-address "${bastion_fixed_ip}" "$server_id" "$bastion_fip")
+  else
+    >&2 echo "WARNING: no bastion-network port found on ${server_id}; associating FIP without fixed-ip pin"
+  fi
+fi
+>&2 openstack server add floating ip "${fip_associate_args[@]}"
 echo ${bastion_fip} >> ${SHARED_DIR}/DELETE_FIPS
 echo ${bastion_fip} > ${SHARED_DIR}/BASTION_FIP
 echo ${BASTION_USER} > ${SHARED_DIR}/BASTION_USER
