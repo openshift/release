@@ -1,0 +1,428 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    exit_trap_ref="6263d6941034bf16cfc10b2bca7433ccf22fde60"
+    exit_trap_sha256="bfc394cc4586576e2c0473d8a276ecb2fa456792fdd9114c23c1be54d9982305"
+    exit_trap_script="$(mktemp)"
+    exit_trap_url="https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/${exit_trap_ref}/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh"
+    curl -fsSL -o "${exit_trap_script}" "${exit_trap_url}"
+    printf '%s  %s\n' "${exit_trap_sha256}" "${exit_trap_script}" | sha256sum --check --status
+    eval "$(cat "${exit_trap_script}")"
+    rm -f "${exit_trap_script}"
+    trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-ibmcloud__quay-tests-deploy-quay-ibmcloud.xml
+    ' EXIT
+fi
+
+QUAY_NS="quay-enterprise"
+
+function archive_pod_info() {
+  local ns="${QUAY_NS}"
+  echo "Archiving pod status and logs from namespace ${ns}..."
+  oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
+  oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
+  mkdir -p "${ARTIFACT_DIR}/pod_logs"
+  while read -r pod; do
+    [[ -z "${pod}" ]] && continue
+    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
+      oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+}
+
+function print_quayregistry_conditions() {
+  local ns="${QUAY_NS}"
+  if command -v jq >/dev/null 2>&1; then
+    oc -n "${ns}" get quayregistry quay -o json 2>/dev/null \
+      | jq -r '.status.conditions[]? | "\(.type)=\(.status) reason=\(.reason // "") msg=\(.message // "")"' >&2 || true
+  else
+    oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
+  fi
+}
+
+function print_failing_pod_logs() {
+  local ns="${QUAY_NS}"
+  local name status restarts
+  while read -r name _ status restarts _; do
+    [[ -z "${name}" ]] && continue
+    case "${status}" in
+      CrashLoopBackOff|Error|ErrImagePull|ImagePullBackOff|CreateContainerConfigError|CreateContainerError|OOMKilled|Init:CrashLoopBackOff|Init:Error|Failed) ;;
+      *) continue ;;
+    esac
+    echo "===== ${name} status=${status} restarts=${restarts} =====" >&2
+    local containers
+    containers=$(oc get pod "${name}" -n "${ns}" -o jsonpath='{.spec.initContainers[*].name} {.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      echo "----- ${name}/${container} (tail 80) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --tail=80 2>&1 || true
+      echo "----- ${name}/${container} previous (tail 40) -----" >&2
+      oc logs "${name}" -n "${ns}" -c "${container}" --previous --tail=40 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
+}
+
+#Get the credentials and Email of new Quay User
+QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
+QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
+QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
+
+QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
+QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
+
+# The COS instance, HMAC key and bucket are created per run by
+# quay-ibmcloud-cos-provision. This script runs without set -x and never prints
+# the keys.
+for f in QUAY_IBMCLOUD_COS_ENDPOINT QUAY_IBMCLOUD_COS_BUCKET quay-ibmcloud-cos-access-key quay-ibmcloud-cos-secret-key; do
+  if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/${f} is missing; quay-ibmcloud-cos-provision must run first." >&2
+    exit 1
+  fi
+done
+QUAY_IBMCLOUD_COS_ENDPOINT=$(cat "${SHARED_DIR}/QUAY_IBMCLOUD_COS_ENDPOINT")
+QUAY_IBMCLOUD_COS_BUCKET=$(cat "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET")
+QUAY_IBMCLOUD_COS_ACCESS_KEY=$(cat "${SHARED_DIR}/quay-ibmcloud-cos-access-key")
+QUAY_IBMCLOUD_COS_SECRET_KEY=$(cat "${SHARED_DIR}/quay-ibmcloud-cos-secret-key")
+
+mkdir -p /tmp/QUAY_IBMCLOUD && cd /tmp/QUAY_IBMCLOUD
+
+#Deploy Quay Operator to OCP namespace 'quay-enterprise'
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quay-enterprise
+EOF
+
+cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: quay
+  namespace: quay-enterprise
+spec:
+  targetNamespaces:
+  - quay-enterprise
+EOF
+
+SUB=$(
+  cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: quay-operator
+  namespace: quay-enterprise
+spec:
+  installPlanApproval: Automatic
+  name: quay-operator
+  channel: $QUAY_OPERATOR_CHANNEL
+  source: $QUAY_OPERATOR_SOURCE
+  sourceNamespace: openshift-marketplace
+EOF
+)
+
+echo "The Quay Operator subscription is $SUB"
+
+CSV_READY=false
+for _ in {1..60}; do
+  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  if [[ -n "$CSV" ]]; then
+    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+      echo "ClusterServiceVersion \"$CSV\" ready"
+      CSV_READY=true
+      break
+    fi
+  fi
+  sleep 10
+done
+if [[ "$CSV_READY" != "true" ]]; then
+  echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
+  echo "=== CSV Status ===" >&2
+  oc -n quay-enterprise get csv -o wide 2>&1 || true
+  echo "=== Subscription Status ===" >&2
+  oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status}' 2>&1 || true
+  echo "" >&2
+  echo "=== CatalogSource Status ===" >&2
+  oc get catalogsource -n openshift-marketplace -o wide 2>&1 || true
+  archive_pod_info
+  exit 1
+fi
+echo "Quay Operator is deployed successfully"
+
+echo "Waiting for QuayRegistry CRD to be available..."
+for _ in {1..30}; do
+  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "QuayRegistry CRD is available"
+    break
+  fi
+  sleep 5
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  echo "Timed out waiting for QuayRegistry CRD" >&2
+  echo "=== Operator Pod Logs ===" >&2
+  oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
+  echo "=== Events ===" >&2
+  oc get events -n quay-enterprise --sort-by='.lastTimestamp' 2>&1 | tail -30 || true
+  archive_pod_info
+  exit 1
+fi
+
+#Deploy Quay, here disable monitoring component. Storage is unmanaged IBMCloudStorage.
+cat >>config.yaml <<EOF
+CREATE_PRIVATE_REPO_ON_PUSH: true
+CREATE_NAMESPACE_ON_PUSH: true
+FEATURE_EXTENDED_REPOSITORY_NAMES: true
+FEATURE_QUOTA_MANAGEMENT: true
+FEATURE_AUTO_PRUNE: true
+FEATURE_PROXY_CACHE: true
+FEATURE_USER_INITIALIZE: true
+PERMANENTLY_DELETE_TAGS: true
+RESET_CHILD_MANIFEST_EXPIRATION: true
+FEATURE_PROXY_STORAGE: true
+FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_UI_V2: true
+FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_UI_MODELCARD: true
+SUPER_USERS:
+  - quay
+USERFILES_LOCATION: default
+USERFILES_PATH: userfiles/
+DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
+  - default
+DISTRIBUTED_STORAGE_PREFERENCE:
+  - default
+DISTRIBUTED_STORAGE_CONFIG:
+  default:
+    - IBMCloudStorage
+    - hostname: $QUAY_IBMCLOUD_COS_ENDPOINT
+      is_secure: true
+      port: 443
+      storage_path: /quay-ci
+      access_key: $QUAY_IBMCLOUD_COS_ACCESS_KEY
+      secret_key: $QUAY_IBMCLOUD_COS_SECRET_KEY
+      bucket_name: $QUAY_IBMCLOUD_COS_BUCKET
+FEATURE_ANONYMOUS_ACCESS: true
+BROWSER_API_CALLS_XHR_ONLY: false
+FEATURE_USERNAME_CONFIRMATION: false
+AUTHENTICATION_TYPE: Database
+FEATURE_LISTEN_IP_VERSION: IPv4
+REPO_MIRROR_ROLLBACK: false
+AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+FEATURE_IMAGE_EXPIRY_TRIGGER: true
+NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+DEFAULT_TAG_EXPIRATION: 2w
+TAG_EXPIRATION_OPTIONS:
+  - 2w
+  - 4w
+  - 8w
+  - 1d
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+FEATURE_IMAGE_PULL_STATS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_IMMUTABLE_TAGS: true
+PULL_METRICS_REDIS:
+        host: quay-quay-redis
+        port: 6379
+        db: 1
+EOF
+
+# Merge a config fragment into config.yaml with list-append semantics.
+# Validate first so a present-but-malformed fragment fails the step clearly
+# instead of corrupting config.yaml.
+function merge_config_fragment() {
+	local fragment="$1"
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
+		echo "ERROR: ${fragment} is not valid YAML" >&2
+		exit 1
+	fi
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
+# Mailpit and OTel fragments merge before QUAY_EXTRA_CONFIG, so an explicit
+# override still wins. A missing fragment is a silent no-op.
+if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
+	echo "Merging Mailpit config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
+fi
+
+if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
+	echo "Merging Jaeger/OTel config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
+# Merge caller-provided extra config if set
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+	echo "Merging extra Quay config into defaults..."
+	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+	# Strip field-group keys for components this CR keeps managed. The operator
+	# injects those values; leaving them in configBundleSecret blocks rollout.
+	yq -i '
+		del(
+			.FEATURE_SECURITY_SCANNER,
+			.FEATURE_SECURITY_NOTIFICATIONS,
+			.SECURITY_SCANNER_ENDPOINT,
+			.SECURITY_SCANNER_INDEXING_INTERVAL,
+			.SECURITY_SCANNER_V4_ENDPOINT,
+			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+			.SECURITY_SCANNER_V4_PSK,
+			.FEATURE_REPO_MIRROR,
+			.REPO_MIRROR_INTERVAL,
+			.REPO_MIRROR_SERVER_HOSTNAME,
+			.REPO_MIRROR_TLS_VERIFY,
+			.BUILDLOGS_REDIS,
+			.USER_EVENTS_REDIS,
+			.DB_URI,
+			.DB_CONNECTION_ARGS,
+			.SERVER_HOSTNAME,
+			.PREFERRED_URL_SCHEME,
+			.EXTERNAL_TLS_TERMINATION
+		)
+	' config.yaml
+fi
+
+# Build support requires unmanaged TLS plus a virtual builder. When enabled, the
+# quay-provisioning-{tls,builder} steps have already written the
+# cert/key, build-cluster CA, and builder config to SHARED_DIR. Fold the builder
+# config into the bundle (after the extra-config merge, so it is not stripped) and
+# hand the operator the unmanaged cert material. Do not echo config_builder.yaml:
+# it carries the Quay password and builder SA token. (This script runs without
+# set -x, so the append below is not traced.)
+TLS_MANAGED="true"
+if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
+  echo "Build support enabled: configuring unmanaged TLS + virtual builder" >&2
+  for f in config_builder.yaml ssl.cert ssl.key build_cluster.crt; do
+    if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
+      echo "ERROR: ENABLE_BUILD_SUPPORT=true but ${SHARED_DIR}/${f} is missing." >&2
+      echo "       Ensure quay-provisioning-tls and -builder ran first." >&2
+      exit 1
+    fi
+  done
+  TLS_MANAGED="false"
+  cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
+
+  # The builder image is always the RELATED_IMAGE_COMPONENT_BUILDER the
+  # Subscription's installed CSV ships, so the builder matches the installed
+  # operator. quay-provisioning-builder leaves "from-csv" for it. No fallback.
+  if ! grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
+    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' line to fill" >&2
+    exit 1
+  fi
+  csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
+  mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+      | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
+      | unique | .[]' <<<"$csv_json")
+  if [[ ${#builder_images[@]} -ne 1 ]]; then
+    echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
+    exit 1
+  fi
+  echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
+  sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
+
+  oc create secret generic -n quay-enterprise config-bundle-secret \
+    --from-file config.yaml=./config.yaml \
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
+    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+else
+  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+fi
+
+echo "Creating Quay registry..." >&2
+cat <<EOF | oc apply -f -
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: quay
+  namespace: quay-enterprise
+spec:
+  configBundleSecret: config-bundle-secret
+  components:
+  - kind: objectstorage
+    managed: false
+  - kind: monitoring
+    managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
+  - kind: quay
+    managed: true
+  - kind: mirror
+    managed: true
+  - kind: clair
+    managed: true
+  - kind: tls
+    managed: ${TLS_MANAGED}
+  - kind: route
+    managed: true
+EOF
+
+echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
+for i in $(seq 1 90); do
+  status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+  if [[ "$status" == "True" ]]; then
+    echo "Quay is ready (after $((i * 10))s)" >&2
+    oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+    oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
+    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
+    quay_ca_bundle="$(mktemp)"
+    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
+      cat /etc/pki/tls/certs/ca-bundle.crt > "${quay_ca_bundle}"
+    fi
+    if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
+      cat "${SHARED_DIR}/ssl.cert" >> "${quay_ca_bundle}"
+    else
+      ingress_cert_secret=$(oc -n openshift-ingress-operator get ingresscontroller default \
+        -o jsonpath='{.spec.defaultCertificate.name}' 2>/dev/null || true)
+      ingress_cert_secret="${ingress_cert_secret:-router-certs-default}"
+      oc -n openshift-ingress get secret "${ingress_cert_secret}" \
+        -o jsonpath='{.data.tls\.crt}' | base64 --decode >> "${quay_ca_bundle}"
+    fi
+    initialize_payload="$(mktemp)"
+    chmod 600 "${initialize_payload}"
+    jq -n --arg username "${QUAY_USERNAME}" --arg password "${QUAY_PASSWORD}" \
+      --arg email "${QUAY_EMAIL}" \
+      '{username: $username, password: $password, email: $email, access_token: true}' \
+      > "${initialize_payload}"
+    if ! curl --fail --silent --show-error --cacert "${quay_ca_bundle}" \
+      -X POST "${quay_route}/api/v1/user/initialize" \
+      --header 'Content-Type: application/json' --data-binary "@${initialize_payload}" \
+      | jq -er '.access_token | select(type == "string" and length > 0)' \
+          > "${SHARED_DIR}/quay_oauth2_token"; then
+      echo "Failed to initialize the Quay user or obtain an access token" >&2
+      exit 1
+    fi
+    chmod 600 "${SHARED_DIR}/quay_oauth2_token"
+    rm -f "${initialize_payload}" "${quay_ca_bundle}"
+    archive_pod_info
+    exit 0
+  fi
+  if (( i % 6 == 0 )); then
+    echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
+    print_quayregistry_conditions
+  fi
+  sleep 10
+done
+
+echo "Timed out waiting for Quay to become ready" >&2
+echo "Final QuayRegistry conditions:" >&2
+print_quayregistry_conditions
+echo "Pods in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get pods -o wide >&2 || true
+print_failing_pod_logs
+echo "Events in ${QUAY_NS} namespace:" >&2
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' >&2 || true
+
+oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml" || true
+oc -n "${QUAY_NS}" get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
+oc -n "${QUAY_NS}" get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
+oc -n "${QUAY_NS}" get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
+archive_pod_info
+exit 1

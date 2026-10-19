@@ -345,6 +345,25 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
+def test_redhat_318_ibmcloud_cos_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-3.18__ibmcloud-ocp422-e2e-install.yaml"
+    assert filename in by_name
+    test = by_name[filename]["tests"][0]
+    assert test["as"] == "ibmcloud-cos-nightly"
+    assert test["cron"] == "@weekly"
+    assert test["steps"]["cluster_profile"] == "ibmcloud-quay"
+    assert test["steps"]["workflow"] == "ipi-ibmcloud"
+    pre = [step.get("ref") or step.get("chain") for step in test["steps"]["pre"]]
+    assert pre == ["ipi-ibmcloud-pre", "quay-ibmcloud-cos-provision"]
+    test_refs = [step["ref"] for step in test["steps"]["test"]]
+    assert "quay-deploy-ibmcloud-cos" in test_refs
+    post = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
+    assert post[-2:] == ["quay-ibmcloud-cos-deprovision", "ipi-ibmcloud-post"]
+    assert "quay-deprovision" not in post
+
+
 def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
