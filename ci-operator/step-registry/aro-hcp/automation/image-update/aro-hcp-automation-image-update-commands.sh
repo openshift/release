@@ -87,7 +87,7 @@ fi
 
 # Precheck: Ensure all required tools are present
 debug "precheck: ensure required tools are present"
-required_tools=(skopeo git az bicep yq jq curl)
+required_tools=(skopeo git az bicep yq jq curl openssl)
 for cmd in "${required_tools[@]}"; do
   command -v "${cmd}" &> /dev/null || error "required tool '${cmd}' is not installed or not in PATH."
 done
@@ -239,6 +239,36 @@ for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
     fi
   fi
 done
+# GitHub: Remove any hold after the image updater refreshes its PR.
+info "github: removing hold from image update PR"
+PR_NUMBER="${PR_URL##*/}"
+APP_ID="$(cat "${GITHUB_APP_ID_PATH}")"
+NOW="$(date +%s)"
+JWT_HEADER="$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+JWT_PAYLOAD="$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$((NOW - 60))" "$((NOW + 540))" "${APP_ID}" | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+JWT_UNSIGNED="${JWT_HEADER}.${JWT_PAYLOAD}"
+JWT_SIGNATURE="$(printf '%s' "${JWT_UNSIGNED}" | openssl dgst -sha256 -sign "${GITHUB_APP_KEY_PATH}" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+GITHUB_APP_JWT="${JWT_UNSIGNED}.${JWT_SIGNATURE}"
+
+INSTALLATION_ID="$(curl --fail --silent --show-error \
+  -H "Authorization: Bearer ${GITHUB_APP_JWT}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/installation" | jq -er '.id')"
+INSTALLATION_TOKEN="$(curl --fail --silent --show-error -X POST \
+  -H "Authorization: Bearer ${GITHUB_APP_JWT}" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" | jq -er '.token')"
+
+curl --fail --silent --show-error -X POST \
+  -H "Authorization: Bearer ${INSTALLATION_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  -H "Content-Type: application/json" \
+  --data '{"body":"/unhold"}' \
+  "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/issues/${PR_NUMBER}/comments" > /dev/null
+info "github: removed hold from PR ${PR_NUMBER}"
+
 
 # Slack: Send notification based on PR creation result
 info "slack: sending notification for PR creation"
