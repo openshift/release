@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: gsm-proxy-tls
+  labels:
+    app: gsm-proxy
+  name: gsm-proxy
+  namespace: ci
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  selector:
+    app: gsm-proxy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gsm-proxy
+  name: gsm-proxy
+  namespace: ci
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: gsm-proxy
+  template:
+    metadata:
+      labels:
+        app: gsm-proxy
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: gsm-proxy
+      containers:
+      - name: gsm-proxy
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_gsm-proxy_latest
+        imagePullPolicy: Always
+        args:
+        - --listen-addr=0.0.0.0:8443
+        - --groups-ownership-file=/etc/gsm-proxy/ownership/ownership.yaml
+        - --gsm-project-id=openshift-ci-secrets
+        - --gsm-credentials-file=/etc/gsm-proxy/gcp/sa-key.json
+        - --tls-cert-file=/etc/gsm-proxy/tls/tls.crt
+        - --tls-key-file=/etc/gsm-proxy/tls/tls.key
+        ports:
+        - name: https
+          containerPort: 8443
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: https
+            scheme: HTTPS
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: https
+            scheme: HTTPS
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: ownership
+          mountPath: /etc/gsm-proxy/ownership
+          readOnly: true
+        - name: gcp-credentials
+          mountPath: /etc/gsm-proxy/gcp
+          readOnly: true
+        - name: serving-cert
+          mountPath: /etc/gsm-proxy/tls
+          readOnly: true
+      volumes:
+      - name: ownership
+        configMap:
+          name: gsm-proxy-ownership
+      - name: gcp-credentials
+        csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: gsm-proxy
+      - name: serving-cert
+        secret:
+          secretName: gsm-proxy-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    route.openshift.io/termination: reencrypt
+  name: gsm-proxy
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+  - secretName: gsm-proxy-web-tls
+    hosts:
+    - gsm-proxy.ci.openshift.org
+  rules:
+  - host: gsm-proxy.ci.openshift.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: gsm-proxy
+            port:
+              name: https
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: gsm-proxy
+  namespace: ci
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: gsm-proxy
