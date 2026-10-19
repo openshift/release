@@ -53,13 +53,38 @@ case "$ES_TYPE" in
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-    if [[ -f "/secret/qe/jira-api-key" ]] && [[ "${JOB_TYPE}" == "periodic" ]] && [[ "${JOB_NAME}" == *"payload"* ]] && [[ -z "${PULL_NUMBER:-}" ]]; then
+    if [[ -f "/secret/qe/jira-api-key" ]]; then
         JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
         JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
         JIRA_URL=https://redhat.atlassian.net/
         export JIRA_TOKEN JIRA_EMAIL JIRA_URL
-        # We use orion's default JIRA project and components
-        ORION_EXTRA_FLAGS+=" --jira-ack --jira-auto-create"
+        # Use existing Jira ACKs for all QE jobs with credentials.
+        ORION_EXTRA_FLAGS+=" --jira-ack"
+
+        # Rehearsals can carry pull refs without PULL_NUMBER. Only create
+        # issues for periodic payload jobs with verified PR-free metadata.
+        if [[ "${JOB_TYPE:-}" == "periodic" ]] &&
+           [[ "${JOB_NAME:-}" == *"payload"* ]] &&
+           [[ -z "${PULL_NUMBER:-}" ]] &&
+           printf '%s' "${JOB_SPEC:-}" | jq -se '
+             def no_pulls:
+               type == "object" and
+               (.pulls | . == null or (type == "array" and length == 0));
+             length == 1 and
+             (.[0] |
+               type == "object" and
+               .type == "periodic" and
+               (.refs == null or (.refs | no_pulls)) and
+               (.extra_refs == null or
+                 (.extra_refs | type == "array" and all(.[]; no_pulls))))
+           ' >/dev/null; then
+            # We use orion's default Jira project and components.
+            ORION_EXTRA_FLAGS+=" --jira-auto-create"
+        else
+            echo "Skipping automatic Jira issue creation: job is ineligible or PR metadata could not be verified."
+        fi
+    else
+        echo "Skipping Jira integration: credentials are unavailable."
     fi
     set -x
     ;;
