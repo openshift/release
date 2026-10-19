@@ -1,0 +1,63 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile
+    optional: true
+    to: spark-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 200Mi
+tests:
+- as: spark-operator-rhoai-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: redhat-ods-applications
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        INSTALL_METHOD=kustomize SPARK_OPERATOR_IMAGE=${SPARK_OPERATOR_IMAGE} \
+          make -C test/e2e/rhoai e2e-rhoai-test
+      dependencies:
+      - env: SPARK_OPERATOR_IMAGE
+        name: spark-operator
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+      timeout: 1h0m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: spark-operator
