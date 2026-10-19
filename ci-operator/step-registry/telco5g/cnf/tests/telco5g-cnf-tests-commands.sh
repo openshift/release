@@ -417,6 +417,22 @@ sriov "NUMA node alignment"
 
 EOF
 fi
+
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]] || [[ "$T5CI_JOB_TYPE" == "sno-ztp-cnftests" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# SNO-SPECIFIC SKIPTESTS
+# switching rdma to exclusive mode and back reboots the only node twice, and the test
+# continues before the webhook pods are back, so creating the policy fails
+# TESTNAME
+sriov "Check rdma metrics inside a pod in exclusive mode"
+
+# after a reboot of the only node, service-ca takes longer than the test timeout
+# to issue the metrics exporter certificate
+# TESTNAME
+sriov "TLS Configuration Kubernetes cluster"
+
+EOF
+fi
 }
 
 
