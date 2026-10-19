@@ -1,0 +1,45 @@
+ref:
+  as: agent-sandbox-install-operator
+  from: cli
+  timeout: 30m0s
+  grace_period: 5m
+  commands: agent-sandbox-install-operator-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: AGENT_SANDBOX_INSTALL
+    default: "false"
+    documentation: |-
+      Whether to install the agent-sandbox operator. Set to "true" to enable.
+      If not true, the step is skipped.
+  - name: AGENT_SANDBOX_CATALOG_IMAGE
+    default: ""
+    documentation: |-
+      Konflux FBC catalog image digest for the agent-sandbox operator.
+      Required when AGENT_SANDBOX_INSTALL=true. Per-OCP-version catalogs are
+      built at quay.io/redhat-user-workloads/ose-osc-tenant/agent-sandbox-fbc-4-NN.
+  - name: AGENT_SANDBOX_PACKAGE
+    default: "agent-sandbox-operator"
+    documentation: |-
+      OLM package name for the agent-sandbox operator.
+  - name: AGENT_SANDBOX_CHANNEL
+    default: "preview-0.9"
+    documentation: |-
+      OLM subscription channel for the agent-sandbox operator.
+  - name: AGENT_SANDBOX_NAMESPACE
+    default: "agent-sandbox-system"
+    documentation: |-
+      Namespace where the agent-sandbox operator will be installed.
+  documentation: |-
+    Installs the Red Hat agent-sandbox operator via OLM on an OpenShift cluster.
+
+    Applies Konflux image mirror sets (ImageTagMirrorSet + ImageDigestMirrorSet)
+    from the upstream repo, waits for MachineConfigPool rollout, then creates a
+    CatalogSource from AGENT_SANDBOX_CATALOG_IMAGE, a Namespace, an
+    AllNamespaces OperatorGroup, and a Subscription. Waits for the CSV to reach
+    Succeeded and the controller deployment to become Available.
+
+    This step is reusable by any workflow that needs the agent-sandbox operator
+    (kata CI, openshell, etc.). It is independent of OSC installation.
