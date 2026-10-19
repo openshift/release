@@ -51,8 +51,8 @@ go install gotest.tools/gotestsum@latest
 
 echo ">>> Running tests"
 gotestsum \
-  --junitfile="${ARTIFACT_DIR}/junit_kata-e2e.xml" \
-  --jsonfile="${ARTIFACT_DIR}/kata-e2e.json" \
+  --junitfile="${SANDBOX_REPORT_DIR}/junit_kata-e2e.xml" \
+  --jsonfile="${SANDBOX_REPORT_DIR}/kata-e2e.json" \
   -- \
   ./test/e2e/extensions/... \
   -run "${SANDBOX_TEST_PATTERN}" \

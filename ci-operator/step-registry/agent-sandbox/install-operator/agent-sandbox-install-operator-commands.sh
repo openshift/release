@@ -124,8 +124,9 @@ function oc_with_retry() {
 # Step 1: Apply Konflux image mirror sets
 #========================================
 
-if oc get imagedigestmirrorset agent-sandbox-registry &>/dev/null; then
-  echo ">>> ImageDigestMirrorSet/agent-sandbox-registry already exists, skipping mirror setup"
+if oc get imagedigestmirrorset agent-sandbox-registry &>/dev/null \
+  && oc get imagetagmirrorset agent-sandbox-registry &>/dev/null; then
+  echo ">>> Mirror sets agent-sandbox-registry already exist, skipping mirror setup"
 else
   echo ">>> Applying Konflux image mirror sets"
   oc_with_retry oc apply -f "${MIRROR_SET_URL}"
@@ -207,12 +208,10 @@ SUBEOF
 
 wait_until "Subscription InstallPlan created" 300 10 \
   "oc get subscription ${AGENT_SANDBOX_PACKAGE} -n ${AGENT_SANDBOX_NAMESPACE} -o jsonpath='{.status.installPlanRef.name}' | grep -q ."
+wait_until "Subscription installedCSV set" 300 10 \
+  "oc get subscription ${AGENT_SANDBOX_PACKAGE} -n ${AGENT_SANDBOX_NAMESPACE} -o jsonpath='{.status.installedCSV}' | grep -q ."
 
-CSV_NAME=""
-wait_until "CSV created" 300 10 \
-  "CSV_NAME=\$(oc get csv -n ${AGENT_SANDBOX_NAMESPACE} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) && [[ -n \"\${CSV_NAME}\" ]]"
-
-CSV_NAME=$(oc get csv -n "${AGENT_SANDBOX_NAMESPACE}" -o jsonpath='{.items[0].metadata.name}')
+CSV_NAME=$(oc get subscription "${AGENT_SANDBOX_PACKAGE}" -n "${AGENT_SANDBOX_NAMESPACE}" -o jsonpath='{.status.installedCSV}')
 echo ">>> CSV: ${CSV_NAME}"
 
 wait_until "CSV ${CSV_NAME} Succeeded" 300 10 \
@@ -223,7 +222,7 @@ wait_until "CSV ${CSV_NAME} Succeeded" 300 10 \
 #========================================
 
 wait_until "agent-sandbox-controller deployment Available" 300 10 \
-  "oc rollout status deployment/agent-sandbox-controller -n ${AGENT_SANDBOX_NAMESPACE} --timeout=0s 2>/dev/null"
+  "oc wait deployment/agent-sandbox-controller -n ${AGENT_SANDBOX_NAMESPACE} --for=condition=Available --timeout=0s 2>/dev/null"
 
 echo ">>> Controller deployment is ready"
 
