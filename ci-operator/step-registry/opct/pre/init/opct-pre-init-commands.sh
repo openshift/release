@@ -42,6 +42,7 @@ export AWS_RETRY_MODE=adaptive
 function show_msg() {
   echo -e "$(date -u --rfc-3339=seconds)> \$@"
 }
+export -f show_msg
 
 # Extract OPCT from ImageStream
 function extract_opct() {
@@ -51,7 +52,8 @@ function extract_opct() {
   timeout 3m bash -c "until \
       oc image extract ${OPCT_CLI_IMAGE} ${IMAGE_EXTRACT_OPTS-} --registry-config=${CI_CREDENTIALS} --file=${OPCT_CLI_PATH_IMAGE} >/dev/null; \
       do
-        show_msg 'retrying in 15s...' && sleep 15;\
+        show_msg 'retrying in 15s...';\
+        sleep 15;\
       done"
 
   chmod u+x ${OPCT_CLI}
