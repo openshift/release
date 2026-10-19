@@ -111,31 +111,22 @@ spec:
         secret:
           secretName: gsm-proxy-tls
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: route.openshift.io/v1
+kind: Route
 metadata:
-  annotations:
-    cert-manager.io/cluster-issuer: cert-issuer
-    route.openshift.io/termination: reencrypt
   name: gsm-proxy
   namespace: ci
 spec:
-  ingressClassName: openshift-default
+  host: gsm-proxy-ci.apps.master.ci.devcluster.openshift.com
+  port:
+    targetPort: https
   tls:
-  - secretName: gsm-proxy-web-tls
-    hosts:
-    - gsm-proxy.ci.openshift.org
-  rules:
-  - host: gsm-proxy.ci.openshift.org
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: gsm-proxy
-            port:
-              name: https
+    insecureEdgeTerminationPolicy: None
+    termination: reencrypt
+  to:
+    kind: Service
+    name: gsm-proxy
+    weight: 100
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
