@@ -9,6 +9,15 @@ ls -ltra ${SHARED_DIR}
 cat ${SHARED_DIR}/testing.txt
 
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+USER_ENV_SRC="${CLUSTER_PROFILE_DIR}/user-env"
+OPENSHIFT_PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
+DPF_PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/dpf-pull-secret"
+for profile_file in "${USER_ENV_SRC}" "${OPENSHIFT_PULL_SECRET_SRC}" "${DPF_PULL_SECRET_SRC}"; do
+  if [[ ! -r "${profile_file}" ]]; then
+    echo "ERROR: Required Vault-backed cluster profile file is missing or unreadable: ${profile_file}" >&2
+    exit 1
+  fi
+done
 
 # Configuration
 REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
@@ -79,7 +88,6 @@ echo "Deploy make target: ${DPF_DEPLOY_MAKE_TARGET}"
 
 # Git clone the dpf-openshift repo on hypervisor
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
   cd ${REMOTE_MAIN_WORK_DIR}; \
   mkdir -p openshift-dpf-${datetime_string}; \
   cd openshift-dpf-${datetime_string}; \
@@ -106,6 +114,13 @@ if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${REPO_NAME:-}" == "openshift-dpf" ]]; the
 fi
 
 REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
+REMOTE_USER_ENV_FILE="${REMOTE_WORK_DIR}/openshift-dpf/env.user_${CLUSTER_NAME}"
+REMOTE_OPENSHIFT_PULL_SECRET="${REMOTE_WORK_DIR}/openshift_pull.json"
+REMOTE_DPF_PULL_SECRET="${REMOTE_WORK_DIR}/nvidia_pull.json"
+SECRET_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dpf-hypervisor.XXXXXX")"
+chmod 700 "${SECRET_TMP_DIR}"
+OPENSHIFT_PULL_SECRET_FILE="${SECRET_TMP_DIR}/openshift_pull.json"
+DPF_PULL_SECRET_FILE="${SECRET_TMP_DIR}/nvidia_pull.json"
 echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
 # Copy kubeconfig to SHARED_DIR on exit so must-gather can reach the
@@ -126,12 +141,17 @@ copy_kubeconfig() {
   else
     echo "WARNING: Could not copy .env to SHARED_DIR (file may not exist yet)"
   fi
+
+  if [[ -n "${REMOTE_USER_ENV_FILE:-}" ]]; then
+    ssh ${SSH_OPTS} root@${REMOTE_HOST} "rm -f '${REMOTE_USER_ENV_FILE}' '${REMOTE_OPENSHIFT_PULL_SECRET}' '${REMOTE_DPF_PULL_SECRET}'" >/dev/null 2>&1 || true
+  fi
+  rm -rf "${SECRET_TMP_DIR}"
+  rm -f /tmp/id_rsa
 }
 trap copy_kubeconfig EXIT
 
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   git status; \
   git log -1"; then
@@ -140,6 +160,16 @@ else
   echo "ERROR: Failed to verify git repository at ${REMOTE_WORK_DIR}/openshift-dpf"
   exit 1
 fi
+
+stage_file_on_remote() {
+  local source_file="$1"
+  local remote_file="$2"
+  local remote_dir="${remote_file%/*}"
+
+  if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; umask 077; mkdir -p '${remote_dir}'; cat > '${remote_file}'; chmod 600 '${remote_file}'" < "${source_file}"; then
+    return 1
+  fi
+}
 
 echo "Verify last-openshift-dpf-dir.sh file exists..."
 if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}"; then
@@ -160,16 +190,24 @@ else
   fi
 fi
 
-# Generate the .env file using the env.user file on hypervisor
-echo "Verify env.user_${CLUSTER_NAME} source file exists on hypervisor ..."
-if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"; then
-  echo "ERROR: File env.user_${CLUSTER_NAME} file does not exist: ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}"
+# Stage Vault-backed configuration and pull secrets in this deployment's private work directory.
+echo "Staging Vault-backed user-env and pull secrets on the hypervisor..."
+if ! stage_file_on_remote "${USER_ENV_SRC}" "${REMOTE_USER_ENV_FILE}"; then
+  echo "ERROR: Failed to stage cluster profile user-env on ${REMOTE_HOST}" >&2
   exit 1
 fi
+if ! base64 -d < "${OPENSHIFT_PULL_SECRET_SRC}" > "${OPENSHIFT_PULL_SECRET_FILE}"; then
+  echo "ERROR: Failed to decode the Vault-backed OpenShift pull secret" >&2
+  exit 1
+fi
+if ! base64 -d < "${DPF_PULL_SECRET_SRC}" > "${DPF_PULL_SECRET_FILE}"; then
+  echo "ERROR: Failed to decode the Vault-backed DPF pull secret" >&2
+  exit 1
+fi
+chmod 600 "${OPENSHIFT_PULL_SECRET_FILE}" "${DPF_PULL_SECRET_FILE}"
 
-echo "File ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} was found on hypervisor"
-
-echo "Copy the env.user file in ${REMOTE_MAIN_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf, source the file, then generate .env file"
+echo "Vault-backed configuration staged for this deployment"
+echo "Generate the DPF .env file using the staged cluster profile user-env"
 # Pass the CI release payload (resolved by ci-operator from the releases.latest config)
 if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
   PAYLOAD_URL=""
@@ -177,43 +215,43 @@ if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
 else
   PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 fi
-echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "PAYLOAD_URL is set"
+else
+  echo "PAYLOAD_URL is unset"
+fi
 
 # Merge CI registry credentials into the pull secret so the cluster can
 # access the Prow-internal registry (registry.buildXX.ci.openshift.org).
 if [[ -n "${PAYLOAD_URL}" ]]; then
   echo "Merging CI registry credentials into pull secret on hypervisor..."
-  PULL_SECRET_SRC="${CLUSTER_PROFILE_DIR}/openshift-pull-secret"
-  if [[ ! -f "${PULL_SECRET_SRC}" ]]; then
-    echo "ERROR: ${PULL_SECRET_SRC} not found"
-    exit 1
-  fi
-  cp "${PULL_SECRET_SRC}" /tmp/pull-secret.json
-  oc registry login --to=/tmp/pull-secret.json
-  REMOTE_PULL_SECRET=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -ea; source ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME}; set +a; PS=\${OPENSHIFT_PULL_SECRET:-openshift_pull.json}; [[ \"\$PS\" = /* ]] && echo \"\$PS\" || echo \"${REMOTE_WORK_DIR}/openshift-dpf/\$PS\"")
-  scp -q ${SSH_OPTS} /tmp/pull-secret.json root@${REMOTE_HOST}:"${REMOTE_PULL_SECRET}"
-  echo "Pull secret with CI registry credentials copied to ${REMOTE_PULL_SECRET}"
-  rm -f /tmp/pull-secret.json
+  oc registry login --to="${OPENSHIFT_PULL_SECRET_FILE}"
+fi
+if ! stage_file_on_remote "${OPENSHIFT_PULL_SECRET_FILE}" "${REMOTE_OPENSHIFT_PULL_SECRET}"; then
+  echo "ERROR: Failed to stage the Vault-backed OpenShift pull secret on ${REMOTE_HOST}" >&2
+  exit 1
+fi
+if ! stage_file_on_remote "${DPF_PULL_SECRET_FILE}" "${REMOTE_DPF_PULL_SECRET}"; then
+  echo "ERROR: Failed to stage the Vault-backed DPF pull secret on ${REMOTE_HOST}" >&2
+  exit 1
 fi
 
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   export DPF_OPENSHIFT_VERSION='${DPF_OPENSHIFT_VERSION:-}'; \
-  cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
-  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
-  pwd; \
-  env; \
   set -a; \
-  source env.user_${CLUSTER_NAME}; \
+  source '${REMOTE_USER_ENV_FILE}'; \
+  export OPENSHIFT_PULL_SECRET='${REMOTE_OPENSHIFT_PULL_SECRET}'; \
+  export DPF_PULL_SECRET='${REMOTE_DPF_PULL_SECRET}'; \
   if [[ -n \"\${DPF_OPENSHIFT_VERSION:-}\" ]]; then \
     export OPENSHIFT_VERSION=\"\${DPF_OPENSHIFT_VERSION}\"; \
   fi; \
-  env; \
   set +a; \
+  cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   make generate-env; \
   ls -ltra .env"; then
-  echo ".env file from sourced env.user_${CLUSTER_NAME} was generated successfully"
+  echo ".env file from Vault-backed cluster profile user-env was generated successfully"
 else
-  echo "ERROR: Failed to generate .env file from sourced env.user_${CLUSTER_NAME} file"
+  echo "ERROR: Failed to generate .env file from Vault-backed cluster profile user-env"
   exit 1
 fi
 
@@ -277,7 +315,6 @@ echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 # Execute `make clean-all` on hypervisor with comprehensive logging
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   ls -ltr; \
-  env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
   mkdir -p ${REMOTE_LOGS_DIR} ; \
   make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
