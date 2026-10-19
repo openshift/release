@@ -34,6 +34,7 @@ new_s3_bucket_name() {
 }
 
 WORKDIR="$(mktemp -d)"
+trap 'rm -rf "${WORKDIR}"' EXIT
 cd "${WORKDIR}"
 cat >variables.tf <<EOF
 variable "region" {
