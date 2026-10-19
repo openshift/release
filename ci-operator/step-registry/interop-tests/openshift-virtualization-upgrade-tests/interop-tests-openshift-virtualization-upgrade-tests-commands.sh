@@ -10,14 +10,14 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 eval "$(
     curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-)"; EnsureReqs jq yq
+)"; EnsureReqs jq
 
 eval "$(
     curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
-typeset -i startTime=$SECONDS
-typeset -r mergedJunitFN="junit--cnv__interop-tests__openshift-virtualization-upgrade-tests.xml"
+typeset -i startTime=${SECONDS}
+typeset -r mergedJunitFN='junit--cnv__interop-tests__openshift-virtualization-upgrade-tests.xml'
 
 # shellcheck disable=SC2329
 # RunPostProcessPrep — merges/archives the JUnit XML(s) under ${ARTIFACT_DIR} and copies the
@@ -25,32 +25,26 @@ typeset -r mergedJunitFN="junit--cnv__interop-tests__openshift-virtualization-up
 # interop-tests-openshift-virtualization-tests), instead of a bespoke yq rename + manual cp.
 # Only set the Component Readiness rename (LP_IO__CR_COMP_NAME) when MAP_TESTS=true; the
 # merge/archive/copy-to-SHARED_DIR itself always runs so behavior is unchanged for callers that
-# don't opt into MAP_TESTS.
-# The library can return 0 ("success") even when it produced nothing at all -- e.g. when no
-# JUnit XML exists under ${ARTIFACT_DIR} (confirmed via local testing of the actual library
-# source) -- so explicitly verify the merged file landed in ${SHARED_DIR} and is well-formed
-# before treating post-processing as successful.
+# don't opt into MAP_TESTS. Surfaces the library's own return code so a genuine post-processing
+# failure is visible. Not checking for the merged file's existence here: this EXIT trap can
+# legitimately fire before any JUnit exists at all (e.g. an early infra failure before pytest
+# ever runs) — that case is already reflected by the main script's own exit code, not a
+# post-processing failure.
+# IMPORTANT: the library call below is deliberately a plain (untested) statement, not
+# `... || ppRC=$?`. ExitTrap--PostProcessPrep's own body ends in an explicit `true`; under
+# errexit, a command on the left-hand side of `||`/`&&`/`if` has errexit suppressed for its
+# *entire* nested execution (confirmed locally against the real library), so a genuine internal
+# failure (e.g. `cp` to ${SHARED_DIR} failing) would be masked by that trailing `true` and never
+# reach `ppRC=$?`. The caller (HandleExit) is responsible for wrapping this call in `set +e`/
+# `set -e` so a nonzero return here doesn't itself trigger errexit.
 RunPostProcessPrep() {
-    typeset newTsName=""
-    [[ "${MAP_TESTS}" == "true" ]] && newTsName="${LP_IO__CR_COMP_NAME}--%s"
+    typeset newTsName=''
     typeset -i ppRC=0
+    [[ "${MAP_TESTS}" == 'true' ]] && newTsName="${LP_IO__CR_COMP_NAME}--%s"
     LP_IO__ET_PPP__NEW_TS_NAME="${newTsName}" \
-        ExitTrap--PostProcessPrep "${mergedJunitFN}" || ppRC=$?
-    if (( ppRC != 0 )); then
-        : "ExitTrap--PostProcessPrep failed (rc=${ppRC})"
-        return "${ppRC}"
-    fi
-
-    typeset mergedFile="${SHARED_DIR}/${mergedJunitFN}"
-    if [[ ! -s "${mergedFile}" ]]; then
-        : "Merged JUnit XML missing or empty after post-processing: ${mergedFile}"
-        return 1
-    fi
-    if ! yq eval -px -ox '.' "${mergedFile}" 1>/dev/null; then
-        : "Merged JUnit XML failed validity check: ${mergedFile}"
-        return 1
-    fi
-    true
+        ExitTrap--PostProcessPrep "${mergedJunitFN}"
+    ppRC=$?
+    return "${ppRC}"
 }
 
 # shellcheck disable=SC2329
@@ -59,33 +53,41 @@ RunPostProcessPrep() {
 # intra-string variable flow within a single-quoted `trap '...' EXIT` body — any variable both
 # assigned and referenced purely inside such a string is flagged as "referenced but not
 # assigned", regardless of typeset/declare/-i/naming (confirmed locally with shellcheck v0.11.0).
+# RunPostProcessPrep is called as a plain statement under a temporary `set +e` (not
+# `RunPostProcessPrep || _ppRC=$?`), for the same reason documented on RunPostProcessPrep itself:
+# testing it via `||` would suppress errexit for its entire nested call chain, including the
+# ExitTrap--PostProcessPrep library invocation inside it, silently masking a genuine failure.
 HandleExit() {
     typeset -i _exitCode=$?
     typeset -i _ppRC=0
-    RunPostProcessPrep || _ppRC=$?
+    set +e
+    RunPostProcessPrep
+    _ppRC=$?
+    set -e
     DebugOnExit "${_exitCode}" "${_ppRC}"
 }
 
 trap 'HandleExit' EXIT
 
 # shellcheck disable=SC2329
-# DebugOnExit — exitCode is the script's own (pre-trap) exit status: nonzero only for
+# DebugOnExit — mainScriptEC is the script's own (pre-trap) exit status: nonzero only for
 # infrastructure failures that occur before/instead of the pytest run (the main script body
 # always exits 0 after RunCnvUpgradePytest, regardless of test failures, which are recorded in
-# JUnit and handled by Firewatch). ppRC is RunPostProcessPrep's result.
-# An existing primary (exitCode) failure always wins — preserved as-is, and it already triggers
-# the debug-hold path below. If the main script otherwise succeeded but post-processing failed,
-# surface that as the step's final exit status WITHOUT entering the (cluster-health-focused,
-# expensive) debug-hold path, since a reporting/merge failure is not an infrastructure issue.
+# JUnit and handled by Firewatch). postProcessEC is RunPostProcessPrep's result.
+# An existing primary (mainScriptEC) failure always wins — preserved as-is, and it already
+# triggers the debug-hold path below. If the main script otherwise succeeded but post-processing
+# failed, surface that as the step's final exit status WITHOUT entering the
+# (cluster-health-focused, expensive) debug-hold path, since a reporting/merge failure is not an
+# infrastructure issue.
 DebugOnExit() {
-    typeset -i exitCode="${1:?}"; (($#)) && shift
-    typeset -i ppRC="${1:-0}"; (($#)) && shift
+    typeset -i mainScriptEC="${1:?}"; (($#)) && shift
+    typeset -i postProcessEC="${1:-0}"; (($#)) && shift
     typeset -i endTime=$SECONDS
     typeset -i executionTime=$((endTime - startTime))
     typeset hcoNamespace="openshift-cnv"
 
-    if (( exitCode != 0 )); then
-        : "SCRIPT EXITED PREMATURELY (runtime: ${executionTime}s, PID: $$, exitCode: ${exitCode})"
+    if (( mainScriptEC != 0 )); then
+        : "SCRIPT EXITED PREMATURELY (runtime: ${executionTime}s, PID: $$, exitCode: ${mainScriptEC})"
         oc get -n "${hcoNamespace}" hco kubevirt-hyperconverged -o yaml \
             > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml 2>/dev/null || true
         oc logs --since=1h -n "${hcoNamespace}" -l name=hyperconverged-cluster-operator \
@@ -98,12 +100,12 @@ DebugOnExit() {
             sleep 120
         done
         rm -f /tmp/debug_marker
-    elif (( ppRC != 0 )); then
-        : "Post-processing failed (rc=${ppRC}) though main script otherwise succeeded -- surfacing as step failure"
-        exitCode=${ppRC}
+    elif ((postProcessEC)); then
+        : "Post-processing failed (rc=${postProcessEC}) though main script otherwise succeeded -- surfacing as step failure"
+        mainScriptEC="${postProcessEC}"
     fi
 
-    exit "${exitCode}"
+    exit "${mainScriptEC}"
 }
 
 # shellcheck disable=SC2329
