@@ -69,6 +69,10 @@ ACS_TARGET_CHANNEL="${ACS_TARGET_CHANNEL:-}"
 ACS_UPGRADE_TIMEOUT="${ACS_UPGRADE_TIMEOUT:-30m}"
 ACS_SUBSCRIPTION_NAME="${ACS_SUBSCRIPTION_NAME:-rhacs-operator}"
 ACS_SUBSCRIPTION_NAMESPACE="${ACS_SUBSCRIPTION_NAMESPACE:-rhacs-operator}"
+# Use the fully-qualified OLM resource type to avoid ambiguity with ACM's own
+# subscriptions.apps.open-cluster-management.io CRD that is registered on the
+# hub once ACM is installed. Override via ACS_SUBSCRIPTION_RESOURCE if needed.
+ACS_SUBSCRIPTION_RESOURCE="${ACS_SUBSCRIPTION_RESOURCE:-subscriptions.operators.coreos.com}"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -79,7 +83,7 @@ function CollectDiagnostics () {
     {
         printf '=== ACS Operator Upgrade Diagnostics ===\n\n'
         printf '=== Subscription ===\n'
-        oc get subscription "${ACS_SUBSCRIPTION_NAME}" -n "${ACS_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
+        oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" -n "${ACS_SUBSCRIPTION_NAMESPACE}" -o yaml 2>&1 || true
         printf '\n=== CSVs in %s ===\n' "${ACS_SUBSCRIPTION_NAMESPACE}"
         oc get csv -n "${ACS_SUBSCRIPTION_NAMESPACE}" 2>&1 || true
         printf '\n=== InstallPlan ===\n'
@@ -98,7 +102,7 @@ trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; if (( _exit_code != 0 
 
 function GetCurrentCsv () {
     # Return the currentCSV name from the operator subscription status.
-    oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+    oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' || true
 }
@@ -125,7 +129,7 @@ function GetInstalledVersion () {
 
 function GetCurrentChannel () {
     # Return the current subscription channel for the operator.
-    oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+    oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
 }
@@ -145,12 +149,12 @@ function ResolveTargetChannel () {
     fi
 
     typeset catalogNamespace
-    catalogNamespace="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+    catalogNamespace="$(oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.sourceNamespace}' || true)"
 
     typeset packageName
-    packageName="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+    packageName="$(oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.name}' || true)"
 
@@ -427,7 +431,7 @@ function Main () {
     echo "Target channel: ${targetChannel}"
 
     prePatchPlan=""
-    if ! prePatchPlan="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+    if ! prePatchPlan="$(oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null)"; then
         echo "WARNING: Could not query current installPlanRef; treating as empty"
@@ -451,7 +455,7 @@ function Main () {
         installPlan="${prePatchPlan}"
     else
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
-        oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
+        oc patch "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
             --type merge \
             -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
@@ -461,7 +465,7 @@ function Main () {
 
         installPlan=""
         for _ in {1..18}; do
-            installPlan="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+            installPlan="$(oc get "${ACS_SUBSCRIPTION_RESOURCE}" "${ACS_SUBSCRIPTION_NAME}" \
                 -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
                 -o jsonpath='{.status.installPlanRef.name}' || true)"
             if [[ -n "${installPlan}" && "${installPlan}" != "${prePatchPlan}" ]]; then
