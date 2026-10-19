@@ -126,11 +126,11 @@ echo "Cluster became available, creating kubeconfig"
 sleep 15
 echo "Getting ${CLUSTER_NAME}-kubeadmin-password from namespace ${HYPERSHIFT_NAMESPACE}"
 until \
-  oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password 2> /dev/null; do
+  oc get secret -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}-kubeadmin-password" 2> /dev/null; do
     echo "$(date --rfc-3339=seconds) kubeadmin password not yet available"
     sleep 5
 done
-oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password --template={{.data.password}} | base64 -d > "${KUBEADMIN_PASSWORD_FILE}"
+oc get secret -n "${HYPERSHIFT_NAMESPACE}" "${CLUSTER_NAME}-kubeadmin-password" --template='{{.data.password}}' | base64 -d > "${KUBEADMIN_PASSWORD_FILE}"
 
 bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >"${MANAGEMENT_CLUSTER_KUBECONFIG}"
 bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >"${KUBECONFIG_OUTPUT}"
