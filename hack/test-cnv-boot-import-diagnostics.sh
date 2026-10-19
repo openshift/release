@@ -42,6 +42,7 @@ case "$*" in
     'logs '*)
         [[ "$*" == *' -n openshift-virtualization-os-images -c '* ]]
         [[ "$*" == *' --tail=200 --limit-bytes=65536 --timestamps'* ]]
+        if [[ "${SCENARIO}" == slow-logs ]]; then sleep 5; exit 14; fi
         if [[ "$*" == *--previous ]]; then echo 'previous unavailable' >&2; exit 19; fi
         echo 'importer output' ;;
     'get pod '*)
@@ -63,6 +64,8 @@ case "$2" in
         [[ "$1" == --kill-after=5s ]]
         if [[ "${SCENARIO}" == collection-timeout ]]; then
             shift 2; exec "${REAL_TIMEOUT}" --kill-after=0.1s 0.2s "$@"
+        elif [[ "${SCENARIO}" == slow-logs ]]; then
+            shift 2; exec "${REAL_TIMEOUT}" --kill-after=0.1s 2s "$@"
         fi ;;
     15s)
         [[ "$1" == --kill-after=2s ]]
@@ -75,7 +78,7 @@ exec "${REAL_TIMEOUT}" "$@"
 STUB
 chmod +x "${testDir}/bin/oc" "${testDir}/bin/timeout"
 
-for SCENARIO in success populated missing malformed denied request-timeout collection-timeout unwritable; do
+for SCENARIO in success populated missing malformed denied request-timeout collection-timeout slow-logs unwritable; do
     export SCENARIO ARTIFACT_DIR="${testDir}/${SCENARIO}" CALLS="${testDir}/${SCENARIO}.calls"
     mkdir -p "${ARTIFACT_DIR}"
     : > "${CALLS}"
@@ -110,6 +113,25 @@ for SCENARIO in success populated missing malformed denied request-timeout colle
         collection-timeout)
             [[ "$(wc -l < "${CALLS}")" == 1 ]]
             (( SECONDS - startSeconds < 5 )) ;;
+        slow-logs)
+            [[ "$(grep -c '^logs ' "${CALLS}")" == 1 ]]
+            [[ "$(wc -l < "${CALLS}")" == 10 ]]
+            for artifact in odf-state-on-failure.yaml pvcs-on-failure.txt cnv-olm-state-on-failure.yaml; do
+                grep -q 'existing diagnostics' "${ARTIFACT_DIR}/${artifact}"
+            done
+            for resource in dataimportcrons datavolumes datasources events; do
+                grep -q 'items: \[\]' "${ARTIFACT_DIR}/cnv-boot-import-on-failure/${resource}.yaml"
+            done
+            grep -q terminated "${ARTIFACT_DIR}/cnv-boot-import-on-failure/importer-test-0.yaml"
+            (( SECONDS - startSeconds < 5 )) ;;
     esac
+    if [[ "${SCENARIO}" == populated || "${SCENARIO}" == slow-logs ]]; then
+        firstLogLine="$(awk '/^logs / { print NR; exit }' "${CALLS}")"
+        [[ -n "${firstLogLine}" ]]
+        awk -v firstLogLine="${firstLogLine}" '
+            NR < firstLogLine && /^get (dataimportcrons[.]|datavolumes[.]|datasources[.]|events |storagecluster,|pvc |subscription[.])/ { snapshots++ }
+            END { exit (snapshots != 7) }
+        ' "${CALLS}"
+    fi
     printf 'PASS: %s (exit %s)\n' "${SCENARIO}" "${actualExit}"
 done

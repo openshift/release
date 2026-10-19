@@ -670,6 +670,12 @@ Cnv__CollectFailureDiagnostics() {
     done
     Cnv__FailureOc get events -n "${dvNamespace}" -o yaml \
         > "${diagnosticsDir}/events.yaml" 2>&1 || true
+    Cnv__FailureOc get storagecluster,cephcluster -n openshift-storage -o yaml \
+        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
+    Cnv__FailureOc get pvc -A -o wide \
+        > "${ARTIFACT_DIR}/pvcs-on-failure.txt" 2>&1 || true
+    Cnv__FailureOc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
+        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
     Cnv__FailureOc get pods -n "${dvNamespace}" -l cdi.kubevirt.io=importer -o json \
         > "${diagnosticsDir}/importer-pods.json" 2> "${diagnosticsDir}/importer-pods.stderr" || true
 
@@ -694,12 +700,6 @@ Cnv__CollectFailureDiagnostics() {
     done < <(jq -r '.items | sort_by(.metadata.name) | .[:10][].metadata.name' \
         "${diagnosticsDir}/importer-pods.json" 2>/dev/null || true)
 
-    Cnv__FailureOc get storagecluster,cephcluster -n openshift-storage -o yaml \
-        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
-    Cnv__FailureOc get pvc -A -o wide \
-        > "${ARTIFACT_DIR}/pvcs-on-failure.txt" 2>&1 || true
-    Cnv__FailureOc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
-        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
 }
 
 Cnv__CaptureFailure() {
