@@ -26,6 +26,11 @@ _opp_cleanup() {
 }
 trap '_opp_cleanup' EXIT
 
+# --- Typed exit globals (INTEROP-9527) ---
+_JUNIT_KIND=""
+_JUNIT_MESSAGE=""
+_EXIT_CLASS=""    # "product" or "infra"
+
 echo ">>> PHASE: initialization"
 
 # ---------------------------------------------------------------------------
@@ -150,7 +155,47 @@ _propagate_junit () {
     done
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+# --- Atomic JUnit Writer (INTEROP-9527) ---
+_junit_emit_safe() {
+  local kind="$1" message="$2" rc="${3:-0}"
+  local tmpf
+  tmpf="${ARTIFACT_DIR}/.junit_step_smoke.tmp.$$"
+  {
+    cat <<XMLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--smoke" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+  <testcase name="${kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  </testcase>
+</testsuite>
+XMLEOF
+  } > "${tmpf}"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_step_smoke.xml"
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_step_smoke.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+  fi
+}
+
+# --- Single typed finalizer (INTEROP-9527) ---
+# shellcheck disable=SC2317
+_finalize_exit() {
+  local rc=$?
+  set +e
+  if [[ -z "${_JUNIT_KIND}" && "${rc}" -ne 0 ]]; then
+    _JUNIT_KIND="unclassified-failure"
+    _JUNIT_MESSAGE="Script exited with code ${rc} before classification"
+    _EXIT_CLASS="infra"
+  fi
+  if [[ -n "${_JUNIT_KIND}" ]]; then
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+  fi
+  (exit "${rc}"); _opp_cleanup
+  CollectExitArtifacts
+  _propagate_junit
+  exit "${rc}"
+}
+trap '_finalize_exit' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
@@ -582,8 +627,15 @@ Main() {
 
     if (( hasAnyFail )); then
         : "OPP Smoke Tests: SOME TESTS FAILED"
+        _JUNIT_KIND=fail
+        _JUNIT_MESSAGE="OPP Smoke Tests: some tests failed"
+        _EXIT_CLASS=infra
         exit 1
     fi
+
+    _JUNIT_KIND=pass
+    _JUNIT_MESSAGE="OPP Smoke Tests: all passed"
+    _EXIT_CLASS=success
 
     : "OPP Smoke Tests: ALL PASSED"
     exit 0
