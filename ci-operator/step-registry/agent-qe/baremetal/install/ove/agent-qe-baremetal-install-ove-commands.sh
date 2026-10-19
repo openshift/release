@@ -60,7 +60,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    else
      # Assuming HTTP or HTTPS
      # IF _SNAPSHOT_ is not empty, this is a konflux job
-     OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
+     #OVE_ISO_STORAGE_HOST=$(<"${CLUSTER_PROFILE_DIR}/ove_iso_storage_host")
+     OVE_ISO_STORAGE_HOST="192.168.80.2"
      if [ ! -z "${SNAPSHOT}" ]; then
         iso_path="${transfer_protocol_type:-http}://${OVE_ISO_STORAGE_HOST}/${CLUSTER_NAME}.agent-ove.x86_64.iso"
      else
@@ -74,17 +75,17 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    fi
    echo "Power on #${host} (${name})..."
    CONTAINER_NAME="haproxy-$(<"${SHARED_DIR}"/cluster_name)"
-  # if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
-  #      "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
-  #        ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" prepare_host_for_boot \
-  #        --host \"${bmc_address}\" \
-  #        --user \"${bmc_user}\" \
-  #        --password \"${bmc_pass}\" \
-  #        --vendor \"${vendor}\" \
-  #        --bootmode \"${boot_selection}\" \
-  #        --iso \"${iso_path}\""; then
-  #   echo "Failed to power on ${host} (${name})"
-  # fi
+   if ! timeout -s 9 15m ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" \
+        "nsenter -n -t \"\$(podman inspect -f '{{ .State.Pid }}' \"${CONTAINER_NAME}\")\" \
+          ssh -o StrictHostKeyChecking=no root@\"${OVE_ISO_STORAGE_HOST}\" prepare_host_for_boot \
+          --host \"${bmc_address}\" \
+          --user \"${bmc_user}\" \
+          --password \"${bmc_pass}\" \
+          --vendor \"${vendor}\" \
+          --bootmode \"${boot_selection}\" \
+          --iso \"${iso_path}\""; then
+     echo "Failed to power on ${host} (${name})"
+   fi
   ) &
   sleep 2s
 done
