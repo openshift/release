@@ -22,6 +22,7 @@ images:
       FROM ci-tools-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip python3.12 python3.12-pip && dnf clean all
+      RUN usermod -g 0 vscode
       COPY --from=podman /entrypoint.sh /entrypoint.sh
       RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
@@ -34,7 +35,9 @@ images:
       RUN mkdir -p /home/vscode/.claude/plugins
       COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
       RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
-      RUN python3.12 -m pip install --no-cache-dir agentic-ci==0.3.48
+      RUN python3.12 -m pip install --no-cache-dir agentic-ci==0.3.48 && \
+          ln -sf /usr/bin/python3.12 /usr/local/bin/python3 && \
+          ln -sf /usr/bin/pip3.12 /usr/local/bin/pip3
       ENV BUILDAH_ISOLATION=chroot
       USER vscode
       WORKDIR /workspace
@@ -52,6 +55,7 @@ images:
         as:
         - src
     to: agentic-dev
+  run_if_changed: ^(\.devcontainer/|hack/agentic_setup\.sh|\.agentic/)
 resources:
   '*':
     requests:

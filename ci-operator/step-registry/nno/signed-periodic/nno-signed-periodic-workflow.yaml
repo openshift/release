@@ -1,0 +1,87 @@
+workflow:
+  as: nno-signed-periodic
+  steps:
+    pre:
+    - as: nno-discover-signed-target
+      from: nvidia-ci
+      cli: latest
+      commands: exec python3 scripts/nno/discover-signed-target.py
+      timeout: 30m0s
+      grace_period: 2m0s
+      credentials:
+      - namespace: test-credentials
+        bundle: ci-pull-credentials
+        mount_path: /var/run/secrets/ci-pull-credentials
+      env:
+      - name: REGISTRY_AUTH_FILE
+        default: /var/run/secrets/ci-pull-credentials/.dockerconfigjson
+        documentation: Existing CI Docker auth for staging inventory and release reads.
+      - name: NNO_DISCOVERY_ARCHITECTURE
+        default: amd64
+        documentation: Architecture supported by the automatic signed lab job.
+      - name: NNO_SIGNED_HISTORY_JOBS
+        default: pull-ci-rh-ecosystem-edge-nvidia-ci-main-doca2-nno-signed periodic-ci-rh-ecosystem-edge-nvidia-ci-main-doca2-nno-signed-auto
+        documentation: Space-separated manual and automatic signed jobs included in history.
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+    - ref: dpf-hypervisor-load-kubeconfig
+    - ref: nno-day2-setup
+    - as: nno-periodic-cluster-health
+      from_image:
+        namespace: ci
+        name: ocp-qe-perfscale-ci
+        tag: latest
+      cli: latest
+      commands: |-
+        set -eu
+        if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+          echo "Skipping work step: skip-work-steps marker is present."
+          exit 0
+        fi
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          # shellcheck disable=SC1090
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        oc version
+        oc get node -o wide
+        oc adm wait-for-stable-cluster --minimum-stable-period=${MINIMUM_STABLE_PERIOD} --timeout=${TIMEOUT}
+      env:
+      - name: MINIMUM_STABLE_PERIOD
+        default: "2m"
+        documentation: Minimum duration to consider a cluster stable.
+      - name: TIMEOUT
+        default: "20m"
+        documentation: Duration before the health check times out.
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: nno-install-signed-driver
+    - ref: nno-install-gpu-operator-rdma
+    - ref: nno-test-gpudirect
+    post:
+    - ref: gather-must-gather
+    allow_skip_on_success: true
+    env:
+      DPF_DEPLOY_MAKE_TARGET: create-base-cluster
+      DPF_REQUIRE_SHARED_OPENSHIFT_VERSION: "true"
+      DUMP_FAILED_TESTS: "true"
+      TEST_TRACE: "true"
+      TIMEOUT: 120m
+      VERBOSE_LEVEL: "100"
+  documentation: |-
+    Under the consuming job's exclusive lab lease, discover one recent unattempted
+    staging driver and an exact compatible OCP release. Then reuse the existing
+    installation, day-2, signed deploy, GPU and GPUDirect steps. A periodic-local
+    health step uses the QE image and the same oc health checks. Each
+    work step honors SHARED_DIR/skip-work-steps, which discovery creates on
+    no-work. Discovery errors fail the pre phase; cleanup is not gated.
+    The established installer supplies worker staging credentials. Existing
+    must-gather collects failures when installation produced a kubeconfig.
+
+    The doca2 job tests one amd64 target at 08:30/16:30 UTC, eight hours apart
+    from each other and the existing 00:30 UTC daily job.

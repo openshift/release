@@ -462,7 +462,6 @@ tests:
 - always_run: false
   as: e2e-gcp-operator
   optional: true
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -1205,7 +1204,6 @@ tests:
           memory: 200Mi
 - always_run: false
   as: e2e-aro-classic-miwi-operator
-  optional: true
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     allow_best_effort_post_steps: true
@@ -1684,7 +1682,6 @@ tests:
           memory: 200Mi
 - always_run: false
   as: e2e-aro-hcp-operator
-  optional: true
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
@@ -2154,16 +2151,16 @@ tests:
       commands: |
         # The customer's half on ARO HCP, as the day-2 workload identity
         # process describes it: an identity for the operator, trusted for the
-        # operator's ServiceAccount on this cluster's issuer, holding Network
-        # Contributor, and handed to the operator through its Subscription. No
-        # platform identity is borrowed.
+        # operator's ServiceAccount on this cluster's issuer, holding a role on
+        # each of the cluster's two groups, and handed to the operator through
+        # its Subscription. No platform identity is borrowed.
         #
-        # The role is assigned over the cluster's group, which holds the vnet
-        # and the Route Server, and over the managed group, which holds the
-        # router nodes' interfaces and the load balancer they sit behind. Where
-        # the managed group carries the ARO HCP deny assignment, the interface
-        # write is refused whatever this role says; the suite then reports the
-        # refusal, naming the action and the deny assignment.
+        # The cluster's group holds the vnet and the Route Server; the managed
+        # group holds the router nodes' interfaces and the load balancer they
+        # sit behind. Where the managed group carries the ARO HCP deny
+        # assignment, the interface write is refused whatever the role says;
+        # the suite then reports the refusal, naming the action and the deny
+        # assignment.
         set -euo pipefail
 
         redact() {
@@ -2204,14 +2201,24 @@ tests:
         echo "created ${identity}, trusted for ${ns}/${sa}"
 
         # The CI principal is refused Microsoft.Authorization/roleDefinitions/write,
-        # so the identity holds the built-in Network Contributor, as in the ARO
-        # classic MIWI job, rather than a custom role with only the actions in
-        # the operator's CredentialsRequest.
-        role="Network Contributor"
+        # so both roles are built-in rather than custom roles with only the
+        # operator's actions. On the managed group, Azure Red Hat OpenShift
+        # Network Operator (be7a6435-15ae-4171-8f30-4a343eff9e8f) holds the
+        # three actions the operator needs there, which are the ones the ARO
+        # HCP deny assignment has to let through: networkInterfaces/read and
+        # /write, and loadBalancers/backendAddressPools/join/action. Its other
+        # four are vnet, backend pool and VM reads and the subnet join. No
+        # built-in role narrower than Network Contributor covers the Route
+        # Server's BGP connections, so the cluster's group keeps it.
+        declare -A roles=(
+          ["${rg_scope}"]="Network Contributor"
+          ["${managed_scope}"]="Azure Red Hat OpenShift Network Operator"
+        )
 
         # A new principal takes a while to replicate; an assignment made too
         # soon fails with PrincipalNotFound.
         for scope in "${rg_scope}" "${managed_scope}"; do
+          role="${roles[${scope}]}"
           for attempt in $(seq 1 18); do
             if az role assignment create --assignee-object-id "${principal_id}" \
                  --assignee-principal-type ServicePrincipal --role "${role}" \
@@ -2235,32 +2242,22 @@ tests:
           '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')"
         echo "handed the identity to the operator through ${subscription_object}"
 
-        # The customer path ends with the cloud credential operator writing the
-        # operator's secret from its CredentialsRequest. Whether CCO does that
-        # on a hosted cluster is one of the things this job exists to find out,
-        # so it is waited for and reported either way. If it does not come, the
-        # secret is written by hand with the same fields, so the suite still
-        # runs, and the log says which happened.
-        secret=bgp-cloud-connector-azure-credentials
+        # The operator authenticates as this identity straight from the
+        # Subscription's env. A hosted cluster runs no cloud credential
+        # operator, so nothing writes a secret from the operator's
+        # CredentialsRequest. OLM rewrites the deployment from the
+        # Subscription; wait for the identity to reach it, then for the new
+        # pod.
         deadline=$((SECONDS + 300))
-        until oc -n "${ns}" get secret "${secret}" >/dev/null 2>&1; do
+        until oc -n "${ns}" get deployment openshift-bgp-cloud-connector-controller-manager \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].env[?(@.name=="CLIENTID")].value}' \
+                | grep -q .; do
           if (( SECONDS >= deadline )); then
-            echo "CCO did not write ${ns}/${secret} within five minutes; writing it by hand"
-            oc -n "${ns}" get credentialsrequest.cloudcredential.openshift.io -A -o yaml 2>/dev/null \
-              | grep -E 'name:|azureClientID|conditions|message|reason' | redact || true
-            region="$(oc get nodes -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/region}')"
-            oc -n "${ns}" create secret generic "${secret}" \
-              --from-literal=azure_client_id="${client_id}" \
-              --from-literal=azure_tenant_id="${tenant}" \
-              --from-literal=azure_subscription_id="${subscription}" \
-              --from-literal=azure_region="${region}" \
-              --from-literal=azure_resourcegroup="${rg}" \
-              --from-literal=azure_federated_token_file=/var/run/secrets/openshift/serviceaccount/token
-            break
+            echo "the Subscription's identity never reached the deployment" >&2
+            exit 1
           fi
-          sleep 10
+          sleep 5
         done
-        oc -n "${ns}" get secret "${secret}" -o jsonpath='{.data}' | jq -r 'keys | "secret keys: " + join(" ")'
         oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
       credentials:
       - collection: hcm-aro

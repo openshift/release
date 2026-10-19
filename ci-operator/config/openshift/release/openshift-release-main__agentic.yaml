@@ -27,7 +27,7 @@ images:
           dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
           dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip python3.12 python3.12-pip jq make git gh && \
           dnf clean all
-      RUN useradd --create-home --uid 1000 vscode && \
+      RUN useradd --create-home --uid 1000 --gid 0 vscode && \
           git config --system --add safe.directory /workspace && \
           chgrp -R 0 /home/vscode && chmod -R g=u /home/vscode
       COPY --from=podman /entrypoint.sh /entrypoint.sh
@@ -41,8 +41,9 @@ images:
       RUN mkdir -p /home/vscode/.claude/plugins
       COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
       RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
-      RUN python3.12 -m pip install --no-cache-dir agentic-ci==0.3.48 && \
-          python3 -m pip install --no-cache-dir pyyaml
+      RUN python3.12 -m pip install --no-cache-dir agentic-ci==0.3.48 pyyaml && \
+          ln -sf /usr/bin/python3.12 /usr/local/bin/python3 && \
+          ln -sf /usr/bin/pip3.12 /usr/local/bin/pip3
       ENV BUILDAH_ISOLATION=chroot
       USER vscode
       WORKDIR /workspace
