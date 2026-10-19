@@ -109,6 +109,18 @@ echo "--- private DNS zones"
 mapfile -t zones < <(az network private-dns zone list -g "${RG}" --query '[].name' -o tsv)
 for zone in "${zones[@]}"; do
     [[ -z "${zone}" ]] && continue
+    # The A record azure-provision-bastionhost adds is named after the bastion, so it is
+    # prefix-matched. It has to go even when the zone itself survives, or every run leaves one
+    # behind in a zone that is shared and never deleted.
+    mapfile -t records < <(az network private-dns record-set a list -g "${RG}" -z "${zone}" \
+        --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
+    for record in "${records[@]}"; do
+        [[ -z "${record}" ]] && continue
+        echo "Deleting A record '${record}' from zone '${zone}'..."
+        az network private-dns record-set a delete -g "${RG}" -z "${zone}" -n "${record}" --yes -o none \
+            || echo "WARNING: failed to delete A record '${record}'"
+    done
+
     mapfile -t links < <(az network private-dns link vnet list -g "${RG}" -z "${zone}" \
         --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
     for link in "${links[@]}"; do
