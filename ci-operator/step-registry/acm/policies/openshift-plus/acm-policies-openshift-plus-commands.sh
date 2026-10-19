@@ -186,7 +186,7 @@ typeset testcaseXml=""
 # so CI sees a real failure instead of a silent 0-test JUnit.
 typeset policyStatusJson=""
 set +x  # avoid tracing policy JSON content
-if ! policyStatusJson="$(oc get policies -n policies -o json 2>&1)"; then
+if ! policyStatusJson="$(oc get policies -n policies -o json 2>/dev/null)"; then
   set -x
   printf '[%s] ERROR: failed to query policies for JUnit generation\n' \
     "$(date -u +%FT%TZ)" >&2
@@ -203,39 +203,49 @@ EREOF
   mv -f "${_tmpjunit}" "${ARTIFACT_DIR}/junit_acm_policies.xml"
   exit 1
 fi
-set -x
 
 if [[ -n "${policyStatusJson}" ]]; then
-  while IFS='|' read -r pName pCompliant; do
-    [[ -z "${pName}" ]] && continue
+  # Capture jq output into a variable and check its exit status so that
+  # malformed JSON is caught instead of silently producing zero testcases.
+  typeset policyLines=""
+  if ! policyLines="$(echo "${policyStatusJson}" | jq -r '.items[] | "\(.metadata.name)|\(.status.compliant // "unknown")"')"; then
     junitTests+=1
+    junitFailures+=1
+    testcaseXml+="    <testcase name=\"jq-parse-policies\" classname=\"${SUITE_NAME}\">
+      <failure message=\"jq failed to parse policy JSON\">policyStatusJson was not valid JSON or had an unexpected schema</failure>
+    </testcase>
+"
+  else
+    while IFS='|' read -r pName pCompliant; do
+      [[ -z "${pName}" ]] && continue
+      junitTests+=1
 
-    # Check whether this policy was skipped
-    typeset _skip=false
-    for _sp in "${skipPoliciesArr[@]}"; do
-      [[ "${_sp}" == "${pName}" ]] && { _skip=true; break; }
-    done
+      # Check whether this policy was skipped
+      typeset _skip=false
+      for _sp in "${skipPoliciesArr[@]}"; do
+        [[ "${_sp}" == "${pName}" ]] && { _skip=true; break; }
+      done
 
-    if [[ "${_skip}" == "true" ]]; then
-      junitSkipped+=1
-      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
+      if [[ "${_skip}" == "true" ]]; then
+        junitSkipped+=1
+        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
       <skipped message=\"Policy in SKIP_POLICIES list\"/>
     </testcase>
 "
-    elif [[ "${pCompliant}" == "Compliant" ]]; then
-      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\"/>
+      elif [[ "${pCompliant}" == "Compliant" ]]; then
+        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\"/>
 "
-    else
-      junitFailures+=1
-      testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
+      else
+        junitFailures+=1
+        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
       <failure message=\"Policy status: ${pCompliant:-unknown}\">Policy ${pName} is ${pCompliant:-unknown}</failure>
     </testcase>
 "
-    fi
-  # Disable tracing while piping policy JSON through jq to avoid
-  # logging potentially sensitive policy configuration content.
-  done < <(set +x; echo "${policyStatusJson}" | jq -r '.items[] | "\(.metadata.name)|\(.status.compliant // "unknown")"')
+      fi
+    done <<< "${policyLines}"
+  fi
 fi
+set -x  # Re-enable xtrace after policy JSON processing
 
 # Atomic JUnit write: temp file + mv prevents partial writes on failure.
 typeset _tmpjunit2="${ARTIFACT_DIR}/.junit_acm_policies.tmp.$$"
@@ -255,6 +265,6 @@ printf '[%s] JUnit: %d tests, %d failures, %d skipped → %s\n' \
   "$(date -u +%FT%TZ)" "${junitTests}" "${junitFailures}" "${junitSkipped}" "${junitFile}"
 
 # ── Exit with the original compliance outcome ────────────────────────
-if (( complianceFailed )); then
+if (( complianceFailed || junitFailures )); then
   exit 1
 fi
