@@ -653,6 +653,67 @@ SlowDownHcoWorkloadUpdateForUpgradeTest() {
     true
 }
 
+Cnv__FailureOc() {
+    timeout --kill-after=2s 15s oc \
+        --kubeconfig="${SHARED_DIR}/managed-cluster-kubeconfig" --request-timeout=10s "$@"
+}
+
+Cnv__CollectFailureDiagnostics() {
+    typeset dvNamespace='openshift-virtualization-os-images'
+    typeset diagnosticsDir="${ARTIFACT_DIR}/cnv-boot-import-on-failure"
+    typeset resource podName containerName logMode
+    mkdir -p "${diagnosticsDir}" || return 0
+
+    for resource in dataimportcrons datavolumes datasources; do
+        Cnv__FailureOc get "${resource}.cdi.kubevirt.io" -n "${dvNamespace}" -o yaml \
+            > "${diagnosticsDir}/${resource}.yaml" 2>&1 || true
+    done
+    Cnv__FailureOc get events -n "${dvNamespace}" -o yaml \
+        > "${diagnosticsDir}/events.yaml" 2>&1 || true
+    Cnv__FailureOc get pods -n "${dvNamespace}" -l cdi.kubevirt.io=importer -o json \
+        > "${diagnosticsDir}/importer-pods.json" 2> "${diagnosticsDir}/importer-pods.stderr" || true
+
+    while read -r podName; do
+        [[ -n "${podName}" ]] || continue
+        Cnv__FailureOc get pod "${podName}" -n "${dvNamespace}" -o yaml \
+            > "${diagnosticsDir}/${podName}.yaml" 2>&1 || true
+        while read -r containerName; do
+            [[ -n "${containerName}" ]] || continue
+            for logMode in current previous; do
+                typeset -a logOptions=()
+                [[ "${logMode}" != previous ]] || logOptions+=(--previous)
+                Cnv__FailureOc logs "${podName}" -n "${dvNamespace}" -c "${containerName}" \
+                    --tail=200 --limit-bytes=65536 --timestamps "${logOptions[@]}" \
+                    > "${diagnosticsDir}/${podName}-${containerName}-${logMode}.log" 2>&1 || true
+            done
+        done < <(jq -r --arg pod "${podName}" '
+            .items[] | select(.metadata.name == $pod)
+            | [.spec.initContainers[]?.name, .spec.containers[]?.name] | unique | .[:4][]
+        ' "${diagnosticsDir}/importer-pods.json" 2>/dev/null || true)
+    done < <(jq -r '.items | sort_by(.metadata.name) | .[:10][].metadata.name' \
+        "${diagnosticsDir}/importer-pods.json" 2>/dev/null || true)
+
+    Cnv__FailureOc get storagecluster,cephcluster -n openshift-storage -o yaml \
+        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
+    Cnv__FailureOc get pvc -A -o wide \
+        > "${ARTIFACT_DIR}/pvcs-on-failure.txt" 2>&1 || true
+    Cnv__FailureOc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
+        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
+}
+
+Cnv__CaptureFailure() {
+    typeset -i originalExitCode="${1}"
+    trap - EXIT
+    if (( originalExitCode )); then
+        (
+            set +eux
+            export -f Cnv__FailureOc Cnv__CollectFailureDiagnostics
+            timeout --kill-after=5s 120s bash -c Cnv__CollectFailureDiagnostics
+        ) || true
+    fi
+    exit "${originalExitCode}"
+}
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 typeset binFolder
@@ -662,15 +723,7 @@ export PATH="${binFolder}:${PATH}"
 [ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]
 export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 
-trap '
-    (($?)) || exit 0
-    oc get storagecluster,cephcluster -n openshift-storage -o yaml \
-        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
-    oc get pvc -A -o wide \
-        > "${ARTIFACT_DIR}/pvcs-on-failure.txt" 2>&1 || true
-    oc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
-        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
-' EXIT
+trap 'Cnv__CaptureFailure "$?"' EXIT
 
 if [[ -n "${CNV_TARGET_MAJOR_MINOR}" ]]; then
     typeset resolvedCnvVersion
