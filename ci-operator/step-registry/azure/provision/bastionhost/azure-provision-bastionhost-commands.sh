@@ -541,17 +541,7 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     echo "Adding private DNS record for mirror registry"
     private_zone="mirror-registry.${BASE_DOMAIN}"
     dns_vnet_link_name="${bastion_name}-pvz-vnet-link"
-    # The zone name derives from BASE_DOMAIN alone, so unlike everything else here it is not
-    # unique per run. In most Azure jobs the bastion lives in a throwaway resource group and that
-    # is harmless, but when RESOURCE_GROUP points at a shared, permanent group -- as the Azure IL6
-    # job does -- a zone left behind by any earlier run makes 'zone create' return
-    # PreconditionFailed and kills the step. Adopt an existing zone instead. The record set and the
-    # VNet link below are both named from ${bastion_name}, so they stay unique per run regardless.
-    if az network private-dns zone show -g "${bastion_rg}" -n "${private_zone}" >/dev/null 2>&1; then
-        echo "Private DNS zone ${private_zone} already exists; reusing it."
-    else
-        run_command "az network private-dns zone create -g ${bastion_rg} -n ${private_zone}" || exit 2
-    fi
+    run_command "az network private-dns zone create -g ${bastion_rg} -n ${private_zone}" &&
     run_command "az network private-dns record-set a add-record -g ${bastion_rg} -z ${private_zone} -n ${bastion_name} -a ${bastion_private_ip}" &&
     run_command "az network private-dns link vnet create --name '${dns_vnet_link_name}' --registration-enabled false --resource-group ${bastion_rg} --virtual-network ${bastion_vnet_name} --zone-name ${private_zone}" || exit 2
 
