@@ -77,7 +77,7 @@ if [[ "${USE_ACR}" != "true" ]]; then
     DEST_TLS_ARGS=(--dest-tls-verify=false --src-tls-verify=false)
 fi
 
-EXTRA_IMAGES="${EXTRA_IMAGES_TO_MIRROR:-quay.io/openshift/origin-hello-openshift:latest}"
+EXTRA_IMAGES="${EXTRA_IMAGES_TO_MIRROR:-ghcr.io/nginxinc/nginx-unprivileged:alpine}"
 if [[ -n "${EXTRA_IMAGES}" ]]; then
     echo "Mirroring extra images..."
     for img in $(echo "${EXTRA_IMAGES}" | tr ',' ' '); do
