@@ -224,7 +224,7 @@ echo "Automatic closing of duplicate rebase PRs completed"
 # Run the deterministic doctor pipeline.
 echo "Running CI doctor pipeline..."
 python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
-    --releases "5.0" \
+    --releases "${RELEASE_VERSIONS}" \
     --workdir "${WORKDIR}" \
     --model "${CLAUDE_MODEL}" \
     --pull-requests \
