@@ -111,6 +111,8 @@ if [[ -n "${_saved_exit_trap}" ]]; then
 fi
 trap 'cleanup_s3_bucket; eval "${_saved_exit_trap_body}"' EXIT
 
+QUAY_S3_CLEANUP_NEEDED=true
+
 # Bounded retry for S3 BucketAlreadyExists (409) conflicts
 max_retries=3
 retry=0
@@ -127,7 +129,10 @@ while (( retry < max_retries )); do
       echo "Terraform apply failed after ${max_retries} retries due to S3 bucket conflict" >&2
       exit "${tf_exit}"
     fi
-    echo "S3 bucket conflict (409), retry ${retry}/${max_retries} in 10s..." >&2
+    # Regenerate bucket name with retry suffix to avoid the same collision
+    QUAY_AWS_S3_BUCKET="quayprowci${BUILD_ID:-$(date +%s%N)}-r${retry}"
+    export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
+    echo "S3 bucket conflict (409), retry ${retry}/${max_retries} with new name ${QUAY_AWS_S3_BUCKET} in 10s..." >&2
     sleep 10
   else
     echo "Terraform apply failed with non-retryable error (exit code: ${tf_exit})" >&2
@@ -141,8 +146,6 @@ AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}" \
   AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}" \
   aws s3api head-bucket --bucket "${QUAY_AWS_S3_BUCKET}" --region us-east-2
 echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully"
-
-QUAY_S3_CLEANUP_NEEDED=true
 
 #Share Terraform Var and Terraform Directory
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
