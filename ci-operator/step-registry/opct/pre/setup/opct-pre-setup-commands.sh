@@ -44,9 +44,14 @@ if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
   cmd_yq="$(which yq 2>/dev/null || true)"
 
   UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
-  target_version_y=$(( current_version_y + 1 ))
-  target_version_xy="${current_version_x}.${target_version_y}"
-  upgrade_to_channel="${UPGRADE_TO_CHANNEL_TYPE}-${current_version_x}.${target_version_y}"
+  if [ -n "${UPGRADE_TO_VERSION:-}" ]; then
+    target_version_xy="${UPGRADE_TO_VERSION}"
+    target_version_y=$(echo "$target_version_xy" | awk -F'.' '{ print$2 }')
+  else
+    target_version_y=$(( current_version_y + 1 ))
+    target_version_xy="${current_version_x}.${target_version_y}"
+  fi
+  upgrade_to_channel="${UPGRADE_TO_CHANNEL_TYPE}-${target_version_xy}"
 
   cat <<EOF > "${ARTIFACT_DIR}/release-versions"
 UPGRADE_TO_CHANNEL_TYPE=$UPGRADE_TO_CHANNEL_TYPE
