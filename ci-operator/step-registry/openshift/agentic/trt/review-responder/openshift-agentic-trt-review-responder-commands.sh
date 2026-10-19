@@ -33,7 +33,7 @@ else
     PR_NUM=$(echo "${PR_JSON}" | jq -r '.[0].number // empty')
     if [[ -z "${PR_NUM}" ]]; then
         echo "No open PR found for ${JIRA_ISSUE_KEY}. Nothing to do."
-        finalize_session_metrics
+        finalize_session_metrics review
         exit 0
     fi
     echo "Found PR #${PR_NUM}"
@@ -697,6 +697,6 @@ jq -n \
 
 echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
 
-finalize_session_metrics
+finalize_session_metrics review
 
 echo "=== TRT Review Responder Complete ==="

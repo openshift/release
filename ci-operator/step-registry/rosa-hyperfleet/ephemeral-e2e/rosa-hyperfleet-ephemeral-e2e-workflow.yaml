@@ -16,7 +16,9 @@ workflow:
 
     When triggered from rosa-hyperfleet-api, the e2e step auto-detects
     the PR's fork repo and branch via the GitHub API, so test changes in the
-    PR are picked up automatically (including from forks).
+    PR are picked up automatically (including from forks). When triggered
+    from rosa-hyperfleet itself, the environment is provisioned from the PR's
+    head branch and every step runs the PR's code.
 
     Usage from a CI config:
       tests:
@@ -24,13 +26,14 @@ workflow:
         steps:
           workflow: rosa-hyperfleet-ephemeral-e2e
           dependencies:
-            CI_COMPONENT_IMAGE: <pipeline-image-name>
+            CI_IMAGE_1: <pipeline-image-name>
           env:
-            ROSA_REGIONAL_COMPONENT_NAME: "<component-name>"
-            ROSA_REGIONAL_HELM_OVERRIDE_YAML: |
-              <yaml-fragment-with-IMAGE_REPO-and-IMAGE_TAG-placeholders>
-            ROSA_REGIONAL_HELM_VALUES_FILE: "argocd/config/regional-cluster/<component-name>/values.yaml"
-            ROSA_REGIONAL_QUAY_DEST_REPO: "quay.io/rrp-dev-ci/<component>"
+            ROSA_REGIONAL_COMPONENTS: |
+              - image: CI_IMAGE_1
+                repo: quay.io/rrp-dev-ci/<component>
+                target: argocd/config/regional-cluster/<component>/values.yaml
+                override:
+                  <yaml-fragment-with-IMAGE_REPO-and-IMAGE_TAG-placeholders>
 
     Set OCP_RELEASE_STREAM (e.g. "5.1.0-0.nightly-multi") to run against the
     latest accepted OCP payload of a release controller stream instead of the

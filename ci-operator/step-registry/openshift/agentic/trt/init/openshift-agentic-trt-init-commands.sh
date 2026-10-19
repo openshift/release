@@ -93,7 +93,14 @@ agentic_ci() {
 }
 
 finalize_session_metrics() {
-    rm -f "${SHARED_DIR}/claude-otel.jsonl"
+    # phase is "solve" or "review". Each step writes its own artifact so a
+    # later phase cannot overwrite the earlier phase's cost row.
+    local phase="${1:-}"
+    rm -f "${SHARED_DIR}/claude-otel.jsonl" "${SHARED_DIR}/claude-session-metrics-autodl.json"
+    if [[ "${phase}" != "solve" && "${phase}" != "review" ]]; then
+        echo "Warning: finalize_session_metrics requires phase solve or review, skipping session metrics"
+        return 0
+    fi
     if [[ ! -f "${EXTRACT_METRICS}" ]]; then
         echo "Warning: extract_metrics.py not found, skipping session metrics"
         return 0
@@ -102,16 +109,17 @@ finalize_session_metrics() {
         echo "Warning: No OTEL data collected, skipping session metrics"
         return 0
     fi
-    local metrics_tmp
+    local metrics_tmp dest
     metrics_tmp=$(mktemp)
+    dest="${ARTIFACT_DIR}/claude-session-metrics-${phase}-autodl.json"
     if ! python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" 2>&1; then
         echo "Warning: Failed to extract session metrics"
         rm -f "${metrics_tmp}"
         return 0
     fi
-    cp "${metrics_tmp}" "${SHARED_DIR}/claude-session-metrics-autodl.json"
+    cp "${metrics_tmp}" "${dest}"
     rm -f "${metrics_tmp}"
-    echo "Session metrics autodl written to ${SHARED_DIR}/claude-session-metrics-autodl.json"
+    echo "Session metrics autodl written to ${dest}"
 }
 HEREDOC_EOF
 chmod +x "${SHARED_DIR}/trt-telemetry.sh"
