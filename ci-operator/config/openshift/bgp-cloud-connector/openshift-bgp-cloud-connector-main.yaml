@@ -2194,7 +2194,6 @@ tests:
         az identity create -g "${rg}" -n "${identity}" --output none
         client_id="$(az identity show -g "${rg}" -n "${identity}" --query clientId -o tsv)"
         principal_id="$(az identity show -g "${rg}" -n "${identity}" --query principalId -o tsv)"
-        echo "${client_id}" >"${SHARED_DIR}/operator-client-id"
         az identity federated-credential create -g "${rg}" --identity-name "${identity}" \
           --name bgp-cloud-connector --issuer "${issuer}" \
           --subject "system:serviceaccount:${ns}:${sa}" --audiences openshift --output none
@@ -2300,10 +2299,7 @@ tests:
           >"${profile}/osServicePrincipal.json")
         export CLUSTER_PROFILE_DIR="${profile}"
 
-        # No kube-system/azure-credentials on a hosted cluster, so the suite
-        # writes interfaces as the identity the profile names, which here is
-        # the operator's own.
-        NETWORK_INTERFACE_CLIENT_ID="$(<"${SHARED_DIR}/operator-client-id")" hack/ci-e2e-azure.sh
+        hack/ci-e2e-azure.sh
       credentials:
       - collection: hcm-aro
         group: aro-hcp-int-rh
