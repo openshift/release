@@ -148,8 +148,14 @@ function collect_crash_diagnostics() (
   local ns
   ns=$(infer_operator_namespace "${operator}")
   mkdir -p "${destination}" || return 0
-  printf '%s\n' "${crashes}" | jq -c '
-    [.[:4][] | {index: null, restarts, waitingReason: "CrashLoopBackOff",
+  printf '%s\n' "${crashes}" | jq -c --arg operator "${operator}" --arg namespace "${ns}" '
+    def identity($limit):
+      if type == "string" and length <= $limit and
+        test("^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$") then . else "[omitted]" end;
+    [.[:4][] | {index: null,
+      operator: ($operator | identity(253)), namespace: ($namespace | identity(63)),
+      pod: (.pod | identity(253)), podUID: (.uid | identity(64)),
+      container: (.container | identity(63)), restarts, waitingReason: "CrashLoopBackOff",
       lastTermination: {finishedAt: (if (.finishedAt | type) == "string" and
           (.finishedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"))
           then .finishedAt else null end),

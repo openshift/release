@@ -28,6 +28,13 @@ Paths `crash-<condition>-<iteration>-<capture>/` are deterministic and unique
 within a script execution. Capture failures are best effort, never readiness
 evidence.
 
+Each `status.json` entry links its `index` to the corresponding
+`container-<index>-{previous,current}.log` files, with operator, inferred namespace,
+pod name, pod UID and container name. These selected identities are length-bounded
+and restricted to Kubernetes identifier characters; invalid values are omitted.
+No labels, annotations, arbitrary identifiers from log bodies, or specs are kept.
+Events are namespace-wide warnings, not necessarily events for the selected pod.
+
 Raw log bodies can contain credentials. Current and previous log artifacts
 therefore retain only line numbers and fixed panic/fatal-error/segmentation-fault
 signatures; all other text is omitted, rather than relying on incomplete secret
@@ -35,7 +42,9 @@ redaction patterns. Status retains restart counts, validated termination times, 
 and an OOM flag; events retain allowlisted reasons and numeric counts. No raw
 specs, messages, credentials, or API stderr are saved by the new collector.
 This deliberately limits root-cause diagnosis; restarting alone does not prove
-health or explain a console crash. Existing general operator diagnostics are
+health or explain a console crash. Fixed signatures and numeric fields cannot
+guarantee root-cause completeness, and a pod may disappear between observation
+and log retrieval. Existing general operator diagnostics are
 unchanged.
 
 The registry ref invokes the edited commands directly using `rosa-aws-cli`.
@@ -45,3 +54,14 @@ with `hack/.pylintrc`) and `validate-step-registry` (YAML/registry resolution).
 No registry definitions or generated configuration change in this patch, so
 focused shellcheck, Bash syntax, pylint, unittest, and clean-diff checks cover
 the changed consumer path without generating or triggering CI jobs.
+The regression suite is manual: no current Prow job or Makefile target invokes
+`test_rosa_crash_progress.py`. Existing step-registry shellcheck and hack Python
+lint jobs cover syntax/security rules and pylint respectively, not these runtime
+regressions. Local focused checks do not establish that full CI has passed.
+
+The `ci/rosa-aws-cli:latest` build is declared by
+`ci-operator/config/openshift/rosa/openshift-rosa-master__images.yaml`, using
+`openshift/rosa`'s `images/Dockerfile.e2e`. That Dockerfile installs jq and verifies
+the OpenShift client. Bash, GNU coreutils (including timeout/head/date), and awk
+are runtime base-image tools; verify the resolved image rather than assuming a
+particular RPM package name (coreutils may be provided by coreutils-single).

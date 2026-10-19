@@ -2,6 +2,7 @@
 
 """Offline regressions executing the real ROSA operator readiness entry point."""
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -90,10 +91,18 @@ elif args[:2] == ["get", "pods"]:
             pods.append({"metadata": {"name": "other", "uid": "other"}, "status": {"containerStatuses": [dict(status, name="other")]}})
             if iteration % 2:
                 pods.reverse()
+        if mode == "multi":
+            pods.append({"metadata": {"name": "other-pod", "uid": "2"}, "status": {
+                "containerStatuses": [dict(status, name="other")]}})
+            if iteration % 2:
+                pods.reverse()
         if mode in ["many", "budget"]:
             pods *= 50
         if mode == "missing-status":
             pods[0]["status"] = {}
+        if mode == "unsafe-identity":
+            pods[0]["metadata"] = {"name": "https://SECRET_SENTINEL", "uid": "Bearer SECRET_SENTINEL"}
+            status["name"] = "SECRET_SENTINEL" * 100
         print(json.dumps({"items": pods}))
 elif args[:2] == ["get", "events"]:
     if "json" in args:
@@ -225,6 +234,61 @@ class CrashProgressTests(CrashProgressHarness):
 
 
 class LateCrashProgressTests(CrashProgressHarness):
+    def test_multiple_log_indices_match_requested_identities(self):
+        self.assertEqual(self.run_step("multi").returncode, 1, self.output)
+        files = sorted((self.directory / "artifacts").glob("crash*/status.json"))
+        calls = [json.loads(line) for line in (self.directory / "calls").read_text().splitlines()]
+        logs = [arguments for arguments in calls if arguments[0] == "logs"]
+        self.assertEqual(len(files), 2)
+        self.assertEqual(len(logs), 8)
+        for capture, path in enumerate(files):
+            metadata = json.loads(path.read_text())
+            self.assertEqual([(entry["pod"], entry["container"]) for entry in metadata], [
+                ("console-pod", "console"), ("other-pod", "other"),
+            ])
+            for index, entry in enumerate(metadata):
+                self.assertEqual(entry["index"], index)
+                for offset, stream in enumerate(["previous", "current"]):
+                    arguments = logs[capture * 4 + index * 2 + offset]
+                    self.assertEqual(arguments[1], entry["pod"])
+                    self.assertEqual(arguments[arguments.index("-c") + 1], entry["container"])
+                    self.assertEqual(arguments[arguments.index("-n") + 1], entry["namespace"])
+                    self.assertEqual("--previous" in arguments, stream == "previous")
+                    self.assertTrue((path.parent / f"container-{index}-{stream}.log").is_file())
+
+    def test_artifacts_correlate_logs_to_selected_identities(self):
+        self.assertEqual(self.run_step("replacement").returncode, 0, self.output)
+        files = sorted((self.directory / "artifacts").glob("crash*/status.json"))
+        self.assertEqual(len(files), 3)
+        for iteration, path in enumerate(files):
+            metadata = json.loads(path.read_text())
+            self.assertEqual(len(metadata), 1)
+            self.assertEqual({key: metadata[0][key] for key in [
+                "index", "operator", "namespace", "pod", "podUID", "container",
+            ]}, {
+                "index": 0, "operator": "console", "namespace": "openshift-console",
+                "pod": "console-pod", "podUID": str(iteration), "container": "console",
+            })
+            self.assertEqual(metadata[0]["lastTermination"]["exitCode"], 1)
+            self.assertTrue((path.parent / "container-0-previous.log").is_file())
+            self.assertTrue((path.parent / "container-0-current.log").is_file())
+            self.assertLessEqual(path.stat().st_size, 65536)
+            self.assertNotIn("SECRET_SENTINEL", path.read_text())
+
+    def test_invalid_identity_metadata_is_omitted(self):
+        self.assertEqual(self.run_step("unsafe-identity").returncode, 1, self.output)
+        files = list((self.directory / "artifacts").glob("crash*/status.json"))
+        self.assertTrue(files)
+        for path in files:
+            metadata = json.loads(path.read_text())[0]
+            for key in ["pod", "podUID", "container"]:
+                self.assertEqual(metadata[key], "[omitted]")
+            self.assertEqual(metadata["namespace"], "openshift-console")
+            self.assertNotIn("SECRET_SENTINEL", path.read_text())
+        for path in (self.directory / "artifacts").glob("crash*/*"):
+            self.assertNotIn("SECRET_SENTINEL", path.read_text())
+        self.assertNotIn("SECRET_SENTINEL", self.output)
+
     def test_late_onset_and_replacement_are_captured(self):
         for mode in ["late", "late-replacement"]:
             with self.subTest(mode=mode):
