@@ -1,5 +1,25 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euo pipefail; shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+# Keeps xtrace out of CI build logs (policy JSON may contain sensitive
+# configuration); the log is saved to artifacts only on failure.
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  sed -i -E 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
 
 cd /tmp/
 git clone https://github.com/stolostron/policy-collection.git
@@ -162,9 +182,28 @@ typeset -i junitFailures=0
 typeset -i junitSkipped=0
 typeset testcaseXml=""
 
-# Query per-policy compliance status
+# Query per-policy compliance status — fail hard if the cluster is unreachable
+# so CI sees a real failure instead of a silent 0-test JUnit.
 typeset policyStatusJson=""
-policyStatusJson="$(oc get policies -n policies -o json 2>/dev/null)" || true
+set +x  # avoid tracing policy JSON content
+if ! policyStatusJson="$(oc get policies -n policies -o json 2>&1)"; then
+  set -x
+  printf '[%s] ERROR: failed to query policies for JUnit generation\n' \
+    "$(date -u +%FT%TZ)" >&2
+  # Emit an error JUnit so CI sees a failure, not a 0-test pass
+  typeset _tmpjunit="${ARTIFACT_DIR}/.junit_acm_policies.tmp.$$"
+  cat > "${_tmpjunit}" <<'EREOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="lp-interop--OPP--acm-policies" tests="1" failures="1">
+  <testcase name="policy-query" classname="lp-interop--OPP--acm-policies">
+    <failure message="oc get policies failed">Failed to query policies from the cluster</failure>
+  </testcase>
+</testsuite>
+EREOF
+  mv -f "${_tmpjunit}" "${ARTIFACT_DIR}/junit_acm_policies.xml"
+  exit 1
+fi
+set -x
 
 if [[ -n "${policyStatusJson}" ]]; then
   while IFS='|' read -r pName pCompliant; do
@@ -193,14 +232,24 @@ if [[ -n "${policyStatusJson}" ]]; then
     </testcase>
 "
     fi
-  done < <(echo "${policyStatusJson}" | jq -r '.items[] | "\(.metadata.name)|\(.status.compliant // "unknown")"')
+  # Disable tracing while piping policy JSON through jq to avoid
+  # logging potentially sensitive policy configuration content.
+  done < <(set +x; echo "${policyStatusJson}" | jq -r '.items[] | "\(.metadata.name)|\(.status.compliant // "unknown")"')
 fi
 
-cat > "${junitFile}" <<JUNIT_EOF
+# Atomic JUnit write: temp file + mv prevents partial writes on failure.
+typeset _tmpjunit2="${ARTIFACT_DIR}/.junit_acm_policies.tmp.$$"
+if ! cat > "${_tmpjunit2}" <<JUNIT_EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${SUITE_NAME}" tests="${junitTests}" failures="${junitFailures}" skipped="${junitSkipped}">
 ${testcaseXml}</testsuite>
 JUNIT_EOF
+then
+  printf '[%s] ERROR: failed to write JUnit XML to %s\n' \
+    "$(date -u +%FT%TZ)" "${_tmpjunit2}" >&2
+  exit 1
+fi
+mv -f "${_tmpjunit2}" "${junitFile}"
 
 printf '[%s] JUnit: %d tests, %d failures, %d skipped → %s\n' \
   "$(date -u +%FT%TZ)" "${junitTests}" "${junitFailures}" "${junitSkipped}" "${junitFile}"
