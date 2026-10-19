@@ -33,11 +33,14 @@ ref:
         incorrect settings). Each node gets a partitioned slice of the DHCP range to
         avoid IP conflicts on the shared L2 segment.
     - name: LOCALNET_SECONDARY_DNSMASQ_GATEWAY
-      default: ""
+      default: "auto"
       documentation: |-
-        Gateway IP advertised via DHCP option 3. Typically the libvirt host's IP on
-        the secondary network (e.g. 192.168.221.1), which can route to the management
-        network for API VIP reachability.
+        Gateway IP advertised via DHCP option 3. When set to "auto" (default), each
+        node's own IP on the secondary bridge is used as the gateway.  This works
+        because each management node has interfaces on both networks (secondary
+        bridge + br-ex) and uses MASQUERADE to forward traffic between them.  The
+        hypervisor cannot be used as the gateway because its libvirt iptables do not
+        forward between bridges.  Set an explicit IP only if a custom router exists.
     - name: LOCALNET_SECONDARY_DNSMASQ_DNS
       default: ""
       documentation: |-
@@ -64,8 +67,13 @@ ref:
     Create an OVS bridge on each management-cluster node's secondary interface
     (provisioned by baremetalds-devscripts-conf-extranetwork), add the
     corresponding OVN bridge-mapping, and optionally enable global IP
-    forwarding. When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, also deploy a
-    per-node dnsmasq DHCP server on the bridge for subnet-less NAD topologies
-    where KubeVirt's internal DHCP must be eliminated. Run this step after
-    cluster installation but before hypershift-kubevirt-create so that localnet
-    NADs can reference the secondary bridge and VMs receive DHCP on first boot.
+    forwarding.  When forwarding is enabled, also configures cross-subnet
+    routing (rp_filter=2, iptables MASQUERADE) so management nodes can
+    route traffic between the secondary and primary networks — the libvirt
+    hypervisor does not forward between its bridges.
+    When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, also deploy a per-node
+    dnsmasq DHCP server on the bridge for subnet-less NAD topologies where
+    KubeVirt's internal DHCP must be eliminated, and add OVS flows to block
+    competing DHCP responses from the hypervisor.  Run this step after cluster
+    installation but before hypershift-kubevirt-create so that localnet NADs
+    can reference the secondary bridge and VMs receive DHCP on first boot.
