@@ -79,7 +79,14 @@ cat > "$playbook" <<EOF
 EOF
 
 ansible_status=0
-ANSIBLE_ROLES_PATH="$ANSIBLE_FILES_DIR/roles" ansible-playbook -i localhost, "$playbook" || ansible_status=$?
+ANSIBLE_COLLECTIONS_PATH="/output/.ansible/collections:/usr/share/ansible/collections${ANSIBLE_COLLECTIONS_PATH:+:$ANSIBLE_COLLECTIONS_PATH}" \
+  HOME="$WORK_DIR" ANSIBLE_LOCAL_TEMP=/tmp ANSIBLE_REMOTE_TEMP=/tmp \
+  ANSIBLE_ROLES_PATH="$ANSIBLE_FILES_DIR/roles" \
+  ansible-playbook -i localhost, "$playbook" || ansible_status=$?
+
+if [[ -s "$SHARED_DIR/vm_uuids.txt" && -n "$(tail -c 1 "$SHARED_DIR/vm_uuids.txt")" ]]; then
+  printf '\n' >> "$SHARED_DIR/vm_uuids.txt"
+fi
 
 function recover_recorded_ids() {
   local response name uuid
