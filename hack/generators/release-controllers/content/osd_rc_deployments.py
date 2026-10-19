@@ -359,7 +359,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "11Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
@@ -450,7 +450,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "4Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller-api',
