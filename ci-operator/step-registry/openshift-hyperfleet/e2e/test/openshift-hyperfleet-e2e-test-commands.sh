@@ -25,6 +25,7 @@ if [ -n "$E2E_REF" ]; then
   git clone --branch "$E2E_REF" --depth 1 \
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
   cd "${SRC_DIR}"
+  log "E2E_REF ${E2E_REF} -> $(git rev-parse HEAD) (binary built from this commit, not the pod image)"
   make build
   # Build ginkgo CLI and test binary for parallel execution. Build the CLI
   # from the cloned module's own go.mod: every supported ref pins ginkgo/v2
