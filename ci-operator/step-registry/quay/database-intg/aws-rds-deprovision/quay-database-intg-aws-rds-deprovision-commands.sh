@@ -12,12 +12,24 @@ QUAY_DB_AWS_RDS_TF_ARCHIVE="quay-db-aws-rds-terraform.tgz"
 QUAY_DB_AWS_RDS_CONFIG_ARCHIVE="quay-db-aws-rds-config.tgz"
 QUAY_DB_AWS_RDS_OUTPUTS_JSON="quay-db-aws-rds-outputs.json"
 
+# Region the database was created in, persisted by the provisioning step.
+# Destroy and import must target the same region the resources live in;
+# fall back to the same lease env the provisioner resolves from, then the
+# legacy default.
+QUAY_DB_AWS_REGION=""
+if [[ -f "${SHARED_DIR}/QUAY_DB_AWS_REGION" ]]; then
+  QUAY_DB_AWS_REGION="$(cat "${SHARED_DIR}/QUAY_DB_AWS_REGION")"
+fi
+if [[ -z "${QUAY_DB_AWS_REGION}" ]]; then
+  QUAY_DB_AWS_REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE:-us-west-2}}"
+fi
+
 echo "Deprovisioning AWS RDS PostgreSQL resources..."
 
 mkdir -p terraform_quay_aws_rds && cd terraform_quay_aws_rds
 
 has_db_identifiers=false
-if [[ -f "${SHARED_DIR}/QUAY_DB_AWS_SUBNET_GROUP" || -f "${SHARED_DIR}/QUAY_DB_AWS_SECURITY_GROUP" || -f "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS" || -f "${SHARED_DIR}/QUAY_DB_AWS_PARAMETER_GROUP" || -f "${SHARED_DIR}/${QUAY_DB_AWS_RDS_OUTPUTS_JSON}" ]]; then
+if [[ -f "${SHARED_DIR}/QUAY_DB_AWS_SUBNET_GROUP" || -f "${SHARED_DIR}/QUAY_DB_AWS_SECURITY_GROUP" || -f "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID" || -f "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS" || -f "${SHARED_DIR}/QUAY_DB_AWS_PARAMETER_GROUP" || -f "${SHARED_DIR}/${QUAY_DB_AWS_RDS_OUTPUTS_JSON}" ]]; then
   has_db_identifiers=true
 fi
 
@@ -54,6 +66,11 @@ cleanup_by_identifiers() {
     instance_id="$(cat "${SHARED_DIR}/QUAY_AWS_RDS_POSTGRESQL_ADDRESS")"
     instance_id="${instance_id%%.*}"
   fi
+  # Identifier persisted pre-apply by the provisioning step: covers a step
+  # killed mid-apply, before outputs/address were written.
+  if [[ -z "${instance_id}" && -f "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID" ]]; then
+    instance_id="$(cat "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID")"
+  fi
   if [[ -f "${SHARED_DIR}/QUAY_DB_AWS_SUBNET_GROUP" ]]; then
     quay_subnet_group="$(cat "${SHARED_DIR}/QUAY_DB_AWS_SUBNET_GROUP")"
   fi
@@ -75,8 +92,10 @@ cleanup_by_identifiers() {
 
   # Dummy / persisted values for required variables: after import, resource
   # values come from the state, so only the persisted identifiers matter.
+  export TF_VAR_region="${QUAY_DB_AWS_REGION}"
   export TF_VAR_quay_subnet_group="${quay_subnet_group:-quay-subnet-group-dummy}"
   export TF_VAR_quay_security_group="${quay_security_group:-quay-security-group-dummy}"
+  export TF_VAR_db_instance_identifier="${instance_id:-quayprowcidb-dummy}"
   export TF_VAR_db_name="${TF_VAR_db_name:-quay}"
   export TF_VAR_db_username="${TF_VAR_db_username:-quayuser}"
   export TF_VAR_db_password="${TF_VAR_db_password:-dummypass}"
@@ -141,8 +160,14 @@ fi
 
 echo "Destroying AWS RDS PostgreSQL resources (including per-job parameter group)..."
 
+DB_INSTANCE_ID_DUMMY="quayprowcidb-dummy"
+if [[ -f "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID" ]]; then
+  DB_INSTANCE_ID_DUMMY="$(cat "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID")"
+fi
+export TF_VAR_region="${QUAY_DB_AWS_REGION}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
+export TF_VAR_db_instance_identifier="${DB_INSTANCE_ID_DUMMY}"
 # Dummy / persisted values for required variables when state already has resource values.
 export TF_VAR_db_name="${TF_VAR_db_name:-quay}"
 export TF_VAR_db_username="${TF_VAR_db_username:-quayuser}"

@@ -18,6 +18,22 @@ QUAY_DB_AWS_RDS_CONFIG_ARCHIVE="quay-db-aws-rds-config.tgz"
 QUAY_DB_AWS_RDS_OUTPUTS_JSON="quay-db-aws-rds-outputs.json"
 QUAY_SUBNET_GROUP="quayprowcisubnetgroup$RANDOM"
 QUAY_SECURITY_GROUP="quayprowcisecuritygroup$RANDOM"
+# Explicit RDS instance identifier: without one, Terraform generates a random
+# identifier knowable only after apply, so a step killed mid-apply (before
+# outputs are persisted) would leak the db instance. Persisted pre-apply
+# below so the deprovision identifier fallback can always import it.
+QUAY_DB_INSTANCE_ID="quayprowcidb${RANDOM}${RANDOM}"
+
+# The cluster's AWS region, resolved the same way ipi-conf-aws resolves it.
+# The aws-quay-qe quota-slice leases rotate across us-east-1/us-east-2/
+# us-west-1/us-west-2; a hardcoded region puts the database in a different
+# region than the cluster on 3 of 4 leases, adding cross-region latency to
+# every query.
+QUAY_DB_AWS_REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE:-}}"
+if [[ -z "${QUAY_DB_AWS_REGION}" ]]; then
+  echo "ERROR: could not determine the cluster's AWS region from AWS_REGION_OVERWRITE or LEASED_RESOURCE." >&2
+  exit 1
+fi
 
 QUAY_AWS_RDS_POSTGRESQL_VERSION="$POSTGRESQL_VERSION"
 
@@ -93,7 +109,9 @@ trap archive_terraform_state EXIT
 
 cat >>variables.tf <<EOF
 variable "region" {
-  default = "us-west-2"
+}
+
+variable "db_instance_identifier" {
 }
 
 variable "quay_subnet_group" {
@@ -124,7 +142,14 @@ EOF
 
 cat >>create_aws_rds_postgresql.tf <<EOF
 provider "aws" {
-  region = "us-west-2"
+  region = var.region
+}
+
+# Availability zones of the leased region (data source, not hardcoded
+# us-west-2b/us-west-2c: those AZs do not exist in the other three leased
+# regions and would fail subnet creation there).
+data "aws_availability_zones" "available" {
+  state = "available"
 }
 
 resource "aws_db_parameter_group" "quay_scram" {
@@ -162,13 +187,13 @@ resource "aws_route" "route-public" {
 resource "aws_subnet" "quayrds1" {
   vpc_id            = aws_vpc.quayrds.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-west-2b"
+  availability_zone = data.aws_availability_zones.available.names[0]
 }
 
 resource "aws_subnet" "quayrds2" {
   vpc_id            = aws_vpc.quayrds.id
   cidr_block        = "10.0.2.0/24"
-  availability_zone = "us-west-2c"
+  availability_zone = data.aws_availability_zones.available.names[1]
 }
 
 resource "aws_db_subnet_group" "quayrds" {
@@ -202,6 +227,7 @@ resource "aws_security_group" "quayrds" {
 }
 
 resource "aws_db_instance" "quaydb" {
+  identifier          = var.db_instance_identifier
   # gp3 storage has a 3000 IOPS baseline vs ~100 IOPS for 30 GiB gp2; with
   # gp2 the full e2e suite timed out (2h16m vs ~26m for the in-cluster DB
   # baseline) on DB-bound pages. db.m5.xlarge (4 vCPU / 16 GiB) adds
@@ -280,8 +306,10 @@ if (cd "${TF_RDS_DIR}" && tar -cvzf "${config_archive_tmp}" variables.tf create_
   cp -f "${config_archive_tmp}" "${SHARED_DIR}/" || true
 fi
 
+export TF_VAR_region="${QUAY_DB_AWS_REGION}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
+export TF_VAR_db_instance_identifier="${QUAY_DB_INSTANCE_ID}"
 export TF_VAR_db_name="${QUAY_AWS_RDS_POSTGRESQL_DBNAME}"
 export TF_VAR_db_username="${QUAY_AWS_RDS_POSTGRESQL_USERNAME}"
 export TF_VAR_db_password="${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}"
@@ -294,6 +322,8 @@ export TF_VAR_parameter_group_family="postgres${QUAY_AWS_RDS_POSTGRESQL_VERSION}
 echo "${QUAY_SUBNET_GROUP}" > "${SHARED_DIR}/QUAY_DB_AWS_SUBNET_GROUP"
 echo "${QUAY_SECURITY_GROUP}" > "${SHARED_DIR}/QUAY_DB_AWS_SECURITY_GROUP"
 echo "${AWS_RDS_PARAMETER_GROUP}" > "${SHARED_DIR}/QUAY_DB_AWS_PARAMETER_GROUP"
+echo "${QUAY_DB_INSTANCE_ID}" > "${SHARED_DIR}/QUAY_DB_AWS_INSTANCE_ID"
+echo "${QUAY_DB_AWS_REGION}" > "${SHARED_DIR}/QUAY_DB_AWS_REGION"
 
 echo "Initializing Terraform..."
 terraform init
