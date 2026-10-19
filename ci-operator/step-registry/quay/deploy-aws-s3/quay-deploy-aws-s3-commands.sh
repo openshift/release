@@ -420,12 +420,6 @@ yq -i '
 	)
 ' config.yaml
 
-# Quay must trust the IdP's CA to reach its discovery/token endpoints.
-CONFIG_BUNDLE_EXTRA_FILES=()
-if [[ -s "${SHARED_DIR}/quay-auth-ca.crt" ]]; then
-  CONFIG_BUNDLE_EXTRA_FILES+=(--from-file extra_ca_cert_quay_auth.crt="${SHARED_DIR}/quay-auth-ca.crt")
-fi
-
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
 # cert/key, build-cluster CA, and builder config to SHARED_DIR. Fold the builder
@@ -472,11 +466,9 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
     --from-file config.yaml=./config.yaml \
     --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
     --from-file ssl.key="${SHARED_DIR}/ssl.key" \
-    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt" \
-    "${CONFIG_BUNDLE_EXTRA_FILES[@]}"
+    --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret \
-    "${CONFIG_BUNDLE_EXTRA_FILES[@]}"
+  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 fi
 
 # Quay rejects user/initialize unless AUTHENTICATION_TYPE is Database, so the

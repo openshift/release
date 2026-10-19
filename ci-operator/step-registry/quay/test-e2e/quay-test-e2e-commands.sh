@@ -47,14 +47,6 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
-# Keycloak Route origin for @auth:OIDC specs, written by quay-deploy-rhbk. A
-# public URL, not a secret. Left unset when no Keycloak was deployed.
-if [[ -s "${SHARED_DIR}/keycloak_host" ]]; then
-  KEYCLOAK_HOST=$(cat "${SHARED_DIR}/keycloak_host")
-  export KEYCLOAK_HOST
-  echo "KEYCLOAK_HOST=${KEYCLOAK_HOST}"
-fi
-
 PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
 CLONE_DIR="/tmp/quay-playwright-src"
 if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then

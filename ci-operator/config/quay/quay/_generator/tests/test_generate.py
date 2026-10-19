@@ -1193,13 +1193,9 @@ def test_redhat_318_aws_auth_mode_rows_share_aws_file() -> None:
     jaeger = default_refs.index("quay-deploy-jaeger")
     assert default_refs[jaeger + 1] == "quay-deploy-aws-s3"
     assert "quay-deploy-openldap" not in default_refs
-    assert "quay-deploy-rhbk" not in default_refs
 
     default_invert = default["env"]["PLAYWRIGHT_GREP_INVERT"]
-    for mode, ref, dropped in (
-        ("ldap", "quay-deploy-openldap", "@auth:LDAP"),
-        ("oidc", "quay-deploy-rhbk", "@auth:OIDC"),
-    ):
+    for mode, ref, dropped in (("ldap", "quay-deploy-openldap", "@auth:LDAP"),):
         test = tests[f"aws-s3-nightly-{mode}"]
         assert test["cron"] == "@weekly"
         steps = test["steps"]
@@ -1235,7 +1231,7 @@ def test_presubmit_rejects_auth_mode() -> None:
             "clouds": ["aws"],
             "ocp": ["4.22"],
             "test": "e2e-install",
-            "auth_mode": "oidc",
+            "auth_mode": "ldap",
         },
         release_overrides={"branch": "master", "layout": "base"},
     )
@@ -1251,7 +1247,7 @@ def test_auth_mode_rejects_unknown_value() -> None:
             "clouds": ["aws"],
             "ocp": ["4.22"],
             "test": "e2e-install",
-            "auth_mode": "kerberos",
+            "auth_mode": "oidc",
         }
     )
     with pytest.raises(ValueError, match="auth_mode must be one of"):

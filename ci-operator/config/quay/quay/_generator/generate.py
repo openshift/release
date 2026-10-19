@@ -70,7 +70,7 @@ JOB_KEYS = {
     "storage",
     "auth_mode",
 }
-AUTH_MODES = ("ldap", "oidc")
+AUTH_MODES = ("ldap",)
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
 GENERATED_HEADER = """\
