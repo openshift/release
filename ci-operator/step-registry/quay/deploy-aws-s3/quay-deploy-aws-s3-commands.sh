@@ -385,7 +385,6 @@ fi
 DATABASE_CONFIG_FRAGMENT=""
 for candidate in \
 	"${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
-	"${SHARED_DIR}/quay-database-gcp-sql-config.yaml" \
 	"${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
 do
 	if [[ -s "${candidate}" ]]; then
@@ -410,50 +409,28 @@ fi
 # injects those values; leaving them in configBundleSecret blocks rollout.
 # Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
 # merged above; otherwise strip them so the operator manages postgres.
+yq -i '
+	del(
+		.FEATURE_SECURITY_SCANNER,
+		.FEATURE_SECURITY_NOTIFICATIONS,
+		.SECURITY_SCANNER_ENDPOINT,
+		.SECURITY_SCANNER_INDEXING_INTERVAL,
+		.SECURITY_SCANNER_V4_ENDPOINT,
+		.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
+		.SECURITY_SCANNER_V4_PSK,
+		.FEATURE_REPO_MIRROR,
+		.REPO_MIRROR_INTERVAL,
+		.REPO_MIRROR_SERVER_HOSTNAME,
+		.REPO_MIRROR_TLS_VERIFY,
+		.BUILDLOGS_REDIS,
+		.USER_EVENTS_REDIS,
+		.SERVER_HOSTNAME,
+		.PREFERRED_URL_SCHEME,
+		.EXTERNAL_TLS_TERMINATION
+	)
+' config.yaml
 if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
-	yq -i '
-		del(
-			.FEATURE_SECURITY_SCANNER,
-			.FEATURE_SECURITY_NOTIFICATIONS,
-			.SECURITY_SCANNER_ENDPOINT,
-			.SECURITY_SCANNER_INDEXING_INTERVAL,
-			.SECURITY_SCANNER_V4_ENDPOINT,
-			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
-			.SECURITY_SCANNER_V4_PSK,
-			.FEATURE_REPO_MIRROR,
-			.REPO_MIRROR_INTERVAL,
-			.REPO_MIRROR_SERVER_HOSTNAME,
-			.REPO_MIRROR_TLS_VERIFY,
-			.BUILDLOGS_REDIS,
-			.USER_EVENTS_REDIS,
-			.DB_URI,
-			.DB_CONNECTION_ARGS,
-			.SERVER_HOSTNAME,
-			.PREFERRED_URL_SCHEME,
-			.EXTERNAL_TLS_TERMINATION
-		)
-	' config.yaml
-else
-	yq -i '
-		del(
-			.FEATURE_SECURITY_SCANNER,
-			.FEATURE_SECURITY_NOTIFICATIONS,
-			.SECURITY_SCANNER_ENDPOINT,
-			.SECURITY_SCANNER_INDEXING_INTERVAL,
-			.SECURITY_SCANNER_V4_ENDPOINT,
-			.SECURITY_SCANNER_V4_NAMESPACE_WHITELIST,
-			.SECURITY_SCANNER_V4_PSK,
-			.FEATURE_REPO_MIRROR,
-			.REPO_MIRROR_INTERVAL,
-			.REPO_MIRROR_SERVER_HOSTNAME,
-			.REPO_MIRROR_TLS_VERIFY,
-			.BUILDLOGS_REDIS,
-			.USER_EVENTS_REDIS,
-			.SERVER_HOSTNAME,
-			.PREFERRED_URL_SCHEME,
-			.EXTERNAL_TLS_TERMINATION
-		)
-	' config.yaml
+	yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
 fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
@@ -508,22 +485,9 @@ else
   secret_args=(--from-file config.yaml=./config.yaml)
 fi
 
-# On redhat-3.18 the operator projects only a secret named
-# postgresql-client-certs into /run/secrets/postgresql (see gsql deploy).
-# When GCP SQL client certs are present, use that secret name as configBundleSecret.
+# configBundleSecret name. The GCP SQL handling (client certs in the bundle
+# and the postgresql-client-certs name) returns with the GCP database lane.
 CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
-if [[ -s "${SHARED_DIR}/client-cert.pem" && -s "${SHARED_DIR}/client-key.pem" && -s "${SHARED_DIR}/server-ca.pem" ]]; then
-  echo "Including GCP SQL client certificates in postgresql-client-certs..." >&2
-  secret_args+=(
-    --from-file tls.crt="${SHARED_DIR}/client-cert.pem"
-    --from-file tls.key="${SHARED_DIR}/client-key.pem"
-    --from-file ca.crt="${SHARED_DIR}/server-ca.pem"
-  )
-  CONFIG_BUNDLE_SECRET_NAME="postgresql-client-certs"
-elif [[ "${DATABASE_CONFIG_FRAGMENT}" == *gcp-sql* ]]; then
-  echo "ERROR: GCP SQL config fragment present but client certificates missing in SHARED_DIR" >&2
-  exit 1
-fi
 
 oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 

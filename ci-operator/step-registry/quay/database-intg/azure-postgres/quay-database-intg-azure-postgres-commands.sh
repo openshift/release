@@ -143,14 +143,14 @@ resource "azurerm_postgresql_flexible_server" "quay" {
   version                = var.postgres_version
   administrator_login    = var.db_username
   administrator_password = var.db_password
-  # 4 vCPU / 16 GiB general purpose, matching the AWS (db.m5.xlarge) and GCP
-  # (db-custom-4-15360) lanes. The burstable B_Standard_B1ms (1 vCPU) is too
-  # small for the full Playwright e2e suite.
+  # 4 vCPU / 16 GiB general purpose, matching the AWS lane (db.m5.xlarge).
+  # The burstable B_Standard_B1ms (1 vCPU) is too small for the full
+  # Playwright e2e suite.
   sku_name               = "GP_Standard_D4ds_v5"
-  # 1 TiB maps to the 3000-IOPS storage tier (512 GiB/2000, 2 TiB/5000) -
-  # parity with the AWS gp3 3000-IOPS baseline that passes; 32 GiB (~120
-  # IOPS) starved the suite on GCP (build 2110398453279363072: 2h15m e2e
-  # timeout on DB-bound pages).
+  # 1 TiB maps to the 5000-IOPS Premium SSD storage tier (512 GiB/2300 with
+  # 3500 burst, 2 TiB/7500), above the AWS gp3 3000-IOPS baseline that
+  # passes; 32 GiB (~120 IOPS) starved the e2e suite on a minimal-disk
+  # database (2h15m timeout on DB-bound pages).
   storage_mb             = 1048576
   backup_retention_days  = 7
   geo_redundant_backup_enabled = false

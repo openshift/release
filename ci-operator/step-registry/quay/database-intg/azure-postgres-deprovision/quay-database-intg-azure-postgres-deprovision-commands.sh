@@ -173,10 +173,9 @@ terraform state list
 
 # Quay pods are still running when this post step executes and keep open
 # connection pools to the external database; dropping an individual database
-# can fail on active sessions ("database is being accessed by other users",
-# same failure class as the GCP SQL deprovision). Removing the database from
-# state lets the server/resource-group deletion cascade it - deleting the
-# server force-drops everything regardless of active sessions.
+# can fail on active sessions ("database is being accessed by other users").
+# Removing the database from state lets the server deletion cascade it -
+# deleting the server force-drops everything regardless of active sessions.
 if terraform state list | grep -q "azurerm_postgresql_flexible_server_database"; then
   terraform state rm azurerm_postgresql_flexible_server_database.quay
 fi

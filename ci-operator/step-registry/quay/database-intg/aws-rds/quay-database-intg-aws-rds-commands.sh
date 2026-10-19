@@ -114,6 +114,9 @@ variable "region" {
 variable "db_instance_identifier" {
 }
 
+variable "build_id" {
+}
+
 variable "quay_subnet_group" {
 }
 
@@ -143,6 +146,14 @@ EOF
 cat >>create_aws_rds_postgresql.tf <<EOF
 provider "aws" {
   region = var.region
+  # Tag every resource with the CI build so a leaked VPC/instance is
+  # traceable to its job (AWS has no resource-group deletion backstop
+  # like the Azure installer's cluster resource-group cleanup).
+  default_tags {
+    tags = {
+      ci-build = var.build_id
+    }
+  }
 }
 
 # Availability zones of the leased region (data source, not hardcoded
@@ -310,6 +321,7 @@ export TF_VAR_region="${QUAY_DB_AWS_REGION}"
 export TF_VAR_quay_subnet_group="${QUAY_SUBNET_GROUP}"
 export TF_VAR_quay_security_group="${QUAY_SECURITY_GROUP}"
 export TF_VAR_db_instance_identifier="${QUAY_DB_INSTANCE_ID}"
+export TF_VAR_build_id="${BUILD_ID:-${UNIQUE_HASH:-quay-ci}}"
 export TF_VAR_db_name="${QUAY_AWS_RDS_POSTGRESQL_DBNAME}"
 export TF_VAR_db_username="${QUAY_AWS_RDS_POSTGRESQL_USERNAME}"
 export TF_VAR_db_password="${QUAY_AWS_RDS_POSTGRESQL_PASSWORD}"
@@ -411,6 +423,9 @@ cat > "${SHARED_DIR}/quay-database-aws-rds-config.yaml" <<EOF
 DB_CONNECTION_ARGS:
   autorollback: true
   threadlocals: true
+  # RDS forces SSL from PostgreSQL 15 on, but not on 13/14 which the step
+  # ref documents; require TLS client-side on every version.
+  sslmode: require
 DB_URI: postgresql://${DB_URI_USER}:${DB_URI_PASS}@${QUAY_AWS_RDS_POSTGRESQL_ADDRESS}:5432/${QUAY_AWS_RDS_POSTGRESQL_DBNAME}
 EOF
 

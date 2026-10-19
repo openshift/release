@@ -130,32 +130,25 @@ class Cell:
         except KeyError as exc:
             raise ValueError(f"unsupported cloud {self.cloud!r}") from exc
 
-    @property
-    def database_kind(self) -> str | None:
+    def _database_ref(self, mapping: dict[str, str]) -> str | None:
         if not self.database:
             return None
         try:
-            return DATABASE_BY_CLOUD[self.cloud]
+            return mapping[self.cloud]
         except KeyError as exc:
             raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+
+    @property
+    def database_kind(self) -> str | None:
+        return self._database_ref(DATABASE_BY_CLOUD)
 
     @property
     def database_provision_ref(self) -> str | None:
-        if not self.database:
-            return None
-        try:
-            return DATABASE_PROVISION_REF_BY_CLOUD[self.cloud]
-        except KeyError as exc:
-            raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+        return self._database_ref(DATABASE_PROVISION_REF_BY_CLOUD)
 
     @property
     def database_deprovision_ref(self) -> str | None:
-        if not self.database:
-            return None
-        try:
-            return DATABASE_DEPROVISION_REF_BY_CLOUD[self.cloud]
-        except KeyError as exc:
-            raise ValueError(f"database not supported for cloud {self.cloud!r}") from exc
+        return self._database_ref(DATABASE_DEPROVISION_REF_BY_CLOUD)
 
     @property
     def operator_channel(self) -> str:
@@ -193,14 +186,11 @@ class Cell:
             return f"from-{self.upgrade_from_nodot}"
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
-        # cloud DB kind (rds/sql/postgres) before source; fips still suffixes.
+        # cloud DB kind (rds/postgres) before source; fips still suffixes.
         # Filename/variant are unchanged, so sibling rows share one file.
         parts = [self.cloud, self.storage]
         if self.database:
-            kind = self.database_kind
-            if kind is None:
-                raise ValueError(f"database not supported for cloud {self.cloud!r}")
-            parts.append(kind)
+            parts.append(self.database_kind)
         if self.kind == "periodic":
             parts.append(str(self.source))
         base = "-".join(parts)
