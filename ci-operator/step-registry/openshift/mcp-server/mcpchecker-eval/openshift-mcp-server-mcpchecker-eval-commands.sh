@@ -66,8 +66,23 @@ case "${EVAL_SUITE:-}" in
             make setup-netobserv
         else
             oc -n netobserv port-forward svc/netobserv-plugin 9001:9001 >/dev/null 2>&1 &
-            echo $! > .netobserv-pf.pid
+            pf_pid=$!
+            echo "${pf_pid}" > .netobserv-pf.pid
             netobserv_port_forward=true
+            for ((attempt=0; attempt<30; attempt++)); do
+                if ! kill -0 "${pf_pid}" 2>/dev/null; then
+                    echo "ERROR: NetObserv port-forward exited before localhost:9001 was ready" >&2
+                    exit 1
+                fi
+                if ( : > /dev/tcp/127.0.0.1/9001 ) 2>/dev/null; then
+                    break
+                fi
+                sleep 1
+            done
+            if (( attempt == 30 )); then
+                echo "ERROR: NetObserv port-forward did not reach localhost:9001 within 30 seconds" >&2
+                exit 1
+            fi
         fi
         ;;
     ovn-kubernetes)
