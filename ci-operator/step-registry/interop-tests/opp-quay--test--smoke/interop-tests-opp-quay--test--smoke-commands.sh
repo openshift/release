@@ -6,3 +6,5 @@ shopt -s inherit_errexit 2>/dev/null || true
 openshift-tests run-suite interop/quay \
   --extension-local-binaries /usr/bin/quay-tests-ext.gz \
   --junit-dir "${ARTIFACT_DIR}/junit"
+
+true
