@@ -12,14 +12,15 @@ chain:
     documentation: |-
       Private API endpoint: rosa-cluster-provision maps this to
       `rosa create cluster --private` for HCP clusters.
-  - name: PRIVATE_LINK
+  - name: PRIVATE_DEFAULT_INGRESS
     default: "true"
     documentation: |-
-      On HCP this is NOT the classic-only AWS PrivateLink feature: rosa-cluster-provision
-      repurposes the flag for HCP as `--default-ingress-private` (private default ingress)
-      and enforces BYO VPC with private subnets only. Both PRIVATE and PRIVATE_LINK are
-      needed for a fully private HCP cluster; PRIVATE alone leaves the default ingress
-      public.
+      HCP-only: make the default apps ingress (router) listen internally
+      (`rosa create cluster --default-ingress-private`). Per the rosa CLI,
+      PrivateLink is a Classic-only concept: "For Hosted Control Plane clusters,
+      use the '--private' and '--default-ingress-private' flags instead." Together
+      PRIVATE and PRIVATE_DEFAULT_INGRESS give a fully private HCP cluster; PRIVATE
+      alone leaves the default ingress public.
   steps:
   - ref: aws-provision-vpc-shared
   - ref: aws-provision-tags-for-byo-vpc-ocm-pre

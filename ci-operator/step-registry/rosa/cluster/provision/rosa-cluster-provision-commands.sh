@@ -26,6 +26,7 @@ FIPS=${FIPS:-false}
 POD_CIDR=${POD_CIDR:-""}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
+PRIVATE_DEFAULT_INGRESS=${PRIVATE_DEFAULT_INGRESS:-false}
 PRIVATE_SUBNET_ONLY="false"
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
@@ -449,7 +450,8 @@ cat > ${cluster_config_file} << EOF
   "enable_customer_managed_key": ${STORAGE_ENCRYPTION},
   "fips": ${FIPS},
   "private": ${PRIVATE},
-  "private_link": ${PRIVATE_LINK}
+  "private_link": ${PRIVATE_LINK},
+  "default_ingress_private": ${PRIVATE_DEFAULT_INGRESS}
 }
 EOF
 
@@ -634,10 +636,25 @@ fi
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
+    # HCP has no PrivateLink concept (see `rosa create cluster --hosted-cp --help`):
+    # honor PRIVATE_LINK=true on HCP for backward compatibility by mapping it to
+    # the HCP ingress-privacy flag. New HCP jobs should use PRIVATE_DEFAULT_INGRESS.
     PRIVATE_LINK_SWITCH="--default-ingress-private"
   else
     PRIVATE_LINK_SWITCH="--private-link"
   fi
+
+  ENABLE_BYOVPC="true"
+  PRIVATE_SUBNET_ONLY="true"
+fi
+
+PRIVATE_DEFAULT_INGRESS_SWITCH=""
+if [[ "$PRIVATE_DEFAULT_INGRESS" == "true" ]]; then
+  # HCP-only: make the default apps ingress (router) listen internally
+  # (--default-ingress-private). Per the rosa CLI this is the HCP equivalent of
+  # classic PrivateLink ingress privacy: "For Hosted Control Plane clusters, use
+  # the '--private' and '--default-ingress-private' flags instead."
+  PRIVATE_DEFAULT_INGRESS_SWITCH="--default-ingress-private"
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"
@@ -844,6 +861,7 @@ ${FIPS_SWITCH} \
 ${POD_CIDR_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
+${PRIVATE_DEFAULT_INGRESS_SWITCH} \
 ${PROXY_SWITCH} \
 ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \
