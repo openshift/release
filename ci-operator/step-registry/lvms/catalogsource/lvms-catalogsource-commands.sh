@@ -174,6 +174,11 @@ resolve_snapshot_to_digest() {
 	echo "${digest}"
 }
 
+# TEMP (rehearsal testing — REVERT BEFORE MERGE):
+# Force z-stream catalog resolution against openshift/lvm-operator PR #3823 instead
+# of the Prow-injected PULL_NUMBER (which during rehearsal is the openshift/release PR).
+PULL_NUMBER="3823"
+
 # Z-stream presubmit: resolve catalog image from PR content
 if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 	if [[ -z "${PULL_NUMBER:-}" ]]; then

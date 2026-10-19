@@ -12,6 +12,11 @@ declare -r ZSTREAM_VERSION=${ZSTREAM_VERSION:-""}
 declare -r QUAY_REPO="redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog"
 declare -r QUAY_API="https://quay.io/api/v1"
 
+# TEMP (rehearsal testing — REVERT BEFORE MERGE):
+# Force z-stream catalog resolution against openshift/lvm-operator PR #3823 instead
+# of the Prow-injected PULL_NUMBER (which during rehearsal is the openshift/release PR).
+PULL_NUMBER="3823"
+
 function get_target_version_from_channel() {
     local channel="${1}"
     echo "${channel}" | sed -E 's/^[a-z]+-//'
