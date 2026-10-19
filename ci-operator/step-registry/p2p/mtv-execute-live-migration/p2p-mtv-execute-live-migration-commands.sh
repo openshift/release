@@ -41,6 +41,9 @@ typeset vmSshVerify="${MTV_VM_SSH_VERIFY}"
 # Suffix applied to all artifact names (status file, diag dir, JUnit XML, JUnit suite name).
 # Empty string for the forward leg; "-return" for the return leg.
 typeset migrationSuffix="${MTV_MIGRATION_SUFFIX}"
+# JUnit <testsuite>/<testcase classname>; prefixed with LP_IO__CR_COMP_NAME (when set) so
+# Component Readiness can match this suite against a registered interop prefix.
+typeset junitSuiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}cclm-live-migration${migrationSuffix}"
 # When true, clean up stale VM/DV/PVC on the destination before Plan creation.
 # Required for the return leg (destination may still hold the pre-forward-migration VM).
 typeset cleanupDestBeforeMigration="${MTV_CLEANUP_DEST_BEFORE_MIGRATION}"
@@ -783,12 +786,12 @@ function WriteJunit () {
 
     {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="cclm-live-migration%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${migrationSuffix}" "${total}" "${failures}" "${totalTime}"
+        printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+            "${junitSuiteName}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="cclm-live-migration%s" time="%d">\n' \
-                "${escapedName}" "${migrationSuffix}" "${elapsed}"
+            printf '  <testcase name="%s" classname="%s" time="%d">\n' \
+                "${escapedName}" "${junitSuiteName}" "${elapsed}"
             if [[ "${status}" == "FAIL" ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \
