@@ -393,26 +393,36 @@ typeset -i qiWaited=0
 typeset qiReady=false
 
 while ((qiWaited < qiMaxWait)); do
-    # Primary signal: QuayRegistry CR is Available (Quay is deployed and operational)
+    # QuayRegistry Available=True is necessary but NOT sufficient.
+    # QuayRegistry proves Quay is deployed; the httpd-example BuildConfig is created
+    # by ACM policy (gparvin/grc-demo), not by the Quay Bridge Operator. We must also
+    # verify QuayIntegrationSuccess to confirm bridge integration is working.
     typeset qrAvailable=""
     qrAvailable=$(oc get quayregistry --all-namespaces \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "")
 
     if [[ "${qrAvailable}" == "True" ]]; then
-        : "QuayRegistry is Available - Quay is operational"
-        qiReady=true
-        break
-    fi
+        : "QuayRegistry is Available - checking QuayIntegrationSuccess"
 
-    # Fallback: check QuayIntegration status (handle missing fields gracefully)
-    typeset qiSuccess=""
-    qiSuccess=$(oc get quayintegration quay \
-        -o jsonpath='{.status.conditions[?(@.type=="QuayIntegrationSuccess")].status}' 2>/dev/null || echo "")
+        typeset qiSuccess=""
+        qiSuccess=$(oc get quayintegration quay \
+            -o jsonpath='{.status.conditions[?(@.type=="QuayIntegrationSuccess")].status}' 2>/dev/null || echo "")
 
-    if [[ "${qiSuccess}" == "True" ]]; then
-        : "QuayIntegration reports QuayIntegrationSuccess=True"
-        qiReady=true
-        break
+        if [[ "${qiSuccess}" == "True" ]]; then
+            : "QuayIntegrationSuccess=True - full bridge integration confirmed"
+            qiReady=true
+            break
+        elif [[ -z "${qiSuccess}" ]]; then
+            # Operator version may not expose QuayIntegrationSuccess condition;
+            # allow the gate to pass but warn that integration is unverified.
+            # Downstream BuildConfig polling in RunTestCase1 will catch failures.
+            : "WARNING: QuayIntegrationSuccess condition not present - integration unverified, relying on downstream BuildConfig polling"
+            qiReady=true
+            break
+        else
+            # QuayIntegrationSuccess=False - bridge not yet ready, keep waiting
+            : "QuayIntegrationSuccess=${qiSuccess} - bridge integration not ready, continuing to wait (${qiWaited}s/${qiMaxWait}s)"
+        fi
     fi
 
     : "Waiting for QuayIntegration readiness... (${qiWaited}s/${qiMaxWait}s)"
@@ -423,9 +433,9 @@ done
 if [[ "${qiReady}" != "true" ]]; then
     : "ERROR: QuayIntegration CR 'quay' not Ready after ${qiMaxWait}s - Quay chain incomplete"
 
-    # Dump diagnostic info
-    oc get quayintegration quay -o yaml --ignore-not-found || true
-    oc get quayregistry --all-namespaces -o yaml --ignore-not-found || true
+    # Dump diagnostic info (redacted: name, namespace, and status conditions only)
+    oc get quayintegration quay -o jsonpath='{.metadata.name}{"\t"}{.metadata.namespace}{"\n"}{range .status.conditions[*]}{.type}{"\t"}{.status}{"\t"}{.reason}{"\t"}{.message}{"\n"}{end}' --ignore-not-found 2>/dev/null || true
+    oc get quayregistry --all-namespaces -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.namespace}{"\n"}{range .status.conditions[*]}  {.type}{"\t"}{.status}{"\t"}{.reason}{"\n"}{end}{end}' --ignore-not-found 2>/dev/null || true
 
     for test in "${allTestCasesArr[@]}"; do
         testStatus["${test}"]="failed"
