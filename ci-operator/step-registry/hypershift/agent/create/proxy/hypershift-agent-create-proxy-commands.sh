@@ -29,6 +29,7 @@ if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
     echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
     exit 1
   fi
+  hosts=$(printf '%s\n' "${hosts}" registry.redhat.io .quay.io | sort -u)
 
   printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"
