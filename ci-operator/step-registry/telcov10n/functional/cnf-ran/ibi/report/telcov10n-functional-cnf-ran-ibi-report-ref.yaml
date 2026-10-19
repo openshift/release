@@ -1,0 +1,32 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-report
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-report-commands.sh
+  timeout: 30m
+  grace_period: 1m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  env:
+  - name: VERSION
+    default: "4.20"
+    documentation: OpenShift release family used in the ReportPortal launch name.
+  - name: IBI_REPORTPORTAL_LAUNCH_NAME
+    default: telco-ft-ran-ibi
+    documentation: Launch prefix; the reporter appends the OpenShift release family.
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  documentation: |-
+    Collect current-run raw JUnit reports from the seed and target bastions.
+    Prefix suites by IBI stage and upload them together to ReportPortal using
+    the existing cnf-polarion DataRouter metadata and client, without Polarion.
+    Include the independent IBBF policy gate and exclude duplicate processed XML.
+    Upload available reports even when another stage's reports cannot be read,
+    then fail for collection or upload errors. Keep the shared final verifier
+    responsible for deferred Deployment Types failures.

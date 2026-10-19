@@ -8,6 +8,10 @@ ref:
   documentation: |-
     Mirror the IBU seed image from the seed bastion's local registry to the
     target bastion's disconnected registry, making it available for eco-gotests IBU upgrade.
+    With IBI_MIRROR_SEED_DEPENDENCIES enabled, also copy the seed inventory and
+    captured catalog manifests, verify target manifests and Linux/amd64 blobs,
+    and publish the verified seed digest for both IBI preinstall stages.
+    The existing playbook is unchanged. Full validation runs on the target bastion.
   timeout: 60m
   resources:
     requests:
@@ -20,3 +24,28 @@ ref:
   - name: TARGET_REGISTRY_HOST
     default: "10.6.184.4"
     documentation: IP or hostname of the target bastion's disconnected registry
+  - name: IBI_MIRROR_SEED_DEPENDENCIES
+    default: "false"
+    documentation: Enable blocking IBI dependency transfer and target pull verification.
+  - name: CLUSTER_NAME
+    default: "kni-qe-127"
+    documentation: Seed hub used to read local registry credentials for IBI.
+  - name: TARGET_CLUSTER_NAME
+    default: ""
+    documentation: Target hub used to read local registry credentials and mirror mappings for IBI.
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Logical registry hostname and port used on both IBI bastions.
+  - name: TARGET_SPOKE_CLUSTER
+    default: "['ibi-target']"
+    documentation: Target spoke used to locate its preinstall image mirror configuration.
+  - name: ZTP_GIT_REPO
+    default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+    documentation: GitLab repository containing the IBI preinstall template.
+  - name: ZTP_GIT_BRANCH
+    default: "main"
+    documentation: Branch resolved once and shared with IBI preinstall consumers.
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all

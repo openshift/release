@@ -1,4 +1,5 @@
 #!/bin/bash
+set +x
 set -e
 set -o pipefail
 
@@ -71,33 +72,144 @@ ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   --extra-vars 'eco_gotests_tag=latest' \
   --extra-vars "additional_test_env_variables=\"${ECO_GOTESTS_ENV_VARS}\""
 
+# Preparation above removes the old test directory before creating this launcher.
+printf '%s\n' /tmp/eco_gotests/report > "${SHARED_DIR}/ibi-rp-seedgen-dir"
+
 echo ""
+# Capture floating catalog identities while the seed API is still available.
+# The later mirror step must use these exact manifests, not a newer :latest.
+CATALOG_WORK=$(mktemp -d /tmp/ibi-seed-catalogs.XXXXXX)
+trap 'rm -rf -- "$CATALOG_WORK"' EXIT
+cp /var/group_variables/common/all/ansible_ssh_private_key "$CATALOG_WORK/ssh-key"
+chmod 600 "$CATALOG_WORK/ssh-key"
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
+[[ "$BASTION_IP" =~ ^[a-zA-Z0-9.-]+$ && "$BASTION_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+[[ "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ && "$SEED_SPOKE_CLUSTER" =~ ^[a-z0-9-]+$ ]]
+[[ "$MIRROR_REGISTRY" =~ ^[a-zA-Z0-9.-]+:[0-9]+$ ]]
+SEED_VERSION=$(<"${SHARED_DIR}/ibi-seed-version")
+[[ "$SEED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]
+rm -f -- "${SHARED_DIR}/ibi-seed-catalogs.json"
+ssh -i "$CATALOG_WORK/ssh-key" -o BatchMode=yes -o ConnectTimeout=30 \
+  -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  "$BASTION_USER@$BASTION_IP" \
+  "python3 - '$SEED_SPOKE_KUBECONFIG' '/home/telcov10n/project/generated/$CLUSTER_NAME/auth/kubeconfig' '$MIRROR_REGISTRY' '$SEED_VERSION'" \
+  > "$CATALOG_WORK/catalogs.json" <<'PY'
+import base64
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+spoke, hub, registry, version = sys.argv[1:]
+os.umask(0o077)
+
+
+def run(args, timeout=120):
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, timeout=timeout, check=False)
+    if result.returncode:
+        raise RuntimeError(args[0] + " failed (exit " + str(result.returncode) + ")")
+    return result.stdout
+
+
+def get(kubeconfig, *args):
+    return json.loads(run(["oc", "--kubeconfig", kubeconfig, "--request-timeout=60s",
+                           *args, "-o", "json"]))
+
+
+def repository(ref):
+    ref = ref.split("@", 1)[0]
+    return ref.rsplit(":", 1)[0] if ":" in ref.rsplit("/", 1)[-1] else ref
+
+
+def digest(raw):
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+catalogs = get(spoke, "get", "catalogsources.operators.coreos.com", "-A")["items"]
+pods = get(spoke, "get", "pods", "-A", "-l", "olm.catalogSource")["items"]
+secret = get(hub, "-n", "openshift-config", "get", "secret", "pull-secret")
+auths = json.loads(base64.b64decode(secret["data"][".dockerconfigjson"], validate=True))["auths"]
+snapshots = {}
+with tempfile.TemporaryDirectory(prefix="ibi-catalogs.") as scratch:
+    auth = Path(scratch) / "auth.json"
+    auth.write_text(json.dumps({"auths": {registry: auths[registry]}}))
+
+    def raw(ref):
+        return run(["skopeo", "inspect", "--raw", "--tls-verify=false",
+                    "--authfile", str(auth), "docker://" + ref])
+
+    for catalog in catalogs:
+        ref = catalog.get("spec", {}).get("image", "")
+        if not ref.startswith(registry + "/") or "@" in ref:
+            continue
+        if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9./_:-]*", ref):
+            raise ValueError("Invalid catalog reference")
+        if ":" not in ref.rsplit("/", 1)[-1]:
+            ref += ":latest"
+        manifest = raw(ref)
+        captured = digest(manifest)
+        allowed = {captured}
+        index = json.loads(manifest)
+        if "manifests" in index:
+            children = [entry["digest"] for entry in index["manifests"]
+                        if entry.get("platform", {}).get("os") == "linux"
+                        and entry.get("platform", {}).get("architecture") == "amd64"]
+            if len(children) != 1 or digest(raw(repository(ref) + "@" + children[0])) != children[0]:
+                raise ValueError("Catalog lacks a verified linux/amd64 manifest")
+            allowed.add(children[0])
+        meta = catalog["metadata"]
+        matches = [pod for pod in pods
+                   if pod["metadata"]["namespace"] == meta["namespace"]
+                   and pod["metadata"].get("labels", {}).get("olm.catalogSource") == meta["name"]
+                   and not pod["metadata"].get("deletionTimestamp")]
+        if len(matches) != 1:
+            raise ValueError("Expected one active seed catalog Pod: " + meta["name"])
+        pod = matches[0]
+        if not any(c.get("type") == "Ready" and c.get("status") == "True"
+                   for c in pod.get("status", {}).get("conditions", [])):
+            raise ValueError("Seed catalog Pod is not Ready: " + meta["name"])
+        names = {c["name"] for c in pod["spec"]["containers"] if repository(c["image"]) == repository(ref)}
+        statuses = [s for s in pod.get("status", {}).get("containerStatuses", [])
+                    if s["name"] in names and s.get("ready")]
+        image_id = statuses[0].get("imageID", "") if len(statuses) == 1 else ""
+        match = re.search(r"(sha256:[a-f0-9]{64})$", image_id)
+        if not match or match.group(1) not in allowed:
+            raise ValueError("Running catalog differs from registry snapshot: " + meta["name"])
+        retained = repository(ref) + ":ibi-catalog-" + captured[7:]
+        run(["skopeo", "copy", "--all", "--preserve-digests",
+             "--authfile", str(auth), "--src-tls-verify=false", "--dest-tls-verify=false",
+             "docker://" + repository(ref) + "@" + captured, "docker://" + retained], 600)
+        if digest(raw(ref)) != captured or digest(raw(retained)) != captured:
+            raise ValueError("Catalog changed during snapshot")
+        if ref in snapshots and snapshots[ref] != captured:
+            raise ValueError("Conflicting catalog snapshots")
+        snapshots[ref] = captured
+if not snapshots:
+    raise ValueError("No local seed catalog tags were captured")
+print(json.dumps({"registry": registry, "version": version, "catalogs": snapshots}, indent=2))
+PY
+cp "$CATALOG_WORK/catalogs.json" "${SHARED_DIR}/ibi-seed-catalogs.json"
+echo "Seed catalog digests captured and retained."
+
 echo "=== Step 2b: Run seedgeneration ==="
 ansible-playbook playbooks/ran/ibu-run-seedgeneration.yml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
   --extra-vars "spoke_cluster=${SEED_SPOKE_CLUSTER}" \
   --extra-vars "kubeconfig=${SEED_SPOKE_KUBECONFIG}"
 
-echo "Set bastion SSH configuration"
-PROJECT_DIR="/tmp"
-grep ansible_ssh_private_key -A 100 "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | \
-  sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
-
 echo "Gather artifacts from bastion"
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-  -i "${PROJECT_DIR}/temp_ssh_key" \
+  -i "$CATALOG_WORK/ssh-key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
   "${ARTIFACT_DIR}/junit_eco_gotests/" || true
-rm -f "${PROJECT_DIR}/temp_ssh_key"
-
-for f in "${ARTIFACT_DIR}/junit_eco_gotests/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibi_seed_$(basename "$f")"
-done
 
 echo ""
 echo "=== IBI Seed Eco-Gotests Complete ==="

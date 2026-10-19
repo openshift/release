@@ -59,6 +59,7 @@ create_work_directories() {
   SPOKE_KUBECONFIG="/tmp/${TEMP_DIR##*/}-kubeconfig"
   REPORT_DIR="${ARTIFACT_DIR}/ibi-ibbf"
   mkdir -p "${REPORT_DIR}"
+  printf '%s\n' "${WORK_DIR}/report" > "${SHARED_DIR}/ibi-rp-ibbf-dir"
   BMC_ENV_FILE="/tmp/${TEMP_DIR##*/}-bmc.env"
   POLICY_BASELINE="/tmp/${TEMP_DIR##*/}-policies.json"
 }
