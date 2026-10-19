@@ -106,6 +106,20 @@ if ! oc rollout status deployment/openldap -n "${QUAY_NS}" --timeout=5m; then
   exit 1
 fi
 
+# Users the Playwright specs log in as under LDAP auth (quota, prune, logout,
+# metadata specs); they need no group.
+SPEC_USERS=(quota_ldap prune_count_ldap prune_age_ldap prune_both_ldap
+  logout_success_ldap logout_error_ldap logout_access_ldap
+  metadata_submit_ldap metadata_skip_ldap)
+
+spec_users_ldif() {
+  local u
+  for u in "${SPEC_USERS[@]}"; do
+    printf 'dn: uid=%s,ou=users,%s\nobjectClass: inetOrgPerson\nuid: %s\ncn: %s\nsn: Ldap\nmail: %s@example.com\nuserPassword: password\n\n' \
+      "${u}" "${LDAP_SUFFIX}" "${u}" "${u}" "${u}"
+  done
+}
+
 # Seed the fixture users. employeeType carries the group DN because Quay's team
 # sync searches (LDAP_MEMBEROF_ATTR=<group dn>) and memberOf is overlay-managed.
 # The single-quoted sh -c expands the root password inside the pod only.
@@ -146,6 +160,8 @@ sn: Ldap
 mail: readonly_ldap@example.com
 userPassword: password
 
+$(spec_users_ldif)
+
 dn: ${LDAP_GROUP_DN}
 objectClass: groupOfNames
 cn: test_ldap_group
@@ -184,6 +200,16 @@ for dn in "uid=readonly_ldap,ou=users,${LDAP_SUFFIX}" "${LDAP_GROUP_DN}"; do
     'ldapsearch -x -LLL -H "$1" -D "$2" -w "$OPENLDAP_ROOT_PASSWORD" -b "$3" -s base dn' \
     sh "${LDAP_SVC_URI}" "${LDAP_ROOT_DN}" "${dn}"
 done
+
+echo "Preflight: searching and binding the spec users..."
+oc exec -n "${QUAY_NS}" deploy/openldap -- sh -c '
+  uri=$1 root=$2 base=$3; shift 3
+  for u; do
+    n=$(ldapsearch -x -LLL -H "$uri" -D "$root" -w "$OPENLDAP_ROOT_PASSWORD" -b "ou=users,$base" \
+      "(&(uid=$u)(mail=$u@example.com))" dn | grep -c "^dn:")
+    if [ "$n" != 1 ]; then echo "ERROR: uid/mail search for $u returned $n entries" >&2; exit 1; fi
+    ldapwhoami -x -H "$uri" -D "uid=$u,ou=users,$base" -w password || exit 1
+  done' sh "${LDAP_SVC_URI}" "${LDAP_ROOT_DN}" "${LDAP_SUFFIX}" "${SPEC_USERS[@]}"
 
 LDAP_ADMIN_PASSWD=$(oc get secret openldap -n "${QUAY_NS}" -o jsonpath='{.data.OPENLDAP_ROOT_PASSWORD}' | base64 -d)
 
