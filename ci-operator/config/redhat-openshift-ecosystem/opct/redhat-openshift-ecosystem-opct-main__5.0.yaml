@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.18"
+    name: "5.0"
     namespace: ocp
     tag: upi-installer
   vsphere-ci-python:
@@ -12,21 +12,21 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.18
+    tag: rhel-9-release-golang-1.25-openshift-5.0
 releases:
   initial:
-    release:
-      channel: fast
-      version: "4.18"
+    integration:
+      name: "5.0"
+      namespace: ocp
   initial-minor:
     release:
-      channel: fast
-      version: "4.17"
+      channel: stable
+      version: "4.22"
   latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.18"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -40,7 +40,7 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-none-vsphere
-  cron: 0 0 1,15 * 4
+  cron: 0 8 1 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -52,7 +52,7 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: opct-test-platform-none-vsphere
 - as: platform-none-vsphere-upgrade
-  cron: '@yearly'
+  cron: 0 9 1 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -68,7 +68,7 @@ tests:
     workflow: opct-test-platform-none-vsphere
   timeout: 8h0m0s
 - as: platform-external-vsphere
-  cron: 0 12 1,15 * 4
+  cron: 0 10 1 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -82,7 +82,7 @@ tests:
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
 - as: platform-external-vsphere-upgrade
-  cron: 0 16 1,15 * 4
+  cron: 0 11 1 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -102,4 +102,4 @@ zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
   repo: opct
-  variant: "4.18"
+  variant: "5.0"
