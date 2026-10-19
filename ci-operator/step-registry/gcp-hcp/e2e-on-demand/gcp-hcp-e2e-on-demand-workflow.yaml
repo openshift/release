@@ -20,10 +20,12 @@ workflow:
     customer namespace once through the regional activate-project workflow
     and grant the WIF identity cluster-admin through the public API. The CI
     job itself does not invoke the regional workflow.
-    On ordinary test failure, Ginkgo captures diagnostics and cleans test
-    resources. If the test process ends before cleanup finishes, the post
-    step uses recorded test resource names for a bounded fallback cleanup in
-    the customer project. This workflow does not gather or preserve failed HCs.
+    Ginkgo captures diagnostics on failure and cleans test resources. After
+    every run, including a successful test, the post step verifies that the
+    exact test nodepool, worker VMs, and HostedCluster are absent and retries
+    network and IAM teardown in the customer project. A cleanup failure fails
+    the job and deployed-commit status. This workflow does not gather or
+    preserve failed HCs.
     Promotion-branch postsubmits publish a separate HC lifecycle status on the
     pushed sector commit. They wait for Terraform and ArgoCD deployment checks
     on that commit to become successful before testing. A commit superseded

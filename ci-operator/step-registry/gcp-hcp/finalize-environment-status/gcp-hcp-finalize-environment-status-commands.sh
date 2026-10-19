@@ -6,9 +6,14 @@ readonly targets_path="${SHARED_DIR}/gcp-hcp-environment-status-targets.json"
 readonly skip_path="${SHARED_DIR}/gcp-hcp-environment-status-skipped"
 readonly tests_started_path="${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
+readonly cleanup_verified_path="${SHARED_DIR}/gcp-hcp-cleanup-verified"
 readonly api="https://api.github.com/repos/openshift-online/gcp-hcp-infra"
 
 if [[ -e "${skip_path}" ]]; then
+  if [[ -e "${tests_started_path}" && ! -e "${cleanup_verified_path}" ]]; then
+    echo "ERROR: HostedCluster cleanup was not verified" >&2
+    exit 1
+  fi
   echo "Status publication was skipped; nothing to finalize"
   exit 0
 fi
@@ -51,7 +56,7 @@ description="HostedCluster lifecycle did not pass"
 if [[ ! -e "${tests_started_path}" ]]; then
   description="HostedCluster lifecycle did not run"
 fi
-if [[ -e "${tests_passed_path}" ]]; then
+if [[ -e "${tests_passed_path}" && -e "${cleanup_verified_path}" ]]; then
   state=success
   description="HostedCluster lifecycle passed on deployed revision"
   # A successful test only counts for the exact revisions captured before it
@@ -120,6 +125,10 @@ if [[ -e "${tests_passed_path}" ]]; then
       break
     fi
   done < <(jq -c '.targets[]' "${targets_path}")
+fi
+if [[ -e "${tests_started_path}" && ! -e "${cleanup_verified_path}" ]]; then
+  state=failure
+  description="HostedCluster cleanup did not complete"
 fi
 
 target_url="$(jq -r '.target_url' "${targets_path}")"
