@@ -5,7 +5,10 @@ local alerts = (import 'prometheus.libsonnet').prometheusAlerts;
 	"kind": "PrometheusRule",
 	"metadata": {
 		"name": "ci-alerts",
-		"namespace": "ci"
+		"namespace": "ci-monitoring",
+		"labels": {
+			"app.kubernetes.io/managed-by": "thanos-operator"
+		}
 	},
 	"spec": alerts
 }

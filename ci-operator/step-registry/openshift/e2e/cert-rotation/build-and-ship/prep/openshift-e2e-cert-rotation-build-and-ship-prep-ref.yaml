@@ -30,9 +30,20 @@ ref:
   - name: APPROVER_IDLE_CHECK
     default: "2m"
     documentation: How long to check that the approver approves nothing on the healthy cluster.
+  - name: ROTATION_CHECK
+    default: "false"
+    documentation: |-
+      With NODE_CLIENT_CERT_RECOVERY_TOGGLE=on, "true" also rotates one node's kubelet serving cert (the
+      first worker, or the first node on a compact cluster) and fails if the approver approves its CSR.
+      For platforms whose Machines list only IPs (agent), where machine-approver can't approve it and
+      only the approver's recovery gate stands in the way. A CSR still pending afterwards is approved by
+      hand before the power-off.
+  - name: ROTATION_CHECK_WAIT
+    default: "3m"
+    documentation: How long the rotated node's serving CSR is watched before the check decides.
   documentation: |-
     Prepares a freshly installed cluster for the build-and-ship test (OCPSTRAT-1346): the cluster must
     still be on its 24h install-time kubelet signer. Optionally enables the kubelet client CSR recovery
-    approver, then installs a one-shot systemd unit on every node that jumps the clock forward by SKEW at
+    approver (and with ROTATION_CHECK, checks it leaves a routine serving rotation alone), then installs a one-shot systemd unit on every node that jumps the clock forward by SKEW at
     the next boot, before crio and the kubelet start, and masks chronyd so nothing pulls it back.
     The next step powers the nodes off and on; the node clocks then read past the kubelet cert expiry.

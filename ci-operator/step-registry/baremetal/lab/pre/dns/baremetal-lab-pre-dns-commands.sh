@@ -24,10 +24,18 @@ CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
 if [[ ${TOPOLOGY_TYPE:-COMPACT} == "SNO" ]]; then
-  ip=$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")
-  api_vip=${ip}
-  api_int=${ip}
-  ingress_vip=${ip}
+  if [[ ${ipv4_enabled:-false} == true ]]; then
+    sno_ip=$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")
+    api_vip=${sno_ip}
+    api_int=${sno_ip}
+    ingress_vip=${sno_ip}
+  fi
+  if [[ ${ipv6_enabled:-false} == true ]]; then
+    sno_ipv6=$(yq -r e -o=j -I=0 ".[0].ipv6" "${SHARED_DIR}/hosts.yaml")
+    api_vip_v6=${sno_ipv6}
+    api_int_v6=${sno_ipv6}
+    ingress_vip_v6=${sno_ipv6}
+  fi
 fi
 
 if [ "${ipv4_enabled:-false}" == "true" ]; then

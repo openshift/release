@@ -27,6 +27,8 @@ export ISSUE_SUMMARY
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
+# Solve-step start. The dashboard uses this as the trigger time for time-to-merge.
+SOLVE_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 PHASE_SETUP_START=$(date +%s)
 
 # --- Workspace setup ---
@@ -256,6 +258,7 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         --arg result "${PR_RESULT}" \
         --arg pr_url "" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
+        --arg started_at "${SOLVE_STARTED_AT}" \
         --argjson claude_exit "${CLAUDE_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -268,10 +271,13 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           result: $result,
           pr_url: $pr_url,
           upstream_repo: $upstream_repo,
+          started_at: $started_at,
+          pr_status: "",
+          merged_at: "",
           claude_exit: $claude_exit,
           phase_durations: $phase_durations
         }' > "${SHARED_DIR}/metrics-metadata-solve.json"
-    finalize_session_metrics
+    finalize_session_metrics solve
     exit "${CLAUDE_EXIT}"
 fi
 
@@ -350,6 +356,8 @@ jq -n \
     --arg result "${PR_RESULT}" \
     --arg pr_url "${PR_URL:-}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
+    --arg started_at "${SOLVE_STARTED_AT}" \
+    --arg pr_status "open" \
     --argjson claude_exit "${CLAUDE_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -363,12 +371,15 @@ jq -n \
       result: $result,
       pr_url: $pr_url,
       upstream_repo: $upstream_repo,
+      started_at: $started_at,
+      pr_status: $pr_status,
+      merged_at: "",
       claude_exit: $claude_exit,
       phase_durations: $phase_durations
     }' > "${SHARED_DIR}/metrics-metadata-solve.json"
 
 echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
 
-finalize_session_metrics
+finalize_session_metrics solve
 
 echo "=== TRT Jira Solver Complete ==="

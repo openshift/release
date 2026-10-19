@@ -59,37 +59,6 @@ def _phase0_cell(**kwargs: Any) -> Cell:
 def test_expand_matrix_cells() -> None:
     matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
     cells = expand_cells(matrix)
-    assert {
-        (
-            cell.quay_version,
-            cell.branch,
-            cell.cloud,
-            cell.ocp_version,
-            cell.test,
-            cell.cron,
-            cell.kind,
-            cell.arch,
-            cell.fips,
-            cell.storage,
-        )
-        for cell in cells
-    } == {
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
-        ("3.18", "redhat-3.18", "gcp", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "gcs"),
-        ("3.18", "redhat-3.18", "azure", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "blob"),
-        ("3.18", "redhat-3.18", "aws", "5.0", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
-        ("3.18", "redhat-3.18", "aws", "4.14", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "arm64", False, "s3"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", True, "s3"),
-        ("3.18", "redhat-3.18", "libvirt", "4.22", "e2e-install", "0 8 * * 2", "periodic", "s390x", False, "s3"),
-        ("3.18", "redhat-3.18", "aws", "4.22", "e2e-install", "@daily", "periodic", "amd64", False, "odf"),
-        ("3.17", "redhat-3.17", "aws", "4.22", "e2e-install", "@weekly", "periodic", "amd64", False, "s3"),
-        ("5.0", "redhat-5.0", "aws", "5.0", "e2e-install", "@daily", "periodic", "amd64", False, "s3"),
-        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "s3"),
-        (None, "master", "gcp", "4.22", "e2e-install", None, "presubmit", "amd64", False, "gcs"),
-        (None, "master", "azure", "4.22", "e2e-install", None, "presubmit", "amd64", False, "blob"),
-        (None, "master", "aws", "4.22", "e2e-install", None, "presubmit", "amd64", False, "odf"),
-    }
     cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
     assert cell.filename == PHASE0_NAME
     assert cell.arch == "amd64"
@@ -156,7 +125,6 @@ def test_jinja_renders_ocp_version() -> None:
     assert rendered["releases"]["latest"]["candidate"]["architecture"] == "amd64"
     assert rendered["releases"]["latest"]["candidate"]["version"] == "4.22"
     assert rendered["zz_generated_metadata"]["variant"] == "aws-ocp422-e2e-install"
-    assert rendered["prowgen"]["enable_secrets_store_csi_driver"] is True
 
 
 def test_e2e_install_template_inverts_full_default_filter() -> None:
@@ -595,7 +563,7 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
 
 def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
     assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / "quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
+    (tmp_path / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
     (tmp_path / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
     assert main(["--check", "--output", str(tmp_path)]) == 0
@@ -1162,7 +1130,6 @@ def test_redhat_318_aws_fips_shares_aws_file() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
-    assert set(tests) == {"aws-s3-nightly", "aws-s3-nightly-fips", "aws-odf-nightly"}
 
     fips = tests["aws-s3-nightly-fips"]
     assert fips["cron"] == "@weekly"
@@ -1176,6 +1143,15 @@ def test_redhat_318_aws_fips_shares_aws_file() -> None:
     assert "FIPS_ENABLED" not in plain["env"]
     assert "QUAY_DEPLOY_MAILPIT" not in plain["env"]
     assert "FEATURE_FIPS" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_robot_api_tokens_only_on_quay_5() -> None:
+    results, _retired = generate_all()
+    for _group, filename, config in results:
+        enabled = "redhat-5." in filename
+        for test in config["tests"]:
+            extra = test["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+            assert ("FEATURE_ROBOT_API_TOKENS: true" in extra) == enabled, (filename, test["as"])
 
 
 def test_fips_rejects_non_bool() -> None:

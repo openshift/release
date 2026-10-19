@@ -110,6 +110,42 @@ EOF
     sleep 15
   done
   log "approver approved nothing for ${APPROVER_IDLE_CHECK} on the healthy cluster"
+
+  # Rotation check: where Machines list only IPs (agent), machine-approver can't cover a serving CSR,
+  # so only the approver's recovery gate keeps it from approving a routine serving rotation.
+  if [[ ${ROTATION_CHECK} == true ]]; then
+    rot_node=$(oc get nodes -o json | jq -r '[.items[] | select(.metadata.labels | has("node-role.kubernetes.io/worker"))
+      | select(.metadata.labels | has("node-role.kubernetes.io/master") or has("node-role.kubernetes.io/control-plane") | not) | .metadata.name] | sort | .[0] // empty')
+    [[ -n $rot_node ]] || rot_node=$(oc get nodes -o name | sort | head -1 | sed 's|^node/||')
+    serving_csrs() {
+      oc get csr -o json | jq -c --arg u "system:node:${rot_node}" \
+        '[.items[] | select(.spec.signerName == "kubernetes.io/kubelet-serving" and .spec.username == $u) | .metadata.name]'
+    }
+    rot_before=$(serving_csrs)
+    # Restart the kubelet 5s after oc debug returns, so the restart doesn't kill the debug pod mid-command.
+    timeout 300 oc debug "node/${rot_node}" -n default -q -- chroot /host sh -c \
+      'set -e; cd /var/lib/kubelet/pki; mv kubelet-server-current.pem kubelet-server-current.pem.e2e-bak; systemd-run --on-active=5 systemctl restart kubelet' ||
+      die "cannot rotate the serving cert of ${rot_node}"
+    deadline=$(($(now) + 300))
+    rot_csr=""
+    until [[ -n $rot_csr ]]; do
+      (($(now) < deadline)) || die "no new serving CSR from ${rot_node} within 5m of restarting its kubelet"
+      sleep 10
+      rot_csr=$(serving_csrs | jq -r --argjson b "$rot_before" '[.[] | select(IN($b[]) | not)][0] // empty')
+    done
+    log "${rot_node}: routine serving rotation, CSR ${rot_csr}; giving the approvers ${ROTATION_CHECK_WAIT}"
+    sleep "$(dur "${ROTATION_CHECK_WAIT}")"
+    ours=$(oc get csr -o json | jq -c --arg r "${APPROVER_REASON}" \
+      '[.items[] | select(any(.status.conditions[]?; .type == "Approved" and .reason == $r)) | .metadata.name]')
+    [[ $ours == "[]" ]] || die "the approver approved a routine serving rotation: ${ours}"
+    rot_reason=$(oc get csr "${rot_csr}" -o json | jq -r '[.status.conditions[]? | select(.type == "Approved") | .reason][0] // empty')
+    if [[ -z $rot_reason ]]; then
+      # machine-approver leaves serving CSRs for IP-only Machines pending (OCPBUGS-128455, OCPBUGS-128496).
+      oc adm certificate approve "${rot_csr}" >/dev/null
+      rot_reason="left pending, approved by hand"
+    fi
+    log "rotation check passed: ${rot_csr} (${rot_node}) ${rot_reason}; the approver left it alone"
+  fi
 fi
 
 # --- per node: record cert evidence, install the boot-time skew unit, mask chronyd ---

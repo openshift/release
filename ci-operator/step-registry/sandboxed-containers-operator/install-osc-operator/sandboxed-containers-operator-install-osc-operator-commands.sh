@@ -12,7 +12,7 @@
 #   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
-#   PEERPODS_CREDENTIALS_MODE     - Credentials mode when peer-pods enabled (default: cco)
+#   CREDENTIALS_MODE                 - Credentials mode when peer-pods enabled (default: cco)
 #   ENABLEPEERPODS                - "true" to enable peer-pods (default: false)
 #   WORKLOAD_TO_TEST              - "kata", "peer-pods", or "coco" (default: kata)
 #   RUST_RUNTIME                  - "true" to use the Rust runtime (default: false)
@@ -36,9 +36,17 @@ CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE:-}
 if [[ -z "${CATALOG_SOURCE_IMAGE}" && -f "${SHARED_DIR}/catalog-source-image" ]]; then
   CATALOG_SOURCE_IMAGE=$(cat "${SHARED_DIR}/catalog-source-image")
 fi
+# Disconnected runs install from the CatalogSource created from the mirror by
+# sandboxed-containers-operator-post-install-isolation-common-mirror-operator,
+# which already mirrored the Pre-GA catalog when one was requested.
+MIRROR_CATALOG_SOURCE=""
+if [[ -f "${SHARED_DIR}/disconnected_catalog_source_name" ]]; then
+  MIRROR_CATALOG_SOURCE=$(<"${SHARED_DIR}/disconnected_catalog_source_name")
+  CATALOG_SOURCE_IMAGE=""
+fi
 OSC_CHARTS_REPO=${OSC_CHARTS_REPO:-https://github.com/confidential-devhub/charts.git}
 OSC_CHARTS_REF=${OSC_CHARTS_REF:-main}
-PEERPODS_CREDENTIALS_MODE="${PEERPODS_CREDENTIALS_MODE:-cco}"
+CREDENTIALS_MODE="${CREDENTIALS_MODE:-cco}"
 ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 USE_OLMV1=${USE_OLMV1:-false}
@@ -334,6 +342,43 @@ function render_osc_operator_chart() {
     helm_args+=("--set" "dev.enabled=false")
   fi
 
+  if [[ "${CREDENTIALS_MODE}" == "sts" ]]; then
+    local provider
+    provider=$(get_cloud_provider)
+
+    case "${provider}" in
+      azure)
+        local client_id tenant_id subscription_id
+        client_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.clientId}')
+        tenant_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.tenantId}')
+        subscription_id=$(oc_with_retry oc get configmap osc-identity -n default -o jsonpath='{.data.subscriptionId}')
+
+        if [[ -z "${client_id}" || -z "${tenant_id}" || -z "${subscription_id}" ]]; then
+          echo ">>> ERROR: osc-identity ConfigMap missing required fields" >&2
+          return 1
+        fi
+
+        helm_args+=("--set-json" "subscription.config.env=[{\"name\":\"CLIENTID\",\"value\":\"${client_id}\"},{\"name\":\"TENANTID\",\"value\":\"${tenant_id}\"},{\"name\":\"SUBSCRIPTIONID\",\"value\":\"${subscription_id}\"}]")
+        echo ">>> Helm: STS/Azure subscription env vars injected (CLIENTID=${client_id})" >&2
+        ;;
+      aws)
+        if [[ ! -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+          echo ">>> ERROR: ${SHARED_DIR}/osc-irsa-role-arn not found" >&2
+          return 1
+        fi
+
+        local role_arn
+        role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+
+        helm_args+=("--set-json" "subscription.config.env=[{\"name\":\"ROLEARN\",\"value\":\"${role_arn}\"}]")
+        echo ">>> Helm: STS/AWS subscription env vars injected (ROLEARN=${role_arn})" >&2
+        ;;
+      *)
+        echo ">>> WARNING: STS mode not implemented for provider: ${provider}" >&2
+        ;;
+    esac
+  fi
+
   if [[ "${USE_OLMV1}" == "true" ]]; then
     if [[ -z "${CATALOG_SOURCE_IMAGE}" ]]; then
       echo ">>> ERROR: USE_OLMV1=true requires CATALOG_SOURCE_IMAGE to be set" >&2
@@ -468,6 +513,26 @@ function render_osc_operands_chart() {
   echo "$helm_output"
 }
 
+function setup_sts_secrets() {
+  if [[ "${CREDENTIALS_MODE}" != "sts" ]]; then
+    return 0
+  fi
+
+  local provider
+  provider=$(get_cloud_provider)
+
+  if [[ "${provider}" == "aws" ]] && [[ -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+    local role_arn
+    role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+
+    echo ">>> Creating peer-pods-image-creation-secret with IRSA credentials"
+    oc_with_retry oc create secret generic peer-pods-image-creation-secret \
+      --from-literal=AWS_ROLE_ARN="${role_arn}" \
+      --from-literal=AWS_WEB_IDENTITY_TOKEN_FILE="/var/run/secrets/openshift/serviceaccount/token" \
+      -n "${OSC_NAMESPACE}"
+  fi
+}
+
 function install_osc_operator() {
   local charts_dir="$1"
 
@@ -476,10 +541,17 @@ function install_osc_operator() {
   echo ">>> Creating namespace ${OSC_NAMESPACE}"
   oc create namespace "${OSC_NAMESPACE}" 2>/dev/null || true
 
+  setup_sts_secrets
+
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"
   if ! render_osc_operator_chart "${charts_dir}" > "${operator_yaml}"; then
     echo ">>> ERROR: Failed to render operator chart"
     return 1
+  fi
+
+  if [[ -n "${MIRROR_CATALOG_SOURCE}" ]]; then
+    echo ">>> Disconnected: subscribing from CatalogSource ${MIRROR_CATALOG_SOURCE}"
+    sed -i "s/^\(\s*source:\s*\)redhat-operators\s*$/\1${MIRROR_CATALOG_SOURCE}/" "${operator_yaml}"
   fi
 
   echo ">>> Rendered operator objects:"
@@ -491,7 +563,7 @@ function install_osc_operator() {
   # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
   # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
   # the wait only covers catalogs that are actually needed.
-  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
+  if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" || -n "${MIRROR_CATALOG_SOURCE}" ]]; then
     echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
     oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
   fi
@@ -646,15 +718,14 @@ function create_peer_pods_secret() {
     return 0
   fi
 
-  case "${PEERPODS_CREDENTIALS_MODE}" in
+  case "${CREDENTIALS_MODE}" in
     cco)
       echo ">>> Identity mode: cco (Cloud Credential Operator handles credentials)"
       return 0
       ;;
     sts)
-      echo ">>> Identity mode: sts (credentials via subscription environment)"
-      echo ">>> ERROR: sts handler not implemented yet"
-      return 1
+      echo ">>> Identity mode: sts (workload identity - peer-pods-secret not needed)"
+      return 0
       ;;
     manual|*)
       echo ">>> Identity mode: manual (copying credentials from peerpods-param-secret)"
@@ -703,8 +774,18 @@ function create_peer_pods_secret() {
       fi
       ;;
     aws)
-      echo ">>> ERROR: manual credentials handler not implemented for AWS"
-      return 1
+      # Extract AWS credentials
+      local auth_json
+      auth_json=$(oc get secret peerpods-param-secret -n default -o jsonpath='{.data.auth\.json}' 2>/dev/null || echo "")
+      if [[ -n "${auth_json}" ]]; then
+        echo "${auth_json}" | base64 -d > "${SCRATCH}/auth.json"
+        oc_with_retry oc create secret generic peer-pods-secret \
+          -n "${OSC_NAMESPACE}" \
+          --from-file="${SCRATCH}/auth.json"
+        rm -f "${SCRATCH}/auth.json"
+      else
+        echo ">>> WARNING: Could not extract AWS credentials from peerpods-param-secret"
+      fi
       ;;
     *)
       echo ">>> WARNING: peer-pods-secret creation not implemented for provider: ${provider}"

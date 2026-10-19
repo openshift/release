@@ -173,17 +173,8 @@ if [[ -z "${GATEWAY_EXTERNAL_IP}" ]]; then
   exit 1
 fi
 
-MAESTRO_EXTERNAL_IP=$(kubectl get svc maestro -n maestro -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-if [[ -z "${MAESTRO_EXTERNAL_IP}" ]]; then
-  log "ERROR: Failed to resolve Maestro external IP. Is the LoadBalancer ready?"
-  exit 1
-fi
-
 export HYPERFLEET_API_URL=http://${GATEWAY_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
-
-export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
-echo "${MAESTRO_URL}" > "${SHARED_DIR}/maestro_url"
 
 
 wait_for_api() {
@@ -216,9 +207,5 @@ wait_for_api() {
 }
 
 if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
-  exit 1
-fi
-
-if ! wait_for_api "${MAESTRO_URL}/api/maestro/v1/consumers" "Maestro API"; then
   exit 1
 fi

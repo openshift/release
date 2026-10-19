@@ -149,8 +149,30 @@ tests:
         CLUSTER_PROFILE=rosa-sts-upgrade
         UPGRADE_DISTANCE=4
         UPGRADE_TARGET_CHANNEL=candidate
-        UPGRADE_TARGET_VERSION=5.0.0-rc.5
+        UPGRADE_TARGET_VERSION=4.22.6
       OCM_FVT_JOB_NAME: cs-rosa-sts-nx-y-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 12h0m0s
+- as: ocm-fvt-periodic-cs-rosa-sts-nx-y-upg-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 30 10 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_EXTRA_ENVS: |-
+        AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+        CLUSTER_PROFILE=rosa-sts-upgrade-ocp5-latest-rc
+        UPGRADE_DISTANCE=3
+        UPGRADE_TARGET_CHANNEL=candidate
+        UPGRADE_TARGET_VERSION=5.0.0-rc.6
+      OCM_FVT_JOB_NAME: cs-rosa-sts-nx-y-upgrade-ocp5-latest-rc-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
     pre:
