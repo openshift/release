@@ -37,6 +37,10 @@ DEPLOY_REF_BY_STORAGE = {
 # No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).
 # The build root only builds the Playwright runner image, so older clusters reuse it.
 BUILD_ROOT_OCP_FLOOR = "4.22"
+# Tests that target another repo in the same org; the rest use global_defaults.repo.
+REPO_BY_TEST = {"e2e-chainsaw": "quay-operator"}
+# Tests that fan out into one test per suite, all in the same file.
+SUITES_BY_TEST = {"e2e-chainsaw": ("e2e", "destructive")}
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,7 @@ class Cell:
     fips: bool = False
     sts: bool = False
     storage_override: str | None = None
+    suite: str | None = None
     # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
     # channels, and branches are derived from quay_version + upgrade_from, so a row
     # needs only this one field.
@@ -154,7 +159,9 @@ class Cell:
             if self.kind == "periodic"
             else f"{self.cloud}-{self.storage}"
         )
-        return f"{base}-fips" if self.fips else base
+        if self.fips:
+            base = f"{base}-fips"
+        return f"{base}-{self.suite}" if self.suite else base
 
     @property
     def filename(self) -> str:
@@ -187,6 +194,7 @@ class Cell:
             "layout": self.layout,
             "fips": self.fips,
             "sts": self.sts,
+            "suite": self.suite,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

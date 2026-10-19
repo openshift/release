@@ -13,7 +13,8 @@
 #                        kind: presubmit renders templates/presubmit/ instead
 #   3. generate.py    — merge and expansion logic only
 #
-# Merge order (later layers overwrite earlier):
+# Merge order (later layers overwrite earlier; templates/repos/<repo>/base.yaml.j2
+# replaces the shared base layer for that repo's cells):
 #   templates/base.yaml.j2 (or templates/presubmit/base.yaml.j2 for kind: presubmit)
 #   templates/sources/<source>.yaml.j2 (kind: periodic only)
 #   templates/clouds/<cloud>.yaml.j2
@@ -40,7 +41,14 @@ from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
-from model import STORAGE_BY_CLOUD, EXTRA_STORAGE_BY_CLOUD, Cell, YamlMap
+from model import (
+    EXTRA_STORAGE_BY_CLOUD,
+    REPO_BY_TEST,
+    STORAGE_BY_CLOUD,
+    SUITES_BY_TEST,
+    Cell,
+    YamlMap,
+)
 
 GENERATOR_DIR = Path(__file__).resolve().parent
 SOURCES = ("nightly", "stable")
@@ -342,6 +350,15 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             if not test or not ocps or not clouds:
                 raise ValueError(f"{where} is missing test, ocp, or clouds")
             storage = _job_str_field(job, "storage", where)
+            if test == "e2e-chainsaw":
+                # Chainsaw runs only against the operator on ODF/NooBaa, as a periodic.
+                if kind != "periodic":
+                    raise ValueError(f"{where} test e2e-chainsaw is only valid for kind: periodic")
+                if storage not in (None, "odf"):
+                    raise ValueError(f"{where}.storage must be 'odf' for test e2e-chainsaw")
+                if job.get("fips"):
+                    raise ValueError(f"{where}.fips is not supported for test e2e-chainsaw")
+                storage = "odf"
             if storage is not None:
                 for cloud in clouds:
                     allowed = {STORAGE_BY_CLOUD[cloud]} if cloud in STORAGE_BY_CLOUD else set()
@@ -429,11 +446,12 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
             as_name = _job_as_name(job, where)
-            for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
+            suites = SUITES_BY_TEST.get(test, (None,))
+            for ocp, cloud, job_arch, suite in itertools.product(ocps, clouds, arches, suites):
                 cells.append(
                     Cell(
                         org=org,
-                        repo=repo,
+                        repo=REPO_BY_TEST.get(test, repo),
                         branch=branch,
                         quay_version=quay_version,
                         ocp_version=ocp,
@@ -455,6 +473,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         sts=cloud == "aws" and sts is not False,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
+                        suite=suite,
                     )
                 )
     return cells
@@ -500,6 +519,11 @@ def apply_cell_settings(config: YamlMap, cell: Cell) -> YamlMap:
     return config
 
 
+def _repo_template(templates_dir: Path, cell: Cell, name: str) -> str:
+    repo_name = f"repos/{cell.repo}/{name}"
+    return repo_name if (templates_dir / repo_name).exists() else name
+
+
 def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
     env = jinja_env(templates_dir)
     context = cell.context()
@@ -509,7 +533,8 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
         # No presubmit-specific cloud layer: share the periodic one instead of
         # forking a byte-identical copy that would need editing twice.
         cloud_template = f"clouds/{cell.cloud}.yaml.j2"
-    layers = [render_template(env, f"{template_root}base.yaml.j2", context)]
+    base_template = _repo_template(templates_dir, cell, f"{template_root}base.yaml.j2")
+    layers = [render_template(env, base_template, context)]
     if cell.kind == "periodic":
         layers.append(render_template(env, f"sources/{cell.source}.yaml.j2", context))
     layers.append(render_template(env, cloud_template, context))
@@ -678,18 +703,22 @@ def _print_list(results: list[tuple[list[Cell], str, YamlMap]]) -> None:
         print("  ".join(value.ljust(widths[i]) for i, value in enumerate(row)))
 
 
+def _repo_dir(output_dir: Path, cell: Cell) -> Path:
+    # Another repo's configs go to the sibling dir named after it.
+    return output_dir.parent / cell.repo if cell.test in REPO_BY_TEST else output_dir
+
+
 def _write_configs(
     results: list[tuple[list[Cell], str, YamlMap]], output_dir: Path, dry_run: bool
 ) -> None:
-    if not dry_run:
-        output_dir.mkdir(parents=True, exist_ok=True)
-    for _group, filename, config in results:
+    for group, filename, config in results:
         text = dump_config(config)
-        path = output_dir / filename
+        path = _repo_dir(output_dir, group[0]) / filename
         if dry_run:
             print(f"=== {path} ===")
             print(text, end="" if text.endswith("\n") else "\n")
             continue
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
         print(f"wrote {path}")
 
@@ -698,9 +727,10 @@ def _check_configs(
     results: list[tuple[list[Cell], str, YamlMap]], retired: list[str], output_dir: Path
 ) -> int:
     failures = 0
-    expected = {filename: config for _group, filename, config in results}
-    for filename, config in expected.items():
-        path = output_dir / filename
+    # Every repo dir, so a retired file is found after its last active cell is gone.
+    dirs = {output_dir} | {output_dir.parent / repo for repo in REPO_BY_TEST.values()}
+    for group, filename, config in results:
+        path = _repo_dir(output_dir, group[0]) / filename
         if not path.exists():
             print(f"missing {path}", file=sys.stderr)
             failures += 1
@@ -710,10 +740,10 @@ def _check_configs(
             print(f"stale {path}", file=sys.stderr)
             failures += 1
     for filename in retired:
-        path = output_dir / filename
-        if path.exists():
-            print(f"retired {path}", file=sys.stderr)
-            failures += 1
+        for path in (d / filename for d in sorted(dirs)):
+            if path.exists():
+                print(f"retired {path}", file=sys.stderr)
+                failures += 1
     if failures:
         print(f"{failures} config(s) out of date", file=sys.stderr)
         return 1

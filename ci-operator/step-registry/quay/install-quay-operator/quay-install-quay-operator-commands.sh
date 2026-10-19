@@ -6,8 +6,13 @@ set -o pipefail
 
 OO_INSTALL_NAMESPACE=openshift-operators
 
-SOURCE=redhat-operators
-SOURCE_NAMESPACE=openshift-marketplace
+SOURCE=${QUAY_OPERATOR_SOURCE:-redhat-operators}
+SOURCE_NAMESPACE=${QUAY_OPERATOR_SOURCE_NAMESPACE:-openshift-marketplace}
+
+CHANNEL_SPEC=""
+if [ -n "${QUAY_OPERATOR_CHANNEL-}" ]; then
+    CHANNEL_SPEC="  channel: $QUAY_OPERATOR_CHANNEL"
+fi
 
 if [ -n "${QUAY_OPERATOR_INDEX_IMAGE-}" ]; then
     INDEX_IMAGE_DIGEST=$(oc image info --show-multiarch "$QUAY_OPERATOR_INDEX_IMAGE" -o json | jq -r 'if type=="array" then .[0].listDigest else .digest end')
@@ -42,6 +47,7 @@ spec:
   name: quay-operator 
   source: $SOURCE
   sourceNamespace: $SOURCE_NAMESPACE
+$CHANNEL_SPEC
 EOF
 )
 
