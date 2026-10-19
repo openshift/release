@@ -12,10 +12,12 @@ workflow:
     remediation and a separately reported policy compliance check. Stream output
     and collect reports in the same step; the target hub automatically reimports
     the replacement through ImportAndSync.
+    Upload available reports from all five stages to one ReportPortal launch.
     Check their exit code and reports with the shared final JUnit verifier
     so later stages can run before the job is marked failed.
   steps:
     env:
+      IBI_MIRROR_SEED_DEPENDENCIES: "true"
       JUNIT_INVENTORY_PREFIX: target-
       JUNIT_REPORT_DIR_FILE: ibi-deploymenttypes-report-dir
       JUNIT_REQUIRED_RESULT_FILES: ibi-deploymenttypes-exit-code
@@ -47,7 +49,7 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-prune-argocd-apps
     # Run seedgeneration tests without a post-generation power-off
     - ref: telcov10n-functional-cnf-ran-ibi-eco-gotests-seed
-    # Mirror generated seed image from seed bastion registry to target bastion registry
+    # Mirror the seed and its exact dependencies; verify target pulls before preinstall.
     - ref: telcov10n-functional-cnf-ran-ibu-mirror-seed-image
     # Preinstall restores the seed image before final target configuration.
     - ref: telcov10n-functional-cnf-ran-ibi-target-preinstall
@@ -57,4 +59,5 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibi-replacement-preinstall
     - ref: telcov10n-functional-cnf-ran-ibi-ibbf
     post:
+    - ref: telcov10n-functional-cnf-ran-ibi-report
     - ref: telcov10n-verify-junit-reports-bastion
