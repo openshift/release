@@ -4,6 +4,7 @@ set -euo pipefail
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly targets_path="${SHARED_DIR}/gcp-hcp-environment-status-targets.json"
 readonly skip_path="${SHARED_DIR}/gcp-hcp-environment-status-skipped"
+readonly superseded_path="${SHARED_DIR}/gcp-hcp-environment-status-superseded"
 readonly api="https://api.github.com/repos/openshift-online/gcp-hcp-infra"
 
 if [[ -z "${JOB_SPEC:-}" ]]; then
@@ -12,8 +13,8 @@ if [[ -z "${JOB_SPEC:-}" ]]; then
 fi
 
 # A postsubmit is tied to the pushed promotion commit. Use that event SHA;
-# skip it if superseded before status publication, and fail if the branch
-# advances after testing starts.
+# skip its lifecycle if superseded before status publication, and fail if the
+# branch advances after the pending status is posted.
 job_type="$(jq -r '.type // empty' <<<"${JOB_SPEC}")"
 if [[ "${job_type}" == "postsubmit" ]]; then
   if ! jq -e '
@@ -125,6 +126,7 @@ if ! current_sha="$(branch_sha "${branch}")"; then
 fi
 if [[ "${current_sha}" != "${sha}" ]]; then
   touch "${skip_path}"
+  touch "${superseded_path}"
   echo "Skipping superseded promotion ${branch}@${sha}; current commit is ${current_sha}"
   exit 0
 fi
@@ -173,7 +175,6 @@ while IFS= read -r target; do
       exit 1
     fi
     missing=""
-    failed=""
     if [[ "${contexts}" != "[]" ]]; then
       if ! status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"; then
         echo "ERROR: Could not verify deployment statuses on ${branch}@${sha}" >&2
@@ -186,7 +187,7 @@ while IFS= read -r target; do
         case "${status_state}" in
           success) ;;
           pending|"") missing="${missing}${missing:+$'\n'}${wanted}" ;;
-          *) failed="${failed}${failed:+$'\n'}${wanted}: ${status_state}" ;;
+          *) missing="${missing}${missing:+$'\n'}${wanted}: ${status_state}" ;;
         esac
       done < <(jq -r '.[]' <<<"${contexts}")
     fi
@@ -204,17 +205,12 @@ while IFS= read -r target; do
         case "${conclusion}" in
           success) ;;
           "") missing_checks="${missing_checks}${missing_checks:+$'\n'}${check_name}" ;;
-          *) failed="${failed}${failed:+$'\n'}${check_name}: ${conclusion}" ;;
+          *) missing_checks="${missing_checks}${missing_checks:+$'\n'}${check_name}: ${conclusion}" ;;
         esac
       done < <(jq -r '.[]' <<<"${check_runs}")
       if [[ -n "${missing_checks}" ]]; then
         missing="${missing}${missing:+$'\n'}${missing_checks}"
       fi
-    fi
-    if [[ -n "${failed}" ]]; then
-      echo "ERROR: deployment checks failed on ${branch}@${sha}:" >&2
-      echo "${failed}" >&2
-      exit 1
     fi
     if [[ -z "${missing}" ]]; then
       if ! current_sha="$(branch_sha "${branch}")"; then

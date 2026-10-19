@@ -4,6 +4,7 @@ set -euo pipefail
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly targets_path="${SHARED_DIR}/gcp-hcp-environment-status-targets.json"
 readonly skip_path="${SHARED_DIR}/gcp-hcp-environment-status-skipped"
+readonly tests_started_path="${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
 readonly api="https://api.github.com/repos/openshift-online/gcp-hcp-infra"
 
@@ -47,6 +48,9 @@ branch_sha() {
 
 state=failure
 description="HostedCluster lifecycle did not pass"
+if [[ ! -e "${tests_started_path}" ]]; then
+  description="HostedCluster lifecycle did not run"
+fi
 if [[ -e "${tests_passed_path}" ]]; then
   state=success
   description="HostedCluster lifecycle passed on deployed revision"

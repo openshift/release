@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A newer promotion may supersede this postsubmit before status publication.
+# Ordinary presubmits still run the lifecycle, even though they skip status publication.
+if [[ -e "${SHARED_DIR}/gcp-hcp-environment-status-superseded" ]]; then
+  echo "Skipping HostedCluster lifecycle for a superseded promotion"
+  exit 0
+fi
+
 echo "=== GCP HCP HC Lifecycle Validation ==="
 echo ""
 
@@ -136,6 +143,7 @@ export GCPHCPCTL_PATH="/usr/bin/gcphcpctl"
 
 # Run Ginkgo v2 test binary
 echo "Running HC lifecycle validation tests..."
+touch "${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 /usr/bin/test-e2e \
   --ginkgo.v \
   --ginkgo.no-color \
