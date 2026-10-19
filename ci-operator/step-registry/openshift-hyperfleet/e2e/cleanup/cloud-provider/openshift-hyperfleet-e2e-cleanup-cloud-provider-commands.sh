@@ -27,9 +27,6 @@ function gcloud_auth() {
     popd
   fi
 
-  gcloud components install gke-gcloud-auth-plugin --quiet
-  export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-  
   gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
   gcloud config set project "${service_project_id}"
 
