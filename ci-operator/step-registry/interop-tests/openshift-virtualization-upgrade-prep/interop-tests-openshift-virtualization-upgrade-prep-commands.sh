@@ -688,7 +688,8 @@ Cnv__CollectFailureDiagnostics() {
             done
         done < <(jq -r --arg pod "${podName}" '
             .items[] | select(.metadata.name == $pod)
-            | [.spec.initContainers[]?.name, .spec.containers[]?.name] | unique | .[:4][]
+            | [.spec.initContainers[]?.name, .spec.containers[]?.name]
+            | unique | sort_by(. != "importer") | .[:4][]
         ' "${diagnosticsDir}/importer-pods.json" 2>/dev/null || true)
     done < <(jq -r '.items | sort_by(.metadata.name) | .[:10][].metadata.name' \
         "${diagnosticsDir}/importer-pods.json" 2>/dev/null || true)

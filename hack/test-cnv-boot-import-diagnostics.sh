@@ -36,7 +36,8 @@ case "$*" in
             printf 'not json'
         else
             jq -n '{items: [range(12) | {metadata: {name: ("importer-test-" + tostring)},
-                spec: {initContainers: [{name: "init"}], containers: [range(4) | {name: ("importer-" + tostring)}]}}]}'
+                spec: {initContainers: [range(4) | {name: ("helper-" + tostring)}],
+                    containers: [{name: "importer"}, {name: "sidecar"}]}}]}'
         fi ;;
     'logs '*)
         [[ "$*" == *' -n openshift-virtualization-os-images -c '* ]]
@@ -96,6 +97,9 @@ for SCENARIO in success populated missing malformed denied request-timeout colle
             [[ "$(grep -c '^logs ' "${CALLS}")" == 80 ]]
             [[ "$(grep -c '^get pod ' "${CALLS}")" == 10 ]]
             [[ "$(grep -c -- '--previous$' "${CALLS}")" == 40 ]]
+            [[ "$(grep -c -- ' -c importer ' "${CALLS}")" == 20 ]]
+            [[ "$(grep -c -- ' -c helper-' "${CALLS}")" == 60 ]]
+            [[ "$(wc -l < "${CALLS}")" == 98 ]]
             grep -q terminated "${ARTIFACT_DIR}/cnv-boot-import-on-failure/importer-test-0.yaml" ;;
         missing|malformed|denied)
             ! grep -q '^logs ' "${CALLS}"
