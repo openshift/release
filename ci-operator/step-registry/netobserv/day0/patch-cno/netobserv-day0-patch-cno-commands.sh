@@ -24,6 +24,8 @@ done
 echo "Reducing cacheMaxFlows to 50K..."
 oc patch flowcollector cluster --type=merge -p '{"spec":{"agent":{"ebpf":{"cacheMaxFlows":50000}}}}'
 
+sleep 30
+
 echo "Waiting for FlowCollector/cluster Ready condition..."
 oc wait flowcollector/cluster --for=condition=Ready --timeout="${WAIT_TIMEOUT}"
 
