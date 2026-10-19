@@ -35,22 +35,34 @@ _opp_cleanup() {
 # --- Atomic JUnit Writer (INTEROP-9527) ---
 _junit_emit_safe() {
   local kind="$1" message="$2" rc="${3:-0}"
+  # IMPROVEMENT A: Gate remapping with MAP_TESTS
+  local suite_name="interop-opp-product-upgrade-acm"
+  if [[ "${MAP_TESTS:-false}" == "true" && -n "${DR__RP__CR_COMP_NAME:-}" ]]; then
+    suite_name="${DR__RP__CR_COMP_NAME}"
+  fi
+  # IMPROVEMENT B: Sanitize suite_name for path safety and XML safety
+  local safe_name="${suite_name//[^A-Za-z0-9_-]/_}"
+  local junit_file="junit_${safe_name//-/_}.xml"
+  local xml_suite_name="${suite_name//&/&amp;}"
+  xml_suite_name="${xml_suite_name//\"/&quot;}"
+  xml_suite_name="${xml_suite_name//</&lt;}"
+  xml_suite_name="${xml_suite_name//>/&gt;}"
   local tmpf
-  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  tmpf="${ARTIFACT_DIR}/.${junit_file}.tmp.$$"
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="${xml_suite_name}" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
 </testsuite>
 XMLEOF
   } > "${tmpf}"
-  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/${junit_file}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/${junit_file}" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
 }
 
