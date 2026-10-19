@@ -1,0 +1,57 @@
+ref:
+  as: openshift-qe-udn-bgp-bcc
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: WORKLOAD
+    default: "udn-bgp-bcc"
+    documentation: |-
+      Workload name passed to the kube-burner-ocp wrapper.
+  - name: ITERATIONS
+    default: "10"
+    documentation: |-
+      Number of CUDN iterations to create in the udn-bgp-bcc workload.
+  - name: ROUTE_SERVER_ID
+    default: ""
+    documentation: |-
+      AWS VPC Route Server ID. Required for the BCC workload to query
+      the Route Server routing database and measure BGP route advertisement
+      latency. Must be provisioned in the cluster's VPC.
+  - name: ES_SERVER
+    default: ""
+    documentation: |-
+      Elasticsearch server URL for indexing benchmark results.
+  - name: ES_INDEX
+    default: ""
+    documentation: |-
+      Elasticsearch index for benchmark results.
+  - name: WORKLOAD_NODE_ROLE
+    default: "worker"
+    documentation: |-
+      Node role selector for kube-burner workload pods.
+  - name: PIN_SERVER
+    default: ""
+    documentation: |-
+      Pinning Elasticsearch server URL.
+  - name: PIN_INDEX
+    default: ""
+    documentation: |-
+      Pinning Elasticsearch index.
+  commands: openshift-qe-udn-bgp-bcc-commands.sh
+  timeout: 4h
+  credentials:
+  - mount_path: /secret/perfscale
+    name: perfscale-es
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  documentation: >-
+    Runs the udn-bgp-bcc kube-burner-ocp workload that exercises the BGP
+    Cloud Connector operator. Measures end-to-end latency of BGP route
+    advertisements through the BCC operator from RouteAdvertisement spec
+    submission to VPC route table propagation and pod reachability.
