@@ -31,6 +31,21 @@ function archive_pod_info() {
   done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
 }
 
+# S3 bucket cleanup on failure — invoked by EXIT trap after bucket creation
+QUAY_S3_CLEANUP_NEEDED=false
+QUAY_AWS_DIR=""
+
+function cleanup_s3_bucket() {
+  local exit_code=$?
+  if [[ "${QUAY_S3_CLEANUP_NEEDED}" == "true" && ${exit_code} -ne 0 ]]; then
+    echo "Cleaning up S3 bucket ${QUAY_AWS_S3_BUCKET} on failure..." >&2
+    if [[ -d "${QUAY_AWS_DIR}" ]]; then
+      (cd "${QUAY_AWS_DIR}" && TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}" terraform destroy -auto-approve) 2>&1 || \
+        echo "Warning: terraform destroy failed" >&2
+    fi
+  fi
+}
+
 #Get the credentials and Email of new Quay User
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
@@ -39,12 +54,13 @@ QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
-QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
+QUAY_AWS_S3_BUCKET="quayprowci${BUILD_ID:-$(date +%s%N)}"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 
 mkdir -p QUAY_AWS && cd QUAY_AWS
+QUAY_AWS_DIR="$(pwd)"
 cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"
@@ -85,7 +101,48 @@ EOF
 echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 terraform init
-terraform apply -auto-approve || true
+
+# Chain S3 cleanup with any existing EXIT trap (e.g. MAP_TESTS post-processing)
+_saved_exit_trap_body=""
+_saved_exit_trap="$(trap -p EXIT)"
+if [[ -n "${_saved_exit_trap}" ]]; then
+  _saved_exit_trap_body="${_saved_exit_trap#trap -- \'}"
+  _saved_exit_trap_body="${_saved_exit_trap_body%\' EXIT}"
+fi
+trap 'cleanup_s3_bucket; eval "${_saved_exit_trap_body}"' EXIT
+
+# Bounded retry for S3 BucketAlreadyExists (409) conflicts
+max_retries=3
+retry=0
+tf_exit=0
+while (( retry < max_retries )); do
+  tf_exit=0
+  terraform apply -auto-approve 2>&1 | tee /tmp/tf_apply.log || tf_exit=$?
+  if (( tf_exit == 0 )); then
+    break
+  fi
+  if grep -qi "BucketAlreadyExists\|409 Conflict" /tmp/tf_apply.log; then
+    retry=$((retry + 1))
+    if (( retry >= max_retries )); then
+      echo "Terraform apply failed after ${max_retries} retries due to S3 bucket conflict" >&2
+      exit "${tf_exit}"
+    fi
+    echo "S3 bucket conflict (409), retry ${retry}/${max_retries} in 10s..." >&2
+    sleep 10
+  else
+    echo "Terraform apply failed with non-retryable error (exit code: ${tf_exit})" >&2
+    exit "${tf_exit}"
+  fi
+done
+
+# Verify the bucket exists before proceeding
+echo "Verifying S3 bucket ${QUAY_AWS_S3_BUCKET} exists..."
+AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}" \
+  AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}" \
+  aws s3api head-bucket --bucket "${QUAY_AWS_S3_BUCKET}" --region us-east-2
+echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully"
+
+QUAY_S3_CLEANUP_NEEDED=true
 
 #Share Terraform Var and Terraform Directory
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
@@ -278,6 +335,7 @@ for _ in {1..60}; do
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    QUAY_S3_CLEANUP_NEEDED=false
     archive_pod_info
     exit 0
   fi
