@@ -96,7 +96,7 @@ if [[ -z "${iso_url}" ]]; then
   echo "InfraEnv ${INFRAENV_NAME} has no ISO download URL."
   exit 1
 fi
-curl --fail --location --silent --show-error "${iso_url}" -o "${SHARED_DIR}/hcp-agent-nutanix.iso"
+curl --fail --location --silent --show-error --insecure "${iso_url}" -o "${SHARED_DIR}/hcp-agent-nutanix.iso"
 printf '%s\n' "${PROXY_URL}" > "${SHARED_DIR}/nutanix_proxy_url"
 printf '%s\n' "${no_proxy}" > "${SHARED_DIR}/nutanix_no_proxy"
 chmod 600 "${SHARED_DIR}/hcp-agent-nutanix.iso"
