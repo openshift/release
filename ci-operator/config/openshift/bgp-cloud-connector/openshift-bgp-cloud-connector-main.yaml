@@ -459,6 +459,159 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-azure
+- as: e2e-azure-workload-identity-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        # The administrator's half on a workload identity cluster, as the
+        # Workload identity section of docs/azure-authentication.md in
+        # bgp-cloud-connector describes it: a managed identity for the
+        # operator, trusted for its ServiceAccount, granted what it needs
+        # on the router nodes' interfaces and on the Route Server, and
+        # handed to the operator through its Subscription, where the
+        # console would put it. CCO then writes the operator's secret from
+        # that identity.
+        set -euo pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        tenant="$(jq -er .tenantId "${sp}")"
+        az account set --subscription "${subscription}"
+
+        # One group on a default install: the installer puts the vnet,
+        # and so the subnet the interfaces join, beside the VMs.
+        rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
+        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
+        if [[ "${rg}" != "${net_rg}" ]]; then
+          echo "the cluster spans ${rg} and ${net_rg}; this step grants one group" >&2
+          exit 1
+        fi
+
+        ns=openshift-bgp-cloud-connector
+        sa=openshift-bgp-cloud-connector-controller-manager
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')"
+        identity="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')-bgp-cloud-connector"
+
+        az identity create -g "${rg}" -n "${identity}" --output none
+        client_id="$(az identity show -g "${rg}" -n "${identity}" --query clientId -o tsv)"
+        principal_id="$(az identity show -g "${rg}" -n "${identity}" --query principalId -o tsv)"
+        az identity federated-credential create -g "${rg}" --identity-name "${identity}" \
+          --name bgp-cloud-connector --issuer "${issuer}" \
+          --subject "system:serviceaccount:${ns}:${sa}" --audiences openshift --output none
+        echo "created ${identity}, trusted for ${ns}/${sa}"
+
+        # The CI principal is refused roleDefinitions/write, so the role is
+        # built-in. Azure Red Hat OpenShift Network Operator holds what an
+        # interface write checks here and nothing beyond it:
+        # networkInterfaces/read and /write, the subnet and backend pool
+        # joins, and vnet, backend pool and VM reads. The Route Server does
+        # not exist until the test step creates it; the test grants Network
+        # Contributor on it there (hack/azure/grant-route-server-role.sh in
+        # bgp-cloud-connector), since no narrower built-in role covers its
+        # BGP connections.
+        role="Azure Red Hat OpenShift Network Operator"
+        echo "${principal_id}" >"${SHARED_DIR}/route-server-assignee"
+
+        # A role assignment to a principal created seconds ago fails with
+        # PrincipalNotFound until the principal has replicated.
+        scope="/subscriptions/${subscription}/resourceGroups/${rg}"
+        for attempt in $(seq 1 18); do
+          if az role assignment create --assignee-object-id "${principal_id}" \
+               --assignee-principal-type ServicePrincipal --role "${role}" \
+               --scope "${scope}" --output none 2>"${AZURE_CONFIG_DIR}/err"; then
+            echo "assigned ${role} over ${rg}"
+            break
+          fi
+          if (( attempt == 18 )); then
+            echo "could not assign ${role} over ${rg}:" >&2
+            redact <"${AZURE_CONFIG_DIR}/err" | head -5 >&2
+            exit 1
+          fi
+          sleep 20
+        done
+
+        subscription_object="$(oc -n "${ns}" get subscription.operators.coreos.com -o name | head -1)"
+        oc -n "${ns}" patch "${subscription_object}" --type=merge -p "$(jq -nc \
+          --arg c "${client_id}" --arg t "${tenant}" --arg s "${subscription}" \
+          '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')"
+        echo "handed the identity to the operator through ${subscription_object}"
+
+        # OLM rewrites the deployment from the Subscription; wait for the
+        # identity to reach it, then for the new pod.
+        deadline=$((SECONDS + 300))
+        until oc -n "${ns}" get deployment openshift-bgp-cloud-connector-controller-manager \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].env[?(@.name=="CLIENTID")].value}' \
+                | grep -q .; do
+          if (( SECONDS >= deadline )); then
+            echo "the Subscription's identity never reached the deployment" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: ROUTE_SERVER_ASSIGNEE="$(<"${SHARED_DIR}/route-server-assignee")"
+        hack/ci-e2e-azure.sh
+      from: e2e-runner
+      grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - always_run: false
   as: e2e-gcp-operator
   optional: true
