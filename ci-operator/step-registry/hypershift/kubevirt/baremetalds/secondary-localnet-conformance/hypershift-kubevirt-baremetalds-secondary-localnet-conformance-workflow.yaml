@@ -1,13 +1,14 @@
 workflow:
   as: hypershift-kubevirt-baremetalds-secondary-localnet-conformance
   documentation: |-
-    Bare-metal dual-stack management cluster with a KubeVirt hosted cluster
-    whose single localnet network is bridged to a secondary interface
-    (created by baremetalds-devscripts-conf-extranetwork) instead of the
-    primary br-ex.  VMs use ATTACH_DEFAULT_NETWORK=localnet-multi with
-    LOCALNET_MULTI_NETWORK_COUNT=1.  The secondary OVS bridge isolates
-    guest traffic from the management network, avoiding the IPv6 dual-stack
-    issues present on br-ex.
+    Bare-metal dual-stack management cluster with an IPv4-only KubeVirt
+    hosted cluster whose single localnet network is bridged to a secondary
+    interface (created by baremetalds-devscripts-conf-extranetwork) instead
+    of the primary br-ex.  VMs use ATTACH_DEFAULT_NETWORK=localnet-multi
+    with LOCALNET_MULTI_NETWORK_COUNT=1.  The hosted cluster is IPv4-only
+    because the secondary bridge carries only IPv4 traffic; the management
+    cluster remains dual-stack (DEVSCRIPTS_CONFIG IP_STACK=v4v6).  The
+    secondary OVS bridge isolates guest traffic from the management network.
   steps:
     env:
       DEBUG_WAIT_TIMEOUT: "0"
@@ -24,7 +25,7 @@ workflow:
       LOCALNET_SECONDARY_PHYSNET: physnet-localnet
       LOCALNET_SECONDARY_ENABLE_FORWARDING: "true"
       LOCALNET_SECONDARY_DNSMASQ_ENABLED: "true"
-      LOCALNET_SECONDARY_DNSMASQ_GATEWAY: "192.168.221.1"
+      LOCALNET_SECONDARY_DNSMASQ_GATEWAY: "auto"
       LOCALNET_SECONDARY_DNSMASQ_DNS: "192.168.111.1"
       LOCALNET_SECONDARY_DNSMASQ_RANGE_START: "192.168.221.130"
       LOCALNET_SECONDARY_DNSMASQ_RANGE_END: "192.168.221.252"
@@ -42,7 +43,7 @@ workflow:
       CLOUD_PROVIDER: "kubevirt"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.20
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
-      IP_STACK: v4v6
+      IP_STACK: v4
       EXTRA_NETWORK_CONFIG: |
         EXTRA_NETWORK_NAMES="extranet"
         EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'

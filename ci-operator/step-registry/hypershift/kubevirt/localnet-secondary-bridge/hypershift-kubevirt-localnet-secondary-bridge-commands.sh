@@ -186,6 +186,64 @@ echo "  bridge:  ${LOCALNET_SECONDARY_BRIDGE}"
 echo "  physnet: ${LOCALNET_SECONDARY_PHYSNET}"
 
 # ---------------------------------------------------------------------------
+# Cross-subnet routing: each management node routes traffic between the
+# secondary network (e.g. 192.168.221.0/24 on br-localnet) and the primary
+# management network (e.g. 192.168.111.0/24 on br-ex).  The hypervisor
+# (libvirt host) does NOT forward between its bridges, so each node acts as
+# its own gateway.
+#
+# Required fixes:
+# 1. rp_filter=2 (loose) — strict reverse-path filtering drops packets from
+#    the secondary subnet arriving on br-ex because the reverse route goes
+#    via the secondary bridge.
+# 2. MASQUERADE — source-NAT traffic from the secondary subnet going out
+#    br-ex.  Return traffic then arrives back at this node.
+# ---------------------------------------------------------------------------
+if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
+  echo ""
+  echo "Configuring cross-subnet routing on each node..."
+
+  routing_setup_b64=$(base64 -w0 <<'ROUTING_SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+bridge="$1"
+subnet="$2"
+
+sysctl -w "net.ipv4.conf.br-ex.rp_filter=2" >/dev/null
+sysctl -w "net.ipv4.conf.${bridge}.rp_filter=2" >/dev/null
+sysctl -w "net.ipv4.conf.all.rp_filter=0" >/dev/null
+echo "  rp_filter: loose mode on br-ex and ${bridge}"
+
+if ! iptables -t nat -C POSTROUTING -s "${subnet}" -o br-ex -j MASQUERADE 2>/dev/null; then
+  iptables -t nat -A POSTROUTING -s "${subnet}" -o br-ex -j MASQUERADE
+  echo "  MASQUERADE: added ${subnet} -> br-ex"
+else
+  echo "  MASQUERADE: rule already exists"
+fi
+ROUTING_SCRIPT_EOF
+  )
+
+  for node_name in "${nodes[@]}"; do
+    echo "  ${node_name}:"
+    routing_ok=false
+    for attempt in 1 2 3; do
+      if oc debug "node/${node_name}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${routing_setup_b64}' | base64 -d | bash -s -- '${LOCALNET_SECONDARY_BRIDGE}' '${LOCALNET_SECONDARY_SUBNET}'"
+      then
+        routing_ok=true
+        break
+      fi
+      echo "    oc debug failed (attempt ${attempt}/3), retrying..." >&2
+      sleep 5
+    done
+    if [[ "${routing_ok}" != "true" ]]; then
+      echo "WARNING: routing setup failed on ${node_name}" >&2
+    fi
+  done
+  echo "Cross-subnet routing configured"
+fi
+
+# ---------------------------------------------------------------------------
 # When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, deploy dnsmasq on br-localnet
 # on each management node to provide DHCP to guest VMs.
 #
@@ -199,7 +257,7 @@ if [[ "${LOCALNET_SECONDARY_DNSMASQ_ENABLED:-false}" == "true" ]]; then
   echo ""
   echo "Setting up dnsmasq on ${LOCALNET_SECONDARY_BRIDGE} on each node..."
 
-  DNSMASQ_GATEWAY="${LOCALNET_SECONDARY_DNSMASQ_GATEWAY:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_GATEWAY="${LOCALNET_SECONDARY_DNSMASQ_GATEWAY:-auto}"
   DNSMASQ_DNS="${LOCALNET_SECONDARY_DNSMASQ_DNS:?required when DNSMASQ_ENABLED=true}"
   DNSMASQ_RANGE_START="${LOCALNET_SECONDARY_DNSMASQ_RANGE_START:?required when DNSMASQ_ENABLED=true}"
   DNSMASQ_RANGE_END="${LOCALNET_SECONDARY_DNSMASQ_RANGE_END:?required when DNSMASQ_ENABLED=true}"
@@ -227,7 +285,8 @@ if [[ "${LOCALNET_SECONDARY_DNSMASQ_ENABLED:-false}" == "true" ]]; then
 
   # Base64-encoded setup script run inside chroot /host on each node.
   # Configures dnsmasq as a systemd service that provides DHCP-only (port=0)
-  # on the secondary OVS bridge.
+  # on the secondary OVS bridge.  Also blocks the hypervisor's competing DHCP
+  # server via an OVS flow rule and auto-detects the gateway when set to "auto".
   dnsmasq_setup_b64=$(base64 -w0 <<'DNSMASQ_SCRIPT_EOF'
 #!/bin/bash
 set -euo pipefail
@@ -243,6 +302,37 @@ unit="/etc/systemd/system/localnet-secondary-dnsmasq.service"
 if ! ip link show "${bridge}" &>/dev/null; then
   echo "Bridge ${bridge} not present on this node; skipping dnsmasq"
   exit 0
+fi
+
+# Auto-detect gateway: use the node's own bridge IP.  Traffic to management
+# VIPs (API, ingress) is delivered locally via the kernel's local routing
+# table; other management-network traffic goes via br-ex with MASQUERADE.
+if [[ "${gateway}" == "auto" ]]; then
+  gateway=$(ip -o -4 addr show dev "${bridge}" 2>/dev/null \
+    | awk '{print $4}' | cut -d/ -f1 | head -1)
+  if [[ -z "${gateway}" ]]; then
+    echo "ERROR: could not auto-detect gateway on ${bridge}"
+    exit 1
+  fi
+  echo "Auto-detected gateway: ${gateway}"
+fi
+
+# Block competing DHCP from the hypervisor's dnsmasq / libvirt by dropping
+# DHCP server responses (UDP src=67 dst=68) arriving from the physical NIC
+# port on the OVS bridge.  Management nodes have static IPs, so this only
+# prevents the hypervisor from racing with our dnsmasq for guest VM DHCP.
+nic_port=$(ovs-vsctl list-ports "${bridge}" 2>/dev/null | head -1)
+if [[ -n "${nic_port}" ]]; then
+  nic_ofport=$(ovs-vsctl get Interface "${nic_port}" ofport 2>/dev/null || echo "")
+  if [[ -n "${nic_ofport}" && "${nic_ofport}" != "-1" ]]; then
+    ovs-ofctl add-flow "${bridge}" \
+      "priority=100,udp,in_port=${nic_ofport},tp_src=67,tp_dst=68,actions=drop"
+    echo "Blocked hypervisor DHCP on ${bridge} (NIC=${nic_port}, ofport=${nic_ofport})"
+  else
+    echo "WARNING: could not determine ofport for ${nic_port}, hypervisor DHCP not blocked"
+  fi
+else
+  echo "WARNING: no NIC port found on ${bridge}, hypervisor DHCP not blocked"
 fi
 
 mkdir -p /etc/dnsmasq.d
