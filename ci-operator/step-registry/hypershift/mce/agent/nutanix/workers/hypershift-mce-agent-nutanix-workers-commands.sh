@@ -154,7 +154,7 @@ if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX
   exit 1
 fi
 
-for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=RequirementsMet --timeout=20m; done
+for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=Validated --timeout=20m; done
 
 map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
 : > "$map_file"
@@ -201,6 +201,7 @@ oc patch nodepool "$CLUSTER_NAME" -n local-cluster --type=merge -p "$nodepool_se
 for agent in $agents; do
   oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p '{"spec":{"approved":true}}'
 done
+for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=RequirementsMet --timeout=20m; done
 
 oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas="$NUTANIX_WORKERS"
 oc wait agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
