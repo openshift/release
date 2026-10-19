@@ -40,7 +40,7 @@ _junit_emit_safe() {
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="lp-interop--ACM--OPP--product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
