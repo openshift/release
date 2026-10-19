@@ -53,6 +53,7 @@ create_work_directories() {
   REPORT_DIR="${ARTIFACT_DIR}/ibi-replacement-preinstall"
   HTTP_SUBDIR="${TEMP_DIR##*/}"
   mkdir -p "${REPORT_DIR}"
+  printf '%s\n' "${WORK_DIR}/report" > "${SHARED_DIR}/ibi-rp-preinstall_replacement-dir"
 }
 
 configure_ssh() {
@@ -102,9 +103,17 @@ verify_installer_version() {
 }
 
 verify_seed_image() {
+  # Consume only the seed and Git revision verified by the mirror step.
+  test -s "${SHARED_DIR}/ibi-seed-digest"
+  test -s "${SHARED_DIR}/ibi-seed-git-revision"
+  SEED_DIGEST=$(<"${SHARED_DIR}/ibi-seed-digest")
+  GIT_REVISION=$(<"${SHARED_DIR}/ibi-seed-git-revision")
+  [[ "$SEED_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+  [[ "$GIT_REVISION" =~ ^[a-f0-9]{40}$ ]]
+  SEED_IMAGE="${MIRROR_REGISTRY}/ibu/seed@${SEED_DIGEST}"
   local digest
   digest=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
-    "bash -s -- '${SEED_HUB_KUBECONFIG}' '${MIRROR_REGISTRY}/ibu/seed:${VERSION}' '${SEED_VERSION}'" <<'REMOTE'
+    "bash -s -- '${SEED_HUB_KUBECONFIG}' '${SEED_IMAGE}' '${SEED_VERSION}'" <<'REMOTE'
 set +x
 set -euo pipefail
 umask 077
@@ -121,11 +130,11 @@ jq -er '.Digest' <<<"$metadata"
 REMOTE
   )
   [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
-  SEED_IMAGE="${MIRROR_REGISTRY}/ibu/seed@${digest}"
+  [[ "$digest" == "$SEED_DIGEST" ]]
 }
 
 prepare_launcher() {
-  local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${ZTP_GIT_BRANCH}/${VERSION}/${SEED_SPOKE_CLUSTER}/clusterinstance"
+  local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${GIT_REVISION}/${VERSION}/${SEED_SPOKE_CLUSTER}/clusterinstance"
   cd /eco-ci-cd
 
   ansible bastion -i "${INVENTORY_PATH}/build-inventory.py" \

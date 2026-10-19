@@ -25,6 +25,14 @@ validate_inputs() {
     echo "Recorded seed version must be a full OpenShift version in the ${VERSION} release family." >&2
     return 1
   fi
+  # Consume only the seed and Git revision verified by the mirror step.
+  test -s "${SHARED_DIR}/ibi-seed-digest"
+  test -s "${SHARED_DIR}/ibi-seed-git-revision"
+  SEED_DIGEST=$(<"${SHARED_DIR}/ibi-seed-digest")
+  GIT_REVISION=$(<"${SHARED_DIR}/ibi-seed-git-revision")
+  [[ "$SEED_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+  [[ "$GIT_REVISION" =~ ^[a-f0-9]{40}$ ]]
+  SEED_IMAGE="${MIRROR_REGISTRY}/ibu/seed@${SEED_DIGEST}"
   TARGET_SPOKE_NAME=$(printf '%s' "${TARGET_SPOKE_CLUSTER}" | tr -d "[]'\" ")
   [[ "${TARGET_SPOKE_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
 }
@@ -45,6 +53,7 @@ create_work_directories() {
   WORK_DIR="/tmp/eco_gotests_ibi_preinstall/${TEMP_DIR##*/}"
   REPORT_DIR="${ARTIFACT_DIR}/ibi-preinstall"
   mkdir -p "${REPORT_DIR}"
+  printf '%s\n' "${WORK_DIR}/report" > "${SHARED_DIR}/ibi-rp-preinstall-dir"
 }
 
 configure_ssh() {
@@ -94,13 +103,13 @@ verify_installer_version() {
 }
 
 prepare_launcher() {
-  local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${ZTP_GIT_BRANCH}/${VERSION}/${TARGET_SPOKE_NAME}/clusterinstance"
+  local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${GIT_REVISION}/${VERSION}/${TARGET_SPOKE_NAME}/clusterinstance"
   cd /eco-ci-cd
   ansible-playbook ./playbooks/ran/ibi-preinstall.yml \
     -i "${INVENTORY_PATH}/build-inventory.py" \
     --tags setup \
     --extra-vars "ibi_hub_kubeconfig=/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig" \
-    --extra-vars "ibi_seed_image=${MIRROR_REGISTRY}/ibu/seed:${VERSION}" \
+    --extra-vars "ibi_seed_image=${SEED_IMAGE}" \
     --extra-vars "ibi_seed_version=${SEED_VERSION}" \
     --extra-vars "ibi_preinstall_registry=${MIRROR_REGISTRY}" \
     --extra-vars "ibi_cluster_instance_url=${site_config_url}/clusterinstance.yaml" \

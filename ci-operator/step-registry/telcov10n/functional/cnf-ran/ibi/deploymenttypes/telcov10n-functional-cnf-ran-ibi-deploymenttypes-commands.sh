@@ -62,6 +62,7 @@ create_work_directories() {
   SPOKE_KUBECONFIG="/tmp/${TEMP_DIR##*/}-kubeconfig"
   REPORT_DIR="${ARTIFACT_DIR}/ibi-deploymenttypes"
   mkdir -p "${REPORT_DIR}"
+  printf '%s\n' "${WORK_DIR}/report" > "${SHARED_DIR}/ibi-rp-ibi-dir"
   printf '%s\n' "${WORK_DIR}/junit" > "${SHARED_DIR}/ibi-deploymenttypes-report-dir"
 }
 
