@@ -1,3 +1,8 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
 build_root:
   project_image:
     dockerfile_literal: |
@@ -29,6 +34,45 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-in-cluster-presubmit
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_NODE_COUNT: "1"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: feast-operator-system,test-ns-feast,test-ns-remote-registry
+      SCANNER_CPU_LIMIT: "2"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+    test:
+    - as: run-tests
+      cli: latest
+      commands: |
+        export RUN_ON_OPENSHIFT_CI=true
+        cd infra/feast-operator
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager
+        make test-e2e
+        make undeploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+
+        make test-previous-version
+        oc delete deployment feast-operator-controller-manager -n feast-operator-system
+
+        make test-upgrade
+      dependencies:
+      - env: FEAST_OPERATOR_CONTROLLER_IMAGE
+        name: feast-operator
+      - env: FEAST_FEATURE_SERVER_IMAGE
+        name: feast-feature-server
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-in-cluster-postsubmit
   postsubmit: true
   steps:
