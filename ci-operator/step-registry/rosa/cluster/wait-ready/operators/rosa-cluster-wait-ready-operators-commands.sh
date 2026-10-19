@@ -102,13 +102,89 @@ function collect_operator_diagnostics() {
   fi
 }
 
-# Return pod lines in CrashLoopBackOff state for an operator namespace
+# Return normalized CrashLoopBackOff container observations for an operator namespace
 function check_crashloop_pods() {
+  set +x
   local operator=$1
   local ns
   ns=$(infer_operator_namespace "${operator}")
-  oc get pods -n "${ns}" --no-headers 2>/dev/null | grep -i "CrashLoopBackOff" || true
+  local remaining=$(( readiness_deadline - $(date +%s) ))
+  (( remaining > 10 )) && remaining=10
+  (( remaining > 0 )) || return 1
+  timeout --kill-after=1s "${remaining}s" oc get pods -n "${ns}" --request-timeout="${remaining}s" -o json 2>/dev/null |
+    head -c 1048576 | jq -ce '
+      if (.items | type) != "array" then error("missing pod list") else . end |
+      [.items[] |
+        .metadata as $pod |
+        ((.status.initContainerStatuses // []) + (.status.containerStatuses // []) +
+          (.status.ephemeralContainerStatuses // [])) as $statuses |
+        if ($statuses | length) == 0 then error("missing container status") else $statuses[] end |
+        select(.state.waiting.reason == "CrashLoopBackOff") |
+        if ($pod.uid | type) != "string" or ($pod.name | type) != "string" or
+          (.name | type) != "string" or (.restartCount | type) != "number" or .restartCount < 0
+        then error("incomplete crash status") else
+          {uid: $pod.uid, pod: $pod.name, container: .name, restarts: .restartCount,
+           containerID: (.containerID // ""),
+           finishedAt: (.lastState.terminated.finishedAt // ""),
+           exitCode: .lastState.terminated.exitCode, signal: .lastState.terminated.signal,
+           oomKilled: (.lastState.terminated.reason == "OOMKilled")}
+        end] | sort_by(.uid, .container)'
 }
+
+function crash_diagnostic_command() {
+  local remaining=$(( readiness_deadline - $(date +%s) ))
+  local budget=$(( diagnostic_deadline - $(date +%s) ))
+  (( remaining > budget )) && remaining=${budget}
+  (( remaining > 5 )) && remaining=5
+  (( remaining > 0 )) || return 1
+  timeout --kill-after=1s "${remaining}s" oc "$@" --request-timeout="${remaining}s" 2>/dev/null
+}
+
+function collect_crash_diagnostics() (
+  set +x
+  local operator=$1
+  local crashes=$2
+  local destination=$3
+  local ns
+  ns=$(infer_operator_namespace "${operator}")
+  mkdir -p "${destination}" || return 0
+  printf '%s\n' "${crashes}" | jq -c '
+    [.[:4][] | {index: null, restarts, waitingReason: "CrashLoopBackOff",
+      lastTermination: {finishedAt: (if (.finishedAt | type) == "string" and
+          (.finishedAt | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"))
+          then .finishedAt else null end),
+        exitCode: (if (.exitCode | type) == "number" then .exitCode else null end),
+        signal: (if (.signal | type) == "number" then .signal else null end), oomKilled}}] |
+    to_entries | map(.value + {index: .key})' | head -c 65536 > "${destination}/status.json" || true
+  if ! crash_diagnostic_command get events -n "${ns}" --field-selector=type=Warning -o json |
+      head -c 1048576 | jq -c '
+        [.items | sort_by(.lastTimestamp // .eventTime // "") | .[-10:][] |
+          {reason: (if .reason == "BackOff" or .reason == "Unhealthy" or .reason == "Killing"
+            then .reason else "Other" end), count: (if (.count | type) == "number" then .count else null end)}]' |
+      head -c 65536 > "${destination}/events.json"; then
+    printf '%s\n' '{"unavailable":true}' > "${destination}/events.json"
+  fi
+  local pod container index=0 previous
+  while IFS=$'\t' read -r pod container; do
+    [[ -n "${pod}" && -n "${container}" ]] || continue
+    for previous in previous current; do
+      local previous_flag=()
+      [[ "${previous}" == previous ]] && previous_flag=(--previous)
+      if ! crash_diagnostic_command logs "${pod}" -n "${ns}" -c "${container}" \
+          "${previous_flag[@]}" --tail=100 --limit-bytes=16384 |
+          head -c 16384 | LC_ALL=C awk '
+            { label="[content omitted]" }
+            /panic:/ { label="panic: [content omitted]" }
+            /fatal error:/ { label="fatal error: [content omitted]" }
+            /segmentation fault/ { label="segmentation fault: [content omitted]" }
+            { print NR ": " label }' | head -c 16384 > "${destination}/container-${index}-${previous}.log"; then
+        printf '%s\n' '[log unavailable or truncated]' > "${destination}/container-${index}-${previous}.log"
+      fi
+    done
+    index=$((index + 1))
+  done < <(printf '%s\n' "${crashes}" | jq -r '.[:4][] | [.pod, .container] | @tsv')
+  return 0
+)
 
 # ---------------------------------------------------------------------------
 # wait_for_operator_condition
@@ -138,7 +214,10 @@ function wait_for_operator_condition() {
   local stall_start_time=${start_time}
   local iteration=0
   local crashloop_consecutive=0
-  local previous_crashloop_operators=""
+  local previous_crashloop_state=""
+  local readiness_deadline=$(( start_time + timeout ))
+  local diagnostic_budget=40 diagnostic_deadline=0
+  local diagnostic_captures=0
 
   log "Waiting for cluster operators: ${condition}=${desired_value} (timeout: $(( timeout / 60 ))m, poll: ${poll_interval}s)"
 
@@ -159,6 +238,8 @@ function wait_for_operator_condition() {
     # ---- Fetch cluster operator state ----
     local co_json
     co_json=$(oc get clusteroperators -o json 2>/dev/null) || {
+      previous_crashloop_state=""
+      crashloop_consecutive=0
       log "WARNING: Failed to query clusteroperators, will retry in ${poll_interval}s..."
       sleep "${poll_interval}"
       continue
@@ -244,27 +325,38 @@ function wait_for_operator_condition() {
     fi
 
     # ---- Early exit: CrashLoopBackOff with no restart progress ----
-    local crashloop_operators=""
+    local crashloop_operators="" crashloop_state="" crashloop_queries_ok=true
     while IFS= read -r op; do
       [[ -z "${op}" ]] && continue
       local clb
-      clb=$(check_crashloop_pods "${op}")
-      if [[ -n "${clb}" ]]; then
+      if ! clb=$(check_crashloop_pods "${op}"); then
+        crashloop_queries_ok=false
+        log "  WARNING: Pod crash status unavailable for operator '${op}'; not evidence of restart stagnation"
+        continue
+      fi
+      if [[ "${clb}" != '[]' ]]; then
         crashloop_operators="${crashloop_operators}${op},"
-        log "  WARNING: CrashLoopBackOff detected in operator '${op}':"
-        while IFS= read -r pod_line; do
-          log "    ${pod_line}"
-        done <<< "${clb}"
+        crashloop_state="${crashloop_state}${op}:${clb}"
+        log "  WARNING: CrashLoopBackOff detected in operator '${op}' (restart activity is not readiness)"
+        if (( diagnostic_captures < 8 && diagnostic_budget > 0 )); then
+          diagnostic_captures=$((diagnostic_captures + 1))
+          local capture_start
+          capture_start=$(date +%s)
+          diagnostic_deadline=$(( capture_start + diagnostic_budget ))
+          collect_crash_diagnostics "${op}" "${clb}" \
+            "${ARTIFACT_DIR}/crash-${condition}-${iteration}-${diagnostic_captures}" || true
+          diagnostic_budget=$(( diagnostic_budget - $(date +%s) + capture_start ))
+        fi
       fi
     done <<< "${not_ready_operators}"
 
-    if [[ -n "${crashloop_operators}" ]]; then
-      if [[ "${crashloop_operators}" == "${previous_crashloop_operators}" ]]; then
+    if [[ -n "${crashloop_operators}" && "${crashloop_queries_ok}" == true ]]; then
+      if [[ "${crashloop_state}" == "${previous_crashloop_state}" ]]; then
         crashloop_consecutive=$((crashloop_consecutive + 1))
       else
         crashloop_consecutive=1
-        previous_crashloop_operators="${crashloop_operators}"
       fi
+      previous_crashloop_state="${crashloop_state}"
 
       if (( crashloop_consecutive >= 2 )); then
         local affected="${crashloop_operators%,}"
@@ -278,7 +370,7 @@ function wait_for_operator_condition() {
       fi
     else
       crashloop_consecutive=0
-      previous_crashloop_operators=""
+      previous_crashloop_state=""
     fi
 
     # ---- Periodic artifact snapshots (every 5 iterations) ----
