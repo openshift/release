@@ -82,6 +82,28 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 
 typeset reportStatus=0
 cp -r reports "${ARTIFACT_DIR}/" || reportStatus=$?
+
+# ── JUnit validation gate ──────────────────────────────────────────────
+# When the Cypress runner exits 0 the test may still contain JUnit-level
+# failures or errors.  Surface them so downstream steps can trust clcStatus.
+if (( clcStatus == 0 )); then
+    typeset -a junitFailures=()
+    while IFS= read -r -d '' xmlFile; do
+        if grep -qE '<failure|<error' "${xmlFile}"; then
+            junitFailures+=("${xmlFile}")
+        fi
+    done < <(find "${ARTIFACT_DIR}/" -name 'junit*.xml' -print0 2>/dev/null)
+
+    if (( ${#junitFailures[@]} > 0 )); then
+        echo "ERROR: JUnit failures detected while clcStatus was 0; overriding to 1" 1>&2
+        for f in "${junitFailures[@]}"; do
+            echo "  - ${f}" 1>&2
+        done
+        clcStatus=1
+    fi
+fi
+# ── End JUnit validation gate ──────────────────────────────────────────
+
 if (( clcStatus != 0 )); then
     exit "${clcStatus}"
 fi

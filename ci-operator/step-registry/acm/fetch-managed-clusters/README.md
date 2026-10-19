@@ -25,6 +25,7 @@ To gather information about the managed clusters that are created as a result of
 - "advanced-cluster-management" operator installed (see [`install-operators`](../../../step-registry/install-operators/README.md)).
 - MCH custom resource installed (see [acm-mch step](../mch/README.md))
 - [acm-tests-clc-create-commands.sh](../tests/clc-create/acm-tests-clc-create-commands.sh) needs to successfully have run prior to this running. This is what creates the managed clusters that are being used to gather data from.
+- `acm-tests-clc-smoke` is a supported predecessor **only when its JUnit contract passes**. The fetch step checks `${SHARED_DIR}/junit/` for JUnit failure indicators (produced by the CLC smoke step's `_propagate_junit` EXIT trap) before proceeding. If any `<failure` or `<error` elements are found, the fetch step exits early without attempting to gather managed-cluster data. When no JUnit failures are detected, the step waits for the `ManagedCluster` resource to reach `Available=True` (up to 10 minutes) before running the fetch script.
 
 ### Environment Variables
 
