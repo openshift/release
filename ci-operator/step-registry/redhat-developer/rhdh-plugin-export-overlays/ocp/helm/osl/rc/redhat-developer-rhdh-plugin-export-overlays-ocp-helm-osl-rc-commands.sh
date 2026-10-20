@@ -9,7 +9,6 @@ STAGE_REGISTRY="${MIRROR_REGISTRY_DIR}/registry_stage.json"
 WORKDIR=$(mktemp -d)
 CATALOG_NAMESPACE=openshift-marketplace
 LOGIC_CATALOG=osl-rc-logic
-readonly TEST_GREP='(Run Greeting workflow and verify Workflows tab|Run Failswitch workflow and verify statuses|Rerun Failswitch from failure point)$'
 
 trap 'rm -rf "${WORKDIR}"' EXIT
 
@@ -371,7 +370,11 @@ if [[ "$(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)" != "${
 fi
 cd "${WORKDIR}/rhdh-plugin-export-overlays"
 TEST_EXIT=0
-LOKI_ALLOW_PLACEHOLDER=true bash ./run-e2e.sh -w orchestrator --workers=1 --grep "${TEST_GREP}" || TEST_EXIT=$?
+oc create serviceaccount tester-sa-2 -n default 2>/dev/null || true
+oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2 >/dev/null
+export AUTH_TOKEN
+AUTH_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
+bash ./run-e2e.sh -w orchestrator --workers=1 || TEST_EXIT=$?
 
 if [[ -d playwright-report && -n "${ARTIFACT_DIR:-}" ]]; then
     cp -a playwright-report "${ARTIFACT_DIR}/"
@@ -380,8 +383,8 @@ if [[ ! -s playwright-report/results.json ]]; then
     echo "ERROR: Playwright did not create playwright-report/results.json (test exit ${TEST_EXIT})" >&2
     exit 1
 fi
-if ! jq -e '.stats.expected == 3 and .stats.unexpected == 0 and .stats.flaky == 0 and .stats.skipped == 0' playwright-report/results.json >/dev/null; then
-    echo "ERROR: expected 3 tests, 0 unexpected, 0 flaky, and 0 skipped; got $(jq -c '{expected: .stats.expected, unexpected: .stats.unexpected, flaky: .stats.flaky, skipped: .stats.skipped}' playwright-report/results.json)" >&2
+if ! jq -e '.stats.expected == 29 and .stats.unexpected == 0 and .stats.flaky == 0 and .stats.skipped == 2' playwright-report/results.json >/dev/null; then
+    echo "ERROR: expected 29 tests, 0 unexpected, 0 flaky, and 2 intentional skips; got $(jq -c '{expected: .stats.expected, unexpected: .stats.unexpected, flaky: .stats.flaky, skipped: .stats.skipped}' playwright-report/results.json)" >&2
     exit 1
 fi
 exit "${TEST_EXIT}"

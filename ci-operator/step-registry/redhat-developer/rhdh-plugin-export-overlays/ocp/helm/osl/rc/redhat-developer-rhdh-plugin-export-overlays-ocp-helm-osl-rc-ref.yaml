@@ -57,17 +57,13 @@ ref:
     Candidate Logic images referenced from registry.redhat.io are mirrored to
     the matching Brew rh-osbs images named in the OSL release email.
 
-    Always runs these three upstream Orchestrator tests with one worker:
-    - Run Greeting workflow and verify Workflows tab
-    - Run Failswitch workflow and verify statuses
-    - Rerun Failswitch from failure point
-    Requires all three to pass, with no failures, skips, or flakes.
+    Runs the full default Orchestrator E2E project with one worker. The suite
+    currently has 31 tests: 29 must pass, while the Kafka nightly-only test and
+    the known RHIDP-11839 product-bug test are intentional skips. No failures
+    or flakes are allowed.
 
-    For this PR validation, the test checkout is pinned to the trusted
-    rostalan/rhdh-plugin-export-overlays fork commit ea9243d5e39394ebf02d46b4f65e24a31ddfb9cc,
-    with Loki placeholder mode enabled because these three tests do not query Loki.
-    Restore the upstream checkout and required Loki authentication before landing
-    this CI step for ongoing use.
+    The job creates the same short-lived cluster-admin tester-sa-2 token used by
+    the standard RHDH E2E jobs and exposes it as AUTH_TOKEN for Loki queries.
 
     Credentials are mounted from openshift-qe/mirror-registry at
     /var/run/vault/mirror-registry and must provide registry_brew.json and
