@@ -176,6 +176,31 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: openshift-e2e-gcp-csi-filestore
+- always_run: false
+  as: tls-groups-scanner-gcp-filestore
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: gcp-filestore-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+      TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-gcp-csi-filestore
 zz_generated_metadata:
   branch: main
   org: openshift
