@@ -73,7 +73,7 @@ successfully.
 ### Presubmit — Vertex AI provider (Gemini or Anthropic)
 
 ```yaml
-- as: mcpchecker-eval-google
+- as: mcpchecker-eval-google-core
   optional: true
   steps:
     cluster_profile: openshift-org-aws
