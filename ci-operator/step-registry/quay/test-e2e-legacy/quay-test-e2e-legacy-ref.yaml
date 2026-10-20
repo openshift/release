@@ -12,13 +12,16 @@ ref:
       memory: 4Gi
   timeout: 1h30m0s
   grace_period: 15m0s
-  credentials:
-  - collection: quay-tests
-    group: quay
-    mount_path: /var/run/quay-qe-quay-secret
   env:
   - name: QUAY_VERSION
     documentation: Quay X.Y under test, passed to the suite as CYPRESS_QUAY_VERSION.
+  - name: QUAY_E2E_LEGACY_SUPERUSER
+    default: quaye2eci
+    documentation: |-
+      Username the step creates and passes to Cypress as CYPRESS_QUAY_USER for
+      specs that sign in with it; the default specs create their own users. It
+      must be listed in the deployed Quay's SUPER_USERS (QUAY_EXTRA_CONFIG of
+      the deploy step).
   - name: E2E_LEGACY_SPECS
     default: "cypress/integration/smoke/SmokeTesting.js"
     documentation: Comma-separated Cypress specs under quay-frontend-tests to run in full.
@@ -36,6 +39,8 @@ ref:
     Run the quay-tests old-UI Cypress smoke spec plus selected quayConsole
     tests (quay-frontend-tests, E2E_LEGACY_SPECS, plus E2E_LEGACY_GREP_SPECS
     filtered by E2E_LEGACY_GREP) against the Quay deployed by a quay-deploy-*
-    step (${SHARED_DIR}/quayroute). JUnit, videos and screenshots go to
-    ${ARTIFACT_DIR}. The step fails when Cypress fails or either run's JUnit
-    output reports zero tests.
+    step (${SHARED_DIR}/quayroute). The step creates the
+    QUAY_E2E_LEGACY_SUPERUSER account with a per-run random password and
+    passes it to Cypress as CYPRESS_QUAY_USER/CYPRESS_QUAY_PASSWORD. JUnit, videos and screenshots go to
+    ${ARTIFACT_DIR}. The step fails when the user cannot be created, Cypress
+    fails, or either run's JUnit output reports zero tests.

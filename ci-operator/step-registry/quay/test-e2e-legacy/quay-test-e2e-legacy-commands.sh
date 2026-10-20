@@ -14,13 +14,27 @@ export CYPRESS_QUAY_ENDPOINT=${QUAY_ROUTE#*://}
 export CYPRESS_QUAY_VERSION=${QUAY_VERSION}
 echo "Quay version under test: ${CYPRESS_QUAY_VERSION}"
 
+# Run as a per-run superuser: QUAY_E2E_LEGACY_SUPERUSER must be in SUPER_USERS.
 # Disable tracing due to password handling
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
-CYPRESS_QUAY_USER=$(cat /var/run/quay-qe-quay-secret/username)
-CYPRESS_QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-export CYPRESS_QUAY_USER CYPRESS_QUAY_PASSWORD
+export CYPRESS_QUAY_USER=${QUAY_E2E_LEGACY_SUPERUSER}
+CYPRESS_QUAY_PASSWORD=$(set +o pipefail; LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 24)
+export CYPRESS_QUAY_PASSWORD
+# Quay's API rejects session POSTs without a CSRF token, so fetch one first.
+cookies=/tmp/quay-cookies.txt
+csrf=$(curl -sk -c "${cookies}" "${QUAY_ROUTE}/csrf_token" | jq -r '.csrf_token // empty' || true)
+code=$(jq -n '{username: env.CYPRESS_QUAY_USER, password: env.CYPRESS_QUAY_PASSWORD,
+  email: (env.CYPRESS_QUAY_USER + "@example.com")}' |
+  curl -sk -o /tmp/create-user.json -w '%{http_code}' -X POST "${QUAY_ROUTE}/api/v1/user/" \
+    -b "${cookies}" -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' --data @- || true)
+rm -f "${cookies}"
 $WAS_TRACING && set -x
+if [[ "${code}" != "200" ]]; then
+  echo "ERROR: creating Quay user ${CYPRESS_QUAY_USER} returned HTTP ${code}: $(cat /tmp/create-user.json 2>/dev/null)" >&2
+  exit 1
+fi
+echo "Created Quay user ${CYPRESS_QUAY_USER}"
 
 cd quay-frontend-tests
 # npm ci rejects quay-tests' package-lock.json (out of sync with package.json).

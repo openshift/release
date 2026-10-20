@@ -591,8 +591,8 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     assert steps["cluster_profile"] == "aws-quay-qe"
     assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
     assert steps["env"]["QUAY_VERSION"] == "3.15"
-    # quay-test-api-legacy creates this user; its superuser tests need it.
-    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici"]
+    # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
+    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
     assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
     assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
     assert [step["ref"] for step in steps["test"]] == [
