@@ -12,26 +12,23 @@ fi
 
 PROXYCFGLINE=
 PROXYLINE=
-if test -f "${SHARED_DIR}/proxy-conf.sh" && [[ "$JOB_NAME" =~ .*ipv6.* ]]
-then
-    # https://issues.redhat.com/browse/OCPBUGS-29478
-    echo "Clusters using a ipv6 are disabled temporarily"
-    exit 0
-    # proxy-conf.sh holds the IPv4 address, we can't use it here
-    PROXYCFGLINE="        proxy_url: http://[fd00:1101::1]:8213"
-    PROXYLINE="          - name: https_proxy
-            value: http://[fd00:1101::1]:8213"
-# Some kinds of jobs need to skip installing loki by default; but to make
-# sure we rightfully skip them, we have two different conditions.
-elif [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-  echo "Clusters using a proxy are not yet supported for loki"
-  exit 0
-# Some kinds of jobs need to skip installing loki by default
-elif [[ "$JOB_NAME" =~ .*ipv6.* ]]
+if [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
   echo "IPv6 clusters are disconnected and won't be able to reach Loki."
   exit 0
+fi
+
+if test -f "${SHARED_DIR}/install-config.yaml"; then
+  CLUSTER_PROXY_URL=$(grep -A4 '^proxy:' "${SHARED_DIR}/install-config.yaml" | grep -m1 'httpsProxy:\|httpProxy:' | awk '{print $2}' || true)
+
+  if [[ -n "${CLUSTER_PROXY_URL}" ]]; then
+    echo "Cluster proxy detected: configuring Loki to use proxy"
+    PROXYCFGLINE="        proxy_url: ${CLUSTER_PROXY_URL}"
+    PROXYLINE="          - name: HTTPS_PROXY
+            value: ${CLUSTER_PROXY_URL}
+          - name: HTTP_PROXY
+            value: ${CLUSTER_PROXY_URL}"
+  fi
 fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
