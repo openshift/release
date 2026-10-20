@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Set cloud-specific defaults
 if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
