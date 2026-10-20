@@ -1,1 +1,30 @@
 {% set playwright_grep_invert = '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration' %}
+{#- Shared Quay config features for every lane (e2e-install and upgrade). A flag
+    added here reaches both lanes. Render under `QUAY_EXTRA_CONFIG: |` with
+    `| indent(8, true)`. -#}
+{% macro quay_extra_config(fips=false, quay_version="") -%}
+FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+FEATURE_USER_METADATA: true
+FEATURE_IMMUTABLE_TAGS: true
+{%- if quay_version | default("") != "3.16" %}
+FEATURE_SPARSE_INDEX: true
+{%- endif %}
+FEATURE_QUOTA_NOTIFICATIONS: true
+FEATURE_EDIT_QUOTA: true
+FEATURE_CHANGE_TAG_EXPIRATION: true
+FEATURE_IMAGE_PULL_STATS: false
+LOG_ARCHIVE_LOCATION: default
+ACTION_LOG_ARCHIVE_LOCATION: default
+SESSION_TIMEOUT: 2h
+DEFAULT_UI: react
+SUPER_USERS:
+  - admin
+GLOBAL_READONLY_SUPER_USERS:
+  - readonly
+{%- if fips %}
+FEATURE_FIPS: true
+{%- endif %}
+{%- if quay_version is defined and quay_version.split(".")[0] | int >= 5 %}
+FEATURE_ROBOT_API_TOKENS: true
+{%- endif %}
+{%- endmacro %}

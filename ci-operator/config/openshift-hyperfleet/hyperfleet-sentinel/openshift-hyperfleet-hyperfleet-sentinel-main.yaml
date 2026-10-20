@@ -25,7 +25,6 @@ images:
           source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-sentinel
     to: podman-test
 prowgen:
-  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -47,14 +46,11 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    make generate
     export HOME=/tmp
     export GOCACHE=/tmp/go-build
     export GOMODCACHE=/tmp/go-mod
     export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export PATH="$(go env GOPATH)/bin:$PATH"
     unset GOFLAGS
-    go install -mod=mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
     make lint
   container:
     from: podman-test
@@ -63,7 +59,6 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    make generate
     make test-unit
   container:
     from: podman-test

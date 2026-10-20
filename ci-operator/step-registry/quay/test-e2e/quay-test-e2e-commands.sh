@@ -4,6 +4,14 @@ set -euo pipefail
 set -x
 
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
+PLAYWRIGHT_ARTIFACT_SUBDIR="${PLAYWRIGHT_ARTIFACT_SUBDIR:-}"
+if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+  if [[ ! "${PLAYWRIGHT_ARTIFACT_SUBDIR}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: PLAYWRIGHT_ARTIFACT_SUBDIR must be a single safe directory name" >&2
+    exit 1
+  fi
+  ARTIFACT_DIR="${ARTIFACT_DIR}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
+fi
 mkdir -p "${ARTIFACT_DIR}"
 
 # Read the Quay route written by the deploy step
@@ -47,6 +55,29 @@ else
   echo "No mailpit_api in SHARED_DIR; email-dependent specs may skip or fail"
 fi
 
+# Upgrade wrappers select different, independently configured suite controls
+# through PLAYWRIGHT_PHASE. Non-upgrade callers keep the original variables.
+PLAYWRIGHT_PHASE="${PLAYWRIGHT_PHASE:-}"
+case "${PLAYWRIGHT_PHASE}" in
+  "") ;;
+  n-minus-one)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_MINUS_ONE_USE_IMAGE_TESTS:-false}"
+    # The per-phase repo defaults to PLAYWRIGHT_GIT_REPO (both upgrade phases clone
+    # the same quay repo), so only the per-phase branch has to be set explicitly.
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_MINUS_ONE_GIT_REPO:-${PLAYWRIGHT_GIT_REPO:-}}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH:-}"
+    ;;
+  n)
+    PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_USE_IMAGE_TESTS:-false}"
+    # Per-phase repo defaults to PLAYWRIGHT_GIT_REPO (see n-minus-one above).
+    PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_GIT_REPO:-${PLAYWRIGHT_GIT_REPO:-}}"
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_GIT_BRANCH:-}"
+    ;;
+  *)
+    echo "ERROR: PLAYWRIGHT_PHASE must be empty, n-minus-one, or n" >&2
+    exit 1
+    ;;
+esac
 PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_USE_IMAGE_TESTS:-false}"
 CLONE_DIR="/tmp/quay-playwright-src"
 if [[ "${PLAYWRIGHT_USE_IMAGE_TESTS}" == "true" ]]; then
@@ -63,34 +94,31 @@ else
 # the pre-image-tests script.
 # The Playwright suite is cloned from PLAYWRIGHT_GIT_REPO at a ref resolved in this
 # order (first match wins):
-#   1. PLAYWRIGHT_GIT_BRANCH        - explicit override from the ci-operator config.
-#   2. ${SHARED_DIR}/playwright_git_ref - ref auto-derived by the deploy step from the
-#      deployed Quay app image's version/release labels (the upstream vX.Y.Z tag when
-#      one matches, otherwise the redhat-X.Y branch), so the suite is version-matched
-#      to the product with no manual upkeep.
-#   3. PLAYWRIGHT_GIT_FALLBACK_BRANCH - last-resort branch so the run still executes
-#      (with a warning) instead of hard-failing when nothing else is available.
-# PLAYWRIGHT_GIT_REPO stays required. The resolved ref may be a branch, tag, or commit
-# SHA; clone_playwright_sources handles each.
+#   1. PLAYWRIGHT_GIT_BRANCH - explicit override from the ci-operator config; the
+#      step fails if it cannot be cloned.
+#   2. The upstream commit recorded in the deployed quay-app image's labels, so the
+#      suite runs from the revision the image under test was built from.
+#   3. PLAYWRIGHT_REF_MODE=derived only: the upstream vX.Y.Z tag matching the image's
+#      version label, else branch redhat-X.Y, else PLAYWRIGHT_GIT_FALLBACK_BRANCH.
+#      PLAYWRIGHT_REF_MODE=strict (product nightlies) fails the step instead: a moving
+#      branch is not the revision under test, and a spec/image skew reads as a
+#      product failure.
 PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_GIT_REPO:-}"
 PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_GIT_BRANCH:-}"
 PLAYWRIGHT_GIT_FALLBACK_BRANCH="${PLAYWRIGHT_GIT_FALLBACK_BRANCH:-redhat-3.18}"
+PLAYWRIGHT_REF_MODE="${PLAYWRIGHT_REF_MODE:-derived}"
+PLAYWRIGHT_REQUIRE_EXPLICIT_REF="${PLAYWRIGHT_REQUIRE_EXPLICIT_REF:-false}"
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "true" && "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" != "false" ]]; then
+  echo "ERROR: PLAYWRIGHT_REQUIRE_EXPLICIT_REF must be true or false" >&2
+  exit 1
+fi
 if [[ -z "${PLAYWRIGHT_GIT_REPO}" ]]; then
   echo "ERROR: PLAYWRIGHT_GIT_REPO must be set" >&2
   exit 1
 fi
-PLAYWRIGHT_REF_IS_DERIVED=false
-if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
-  echo "Using explicitly configured Playwright ref: ${PLAYWRIGHT_GIT_REF}"
-elif [[ -s "${SHARED_DIR}/playwright_git_ref" ]]; then
-  PLAYWRIGHT_GIT_REF="$(cat "${SHARED_DIR}/playwright_git_ref")"
-  PLAYWRIGHT_REF_IS_DERIVED=true
-  echo "Using Playwright ref auto-derived from the deployed image: ${PLAYWRIGHT_GIT_REF}"
-else
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
-  echo "WARNING: no explicit PLAYWRIGHT_GIT_BRANCH and no derived ref in SHARED_DIR;" >&2
-  echo "         falling back to branch ${PLAYWRIGHT_GIT_REF}" >&2
+if [[ "${PLAYWRIGHT_REQUIRE_EXPLICIT_REF}" == "true" && -z "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  echo "ERROR: PLAYWRIGHT_GIT_BRANCH must be explicitly set when PLAYWRIGHT_REQUIRE_EXPLICIT_REF=true" >&2
+  exit 1
 fi
 
 clone_playwright_sources() {
@@ -141,17 +169,147 @@ clone_playwright_sources() {
   rm -f "${archive}"
 }
 
-echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (ref ${PLAYWRIGHT_GIT_REF})"
-if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
-  if [[ "${PLAYWRIGHT_REF_IS_DERIVED}" != true ]]; then
+# Resolve a digest pullspec through the cluster's IDMS/ICSP mirrors, with the
+# original pullspec last. The kubelet reports the quay-app image under its SOURCE
+# pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but a nightly digest is
+# only published in the mirror; CRI-O rewrites the pull, `oc image info` does not.
+# A source matches its own repo and every repo under it: the nightly IDMS source is
+# registry.redhat.io/quay, not the full app repo. node, not jq: the runner image
+# has no jq.
+function mirror_pullspecs() {
+  local pullspec="$1"
+  if [[ "${pullspec}" == *@* ]]; then
+    # One get per kind: a combined get fails whole when either kind is not served.
+    local kind
+    for kind in imagecontentsourcepolicies imagedigestmirrorsets; do
+      oc get "${kind}" -o json 2>/dev/null \
+        | node -e '
+            const [repo, digest] = process.argv.slice(1);
+            for (const item of JSON.parse(require("fs").readFileSync(0, "utf8")).items || []) {
+              const spec = item.spec || {};
+              for (const m of spec.repositoryDigestMirrors || spec.imageDigestMirrors || []) {
+                if (repo !== m.source && !repo.startsWith(`${m.source}/`)) continue;
+                for (const mirror of m.mirrors || []) {
+                  console.log(`${mirror}${repo.slice(m.source.length)}@${digest}`);
+                }
+              }
+            }' "${pullspec%@*}" "${pullspec#*@}" 2>/dev/null || true
+    done
+  fi
+  printf '%s\n' "${pullspec}"
+}
+
+PW_SHA_LABELS=(io.openshift.build.commit.id vcs-ref org.opencontainers.image.revision)
+PW_IMAGE=none
+PW_LABEL=none
+declare -A PW_LABELS=()
+
+# Clone the upstream commit recorded in the deployed quay-app image's labels. ART
+# builds from the openshift-priv mirror of quay/quay, so its commit label is an
+# upstream sha; a midstream sha (older Konflux builds) fails the fetch and the next
+# label is tried. Returns non-zero when no label sha is fetchable.
+function resolve_playwright_ref() {
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  local app_img authfile errfile candidate info="" key value sha tried=" " was_tracing
+  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
+    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  if [[ -z "${app_img}" ]]; then
+    echo "WARNING: could not determine the deployed quay-app imageID" >&2
+    return 1
+  fi
+  PW_IMAGE="${app_img#*@}"
+  echo "Deployed Quay app image: ${app_img}"
+  # Disable tracing due to pull-secret handling
+  [[ $- == *x* ]] && was_tracing=true || was_tracing=false
+  set +x
+  authfile=$(mktemp)
+  errfile=$(mktemp)
+  oc get secret/pull-secret -n openshift-config \
+    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  # stderr stays out of ${info}: a warning on the success path would corrupt the JSON.
+  for candidate in $(mirror_pullspecs "${app_img}"); do
+    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
+                --registry-config="${authfile}" -o json 2>"${errfile}"); then
+      echo "Read deployed image metadata from ${candidate}"
+      break
+    fi
+    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")"
+    info=""
+  done
+  rm -f "${authfile}" "${errfile}"
+  $was_tracing && set -x
+  if [[ -z "${info}" ]]; then
+    echo "WARNING: deployed image ${PW_IMAGE} is not readable from any configured mirror" >&2
+    return 1
+  fi
+  while IFS='=' read -r key value; do
+    PW_LABELS["${key}"]="${value}"
+    echo "Deployed image label ${key}='${value}'"
+  done < <(node -e '
+      const labels = JSON.parse(require("fs").readFileSync(0, "utf8")).config?.config?.Labels || {};
+      for (const k of process.argv.slice(1)) console.log(`${k}=${labels[k] ?? ""}`);' \
+    io.openshift.build.commit.id io.openshift.build.commit.url io.openshift.build.source-location \
+    vcs-ref org.opencontainers.image.revision version release <<<"${info}")
+  for key in "${PW_SHA_LABELS[@]}"; do
+    sha="${PW_LABELS[${key}]:-}"
+    [[ "${sha}" =~ ^[0-9a-f]{40}$ && "${tried}" != *" ${sha} "* ]] || continue
+    tried+="${sha} "
+    if clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${sha}" "${CLONE_DIR}"; then
+      PLAYWRIGHT_GIT_REF="${sha}"
+      PW_LABEL="${key}"
+      echo "Playwright source: ${sha} from label ${key} of ${PW_IMAGE}"
+      return 0
+    fi
+    echo "WARNING: ${sha} from label ${key} is not fetchable from ${PLAYWRIGHT_GIT_REPO}" >&2
+  done
+  return 1
+}
+
+if [[ -n "${PLAYWRIGHT_GIT_BRANCH}" ]]; then
+  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_BRANCH}"
+  echo "Cloning Playwright tests from ${PLAYWRIGHT_GIT_REPO} (explicitly configured ref ${PLAYWRIGHT_GIT_REF})"
+  if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
     echo "ERROR: failed to clone ${PLAYWRIGHT_GIT_REPO} at ${PLAYWRIGHT_GIT_REF}" >&2
     exit 1
   fi
-  echo "WARNING: derived ref ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
-  echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
-  PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
-  clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+elif ! resolve_playwright_ref; then
+  if [[ "${PLAYWRIGHT_REF_MODE}" == "strict" ]]; then
+    labels=""
+    for key in "${PW_SHA_LABELS[@]}"; do labels+=" ${key}='${PW_LABELS[${key}]:-}'"; done
+    echo "ERROR: no label sha of deployed image ${PW_IMAGE} is fetchable from ${PLAYWRIGHT_GIT_REPO} (${labels# }); PLAYWRIGHT_REF_MODE=strict never falls back to a branch" >&2
+    exit 1
+  fi
+  version="${PW_LABELS[version]:-}"
+  release="${PW_LABELS[release]:-}"
+  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+     && git ls-remote --exit-code "${PLAYWRIGHT_GIT_REPO}" "refs/tags/v${version}" >/dev/null 2>&1; then
+    PLAYWRIGHT_GIT_REF="v${version}"
+  # The version label's X.Y prefix is the product series even when the version
+  # carries a suffix no tag matches. Release is only X.Y on product builds (a
+  # build-id release also has an X.Y shape), so it is consulted only after version.
+  elif [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
+    PLAYWRIGHT_GIT_REF="redhat-${BASH_REMATCH[1]}"
+  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    PLAYWRIGHT_GIT_REF="redhat-${release}"
+  else
+    PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+  fi
+  echo "WARNING: no image label sha is fetchable; cloning ref ${PLAYWRIGHT_GIT_REF} derived from version='${version}' release='${release}'" >&2
+  if ! clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"; then
+    echo "WARNING: ${PLAYWRIGHT_GIT_REF} is not present in ${PLAYWRIGHT_GIT_REPO};" >&2
+    echo "         falling back to branch ${PLAYWRIGHT_GIT_FALLBACK_BRANCH}" >&2
+    PLAYWRIGHT_GIT_REF="${PLAYWRIGHT_GIT_FALLBACK_BRANCH}"
+    clone_playwright_sources "${PLAYWRIGHT_GIT_REPO}" "${PLAYWRIGHT_GIT_REF}" "${CLONE_DIR}"
+  fi
 fi
+if command -v git >/dev/null 2>&1; then
+  PW_TEST_SHA="$(git -C "${CLONE_DIR}" rev-parse HEAD)"
+else
+  PW_TEST_SHA="archive ${PLAYWRIGHT_GIT_REF}"
+fi
+echo "Playwright suite checked out at ${PW_TEST_SHA} (ref ${PLAYWRIGHT_GIT_REF}, mode ${PLAYWRIGHT_REF_MODE})"
+printf 'image=%s\nlabel=%s\nmode=%s\nref=%s\ntest_sha=%s\n' "${PW_IMAGE}" "${PW_LABEL}" \
+  "${PLAYWRIGHT_REF_MODE}" "${PLAYWRIGHT_GIT_REF}" "${PW_TEST_SHA}" > "${ARTIFACT_DIR}/playwright-source.txt"
 PLAYWRIGHT_WORKDIR="${CLONE_DIR}/web"
 if [[ ! -d "${PLAYWRIGHT_WORKDIR}" ]]; then
   echo "ERROR: cloned sources have no web/ directory at ${PLAYWRIGHT_WORKDIR}" >&2
@@ -271,6 +429,21 @@ function stopJaegerPortForward {
   kill "${JAEGER_PF_PID}" 2>/dev/null || true
   wait "${JAEGER_PF_PID}" 2>/dev/null || true
   JAEGER_PF_PID=""
+}
+
+# Public GCS prefix under which this job's per-step artifacts land once the job
+# finishes (Prow's gcsuploader pushes the whole artifact tree at job end, not
+# per step). Used to compose artifact URLs for custom-link cards and pointer
+# files; every CI var defaults so a local run cannot abort under set -u.
+function gcs_job_artifacts_prefix() {
+  local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
+  local gcs_path
+  if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
+    gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
+  else
+    gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+  fi
+  echo "${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}"
 }
 
 # Playwright call logs and traces carry request auth (Authorization, X-CSRF-Token,
@@ -521,37 +694,93 @@ function copyArtifacts {
   for archive in "${ARTIFACT_DIR}"/*/trace.zip "${ARTIFACT_DIR}"/data/*.zip "${ARTIFACT_DIR}"/index.html; do
     [[ -f "${archive}" ]] && archives+=("${archive}")
   done
+  # The combined upgrade report (merge_upgrade_blobs) is a normal Playwright
+  # HTML report tree in its own subdir; scrub its zips and index the same way.
+  while IFS= read -r -d '' archive; do
+    archives+=("${archive}")
+  done < <(find "${ARTIFACT_DIR}/combined-playwright-report" -type f \( -name '*.zip' -o -name 'index.html' \) -print0 2>/dev/null || true)
   scrub_playwright_archives "${archives[@]}" || true
   # Prow's html lens renders any artifact matching custom-link-*.html inline near
-  # the top of the Spyglass job page. The Playwright HTML report copied above only
-  # shows up buried in the artifact tree, so surface a direct link to it. Compose
-  # the GCS URL the same way hypershift-analyze-e2e-failure does. Only write the
-  # link when index.html actually landed so it is never dead; default every CI var
-  # with :- so a missing var in a local run cannot abort this EXIT trap.
-  if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
-    local gcs_base="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
-    local gcs_path
-    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
-      gcs_path="pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER:-}/${JOB_NAME:-}/${BUILD_ID:-}"
-    else
-      gcs_path="logs/${JOB_NAME:-}/${BUILD_ID:-}"
+  # the top of the Spyglass job page, so put the links a failure triage starts from
+  # there: the Playwright report, the quay-gather logs, must-gather, and the Quay
+  # revision under test. Compose the GCS URLs the same way
+  # hypershift-analyze-e2e-failure does. The gather links point at post steps that
+  # run after this one, so they are directory listings. Default every CI var with :-
+  # so a missing var in a local run cannot abort this EXIT trap.
+  #
+  # e2e-install lanes write this card once (PLAYWRIGHT_WRITE_SPYGLASS_CARD=true,
+  # the default). Upgrade seed/verify/functional set it to false so Spyglass only
+  # shows the single rich card from quay-operator-upgrade-report; per-phase HTML
+  # reports, JUnit, and blob merge still publish to ARTIFACT_DIR as usual.
+  if [[ "${PLAYWRIGHT_WRITE_SPYGLASS_CARD:-true}" != "false" ]]; then
+    local steps_base
+    steps_base="$(gcs_job_artifacts_prefix)"
+    # ci-operator uploads a step's ARTIFACT_DIR to artifacts/<test>/<step>/artifacts/.
+    # The step name is quay-test-e2e by default, but composed workflows run this
+    # runner under uniquely named adapter steps (e.g. the operator-upgrade
+    # seed/verify/functional phases), so derive it from PLAYWRIGHT_STEP_NAME. When
+    # a phase nests its reports under PLAYWRIGHT_ARTIFACT_SUBDIR, append that too so
+    # the link resolves to that phase's own report instead of a sibling's.
+    local report_path="${PLAYWRIGHT_STEP_NAME:-quay-test-e2e}/artifacts"
+    if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
+      report_path="${report_path}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
     fi
-    local report_base="${gcs_base}/${gcs_path}/artifacts/${JOB_NAME_SAFE:-}/quay-test-e2e/artifacts"
-    cat > "${ARTIFACT_DIR}/custom-link-playwright-report.html" << EOF || true
-<html>
+    # A quay/quay presubmit tests the PR head. Anything else (periodics, rehearsals)
+    # deploys an image whose revision label may be a midstream commit that does not
+    # exist upstream, so link the upstream commit the Playwright suite was cloned at
+    # (PW_TEST_SHA, see playwright-source.txt): the image's own revision when its
+    # label resolved upstream, else the head of the derived tag or branch.
+    local quay_rev=""
+    if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "quay/quay" ]]; then
+      quay_rev="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
+    elif [[ "${PW_TEST_SHA:-}" =~ ^[0-9a-f]{40}$ ]]; then
+      quay_rev="${PW_TEST_SHA}"
+    fi
+    local quay_image
+    quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
+      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    # PLAYWRIGHT_SPYGLASS_TITLE is the Prow html-lens section name (<title>).
+    local spyglass_title="${PLAYWRIGHT_SPYGLASS_TITLE:-Quay e2e results}"
+    {
+      cat << EOF
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Playwright report</title>
+<meta charset="utf-8">
+<title>${spyglass_title}</title>
+<meta name="description" content="Links for triaging the Quay e2e run">
 <style>
-a { display:inline-block; padding:5px 20px; margin:10px; border:2px solid #4E9AF1; border-radius:1em; text-decoration:none; color:#FFFFFF !important; background-color:#4E9AF1; }
+body { margin: 0; font: 14px/1.4 Roboto, "Helvetica Neue", Arial, sans-serif; color: #151515; }
+main { padding: 12px 18px 16px; }
+ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+li { flex: 1 1 180px; max-width: 260px; }
+a { display: block; height: 100%; box-sizing: border-box; padding: 8px 12px; border: 1px solid #d2d2d2; border-left: 3px solid #0066cc; border-radius: 4px; color: #0066cc; font-weight: 500; text-decoration: none; }
+a:hover, a:focus { background: #f0f7ff; border-color: #0066cc; }
+a span { display: block; color: #6a6e73; font-size: 12px; font-weight: 400; }
+p { margin: 12px 0 0; color: #6a6e73; font-size: 12px; }
+code { color: #151515; font: 12px/1.4 "Roboto Mono", Menlo, Consolas, monospace; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
-<a target="_blank" href="${report_base}/index.html">Playwright HTML report</a>
-</body>
-</html>
+<main>
+<ul>
 EOF
-  else
-    echo "No index.html in ${ARTIFACT_DIR}; skipping custom-link-playwright-report.html"
+      if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/${report_path}/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
+      fi
+      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
+      echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      if [[ -n "${quay_rev}" ]]; then
+        echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
+      fi
+      echo "</ul>"
+      if [[ -n "${quay_image}" ]]; then
+        echo "<p>quay-app image <code>${quay_image}</code></p>"
+      fi
+      echo "</main>"
+      echo "</body>"
+      echo "</html>"
+    } > "${ARTIFACT_DIR}/custom-link-quay-results.html" || true
   fi
   gatherBuilderDiagnostics || true
 }
@@ -740,7 +969,15 @@ fi
 # Playwright test title; see E2E_FAILURE_REPORT.md in the repo root for the rationale
 # behind the current exclusions. When unset, the full suite runs.
 PLAYWRIGHT_GREP_INVERT="${PLAYWRIGHT_GREP_INVERT:-}"
+PLAYWRIGHT_GREP="${PLAYWRIGHT_GREP:-}"
+GREP_ARGS=()
 GREP_INVERT_ARGS=()
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  GREP_ARGS=(--grep "${PLAYWRIGHT_GREP}")
+  echo "Selecting tests matching: ${PLAYWRIGHT_GREP}"
+else
+  echo "No PLAYWRIGHT_GREP set; running all tests not excluded by PLAYWRIGHT_GREP_INVERT."
+fi
 if [[ -n "${PLAYWRIGHT_GREP_INVERT}" ]]; then
   GREP_INVERT_ARGS=(--grep-invert "${PLAYWRIGHT_GREP_INVERT}")
   echo "Excluding tests matching: ${PLAYWRIGHT_GREP_INVERT}"
@@ -758,13 +995,182 @@ fi
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
+# Optional override for Playwright's maxFailures. The suite's playwright.config.ts
+# stops the whole run early after a small number of failures in CI, which leaves
+# later tests reported as "did not run" and hides the full picture. Set
+# PLAYWRIGHT_MAX_FAILURES=0 to run every selected test to completion (0 = no
+# limit); leave empty to honor the suite's own config default.
+MAX_FAILURES_ARGS=()
+if [[ -n "${PLAYWRIGHT_MAX_FAILURES:-}" ]]; then
+  MAX_FAILURES_ARGS=(--max-failures "${PLAYWRIGHT_MAX_FAILURES}")
+  echo "Overriding Playwright maxFailures: ${PLAYWRIGHT_MAX_FAILURES}"
+fi
+
 startJaegerPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"
+if [[ -n "${PLAYWRIGHT_GREP}" ]]; then
+  # A positive selector is useful only when it actually selects something.  Playwright
+  # can otherwise exit successfully after running zero tests, which would make the
+  # n-1 smoke stage a false-positive gate.
+  if ! selected_tests_output="$(npx playwright test "${GREP_ARGS[@]}" "${GREP_INVERT_ARGS[@]}" --list 2>&1)"; then
+    printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log" >&2
+    echo "ERROR: unable to list tests selected by PLAYWRIGHT_GREP" >&2
+    exit 1
+  fi
+  printf '%s\n' "${selected_tests_output}" | tee "${ARTIFACT_DIR}/playwright-selected-tests.log"
+  if [[ "${selected_tests_output}" =~ Total:[[:space:]]+([0-9]+)[[:space:]]+tests? ]]; then
+    selected_tests="${BASH_REMATCH[1]}"
+  else
+    echo "ERROR: Playwright --list output did not report a selected-test total" >&2
+    exit 1
+  fi
+  if (( selected_tests == 0 )); then
+    echo "ERROR: PLAYWRIGHT_GREP selected zero tests" >&2
+    exit 1
+  fi
+  echo "PLAYWRIGHT_GREP selected ${selected_tests} test(s)."
+fi
+# Base reporters. When PLAYWRIGHT_EXPORT_BLOB=true (the upgrade phases set it), also
+# emit a Playwright "blob" report for the combined upgrade report: the subset
+# phases (seed/verify) copy it to SHARED_DIR for the merging phase, and the last
+# full-suite phase merges every phase's blob in its own pod (see below).
+PLAYWRIGHT_REPORTERS="list,junit,html,json"
+PLAYWRIGHT_EXPORT_BLOB="${PLAYWRIGHT_EXPORT_BLOB:-false}"
+if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" ]]; then
+  PLAYWRIGHT_REPORTERS="${PLAYWRIGHT_REPORTERS},blob"
+fi
+# Merge the upgrade phases' Playwright blob reports into one combined HTML
+# report. Runs in the LAST playwright phase's pod (PLAYWRIGHT_MERGE_BLOBS=true):
+# the earlier subset phases left their small blobs in SHARED_DIR, and this
+# phase's own full-suite blob is only ever local, because it is far larger than
+# the 1MiB Kubernetes Secret ci-operator uses to persist SHARED_DIR between
+# step pods (pushing it there fails the step outright with
+# 'Secret ... data: Too long'). The merged report lands in this step's
+# artifacts, and a tiny pointer file with its public GCS URL goes to SHARED_DIR
+# for the final quay-operator-upgrade-report step to link. The URL only
+# resolves once Prow uploads the artifact tree at job end, which is also how
+# the per-phase custom-link cards already reference future steps' artifacts.
+# Best-effort: a merge failure must never fail the phase.
+function merge_upgrade_blobs() {
+  local local_blob="${1:-}"
+  local merged="${ARTIFACT_DIR}/combined-playwright-report"
+  local scratch
+  scratch="$(mktemp -d)"
+  local copied=0 b
+  # Gather the earlier phases' blobs from SHARED_DIR plus this pod's local blob.
+  for b in "${SHARED_DIR:-${scratch}}"/quay-upgrade-blob-*.zip; do
+    [[ -f "${b}" ]] || continue
+    cp "${b}" "${scratch}/" || true
+    copied=$((copied + 1))
+  done
+  if [[ -n "${local_blob}" && -f "${local_blob}" ]]; then
+    cp "${local_blob}" "${scratch}/" || true
+    copied=$((copied + 1))
+  fi
+  if (( copied == 0 )); then
+    echo "WARNING: no Playwright blob reports to merge; skipping the combined report."
+    rm -rf "${scratch}"
+    return 0
+  fi
+  echo "Merging ${copied} Playwright blob report(s) into the combined upgrade report:"
+  ls -1 "${scratch}"
+  # merge-reports needs an @playwright/test install; the quay-playwright-runner
+  # image bakes the suite, so run from its project dir.
+  local app_dir=""
+  for d in /app/web /app "${PLAYWRIGHT_WORKDIR:-}" /tmp/quay-playwright-src/web; do
+    if [[ -n "${d}" && ( -f "${d}/playwright.config.ts" || -f "${d}/package.json" ) ]]; then
+      app_dir="${d}"
+      break
+    fi
+  done
+  (
+    # if (not [[ ]]-&&-cd, which set -e would abort on an empty app_dir)
+    if [[ -n "${app_dir}" ]]; then cd "${app_dir}"; fi
+    # Set both env names so the HTML output dir resolves across Playwright versions.
+    PLAYWRIGHT_HTML_OUTPUT_DIR="${merged}" \
+    PLAYWRIGHT_HTML_REPORT="${merged}" \
+      npx playwright merge-reports --reporter html "${scratch}"
+  ) && echo "Combined upgrade report written to ${merged}" \
+    || echo "WARNING: merge-reports failed; the per-phase reports are still published."
+  rm -rf "${scratch}"
+  # Leave a tiny pointer (NOT the blob: 1MiB Secret cap) for the report step.
+  if [[ -f "${merged}/index.html" && -n "${SHARED_DIR:-}" ]]; then
+    printf '%s\n' "$(gcs_job_artifacts_prefix)/${PLAYWRIGHT_STEP_NAME:-quay-test-e2e}/artifacts/${PLAYWRIGHT_ARTIFACT_SUBDIR:+${PLAYWRIGHT_ARTIFACT_SUBDIR}/}combined-playwright-report/index.html" \
+      > "${SHARED_DIR}/quay-upgrade-combined-report.path" || true
+  fi
+  return 0
+}
+
+playwright_rc=0
 npx playwright test \
+  "${GREP_ARGS[@]}" \
   "${GREP_INVERT_ARGS[@]}" \
+  "${MAX_FAILURES_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
-  --reporter=list,junit,html,json \
-  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log"
+  --reporter="${PLAYWRIGHT_REPORTERS}" \
+  2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log" || playwright_rc=$?
 popd
+
+# Export this phase's blob report for the combined upgrade report. Two modes:
+#   - merging phase (PLAYWRIGHT_MERGE_BLOBS=true, the last full e2e phase):
+#     keep the blob inside this pod and merge it here. The full-suite blob
+#     (traces for every test) is far larger than the 1MiB Kubernetes Secret
+#     ci-operator uses to persist SHARED_DIR between step pods, so pushing it
+#     there fails the step outright ("Secret ... data: Too long").
+#   - subset phases (seed/verify): copy the small blob to SHARED_DIR under a
+#     phase-unique flat name (ci-operator does not persist SHARED_DIR
+#     subdirectories) for the merging phase to pick up.
+# Best-effort: report plumbing must never fail the phase.
+# SHARED_DIR persists as a 1MiB Secret; assumes the base64 overhead counts
+# against that cap, so raw files stay under ~700KiB (x4/3 < 1MiB).
+UPGRADE_BLOB_SHARED_BUDGET=$((700 * 1024))
+local_blob=""
+if [[ "${PLAYWRIGHT_EXPORT_BLOB}" == "true" ]]; then
+  blob_tag="${PLAYWRIGHT_ARTIFACT_SUBDIR:-${PLAYWRIGHT_STEP_NAME:-phase}}"
+  for z in "${PLAYWRIGHT_WORKDIR}"/blob-report/*.zip; do
+    [[ -e "${z}" ]] || continue
+    if [[ "${PLAYWRIGHT_MERGE_BLOBS:-false}" == "true" ]]; then
+      local_blob="${z}"
+    elif [[ -n "${SHARED_DIR:-}" ]]; then
+      blob_bytes="$(stat -c %s "${z}" 2>/dev/null || echo 0)"
+      shared_bytes="$(du -sb "${SHARED_DIR}" 2>/dev/null | cut -f1 || echo 0)"
+      if (( blob_bytes + shared_bytes > UPGRADE_BLOB_SHARED_BUDGET )); then
+        echo "WARNING: ${blob_tag} blob (${blob_bytes}B) plus SHARED_DIR (${shared_bytes}B) exceeds ${UPGRADE_BLOB_SHARED_BUDGET}B; not exporting it to the combined report." >&2
+      else
+        cp "${z}" "${SHARED_DIR}/quay-upgrade-blob-${blob_tag}.zip" || true
+      fi
+    fi
+    break
+  done
+fi
+
+if [[ "${PLAYWRIGHT_MERGE_BLOBS:-false}" == "true" ]]; then
+  merge_upgrade_blobs "${local_blob}" || echo "WARNING: combined-report merge errored; continuing." >&2
+fi
+
+# The EXIT trap (copyArtifacts) always publishes this phase's JUnit + HTML report,
+# so per-test results are visible in the Prow UI regardless of outcome. In
+# best-effort mode a test failure must NOT fail this ci-operator step: the upgrade
+# phases run as a sequential multi-stage chain (seed -> upgrade -> verify ->
+# functional), and a non-zero step aborts the chain so the later phases never run
+# and never publish their JUnit. Swallow the failure so every phase executes and
+# reports; the aggregated JUnit (not the job color) carries the pass/fail detail.
+# Non-best-effort callers (e.g. the e2e-install gate) still fail on a non-zero rc.
+if [[ "${PLAYWRIGHT_BEST_EFFORT:-false}" == "true" ]]; then
+  # Record this phase's result so the final report/gate step can fail the JOB when
+  # any best-effort phase had test failures, even though this step exits 0 (so the
+  # chain keeps running and every phase publishes its report). ci-operator only
+  # persists FLAT files in SHARED_DIR between steps (subdirectories are not copied),
+  # so write a single flat, phase-unique marker file.
+  if [[ -n "${SHARED_DIR:-}" ]]; then
+    result_tag="${PLAYWRIGHT_ARTIFACT_SUBDIR:-${PLAYWRIGHT_STEP_NAME:-phase}}"
+    echo "${playwright_rc}" > "${SHARED_DIR}/quay-upgrade-result-${result_tag}.rc" || true
+  fi
+  if (( playwright_rc != 0 )); then
+    echo "PLAYWRIGHT_BEST_EFFORT=true: Playwright exited ${playwright_rc}; not failing the step so subsequent phases still run. The final report/gate step will fail the job; see the JUnit report for per-test results."
+  fi
+  exit 0
+fi
+exit "${playwright_rc}"

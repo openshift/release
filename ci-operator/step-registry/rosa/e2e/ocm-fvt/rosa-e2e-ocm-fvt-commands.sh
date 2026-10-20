@@ -3,6 +3,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Apply Gangway override before any use of OCM_FVT_EXTRA_ENVS.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS:-}" ]]; then
+  echo "Applying Gangway override: OCM_FVT_EXTRA_ENVS (from MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS)"
+  export OCM_FVT_EXTRA_ENVS="${MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS}"
+fi
+
 if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   echo "ERROR: OCM_FVT_JOB_NAME is required but not set" >&2
   exit 1
@@ -283,6 +289,16 @@ podman_args+=(--rm)
 
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 
+# Defer CleanClusterByProfile to Prow post (rosa-e2e-ocm-fvt-clean) so guest
+# must-gather can run against a live API. Do NOT set GINKGO_SKIP=CleanClusterByProfile:
+# that filters the cleaner to 0 specs and fails --fail-on-empty, marking green
+# test runs as failed. Instead rely on OCM_FVT_DEFER_CLEAN so ocmtest skips the
+# post phase (and tear_down Skip() if post still runs). See ROSAENG-67965.
+if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
+  echo "OCM_FVT_DEFER_CLEAN=true: in-workflow post-clean deferred to Prow rosa-e2e-ocm-fvt-clean"
+  echo "OCM_FVT_DEFER_CLEAN=true" >> "${podman_env_file}"
+fi
+
 # ROSAENG-67791: osdfm metrics/alerts query RHOBS (in-cluster prometheus-app-sre PF removed).
 if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
   echo "=== RHOBS metrics endpoint (osdfm post-alerts) ==="
@@ -379,5 +395,126 @@ done
 
 # Exit code for post-steps (e.g. stage promotion).
 echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
+
+# Publish cluster id (+ best-effort guest kubeconfig) for post gather steps
+# (rosa-gather-hcp-guest-artifacts / gather-extra). OCM FVT keeps cluster state
+# under output/ only; SHARED_DIR is not mounted into the container.
+# See ROSAENG-67965.
+if [[ ! -s "${SHARED_DIR}/cluster-id" ]]; then
+  cluster_id=""
+  while IFS= read -r -d '' ini; do
+    cluster_id="$(awk -F'=[[:space:]]*' '/^ID[[:space:]]*=/{print $2; exit}' "${ini}" | tr -d '[:space:]')"
+    [[ -n "${cluster_id}" ]] && break
+  done < <(find "${ocm_fvt_output}" -type f -name 'cluster.ini' -print0 2>/dev/null)
+
+  if [[ -z "${cluster_id}" ]]; then
+    while IFS= read -r -d '' kc; do
+      base="$(basename "${kc}" .kubeconfig)"
+      if [[ "${base}" =~ ^[a-zA-Z0-9]{20,}$ ]]; then
+        cluster_id="${base}"
+        break
+      fi
+    done < <(find "${ocm_fvt_output}/.datainfo/kube-configs" -type f -name '*.kubeconfig' -print0 2>/dev/null)
+  fi
+
+  if [[ -n "${cluster_id}" ]]; then
+    printf '%s' "${cluster_id}" > "${SHARED_DIR}/cluster-id"
+    echo "Wrote SHARED_DIR/cluster-id=${cluster_id} for post gather steps"
+  else
+    echo "WARNING: could not resolve cluster id from ${ocm_fvt_output} for post gather steps"
+  fi
+fi
+
+if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+  while IFS= read -r -d '' kc; do
+    # Skip empty / scrubbed placeholders; real kubeconfigs are much larger.
+    if [[ -s "${kc}" ]] && grep -q 'apiVersion:' "${kc}" 2>/dev/null; then
+      cp "${kc}" "${SHARED_DIR}/kubeconfig"
+      chmod 0600 "${SHARED_DIR}/kubeconfig"
+      echo "Copied guest kubeconfig from ${kc} -> SHARED_DIR/kubeconfig"
+      break
+    fi
+  done < <(find "${ocm_fvt_output}" -type f \( -name 'kubeconfig' -o -name '*.kubeconfig' \) -print0 2>/dev/null)
+fi
+
+# Gate guest gather (must-gather / gather-extra) when deferred clean is enabled.
+# Write SHARED_DIR/ocm-fvt-gather-eligible=true only when the cluster reached ready
+# (and the guest API still answers if oc is available). When false, clear any
+# stale kubeconfig so post gather steps no-op instead of failing on dead DNS.
+# Jobs that do not provision a cluster omit this flag and do not use the
+# guest-artifacts chain; guest-kubeconfig treats a missing flag as "proceed".
+if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
+  gather_eligible=false
+  cluster_state=""
+  while IFS= read -r -d '' ini; do
+    cluster_state="$(awk -F'=[[:space:]]*' '/^State[[:space:]]*=/{print $2; exit}' "${ini}" | tr -d '[:space:]')"
+    [[ -n "${cluster_state}" ]] && break
+  done < <(find "${ocm_fvt_output}" -type f -name 'cluster.ini' -print0 2>/dev/null)
+
+  if [[ -s "${SHARED_DIR}/cluster-id" && "${cluster_state}" == "ready" ]]; then
+    gather_eligible=true
+    if [[ -s "${SHARED_DIR}/kubeconfig" ]] && command -v oc >/dev/null 2>&1; then
+      if ! oc --kubeconfig="${SHARED_DIR}/kubeconfig" --request-timeout=15s --insecure-skip-tls-verify \
+          get ns default >/dev/null 2>&1; then
+        echo "WARNING: cluster.ini State=ready but guest API unreachable; marking gather ineligible"
+        gather_eligible=false
+      fi
+    fi
+  fi
+
+  printf '%s' "${gather_eligible}" > "${SHARED_DIR}/ocm-fvt-gather-eligible"
+  cp -f "${SHARED_DIR}/ocm-fvt-gather-eligible" "${ARTIFACT_DIR}/ocm-fvt-gather-eligible" 2>/dev/null || true
+  echo "Wrote SHARED_DIR/ocm-fvt-gather-eligible=${gather_eligible} (cluster State=${cluster_state:-unknown})"
+
+  if [[ "${gather_eligible}" != "true" ]]; then
+    rm -f "${SHARED_DIR}/kubeconfig"
+    echo "Cleared SHARED_DIR/kubeconfig; rosa-gather-hcp-guest-artifacts will skip must-gather/extra"
+  fi
+fi
+
+# Persist profile recording (.datainfo + */cluster.ini) for rosa-e2e-ocm-fvt-clean.
+# Each Prow step is a new pod; ARTIFACT_DIR is not shared across steps.
+# Packaging must never override ocmtest's exit_code: IDP user kubeconfigs under
+# .datainfo/kube-configs/ are often mode 0600 owned by a different uid, and a
+# plain `tar czf` then exits non-zero under `set -e`, failing the whole step after
+# a green test run (and skipping writing ocm-fvt-job-name / leaving CLEAN_TAR empty).
+if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
+  clean_tar="${SHARED_DIR}/ocm-fvt-clean-state.tgz"
+  printf '%s' "${OCM_FVT_JOB_NAME}" > "${SHARED_DIR}/ocm-fvt-job-name"
+  # Also mirror into ARTIFACT_DIR: SHARED_DIR is not published to Prow GCS artifacts.
+  cp -f "${SHARED_DIR}/ocm-fvt-job-name" "${ARTIFACT_DIR}/ocm-fvt-job-name" 2>/dev/null || true
+  if [[ -d "${ocm_fvt_output}" ]]; then
+    (
+      cd "${ocm_fvt_output}" || exit 0
+      # Best-effort: make IDP kubeconfigs readable for tar (ignore failures).
+      chmod -R u+rX .datainfo 2>/dev/null || true
+      paths=()
+      [[ -d .datainfo ]] && paths+=(.datainfo)
+      while IFS= read -r -d '' ini; do
+        # ./<profile>/cluster.ini -> <profile>
+        rel="${ini#./}"
+        profile_dir="$(dirname "${rel}")"
+        if [[ "${profile_dir}" != "." && "${profile_dir}" != .datainfo* ]]; then
+          paths+=("${profile_dir}")
+        fi
+      done < <(find . -mindepth 2 -maxdepth 2 -type f -name 'cluster.ini' -print0 2>/dev/null)
+      # uniq
+      if [[ ${#paths[@]} -eq 0 ]]; then
+        echo "WARNING: no cluster.ini / .datainfo under ${ocm_fvt_output}; clean post may be limited to cluster-id"
+        exit 0
+      fi
+      # shellcheck disable=SC2207
+      paths=($(printf '%s\n' "${paths[@]}" | awk 'NF && !seen[$0]++'))
+      # --ignore-failed-read: skip unreadable files (e.g. IDP kubeconfigs) and still exit 0.
+      tar --ignore-failed-read -czf "${clean_tar}" "${paths[@]}"
+      echo "Persisted clean state (${paths[*]}) -> ${clean_tar}"
+      # Publish a copy for Prow artifact browsing (SHARED_DIR is not uploaded).
+      cp -f "${clean_tar}" "${ARTIFACT_DIR}/ocm-fvt-clean-state.tgz"
+      echo "Copied clean state tar -> ${ARTIFACT_DIR}/ocm-fvt-clean-state.tgz"
+    ) || echo "WARNING: failed to persist clean state tar (deferred clean may be incomplete)"
+  else
+    echo "WARNING: ocm-fvt output dir missing (${ocm_fvt_output}); deferred clean may no-op"
+  fi
+fi
 
 exit "${exit_code}"

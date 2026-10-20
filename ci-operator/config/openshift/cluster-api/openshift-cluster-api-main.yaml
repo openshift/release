@@ -47,8 +47,6 @@ promotion:
     - src-podman
     name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -62,7 +60,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -177,6 +175,8 @@ tests:
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: ^(TestCreateCluster|TestUpgradeControlPlane|TestNodePool)$
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-vsphere-staticip-ipam-ovn

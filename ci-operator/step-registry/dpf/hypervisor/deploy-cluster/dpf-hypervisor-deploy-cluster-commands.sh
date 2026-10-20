@@ -1,7 +1,34 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+  echo "Skipping work step: skip-work-steps marker is present."
+  exit 0
+fi
+
 export PATH="/cli:${PATH}"
+
+# A workflow can require an exact version handoff. Validate it before touching
+# the hypervisor, independently of the workflow that supplied the request.
+REQUESTED_DPF_OPENSHIFT_VERSION=""
+if [[ -f "${SHARED_DIR}/dpf-openshift-version" ]]; then
+  DPF_OPENSHIFT_VERSION="$(tr -d '[:space:]' < "${SHARED_DIR}/dpf-openshift-version")"
+  if [[ -z "${DPF_OPENSHIFT_VERSION}" ]]; then
+    echo "ERROR: ${SHARED_DIR}/dpf-openshift-version is empty"
+    exit 1
+  fi
+  if [[ ! "${DPF_OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9][A-Za-z0-9._-]*)?$ ]]; then
+    echo "ERROR: invalid OpenShift version '${DPF_OPENSHIFT_VERSION}'"
+    exit 1
+  fi
+  export DPF_OPENSHIFT_VERSION
+  REQUESTED_DPF_OPENSHIFT_VERSION="${DPF_OPENSHIFT_VERSION}"
+  DPF_SKIP_CI_PAYLOAD=true
+  echo "Using OpenShift version ${DPF_OPENSHIFT_VERSION} from shared dir"
+elif [[ "${DPF_REQUIRE_SHARED_OPENSHIFT_VERSION:-false}" == "true" ]]; then
+  echo "ERROR: workflow requires ${SHARED_DIR}/dpf-openshift-version"
+  exit 1
+fi
 
 echo "Checking access to SHARED_DIR ..."
 echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
@@ -12,9 +39,8 @@ CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 
 # Configuration
 REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
-echo "Remote host: ${REMOTE_HOST}"
 
-echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
+echo "Setting up SSH access to DPF hypervisor"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
 echo "Configuring SSH private key..."
@@ -23,19 +49,14 @@ echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
-SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
+SSH_OPTS="-q -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=QUIET -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 # Test SSH connection
-echo "Testing SSH connection to ${REMOTE_HOST}..."
+echo "Testing SSH connection to DPF hypervisor..."
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
   echo "SSH setup complete and tested successfully"
 else
-  echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
-  echo "Debug information:"
-  echo "- Checking if SSH key exists:"
-  ls -la /tmp/id_rsa
-  echo "- Testing SSH connectivity with verbose output:"
-  ssh -v ${SSH_OPTS} root@${REMOTE_HOST} echo 'test' || true
+  echo "ERROR: Failed to connect to DPF hypervisor"
   exit 1
 fi
 
@@ -51,14 +72,14 @@ fi
 # store last openshift-dpf install dir on hypervisor
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
-echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
+echo "Deploying OpenShift cluster with DPF on hypervisor"
 echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
 echo "Cluster name: ${CLUSTER_NAME}"
 
 # Verify remote work directory exists
 echo "Verifying remote work directory exists..."
 if ! ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -d ${REMOTE_MAIN_WORK_DIR}"; then
-  echo "ERROR: Remote work directory ${REMOTE_MAIN_WORK_DIR} does not exist on ${REMOTE_HOST}"
+  echo "ERROR: Remote work directory ${REMOTE_MAIN_WORK_DIR} does not exist on hypervisor"
   exit 1
 fi
 echo "Remote work directory verified: ${REMOTE_MAIN_WORK_DIR}"
@@ -79,7 +100,6 @@ echo "Deploy make target: ${DPF_DEPLOY_MAKE_TARGET}"
 
 # Git clone the dpf-openshift repo on hypervisor
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
   cd ${REMOTE_MAIN_WORK_DIR}; \
   mkdir -p openshift-dpf-${datetime_string}; \
   cd openshift-dpf-${datetime_string}; \
@@ -131,7 +151,6 @@ trap copy_kubeconfig EXIT
 
 echo "Checking if github repo branch was cloned successfully"
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
-  env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   git status; \
   git log -1"; then
@@ -201,13 +220,15 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "export PAYLOAD_URL='${PAYLOAD_URL}'; \
   cp ${REMOTE_MAIN_WORK_DIR}/env/env.user_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf; \
   pwd; \
-  env; \
   set -a; \
   source env.user_${CLUSTER_NAME}; \
+  if [[ -n '${REQUESTED_DPF_OPENSHIFT_VERSION}' ]]; then \
+    export DPF_OPENSHIFT_VERSION='${REQUESTED_DPF_OPENSHIFT_VERSION}'; \
+    export PAYLOAD_URL=''; \
+  fi; \
   if [[ -n \"\${DPF_OPENSHIFT_VERSION:-}\" ]]; then \
     export OPENSHIFT_VERSION=\"\${DPF_OPENSHIFT_VERSION}\"; \
   fi; \
-  env; \
   set +a; \
   make generate-env; \
   ls -ltra .env"; then
@@ -269,7 +290,6 @@ echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 # Execute `make clean-all` on hypervisor with comprehensive logging
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   ls -ltr; \
-  env; \
   cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
   mkdir -p ${REMOTE_LOGS_DIR} ; \
   make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then

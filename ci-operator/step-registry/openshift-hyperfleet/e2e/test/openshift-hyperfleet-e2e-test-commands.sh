@@ -11,7 +11,6 @@ log(){
 }
 
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
-MAESTRO_URL=$(cat "${SHARED_DIR}/maestro_url")
 
 cp -r /e2e/ /tmp/
 
@@ -26,10 +25,14 @@ if [ -n "$E2E_REF" ]; then
   git clone --branch "$E2E_REF" --depth 1 \
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
   cd "${SRC_DIR}"
+  log "E2E_REF ${E2E_REF} -> $(git rev-parse HEAD) (binary built from this commit, not the pod image)"
   make build
-  # Build ginkgo CLI and test binary for parallel execution
-  (cd .bingo && GOWORK=off go build -mod=mod -modfile=ginkgo.mod \
-    -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo")
+  # Build ginkgo CLI and test binary for parallel execution. Build the CLI
+  # from the cloned module's own go.mod: every supported ref pins ginkgo/v2
+  # as a direct dependency, so the CLI always matches the branch's library
+  # version. The old .bingo/ginkgo.mod pin existed only briefly on main and
+  # is absent from every ref this step can run against.
+  GOWORK=off go build -o "${SRC_DIR}/bin/ginkgo" "github.com/onsi/ginkgo/v2/ginkgo"
   CGO_ENABLED=0 go test -c -o "${SRC_DIR}/bin/e2e.test" ./e2e
   GINKGO_BIN="${SRC_DIR}/bin/ginkgo"
   E2E_TEST_BIN="${SRC_DIR}/bin/e2e.test"
@@ -46,7 +49,6 @@ cd /tmp/e2e
 source /tmp/e2e/env/env.ci
 
 export HYPERFLEET_API_URL
-export MAESTRO_URL
 export HYPERFLEET_E2E_CREDENTIALS_PATH="/var/run/hyperfleet-e2e/"
 export TESTDATA_DIR="${TESTDATA}"
 
@@ -66,7 +68,7 @@ export RUN_ID
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Export adapter parameters for the test
 export ADAPTER_CHART_REPO="${ADAPTER_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-adapter.git}"
-export ADAPTER_CHART_REF="${ADAPTER_CHART_REF:-main}"
+export ADAPTER_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_CHART_REF:-${ADAPTER_CHART_REF:-main}}"
 export ADAPTER_CHART_PATH="${ADAPTER_CHART_PATH:-charts}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:-registry.ci.openshift.org}"
 export ADAPTER_IMAGE_REPO="${ADAPTER_IMAGE_REPO:-ci/hyperfleet-adapter}"
@@ -74,7 +76,7 @@ export ADAPTER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG:-latest}
 
 # Export API chart parameters for tier2 tests
 export API_CHART_REPO="${API_CHART_REPO:-https://github.com/openshift-hyperfleet/hyperfleet-api.git}"
-export API_CHART_REF="${API_CHART_REF:-main}"
+export API_CHART_REF="${MULTISTAGE_PARAM_OVERRIDE_API_CHART_REF:-${API_CHART_REF:-main}}"
 export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # JWT authentication via K8s TokenRequest API

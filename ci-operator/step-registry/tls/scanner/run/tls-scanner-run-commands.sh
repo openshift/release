@@ -12,6 +12,16 @@ fi
 
 run_tls_scan() {
 
+  local scanner_pod_mode="${SCANNER_POD_MODE:-false}"
+  case "${scanner_pod_mode}" in
+    true|false) ;;
+    *) echo "Invalid SCANNER_POD_MODE: expected true or false" >&2; exit 1 ;;
+  esac
+  if [[ "${scanner_pod_mode}" == "true" && ( -n "${SCANNER_NAMESPACE:-}" || -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ) ]]; then
+      echo "SCANNER_POD_MODE requires the scanner-owned namespace and no cluster label" >&2
+      exit 1
+  fi
+
   # TLS Scanner - scans TLS configurations of all pods in the cluster
   local NAMESPACE="${SCANNER_NAMESPACE:-tls-scanner}"
   local OWNS_NAMESPACE=true
@@ -63,10 +73,44 @@ run_tls_scan() {
       SCANNER_ARGS="--all-pods"
   fi
 
+  if [[ -n "${COMPONENT_FILTER:-}" ]]; then
+      local component_name='[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?'
+      local component_list="^[[:blank:]]*${component_name}[[:blank:]]*(,[[:blank:]]*${component_name}[[:blank:]]*)*$"
+      if [[ ! "${COMPONENT_FILTER}" =~ ${component_list} ]]; then
+          echo "Invalid COMPONENT_FILTER: expected comma-separated component names" >&2
+          exit 1
+      fi
+      local component_filter_arg
+      printf -v component_filter_arg '%q' "--component-filter=${COMPONENT_FILTER}"
+      SCANNER_ARGS="${SCANNER_ARGS} ${component_filter_arg}"
+      echo "Component filter: ${COMPONENT_FILTER}"
+  fi
+
   # Enable post-quantum cryptography checks when requested by the step ref.
   if [[ "${PQC_CHECK:-false}" == "true" ]]; then
       SCANNER_ARGS="${SCANNER_ARGS} --pqc-check"
       echo "PQC readiness mode enabled: checks TLS 1.3 support and mlkem or mlkem25519 support per target."
+  fi
+
+  # Assert TLS named groups/curves independently of PQC readiness.
+  if [[ -n "${EXPECTED_GROUPS:-}" ]]; then
+      local groups_mode="${EXPECTED_GROUPS_MODE:-contains}"
+      case "${groups_mode}" in
+        contains|exact) ;;
+        *)
+          echo "Invalid EXPECTED_GROUPS_MODE='${groups_mode}' (expected contains or exact)"
+          exit 1
+          ;;
+      esac
+      # SCANNER_ARGS is expanded unquoted into the scanner pod script, so strip
+      # whitespace from the group list (e.g. "X25519, x25519" -> "X25519,x25519").
+      local expected_groups="${EXPECTED_GROUPS//[[:space:]]/}"
+      if [[ -z "${expected_groups}" ]]; then
+          echo "EXPECTED_GROUPS must list at least one group after removing whitespace"
+          exit 1
+      fi
+      SCANNER_ARGS="${SCANNER_ARGS} --expected-groups=${expected_groups} --expected-groups-mode=${groups_mode}"
+      echo "Expected groups check enabled: groups=${expected_groups} mode=${groups_mode}"
   fi
 
   if [[ -n "${SCAN_LIMIT_IPS:-}" && "${SCAN_LIMIT_IPS}" != "0" ]]; then
@@ -137,14 +181,21 @@ run_tls_scan() {
   # for pod-mode management cluster scans (host-networked pods source from the node
   # IP, which does not match any pod/namespace selector in HCP ingress rules).
   # Pod-mode scanning uses the kube API for discovery and exec, so neither is needed.
-  if [[ "${OWNS_NAMESPACE}" == "false" ]]; then
+  local pod_annotations=""
+  local run_as_user_yaml="      runAsUser: 65532"
+  if [[ "${scanner_pod_mode}" == "true" ]]; then
+      pod_annotations="  annotations:
+    openshift.io/required-scc: restricted-v2"
+      run_as_user_yaml=""
+  fi
+  if [[ "${OWNS_NAMESPACE}" == "false" || "${scanner_pod_mode}" == "true" ]]; then
       HOST_NETWORK="false"
       HOST_PID="false"
       # PodSecurity restricted-compliant securityContext for HCP namespace scans.
       # The scanner binary only needs kube API access in pod-mode, so root is not required.
       SECURITY_CONTEXT_YAML="      allowPrivilegeEscalation: false
       runAsNonRoot: true
-      runAsUser: 65532
+${run_as_user_yaml}
       capabilities:
         drop:
         - ALL
@@ -162,7 +213,7 @@ run_tls_scan() {
 
   # Grant privileged SCC to the service account (required for hostNetwork/hostPID/privileged
   # container in host-mode scans).
-  if [[ "${OWNS_NAMESPACE}" == "true" ]]; then
+  if [[ "${OWNS_NAMESPACE}" == "true" && "${scanner_pod_mode}" == "false" ]]; then
       oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
   fi
 
@@ -178,6 +229,7 @@ kind: Pod
 metadata:
   name: tls-scanner
   namespace: ${NAMESPACE}
+${pod_annotations}
   labels:
     app: tls-scanner
     # Required when running in an HCP namespace (OWNS_NAMESPACE=false): HyperShift's
@@ -327,6 +379,9 @@ EOF
 
   # Unregister the trap so it doesn't fire after the function returns (local
   # variables NAMESPACE/OWNS_NAMESPACE would be unbound at that point).
+  if [[ "${scanner_pod_mode}" == "true" ]]; then
+      cleanup
+  fi
   trap - EXIT
 }
 

@@ -21,8 +21,6 @@ promotion:
   to:
   - name: "4.22"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -38,13 +36,18 @@ resources:
     requests:
       cpu: "4"
       memory: 3Gi
+  upstream-integration:
+    limits:
+      cpu: "6"
+    requests:
+      cpu: "6"
 tests:
 - as: upstream-unit
   commands: CGO_ENABLED=1 make test-unit --warn-undefined-variables
   container:
     from: bin
 - as: upstream-integration
-  commands: CGO_ENABLED=1 make test-integration --warn-undefined-variables
+  commands: CGO_ENABLED=1 CPU=4 make test-integration --warn-undefined-variables
   container:
     from: bin
   optional: true

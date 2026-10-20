@@ -92,7 +92,6 @@ base_images:
     namespace: ci
     tag: latest
 prowgen:
-  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 releases:
@@ -252,6 +251,43 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-confidential-computing
+- as: aws-ipi-amd-f28-file-integrity
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+      TEST_TYPE: dev
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-amd-f28-security-profiles
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: security-profiles-operator
+      COMPUTE_NODE_REPLICAS: "2"
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
+      TEST_TIMEOUT: "30"
+      TEST_TYPE: dev
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-disc-priv-f28-longrun-ota
   cron: 0 0 31 2 *
   steps:
@@ -4539,6 +4575,32 @@ tests:
     test:
     - ref: baremetal-lab-test-cbo-extension
     workflow: baremetal-lab-ipi-virtual-media
+- as: vsphere-ipi-disconnected-ovn-winc-f7
+  cron: 9 3 6,13,20,27 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-ovn-winc
+- as: aws-upi-ovn-winc-f7
+  cron: 45 5 8,15,22,29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-upi-ovn-winc
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

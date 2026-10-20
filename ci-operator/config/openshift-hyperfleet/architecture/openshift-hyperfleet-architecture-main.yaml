@@ -3,11 +3,9 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi:latest
       RUN dnf module enable -y nodejs:20 && \
-            dnf install -y git npm python3-pip && \
+            dnf install -y git make npm python3-pip python3-pyyaml && \
             npm install -g markdownlint-cli2 markdown-link-check && \
             pip3 install yamllint
-prowgen:
-  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
@@ -26,6 +24,11 @@ tests:
   commands: hack/linkcheck.sh
   container:
     from: src
+- as: verify-owners
+  commands: make verify-owners
+  container:
+    from: src
+  run_if_changed: ^(Makefile|hack/owners/|hyperfleet/docs/(owners\.(yaml|md)|working-agreement\.md))
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet

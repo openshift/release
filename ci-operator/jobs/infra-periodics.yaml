@@ -655,6 +655,184 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 1,9 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=2160h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=PRs go stale after 90d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Stale PRs rot after an additional 30d of inactivity and eventually close.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Stale PRs rot after 30d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten PRs close after an additional 30d of inactivity.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Rotten PRs close after 30d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 1,9 * * *
   decorate: true
   labels:
@@ -1281,7 +1459,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261007-6ed406f29
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1316,7 +1494,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261007-6ed406f29
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1634,7 +1812,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1692,7 +1870,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1739,32 +1917,39 @@ periodics:
       - |
         set -euo pipefail
 
-        echo "Filtering openshift-priv from org/config.yaml"
+        cp org/config.yaml /tmp/stripped-config.yaml
 
-        # Safety check: ensure openshift-priv exists exactly once
-        count=$(grep -cE '^  openshift-priv:' org/config.yaml || true)
-        if [ "$count" -ne 1 ]; then
-            echo "ERROR: expected exactly one 'openshift-priv:' key, found $count" >&2
-            exit 1
-        fi
+        # Strip these orgs from the config before running peribolos; their
+        # membership is reconciled elsewhere and must not be managed here.
+        for org in openshift-priv openshift; do
+            echo "Filtering ${org} from org/config.yaml"
 
-        # Remove the openshift-priv org block using range deletion
-        # This deletes from "  openshift-priv:" line up to (but not including) the next org
-        sed -E '/^  openshift-priv:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-priv:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
-            org/config.yaml > /tmp/stripped-config.yaml
+            # Safety check: ensure the org exists exactly once
+            count=$(grep -cE "^  ${org}:" /tmp/stripped-config.yaml || true)
+            if [ "$count" -ne 1 ]; then
+                echo "ERROR: expected exactly one '${org}:' key, found $count" >&2
+                exit 1
+            fi
+
+            # Remove the org block using range deletion
+            # This deletes from "  <org>:" line up to (but not including) the next org
+            sed -E "/^  ${org}:/,/^  [a-zA-Z0-9_-]+:/{/^  ${org}:/d; /^  [a-zA-Z0-9_-]+:/!d;}" \
+                /tmp/stripped-config.yaml > /tmp/stripped-config.next.yaml
+            mv /tmp/stripped-config.next.yaml /tmp/stripped-config.yaml
+
+            if grep -qE "^  ${org}:" /tmp/stripped-config.yaml; then
+                echo "ERROR: ${org} still present in output" >&2
+                exit 1
+            fi
+
+            echo "Successfully removed ${org} from configuration"
+        done
 
         # Verify the result is valid
         if ! grep -qE '^orgs:' /tmp/stripped-config.yaml; then
             echo "ERROR: Output YAML appears malformed (no 'orgs:' found)" >&2
             exit 1
         fi
-
-        if grep -qE '^  openshift-priv:' /tmp/stripped-config.yaml; then
-            echo "ERROR: openshift-priv still present in output" >&2
-            exit 1
-        fi
-
-        echo "Successfully removed openshift-priv from configuration"
 
         # Run peribolos with the filtered config
         exec /ko-app/peribolos \
@@ -1784,7 +1969,7 @@ periodics:
           --github-allowed-burst=600 \
           --allow-repo-archival \
           --ignore-enterprise-teams
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1816,7 +2001,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2081,65 +2266,6 @@ periodics:
         requests:
           cpu: 500m
     serviceAccountName: imagestream-importer
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  decoration_config:
-    oauth_token_secret:
-      key: oauth
-      name: github-credentials-openshift-ci-robot-private-git-cloner
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: config
-    workdir: true
-  - base_ref: main
-    org: openshift
-    repo: release
-  hidden: true
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra-internal
-  name: periodic-auto-private-org-peribolos-sync
-  spec:
-    containers:
-    - args:
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --dry-run=false
-      - --self-approve=true
-      - --github-login=openshift-ci[bot]
-      - --git-name=openshift-ci[bot]
-      - --git-email=75433959+openshift-ci[bot]@users.noreply.github.com
-      - --peribolos-config=./org/config.yaml
-      - --release-repo-path=/home/prow/go/src/github.com/openshift/release
-      - --whitelist-file=/home/prow/go/src/github.com/openshift/release/core-services/openshift-priv/_whitelist.yaml
-      - --only-org=openshift
-      command:
-      - /usr/bin/auto-peribolos-sync
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-peribolos-sync_latest
-      imagePullPolicy: Always
-      name: auto-peribolos-sync
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: github-app-credentials
-        readOnly: true
-    volumes:
-    - name: github-app-credentials
-      secret:
-        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -2455,7 +2581,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2487,7 +2613,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2519,7 +2645,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261005-27fe62bda
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:

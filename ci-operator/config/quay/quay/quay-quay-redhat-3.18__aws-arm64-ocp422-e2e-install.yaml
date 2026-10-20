@@ -7,8 +7,6 @@ images:
   items:
   - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-latest:
     candidate:
@@ -47,6 +45,7 @@ tests:
       PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
         and loads architecture filter with mirror configuration|loads existing architecture
         filter from saved mirror configuration'
+      PLAYWRIGHT_REF_MODE: strict
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
@@ -72,7 +71,9 @@ tests:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - ref: quay-deprovision
-    - chain: ipi-aws-post
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art

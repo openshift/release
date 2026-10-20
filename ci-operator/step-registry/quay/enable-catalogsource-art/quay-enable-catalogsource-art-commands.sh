@@ -94,12 +94,16 @@ function check_catalog_source_status(){
 #      is resolved to an immutable @sha256 digest, so each run tracks the newest FBC
 #      build. The art-fbc repo has no ":latest" tag. The repo is public, so no auth is
 #      needed for the resolve.
-# The resolved reference is written to ${SHARED_DIR}/quay_index_image for traceability.
+# The resolved reference is written to ${SHARED_DIR}/quay_index_image for traceability,
+# and the reference it was resolved from to ${SHARED_DIR}/quay_index_image_requested;
+# quay-gather records both in tested-images.json.
 function resolve_index_image () {
   if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}" ]]; then
     echo "Using explicitly pinned index image: ${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}"
+    echo "${MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE}" > "${SHARED_DIR}/quay_index_image_requested"
   else
     local ref="${QUAY_INDEX_IMAGE_REPO}:${QUAY_INDEX_IMAGE_TAG}"
+    echo "${ref}" > "${SHARED_DIR}/quay_index_image_requested"
     echo "Resolving ART FBC catalog ${ref} to a digest..."
     local digest=""
     # The catalog repo is public, so no auth is needed for the resolve.

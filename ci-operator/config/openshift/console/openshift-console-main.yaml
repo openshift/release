@@ -3,10 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-nodejs-openshift-4.22
-  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
+    tag: rhel-9-golang-1.26-openshift-5.1
 build_root:
   project_image:
     dockerfile_literal: |
@@ -43,6 +43,8 @@ images:
       RUN cd frontend && \
           yarn install --immutable && \
           yarn playwright install chromium
+      RUN dnf install -y python3 git jq && dnf clean all
+      RUN npm install -g @anthropic-ai/claude-code@2.1.273 && claude --version
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     inputs:
       src:
@@ -54,8 +56,6 @@ promotion:
   to:
   - name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -102,7 +102,7 @@ tests:
     go install -mod= github.com/jstemmer/go-junit-report@latest
     /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: ocp_builder_rhel-9-golang-1.25-openshift-4.22
+    from: ocp_builder_rhel-9-golang-1.26-openshift-5.1
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
@@ -120,7 +120,17 @@ tests:
   as: e2e-gcp-console
   pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
+    allow_skip_on_success: true
     cluster_profile: openshift-org-gcp
+    env:
+      CONSOLE_FLAKE_AGENT_ENABLED: "true"
+      CONSOLE_FLAKE_DRIVER_SHA256: 9d0a79ca0a5ab3e9847c830822b8383afd7661e931235856ccc22c9e68115a3e
+      CONSOLE_FLAKE_SKILL_REVISION: main
+      CONSOLE_FLAKE_SKILL_SHA256: 8dea3696de872902b10dd642a330dc6eb13aa4477fb2108db4cd5acbc85a8ef0
+    post:
+    - ref: openshift-console-qe-agent
+    - chain: ipi-gcp-post
+    - ref: send-results-to-reportportal
     test:
     - as: test
       cli: latest

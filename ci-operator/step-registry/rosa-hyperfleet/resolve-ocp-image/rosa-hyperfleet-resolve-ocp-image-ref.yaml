@@ -17,17 +17,25 @@ ref:
       OCP release image of the e2e HCP cluster. Empty (the default) skips
       this step and the e2e step uses its default image.
 
-      - "latest": the newest multi-arch nightly stream (X.Y.0-0.nightly-multi)
-        with at least one accepted payload. Moves to a new OCP version on its
-        own once that version's first nightly is accepted.
-      - "ocp-branch": X.Y.0-0.nightly-multi for a release-X.Y branch under
-        test, "latest" for any other branch (e.g. main). Requires a repo
-        whose release-X.Y branches track OCP X.Y, such as an OCP component
-        like openshift/hypershift; do not use it in repos with their own
-        versioning. Falls back to "latest" with a warning when the branch's
-        stream has no accepted payload yet (e.g. right after a branch cut).
-        Unlike a fixed stream name, the value stays correct when
-        config-brancher copies the config to release branches.
+      - "ocp-branch-nightly": the newest accepted multi-arch nightly
+        (X.Y.0-0.nightly-multi) of the release-X.Y branch's OCP version.
+        Suited to periodics that should catch OCP regressions early.
+      - "ocp-branch-candidate": the newest accepted GA, z-stream or RC
+        payload of the release-X.Y branch's OCP version, from the
+        N-stable-multi streams (no nightlies or ECs). The OCP "candidate"
+        update channel carries the same releases. Suited to presubmits,
+        where a failure should point at the change under test.
+
+      Both ocp-branch-* values fall back to the highest older X.Y with an
+      accepted payload, with a warning, when the branch's own version has
+      none yet (e.g. right after a branch cut, or before the first RC), so a
+      branch never tests a newer OCP than its own. On any other branch (e.g.
+      main) they use the highest X.Y available. They require a repo whose
+      release-X.Y branches track OCP X.Y, such as an OCP component like
+      openshift/hypershift; do not use them in repos with their own
+      versioning. Unlike a fixed stream name, the value stays correct when
+      config-brancher copies the config to release branches.
+
       - Any other value is used as the stream name, e.g. 5.1.0-0.nightly-multi
         or 5-dev-preview-multi. Multi-arch streams (ending in -multi) resolve
         to quay.io/openshift-release-dev images. amd64 nightly and CI streams
@@ -39,13 +47,15 @@ ref:
     nothing when OCP_RELEASE_STREAM is empty.
 
     How it resolves:
-    1. "latest" and "ocp-branch" are turned into a stream name using the
-       accepted streams listed by the multi-arch release controller. The
-       branch for "ocp-branch" comes from JOB_SPEC (refs.base_ref for
-       presubmits, extra_refs[0].base_ref for periodics).
-    2. The latest accepted payload of that stream is fetched from
-       multi.ocp.releases.ci.openshift.org for -multi streams, or from
-       amd64.ocp.releases.ci.openshift.org otherwise.
+    1. "ocp-branch-nightly" and "ocp-branch-candidate" are turned into a
+       stream name (and, for candidates, an X.Y version prefix) using the
+       accepted payloads listed by the multi-arch release controller. The
+       branch comes from JOB_SPEC: the ref marked workdir:true, else
+       refs.base_ref for presubmits, else extra_refs[0].base_ref for
+       periodics.
+    2. The latest accepted payload of that stream (matching the prefix, if
+       any) is fetched from multi.ocp.releases.ci.openshift.org for -multi
+       streams, or from amd64.ocp.releases.ci.openshift.org otherwise.
     3. Its pullspec is written to ${SHARED_DIR}/ocp-image, which
        rosa-hyperfleet-e2e uses unless OCP_IMAGE is set explicitly. The full
        release is saved as ocp-release.json in the step artifacts.

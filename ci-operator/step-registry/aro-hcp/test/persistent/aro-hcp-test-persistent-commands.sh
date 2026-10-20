@@ -39,34 +39,20 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
+# Resolve mock msi principal ID when mocked as certain e2es require it
+if [[ -n "${ARO_HCP_DEPLOY_ENV:-}" ]]; then
+  msi_mock_app_name=$(yq ".clouds.dev.defaults.ci.\"${ARO_HCP_DEPLOY_ENV}\".mockIdentities.msiMock.applicationName // \"\"" "${PWD}/config/config-dev-ci.yaml")
+  if [[ -n "${msi_mock_app_name}" ]]; then
+    export MI_MOCK_PRINCIPAL_ID; MI_MOCK_PRINCIPAL_ID=$(az ad sp list --display-name "${msi_mock_app_name}" --query "[0].id" -o tsv || true)
+    if [[ -z "${MI_MOCK_PRINCIPAL_ID}" ]]; then
+      echo "WARNING: could not resolve object ID for msi-mock SP '${msi_mock_app_name}'" >&2
+    fi
+  fi
+fi
+
 export ARO_HCP_CONFIG_FILE="${PWD}/config/config.yaml"
 export ARO_HCP_CLOUD="dev"
 export DEPLOY_ENV="${VAULT_SECRET_PROFILE}"
 export REGION="${LOCATION}"
 
-if [[ -n "${ARO_HCP_SUITE_PARALLELISM_BY_LOCATION:-}" ]]; then
-    declare -A regional_parallelism=()
-    remaining="${ARO_HCP_SUITE_PARALLELISM_BY_LOCATION},"
-    while [[ -n "${remaining}" ]]; do
-        entry="${remaining%%,*}"
-        remaining="${remaining#*,}"
-        if [[ "${entry}" =~ ^([[:alpha:]][[:alnum:]]*)=([1-9][0-9]*)$ ]]; then
-            location="${BASH_REMATCH[1],,}"
-            count="${BASH_REMATCH[2]}"
-        else
-            echo "Invalid ARO_HCP_SUITE_PARALLELISM_BY_LOCATION entry: ${entry}" >&2
-            exit 1
-        fi
-        if [[ -v "regional_parallelism[$location]" ]]; then
-            echo "Duplicate ARO_HCP_SUITE_PARALLELISM_BY_LOCATION location: ${location}" >&2
-            exit 1
-        fi
-        regional_parallelism["${location}"]="${count}"
-    done
-    effective_location="${REGION,,}"
-    if [[ -z "${ARO_HCP_SUITE_PARALLELISM:-}" && -v "regional_parallelism[$effective_location]" ]]; then
-        export ARO_HCP_SUITE_PARALLELISM="${regional_parallelism[$effective_location]}"
-    fi
-fi
-
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency 100
+./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency "${ARO_HCP_MAX_CONCURRENCY}"

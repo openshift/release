@@ -29,8 +29,6 @@ images:
   - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
   skip_if_only_changed: ^(\.agents/|\.claude/|ci-generator/|docs/|.*\.md$)
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-latest:
     candidate:
@@ -92,7 +90,9 @@ tests:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - ref: quay-deprovision
-    - chain: ipi-aws-post
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art

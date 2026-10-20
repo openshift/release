@@ -32,9 +32,6 @@ tests:
       ENABLEPEERPODS: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: sig-kata.*Kata Author
-      TEST_TIMEOUT: "75"
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-aws
 ```
@@ -51,9 +48,6 @@ tests:
       ENABLEPEERPODS: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: sig-kata.*Kata Author
-      TEST_TIMEOUT: "75"
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-aws
 ```
@@ -71,9 +65,6 @@ tests:
       ENABLEPEERPODS: "true"
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: "0"
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_SCENARIOS: sig-kata.*Kata Author
-      TEST_TIMEOUT: "75"
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-aws
 ```

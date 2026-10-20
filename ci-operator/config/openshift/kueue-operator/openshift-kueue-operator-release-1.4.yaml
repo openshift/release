@@ -60,7 +60,6 @@ operator:
     with: pipeline:kueue-must-gather
 prowgen:
   disable_sparse_checkout: true
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-4-22-latest:
     candidate:
@@ -116,6 +115,8 @@ tests:
 - as: test-e2e-ci-build-downstream-4-22
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: kueue-operator-post
     test:
@@ -147,6 +148,8 @@ tests:
 - as: test-e2e-ci-build-upstream-4-22
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
     - chain: kueue-operator-post
     test:
@@ -183,6 +186,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       DRA_GPU_PARTITIONS: "4"
     post:
     - chain: kueue-operator-post
@@ -260,6 +264,7 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-22-latest
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BUNDLE_COMPONENT: kueue-bundle-1-4
       CONTAINER_IMAGE: quay.io/curl/curl:latest
       OCP_ARCH: arm64
@@ -309,6 +314,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BUNDLE_COMPONENT: kueue-bundle-1-4
       FIPS_ENABLED: "true"
       OPERAND_COMPONENT: kueue-operand-1-4
@@ -615,42 +621,6 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-downstream-disruptive
-- always_run: false
-  as: perfscale-pr-kueue-operator-9nodes
-  optional: true
-  steps:
-    cluster_profile: aws-perfscale
-    env:
-      BASE_DOMAIN: perfscale.devcluster.openshift.com
-      BUNDLE_COMPONENT: kueue-bundle-1-4
-      COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      KUBE_BURNER_VERSION: 1.8.3
-      OPERAND_COMPONENT: kueue-operand-1-4
-      OPERATOR_COMPONENT: kueue-operator-1-4
-      ZONES_COUNT: "3"
-    test:
-    - chain: kueue-operator-test-perfscale
-    workflow: openshift-qe-installer-aws
-- as: perfscale-kueue-operator-9nodes
-  cron: 0 1 1,15 * *
-  steps:
-    cluster_profile: aws-perfscale
-    env:
-      BASE_DOMAIN: perfscale.devcluster.openshift.com
-      BUNDLE_COMPONENT: kueue-bundle-1-4
-      COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      KUBE_BURNER_VERSION: 1.8.3
-      OPERAND_COMPONENT: kueue-operand-1-4
-      OPERATOR_COMPONENT: kueue-operator-1-4
-      ZONES_COUNT: "3"
-    test:
-    - chain: kueue-operator-test-perfscale
-    - chain: openshift-qe-orion-kueue-operator
-    workflow: openshift-qe-installer-aws
 - as: test-e2e-disconnected
   capabilities:
   - arm64
@@ -725,6 +695,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BUNDLE_COMPONENT: kueue-bundle-1-4
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: g4dn.12xlarge

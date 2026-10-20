@@ -66,6 +66,18 @@ components:
           step: "30s"
           severity: "Down"
   - component_slug: "prow"
+    sub_component_slug: "horologium"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
+      queries:
+        - query: "max(up{job=\"horologium\"}) > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+  - component_slug: "prow"
     sub_component_slug: "prow-controller-manager"
     prometheus_monitor:
       prometheus_location:
@@ -187,9 +199,9 @@ components:
     sub_component_slug: "leasing-server"
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "max(up{job=\"boskos\"}) > 0"
         duration: "5m"
@@ -197,82 +209,164 @@ components:
         severity: "Down"
   - component_slug: "boskos"
     sub_component_slug: "aws"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"openshift-org-aws-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-aws-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-aws-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-aws-ovn"
+      artifact_path: "artifacts/e2e-aws-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
     sub_component_slug: "azure"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"openshift-org-azure-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-azure-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-azure-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-azure-ovn"
+      artifact_path: "artifacts/e2e-azure-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
     sub_component_slug: "gcp"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"openshift-org-gcp-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-gcp-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-gcp-ovn"
+      artifact_path: "artifacts/e2e-gcp-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
     sub_component_slug: "gcp-arm64"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-multiarch-main-nightly-5.1-ocp-e2e-gcp-ovn-multi-a-a"
+        - "periodic-ci-openshift-multiarch-main-nightly-5.0-ocp-e2e-gcp-ovn-multi-a-a"
+      artifact_path: "artifacts/ocp-e2e-gcp-ovn-multi-a-a/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos-hypershift"
     sub_component_slug: "aws"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"hypershift-aws-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"hypershift-aws-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-hypershift-release-5.1-periodics-e2e-aws-ovn-conformance"
+        - "periodic-ci-openshift-hypershift-release-5.0-periodics-e2e-aws-ovn-conformance"
+      artifact_path: "artifacts/junit_operator.xml"
+      testcase_prefix: "Run multi-stage step create-hostedcluster"
+      missing_artifact_unhealthy: false
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos-hypershift"
     sub_component_slug: "aks"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "core-ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "sum(boskos_resources{type=\"hypershift-aks-quota-slice\",state=\"free\"}) > 0"
         failure_query: "sum by (state) (boskos_resources{type=\"hypershift-aks-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-hypershift-release-5.1-periodics-e2e-aks"
+        - "periodic-ci-openshift-hypershift-release-5.0-periodics-e2e-aks"
+      artifact_path: "artifacts/junit_operator.xml"
+      testcase_prefix: "Run multi-stage step aks-provision"
+      missing_artifact_unhealthy: false
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   # BEGIN: auto-generated build-farm entries (hack/generate-build-farm-monitor-config.py)
   - component_slug: "build-farm"
     sub_component_slug: "build01"
@@ -291,7 +385,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build01"
+      job_names:
+        - "periodic-build-farm-canary-build01"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -342,7 +440,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build02"
+      job_names:
+        - "periodic-build-farm-canary-build02"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -393,7 +495,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build03"
+      job_names:
+        - "periodic-build-farm-canary-build03"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -444,7 +550,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build04"
+      job_names:
+        - "periodic-build-farm-canary-build04"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -495,7 +605,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build05"
+      job_names:
+        - "periodic-build-farm-canary-build05"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -546,7 +660,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build06"
+      job_names:
+        - "periodic-build-farm-canary-build06"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -597,7 +715,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build07"
+      job_names:
+        - "periodic-build-farm-canary-build07"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -648,7 +770,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build08"
+      job_names:
+        - "periodic-build-farm-canary-build08"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -699,7 +825,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build09"
+      job_names:
+        - "periodic-build-farm-canary-build09"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -750,7 +880,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build10"
+      job_names:
+        - "periodic-build-farm-canary-build10"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -801,7 +935,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build11"
+      job_names:
+        - "periodic-build-farm-canary-build11"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -852,7 +990,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build12"
+      job_names:
+        - "periodic-build-farm-canary-build12"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -903,7 +1045,11 @@ components:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-build13"
+      job_names:
+        - "periodic-build-farm-canary-build13"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
