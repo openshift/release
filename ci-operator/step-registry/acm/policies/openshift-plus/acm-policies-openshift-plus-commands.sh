@@ -34,7 +34,8 @@ if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
   fi
   typeset quayPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-quay/policy-install-quay.yaml"
   sed -i "/^    name: quay-operator$/a\\    channel: ${QUAY_OPERATOR_CHANNEL}" "${quayPolicyFile}"
-  grep -A5 'name: quay-operator' "${quayPolicyFile}"
+  grep -A5 'name: quay-operator' "${quayPolicyFile}" >> "${ARTIFACT_DIR}/channel-patches.log" 2>&1
+  echo "Quay operator channel patch applied — details saved to artifacts/channel-patches.log"
 fi
 
 # If ODF_OPERATOR_CHANNEL is set, patch the ODF operator subscription to pin the channel
@@ -45,7 +46,8 @@ if [[ -n "${ODF_OPERATOR_CHANNEL}" ]]; then
   fi
   typeset odfPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-odf/policy-odf.yaml"
   sed -i "/^    name: odf-operator$/a\\    channel: ${ODF_OPERATOR_CHANNEL}" "${odfPolicyFile}"
-  grep -A5 'name: odf-operator' "${odfPolicyFile}"
+  grep -A5 'name: odf-operator' "${odfPolicyFile}" >> "${ARTIFACT_DIR}/channel-patches.log" 2>&1
+  echo "ODF operator channel patch applied — details saved to artifacts/channel-patches.log"
 fi
 
 # Remove the local-cluster exclusion from the clusters placement so
@@ -56,7 +58,8 @@ fi
 sed -i '/local-cluster.*NotIn/d' \
   ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus > "${ARTIFACT_DIR}/deploy-output.log" 2>&1
+echo "Deploy completed — output saved to artifacts/deploy-output.log"
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
@@ -80,8 +83,9 @@ for ns in "${quayNamespacesArr[@]}"; do
     if ! oc wait quayregistry --all -n "${ns}" \
       --for condition=Available=True \
       --timeout=10m; then
-      oc get quayregistry --all -n "${ns}" --ignore-not-found -o yaml
-      oc describe quayregistry --all -n "${ns}"
+      oc get quayregistry --all -n "${ns}" --ignore-not-found -o yaml > "${ARTIFACT_DIR}/quay-diagnostics.yaml" 2>&1
+      oc describe quayregistry --all -n "${ns}" > "${ARTIFACT_DIR}/quay-describe.txt" 2>&1
+      echo "Quay diagnostics saved to artifacts/"
       exit 1
     fi
     quayFound=true
@@ -151,8 +155,9 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       complianceFailed=1
       : "Non-skipped policies failed to become compliant:"
       oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$" || true
-      oc get policies -n policies --ignore-not-found -o yaml || true
-      oc describe policies -n policies || true
+      oc get policies -n policies --ignore-not-found -o yaml > "${ARTIFACT_DIR}/policy-diagnostics.yaml" 2>&1 || true
+      oc describe policies -n policies > "${ARTIFACT_DIR}/policy-describe.txt" 2>&1 || true
+      echo "Policy diagnostics saved to artifacts/"
     fi
   else
     printf '[%s] All policies are in the skip list — no policies to wait for\n' \
@@ -167,8 +172,9 @@ else
     complianceFailed=1
     : "Policies failed to become compliant:"
     oc get policies -n policies --ignore-not-found || true
-    oc get policies -n policies --ignore-not-found -o yaml || true
-    oc describe policies -n policies || true
+    oc get policies -n policies --ignore-not-found -o yaml > "${ARTIFACT_DIR}/policy-diagnostics.yaml" 2>&1 || true
+    oc describe policies -n policies > "${ARTIFACT_DIR}/policy-describe.txt" 2>&1 || true
+    echo "Policy diagnostics saved to artifacts/"
   fi
 fi
 
