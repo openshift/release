@@ -34,7 +34,7 @@ Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distribut
 ```
 
 - `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path
-- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`
+- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`, plus five `INSTRUMENTATION_*_IMG` vars (`JAVA`/`NODEJS`/`PYTHON`/`DOTNET`/`APACHE_HTTPD`) that the setup section's own validation requires
 
 Construct the raw GitHub URL and fetch the script:
 
