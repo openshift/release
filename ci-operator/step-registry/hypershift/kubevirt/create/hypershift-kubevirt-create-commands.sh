@@ -643,9 +643,37 @@ prepare_localnet_multi_dhcp_renewal_secret() {
     return 1
   fi
 
-  oc label namespace "${multi_ns}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  # Create SSH renewal pods in a dedicated namespace that we control, rather
+  # than the HCP namespace where the HyperShift control-plane operator
+  # continuously reconciles pod-security labels back to "restricted".
+  DHCP_RENEWAL_NS="localnet-dhcp-renew-${CLUSTER_NAME}"
+  oc create namespace "${DHCP_RENEWAL_NS}" --dry-run=client -o yaml | oc apply -f -
+  oc label ns "${DHCP_RENEWAL_NS}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+
+  IFS=',' read -ra _PREP_SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+  local _nad_subnets="${_PREP_SUBNETS[0]}"
+  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+    _nad_subnets="${_nad_subnets},${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+  fi
+  oc apply -f - <<RENEWAL_NAD_EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-1
+  namespace: ${DHCP_RENEWAL_NS}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "${LOCALNET_MULTI_PHYSNET:-physnet}",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${DHCP_RENEWAL_NS}/localnet-1",
+      "subnets": "${_nad_subnets}"
+  }'
+RENEWAL_NAD_EOF
+
   oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" -o json \
-    | python3 -c "import sys,json; s=json.load(sys.stdin); s['metadata']={'name':s['metadata']['name'],'namespace':'${multi_ns}'}; print(json.dumps(s))" \
+    | python3 -c "import sys,json; s=json.load(sys.stdin); s['metadata']={'name':s['metadata']['name'],'namespace':'${DHCP_RENEWAL_NS}'}; print(json.dumps(s))" \
     | oc apply -f - 2>/dev/null || true
   return 0
 }
@@ -722,12 +750,15 @@ FIXEOF
 
   # The SSH pod is attached to localnet-1 so it can reach the VMI on the
   # localnet subnet (with attachDefaultNetwork=false the VMI has no pod network).
+  # Use DHCP_RENEWAL_NS (a namespace we control) instead of the HCP namespace
+  # to avoid PodSecurity label races with the HyperShift control-plane operator.
+  local _renewal_ns="${DHCP_RENEWAL_NS:-${multi_ns}}"
   if ! cat <<RENEW_EOF | oc apply -f -; then
 apiVersion: v1
 kind: Pod
 metadata:
   name: ${renew_pod}
-  namespace: ${multi_ns}
+  namespace: ${_renewal_ns}
   annotations:
     k8s.v1.cni.cncf.io/networks: localnet-1
 spec:
@@ -777,18 +808,18 @@ RENEW_EOF
     echo "WARNING: Failed to create DHCP renewal pod ${renew_pod} for ${vmi}"
     return 1
   fi
-  oc wait pod/"${renew_pod}" -n "${multi_ns}" \
+  oc wait pod/"${renew_pod}" -n "${_renewal_ns}" \
     --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s 2>&1 || true
   echo "--- DHCP renewal output for ${vmi} ---"
-  oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | tail -20
-  if ! oc logs "${renew_pod}" -n "${multi_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
+  oc logs "${renew_pod}" -n "${_renewal_ns}" 2>&1 | tail -20
+  if ! oc logs "${renew_pod}" -n "${_renewal_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
     echo "WARNING: VMI ${vmi} may still lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY} after SSH renewal"
     localnet_multi_log_check "${vmi}" "default_route=MISSING renewal=ssh"
-    oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
+    oc delete pod "${renew_pod}" -n "${_renewal_ns}" --ignore-not-found 2>/dev/null || true
     return 1
   fi
   localnet_multi_log_check "${vmi}" "default_route=OK renewal=ssh"
-  oc delete pod "${renew_pod}" -n "${multi_ns}" --ignore-not-found 2>/dev/null || true
+  oc delete pod "${renew_pod}" -n "${_renewal_ns}" --ignore-not-found 2>/dev/null || true
   return 0
 }
 
