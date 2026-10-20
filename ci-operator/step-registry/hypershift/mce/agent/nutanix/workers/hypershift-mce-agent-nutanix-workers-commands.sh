@@ -49,7 +49,12 @@ cp "$SHARED_DIR/hostnames.txt" "$SHARED_DIR/nutanix_worker_names"
 printf '%s\n' "$IMAGE_NAME" > "$SHARED_DIR/nutanix_image_name"
 : > "$SHARED_DIR/vm_uuids.txt"
 : > "$SHARED_DIR/image_uuid.txt"
-cp "$SHARED_DIR/hcp-agent-nutanix.iso" "$WORK_DIR/$IMAGE_NAME"
+iso_url=$(oc get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o go-template='{{with .status.isoDownloadURL}}{{.}}{{end}}')
+if [[ -z "$iso_url" ]]; then
+  echo "InfraEnv $INFRAENV_NAME has no ISO download URL."
+  exit 1
+fi
+curl --fail --location --silent --show-error --insecure "$iso_url" -o "$WORK_DIR/$IMAGE_NAME"
 
 export WORK_DIR AGENT_IMAGE="$IMAGE_NAME" SHARED_DIR
 export NUTANIX_HOST NUTANIX_PORT NUTANIX_USERNAME NUTANIX_PASSWORD NUTANIX_PC_URL
@@ -238,5 +243,5 @@ for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
     "timeout 10 /usr/bin/bash -c '</dev/tcp/$proxy_host/$proxy_port'" >/dev/null
 done
 
-rm -f "$SHARED_DIR/hcp-agent-nutanix.iso"
+rm -f "$WORK_DIR/$IMAGE_NAME"
 printf 'Provisioned %s run-owned Nutanix workers; Agents joined and guest Nodes are Ready.\n' "$NUTANIX_WORKERS"

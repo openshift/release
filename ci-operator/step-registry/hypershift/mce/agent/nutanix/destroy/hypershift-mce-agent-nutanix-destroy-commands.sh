@@ -210,6 +210,5 @@ if [[ "$management_cleanup_failed" == "true" ]]; then
 fi
 
 rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_pull_secret_created"
-rm -f "$SHARED_DIR/hcp-agent-nutanix.iso"
 rm -rf /tmp/hcp-agent-nutanix
 printf "Deleted this run's Nutanix resources for lease %s; CI-operator releases the lease after the workflow.\n" "$lease_resource"
