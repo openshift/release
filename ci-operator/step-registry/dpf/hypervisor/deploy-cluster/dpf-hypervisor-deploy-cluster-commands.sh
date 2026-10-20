@@ -272,7 +272,8 @@ echo ".env file generated successfully"
 # Set LIBVIRT_HOST for remote VM management from the Prow pod
 # Include user since the pod runs as UID 1000, not root
 echo "LIBVIRT_HOST=root@${REMOTE_HOST}" >> .env
-echo "Added LIBVIRT_HOST=root@${REMOTE_HOST} to .env"
+echo "POWER_OFF_WORKERS=false" >> .env
+echo "Added LIBVIRT_HOST=root@${REMOTE_HOST} and POWER_OFF_WORKERS=false to .env"
 
 # Update KUBECONFIG to local path
 sed -i "s|KUBECONFIG=.*|KUBECONFIG=${WORK_DIR}/kubeconfig.${CLUSTER_NAME}|" .env
