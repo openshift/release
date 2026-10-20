@@ -110,12 +110,27 @@ ref:
         Optional comma-separated CIDRs excluded from OVN IPAM on the primary localnet NAD
         (in addition to choosing a non-overlapping primary subnet). Use when the primary
         subnet must be a full /24 but must not assign dev-scripts VIP addresses.
+    - name: LOCALNET_MULTI_IPV6_SUBNET
+      default: ""
+      documentation: |-
+        IPv6 CIDR for the primary localnet NAD, enabling dual-stack on the guest cluster's
+        external network. When set, OVN natively manages IPv6 on the localnet and a br-ex
+        flow fix is applied so management kernel responses (e.g. Ingress VIP SYN-ACKs) reach
+        VMs via the localnet bridge instead of being sent only to the physical NIC.
+        - "auto": auto-discover from the management cluster's IPv6 machineNetwork (upper /121
+          of the node /120, e.g. fd2e:6f44:5dd8:c956::80/121). Falls back to no IPv6 if the
+          management cluster is IPv4-only.
+        - "": no IPv6 on localnet (IPv4-only, uses LOCALNET_MULTI_DISABLE_IPV6_BOOT for
+          IPv6 blocking during bootstrap).
+        - explicit CIDR: use this IPv6 subnet for the primary localnet NAD.
     - name: LOCALNET_MULTI_DISABLE_IPV6_BOOT
       default: "true"
       documentation: |-
         When true and IP_STACK is dual-stack (v4v6/v6v4), strip IPv6 from localnet LSPs and
         disable IPv6 on worker enp*s0 during bootstrap so initrd Ignition reaches the IPv4
         ingress VIP instead of timing out on IPv6.
+        Ignored when LOCALNET_MULTI_IPV6_SUBNET resolves to a valid IPv6 CIDR, because OVN
+        then manages IPv6 natively on the localnet.
     - name: LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE
       default: "true"
       documentation: |-

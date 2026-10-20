@@ -83,6 +83,77 @@ discover_ovn_container_names() {
   return 0
 }
 
+# discover_localnet_ipv6_subnet auto-discovers an IPv6 subnet for localnet VMs
+# from the management cluster's worker node IPv6 addresses.  Returns the upper
+# half (/121) of the /120 machine network so VM addresses do not collide with
+# management node addresses or VIPs in the lower half.
+discover_localnet_ipv6_subnet() {
+  local node_ipv6
+  node_ipv6=$(oc get nodes -l node-role.kubernetes.io/worker \
+    -o jsonpath='{.items[0].status.addresses}' 2>/dev/null \
+    | python3 -c "
+import sys, json
+try:
+    addrs = json.loads(sys.stdin.read())
+    for a in addrs:
+        if ':' in a['address'] and a['type'] == 'InternalIP':
+            print(a['address']); break
+except: pass
+" 2>/dev/null)
+  if [[ -z "${node_ipv6}" ]]; then
+    return 1
+  fi
+  python3 -c "
+import ipaddress
+addr = ipaddress.ip_address('${node_ipv6}')
+net  = ipaddress.ip_network(f'{addr}/120', strict=False)
+print(ipaddress.ip_network(f'{net.network_address + 128}/121'))
+" 2>/dev/null
+}
+
+# ensure_brex_ipv6_localnet_flow adds a priority-102 NORMAL rule on br-ex for
+# IPv6 traffic originating from the kernel (in_port=LOCAL) to the management
+# IPv6 /120.  OVN-K generates a matching subnet-wide rule for IPv4
+# (nw_dst=192.168.111.0/24 → NORMAL) but only per-address rules for IPv6
+# (node-self + VIPs).  Without a subnet-wide IPv6 rule, kernel responses
+# (Ingress VIP SYN-ACKs) to localnet VMs are sent to output:1 (physical NIC)
+# only and never reach the localnet OVS patch port on same-node VMs, causing
+# TCP timeouts.  The rule uses the OVN-K cookie so it matches the existing flow
+# format.  Because OVN-K may reconcile br-ex flows periodically, this function
+# should be called more than once during the VM bootstrap window.
+ensure_brex_ipv6_localnet_flow() {
+  local ipv6_subnet="$1"
+  local mgmt_net node ovn_pod brex_mac
+
+  mgmt_net=$(python3 -c "
+import ipaddress
+net = ipaddress.ip_network('${ipv6_subnet}', strict=False)
+print(ipaddress.ip_network(f'{net.network_address}/120', strict=False))
+" 2>/dev/null)
+  if [[ -z "${mgmt_net}" ]]; then
+    echo "WARNING: could not derive /120 from ${ipv6_subnet}, skipping br-ex flow fix"
+    return 1
+  fi
+
+  for node in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    [[ -z "${ovn_pod}" ]] && continue
+    if oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      ovs-ofctl dump-flows br-ex 2>/dev/null | grep -q "ipv6_dst=${mgmt_net}"; then
+      continue
+    fi
+    brex_mac=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      cat /sys/class/net/br-ex/address 2>/dev/null || true)
+    [[ -z "${brex_mac}" ]] && continue
+    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      ovs-ofctl add-flow br-ex \
+      "cookie=0xdeff105,priority=102,ipv6,in_port=LOCAL,dl_src=${brex_mac},ipv6_dst=${mgmt_net},actions=ct(commit,zone=64000,exec(load:0x2->NXM_NX_CT_MARK[])),NORMAL" \
+      2>/dev/null || true
+    echo "  ${node}: added br-ex IPv6 NORMAL flow for ${mgmt_net}"
+  done
+}
+
 # find_localnet_lsps_for_nad prints LSP names (one per line) for a NAD on a node's OVN DB.
 find_localnet_lsps_for_nad() {
   local multi_ns="$1"
@@ -191,6 +262,9 @@ count_configured_localnet_lsps_for_nad() {
 }
 
 localnet_multi_should_disable_ipv6_boot() {
+  # When OVN manages IPv6 natively on the localnet (IPv6 subnet in the NAD),
+  # do not block IPv6 during boot — the whole point is dual-stack.
+  [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && return 1
   [[ "${LOCALNET_MULTI_DISABLE_IPV6_BOOT:-true}" == "true" ]] \
     && [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]
 }
@@ -240,7 +314,7 @@ localnet_multi_block_ipv6_ingress() {
 
   ls_name=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
     ovn-nbctl --no-leader-only --bare --columns=name find Logical_Switch \
-    "ports{>=${lsp_uuid}}" 2>/dev/null | head -1) || return 0
+    "ports{>=}${lsp_uuid}" 2>/dev/null | head -1) || return 0
   if [[ -z "${ls_name}" ]]; then
     echo "  Warning: could not find logical switch for ${lsp_name}, skipping IPv6 ACL"
     return 0
@@ -355,7 +429,9 @@ localnet_multi_guest_renew_script() {
     renew_devices="${renew_devices} enp${idx}s0"
   done
   inner_script="for dev in${renew_devices}; do "
-  inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
+  if localnet_multi_should_disable_ipv6_boot; then
+    inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
+  fi
   inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
   inner_script+="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
   inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
@@ -597,19 +673,23 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   # Build the remote fix script with a quoted heredoc (zero expansion), then
   # substitute placeholders.  base64-encode the result and pass it as a pod
   # env-var so no multi-level shell escaping is needed.
-  # The script: (1) disables IPv6 on localnet interfaces, (2) injects a
-  # static default route (immune to competing DHCP servers such as baremetal
-  # dnsmasq), and (3) installs a NM dispatcher so the route survives the MCD
-  # rpm-ostree rebase + reboot (OVS takes over enp1s0 → br-ex after rebase).
-  local fix_script fix_b64
-  fix_script=$(sed "s|__GW__|${LOCALNET_MULTI_PRIMARY_GATEWAY}|g; s|__DEVS__|${renew_devices}|g" <<'FIXEOF'
+  # The script: (1) optionally disables IPv6 on localnet interfaces (skipped
+  # when dual-stack IPv6 is configured on the NAD), (2) injects a static
+  # default route (immune to competing DHCP servers such as baremetal dnsmasq),
+  # and (3) installs a NM dispatcher so the route survives the MCD rpm-ostree
+  # rebase + reboot (OVS takes over enp1s0 → br-ex after rebase).
+  local fix_script fix_b64 disable_ipv6="false"
+  localnet_multi_should_disable_ipv6_boot && disable_ipv6="true"
+  fix_script=$(sed "s|__GW__|${LOCALNET_MULTI_PRIMARY_GATEWAY}|g; s|__DEVS__|${renew_devices}|g; s|__DISABLE_IPV6__|${disable_ipv6}|g" <<'FIXEOF'
 #!/bin/bash
 set -e
 GW="__GW__"
-for dev in __DEVS__; do
-  sudo nmcli device set "$dev" ipv6.method disabled 2>/dev/null || true
-  sudo nmcli device reapply "$dev" 2>/dev/null || true
-done
+if [ "__DISABLE_IPV6__" = "true" ]; then
+  for dev in __DEVS__; do
+    sudo nmcli device set "$dev" ipv6.method disabled 2>/dev/null || true
+    sudo nmcli device reapply "$dev" 2>/dev/null || true
+  done
+fi
 GW_DEV=""
 for cand in br-ex enp1s0; do
   if ip addr show "$cand" 2>/dev/null | grep -q 'inet '; then
@@ -925,6 +1005,25 @@ EOF
       exit 1
     fi
 
+    # Resolve IPv6 subnet for dual-stack localnet.
+    # "auto" discovers the management cluster's IPv6 machineNetwork and carves
+    # out the upper /121 for VM addresses.  An explicit CIDR is used as-is.
+    # Empty string means no IPv6 on localnet (IPv4-only).
+    LOCALNET_MULTI_IPV6_SUBNET_RESOLVED=""
+    if [[ "${LOCALNET_MULTI_IPV6_SUBNET:-}" == "auto" ]]; then
+      if [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]; then
+        LOCALNET_MULTI_IPV6_SUBNET_RESOLVED=$(discover_localnet_ipv6_subnet) || true
+        if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" ]]; then
+          echo "Auto-discovered IPv6 subnet for localnet: ${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+        else
+          echo "WARNING: Could not auto-discover IPv6 subnet; localnet will be IPv4-only"
+        fi
+      fi
+    elif [[ -n "${LOCALNET_MULTI_IPV6_SUBNET:-}" ]]; then
+      LOCALNET_MULTI_IPV6_SUBNET_RESOLVED="${LOCALNET_MULTI_IPV6_SUBNET}"
+      echo "Using explicit IPv6 subnet for localnet: ${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+    fi
+
     # Add bridge-mappings on all nodes when using multiple localnet networks or a
     # custom bridge/physnet.  The default physnet:br-ex exists automatically; additional
     # names (physnet2, physnet3, ...) are needed because OVN-K doesn't support multiple
@@ -1014,6 +1113,11 @@ EOF
         if [[ ${i} -eq 1 && -n "${LOCALNET_MULTI_EXCLUDE_SUBNETS:-}" ]]; then
           EXCLUDE_SUBNETS_JSON=",\"excludeSubnets\": \"${LOCALNET_MULTI_EXCLUDE_SUBNETS}\""
         fi
+        # For the primary localnet, add the IPv6 subnet for dual-stack.
+        NAD_SUBNETS="${SUBNET}"
+        if [[ ${i} -eq 1 && -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+          NAD_SUBNETS="${SUBNET},${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+        fi
         oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -1027,13 +1131,13 @@ spec:
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
       "netAttachDefName": "${ns}/${NAD_NAME}",
-      "subnets": "${SUBNET}"${EXCLUDE_SUBNETS_JSON}
+      "subnets": "${NAD_SUBNETS}"${EXCLUDE_SUBNETS_JSON}
   }'
 EOF
         if [[ -n "${EXCLUDE_SUBNETS_JSON}" ]]; then
-          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${SUBNET}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
+          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${NAD_SUBNETS}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
         else
-          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${SUBNET})"
+          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${NAD_SUBNETS})"
         fi
       fi
     done
@@ -1188,6 +1292,15 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
   fi
 
   echo "Configuring early OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces on nodes:${LAUNCHER_NODES}"
+
+  # When dual-stack is enabled, add the missing br-ex IPv6 NORMAL flow so kernel
+  # responses (Ingress VIP SYN-ACKs) can reach localnet VMs.  Re-applied
+  # periodically below because OVN-K may reconcile br-ex flows.
+  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+    echo "Applying br-ex IPv6 flow fix for dual-stack localnet (${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED})..."
+    ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+  fi
+
   prepare_localnet_multi_dhcp_renewal_secret "${MULTI_NAMESPACE}" || true
   for attempt in $(seq 1 120); do
     LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
@@ -1237,6 +1350,12 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHC
     echo "WARNING: No virt-launcher pods found after 10 minutes" >&2
   fi
 
+  # When dual-stack is enabled, add the br-ex IPv6 flow fix.
+  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+    echo "Applying br-ex IPv6 flow fix for dual-stack localnet (${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED})..."
+    ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+  fi
+
   # Even with external DHCP, block IPv6 ingress on localnet LSPs in dual-stack
   # environments to prevent VMs from getting DHCPv6 leases from the management
   # cluster's dnsmasq/radvd, which would cause Ignition to resolve the IPv6
@@ -1273,6 +1392,10 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
   NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
   for attempt in $(seq 1 360); do
     renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    # Re-apply br-ex IPv6 flow every ~60s in case OVN-K reconciled it away.
+    if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && [[ $((attempt % 12)) -eq 0 ]]; then
+      ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+    fi
     if oc get hostedcluster "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
       -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
       echo "HostedCluster became Available (attempt ${attempt})"
@@ -1289,6 +1412,10 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHC
   # Just wait for HC Available with periodic status logging.
   MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   for attempt in $(seq 1 360); do
+    # Re-apply br-ex IPv6 flow every ~60s in case OVN-K reconciled it away.
+    if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && [[ $((attempt % 12)) -eq 0 ]]; then
+      ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+    fi
     if oc get hostedcluster "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
       -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
       echo "HostedCluster became Available (attempt ${attempt})"
