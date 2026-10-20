@@ -1,0 +1,105 @@
+ref:
+  as: ovs-doca-build-osimage
+  from: nested-podman
+  cli: latest
+  nested_podman: true
+  grace_period: 10m
+  timeout: 1h30m0s
+  commands: ovs-doca-build-osimage-commands.sh
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+  credentials:
+  - collection: ovs-doca
+    group: rhsm-activation-key
+    mount_path: /var/run/rhsm-creds
+  - collection: ovs-doca
+    group: quay-push
+    mount_path: /var/run/quay-push
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: OVS_DOCA_BASE_IMAGE_TAGS
+    default: "rhel-coreos-10 rhel-coreos"
+    documentation: |-
+      Space-separated, ordered list of release payload image tags to use as the layering base.
+      The first tag that resolves in the payload wins. Defaults to preferring the RHEL 10
+      CoreOS variant of the 4.22 dual stream, falling back to the default rhel-coreos tag.
+  - name: OVS_DOCA_PACKAGES
+    default: "doca-networking-runtime openvswitch-selinux-extra-policy mft"
+    documentation: |-
+      Space-separated list of packages to install into the layered CoreOS image.
+      libunwind is deliberately absent: it does not exist as a package in RHEL 10 and
+      nothing in the DOCA stack requires it.
+  - name: OVS_DOCA_REMOVE_PACKAGES
+    default: "openvswitch[0-9]*"
+    documentation: |-
+      Space-separated list of package globs to remove before installing OVS_DOCA_PACKAGES.
+      The stock openvswitch packages conflict with the DOCA-provided ones and must go first.
+      Set to an empty string to skip the removal.
+  - name: OVS_DOCA_REPO_COMPONENTS
+    default: "baseos appstream supplementary"
+    documentation: |-
+      Space-separated list of RHEL CDN components to enable inside the layering build. Each is
+      expanded to
+      https://${OVS_DOCA_CDN_HOST}/content/dist/rhel10/${OVS_DOCA_RELEASEVER}/aarch64/<component>/os
+      and authenticated with the entitlement certificate.
+
+      The DOCA packages (doca-networking-runtime, doca-openvswitch, mft, and the 1.0-41 build of
+      openvswitch-selinux-extra-policy) ship in 'supplementary'. There is no DOCA-specific
+      repository, and fast-datapath carries only older openvswitch-selinux-extra-policy builds.
+  - name: OVS_DOCA_NVIDIA_BASEURL
+    default: "https://linux.mellanox.com/public/repo/doca/3.5.0/rhel10/arm64-sbsa/"
+    documentation: |-
+      NVIDIA DOCA repository used only to fill the dependency gaps that Red Hat's Supplementary
+      channel leaves open, at a worse dnf priority than the Red Hat repositories so that Red
+      Hat content wins wherever it exists. On DOCA 3.5.0 / aarch64 / el10 this pulls 7 of 142
+      packages from NVIDIA; the rest, including all four wanted DOCA packages, come from Red
+      Hat. Note the arch path component here is 'arm64-sbsa', not 'aarch64'.
+
+      Set to an empty string to build from Red Hat content only. That does not currently
+      resolve -- see README.md for the three unsatisfied requirements and why.
+  - name: OVS_DOCA_RELEASEVER
+    default: "10"
+    documentation: |-
+      The $releasever used to build the CDN paths. '10' tracks the latest RHEL 10 minor; pin to
+      a specific minor such as '10.2' to match a fixed RHCOS base.
+  - name: OVS_DOCA_CDN_HOST
+    default: "cdn.redhat.com"
+    documentation: The Red Hat CDN host serving entitled content.
+  - name: OVS_DOCA_IMAGE_REPO
+    default: "quay.io/rh-ecosystem-edge/ovs-doca-layering"
+    documentation: |-
+      Repository the layered CoreOS image is pushed to. Must be publicly readable, or the
+      cluster pull secret must already carry credentials for it, otherwise nodes cannot pivot.
+  - name: OVS_DOCA_IMAGE_EXPIRATION
+    default: "24h"
+    documentation: Value for the quay.expires-after label on the pushed layered image.
+  - name: OVS_DOCA_MCP
+    default: "worker"
+    documentation: |-
+      The MachineConfigPool whose nodes pivot to the layered image. The generated MachineConfig
+      is written to SHARED_DIR so that ipi-install applies it as a day-0 install manifest,
+      meaning nodes come up on the layered image rather than being reconfigured afterwards.
+  documentation: |-
+    Builds a DOCA-enabled layered RHCOS image and stages it for day-0 installation.
+
+    Runs before ipi-install. Resolves the RHEL 10 CoreOS image from the release payload,
+    obtains a Red Hat entitlement from the ovs-doca/rhsm-activation-key secret, and runs a
+    nested podman build that removes the stock openvswitch packages and installs the DOCA
+    networking stack. Entitlement certificates are bind-mounted into the build, so they never
+    land in an image layer.
+
+    The image is pushed by digest and a MachineConfig carrying spec.osImageURL is written to
+    ${SHARED_DIR}/manifest_*.yaml, so the installer applies it as an initial cluster manifest
+    and nodes boot the DOCA image rather than being reconfigured afterwards. The image
+    reference is written to ${SHARED_DIR}/ovs-doca-osimage-reference for validation steps.
+
+    Run this step pod on arm64 via node_architecture_overrides so the aarch64 RPM transaction
+    executes natively rather than under emulation.
+
+    See ci-operator/step-registry/ovs-doca/README.md for which repositories the packages come
+    from, the Red Hat dependency gaps that make the NVIDIA repository necessary, the accepted
+    secret shapes, and how to reproduce the dependency analysis without a cluster.
