@@ -360,14 +360,7 @@ fi
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
-OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
-OVERLAYS_REF=main
-OVERLAYS_COMMIT=677eb0fdf5aeb4a3c280b08f5f2ac33324664959
-git clone --depth 1 --branch "${OVERLAYS_REF}" "${OVERLAYS_REPO}" "${WORKDIR}/rhdh-plugin-export-overlays"
-if [[ "$(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)" != "${OVERLAYS_COMMIT}" ]]; then
-    echo "ERROR: overlays test checkout did not resolve to pinned commit ${OVERLAYS_COMMIT}" >&2
-    exit 1
-fi
+git clone --depth 1 --branch main https://github.com/redhat-developer/rhdh-plugin-export-overlays.git "${WORKDIR}/rhdh-plugin-export-overlays"
 cd "${WORKDIR}/rhdh-plugin-export-overlays"
 TEST_EXIT=0
 oc create serviceaccount tester-sa-2 -n default 2>/dev/null || true
