@@ -64,6 +64,13 @@ images:
         rm grpcurl_1.8.9_linux_x86_64.tar.gz
     from: src
     to: src-grpcurl
+  - dockerfile_literal: |
+      FROM quay.io/ocp-edge-qe/eco-gotests:latest
+      USER 0
+      RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+      RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    to: eco-gotests
+    run_if_changed: x^
 operator:
   bundles:
   - as: operator-bundle
@@ -285,6 +292,32 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
+- as: eco-gotests-kmm-modules
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm --timeout 5m0s "$OO_BUNDLE"
+        oc wait --for=condition=Available -n openshift-kmm --timeout=10m deployment/kmm-operator-controller
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - ref: kernel-module-management-eco-gotests
+  workflow: generic-claim
 - as: security
   steps:
     env:
