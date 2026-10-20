@@ -77,7 +77,7 @@ exec /usr/bin/timeout --signal=TERM --kill-after=0.1s 0.1s "$@"
             if scenario == "artifact-failure":
                 environment["ARTIFACT_DIR"] = str(root / "missing")
             command = ["bash", "-x", str(SCRIPT)] if scenario == "traced" else ["bash", str(SCRIPT)]
-            result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
+            result = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5, check=False)
             self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
             self.assertNotIn("SENSITIVE-MARKER", result.stdout + result.stderr)
             calls = (root / "calls").read_text()

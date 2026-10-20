@@ -12,7 +12,9 @@ memory; raw output and stderr are never written to artifacts or logged.
 The JSON artifact and summary allow only a fixed failure reason, collection
 availability and state. State accepts only `error` or `uninstalling`; all other
 values are withheld. No free-form fields, identifiers or account data are kept.
-Malformed, oversized/truncated or failed responses yield an unavailable state.
+Oversized responses are truncated before parsing. Malformed or failed responses
+yield an unavailable state; a truncated response is usable only if it still
+parses as exactly one JSON object.
 Artifact write failure is best effort and the original exit remains 1.
 
 The command and `.state` field already exist in this step. The registry's
