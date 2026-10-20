@@ -61,6 +61,7 @@ class Cell:
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
     fips: bool = False
+    dualstack: bool = False
     storage_override: str | None = None
 
     @property
@@ -135,7 +136,9 @@ class Cell:
             if self.kind == "periodic"
             else f"{self.cloud}-{self.storage}"
         )
-        return f"{base}-fips" if self.fips else base
+        if self.fips:
+            base = f"{base}-fips"
+        return f"{base}-dualstack" if self.dualstack else base
 
     @property
     def filename(self) -> str:
@@ -167,6 +170,7 @@ class Cell:
             "kind": self.kind,
             "layout": self.layout,
             "fips": self.fips,
+            "dualstack": self.dualstack,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

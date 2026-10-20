@@ -9,7 +9,17 @@ tests:
       # Mailpit stays off and the @feature:MAILING specs self-skip.
       QUAY_DEPLOY_MAILPIT: "false"
 {%- endif %}
+{%- if dualstack %}
+      IP_FAMILY: DualStackIPv6Primary
+      # quay-mirror init gets "connection refused" from quay-app:80 on this
+      # IPv6-primary cluster, likely because Quay's TLS nginx config has no
+      # [::]:8080 listener. Drop this and the extra grep-invert tests (they
+      # need FEATURE_REPO_MIRROR) once a fixed Quay 3.18 build ships.
+      QUAY_MIRROR_MANAGED: "false"
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}|auto-pruning does not affect mirror repos|can change repository state|Builds tab not visible for read-only repositories'
+{%- else %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+{%- endif %}
 {%- if storage == "odf" %}
       SETUP_NOOBAA: "true"
       QUAY_STORAGE_PROVIDER: odf
@@ -36,6 +46,9 @@ tests:
 {%- if fips %}
         FEATURE_FIPS: true
 {%- endif %}
+{%- if dualstack %}
+        FEATURE_LISTEN_IP_VERSION: dual-stack
+{%- endif %}
 {%- if quay_version is defined and quay_version.split(".")[0] | int >= 5 %}
         FEATURE_ROBOT_API_TOKENS: true
 {%- endif %}
@@ -53,4 +66,7 @@ tests:
     - ref: quay-install-odf-operator
 {%- endif %}
     - ref: "{{ deploy_ref }}"
+{%- if dualstack %}
+    - ref: quay-check-dualstack
+{%- endif %}
     - ref: quay-test-e2e

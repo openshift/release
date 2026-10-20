@@ -1184,6 +1184,58 @@ def test_presubmit_rejects_fips() -> None:
         expand_cells(matrix)
 
 
+def test_redhat_318_aws_ocp50_dualstack_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {
+        test["as"]: test
+        for test in by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]["tests"]
+    }
+
+    dualstack = tests["aws-s3-nightly-dualstack"]
+    assert dualstack["cron"] == "@weekly"
+    assert dualstack["steps"]["env"]["IP_FAMILY"] == "DualStackIPv6Primary"
+    assert dualstack["steps"]["env"]["QUAY_MIRROR_MANAGED"] == "false"
+    assert dualstack["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"].endswith(
+        "|auto-pruning does not affect mirror repos"
+        "|can change repository state"
+        "|Builds tab not visible for read-only repositories"
+    )
+    extra = dualstack["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert "FEATURE_LISTEN_IP_VERSION: dual-stack" in extra
+    steps = dualstack["steps"]["test"]
+    deploy = steps.index({"ref": "quay-deploy-aws-s3"})
+    assert steps[deploy + 1] == {"ref": "quay-check-dualstack"}
+    assert steps[:deploy + 1] + steps[deploy + 2:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "IP_FAMILY" not in plain["env"]
+    assert "QUAY_MIRROR_MANAGED" not in plain["env"]
+    assert "auto-pruning" not in plain["env"]["PLAYWRIGHT_GREP_INVERT"]
+    assert "can change repository state" not in plain["env"]["PLAYWRIGHT_GREP_INVERT"]
+    assert "FEATURE_LISTEN_IP_VERSION" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_dualstack_only_on_aws_periodic() -> None:
+    job = {
+        "cron": "daily",
+        "source": "nightly",
+        "clouds": ["gcp"],
+        "ocp": ["5.0"],
+        "test": "e2e-install",
+        "dualstack": True,
+    }
+    with pytest.raises(ValueError, match="dualstack is only valid for clouds"):
+        expand_cells(_matrix_with_job(job))
+    presubmit = {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    matrix = _matrix_with_job(
+        {**presubmit, "dualstack": True},
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="dualstack is only valid for kind: periodic"):
+        expand_cells(matrix)
+
+
 def test_storage_odf_allowed_only_on_aws() -> None:
     for cloud in ("gcp", "azure", "libvirt"):
         matrix = _matrix_with_job(
