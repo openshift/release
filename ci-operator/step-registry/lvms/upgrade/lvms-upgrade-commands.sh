@@ -317,6 +317,16 @@ function main() {
     local new_version
     new_version=$(get_lvms_version)
     echo "LVMS upgrade completed: ${new_version}"
+
+     # Prove an upgrade actually happened
+    if [[ "${new_version}" == "${current_version}" ]]; then
+        echo "ERROR: LVMS did not upgrade; still at ${current_version}"
+        return 1
+    fi
+    if [[ "$(printf '%s\n%s\n' "${current_version}" "${new_version}" | sort -V | tail -1)" != "${new_version}" ]]; then
+        echo "ERROR: ${new_version} is not newer than ${current_version}"
+        return 1
+    fi
 }
 
 main
