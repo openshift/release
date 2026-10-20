@@ -153,6 +153,130 @@ tests:
         requests:
           cpu: 100m
     workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-odh-kserve-auth
+  run_if_changed: ^cmd/.*\.go$|^internal/controller/(resources/(authconfig|template/authconfig_|configmap\.go$|gateway\.go$|networkpolicy\.go$|peerauthentication\.go$|route\.go$|secret\.go$|service\.go$|servicemeshmember\.go$|smmr\.go$)|comparators/(authconfig|resourcecomparator|gateway|networkpolicy|peerAuthentication|route|service|servicemeshmember)|processors/|serving/((inference(service|graph)|servingruntime)_controller|reconcilers/(kserve_(authconfig|serverless|istio|isvc|route|networkpolicy)|meta\.go$|types\.go$))|core/(secret|configmap)_controller|utils/(utils|init|cert|conditions|converter|gvk)(_test)?\.go$|constants/constants\.go$)|^config/(base|default|manager|rbac|certmanager|network-policy)/|^config/crd/external/authorino\.kuadrant\.io_authconfigs\.yaml$|^test/e2e/authorino/.*\.go$|^test/config/authconfig-e2e/.*\.yaml$|^hack/setup-authconfig-e2e\.sh$|^go\.(mod|sum)$|^(Makefile|Containerfile)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log "${ARTIFACT_DIR}/" || true
+        oc logs -n authconfig-e2e deployment/authorino --all-containers --tail=500 > "${ARTIFACT_DIR}/authorino.log" 2>&1 || true
+        oc logs -n opendatahub deployment/odh-model-controller --all-containers --tail=500 > "${ARTIFACT_DIR}/model-controller.log" 2>&1 || true
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        oc adm must-gather \
+          --image=quay.io/modh/must-gather:rhoai-2.24 \
+          --dest-dir "${ARTIFACT_DIR}/gather-kserve" \
+          -- "export COMPONENT=kserve; /usr/bin/gather"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - chain: hypershift-hostedcluster-destroy
+    test:
+    - as: serverless-setup
+      cli: latest
+      commands: |
+        set -euxo pipefail
+        echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
+
+        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
+        pushd /tmp/kserve
+          git fetch --all --tags
+          git checkout stable-2.x
+
+          git clone --depth 1 --branch stable-2.x \
+            https://github.com/opendatahub-io/odh-model-controller.git /tmp/kserve/odh-model-controller
+          export ODH_MC_MANIFEST_SOURCE=../../odh-model-controller/config/base
+
+          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
+          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          echo "Loading environment variables from params.env"
+          #Parse params.env into shell vars with underscores instead of dashes
+          while IFS='=' read -r key value; do
+            case "$key" in
+              ''|\#*) continue ;;
+            esac
+            key="${key%%[[:space:]]*}"
+            value="${value##[[:space:]]}"
+            sane_key="${key//-/_}"
+            printf -v "$sane_key" '%s' "$value"
+          done < config/overlays/odh/params.env
+
+          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
+          export KSERVE_AGENT_IMAGE="${kserve_agent}"
+          export KSERVE_ROUTER_IMAGE="${kserve_router}"
+          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
+          export LLMD_IMAGE="${kserve_llm_d}"
+          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
+          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
+          export OAUTH_PROXY_IMAGE="${oauth_proxy}"
+
+          echo "Loaded all images from params.env:"
+          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
+          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
+          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
+          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
+          echo "LLMD_IMAGE=${LLMD_IMAGE}"
+          echo "LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}"
+          echo "LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}"
+          echo "OAUTH_PROXY_IMAGE=${OAUTH_PROXY_IMAGE}"
+
+          ./test/scripts/openshift-ci/setup-e2e-tests.sh predictor 1 serverless
+        popd
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 45m0s
+    - as: serverless-auth
+      cli: latest
+      commands: |
+        set -euo pipefail
+        unset GOFLAGS
+        bash hack/setup-authconfig-e2e.sh
+        make test-e2e-authorino E2E_ARGS="-ginkgo.junit-report=${ARTIFACT_DIR}/junit-serverless-auth.xml"
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: src
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      timeout: 40m0s
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
   steps:
