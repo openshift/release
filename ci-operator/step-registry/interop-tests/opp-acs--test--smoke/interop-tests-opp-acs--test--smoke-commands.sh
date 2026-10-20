@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euxo pipefail
-shopt -s inherit_errexit 2>/dev/null || true
+shopt -s inherit_errexit
 
 # Run ACS smoke tests via openshift-tests with local extension binary
 openshift-tests run-suite acs/smoke \
