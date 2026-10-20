@@ -680,24 +680,27 @@ def test_list_shows_one_row_per_cell_in_grouped_file(capsys: object) -> None:
 
 
 def test_check_clean_after_generate(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    assert (tmp_path / PHASE0_NAME).exists()
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    assert (out / PHASE0_NAME).exists()
+    assert main(["--check", "--output", str(out)]) == 0
 
 
 def test_check_fails_when_stale(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / PHASE0_NAME).write_text("foo: bar\n")
-    assert main(["--check", "--output", str(tmp_path)]) == 1
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    (out / PHASE0_NAME).write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
 
 
 def test_check_ignores_header_and_quoting_drift(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    path = tmp_path / PHASE0_NAME
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    path = out / PHASE0_NAME
     parsed = yaml.safe_load(path.read_text())
     path.write_text("# extra comment\n" + yaml.dump(parsed, sort_keys=False))
     assert yaml.safe_load(path.read_text()) == parsed
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+    assert main(["--check", "--output", str(out)]) == 0
 
 
 def test_check_fails_when_missing(tmp_path: Path) -> None:
@@ -731,11 +734,12 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
 
 
 def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
-    (tmp_path / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
-    (tmp_path / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    (out / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
+    (out / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
+    (out / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 0
 
 
 def test_managed_files_active_must_match_generated(tmp_path: Path) -> None:
@@ -1316,7 +1320,9 @@ def test_redhat_318_aws_fips_shares_aws_file() -> None:
 
 def test_robot_api_tokens_only_on_quay_5() -> None:
     results, _retired = generate_all()
-    for _group, filename, config in results:
+    for group, filename, config in results:
+        if group[0].test != "e2e-install":
+            continue
         enabled = "redhat-5." in filename
         for test in config["tests"]:
             extra = test["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()

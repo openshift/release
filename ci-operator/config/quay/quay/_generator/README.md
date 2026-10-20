@@ -24,9 +24,9 @@ python3 generate.py --list       # show matrix expansion table (includes KIND an
 python3 generate.py --output DIR # write or check a specific directory
 ```
 
-Standalone default output is `./out`. When this directory is named `_generator`, output is the parent directory (`ci-operator/config/quay/quay/` in openshift/release).
+Standalone default output is `./out`. When this directory is named `_generator`, output is the parent directory (`ci-operator/config/quay/quay/` in openshift/release). Cells whose test targets another repo (`REPO_BY_TEST` in `model.py`) write to the sibling directory named after that repo instead (`ci-operator/config/quay/quay-operator/` in-tree); `--check`, `--dry-run` and `--output DIR` cover both.
 
-`--check` is the CI verification step: exit `1` if any file listed in `managed_files.active` is missing or its parsed YAML differs from what the matrix generates, or if any file listed in `managed_files.retired` still exists in the output directory. Files not listed in either list are ignored entirely, including hand-written neighbours like `quay-quay-master__claim.yaml` and `quay-quay-master__omr-*.yaml`. Content comparison is parsed YAML (comments and `determinize-ci-operator` quoting are ignored).
+`--check` is the CI verification step: exit `1` if any file listed in `managed_files.active` is missing or its parsed YAML differs from what the matrix generates, or if any file listed in `managed_files.retired` still exists in an output directory. Files not listed in either list are ignored entirely, including hand-written neighbours like `quay-quay-master__claim.yaml` and `quay-quay-master__omr-*.yaml`. Content comparison is parsed YAML (comments and `determinize-ci-operator` quoting are ignored).
 
 ## `matrix.yaml.in`
 
@@ -63,36 +63,39 @@ quay:
 
 | Field | Meaning |
 | --- | --- |
-| `global_defaults.repo` | GitHub `org/repo` used in `zz_generated_metadata` and filenames |
+| `global_defaults.repo` | GitHub `org/repo` used in `zz_generated_metadata` and filenames, unless the job's `test` targets another repo in the same org (`REPO_BY_TEST`: `e2e-chainsaw` -> `quay-operator`) |
 | `global_defaults.arch` | Cluster architecture |
 | `global_defaults.image_source` | How images are obtained (`build` today). Not referenced by templates yet. |
 | `managed_files.active` | Required, non-empty list of every filename the matrix must generate. Generation fails loudly if this set doesn't exactly match what the matrix expands to. |
-| `managed_files.retired` | Filenames the generator used to own but no longer generates. `--check` fails if any of these still exist in the output directory; run `generate.py` (without `--check`) and delete them, then drop them from this list. Defaults to `[]`. |
+| `managed_files.retired` | Filenames the generator used to own but no longer generates. `--check` fails if any of these still exist in an output directory; run `generate.py` (without `--check`) and delete them, then drop them from this list. Defaults to `[]`. |
 | `quay[]` | One Quay release, identified by git `branch` (`redhat-X.Y`, or `master`). The Quay version `X.Y` is derived from that suffix; `master` has no Quay version. |
 | `quay[].layout` | `variant` (default) writes `{org}-{repo}-{branch}__{variant}.yaml`; `base` writes `{org}-{repo}-{branch}.yaml` in place (used for `master`). |
 | `quay[].env` | Env keys applied to every job on that branch. Values replace whole keys. |
 | `quay[].jobs[]` | One job spec, expanded across `clouds` × `ocp` |
+| `quay[].jobs[].test` | `e2e-install` (Quay deployed by the Playwright e2e flow, repo `quay/quay`), `upgrade` (operator-channel upgrade lane, repo `quay/quay`, see below) or `e2e-chainsaw` (quay-operator Chainsaw suites, repo `quay/quay-operator`, periodic only); selects `templates/tests/{test}.yaml.j2` |
 | `quay[].jobs[].kind` | `periodic` (default, renders `templates/`) or `presubmit` (renders `templates/presubmit/`) |
 | `quay[].jobs[].cron` | Required for `periodic`; must be unset for `presubmit`. Either an alias (`daily` / `nightly` / `weekly`) or a raw 5-field cron expression, passed through verbatim |
-| `quay[].jobs[].source` | Required for periodic: `nightly` (`fbc-operator-catalog` + `QUAY_INDEX_IMAGE_REPO` + `PLAYWRIGHT_REF_MODE: strict`, which fails closed with no branch fallback) or `stable` (`redhat-operators`, no index image); must be unset for presubmit |
+| `quay[].jobs[].source` | Required for periodic: `nightly` (`fbc-operator-catalog` + `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`, which fails closed with no branch fallback) or `stable` (`redhat-operators`, no index image); must be unset for presubmit |
 | `quay[].jobs[].always_run` / `.optional` / `.run_if_changed` / `.skip_if_only_changed` | Presubmit trigger fields, copied onto the test when set. `run_if_changed` and `skip_if_only_changed` are mutually exclusive; `always_run: true` cannot combine with either. Only valid when `kind: presubmit`. |
 | `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
 | `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
 | `quay[].jobs[].fips` | Optional boolean, periodic only. `true` installs a FIPS cluster (`FIPS_ENABLED`), runs `fips-check-fips-or-die` first, sets `FEATURE_FIPS: true` in `QUAY_EXTRA_CONFIG`, and turns Mailpit off (`QUAY_DEPLOY_MAILPIT: "false"`; `FEATURE_FIPS` requires `MAIL_USE_TLS`, so the `@feature:MAILING` specs self-skip). The derived `as` gets a `-fips` suffix; the filename does not change, so a FIPS row shares its non-FIPS sibling's file. Not supported with `test: upgrade`; generation fails. |
 | `quay[].jobs[].sts` | Optional boolean, default `true`; applies to the job's `aws` cells and is rejected when `clouds` has no `aws`. `true` installs the cluster with CCO in Manual mode and per-operator STS roles: `pre` is `ipi-aws-pre-manual-oidc-sts` and the final `post` chain is `ipi-aws-post-manual-oidc-sts`, which also deletes the ccoctl OIDC provider and roles. `false` keeps the plain `ipi-aws` install. The `as` and filename do not change. Quay's own S3 storage still uses the static `quay-tests/aws` keys. |
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
-| `quay[].jobs[].storage` | Optional override of the cloud's default storage backend (`STORAGE_BY_CLOUD` in `model.py`). Absent uses the cloud's default; the only other allowed value today is `odf`, and only on `aws`. Any other value, or `odf` on a different cloud, fails generation. |
+| `quay[].jobs[].storage` | Optional override of the cloud's default storage backend (`STORAGE_BY_CLOUD` in `model.py`). Absent uses the cloud's default; the only other allowed value today is `odf`, and only on `aws`. Any other value, or `odf` on a different cloud, fails generation. `e2e-chainsaw` defaults to `odf` and rejects anything else. |
 | `quay[].jobs[].upgrade_from` | Required for and only valid with `test: upgrade`: the n-1 Quay version as `X.Y` (e.g. `"3.17"`). Everything else about the upgrade edge is derived -- target channel `stable-<quay_version>`, source channel `stable-<upgrade_from>`, n branch `redhat-<quay_version>`, n-1 branch `redhat-<upgrade_from>`, and the `as` name `from-<upgrade_from without the dot>` (e.g. `from-317`) -- so a row never hand-codes a channel, branch, or name per version. |
 
 The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.
 
 `storage: odf` deploys Quay with NooBaa-managed object storage instead of a per-job bucket: the `quay-install-odf-operator` ref (with `SETUP_NOOBAA: "true"`) is inserted right before the deploy ref, which becomes `quay-deploy-odf` instead of the cloud's usual deploy step, and the QuayRegistry's `objectstorage` component is left `managed: true` for the operator to own.
 
+`test: e2e-chainsaw` runs the quay-operator repo's Chainsaw suites against the operator from the ART nightly FBC: `merge-stage-registry-credentials`, `quay-enable-catalogsource-art`, `quay-install-odf-operator` (NooBaa), `quay-install-quay-operator` (all namespaces, channel `stable-{quay_version}`), then `quay-test-chainsaw`. Each cell is one test on one cluster: `CHAINSAW_SUITE: all` runs the e2e suite, then the destructive suite even if e2e failed, under a `4h0m0s` job timeout. Its config lives under `quay/quay-operator`, so it renders `templates/repos/quay-operator/base.yaml.j2` (build root from the repo, `src-oc` image) and the shared `templates/clouds/aws.yaml.j2` (cluster profile `aws-quay-qe`). `QUAY_STORAGE_PROVIDER: odf` makes `quay-deprovision` skip the bucket teardown.
+
 Each job is cartesian-expanded to one ci-operator file named `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml` (`layout: base` rows instead write `{org}-{repo}-{branch}.yaml`). A non-`amd64` arch folds into that same naming: `variant` becomes `{cloud}-{arch}-ocp{ocp_nodot}-{test}` (the derived `as` does not repeat the arch), and a `layout: base` row writes `{org}-{repo}-{branch}__{arch}.yaml` instead (with `zz_generated_metadata.variant` set to `{arch}`) since `arch` isn't otherwise part of its filename. Cells that share a filename (for example a periodic and a presubmit row for the same branch/cloud/OCP/test) merge into one file: their tests concatenate in matrix order, and everything but `tests` must be identical across the group or generation fails with `incompatible file-level inputs`. Two rows in one file that derive or set the same `as` collide: the generator fails with `duplicate as`. Periodic derives `{cloud}-{storage}-{source}` and presubmit derives `{cloud}-{storage}`, so a periodic/presubmit pair does not collide on its own. Two rows of the same kind can still collide; set an explicit `as` on one row to resolve it, and the name must not encode the kind.
 
 ## Layer order
 
-Each cell is assembled by deep-merge, later layers win. `kind: presubmit` jobs render from `templates/presubmit/` for base and clouds; the test layer instead builds on top of the shared periodic one:
+Each cell is assembled by deep-merge, later layers win. `kind: presubmit` jobs render from `templates/presubmit/` for base and clouds; the test layer instead builds on top of the shared periodic one. For a cell whose repo has `templates/repos/{repo}/base.yaml.j2`, that file replaces the shared layer 1:
 
 1. `templates/base.yaml.j2` (or `templates/presubmit/base.yaml.j2`)
 2. `templates/sources/{source}.yaml.j2` (periodic only; presubmit renders no source layer)
@@ -145,7 +148,7 @@ Add an OCP version on an existing job:
         ocp: ["4.22", "4.23"]
 ```
 
-Both add a new generated filename for `layout: variant` releases; add it to `managed_files.active` in the same change. `layout: base` rows (for example `master`) share one file per branch: an extra cloud on an existing job needs a distinct `as` instead of a new filename, but an extra OCP version does not work the same way — `ocp` is a file-level input for base rows, so it needs its own variant/file.
+Both add a new generated filename for `layout: variant` releases; add it to `managed_files.active` in the same change. The same holds for `e2e-chainsaw`: another Quay or OCP version is one `{cron: weekly, source: nightly, clouds: [aws], ocp: [...], test: e2e-chainsaw}` row plus its `quay-quay-operator-{branch}__aws-ocp{ocp_nodot}-e2e-chainsaw.yaml` line in `managed_files.active`. `layout: base` rows (for example `master`) share one file per branch: an extra cloud on an existing job needs a distinct `as` instead of a new filename, but an extra OCP version does not work the same way — `ocp` is a file-level input for base rows, so it needs its own variant/file.
 
 Add a `stable` source alongside a `nightly` one on the same branch/cloud/OCP/test: `source` isn't part of the filename, so both jobs land in one shared file with distinct `as` names:
 
@@ -191,9 +194,9 @@ This generator lives in `openshift/release` directly (`ci-operator/config/quay/q
 1. Edit `matrix.yaml.in` or `templates/`.
 2. Regenerate the managed files: `make -C ci-operator/config/quay/quay/_generator generate`.
 3. Regenerate Prow jobs and determinize the config from the repo root: `make update`.
-4. Commit the generator source together with the regenerated files under `ci-operator/config/quay/quay/` and `ci-operator/jobs/quay/quay/`.
+4. Commit the generator source together with the regenerated files under `ci-operator/config/quay/{quay,quay-operator}/` and `ci-operator/jobs/quay/{quay,quay-operator}/`.
 
-`make -C ci-operator/config/quay/quay/_generator check` is the CI gate: it installs dependencies, runs `pytest`, then `generate.py --check`. It runs as the `quay-quay-check` presubmit whenever `ci-operator/(config|jobs)/quay/quay/` changes.
+`make -C ci-operator/config/quay/quay/_generator check` is the CI gate: it installs dependencies, runs `pytest`, then `generate.py --check`. It runs as the `quay-quay-check` presubmit whenever `ci-operator/(config|jobs)/quay/(quay|quay-operator)/` changes.
 
 ## Tests
 

@@ -19,11 +19,19 @@ ASSERT_TIMEOUT="--assert-timeout 20m"
 
 case "${CHAINSAW_SUITE}" in
 all)
+  # Destructive runs last (it degrades the cluster) and even when e2e fails;
+  # the step fails if either suite failed.
+  rc=0
   echo "Running chainsaw e2e tests..."
-  make test-e2e CHAINSAW_PARALLEL=1 CHAINSAW_EXTRA_ARGS="--report-name junit_chainsaw_e2e ${REPORT_ARGS} ${ASSERT_TIMEOUT}"
+  make test-e2e CHAINSAW_PARALLEL=1 CHAINSAW_EXTRA_ARGS="--report-name junit_chainsaw_e2e ${REPORT_ARGS} ${ASSERT_TIMEOUT}" || rc=1
 
   echo "Running chainsaw destructive (ca-rotation, postgres-tls-lifecycle) tests..."
-  make test-e2e-destructive CHAINSAW_PARALLEL=1 CHAINSAW_EXTRA_ARGS="--report-name junit_chainsaw_ca_rotation ${REPORT_ARGS} ${ASSERT_TIMEOUT}"
+  make test-e2e-destructive CHAINSAW_PARALLEL=1 CHAINSAW_EXTRA_ARGS="--report-name junit_chainsaw_ca_rotation ${REPORT_ARGS} ${ASSERT_TIMEOUT}" || rc=1
+
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "Chainsaw e2e and/or destructive tests failed" >&2
+    exit 1
+  fi
   ;;
 e2e)
   echo "Running chainsaw e2e tests..."
