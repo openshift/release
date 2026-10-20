@@ -29,16 +29,34 @@ validate_inputs() {
   : "${VERSION:?VERSION is required}"
   : "${IBI_IBBF_ORIGINAL_BMC_HOST:?Original target BMC is required}"
   : "${IBI_IBBF_REPLACEMENT_BMC_HOST:?Replacement BMC is required}"
-  : "${IBI_IBBF_TARGET_IP:?Static target IPv4 address is required}"
+  : "${IBI_IBBF_TARGET_IP:?Static target IP address is required}"
   [[ "${IBI_REPLACEMENT_PREINSTALL_ENABLED}" == true ]]
   [[ "${IBI_IBBF_ORIGINAL_BMC_HOST}" != "${IBI_IBBF_REPLACEMENT_BMC_HOST}" ]]
   [[ "${IBI_IBBF_ORIGINAL_BMC_HOST}" =~ ^[0-9.]+$ ]]
   [[ "${IBI_IBBF_REPLACEMENT_BMC_HOST}" =~ ^[0-9.]+$ ]]
-  [[ "${IBI_IBBF_TARGET_IP}" =~ ^[0-9.]+$ ]]
+  [[ "${IBI_IBBF_TARGET_IP}" =~ ^[0-9a-fA-F:.]+$ ]]
+  python3 - "${IBI_IBBF_ORIGINAL_BMC_HOST}" "${IBI_IBBF_REPLACEMENT_BMC_HOST}" "${IBI_IBBF_TARGET_IP}" <<'PY'
+import ipaddress
+import sys
+
+ipaddress.IPv4Address(sys.argv[1])
+ipaddress.IPv4Address(sys.argv[2])
+ipaddress.ip_address(sys.argv[3])
+PY
   [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]
   TARGET_SPOKE_NAME=$(printf '%s' "${TARGET_SPOKE_CLUSTER}" | tr -d "[]'\" ")
   [[ "${TARGET_CLUSTER_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
   [[ "${TARGET_SPOKE_NAME}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
+  REPLACEMENT_POLICY_PATH=${IBI_IBBF_REPLACEMENT_POLICY_PATH:-}
+  POLICY_REVISION=none
+  POLICY_REPO=none
+  if [[ -n "${REPLACEMENT_POLICY_PATH}" ]]; then
+    [[ "${REPLACEMENT_POLICY_PATH}" == "${VERSION}/${TARGET_SPOKE_NAME}/policygentemplate/ztp-test/ibbf-test" ]]
+    POLICY_REPO=${ZTP_GIT_REPO:?ZTP_GIT_REPO is required for replacement policies}
+    [[ "${POLICY_REPO}" =~ ^https://[a-zA-Z0-9./:_-]+$ ]]
+    POLICY_REVISION=$(<"${SHARED_DIR}/ibi-seed-git-revision")
+    [[ "${POLICY_REVISION}" =~ ^[a-f0-9]{40}$ ]]
+  fi
   HUB_CONFIG_DIR="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}"
 }
 
@@ -101,6 +119,60 @@ fetch_target_kubeconfig() {
     2>&1 | redact_bastion
 }
 
+verify_policy_fixture() {
+  [[ -n "${REPLACEMENT_POLICY_PATH}" ]] || return 0
+  # Check real YAML at the seed's immutable revision, not a HEAD response that
+  # could be a GitLab login page. PyYAML is supplied by the Ansible runner.
+  python3 - "${POLICY_REPO}" "${POLICY_REVISION}" "${REPLACEMENT_POLICY_PATH}" <<'PY' \
+    2>&1 | tee "${REPORT_DIR}/policy-fixture.log"
+import sys
+import urllib.request
+import yaml
+
+repo, revision, replacement_path = sys.argv[1:]
+base_path = replacement_path.removesuffix("/ztp-test/ibbf-test")
+
+def read(path):
+    try:
+        url = repo.removesuffix(".git") + "/-/raw/" + revision + "/" + path
+        with urllib.request.urlopen(url, timeout=60) as response:
+            result = yaml.safe_load(response.read())
+        if not isinstance(result, dict):
+            raise ValueError("Expected a YAML mapping")
+        return result
+    except Exception:
+        sys.exit("Cannot read policy fixture YAML at the recorded Git revision.")
+
+def policies(path):
+    kustomization = read(path + "/kustomization.yaml")
+    generators = kustomization.get("generators", [])
+    if not generators or kustomization.get("patches") or kustomization.get("components"):
+        sys.exit("Expected standalone PolicyGenTemplate generators in the policy fixture.")
+    result = {}
+    for filename in generators:
+        if not isinstance(filename, str) or "/" in filename or not filename.endswith(".yaml"):
+            sys.exit("Unexpected policy generator path.")
+        template = read(path + "/" + filename)
+        if template.get("kind") != "PolicyGenTemplate":
+            sys.exit("Expected PolicyGenTemplate in the policy fixture.")
+        metadata = template["metadata"]
+        for source in template["spec"]["sourceFiles"]:
+            name = metadata["namespace"] + "." + metadata["name"] + "-" + source["policyName"]
+            result.setdefault(name, []).append(source)
+    return result
+
+original, replacement = policies(base_path), policies(replacement_path)
+if original.keys() != replacement.keys():
+    sys.exit("Replacement policies must preserve all original policy identities.")
+spoke = base_path.split("/")[1]
+for name in ("ztp-group.group-du-sno-config-policy", "ztp-site." + spoke + "-config-policy"):
+    if name not in replacement or original[name] == replacement[name]:
+        sys.exit("Replacement fixture must contain the changed group and site hardware policies.")
+print("Original and replacement policy fixtures have matching identities and changed hardware settings.")
+print("Policy rendering and synchronization will be checked by Argo CD during handover.")
+PY
+}
+
 prepare_launcher() {
   cd /eco-ci-cd
   ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml \
@@ -155,7 +227,8 @@ prepare_bmc_environment() {
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
     python3 - "${HUB_CONFIG_DIR}/auth/kubeconfig" "${TARGET_SPOKE_NAME}" \
     "${VERSION}" "${IBI_IBBF_ORIGINAL_BMC_HOST}" "${IBI_IBBF_REPLACEMENT_BMC_HOST}" \
-    "${IBI_IBBF_TARGET_IP}" "${BMC_ENV_FILE}" "${SPOKE_KUBECONFIG}" "${POLICY_BASELINE}" <<'PY' \
+    "${IBI_IBBF_TARGET_IP}" "${BMC_ENV_FILE}" "${SPOKE_KUBECONFIG}" "${POLICY_BASELINE}" \
+    "${REPLACEMENT_POLICY_PATH:-none}" "${POLICY_REPO}" "${POLICY_REVISION}" <<'PY' \
     2>&1 | redact_bastion | tee "${REPORT_DIR}/preflight.log"
 import base64
 import ipaddress
@@ -167,10 +240,13 @@ import sys
 import urllib.parse
 import urllib.request
 
-kubeconfig, spoke, version, original, replacement, target_ip, env_file, spoke_config, baseline_file = sys.argv[1:]
+(kubeconfig, spoke, version, original, replacement, target_ip, env_file, spoke_config,
+ baseline_file, policy_path, policy_repo, policy_revision) = sys.argv[1:]
+policy_handoff = policy_path != "none"
 os.umask(0o077)
-for address in (original, replacement, target_ip):
+for address in (original, replacement):
     ipaddress.IPv4Address(address)
+target_address = ipaddress.ip_address(target_ip)
 
 def get(resource, name, namespace):
     return json.loads(subprocess.check_output([
@@ -225,11 +301,16 @@ for policy in policies:
                    if item["metadata"]["name"] == definition["metadata"]["name"]]
         require(len(matches) == 1, "Target ConfigurationPolicy is missing or ambiguous.")
         baseline[name].append({key: matches[0]["metadata"][key] for key in ("name", "namespace")})
-for name in ("common-config-policy", "common-subscriptions-policy"):
-    replica = next((item for item in policies if item["metadata"]["name"] == "ztp-common." + name), {})
+roots = [("ztp-common", "common-config-policy"), ("ztp-common", "common-subscriptions-policy")]
+if policy_handoff:
+    roots.extend([("ztp-group", "group-du-sno-config-policy"), ("ztp-site", spoke + "-config-policy")])
+root_templates = {}
+for namespace, name in roots:
+    replica_name = namespace + "." + name
+    replica = next((item for item in policies if item["metadata"]["name"] == replica_name), {})
     require(replica.get("metadata", {}).get("labels", {}).get("policy.open-cluster-management.io/root-policy")
-            == "ztp-common." + name, "Expected common policy is not assigned to the target.")
-    get("policies.policy.open-cluster-management.io", name, "ztp-common")
+            == replica_name, "Expected remediation policy is not assigned to the target.")
+    root_templates[replica_name] = get("policies.policy.open-cluster-management.io", name, namespace)["spec"]["policy-templates"]
 original_cgu = get("clustergroupupgrades.ran.openshift.io", spoke, "ztp-install")
 require(any(condition.get("type") == "Succeeded" and condition.get("status") == "True"
             for condition in original_cgu.get("status", {}).get("conditions", [])),
@@ -237,16 +318,24 @@ require(any(condition.get("type") == "Succeeded" and condition.get("status") == 
 original_nodes = listing("nodes", spoke_config)
 require(len(original_nodes) == 1 and original_nodes[0]["metadata"].get("uid"),
         "Expected one original target node with a UID.")
-with open(baseline_file, "w") as output:
-    json.dump({"node_uid": original_nodes[0]["metadata"]["uid"], "policies": baseline}, output)
-
 for name, suffix in (("clusters", "clusterinstance"), ("policies", "policygentemplate")):
     app = get("applications.argoproj.io", name, "openshift-gitops")
     require(app["spec"].get("source", {}).get("path") == f"{version}/{spoke}/{suffix}",
             "Argo application is not on the original target path.")
     require(not app.get("operation") and
+            app.get("status", {}).get("operationState", {}).get("phase") not in ("Running", "Terminating") and
             app.get("status", {}).get("sync", {}).get("status") == "Synced",
             "Argo application is not idle and synced.")
+    if policy_handoff:
+        require(app["spec"]["source"].get("repoURL") == policy_repo and
+                app["status"]["sync"].get("revision") == policy_revision,
+                "Target applications must match the fork and recorded seed Git revision.")
+    if name == "policies":
+        policy_app = {"uid": app["metadata"]["uid"], "source": app["spec"]["source"]}
+        if policy_handoff:
+            automated = app["spec"].get("syncPolicy", {}).get("automated")
+            require(isinstance(automated, dict) and automated.get("enabled") is not False,
+                    "Replacement policy handoff requires automated Argo synchronization.")
 
 ci = get("clusterinstances.siteconfig.open-cluster-management.io", spoke, spoke)
 require(not ci["spec"].get("reinstall"), "Target already has a reinstall request; use a fresh workflow run.")
@@ -254,9 +343,13 @@ nodes = ci["spec"]["nodes"]
 require(len(nodes) == 1, "IBBF requires exactly one target node.")
 node = nodes[0]
 interfaces = node["nodeNetwork"]["config"]["interfaces"]
-require(any(not interface.get("ipv4", {}).get("dhcp", True) and
-            any(item.get("ip") == target_ip for item in interface.get("ipv4", {}).get("address", []))
-            for interface in interfaces), "Target must already use the reserved static IPv4 address.")
+family = "ipv" + str(target_address.version)
+require(any(interface.get(family, {}).get("enabled", True) and
+            interface.get(family, {}).get("dhcp") is False and
+            (family != "ipv6" or interface[family].get("autoconf") is False) and
+            any(ipaddress.ip_address(item["ip"]) == target_address
+                for item in interface.get(family, {}).get("address", []))
+            for interface in interfaces), "Target must already use the reserved static IP address.")
 
 bmh = get("baremetalhosts.metal3.io", node["hostName"], spoke)
 endpoint = urllib.parse.urlparse(bmh["spec"]["bmc"]["address"])
@@ -265,6 +358,12 @@ require(urllib.parse.urlparse(node["bmcAddress"]).hostname == original,
         "Original BMC does not match the ClusterInstance.")
 secret_name = bmh["spec"]["bmc"]["credentialsName"]
 require(secret_name == node["bmcCredentialsName"]["name"], "BMC secret references differ.")
+with open(baseline_file, "w") as output:
+    json.dump({"node_uid": original_nodes[0]["metadata"]["uid"], "policies": baseline,
+               "roots": roots, "root_templates": root_templates, "policy_app": policy_app,
+               "policy_path": policy_path, "policy_revision": policy_revision,
+               "original_bmc": original, "replacement_bmc": replacement,
+               "bmc_secret": secret_name}, output)
 secret = get("secret", secret_name, spoke)["data"]
 user = base64.b64decode(secret["username"]).decode()
 password = base64.b64decode(secret["password"]).decode()
@@ -334,10 +433,14 @@ remediate_and_verify_policies() {
     2>&1 | redact_bastion | tee "${REPORT_DIR}/policy-gate.log"
 from datetime import datetime, timezone
 from pathlib import Path
+import base64
 import json
+import ssl
 import subprocess
 import sys
 import time
+import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 
 hub_config, spoke, spoke_config, baseline_file, report_dir = sys.argv[1:]
@@ -350,6 +453,8 @@ cutoff = None
 passed = False
 failure = "Post-replacement policy recovery did not complete."
 cgu_status = {}
+expected_templates = {}
+expected_source = None
 
 def oc(config, *args, manifest=None):
     try:
@@ -363,7 +468,8 @@ def oc(config, *args, manifest=None):
         raise RuntimeError("Policy recovery API request failed: " + " ".join(args[:2]))
     return json.loads(result.stdout)
 
-def wait_for(description, check, limit=deadline):
+def wait_for(description, check, limit=None):
+    limit = deadline if limit is None else min(deadline, limit)
     while time.monotonic() < limit:
         if check():
             print(description + ": complete.", flush=True)
@@ -400,6 +506,95 @@ def replacement_ready():
         raise RuntimeError("Replacement node has no valid creation timestamp.")
     return True
 
+def verify_handover():
+    ci = oc(hub_config, "-n", spoke, "get", "clusterinstances.siteconfig.open-cluster-management.io",
+            spoke, "-o", "json")
+    nodes = ci["spec"]["nodes"]
+    if len(nodes) != 1 or urllib.parse.urlparse(nodes[0]["bmcAddress"]).hostname != saved["replacement_bmc"]:
+        raise RuntimeError("ClusterInstance does not reference the replacement BMC.")
+    bmh = oc(hub_config, "-n", spoke, "get", "baremetalhosts.metal3.io", nodes[0]["hostName"], "-o", "json")
+    if (bmh["metadata"].get("deletionTimestamp") or
+            urllib.parse.urlparse(bmh["spec"]["bmc"]["address"]).hostname != saved["replacement_bmc"]):
+        raise RuntimeError("BareMetalHost does not reference the replacement BMC.")
+    secret = oc(hub_config, "-n", spoke, "get", "secret", saved["bmc_secret"], "-o", "json")["data"]
+    credentials = b":".join(base64.b64decode(secret[key]) for key in ("username", "password"))
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
+    for host, expected in ((saved["original_bmc"], "Off"), (saved["replacement_bmc"], "On")):
+        request = urllib.request.Request(
+            f"https://{host}/redfish/v1/Systems/System.Embedded.1",
+            headers={"Authorization": "Basic " + base64.b64encode(credentials).decode()})
+        try:
+            with opener.open(request, timeout=30) as response:
+                if json.load(response).get("PowerState") != expected:
+                    raise ValueError("Unexpected power state")
+        except Exception:
+            raise RuntimeError("Original fencing and replacement power state could not be verified.") from None
+
+def policy_application_synced():
+    app = oc(hub_config, "-n", "openshift-gitops", "get", "applications.argoproj.io", "policies", "-o", "json")
+    if app["metadata"].get("deletionTimestamp") or app["metadata"]["uid"] != saved["policy_app"]["uid"]:
+        raise RuntimeError("Policies Application was deleted or replaced.")
+    if app["spec"].get("source") != expected_source:
+        raise RuntimeError("Policies Application source changed during handover.")
+    status = app.get("status", {})
+    if any(item.get("type") in ("ComparisonError", "InvalidSpecError", "SyncError")
+           for item in status.get("conditions", [])):
+        raise RuntimeError("Argo CD could not render or sync the replacement policies.")
+    sync = status.get("sync", {})
+    operation = status.get("operationState", {})
+    result = operation.get("syncResult", {})
+    return (not app.get("operation") and sync.get("status") == "Synced" and
+            sync.get("revision") == saved["policy_revision"] and
+            sync.get("comparedTo", {}).get("source") == expected_source and
+            operation.get("phase") == "Succeeded" and
+            result.get("revision") == saved["policy_revision"] and result.get("source") == expected_source)
+
+def definitions(templates):
+    result = {}
+    for template in templates:
+        obj = template["objectDefinition"]
+        if obj.get("kind") != "ConfigurationPolicy" or "{{hub" in json.dumps(obj):
+            raise RuntimeError("Replacement policy gate requires ConfigurationPolicies without hub templates.")
+        name = obj["metadata"]["name"]
+        if name in result:
+            raise RuntimeError("Duplicate ConfigurationPolicy template name.")
+        result[name] = obj["spec"]
+    if not result:
+        raise RuntimeError("Replacement policy has no ConfigurationPolicy templates.")
+    return result
+
+def matches_spec(actual, expected):
+    # CRD defaults may add top-level fields. Opaque object-template payloads
+    # must match exactly; TALM alone may change inform/enforce during remediation.
+    return all(actual.get(key) == value for key, value in expected.items() if key != "remediationAction")
+
+def activate_replacement_policies():
+    global expected_source
+    verify_handover()
+    expected_source = dict(saved["policy_app"]["source"], path=saved["policy_path"],
+                           targetRevision=saved["policy_revision"])
+    # JSON Patch tests prevent overwriting a concurrent source or Application change.
+    oc(hub_config, "-n", "openshift-gitops", "patch", "applications.argoproj.io", "policies",
+       "--type=json", "--patch-file=/dev/stdin", "-o", "json", manifest=[
+           {"op": "test", "path": "/metadata/uid", "value": saved["policy_app"]["uid"]},
+           {"op": "test", "path": "/spec/source", "value": saved["policy_app"]["source"]},
+           {"op": "replace", "path": "/spec/source", "value": expected_source},
+       ])
+    wait_for("replacement policy Application synchronization", policy_application_synced,
+             min(deadline, time.monotonic() + 600))
+    for namespace, name in saved["roots"]:
+        root = oc(hub_config, "-n", namespace, "get", "policies.policy.open-cluster-management.io",
+                  name, "-o", "json")
+        key = namespace + "." + name
+        templates = definitions(root["spec"]["policy-templates"])
+        if set(templates) != {item["name"] for item in baseline[key]}:
+            raise RuntimeError("Replacement ConfigurationPolicy identities changed.")
+        if namespace in ("ztp-group", "ztp-site") and templates == definitions(saved["root_templates"][key]):
+            raise RuntimeError("Hardware policy specification did not change after Argo synchronization.")
+        expected_templates[key] = templates
+
 def policy_state():
     try:
         hub = oc(hub_config, "-n", spoke, "get", "policies.policy.open-cluster-management.io", "-o", "json")
@@ -413,10 +608,18 @@ def policy_state():
     leaf = {(item["metadata"]["namespace"], item["metadata"]["name"]): item for item in leaf["items"]}
     fresh = True
     compliant = True
+    if expected_source is not None and not policy_application_synced():
+        return False, False
     for name, templates in baseline.items():
         policy = hub.get(name, {})
         if not policy or policy["metadata"].get("deletionTimestamp"):
             return False, False
+        if name in expected_templates:
+            replicated = definitions(policy["spec"]["policy-templates"])
+            expected = expected_templates[name]
+            if replicated.keys() != expected.keys() or any(
+                    not matches_spec(replicated[key], value) for key, value in expected.items()):
+                return False, False
         states = []
         for template in templates:
             item = leaf.get((template["namespace"], template["name"]), {})
@@ -426,6 +629,9 @@ def policy_state():
                     status.get("lastEvaluatedGeneration") != item["metadata"]["generation"] or
                     timestamp(status.get("lastEvaluated")) < cutoff or
                     state not in ("Compliant", "NonCompliant")):
+                return False, False
+            if name in expected_templates and not matches_spec(
+                    item.get("spec", {}), expected_templates[name][template["name"]]):
                 return False, False
             states.append(state)
         expected = "Compliant" if all(state == "Compliant" for state in states) else "NonCompliant"
@@ -450,6 +656,10 @@ def cgu_completed():
 
 try:
     saved = json.loads(Path(baseline_file).read_text())
+    # Allow handoff/propagation time without taking away TALM's 30-minute
+    # remediation budget. Jobs without a policy switch keep the old 50 minutes.
+    if saved["policy_path"] != "none":
+        deadline = started + 4500
     baseline, original_node_uid = saved["policies"], saved["node_uid"]
     if not original_node_uid or not baseline or any(not templates for templates in baseline.values()):
         raise RuntimeError("Expected policy baseline is empty.")
@@ -457,13 +667,16 @@ try:
     # Inform policies must be evaluated on the replacement before TALM reads
     # their status; otherwise old Compliant values can skip needed remediation.
     wait_for("replacement node readiness", replacement_ready, started + 900)
-    wait_for("fresh replacement policy evaluations", lambda: policy_state()[0], started + 900)
+    if saved["policy_path"] != "none":
+        activate_replacement_policies()
+    wait_for("fresh replacement policy specifications and evaluations", lambda: policy_state()[0],
+             min(deadline, time.monotonic() + 900))
     obj = oc(hub_config, "create", "-f", "-", "-o", "json", manifest={
         "apiVersion": "ran.openshift.io/v1alpha1", "kind": "ClusterGroupUpgrade",
         "metadata": {"generateName": spoke + "-post-ibbf-", "namespace": "ztp-install"},
         "spec": {
             "clusters": [spoke], "enable": True, "backup": False, "preCaching": False,
-            "managedPolicies": ["common-config-policy", "common-subscriptions-policy"],
+            "managedPolicies": [name for _, name in saved["roots"]],
             "remediationStrategy": {"maxConcurrency": 1, "timeout": 30},
         },
     })
@@ -504,6 +717,7 @@ main() {
   trap 'finish "$?"' EXIT
   configure_ssh
   fetch_target_kubeconfig
+  verify_policy_fixture
   prepare_bmc_environment
   prepare_launcher
   run_tests
