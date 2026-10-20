@@ -17,20 +17,24 @@ This skill drives an agentic loop that takes failing CI test results for the Ope
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`. The test step writes it at exit time:
+Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
 
 ```json
 {
-  "step_script_ref": "distributed-tracing/tests/opentelemetry/downstream/distributed-tracing-tests-opentelemetry-downstream-commands.sh",
+  "step_script_ref": "distributed-tracing/tests/opentelemetry/premerge/distributed-tracing-tests-opentelemetry-premerge-commands.sh",
   "has_test_failures": true,
   "env": {
-    "MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH": "rhosdt-0.158"
+    "OPERATOR_IMG": "...",
+    "OTEL_COLLECTOR_IMAGE": "...",
+    "TARGETALLOCATOR_IMG": "...",
+    "RUN_TESTS": "...",
+    "SKIP_TESTS": "..."
   }
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo
-- `env` — runtime env var values that were injected at job time and are needed to reproduce setup (e.g. branch names, image refs); most steps have an empty `env`
+- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path
+- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`, plus five `INSTRUMENTATION_*_IMG` vars (`JAVA`/`NODEJS`/`PYTHON`/`DOTNET`/`APACHE_HTTPD`) that the setup section's own validation requires
 
 Construct the raw GitHub URL and fetch the script:
 
@@ -48,17 +52,17 @@ Mandatory, before Step 0b. Read `/tmp/qe-agent-modules/cluster-stability.md` and
 
 ## Step 0b — Re-establish the Test Environment
 
-Export any env vars from the `env` field, then **run the setup section of the fetched script** — the commands up to (but not including) the first `chainsaw test` invocation.
+Export any env vars from the `env` field, then **run the setup section of the fetched script** — the commands up to (but not including) the first `chainsaw test` invocation. Upstream only: this also clones `https://github.com/openshift/distributed-tracing-qe` and moves its `tests/e2e-otel` into the copied tree (the upstream operator repo lacks those tests) and `sed`-substitutes `OPAMP_BRIDGE_SERVER` into the test fixtures — run that too, it is still setup, before the test-directory logic below.
 
 Required adaptations:
 
 | Script pattern | Adaptation |
 |---|---|
-| `cp -R /tmp/<name>` (image mount) | Replace with `git clone <repo> <dest>` — find the repo URL from `oc get csv -o yaml \| grep github.com` |
+| `cp -R /tmp/opentelemetry-operator ...` (image mount) | This pod runs the same `obs-tests-runner` image as the test step, so the pull request source is already at `/tmp/opentelemetry-operator` here too — just run the `cp -R` as written, no clone needed. For a different step whose source repo isn't baked into this pod's image, replace with `git clone <repo> <dest>` — find the repo URL from `oc get csv -o yaml \| grep github.com` |
 | `kubectl create -f <url>` (CRDs) | Use `kubectl apply -f <url>` — `create` fails if the CRD exists from the prior run |
 | `oc patch csv ...` (initial setup patches) | Skip — the operator is already patched; verify with `oc get csv -n opentelemetry-operator-system` |
 | `oc patch csv ...` (later patches: `LABELS_FILTER`, instrumentation images, etc.) | **Evaluate per-test**: later CSV patches create operator state that subsequent tests may not expect. When rerunning a single test out of the original execution order, check whether that test assumes a clean CSV or one with specific patches applied. If the test asserts on a CSV field that a prior patch modified (e.g., `LABELS_FILTER=.*filter.out`), either (a) reset the CSV field before the rerun, or (b) rerun the test in its original suite order. Document which CSV state the test requires in the diagnosis. |
-| `$SKIP_TESTS` block | Skip entirely — `$SKIP_TESTS` is unset in the qe-agent pod |
+| `$SKIP_TESTS` block | Run it with the value Step 0b exported — `SKIP_TESTS` (set whenever `RUN_TESTS` is empty) removes tests from `FULL_SUITE`; the failing test was never in it, so it is never removed by this |
 | chainsaw test invocation | Run `unset NAMESPACE` before every `chainsaw test` call — a set `NAMESPACE` causes tests to run in the wrong namespace |
 
 After setup, `cd` into the repo directory and proceed with Steps 1–6.
