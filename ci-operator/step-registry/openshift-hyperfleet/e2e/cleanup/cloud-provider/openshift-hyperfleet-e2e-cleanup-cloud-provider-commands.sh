@@ -32,14 +32,15 @@ function gcloud_auth() {
 
 }
 
-PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
-gcloud_auth "$PROJECT_ID"
-
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ ! -f "${SHARED_DIR}/setup_succeeded" ]] && [[ ! -f "${SHARED_DIR}/namespace_name" ]]; then
   log "Setup failed before it chose a namespace, so nothing was deployed. Skipping cleanup."
   exit 0
 fi
+
+PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
+gcloud_auth "$PROJECT_ID"
+
 NAMESPACE_NAME=$(cat ${SHARED_DIR}/namespace_name)
 
 log "Cleaning up Google Cloud Pub/Sub resources"
