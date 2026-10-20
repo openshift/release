@@ -758,6 +758,48 @@ tests:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts-hcp-mp
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      PPROF: "false"
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: udn-bgp-bcc-10cudns-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      ITERATIONS: "10"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      REPLICAS: "24"
+      ROUTE_SERVER_ID: ""
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-bcc-install
+    - ref: openshift-qe-udn-bgp-bcc
+    workflow: rosa-aws-sts-hcp
 zz_generated_metadata:
   branch: main
   org: openshift-eng
