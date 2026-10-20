@@ -360,9 +360,9 @@ fi
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
-OVERLAYS_REPO=https://github.com/rostalan/rhdh-plugin-export-overlays.git
-OVERLAYS_REF=fix/orchestrator-loki-placeholder-without-token
-OVERLAYS_COMMIT=f5db4ffc5237eb946f3c43920ac95fa8c67f6f73
+OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
+OVERLAYS_REF=main
+OVERLAYS_COMMIT=677eb0fdf5aeb4a3c280b08f5f2ac33324664959
 git clone --depth 1 --branch "${OVERLAYS_REF}" "${OVERLAYS_REPO}" "${WORKDIR}/rhdh-plugin-export-overlays"
 if [[ "$(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)" != "${OVERLAYS_COMMIT}" ]]; then
     echo "ERROR: overlays test checkout did not resolve to pinned commit ${OVERLAYS_COMMIT}" >&2
