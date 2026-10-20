@@ -1042,7 +1042,7 @@ tests:
       timeout: 2h0m0s
     - ref: ipi-install-rbac
     test:
-    - as: grant-network-role
+    - as: route-server-assignee
       cli: latest
       commands: |
         # The principal passthrough hands the operator holds Network Contributor
@@ -1051,20 +1051,11 @@ tests:
         # group this job owns, so the operator is refused when it tries to
         # discover or peer it. Measured, twice.
         #
-        # Granting that principal a role over the network resource group is the
-        # repair, and the cluster profile's principal may make it. This is the
-        # step an ARO job needs that no other cloud's job does.
+        # The Route Server does not exist until the test step creates it, so
+        # this only names the principal; the test grants it Network
+        # Contributor on the Route Server alone, straight after creating it
+        # (hack/azure/grant-route-server-role.sh in bgp-cloud-connector).
         set -euo pipefail
-
-        redact() {
-          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
-        }
-
-        net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.networkResourceGroupName}')"
-        if [[ -z "${net_rg}" ]]; then
-          net_rg="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')"
-        fi
-        echo "the group holding the estate: ${net_rg}"
 
         # Passthrough hands out the cluster's own principal, so the grant goes to
         # whoever kube-system/azure-credentials names rather than to a principal
@@ -1082,35 +1073,10 @@ tests:
           --username "$(jq -er .clientId "${sp}")" \
           --password="$(jq -er .clientSecret "${sp}")" \
           --tenant "$(jq -er .tenantId "${sp}")" --output none
-        subscription="$(jq -er .subscriptionId "${sp}")"
-        az account set --subscription "${subscription}"
+        az account set --subscription "$(jq -er .subscriptionId "${sp}")"
 
-        object_id="$(az ad sp show --id "${client_id}" --query id -o tsv)"
-        az role assignment create --assignee-object-id "${object_id}" \
-          --assignee-principal-type ServicePrincipal --role "Network Contributor" \
-          --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
-          --output none 2>&1 | redact
-        echo "granted Network Contributor over ${net_rg}"
-
-        # A role assignment is not usable the instant it exists. Measured on
-        # three runs at about twenty seconds, over two minutes, and six minutes,
-        # so this waits for it to be observably usable rather than sleeping a
-        # guess and hoping.
-        echo "waiting for it to become usable..."
-        for attempt in $(seq 1 36); do
-          if az role assignment list --assignee "${object_id}" \
-               --scope "/subscriptions/${subscription}/resourceGroups/${net_rg}" \
-               --query "[?roleDefinitionName=='Network Contributor'] | length(@)" -o tsv 2>/dev/null \
-               | grep -qv '^0$'; then
-            echo "  visible after $(( attempt * 20 )) seconds"
-            break
-          fi
-          if (( attempt == 36 )); then
-            echo "the role assignment never became visible" >&2
-            exit 1
-          fi
-          sleep 20
-        done
+        az ad sp show --id "${client_id}" --query id -o tsv >"${SHARED_DIR}/route-server-assignee"
+        echo "the test grants the cluster principal Network Contributor on the Route Server"
       from: e2e-runner
       grace_period: 10m0s
       resources:
@@ -1191,7 +1157,8 @@ tests:
           memory: 200Mi
     - as: test
       cli: latest
-      commands: hack/ci-e2e-azure.sh
+      commands: ROUTE_SERVER_ASSIGNEE="$(<"${SHARED_DIR}/route-server-assignee")"
+        hack/ci-e2e-azure.sh
       from: e2e-runner
       grace_period: 1h0m0s
       resources:
