@@ -254,28 +254,34 @@ JWT_UNSIGNED="${JWT_HEADER}.${JWT_PAYLOAD}"
 JWT_SIGNATURE="$(printf '%s' "${JWT_UNSIGNED}" | openssl dgst -sha256 -sign "${GITHUB_APP_KEY_PATH}" -binary | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
 GITHUB_APP_JWT="${JWT_UNSIGNED}.${JWT_SIGNATURE}"
 
-INSTALLATION_ID="$(curl --fail --silent --show-error \
+if ! INSTALLATION_ID="$({ curl -q --fail --silent \
   -H @- \
   -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/installation" \
-  <<< "Authorization: Bearer ${GITHUB_APP_JWT}" | jq -er '.id')"
-INSTALLATION_TOKEN="$(curl --fail --silent --show-error -X POST \
+  <<< "Authorization: Bearer ${GITHUB_APP_JWT}" | jq -er '.id'; } 2>/dev/null)"; then
+  error "github: installation lookup failed"
+fi
+if ! INSTALLATION_TOKEN="$({ curl -q --fail --silent -X POST \
   -H @- \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
   --data "$(jq -n --arg repo "${GITHUB_REPO_NAME}" '{repositories:[$repo],permissions:{issues:"write"}}')" \
   "https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens" \
-  <<< "Authorization: Bearer ${GITHUB_APP_JWT}" | jq -er '.token')"
+  <<< "Authorization: Bearer ${GITHUB_APP_JWT}" | jq -er '.token'; } 2>/dev/null)"; then
+  error "github: token request failed"
+fi
 
-curl --fail --silent --show-error -X POST \
+if ! curl -q --fail --silent -X POST \
   -H @- \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
   --data '{"body":"/unhold"}' \
   "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/issues/${PR_NUMBER}/comments" \
-  <<< "Authorization: Bearer ${INSTALLATION_TOKEN}" > /dev/null
+  <<< "Authorization: Bearer ${INSTALLATION_TOKEN}" > /dev/null 2>&1; then
+  error "github: unhold comment request failed"
+fi
 info "github: posted /unhold to PR ${PR_NUMBER}"
 
 # Slack: Send notification based on PR creation result
