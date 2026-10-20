@@ -74,20 +74,26 @@ echo "Deleting cluster-id: ${CLUSTER_ID}"
 capture_failure_diagnostics() {
   local reason="$1" description summary describe_result
   describe_result=unavailable
-  summary='"unavailable"'
+  summary='{"state":"unavailable","configuration_mode":"unavailable","delete_protection_enabled":null}'
   if description=$(timeout --signal=TERM --kill-after=2s 15s rosa describe cluster -c "${CLUSTER_ID}" -o json 2>/dev/null | head -c 32768); then
     if summary=$(printf '%s' "${description}" | jq -ces '
       if length == 1 and (.[0] | type) == "object" then
-        .[0].state | if . == "error" or . == "uninstalling" then . else "withheld" end
+        .[0] | {
+          state: (.state | if . == "error" or . == "uninstalling" then . else "withheld" end),
+          configuration_mode: ((if (.status | type) == "object" then .status.configuration_mode else null end)
+            | if . == "full" or . == "read_only" then . else "withheld" end),
+          delete_protection_enabled: ((if (.delete_protection | type) == "object" then .delete_protection.enabled else null end)
+            | if type == "boolean" then . else null end)
+        }
       else error("invalid description") end' 2>/dev/null); then
       describe_result=available
     else
-      summary='"unavailable"'
+      summary='{"state":"unavailable","configuration_mode":"unavailable","delete_protection_enabled":null}'
     fi
   fi
   summary=$(jq -cn --arg reason "${reason}" --arg describe_result "${describe_result}" \
-    --argjson state "${summary}" \
-    '{reason: $reason, describe_result: $describe_result, state: $state}') || return
+    --argjson snapshot "${summary}" \
+    '{reason: $reason, describe_result: $describe_result} + $snapshot') || return
   printf 'Sanitized deprovision diagnostics: %s\n' "${summary}"
   if [[ -n "${ARTIFACT_DIR:-}" ]]; then
     printf '%s\n' "${summary}" > "${ARTIFACT_DIR}/rosa-deprovision-diagnostics.json"

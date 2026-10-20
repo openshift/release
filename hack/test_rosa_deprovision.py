@@ -45,6 +45,11 @@ case "$1 $2" in
         multiple) echo '{} {}' ;;
         oversized) printf '{"state":"error","description":"'; head -c 65536 /dev/zero | tr '\\0' a; printf '"}' ;;
         error) echo '{"state":"error"}' ;;
+        read-only) echo '{"state":"error","status":{"configuration_mode":"read_only","description":"SENSITIVE-MARKER"},"delete_protection":{"enabled":false}}' ;;
+        protected) echo '{"state":"error","status":{"configuration_mode":"full"},"delete_protection":{"enabled":true}}' ;;
+        unrestricted) echo '{"state":"error","status":{"configuration_mode":"full"},"delete_protection":{"enabled":false}}' ;;
+        invalid-fields) echo '{"state":"error","status":{"configuration_mode":"SENSITIVE-MARKER"},"delete_protection":{"enabled":"SENSITIVE-MARKER"}}' ;;
+        invalid-containers) echo '{"state":"error","status":"SENSITIVE-MARKER","delete_protection":[true]}' ;;
         injected-state) echo '{"state":"SENSITIVE-MARKER"}' ;;
         wrong-type) echo '[{"state":"error"}]' ;;
         *) echo '{"state":"uninstalling","id":"SENSITIVE-MARKER","status":{"description":"SENSITIVE-MARKER"},"aws":{"account_id":"SENSITIVE-MARKER"},"credentials":"SENSITIVE-MARKER"}' ;;
@@ -89,15 +94,22 @@ exec /usr/bin/timeout --signal=TERM --kill-after=0.1s 0.1s "$@"
                 self.assertEqual(calls.count("describe cluster"), 2)
                 if scenario != "artifact-failure":
                     diagnostics = json.loads(artifact.read_text())
-                    self.assertEqual(set(diagnostics), {"reason", "describe_result", "state"})
+                    self.assertEqual(set(diagnostics), {"reason", "describe_result", "state", "configuration_mode", "delete_protection_enabled"})
                     self.assertEqual(diagnostics["reason"], "timeout" if scenario == "timeout" else "error")
                     if scenario in ("command-failure", "hang", "stubborn-hang", "malformed", "multiple", "oversized", "wrong-type"):
                         self.assertEqual(diagnostics["describe_result"], "unavailable")
                         self.assertEqual(diagnostics["state"], "unavailable")
+                        self.assertEqual(diagnostics["configuration_mode"], "unavailable")
+                        self.assertIsNone(diagnostics["delete_protection_enabled"])
                     else:
                         self.assertEqual(diagnostics["describe_result"], "available")
-                        expected_state = "error" if scenario == "error" else "uninstalling"
+                        field_scenarios = ("read-only", "protected", "unrestricted", "invalid-fields", "invalid-containers")
+                        expected_state = "error" if scenario == "error" or scenario in field_scenarios else "uninstalling"
                         self.assertEqual(diagnostics["state"], "withheld" if scenario == "injected-state" else expected_state)
+                        expected_mode = {"read-only": "read_only", "protected": "full", "unrestricted": "full"}.get(scenario, "withheld")
+                        self.assertEqual(diagnostics["configuration_mode"], expected_mode)
+                        expected_protection = {"read-only": False, "protected": True, "unrestricted": False}.get(scenario)
+                        self.assertIs(diagnostics["delete_protection_enabled"], expected_protection)
             cleanup = scenario == "success" and sts == "true"
             self.assertEqual("delete operator-roles" in calls, cleanup)
             self.assertEqual("delete oidc-provider" in calls, cleanup)
@@ -114,6 +126,11 @@ exec /usr/bin/timeout --signal=TERM --kill-after=0.1s 0.1s "$@"
         for sts in ("true", "false"):
             with self.subTest(sts=sts):
                 self.run_case("success", expected=0, sts=sts)
+
+    def test_deletion_controls(self):
+        for scenario in ("read-only", "protected", "unrestricted", "invalid-fields", "invalid-containers"):
+            with self.subTest(scenario=scenario):
+                self.run_case(scenario)
 
 
 if __name__ == "__main__":
