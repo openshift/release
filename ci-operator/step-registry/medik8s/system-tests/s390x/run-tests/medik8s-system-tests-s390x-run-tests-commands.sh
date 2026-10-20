@@ -232,12 +232,158 @@ wait_cluster_settle() {
   sleep 90
 }
 
+# Snapshot per-phase junit/report XML so later phases cannot erase earlier
+# results (ginkgo overwrites nhc_suite_test_junit.xml each run).
+preserve_phase_reports() {
+  local phase_slug="$1"
+  local dest="${ARTIFACT_DIR}/nhc-phases/${phase_slug}"
+  mkdir -p "${dest}"
+  # Copy whatever the suite just wrote; ignore missing files.
+  find "${ARTIFACT_DIR}" -maxdepth 1 -type f \( \
+      -name '*_junit.xml' -o -name '*_testrun.xml' -o -name 'junit*.xml' \
+    \) -exec cp -f {} "${dest}/" \; 2>/dev/null || true
+  echo "Preserved phase reports under ${dest}"
+}
+
+# Merge preserved phase reports: for each unique testcase, prefer
+# failure > pass > skip so a earlier-phase pass is not shown as skipped
+# after a later phase that label-filtered it out.
+merge_phased_junit_reports() {
+  local phases_dir="${ARTIFACT_DIR}/nhc-phases"
+  if [[ ! -d "${phases_dir}" ]]; then
+    return 0
+  fi
+  echo "=== Merging phased NHC junit reports (pass wins over skip) ==="
+  python3 - "${phases_dir}" "${ARTIFACT_DIR}" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+phases_dir = Path(sys.argv[1])
+artifact_dir = Path(sys.argv[2])
+
+# Higher rank wins when the same testcase appears in multiple phases.
+RANK = {"failure": 3, "error": 3, "passed": 2, "skipped": 1}
+
+
+def status(tc: ET.Element) -> str:
+    if tc.find("failure") is not None:
+        return "failure"
+    if tc.find("error") is not None:
+        return "error"
+    if tc.find("skipped") is not None:
+        return "skipped"
+    return "passed"
+
+
+def case_key(tc: ET.Element) -> str:
+    # classname+name uniquely identifies a ginkgo/reportxml case.
+    return f"{tc.get('classname') or ''}\0{tc.get('name') or ''}"
+
+
+def merge_files(paths, out_path: Path, root_tag: str) -> None:
+    best: dict[str, ET.Element] = {}
+    total_time = 0.0
+    for path in paths:
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError as exc:
+            print(f"Warning: skip unreadable {path}: {exc}", file=sys.stderr)
+            continue
+        suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+        if root.tag == "testsuites":
+            try:
+                total_time += float(root.get("time") or 0)
+            except ValueError:
+                pass
+        for suite in suites:
+            if root.tag == "testsuite":
+                try:
+                    total_time += float(suite.get("time") or 0)
+                except ValueError:
+                    pass
+            for tc in suite.findall("testcase"):
+                key = case_key(tc)
+                st = status(tc)
+                prev = best.get(key)
+                if prev is None or RANK[st] > RANK[status(prev)]:
+                    best[key] = tc
+
+    if not best:
+        print(f"No testcases to merge for {out_path.name}")
+        return
+
+    tests = len(best)
+    failures = sum(1 for tc in best.values() if status(tc) == "failure")
+    errors = sum(1 for tc in best.values() if status(tc) == "error")
+    skipped = sum(1 for tc in best.values() if status(tc) == "skipped")
+
+    if root_tag == "testsuites":
+        root = ET.Element(
+            "testsuites",
+            {
+                "tests": str(tests),
+                "failures": str(failures),
+                "errors": str(errors),
+                "disabled": str(skipped),
+                "time": f"{total_time:.6f}",
+            },
+        )
+        suite = ET.SubElement(
+            root,
+            "testsuite",
+            {
+                "name": "NHC (phased merge)",
+                "tests": str(tests),
+                "failures": str(failures),
+                "errors": str(errors),
+                "skipped": str(skipped),
+                "time": f"{total_time:.6f}",
+            },
+        )
+    else:
+        root = ET.Element(
+            "testsuite",
+            {
+                "name": "NHC (phased merge)",
+                "tests": str(tests),
+                "failures": str(failures),
+                "errors": str(errors),
+                "skipped": str(skipped),
+                "time": f"{total_time:.6f}",
+            },
+        )
+        suite = root
+
+    for tc in best.values():
+        suite.append(tc)
+
+    ET.ElementTree(root).write(out_path, encoding="utf-8", xml_declaration=True)
+    print(
+        f"Wrote {out_path.name}: tests={tests} passed={tests - failures - errors - skipped} "
+        f"failed={failures + errors} skipped={skipped}"
+    )
+
+
+junit_paths = sorted(phases_dir.glob("*/*_junit.xml"))
+testrun_paths = sorted(phases_dir.glob("*/*_testrun.xml"))
+if junit_paths:
+    # Keep a copy of the last raw junit, then overwrite the canonical name.
+    merge_files(junit_paths, artifact_dir / "nhc_suite_test_junit.xml", "testsuites")
+if testrun_paths:
+    merge_files(testrun_paths, artifact_dir / "report_testrun.xml", "testsuite")
+PY
+}
+
 run_tests_with_labels() {
   local phase_name="$1"
   local labels="$2"
+  local phase_slug
+  phase_slug="$(echo "${phase_name}" | tr -c 'A-Za-z0-9._-' '_' | sed 's/_\{2,\}/_/g;s/^_//;s/_$//')"
   echo "=== Phase: ${phase_name} ==="
   echo "ECO_TEST_LABELS: ${labels}"
   ECO_TEST_LABELS="${labels}" make run-tests
+  preserve_phase_reports "${phase_slug}"
 }
 
 # Base excludes for this GA-subscribe job (never run upgrade/fresh-install here).
@@ -255,6 +401,7 @@ if [[ "${MEDIK8S_NHC_PHASED_RUN:-}" == "true" && "${ECO_TEST_FEATURES}" == "nhc-
   # poison earlier phases.
   run_tests_with_labels "nhc-69711 (control-plane remediation)" \
     "${nhc_base_exclude} && test_id:69711"
+  merge_phased_junit_reports
 else
   make run-tests
 fi
