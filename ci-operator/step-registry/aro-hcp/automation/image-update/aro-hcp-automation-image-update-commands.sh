@@ -272,15 +272,19 @@ if ! INSTALLATION_TOKEN="$({ curl -q --fail --silent -X POST \
   error "github: token request failed"
 fi
 
-if ! curl -q --fail --silent -X POST \
+if UNHOLD_HTTP_STATUS="$(curl -q --fail --silent -X POST \
+  --output /dev/null --write-out '%{http_code}' \
   -H @- \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   -H "Content-Type: application/json" \
   --data '{"body":"/unhold"}' \
   "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/issues/${PR_NUMBER}/comments" \
-  <<< "Authorization: Bearer ${INSTALLATION_TOKEN}" > /dev/null 2>&1; then
-  error "github: unhold comment request failed"
+  <<< "Authorization: Bearer ${INSTALLATION_TOKEN}" 2>/dev/null)"; then
+  :
+else
+  UNHOLD_CURL_EXIT_CODE=$?
+  error "github: unhold comment request failed (HTTP ${UNHOLD_HTTP_STATUS}, curl exit ${UNHOLD_CURL_EXIT_CODE})"
 fi
 info "github: posted /unhold to PR ${PR_NUMBER}"
 
