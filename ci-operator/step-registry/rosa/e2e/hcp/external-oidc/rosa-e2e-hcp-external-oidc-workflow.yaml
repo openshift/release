@@ -3,7 +3,13 @@ workflow:
   steps:
     env:
       CHANNEL_GROUP: stable
-      REPLICAS: "2"
+      # The BYO shared VPC (aws-provision-vpc-shared) provides 3 private
+      # subnets, and HCP requires the compute-node count to be a multiple of
+      # the private-subnet count: 2 is rejected with "Hosted clusters require
+      # that the number of compute nodes be a multiple of the number of private
+      # subnets 3". Use 3 (same as the other workflows on this VPC); dropping
+      # to 2 would require ZONES_COUNT=1 on aws-provision-vpc-shared.
+      REPLICAS: "3"
     pre:
       # rosa-CLI provisioner head, external-OIDC variant: provisions the HCP
       # cluster with external auth enabled, configures the external auth provider,
