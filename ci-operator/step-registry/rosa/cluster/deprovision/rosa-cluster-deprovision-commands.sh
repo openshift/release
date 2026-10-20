@@ -29,6 +29,48 @@ function record_cluster() {
 
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
+collect_uninstall_diagnostics() {
+  local reason="$1"
+  local state="other"
+  local logs_status=127
+  local -a logs_args=(logs uninstall --cluster "${CLUSTER_ID}" --tail=500)
+
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    echo "ARTIFACT_DIR is unset or empty; skipping uninstall diagnostics"
+    return 0
+  fi
+  if ! mkdir -p "${ARTIFACT_DIR}"; then
+    echo "Cannot create ARTIFACT_DIR; skipping uninstall diagnostics"
+    return 0
+  fi
+
+  case "${CLUSTER_STATE}" in
+    uninstalling|error) state="${CLUSTER_STATE}" ;;
+    "") state="absent" ;;
+  esac
+  if [[ "${CLUSTER_STATE}" == "error" ]]; then
+    logs_args+=(--watch)
+  fi
+
+  printf 'reason=%s\nstate=%s\nelapsed_seconds=%s\ndescribe_pipeline_exit_code=%s\n' \
+    "${reason}" "${state}" "$((current_time - start_time))" "${describe_status}" \
+    > "${ARTIFACT_DIR}/rosa-deprovision-failure.txt" || true
+
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --kill-after=5s 30s rosa "${logs_args[@]}" \
+      > "${ARTIFACT_DIR}/rosa-uninstall.log" 2>/dev/null &
+    local logs_pid=$!
+    if wait "${logs_pid}"; then
+      logs_status=0
+    else
+      logs_status=$?
+    fi
+  fi
+
+  printf 'uninstall_logs_exit_code=%s\n' "${logs_status}" \
+    >> "${ARTIFACT_DIR}/rosa-deprovision-failure.txt" || true
+}
+
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
@@ -74,15 +116,21 @@ echo "Deleting cluster-id: ${CLUSTER_ID}"
 start_time=$(date +"%s")
 rosa delete cluster -c "${CLUSTER_ID}" -y
 while true; do
-  CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json 2>/dev/null | jq -r '.state' || true)
+  if CLUSTER_STATE=$(rosa describe cluster -c "${CLUSTER_ID}" -o json 2>/dev/null | jq -r '.state'); then
+    describe_status=0
+  else
+    describe_status=$?
+  fi
   echo "Cluster state: ${CLUSTER_STATE}"
   current_time=$(date +"%s")
   if (( "${current_time}" - "${start_time}" >= "${DESTROY_TIMEOUT}" )); then
     echo "error: Cluster not deleted after ${DESTROY_TIMEOUT}"
+    collect_uninstall_diagnostics timeout || true
     exit 1
   else
     if [[ "${CLUSTER_STATE}" == "error" ]]; then
       echo "Cluster ${CLUSTER_ID} is on error state and wont be deleted."
+      collect_uninstall_diagnostics error || true
       exit 1
     elif [[ "${CLUSTER_STATE}" == "" ]]; then
       end_time=$(date +"%s")
