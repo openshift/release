@@ -17,13 +17,17 @@ ref:
     documentation: |-
       One line per (repo, image) pair this job is willing to resolve a
       cross-repo dependency for, in the form:
-      `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME> [<dockerfile-path>]`
+      `<org>/<name> <RELATED_IMAGE_ENV_VAR_NAME> [<dockerfile-path> [<context-dir>]]`
       (whitespace-separated fields; plain text, not JSON/YAML -- this image
       has no guaranteed `jq`, same reasoning as this repo's other oadp/
       steps). `<dockerfile-path>` is optional and defaults to `Dockerfile`
       at the repo root -- set it when a repo's own ci-operator config uses
       something else (e.g. `Dockerfile.ubi`, `Containerfile`), matching its
-      `images.items[].dockerfile_path`.
+      `images.items[].dockerfile_path`. `<context-dir>` is optional (requires
+      `<dockerfile-path>` to be given too) and defaults to the repo root; set
+      it when the image builds from a subdirectory, matching
+      `images.items[].context_dir`. `<dockerfile-path>` is then relative to
+      `<context-dir>`, as in ci-operator.
 
       The SAME `<org>/<name>` may appear on more than one line: a repo that
       builds several images (e.g. one repo producing 3 separate

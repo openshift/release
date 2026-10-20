@@ -143,9 +143,26 @@ while IFS= read -r line; do
         # "Dockerfile" (e.g. Dockerfile.ubi, Containerfile) -- mirrors that
         # repo's own dockerfile_path in its ci-operator config. Defaults to
         # "Dockerfile" when omitted.
-        read -r _ RELATED_ENV CAND_DOCKERFILE <<< "${CAND_LINE}"
+        # Fourth field is an optional build-context directory relative to
+        # the repo root (mirrors ci-operator's images[].context_dir), for a
+        # repo whose image builds from a subdirectory. The Dockerfile path
+        # is then relative to that directory, as in ci-operator. Defaults to
+        # the repo root when omitted.
+        read -r _ RELATED_ENV CAND_DOCKERFILE CAND_CONTEXT <<< "${CAND_LINE}"
         CAND_DOCKERFILE="${CAND_DOCKERFILE:-Dockerfile}"
-        echo "[$(date --utc +%FT%T.%3NZ)] Resolving ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}) -> ${RELATED_ENV}"
+        CAND_CONTEXT="${CAND_CONTEXT:-.}"
+        if [[ "${CAND_CONTEXT}" == /* || "${CAND_CONTEXT}" == *..* ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] Invalid context dir '${CAND_CONTEXT}' for ${RELATED_ENV}: must be relative and not contain '..'" >&2
+            rm -rf "${SRC_DIR}"
+            exit 1
+        fi
+        BUILD_CONTEXT_DIR="${SRC_DIR}/${CAND_CONTEXT}"
+        if [[ ! -d "${BUILD_CONTEXT_DIR}" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] Context dir '${CAND_CONTEXT}' not found in ${DEP_REPO}#${DEP_PR}" >&2
+            rm -rf "${SRC_DIR}"
+            exit 1
+        fi
+        echo "[$(date --utc +%FT%T.%3NZ)] Resolving ${DEP_REPO}#${DEP_PR} (${CAND_DOCKERFILE}, context ${CAND_CONTEXT}) -> ${RELATED_ENV}"
 
         # Build entirely inside the target test cluster: a normal
         # OpenShift binary Build (buildah managed by OCP, nothing to
@@ -165,9 +182,9 @@ while IFS= read -r line; do
               -p "{\"spec\":{\"strategy\":{\"dockerStrategy\":{\"dockerfilePath\":\"${CAND_DOCKERFILE}\"}}}}"
         fi
 
-        echo "[$(date --utc +%FT%T.%3NZ)] Starting binary build ${BUILD_NAME} from ${SRC_DIR}"
+        echo "[$(date --utc +%FT%T.%3NZ)] Starting binary build ${BUILD_NAME} from ${BUILD_CONTEXT_DIR}"
         set +o errexit
-        oc start-build "${BUILD_NAME}" --from-dir="${SRC_DIR}" --follow --wait -n "${OO_INSTALL_NAMESPACE}"
+        oc start-build "${BUILD_NAME}" --from-dir="${BUILD_CONTEXT_DIR}" --follow --wait -n "${OO_INSTALL_NAMESPACE}"
         BUILD_STATUS=$?
         set -o errexit
 
