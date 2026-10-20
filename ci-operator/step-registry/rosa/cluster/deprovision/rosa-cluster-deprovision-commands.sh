@@ -70,6 +70,46 @@ if [[ -z "$CLUSTER_ID" ]]; then
   fi
 fi
 
+capture_uninstall_diagnostics() {
+  if [[ -z "${ARTIFACT_DIR:-}" || ! -d "${ARTIFACT_DIR}" ]]; then
+    echo "Unable to save uninstall diagnostics: artifact directory unavailable"
+    return
+  fi
+
+  local diagnostic_status=0
+  timeout --kill-after=5s 60s rosa logs uninstall --cluster="${CLUSTER_ID}" --tail=2000 2>/dev/null |
+    awk '
+      BEGIN {
+        total = split("AccessDenied UnauthorizedOperation DependencyViolation ResourceInUse DeleteConflict Throttling RequestLimitExceeded", signatures, " ")
+      }
+      {
+        lines++
+        for (signature = 1; signature <= total; signature++) {
+          if (index($0, signatures[signature])) {
+            counts[signature]++
+          }
+        }
+      }
+      END {
+        printf "log_lines=%d\n", lines
+        for (signature = 1; signature <= total; signature++) {
+          printf "%s=%d\n", signatures[signature], counts[signature]
+        }
+      }
+    ' > "${ARTIFACT_DIR}/uninstall-log-summary.txt" || diagnostic_status=$?
+  printf 'collection_exit_code=%s\n' "${diagnostic_status}" >> "${ARTIFACT_DIR}/uninstall-log-summary.txt" || return
+  echo "Saved allowlisted uninstall log signature counts (no raw log content)"
+}
+
+capture_on_exit() {
+  local exit_status=$?
+  if (( exit_status != 0 )); then
+    capture_uninstall_diagnostics || true
+  fi
+  exit "${exit_status}"
+}
+trap capture_on_exit EXIT
+
 echo "Deleting cluster-id: ${CLUSTER_ID}"
 start_time=$(date +"%s")
 rosa delete cluster -c "${CLUSTER_ID}" -y
