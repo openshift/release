@@ -61,6 +61,7 @@ class Cell:
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
     fips: bool = False
+    sts: bool = False
     storage_override: str | None = None
     # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
     # channels, and branches are derived from quay_version + upgrade_from, so a row
@@ -185,6 +186,7 @@ class Cell:
             "kind": self.kind,
             "layout": self.layout,
             "fips": self.fips,
+            "sts": self.sts,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

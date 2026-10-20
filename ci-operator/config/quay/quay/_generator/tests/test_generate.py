@@ -1353,6 +1353,36 @@ def test_presubmit_rejects_fips() -> None:
         expand_cells(matrix)
 
 
+def test_master_aws_s3_presubmit_installs_with_sts() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[MASTER_NAME]["tests"]}
+
+    sts = tests["aws-s3"]["steps"]
+    assert sts["pre"] == [{"chain": "ipi-aws-pre-manual-oidc-sts"}]
+    assert sts["post"][-1] == {"chain": "ipi-aws-post-manual-oidc-sts"}
+    assert sts["post"][:-1] == tests["aws-odf"]["steps"]["post"][:-1]
+
+    plain = tests["aws-odf"]["steps"]
+    assert "pre" not in plain
+    assert plain["post"][-1] == {"chain": "ipi-aws-post"}
+
+
+def test_sts_allowed_only_on_aws() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws", "gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "sts": True,
+        }
+    )
+    with pytest.raises(ValueError, match=r"sts is only valid for clouds: \[aws\]"):
+        expand_cells(matrix)
+
+
 def test_storage_odf_allowed_only_on_aws() -> None:
     for cloud in ("gcp", "azure", "libvirt"):
         matrix = _matrix_with_job(
