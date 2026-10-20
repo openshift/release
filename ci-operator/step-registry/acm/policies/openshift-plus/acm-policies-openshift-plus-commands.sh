@@ -172,6 +172,20 @@ else
   fi
 fi
 
+# ── XML escaping helper ─────────────────────────────────────────────
+# Escapes the five XML special characters so user-controlled values
+# (policy names, compliance status) can be safely interpolated into
+# JUnit XML attributes and text content.
+_xmlesc() {
+  local s="$1"
+  s="${s//&/&amp;}"
+  s="${s//</&lt;}"
+  s="${s//>/&gt;}"
+  s="${s//\"/&quot;}"
+  s="${s//\'/&apos;}"
+  printf '%s' "$s"
+}
+
 # ── Generate per-policy JUnit XML ────────────────────────────────────
 # Emit one <testcase> per policy so CI dashboards show individual
 # policy compliance rather than a single aggregate pass/fail.
@@ -228,17 +242,17 @@ if [[ -n "${policyStatusJson}" ]]; then
 
       if [[ "${_skip}" == "true" ]]; then
         junitSkipped+=1
-        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
+        testcaseXml+="    <testcase name=\"$(_xmlesc "${pName}")\" classname=\"${SUITE_NAME}\">
       <skipped message=\"Policy in SKIP_POLICIES list\"/>
     </testcase>
 "
       elif [[ "${pCompliant}" == "Compliant" ]]; then
-        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\"/>
+        testcaseXml+="    <testcase name=\"$(_xmlesc "${pName}")\" classname=\"${SUITE_NAME}\"/>
 "
       else
         junitFailures+=1
-        testcaseXml+="    <testcase name=\"${pName}\" classname=\"${SUITE_NAME}\">
-      <failure message=\"Policy status: ${pCompliant:-unknown}\">Policy ${pName} is ${pCompliant:-unknown}</failure>
+        testcaseXml+="    <testcase name=\"$(_xmlesc "${pName}")\" classname=\"${SUITE_NAME}\">
+      <failure message=\"Policy status: $(_xmlesc "${pCompliant:-unknown}")\">Policy $(_xmlesc "${pName}") is $(_xmlesc "${pCompliant:-unknown}")</failure>
     </testcase>
 "
       fi
