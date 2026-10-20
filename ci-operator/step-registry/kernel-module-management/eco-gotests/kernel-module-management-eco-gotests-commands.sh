@@ -7,10 +7,10 @@ mkdir -p "${ARTIFACT_DIR}"
 
 cd /home/testuser
 
-if [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/kmm-pull-secret" ]]; then
+if [[ -f /var/run/secrets/kmm-pull-secret ]]; then
     export ECO_HWACCEL_KMM_PULL_SECRET
-    ECO_HWACCEL_KMM_PULL_SECRET="$(cat "${CLUSTER_PROFILE_DIR}/kmm-pull-secret")"
-    echo "KMM external-registry credentials loaded from the cluster profile"
+    ECO_HWACCEL_KMM_PULL_SECRET="$(cat /var/run/secrets/kmm-pull-secret)"
+    echo "KMM external-registry credentials loaded from GSM"
 else
     echo "No KMM external-registry credentials found; external-registry tests may skip"
 fi
@@ -40,6 +40,7 @@ echo "Running eco-gotests KMM labels: ${ECO_TEST_LABELS}"
 
 test_rc=0
 ./scripts/test-runner.sh \
+    --timeout="${ECO_TEST_TIMEOUT:-80m}" \
     --junit-report="${ARTIFACT_DIR}/junit_kmm_modules.xml" \
     --json-report="${ARTIFACT_DIR}/ginkgo.json" \
     --output-dir="${ARTIFACT_DIR}" \
