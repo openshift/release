@@ -1353,6 +1353,56 @@ def test_presubmit_rejects_fips() -> None:
         expand_cells(matrix)
 
 
+def test_aws_cells_install_with_sts_by_default() -> None:
+    results, _retired = generate_all()
+    aws = gcp = 0
+    for _group, _filename, config in results:
+        for test in config["tests"]:
+            steps = test["steps"]
+            if steps.get("workflow") == "ipi-aws":
+                aws += 1
+                assert steps["pre"] == [{"chain": "ipi-aws-pre-manual-oidc-sts"}]
+                assert steps["post"][-1] == {"chain": "ipi-aws-post-manual-oidc-sts"}
+            elif steps.get("workflow") == "ipi-gcp":
+                gcp += 1
+                assert "pre" not in steps
+    assert aws and gcp
+
+
+def test_sts_false_opts_out_on_aws() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws", "gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "sts": False,
+        }
+    )
+    assert [cell.sts for cell in expand_cells(matrix)] == [False, False]
+    matrix["quay"][0]["jobs"][0].pop("sts")
+    assert [(cell.cloud, cell.sts) for cell in expand_cells(matrix)] == [
+        ("aws", True),
+        ("gcp", False),
+    ]
+
+
+def test_sts_rejected_without_aws() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "sts": False,
+        }
+    )
+    with pytest.raises(ValueError, match="sts is only valid when clouds include aws"):
+        expand_cells(matrix)
+
+
 def test_storage_odf_allowed_only_on_aws() -> None:
     for cloud in ("gcp", "azure", "libvirt"):
         matrix = _matrix_with_job(

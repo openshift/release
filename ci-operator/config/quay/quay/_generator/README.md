@@ -2,7 +2,7 @@
 
 Python generator that reads a compact `matrix.yaml.in` and writes [ci-operator](https://docs.ci.openshift.org/) config files for each test cell.
 
-Templating is Jinja `{{ variable }}` placeholders plus `{% if %}` on cell flags (`arch`, `layout`, `fips`). Expansion and merging stay in `generate.py`, not in the YAML templates.
+Templating is Jinja `{{ variable }}` placeholders plus `{% if %}` on cell flags (`arch`, `layout`, `fips`, `sts`). Expansion and merging stay in `generate.py`, not in the YAML templates.
 
 Each generated file starts with a `# DO NOT EDIT` header pointing back at `matrix.yaml.in`, `templates/`, and `generate.py`.
 
@@ -79,6 +79,7 @@ quay:
 | `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
 | `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
 | `quay[].jobs[].fips` | Optional boolean, periodic only. `true` installs a FIPS cluster (`FIPS_ENABLED`), runs `fips-check-fips-or-die` first, sets `FEATURE_FIPS: true` in `QUAY_EXTRA_CONFIG`, and turns Mailpit off (`QUAY_DEPLOY_MAILPIT: "false"`; `FEATURE_FIPS` requires `MAIL_USE_TLS`, so the `@feature:MAILING` specs self-skip). The derived `as` gets a `-fips` suffix; the filename does not change, so a FIPS row shares its non-FIPS sibling's file. Not supported with `test: upgrade`; generation fails. |
+| `quay[].jobs[].sts` | Optional boolean, default `true`; applies to the job's `aws` cells and is rejected when `clouds` has no `aws`. `true` installs the cluster with CCO in Manual mode and per-operator STS roles: `pre` is `ipi-aws-pre-manual-oidc-sts` and the final `post` chain is `ipi-aws-post-manual-oidc-sts`, which also deletes the ccoctl OIDC provider and roles. `false` keeps the plain `ipi-aws` install. The `as` and filename do not change. Quay's own S3 storage still uses the static `quay-tests/aws` keys. |
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
 | `quay[].jobs[].storage` | Optional override of the cloud's default storage backend (`STORAGE_BY_CLOUD` in `model.py`). Absent uses the cloud's default; the only other allowed value today is `odf`, and only on `aws`. Any other value, or `odf` on a different cloud, fails generation. |
 | `quay[].jobs[].upgrade_from` | Required for and only valid with `test: upgrade`: the n-1 Quay version as `X.Y` (e.g. `"3.17"`). Everything else about the upgrade edge is derived -- target channel `stable-<quay_version>`, source channel `stable-<upgrade_from>`, n branch `redhat-<quay_version>`, n-1 branch `redhat-<upgrade_from>`, and the `as` name `from-<upgrade_from without the dot>` (e.g. `from-317`) -- so a row never hand-codes a channel, branch, or name per version. |
