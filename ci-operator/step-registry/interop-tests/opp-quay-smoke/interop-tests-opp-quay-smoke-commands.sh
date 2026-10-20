@@ -648,5 +648,3 @@ function Main () {
 
 Main "$@"
 
-true
-
