@@ -16,7 +16,7 @@ cat > "${test_dir}/bin/rosa" <<'MOCK'
 printf '%s\n' "$*" >> "${MOCK_CALLS}"
 case "$1 $2" in
   'login --env') exit 0 ;;
-  'delete cluster') [[ "${SCENARIO}" != delete-failure ]] || exit 7 ;;
+  'delete cluster') [[ "${SCENARIO}" != delete-failure* ]] || exit 7 ;;
   'describe cluster')
     case "${SCENARIO}" in
       success|success-no-sts|role-failure) exit 0 ;;
@@ -26,8 +26,9 @@ case "$1 $2" in
   'logs uninstall')
     [[ "$*" == 'logs uninstall --cluster=mock-cluster --tail=2000' ]] || exit 9
     case "${SCENARIO}" in
-      logs-failure) echo 'mock-sensitive-stderr' >&2; exit 8 ;;
+      *logs-failure) echo 'mock-sensitive-stderr' >&2; echo 'AccessDenied mock-sensitive-payload'; exit 8 ;;
       hang) trap '' TERM; exec /usr/bin/sleep 30 ;;
+      no-matches) echo 'unrecognized mock-sensitive-payload' ;;
       *) printf 'AccessDenied mock-sensitive-payload\nDependencyViolation mock-sensitive-payload\nother mock-sensitive-payload\n' ;;
     esac ;;
   'delete operator-roles') [[ "${SCENARIO}" != role-failure ]] || exit 6 ;;
@@ -58,13 +59,13 @@ assert_no_match() {
   fi
 }
 
-for scenario in timeout error logs-failure hang delete-failure success success-no-sts role-failure missing-artifacts unwritable-artifacts; do
+for scenario in timeout error logs-failure hang no-matches delete-failure delete-failure-logs-failure delete-failure-unwritable-artifacts success success-no-sts role-failure missing-artifacts unwritable-artifacts; do
   scenario_dir="${test_dir}/${scenario}"
   mkdir -p "${scenario_dir}/shared" "${scenario_dir}/artifacts"
   printf 'mock-cluster' > "${scenario_dir}/shared/cluster-id"
   printf '{"timers":{}}' > "${scenario_dir}/shared/cluster-config"
   artifact_dir="${scenario_dir}/artifacts"
-  if [[ "${scenario}" == unwritable-artifacts ]]; then
+  if [[ "${scenario}" == *unwritable-artifacts ]]; then
     mkdir "${artifact_dir}/uninstall-log-summary.txt"
   elif [[ "${scenario}" == missing-artifacts ]]; then
     artifact_dir="${scenario_dir}/absent"
@@ -85,7 +86,7 @@ for scenario in timeout error logs-failure hang delete-failure success success-n
   expected_status=1
   case "${scenario}" in
     success*) expected_status=0 ;;
-    delete-failure) expected_status=7 ;;
+    delete-failure*) expected_status=7 ;;
     role-failure) expected_status=6 ;;
   esac
   [[ "${status}" == "${expected_status}" ]]
@@ -102,12 +103,13 @@ for scenario in timeout error logs-failure hang delete-failure success success-n
       jq -e '.timers.sts_destroy == null' "${scenario_dir}/shared/cluster-config" > /dev/null
     fi
     [[ ! -e "${artifact_dir}/uninstall-log-summary.txt" ]]
-  elif [[ "${scenario}" != missing-artifacts && "${scenario}" != unwritable-artifacts ]]; then
+  elif [[ "${scenario}" != missing-artifacts && "${scenario}" != *unwritable-artifacts ]]; then
     [[ $(grep -c '^logs uninstall ' "${scenario_dir}/calls") == 1 ]]
     summary="${artifact_dir}/uninstall-log-summary.txt"
     case "${scenario}" in
-      logs-failure) grep -qx 'collection_exit_code=8' "${summary}" ;;
+      *logs-failure) grep -qx 'collection_exit_code=8' "${summary}" ;;
       hang) grep -Eq '^collection_exit_code=(124|137)$' "${summary}" ;;
+      no-matches) grep -qx 'collection_exit_code=0' "${summary}"; grep -qx 'log_lines=1' "${summary}"; grep -qx 'AccessDenied=0' "${summary}" ;;
       *) grep -qx 'collection_exit_code=0' "${summary}"; grep -qx 'AccessDenied=1' "${summary}"; grep -qx 'DependencyViolation=1' "${summary}" ;;
     esac
     assert_no_match 'mock-sensitive\|mock-cluster\|mock-token\|mock-region' "${summary}"
@@ -117,5 +119,6 @@ for scenario in timeout error logs-failure hang delete-failure success success-n
     assert_no_match '^delete operator-roles\|^delete oidc-provider' "${scenario_dir}/calls"
   fi
   assert_no_match 'mock-sensitive' "${scenario_dir}/output"
+  assert_no_match '^+' "${scenario_dir}/output"
   printf 'PASS: %s\n' "${scenario}"
 done

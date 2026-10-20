@@ -169,6 +169,10 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
+.PHONY: test-rosa-cluster-deprovision
+test-rosa-cluster-deprovision:
+	bash hack/test-rosa-cluster-deprovision.sh
+
 validate-step-registry: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
