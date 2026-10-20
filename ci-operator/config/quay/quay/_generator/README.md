@@ -85,6 +85,7 @@ quay:
 | `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
 | `quay[].jobs[].storage` | Optional override of the cloud's default storage backend (`STORAGE_BY_CLOUD` in `model.py`). Absent uses the cloud's default; the only other allowed value today is `odf`, and only on `aws`. Any other value, or `odf` on a different cloud, fails generation. `e2e-chainsaw` defaults to `odf` and rejects anything else. |
 | `quay[].jobs[].upgrade_from` | Required for and only valid with `test: upgrade`: the n-1 Quay version as `X.Y` (e.g. `"3.17"`). Everything else about the upgrade edge is derived -- target channel `stable-<quay_version>`, source channel `stable-<upgrade_from>`, n branch `redhat-<quay_version>`, n-1 branch `redhat-<upgrade_from>`, and the `as` name `from-<upgrade_from without the dot>` (e.g. `from-317`) -- so a row never hand-codes a channel, branch, or name per version. |
+| `quay[].jobs[].ocp_channel` | Optional, only valid with `test: upgrade`: the OCP release channel the cluster installs from, `stable` (default) or `candidate`. Use `candidate` for an OCP minor with no stable channel yet (OCP 5.0 today); `releases.latest` stays a released payload, never a nightly. |
 
 The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.
 
