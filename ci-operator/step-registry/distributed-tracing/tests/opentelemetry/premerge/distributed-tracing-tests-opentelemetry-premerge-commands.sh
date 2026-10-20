@@ -7,8 +7,12 @@ set -o pipefail
 # Write a flat context file to SHARED_DIR so the qe-agent post-step can detect failures.
 # SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
 function notify_qe_agent() {
+    # The exit status of the step, before anything else runs: the step can fail before any JUnit file exists
+    # (a missing image variable, a bad RUN_TESTS/SKIP_TESTS combination, the operator rollout timing out).
+    local rc=$?
     local has_failures=false
     grep -rqE --include='*.xml' '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
+    [[ "${rc}" -ne 0 ]] && has_failures=true
 
     local i=0
     while IFS= read -r xml; do

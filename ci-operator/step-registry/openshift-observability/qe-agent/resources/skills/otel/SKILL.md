@@ -17,7 +17,7 @@ This skill drives an agentic loop that takes failing CI test results for the Ope
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`. The `distributed-tracing-tests-opentelemetry-premerge` test step writes it at exit time, for example:
+Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
 
 ```json
 {
@@ -33,8 +33,8 @@ Read `${SHARED_DIR}/qe-agent-context.json`. The `distributed-tracing-tests-opent
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path — a different job may point at a different step
-- `env` — the runtime env var values the step was run with; export exactly the keys present in the file, whatever they are. For the premerge step above: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Other steps populate different keys, or none
+- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path
+- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`
 
 Construct the raw GitHub URL and fetch the script:
 
@@ -52,7 +52,7 @@ Mandatory, before Step 0b. Read `/tmp/qe-agent-modules/cluster-stability.md` and
 
 ## Step 0b — Re-establish the Test Environment
 
-Export any env vars from the `env` field, then **run the setup section of the fetched script** — the commands up to (but not including) the first `chainsaw test` invocation.
+Export any env vars from the `env` field, then **run the setup section of the fetched script** — the commands up to (but not including) the first `chainsaw test` invocation. Upstream only: this also clones `https://github.com/openshift/distributed-tracing-qe` and moves its `tests/e2e-otel` into the copied tree (the upstream operator repo lacks those tests) and `sed`-substitutes `OPAMP_BRIDGE_SERVER` into the test fixtures — run that too, it is still setup, before the test-directory logic below.
 
 Required adaptations:
 
