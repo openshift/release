@@ -5,7 +5,7 @@ ref:
     name: eco-ci-cd
     tag: eco-ci-cd
   commands: telcov10n-functional-cnf-ran-ibi-ibbf-commands.sh
-  timeout: 4h
+  timeout: 5h
   grace_period: 5m
   resources:
     requests:
@@ -26,7 +26,13 @@ ref:
     documentation: Replacement BMC IPv4 address, authenticated with the retained target BMC secret.
   - name: IBI_IBBF_TARGET_IP
     default: ""
-    documentation: Reserved static target IPv4 address retained by the replacement hardware.
+    documentation: Reserved static target IPv4 or IPv6 address retained by the replacement hardware.
+  - name: IBI_IBBF_REPLACEMENT_POLICY_PATH
+    default: ""
+    documentation: Optional replacement policy fixture under VERSION/SPOKE/policygentemplate/ztp-test/ibbf-test. Activate after hardware replacement and remediate common, group and site policies. Empty retains the current policy path.
+  - name: ZTP_GIT_REPO
+    default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+    documentation: Repository of the recorded seed Git revision; must match both target Applications when replacement policies are enabled.
   - name: TARGET_CLUSTER_NAME
     default: ""
     documentation: Target hub name used to locate its kubeconfig on the target bastion.
@@ -47,12 +53,19 @@ ref:
     hub ImportAndSync strategy before allowing original-node power-off.
     Read original BMC credentials privately and verify they authenticate both
     the original and replacement BMC. Capture the expected target policies.
-    Require hardware replacement to execute and pass, then wait for fresh policy
-    evaluations on the replacement. Create a new target-only TALM remediation
-    for common-config-policy and common-subscriptions-policy in that order.
+    Require hardware replacement to execute and pass. When a replacement policy
+    path is configured, check its YAML identities at the recorded seed revision
+    before the test. After replacement, verify original fencing, switch policies
+    to that path and revision, and require Argo synchronization and propagation
+    of the new policy specifications before accepting fresh evaluations.
+    Create a new target-only TALM remediation for common-config-policy and
+    common-subscriptions-policy, followed by group and site policies when the
+    replacement policy path is enabled. Validator policies remain inform.
     Require remediation success and all expected policies to be Compliant within
-    a shared 50-minute policy-recovery deadline. Record this independent check
-    in its own JUnit report; image policy spec 87996 is deliberately not selected
+    a shared 50-minute policy-recovery deadline, or 75 minutes when switching
+    hardware policies so synchronization does not consume TALM's budget.
+    Record this independent check in its own JUnit report; image policy spec
+    87996 is deliberately not selected
     because some images repeat the changed Git path in that spec's BeforeEach.
     Stream output, collect reports even on failure, and return failure immediately.
     Leave the original hardware off and Argo on the replacement fixture.
