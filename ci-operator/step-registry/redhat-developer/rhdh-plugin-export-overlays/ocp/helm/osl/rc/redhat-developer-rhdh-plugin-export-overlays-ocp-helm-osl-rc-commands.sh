@@ -360,7 +360,12 @@ fi
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
-git clone --depth 1 --branch main https://github.com/redhat-developer/rhdh-plugin-export-overlays.git "${WORKDIR}/rhdh-plugin-export-overlays"
+OVERLAYS_COMMIT=b1320a680060f03ccaf7c88405125589e38f3fc4
+OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
+git init "${WORKDIR}/rhdh-plugin-export-overlays"
+git -C "${WORKDIR}/rhdh-plugin-export-overlays" remote add origin "${OVERLAYS_REPO}"
+git -C "${WORKDIR}/rhdh-plugin-export-overlays" fetch --depth 1 origin "${OVERLAYS_COMMIT}"
+git -C "${WORKDIR}/rhdh-plugin-export-overlays" checkout --detach FETCH_HEAD
 cd "${WORKDIR}/rhdh-plugin-export-overlays"
 TEST_EXIT=0
 oc create serviceaccount tester-sa-2 -n default 2>/dev/null || true
