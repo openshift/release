@@ -91,6 +91,14 @@ check_provider_configured() {
     return 1
   fi
   log "External auth provider(s) configured: $(echo "${providers}" | jq -r '[.items[].id] | join(", ")')"
+  # Capture the issuer URLs the providers declare: the kube-apiserver's auth
+  # configuration must reference them before its rollout can be trusted.
+  PROVIDER_ISSUER_URLS=$(echo "${providers}" | jq -r '[.items[].issuer.url // empty] | map(select(. != "")) | unique | join(",")')
+  if [[ -z "${PROVIDER_ISSUER_URLS}" ]]; then
+    log "ERROR: no issuer URL found in the external auth payload; item keys: $(echo "${providers}" | jq -c '[.items[0] // {} | keys]')"
+    return 1
+  fi
+  log "Provider issuer URL(s): ${PROVIDER_ISSUER_URLS}"
   return 0
 }
 wait_for "external auth provider configured on cluster ${CLUSTER_NAME}" check_provider_configured
@@ -137,6 +145,36 @@ esac
 HCP_NAMESPACE="ocm-${NS_ENV}-${CLUSTER_ID}-${CLUSTER_NAME}"
 log "HCP namespace: ${HCP_NAMESPACE}"
 
+# 2b. Verify the provider configuration has actually reached the hosted control
+#     plane: the issuer URL the provider declares must appear in the
+#     kube-apiserver's effective auth configuration -- container args (legacy
+#     --oidc-issuer-url style) or the ConfigMaps the deployment mounts
+#     (structured authentication config). Without this gate an already-healthy
+#     deployment at its OLD generation would satisfy the rollout check below
+#     before the operator reconciles the new provider (review feedback: wait
+#     for the provider change, not just a healthy Deployment).
+check_provider_config_applied() {
+  local dep haystack cms cm_json issuer ok=1
+  dep=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment kube-apiserver -n "${HCP_NAMESPACE}" -o json 2>/dev/null) || return 1
+  haystack=$(echo "${dep}" | jq -r \
+    '[.spec.template.spec.containers[].args[]?, .spec.template.spec.containers[].command[]?] | map(select(. != null)) | join(" ")' \
+    2>/dev/null)
+  cms=$(echo "${dep}" | jq -r '.spec.template.spec.volumes[]?.configMap.name // empty' 2>/dev/null)
+  if [[ -n "${cms}" ]]; then
+    # shellcheck disable=SC2086
+    cm_json=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap -n "${HCP_NAMESPACE}" ${cms} -o json 2>/dev/null) || true
+    haystack="${haystack} $(echo "${cm_json}" | jq -r '.items[]?.data // {} | to_entries[].value // empty' 2>/dev/null)"
+  fi
+  for issuer in ${PROVIDER_ISSUER_URLS//,/ }; do
+    if ! grep -qF "${issuer}" <<<"${haystack}"; then
+      log "Issuer ${issuer} not yet present in the kube-apiserver configuration."
+      ok=0
+    fi
+  done
+  (( ok ))
+}
+wait_for "external auth issuer present in kube-apiserver configuration" check_provider_config_applied
+
 check_kube_apiserver_rollout() {
   local dep
   dep=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment kube-apiserver -n "${HCP_NAMESPACE}" -o json 2>/dev/null) || return 1
@@ -163,4 +201,4 @@ check_kube_apiserver_pods() {
 wait_for "kube-apiserver pods running in ${HCP_NAMESPACE}" check_kube_apiserver_pods
 KUBECONFIG="${MC_KUBECONFIG}" oc get pods -n "${HCP_NAMESPACE}" -l app=kube-apiserver -o wide || true
 
-log "External OIDC readiness checks passed: provider configured and kube-apiserver rolled out."
+log "External OIDC readiness checks passed: provider configured, issuer present in the kube-apiserver configuration, and kube-apiserver rolled out."

@@ -22,11 +22,16 @@ ref:
     provider. It logs into OCM and:
     1. Polls the cluster's external_auth_config until at least one external auth
        provider is reported configured (and no provider reports a failing
-       condition).
-    2. Logs into the management cluster via the OCM API and waits for the hosted
-       control plane kube-apiserver Deployment to finish rolling out (and its
-       pods to be Running) in the HCP namespace, which confirms the external OIDC
-       configuration has been applied to the kube-apiserver.
+       condition), capturing the issuer URL(s) the providers declare.
+    2. Verifies the issuer URL(s) actually appear in the kube-apiserver's
+       effective auth configuration on the management cluster (container args
+       or the ConfigMaps the deployment mounts). This gates the rollout check:
+       an already-healthy deployment at its old generation would otherwise
+       satisfy it before the operator reconciles the new provider.
+    3. Waits for the hosted control plane kube-apiserver Deployment to finish
+       rolling out (and its pods to be Running) in the HCP namespace, which
+       confirms the external OIDC configuration has been applied to the
+       kube-apiserver.
 
     The step is a no-op for clusters that were not provisioned with external
     authentication enabled.
