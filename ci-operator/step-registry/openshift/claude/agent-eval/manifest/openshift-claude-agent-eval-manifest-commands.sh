@@ -757,10 +757,15 @@ def summary_data(artifacts, entries, errors):
 def write_summary(artifacts, entries, errors):
     """Publish JSON atomically, including incomplete and failed evaluations."""
     destination = artifacts / "evals-summary.json"
-    temporary = destination.with_suffix(".tmp")
-    temporary.write_text(json.dumps(summary_data(artifacts, entries, errors),
-                                    ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(destination)
+    temporary = destination.with_name(destination.name + ".tmp")
+    try:
+        # Default ASCII escaping keeps diagnostics UTF-8 cannot encode, such as
+        # lone surrogates from undecodable filenames, from failing the report.
+        temporary.write_text(json.dumps(summary_data(artifacts, entries, errors), indent=2) + "\n",
+                             encoding="utf-8")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def write_index(artifacts, entries, errors):
@@ -773,9 +778,13 @@ def write_index(artifacts, entries, errors):
         summary = summary_data(artifacts, entries, errors)
     document = render_report(summary, link_json=(artifacts / "evals-summary.json").is_file())
     destination = artifacts / "evals-summary.html"
-    temporary = destination.with_suffix(".tmp")
-    temporary.write_text(document, encoding="utf-8")
-    temporary.replace(destination)
+    temporary = destination.with_name(destination.name + ".tmp")
+    try:
+        # Show unencodable diagnostics escaped, as JUnit does, instead of losing the page.
+        temporary.write_text(document, encoding="utf-8", errors="backslashreplace")
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def write_reports(artifacts, results, entries, errors):
@@ -1002,11 +1011,15 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
+                    if remaining(deadline) <= 0:
+                        raise EvalError("step time limit reached before regression scoring")
                     # Score the verified physical run through the same harness
-                    # checkout that resolved this original overlay config.
+                    # checkout that resolved this original overlay config. The
+                    # orchestrator had write access to the checkout, so the
+                    # thresholds come from preflight rather than a re-read.
                     status = command([sys.executable, str(Path(__file__).with_name("eval_regression.py")),
-                                      "--harness", str(harness), "--repo", str(repo),
-                                      "--config", plan.config, "--run-dir", str(directory)],
+                                      "--harness", str(harness), "--run-dir", str(directory),
+                                      "--thresholds", json.dumps(plan.settings.get("thresholds", {}))],
                                      repo, run_env, eval_artifacts / "regression.log",
                                      min(60, remaining(deadline)))
                     if status:
@@ -1557,31 +1570,43 @@ if __name__ == "__main__":
 PYTHON_SOURCE_4
 cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_5'
 #!/usr/bin/env python3
-"""Apply harness thresholds to the run directory already verified by the runner."""
+"""Apply the runner's preflight thresholds to the run directory it already verified."""
 
 import argparse
 import importlib
+import json
 from pathlib import Path
 import sys
 
 import yaml
 
 try:
-    from .eval_config import resolve_config
+    from .eval_plan import EvalError, validate_thresholds
 except ImportError:
-    from eval_config import resolve_config
+    from eval_plan import EvalError, validate_thresholds
+
+
+def parse_thresholds(text):
+    """Decode the thresholds the parent resolved before the orchestrator ran."""
+    try:
+        document = json.loads(text)
+    except ValueError as error:
+        raise EvalError(f"--thresholds must be JSON: {error}") from error
+    return validate_thresholds(document)
 
 
 def main():
-    """Use the cloned harness's scoring rules without repeating its path lookup."""
+    """Use the cloned harness's scoring rules without re-reading the eval YAML."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", type=Path, required=True)
-    parser.add_argument("--repo", type=Path, required=True)
-    parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--thresholds", required=True,
+                        help="JSON mapping of judge thresholds resolved at preflight")
     args = parser.parse_args()
-    resolved = resolve_config(args.harness, args.repo, args.config)
-    thresholds = resolved.harness_config.thresholds
+    # The orchestrator runs with write access to the checkout before scoring,
+    # so re-resolving the config here would let the skill under test lower its
+    # own thresholds. Only the parent's preflight resolution decides pass/fail.
+    thresholds = parse_thresholds(args.thresholds)
 
     # Keep harness imports in this bounded child process. Import from the same
     # scripts directory as the score.py CLI, including its agent_eval package.

@@ -104,7 +104,9 @@ checks `git rev-parse HEAD`, and uses that checkout for configuration
 resolution, the Claude plugin, and regression scoring. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
-same rules at preflight and execution. The original overlay path remains the
+harness's rules. Resolution happens once, at preflight; the orchestrator runs
+with write access to the checkout, so scoring uses the preflight thresholds
+rather than re-reading the eval YAML. The original overlay path remains the
 eval identity and the `/eval-run --config` argument. Preflight also records the
 harness's `EvalConfig.eval_name()` (the skill under test, else `name`, else the
 file stem), because the harness scores, reports, and preflights a run under
@@ -233,6 +235,8 @@ logs, and allow subsequent evals to run.
 Ordinary unexpected exceptions also fail the affected eval. Success requires
 completed execution and finalization; an empty error list alone is insufficient.
 Report writers are attempted independently, and reporting errors fail the step.
+Diagnostics UTF-8 cannot encode are published escaped, and a failed write
+leaves no `.tmp` file behind.
 After the orchestrator exits, the runner reads the run only from
 `AGENT_EVAL_RUNS_DIR/<eval_name>/<run_id>`, the directory the harness's own
 `score.py` and `report.py` use. A link there is followed if it stays inside the
@@ -240,8 +244,11 @@ runs directory. Directories the orchestrator created under another guessed name
 (for example the config `name`), whether links or `cp -r` copies, never identify
 the run; when the expected directory is missing, the failure lists them and
 their contents are archived as `stray-runs.tar` for diagnosis only. The regression check reads `summary.yaml` from that verified physical
-run directory and uses the cloned harness's `detect_regressions()` threshold
-rules. Missing summaries or thresholded judges still fail the eval.
+run directory and applies the thresholds resolved at preflight with the
+cloned harness's `detect_regressions()` rules; an eval YAML edited during the
+run cannot change its own verdict. Missing summaries or thresholded judges
+still fail the eval. If the step deadline passes before scoring, the eval
+fails as deadline-expired rather than as a scorer timeout.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 An unreadable, truncated, or non-mapping `run_result.json` and non-integer

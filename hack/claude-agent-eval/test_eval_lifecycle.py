@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+from pathlib import Path
 import sys
 from unittest import mock
 
@@ -154,6 +155,58 @@ class LifecycleTests(support.Fixture):
                 self.assertTrue(errors)
                 self.assertTrue(results[0][2])
 
+    def test_reports_publish_text_utf8_cannot_encode(self):
+        self.artifacts.mkdir()
+        failure = "cannot collect summary.yaml: \udcff"  # for example an undecodable filename
+        entries = [{"config": "evals/a.yaml", "name": "a", "run_id": "run-a",
+                    "status": "failed", "failure": failure}]
+        runner.write_summary(self.artifacts, entries, [failure])
+        runner.write_index(self.artifacts, entries, [failure])
+        summary = json.loads((self.artifacts / "evals-summary.json").read_text(encoding="utf-8"))
+        self.assertEqual((summary["evals"][0]["failure"], summary["errors"]), (failure, [failure]))
+        self.assertIn("\\udcff", self.index())
+        self.assertEqual(list(self.artifacts.glob("*.tmp")), [])
+
+    def test_failed_report_write_leaves_no_temporary_file(self):
+        self.artifacts.mkdir()
+        for writer in (runner.write_summary, runner.write_index):
+            with self.subTest(writer=writer.__name__), \
+                    mock.patch.object(Path, "replace", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    writer(self.artifacts, [], [])
+            self.assertEqual(list(self.artifacts.glob("*.tmp")), [])
+
+    def test_thresholds_edited_during_the_run_do_not_change_the_verdict(self):
+        self.change_skill()
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "tamper_thresholds"}))
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("harness regression check failed", result.stdout)
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        self.assertIn("REGRESSIONS: 1", (self.eval_artifacts() / "regression.log").read_text())
+        tampered = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        self.assertEqual(tampered["thresholds"], {"quality": {"min_pass_rate": 0.0}})
+
+    def test_deadline_reached_after_verification_is_reported_as_the_step_limit(self):
+        self.artifacts.mkdir()
+        self.change_skill()
+        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        verified = False
+        verify, clock = runner.verify_result, runner.remaining
+
+        def verify_then_expire(*args):
+            nonlocal verified
+            verify(*args)
+            verified = True
+
+        with mock.patch.object(runner, "verify_result", side_effect=verify_then_expire), \
+                mock.patch.object(runner, "remaining",
+                                  side_effect=lambda deadline: -1 if verified else clock(deadline)):
+            self.assertEqual(runner.run_evals(self.repo, entries, files, self.artifacts, self.env), 1)
+        self.assertNotIn("regression", self.calls())
+        failure = self.junit().find("testcase/failure").attrib["message"]
+        self.assertIn("step time limit reached before regression scoring", failure)
+        self.assertNotIn("0.01 seconds", failure)
+
 
 class HarnessPreparationTests(support.Fixture):
     def test_failed_harness_fetch_has_junit(self):
@@ -252,7 +305,6 @@ class ConfigValidationTests(support.Fixture):
 
     def test_threshold_validation_at_verification_and_regression_boundaries(self):
         regression = load_sibling("eval_regression")
-        self.put(self.entry["config"], "thresholds: null\n")
         with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
             runner.verify_result(self.repo, {"thresholds": None})
         harness = self.make_fake_harness()
@@ -261,13 +313,13 @@ class ConfigValidationTests(support.Fixture):
             if name == "score":
                 raise AssertionError("score must not be imported")
             return original_import(name, *args, **kwargs)
-        with mock.patch.object(sys, "argv", ["eval_regression", "--harness", str(harness),
-                               "--repo", str(self.repo),
-                               "--config", str(self.repo / self.entry["config"]),
-                               "--run-dir", str(self.root)]), \
-                mock.patch.object(regression.importlib, "import_module", side_effect=guarded_import):
-            with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
-                regression.main()
+        for thresholds in ("null", "[]", "not json"):
+            with self.subTest(thresholds=thresholds), \
+                    mock.patch.object(sys, "argv", ["eval_regression", "--harness", str(harness),
+                                      "--run-dir", str(self.root), "--thresholds", thresholds]), \
+                    mock.patch.object(regression.importlib, "import_module", side_effect=guarded_import):
+                with self.assertRaisesRegex(runner.EvalError, "thresholds must"):
+                    regression.main()
 
     def test_invalid_manifest_entries(self):
         updates = [

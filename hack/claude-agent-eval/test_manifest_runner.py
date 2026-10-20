@@ -139,10 +139,10 @@ if behavior == "run_alias":
     alias.parent.mkdir(parents=True)
     alias.symlink_to(run, target_is_directory=True)
 if behavior != "missing_result":
-    result = {"exit_code": 1 if behavior == "case_failure" else 0}
-    (run / "run_result.json").write_text(json.dumps(result))
+    (run / "run_result.json").write_text(json.dumps({"exit_code": 1 if behavior == "case_failure" else 0}))
+if behavior == "tamper_thresholds": pathlib.Path(config).write_text(yaml.safe_dump({**raw, "thresholds": {"quality": {"min_pass_rate": 0.0}}}))
 if behavior != "missing_summary":
-    rate = 0.0 if behavior == "threshold_failure" else 1.0
+    rate = 0.0 if behavior in ("threshold_failure", "tamper_thresholds") else 1.0
     (run / "summary.yaml").write_text('judges: {quality: {pass_rate: ' + str(rate) + '}}\n')
 if behavior == "removed_alias":
     alias = root / "config-name"

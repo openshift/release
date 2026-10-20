@@ -1,29 +1,41 @@
 #!/usr/bin/env python3
-"""Apply harness thresholds to the run directory already verified by the runner."""
+"""Apply the runner's preflight thresholds to the run directory it already verified."""
 
 import argparse
 import importlib
+import json
 from pathlib import Path
 import sys
 
 import yaml
 
 try:
-    from .eval_config import resolve_config
+    from .eval_plan import EvalError, validate_thresholds
 except ImportError:
-    from eval_config import resolve_config
+    from eval_plan import EvalError, validate_thresholds
+
+
+def parse_thresholds(text):
+    """Decode the thresholds the parent resolved before the orchestrator ran."""
+    try:
+        document = json.loads(text)
+    except ValueError as error:
+        raise EvalError(f"--thresholds must be JSON: {error}") from error
+    return validate_thresholds(document)
 
 
 def main():
-    """Use the cloned harness's scoring rules without repeating its path lookup."""
+    """Use the cloned harness's scoring rules without re-reading the eval YAML."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", type=Path, required=True)
-    parser.add_argument("--repo", type=Path, required=True)
-    parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--thresholds", required=True,
+                        help="JSON mapping of judge thresholds resolved at preflight")
     args = parser.parse_args()
-    resolved = resolve_config(args.harness, args.repo, args.config)
-    thresholds = resolved.harness_config.thresholds
+    # The orchestrator runs with write access to the checkout before scoring,
+    # so re-resolving the config here would let the skill under test lower its
+    # own thresholds. Only the parent's preflight resolution decides pass/fail.
+    thresholds = parse_thresholds(args.thresholds)
 
     # Keep harness imports in this bounded child process. Import from the same
     # scripts directory as the score.py CLI, including its agent_eval package.
