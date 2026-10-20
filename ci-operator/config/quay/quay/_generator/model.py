@@ -62,6 +62,7 @@ class Cell:
     skip_if_only_changed: str | None = None
     fips: bool = False
     storage_override: str | None = None
+    auth_mode: str | None = None
 
     @property
     def quay_version_dashed(self) -> str:
@@ -135,7 +136,8 @@ class Cell:
             if self.kind == "periodic"
             else f"{self.cloud}-{self.storage}"
         )
-        return f"{base}-fips" if self.fips else base
+        base = f"{base}-fips" if self.fips else base
+        return f"{base}-{self.auth_mode}" if self.auth_mode else base
 
     @property
     def filename(self) -> str:
@@ -167,6 +169,7 @@ class Cell:
             "kind": self.kind,
             "layout": self.layout,
             "fips": self.fips,
+            "auth_mode": self.auth_mode,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

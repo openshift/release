@@ -1184,6 +1184,91 @@ def test_presubmit_rejects_fips() -> None:
         expand_cells(matrix)
 
 
+def test_redhat_318_aws_auth_mode_rows_share_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    default = tests["aws-s3-nightly"]["steps"]
+    default_refs = [step["ref"] for step in default["test"]]
+    jaeger = default_refs.index("quay-deploy-jaeger")
+    assert default_refs[jaeger + 1] == "quay-deploy-aws-s3"
+    assert "quay-deploy-openldap" not in default_refs
+
+    default_invert = default["env"]["PLAYWRIGHT_GREP_INVERT"]
+    for mode, ref, dropped in (("ldap", "quay-deploy-openldap", "@auth:LDAP"),):
+        test = tests[f"aws-s3-nightly-{mode}"]
+        assert test["cron"] == "@weekly"
+        steps = test["steps"]
+        refs = [step["ref"] for step in steps["test"]]
+        assert refs == default_refs[: jaeger + 1] + [ref] + default_refs[jaeger + 1 :]
+
+        invert = steps["env"]["PLAYWRIGHT_GREP_INVERT"]
+        assert invert.split("|") == [t for t in default_invert.split("|") if t != dropped]
+        assert {k: v for k, v in steps["env"].items() if k != "PLAYWRIGHT_GREP_INVERT"} == {
+            k: v for k, v in default["env"].items() if k != "PLAYWRIGHT_GREP_INVERT"
+        }
+
+
+def test_auth_mode_rejects_non_e2e_install_test() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-upgrade",
+            "auth_mode": "ldap",
+        }
+    )
+    with pytest.raises(ValueError, match="auth_mode is only valid for test: e2e-install"):
+        expand_cells(matrix)
+
+
+def test_presubmit_rejects_auth_mode() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "auth_mode": "ldap",
+        },
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="auth_mode is only valid for .*kind: periodic"):
+        expand_cells(matrix)
+
+
+def test_auth_mode_rejects_unknown_value() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "auth_mode": "oidc",
+        }
+    )
+    with pytest.raises(ValueError, match="auth_mode must be one of"):
+        expand_cells(matrix)
+
+
+def test_auth_mode_requires_s3_storage() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "auth_mode": "ldap",
+        }
+    )
+    with pytest.raises(ValueError, match="auth_mode requires s3 storage"):
+        expand_cells(matrix)
+
+
 def test_storage_odf_allowed_only_on_aws() -> None:
     for cloud in ("gcp", "azure", "libvirt"):
         matrix = _matrix_with_job(

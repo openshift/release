@@ -367,9 +367,10 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
-# so an explicit override still wins over the service-owned fragments. A
-# missing fragment is a silent no-op, leaving the disabled default above.
+# Merge order: Mailpit fragment -> OTel fragment -> IdP auth fragment ->
+# explicit QUAY_EXTRA_CONFIG, so an explicit override still wins over the
+# service-owned fragments. A missing fragment is a silent no-op, leaving the
+# disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
 	echo "Merging Mailpit config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
@@ -378,6 +379,12 @@ fi
 if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	echo "Merging Jaeger/OTel config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
+# Never print this fragment: an LDAP fragment carries LDAP_ADMIN_PASSWD.
+if [[ -s "${SHARED_DIR}/quay-auth-config.yaml" ]]; then
+	echo "Merging IdP auth config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-auth-config.yaml"
 fi
 
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
@@ -464,6 +471,10 @@ else
   oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 fi
 
+# Quay rejects user/initialize unless AUTHENTICATION_TYPE is Database, so the
+# bootstrap below only runs then (or when the key is unset).
+QUAY_AUTH_TYPE="$(yq e '.AUTHENTICATION_TYPE // ""' config.yaml)"
+
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
@@ -501,8 +512,12 @@ for i in $(seq 1 90); do
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    if [[ -n "${QUAY_AUTH_TYPE}" && "${QUAY_AUTH_TYPE}" != "Database" ]]; then
+      echo "AUTHENTICATION_TYPE is ${QUAY_AUTH_TYPE}: skipping user/initialize bootstrap; no quay_oauth2_token written" >&2
+    else
+      curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
+           --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    fi
     archive_pod_info
     exit 0
   fi
