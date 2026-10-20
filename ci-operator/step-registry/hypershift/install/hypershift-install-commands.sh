@@ -399,7 +399,7 @@ for attempt in $(seq 1 "${INSTALL_ATTEMPTS}"); do
   if [[ "${INSTALL_RC}" -eq 0 ]]; then
     break
   fi
-  if ! grep -Eq 'etcdserver: request timed out|etcdserver: leader changed|context deadline exceeded|the server is currently unable to handle the request|etcdserver: too many requests' "${INSTALL_LOG}"; then
+  if ! grep -Eq 'etcdserver: request timed out|etcdserver: leader changed|context deadline exceeded|the server is currently unable to handle the request|etcdserver: too many requests|http2: client connection lost|connection reset by peer' "${INSTALL_LOG}"; then
     echo "HyperShift install failed with a non-retryable error"
     rm -f "${INSTALL_LOG}"
     exit "${INSTALL_RC}"
