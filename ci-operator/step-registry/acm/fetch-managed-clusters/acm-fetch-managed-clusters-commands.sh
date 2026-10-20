@@ -35,7 +35,7 @@ if [[ -d "${junitDir}" ]]; then
             echo "WARNING: JUnit failure found in ${xmlFile}" 1>&2
             junitFails+=1
         fi
-    done < <(find "${junitDir}" -name '*.xml' -print0 2>/dev/null)
+    done < <(find "${junitDir}" -name 'junit*.xml' -print0 2>/dev/null)
 
     if (( junitFails > 0 )); then
         echo "CLC smoke step reported JUnit failures; skipping managed-cluster fetch" 1>&2
@@ -49,13 +49,16 @@ if [ -s /tmp/ci/managed.cluster.name ] && ! grep -q "null" /tmp/ci/managed.clust
     typeset mcName
     mcName="$(cat /tmp/ci/managed.cluster.name)"
     echo "Waiting up to 10m for ManagedCluster/${mcName} to reach Available=True ..."
-    if ! oc wait "managedcluster/${mcName}" \
+    typeset waitErr
+    if ! waitErr=$(oc wait "managedcluster/${mcName}" \
             --for=condition=ManagedClusterConditionAvailable \
-            --timeout=10m 2>/dev/null; then
+            --timeout=10m 2>&1); then
         echo "ERROR: ManagedCluster/${mcName} did not become Available within 10m" 1>&2
+        [[ -n "${waitErr}" ]] && echo "  oc-wait: ${waitErr}" 1>&2
         oc get "managedcluster/${mcName}" \
             -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")]}' 2>/dev/null | \
-            jq -r '"  status=\(.status)  reason=\(.reason // "n/a")  message=\(.message // "n/a")"' 2>/dev/null || true
+            jq -r '"  status=\(.status)  reason=\(.reason // "n/a")  message=\(.message // "n/a")"' || \
+            echo "  (could not retrieve condition details)" 1>&2
         exit 1
     fi
     echo "ManagedCluster/${mcName} is Available."
