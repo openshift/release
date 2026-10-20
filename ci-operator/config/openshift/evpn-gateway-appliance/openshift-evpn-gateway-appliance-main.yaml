@@ -32,6 +32,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      BOOTC_BASE: quay.io/centos-bootc/centos-bootc@sha256:9aedf2d189b85c498697f9b83112c893b084d359268da7dd6d5d848478d260de
       EC2_AMI: ami-0da467f007dfebd6b
       EC2_INSTANCE_TYPE: m6i.xlarge
       EC2_REGION: us-west-2
@@ -41,19 +42,7 @@ tests:
     pre:
     - chain: openshift-image-based-infra-aws-ec2
     test:
-    - as: smoke
-      commands: |
-        set -euo pipefail
-        ip=$(cat "${SHARED_DIR}/public_address")
-        user=$(cat "${SHARED_DIR}/ssh_user")
-        ssh -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
-          -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-          "${user}@${ip}" 'cat /etc/os-release && sudo dnf install -y podman && podman version'
-      from: ansible-test-runner
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: openshift-evpn-gateway-appliance-runtime
 zz_generated_metadata:
   branch: main
   org: openshift
