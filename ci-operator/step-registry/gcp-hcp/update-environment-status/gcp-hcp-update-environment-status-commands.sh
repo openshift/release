@@ -30,11 +30,11 @@ if [[ "${job_type}" == "postsubmit" ]]; then
   fi
 fi
 
-# Presubmits test the lifecycle against an already deployed environment, but
-# only promotion-branch postsubmits publish a status on a deployed commit.
+# Presubmits and scheduled periodics test the lifecycle against an already
+# deployed environment; only promotion-branch postsubmits publish a commit status.
 if [[ "${job_type}" != "postsubmit" ]]; then
   touch "${skip_path}"
-  echo "Skipping deployed-commit status for an ordinary presubmit"
+  echo "Skipping deployed-commit status for a non-postsubmit job"
   exit 0
 fi
 
