@@ -1,4 +1,4 @@
-"""e2e-chainsaw: quay-operator repo target, suite fan-out, odf-only storage."""
+"""e2e-chainsaw: quay-operator repo target, both suites in one job, odf-only storage."""
 
 from pathlib import Path
 from typing import Any
@@ -60,11 +60,12 @@ def test_chainsaw_targets_quay_operator_and_writes_sibling_dir(tmp_path: Path) -
     }
 
 
-def test_chainsaw_fans_out_suites_into_one_file() -> None:
+def test_chainsaw_runs_both_suites_in_one_job() -> None:
     tests = _chainsaw_config()["tests"]
-    assert [test["as"] for test in tests] == ["aws-odf-nightly-e2e", "aws-odf-nightly-destructive"]
-    assert [test["steps"]["env"]["CHAINSAW_SUITE"] for test in tests] == ["e2e", "destructive"]
-    assert {test["cron"] for test in tests} == {"@weekly"}
+    assert [test["as"] for test in tests] == ["aws-odf-nightly"]
+    assert tests[0]["steps"]["env"]["CHAINSAW_SUITE"] == "all"
+    assert tests[0]["cron"] == "@weekly"
+    assert tests[0]["timeout"] == "4h0m0s"
 
 
 def test_chainsaw_uses_aws_quay_qe_cluster_profile() -> None:

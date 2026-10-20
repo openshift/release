@@ -45,7 +45,6 @@ from model import (
     EXTRA_STORAGE_BY_CLOUD,
     REPO_BY_TEST,
     STORAGE_BY_CLOUD,
-    SUITES_BY_TEST,
     Cell,
     YamlMap,
 )
@@ -446,8 +445,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
             as_name = _job_as_name(job, where)
-            suites = SUITES_BY_TEST.get(test, (None,))
-            for ocp, cloud, job_arch, suite in itertools.product(ocps, clouds, arches, suites):
+            for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
                 cells.append(
                     Cell(
                         org=org,
@@ -473,7 +471,6 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         sts=cloud == "aws" and sts is not False,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
-                        suite=suite,
                     )
                 )
     return cells
