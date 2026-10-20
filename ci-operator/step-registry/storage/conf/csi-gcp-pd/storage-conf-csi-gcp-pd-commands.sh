@@ -21,6 +21,8 @@ if [ "${IMAGE_VOLUME_SNAPSHOT_MANIFEST:-}" = "image-snapshot" ]; then
     echo "Copying image-snapshot-manifest.yaml to ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
     cp test/e2e/${GCPPD}/image-snapshot-manifest.yaml "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
     cat "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}"
+elif [ "${GCP_PD_TEST_DISK_TYPE:-}" = "hyperdisk-throughput" ]; then
+    cp test/e2e/${GCPPD}/hyperdisk-throughput-manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 elif [ "${COMPUTE_DISK_TYPE}" == "hyperdisk-balanced" ]; then
     # Using hyperdisk-balanced worker
     cp test/e2e/${GCPPD}/hyperdisk-manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
