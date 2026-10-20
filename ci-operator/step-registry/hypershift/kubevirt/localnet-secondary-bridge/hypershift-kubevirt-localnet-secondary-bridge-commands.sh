@@ -30,10 +30,18 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
     echo "Enabling global IP forwarding (current: ${current_fwd:-Restricted})..."
     oc patch network.operator cluster --type=merge \
       -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
-    echo "Waiting for machine config pool to reconcile..."
+    echo "Waiting for API to stabilize after MCP rollout (nodes may reboot)..."
     sleep 30
-    oc wait mcp master worker --for condition=Updating=False --timeout=30m 2>/dev/null || true
-    oc wait mcp master worker --for condition=Updated --timeout=30m 2>/dev/null || true
+    for _api_attempt in $(seq 1 90); do
+      if oc get nodes --request-timeout=10s &>/dev/null; then
+        break
+      fi
+      echo "  API not ready (attempt ${_api_attempt}/90), waiting 20s..."
+      sleep 20
+    done
+    echo "Waiting for machine config pools to finish rolling out..."
+    oc wait mcp master worker --for condition=Updating=False --timeout=30m
+    oc wait mcp master worker --for condition=Updated --timeout=30m
     echo "Global IP forwarding enabled"
   else
     echo "Global IP forwarding already enabled"
@@ -47,7 +55,14 @@ namespace="openshift-ovn-kubernetes"
 
 # Wait for ovnkube-node pods to stabilize after MCP rollout, then verify
 # at least one is ready before probing container names.
-sleep 15
+echo "Waiting for ovnkube-node pods to be ready..."
+for _api_attempt in $(seq 1 30); do
+  if oc get nodes --request-timeout=10s &>/dev/null; then
+    break
+  fi
+  echo "  API not ready (attempt ${_api_attempt}/30), waiting 20s..."
+  sleep 20
+done
 oc wait pod -n "${namespace}" -l app=ovnkube-node --for=condition=Ready --timeout=5m
 
 first_ovn_pod=$(oc get pods -n "${namespace}" -l app=ovnkube-node \
