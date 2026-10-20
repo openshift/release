@@ -17,20 +17,24 @@ This skill drives an agentic loop that takes failing CI test results for the Ope
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`. The test step writes it at exit time:
+Read `${SHARED_DIR}/qe-agent-context.json`. The `distributed-tracing-tests-opentelemetry-premerge` test step writes it at exit time, for example:
 
 ```json
 {
   "step_script_ref": "distributed-tracing/tests/opentelemetry/premerge/distributed-tracing-tests-opentelemetry-premerge-commands.sh",
   "has_test_failures": true,
   "env": {
-    "MULTISTAGE_PARAM_OVERRIDE_OTEL_TESTS_BRANCH": "rhosdt-0.158"
+    "OPERATOR_IMG": "...",
+    "OTEL_COLLECTOR_IMAGE": "...",
+    "TARGETALLOCATOR_IMG": "...",
+    "RUN_TESTS": "...",
+    "SKIP_TESTS": "..."
   }
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo
-- `env` — runtime env var values that were injected at job time and are needed to reproduce setup (e.g. branch names, image refs); most steps have an empty `env`
+- `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path — a different job may point at a different step
+- `env` — the runtime env var values the step was run with; export exactly the keys present in the file, whatever they are. For the premerge step above: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Other steps populate different keys, or none
 
 Construct the raw GitHub URL and fetch the script:
 
