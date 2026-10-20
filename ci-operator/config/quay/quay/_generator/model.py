@@ -20,6 +20,7 @@ STORAGE_BY_CLOUD = {
     "gcp": "gcs",
     "azure": "blob",
     "libvirt": "s3",
+    "ibmcloud": "cos",
 }
 # Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
 EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
@@ -30,6 +31,7 @@ DEPLOY_REF_BY_CLOUD = {
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
+    "ibmcloud": "quay-deploy-ibmcloud-cos",
 }
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",
