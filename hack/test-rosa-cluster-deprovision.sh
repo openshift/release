@@ -5,15 +5,16 @@ script="$(cd "$(dirname "$0")/.." && pwd)/ci-operator/step-registry/rosa/cluster
 workdir=$(mktemp -d)
 trap 'rm -rf "${workdir}"' EXIT
 
+# Report the failing scenario with its captured step output.
 fail() {
   echo "FAIL: ${scenario}: $*" >&2
   cat "${TEST_DIR}/output" >&2
   exit 1
 }
 
-for scenario in timeout error logs-fail logs-hang describe-fail unknown-state \
+for scenario in timeout error logs-fail logs-hang logs-sensitive logs-sensitive-fail describe-fail unknown-state \
   success-sts success-nonsts success-after-poll no-cluster no-artifacts empty-artifacts \
-  bad-artifacts summary-fail logfile-fail term; do
+  bad-artifacts summary-fail legacy-log-path term; do
   export TEST_DIR="${workdir}/${scenario}"
   export SCENARIO="${scenario}"
   export SHARED_DIR="${TEST_DIR}/shared"
@@ -46,7 +47,7 @@ case "$1 $2" in
         touch "${TEST_DIR}/described"
         state=uninstalling
         ;;
-      error|logs-fail|logs-hang|summary-fail|logfile-fail|term) state=error ;;
+      error|logs-fail|logs-hang|logs-sensitive|logs-sensitive-fail|summary-fail|legacy-log-path|term) state=error ;;
       unknown-state) state=mock-sensitive-state ;;
       *) state=uninstalling ;;
     esac
@@ -56,13 +57,25 @@ case "$1 $2" in
   'logs uninstall')
     printf '%s\n' "$*" >> "${TEST_DIR}/calls"
     echo 'mock-auth-log-stderr-not-for-artifacts' >&2
-    echo 'mock uninstall log'
+    echo 'mock-untrusted-uninstall-log'
+    if [[ "${SCENARIO}" == logs-sensitive* ]]; then
+      cat "${TEST_DIR}/untrusted-payload"
+      cat "${TEST_DIR}/untrusted-payload" >&2
+      printf '\000\033[31mmock-untrusted-control-payload\n'
+      printf '\000\033[31mmock-untrusted-control-payload\n' >&2
+    fi
     case "${SCENARIO}" in
-      logs-fail) exit 42 ;;
+      logs-fail|logs-sensitive-fail) exit 42 ;;
       logs-hang|term)
         echo "$$" > "${TEST_DIR}/logs-pid"
         trap '' TERM
-        /bin/sleep 120
+        /bin/sleep 120 &
+        descendant_pid=$!
+        echo "${descendant_pid}" > "${TEST_DIR}/logs-descendant-pid"
+        ps -o pgid= -p "$$" > "${TEST_DIR}/logs-pgid"
+        ps -o pgid= -p "${descendant_pid}" > "${TEST_DIR}/logs-descendant-pgid"
+        touch "${TEST_DIR}/logs-ready"
+        wait "${descendant_pid}"
         ;;
     esac
     ;;
@@ -82,8 +95,19 @@ printf 'sleep %s\n' "$*" >> "${TEST_DIR}/calls"
 MOCK
   chmod +x "${TEST_DIR}/bin/"*
 
+  cat > "${TEST_DIR}/untrusted-payload" <<'PAYLOAD'
+mock-untrusted-credential password=synthetic-password
+mock-untrusted-token Authorization: Bearer synthetic-token
+mock-untrusted-session session_id=synthetic-session
+mock-untrusted-pii synthetic-person@example.invalid
+mock-untrusted-host https://synthetic-host.internal.invalid
+{"state":"error","reason":"mock-untrusted-json","token":"synthetic-token"}
+reason=mock-untrusted-summary-injection
+uninstall_logs_exit_code=mock-untrusted-exit-injection
+PAYLOAD
+
   case "${scenario}" in
-    error|logs-fail|logs-hang|summary-fail|logfile-fail|term|success-*) DESTROY_TIMEOUT=3600 ;;
+    error|logs-fail|logs-hang|logs-sensitive|logs-sensitive-fail|summary-fail|legacy-log-path|term|success-*) DESTROY_TIMEOUT=3600 ;;
   esac
   case "${scenario}" in
     success-nonsts) STS=false ;;
@@ -92,7 +116,7 @@ MOCK
     empty-artifacts) ARTIFACT_DIR='' ;;
     bad-artifacts) rmdir "${ARTIFACT_DIR}"; touch "${ARTIFACT_DIR}" ;;
     summary-fail) mkdir "${ARTIFACT_DIR}/rosa-deprovision-failure.txt" ;;
-    logfile-fail) mkdir "${ARTIFACT_DIR}/rosa-uninstall.log" ;;
+    legacy-log-path) mkdir "${ARTIFACT_DIR}/rosa-uninstall.log" ;;
   esac
 
   started=${SECONDS}
@@ -101,10 +125,10 @@ MOCK
     PATH="${TEST_DIR}/bin:${PATH}" bash "${script}" > "${TEST_DIR}/output" 2>&1 &
     step_pid=$!
     for ((attempt=0; attempt<100; attempt++)); do
-      if [[ -f "${TEST_DIR}/logs-pid" ]]; then break; fi
+      if [[ -f "${TEST_DIR}/logs-ready" ]]; then break; fi
       /bin/sleep 0.05
     done
-    if [[ ! -f "${TEST_DIR}/logs-pid" ]]; then
+    if [[ ! -f "${TEST_DIR}/logs-ready" ]]; then
       kill -TERM "${step_pid}" || true
       wait "${step_pid}" || true
       fail 'diagnostics did not start'
@@ -120,9 +144,10 @@ MOCK
   expected=1
   case "${scenario}" in success-*|no-cluster) expected=0 ;; esac
   [[ "${status}" -eq "${expected}" ]] || fail "expected exit ${expected}, got ${status}"
-  if grep -REq 'mock-(auth|private-json)' "${TEST_DIR}/artifacts"; then
-    fail 'diagnostics disclosed describe JSON or stderr'
+  if grep -aREq 'mock-(auth|private-json|untrusted)' "${TEST_DIR}/artifacts" "${TEST_DIR}/output"; then
+    fail 'diagnostics disclosed arbitrary CLI stdout, stderr or describe JSON'
   fi
+  [[ ! -f "${TEST_DIR}/artifacts/rosa-uninstall.log" ]] || fail 'raw uninstall log artifact created'
 
   case "${scenario}" in
     success-*)
@@ -144,17 +169,16 @@ MOCK
       ! grep -q 'logs uninstall' "${TEST_DIR}/calls" || fail 'unexpected log collection'
       ;;
     summary-fail)
-      grep -qx 'mock uninstall log' "${ARTIFACT_DIR}/rosa-uninstall.log" || fail 'summary failure suppressed logs'
+      grep -qx 'logs uninstall --cluster mock-cluster --tail=500 --watch' "${TEST_DIR}/calls" || fail 'summary failure suppressed log probe'
       ;;
     *)
       summary="${ARTIFACT_DIR}/rosa-deprovision-failure.txt"
       grep -q '^reason=' "${summary}" || fail 'missing failure summary'
       expected_logs_status=0
       case "${scenario}" in
-        logs-fail) expected_logs_status=42 ;;
+        logs-fail|logs-sensitive-fail) expected_logs_status=42 ;;
         logs-hang) expected_logs_status=137 ;;
         term) expected_logs_status=143 ;;
-        logfile-fail) expected_logs_status=1 ;;
       esac
       grep -qx "uninstall_logs_exit_code=${expected_logs_status}" "${summary}" || fail 'missing post-logs status'
       case "${scenario}" in
@@ -163,7 +187,6 @@ MOCK
           grep -qx 'elapsed_seconds=10' "${summary}" || fail 'wrong elapsed time'
           grep -qx 'logs uninstall --cluster mock-cluster --tail=500' "${TEST_DIR}/calls" || fail 'expected non-watch log snapshot'
           ;;
-        logfile-fail) ;;
         *)
           grep -qx 'reason=error' "${summary}" || fail 'wrong failure reason'
           grep -qx 'logs uninstall --cluster mock-cluster --tail=500 --watch' "${TEST_DIR}/calls" || fail 'error-state logs need watch'
@@ -176,6 +199,21 @@ MOCK
         grep -qx 'state=other' "${summary}" || fail 'state not allowlisted'
         ! grep -q 'mock-sensitive-state' "${summary}" || fail 'arbitrary state disclosed'
       fi
+      expected_reason=error
+      expected_state=error
+      expected_describe_status=0
+      case "${scenario}" in
+        timeout|describe-fail) expected_reason=timeout; expected_state=uninstalling ;;
+        unknown-state) expected_reason=timeout; expected_state=other ;;
+      esac
+      if [[ "${scenario}" == describe-fail ]]; then expected_describe_status=23; fi
+      printf 'reason=%s\nstate=%s\nelapsed_seconds=10\ndescribe_pipeline_exit_code=%s\nuninstall_logs_output=omitted_unstructured\nuninstall_logs_exit_code=%s\n' \
+        "${expected_reason}" "${expected_state}" "${expected_describe_status}" "${expected_logs_status}" \
+        > "${TEST_DIR}/expected-summary"
+      diff -u "${TEST_DIR}/expected-summary" "${summary}" || fail 'summary exceeded safe field contract'
+      if [[ "${scenario}" == legacy-log-path ]]; then
+        [[ -z "$(ls -A "${ARTIFACT_DIR}/rosa-uninstall.log")" ]] || fail 'raw log path was used'
+      fi
       if [[ "${scenario}" == logs-hang || "${scenario}" == term ]]; then
         [[ "${elapsed}" -le 40 ]] || fail 'diagnostics exceeded hard bound'
         if [[ "${scenario}" == term ]]; then
@@ -183,9 +221,11 @@ MOCK
         else
           [[ "${elapsed}" -ge 30 ]] || fail 'timeout did not exercise configured bound'
         fi
-        child_state=$(ps -o stat= -p "$(cat "${TEST_DIR}/logs-pid")" || true)
-        [[ -z "${child_state}" || "${child_state}" == Z* ]] || fail 'diagnostic child still running'
-        grep -qx 'mock uninstall log' "${ARTIFACT_DIR}/rosa-uninstall.log" || fail 'partial logs lost'
+        cmp "${TEST_DIR}/logs-pgid" "${TEST_DIR}/logs-descendant-pgid" || fail 'descendant escaped diagnostic process group'
+        for pid_file in logs-pid logs-descendant-pid; do
+          child_state=$(ps -o stat= -p "$(cat "${TEST_DIR}/${pid_file}")" || true)
+          [[ -z "${child_state}" || "${child_state}" == Z* ]] || fail "diagnostic process still running: ${pid_file}"
+        done
       fi
       ;;
   esac

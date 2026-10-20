@@ -29,6 +29,7 @@ function record_cluster() {
 
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
+# Record only fixed classifications and numeric results, never unstructured CLI output.
 collect_uninstall_diagnostics() {
   local reason="$1"
   local state="other"
@@ -52,13 +53,14 @@ collect_uninstall_diagnostics() {
     logs_args+=(--watch)
   fi
 
-  printf 'reason=%s\nstate=%s\nelapsed_seconds=%s\ndescribe_pipeline_exit_code=%s\n' \
+  printf 'reason=%s\nstate=%s\nelapsed_seconds=%s\ndescribe_pipeline_exit_code=%s\nuninstall_logs_output=omitted_unstructured\n' \
     "${reason}" "${state}" "$((current_time - start_time))" "${describe_status}" \
     > "${ARTIFACT_DIR}/rosa-deprovision-failure.txt" || true
 
   if command -v timeout >/dev/null 2>&1; then
+    # ROSA prints arbitrary logs.Content() strings; no log content is safe to publish.
     timeout --kill-after=5s 30s rosa "${logs_args[@]}" \
-      > "${ARTIFACT_DIR}/rosa-uninstall.log" 2>/dev/null &
+      > /dev/null 2>&1 &
     local logs_pid=$!
     if wait "${logs_pid}"; then
       logs_status=0
