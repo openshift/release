@@ -58,11 +58,11 @@ Required adaptations:
 
 | Script pattern | Adaptation |
 |---|---|
-| `cp -R /tmp/<name>` (image mount) | Replace with `git clone <repo> <dest>` — find the repo URL from `oc get csv -o yaml \| grep github.com` |
+| `cp -R /tmp/opentelemetry-operator ...` (image mount) | This pod runs the same `obs-tests-runner` image as the test step, so the pull request source is already at `/tmp/opentelemetry-operator` here too — just run the `cp -R` as written, no clone needed. For a different step whose source repo isn't baked into this pod's image, replace with `git clone <repo> <dest>` — find the repo URL from `oc get csv -o yaml \| grep github.com` |
 | `kubectl create -f <url>` (CRDs) | Use `kubectl apply -f <url>` — `create` fails if the CRD exists from the prior run |
 | `oc patch csv ...` (initial setup patches) | Skip — the operator is already patched; verify with `oc get csv -n opentelemetry-operator-system` |
 | `oc patch csv ...` (later patches: `LABELS_FILTER`, instrumentation images, etc.) | **Evaluate per-test**: later CSV patches create operator state that subsequent tests may not expect. When rerunning a single test out of the original execution order, check whether that test assumes a clean CSV or one with specific patches applied. If the test asserts on a CSV field that a prior patch modified (e.g., `LABELS_FILTER=.*filter.out`), either (a) reset the CSV field before the rerun, or (b) rerun the test in its original suite order. Document which CSV state the test requires in the diagnosis. |
-| `$SKIP_TESTS` block | Skip entirely — `$SKIP_TESTS` is unset in the qe-agent pod |
+| `$SKIP_TESTS` block | Run it with the value Step 0b exported — `SKIP_TESTS` (set whenever `RUN_TESTS` is empty) removes tests from `FULL_SUITE`; the failing test was never in it, so it is never removed by this |
 | chainsaw test invocation | Run `unset NAMESPACE` before every `chainsaw test` call — a set `NAMESPACE` causes tests to run in the wrong namespace |
 
 After setup, `cd` into the repo directory and proceed with Steps 1–6.
