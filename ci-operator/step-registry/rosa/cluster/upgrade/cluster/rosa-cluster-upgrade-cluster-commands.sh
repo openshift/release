@@ -20,6 +20,7 @@ NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
 UPGRADE_START_EPOCH=""
 UPGRADE_START_ISO=""
 UPGRADE_FROM_VERSION=""
+UPGRADE_DISCOVERY_DIR=""
 
 # Capture sanitized ClusterOperator/node health before upgrade for gap-analysis Check #13.
 # Relies on Prow's ambient KUBECONFIG from SHARED_DIR/kubeconfig. Node hostnames and
@@ -91,9 +92,9 @@ write_upgrade_metrics() {
   end_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   duration=$((end_epoch - UPGRADE_START_EPOCH))
   mkdir -p "${ARTIFACT_DIR}" || return 0
-  jq -n \
+  if ! jq -n \
     --arg start "${UPGRADE_START_ISO}" \
-    --arg end "${end_iso}" \
+    --arg finish "${end_iso}" \
     --argjson start_epoch "${UPGRADE_START_EPOCH}" \
     --argjson end_epoch "${end_epoch}" \
     --argjson duration_seconds "${duration}" \
@@ -101,16 +102,28 @@ write_upgrade_metrics() {
     --arg to_version "${recommended_version:-${UPGRADED_TO_VERSION:-}}" \
     '{
       start: $start,
-      end: $end,
+      end: $finish,
       start_epoch: $start_epoch,
       end_epoch: $end_epoch,
       duration_seconds: $duration_seconds,
       from_version: $from_version,
       to_version: $to_version
-    }' > "${ARTIFACT_DIR}/upgrade-metrics.json" || true
+    }' > "${ARTIFACT_DIR}/upgrade-metrics.json"; then
+    log "WARNING: failed to write upgrade-metrics.json"
+    return 0
+  fi
   log "Wrote upgrade-metrics.json duration_seconds=${duration}"
 }
-trap 'write_upgrade_metrics || true' EXIT
+cleanup_upgrade_discovery() {
+  if [[ -n "${UPGRADE_DISCOVERY_DIR}" ]]; then
+    if rm -rf "${UPGRADE_DISCOVERY_DIR}"; then
+      UPGRADE_DISCOVERY_DIR=""
+    else
+      log "WARNING: failed to remove private upgrade discovery output"
+    fi
+  fi
+}
+trap 'cleanup_upgrade_discovery || true; write_upgrade_metrics || true' EXIT
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -154,13 +167,51 @@ function unset_proxy () {
     fi
 }
 
+function write_upgrade_discovery_diagnostics () {
+  local discovery_dir=$1 upgrade_status=$2
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  if {
+    printf 'rosa list upgrade exit status: %s\n' "${upgrade_status}"
+    printf 'Only allowlisted summaries are retained; raw output is omitted.\n'
+    printf 'stdout bytes: %s\n' "$(wc -c < "${discovery_dir}/stdout")"
+    printf 'stderr bytes: %s\n' "$(wc -c < "${discovery_dir}/stderr")"
+    local category
+    for category in 'no available upgrades' 'not yet ready' 'unauthorized' 'forbidden' 'timed out' 'failed to get scheduled'; do
+      if grep -Fqi "${category}" "${discovery_dir}/stdout" "${discovery_dir}/stderr"; then
+        printf 'Observed message category: %s\n' "${category}"
+      fi
+    done
+    printf 'Available versions (up to 20 numeric versions; recommendation markers only):\n'
+    awk 'length($1) <= 32 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ && count < 20 {
+      print $1, ($0 ~ /recommended/ ? "recommended" : ""); count++
+    }' "${discovery_dir}/stdout"
+  } > "${ARTIFACT_DIR}/upgrade-discovery.txt"; then
+    return 0
+  else
+    log "WARNING: failed to write upgrade-discovery.txt"
+  fi
+}
+
 function get_recommended_version_for_cluster () {
   major_version=$1
-  recommended_version=$(rosa list upgrade -c $cluster_id | grep -v 'no available upgrades' | grep 'recommended' | grep $major_version | cut -d ' ' -f1 || true)
+  local discovery_dir upgrade_status=0
+  discovery_dir=$(mktemp -d)
+  UPGRADE_DISCOVERY_DIR="${discovery_dir}"
+  rosa list upgrade -c "$cluster_id" > "${discovery_dir}/stdout" 2> "${discovery_dir}/stderr" || upgrade_status=$?
+  if [[ "${upgrade_status}" -ne 0 ]]; then
+    write_upgrade_discovery_diagnostics "${discovery_dir}" "${upgrade_status}" || true
+    cleanup_upgrade_discovery || true
+    log "Error: rosa list upgrade failed with exit status ${upgrade_status}."
+    exit "${upgrade_status}"
+  fi
+  recommended_version=$(grep -v 'no available upgrades' "${discovery_dir}/stdout" | grep 'recommended' | grep $major_version | cut -d ' ' -f1 || true)
   if [[ -z "$recommended_version" ]]; then
+    write_upgrade_discovery_diagnostics "${discovery_dir}" "${upgrade_status}" || true
+    cleanup_upgrade_discovery || true
     log "Error: No recommended $major_version version for the cluster $cluster_id to be upgraded to."
     exit 1
   fi
+  cleanup_upgrade_discovery || true
 }
 
 function get_recommended_version_for_machinepool () {
