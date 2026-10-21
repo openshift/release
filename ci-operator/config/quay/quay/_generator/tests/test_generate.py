@@ -1408,6 +1408,41 @@ def test_redhat_318_database_shares_cloud_files() -> None:
     ]["steps"]["post"]
 
 
+def test_redhat_317_and_50_database_shares_cloud_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    for branch, ocp in (("redhat-3.17", "ocp422"), ("redhat-5.0", "ocp50")):
+        aws = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__aws-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert "aws-s3-rds-nightly" in aws
+        rds = aws["aws-s3-rds-nightly"]
+        assert rds["cron"] == "@weekly"
+        assert {"ref": "quay-database-intg-aws-rds"} in rds["steps"]["test"]
+        assert rds["steps"]["test"].index(
+            {"ref": "quay-database-intg-aws-rds"}
+        ) < rds["steps"]["test"].index({"ref": "quay-deploy-aws-s3"})
+        assert {"ref": "quay-database-intg-aws-rds-deprovision"} in rds["steps"]["post"]
+        assert (
+            {"ref": "quay-database-intg-aws-rds"}
+            not in aws["aws-s3-nightly"]["steps"]["test"]
+        )
+
+        azure = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__azure-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert set(azure) == {"azure-blob-nightly", "azure-blob-postgres-nightly"}
+        assert {"ref": "quay-database-intg-azure-postgres"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["test"]
+        assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["post"]
+
+
 def test_database_rejects_unsupported_cloud() -> None:
     matrix = _matrix_with_job(
         {
