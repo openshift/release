@@ -188,6 +188,7 @@ if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		"https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
 	snapshot=$(echo "${pr_files}" | jq -r \
 		'[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+		| grep '^+' | grep -v '^+++' \
 		| grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
 
 	if [[ -z "${snapshot}" ]]; then
