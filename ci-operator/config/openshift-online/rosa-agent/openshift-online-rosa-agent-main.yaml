@@ -3,12 +3,9 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi:latest
       RUN dnf module enable -y nodejs:20 && \
-            dnf install -y git npm && \
-            npm install -g markdownlint-cli2
-images:
-  items:
-  - dockerfile_path: Containerfile
-    to: rosa-agent
+            dnf install -y git make python3 jq npm && \
+            npm install -g markdownlint-cli2@0.17.2 && \
+            dnf clean all
 prowgen:
   enable_secrets_store_csi_driver: true
 resources:
@@ -21,7 +18,10 @@ tests:
   commands: make lint
   container:
     from: src
-  run_if_changed: (\.md|\.markdown|^Makefile|^\.markdownlint.*)$
+- as: unit
+  commands: make test
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift-online
