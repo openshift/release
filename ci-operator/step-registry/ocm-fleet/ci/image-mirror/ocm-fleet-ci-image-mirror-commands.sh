@@ -41,38 +41,24 @@ fi
 mirror_image() {
     local tag="$1"
     local destination_image_ref="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$tag"
-    local mirror_log
-    mirror_log="$(mktemp)"
 
-    log "INFO Mirroring $IMAGE_REPO:$tag"
+    log "INFO Mirroring image"
 
     for i in {1..6}; do
-        : >"$mirror_log"
-        if oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" >"$mirror_log" 2>&1 \
-            && [[ -s "$mirror_log" ]]; then
-            rm -f "$mirror_log"
-            log "INFO Mirrored $IMAGE_REPO:$tag"
+        # Discard command output because it may contain registry credentials.
+        if oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" >/dev/null 2>&1; then
+            log "INFO Mirrored image"
             return 0
         fi
 
         if [[ "${i}" == "6" ]]; then
-            log "ERROR Failed to mirror $IMAGE_REPO:$tag"
-            # Last lines only — full oc output can be chatty and may include auth detail.
-            if [[ -s "$mirror_log" ]]; then
-                log "ERROR oc image mirror (last 20 lines):"
-                tail -n 20 "$mirror_log" | while IFS= read -r line || [[ -n "$line" ]]; do
-                    log "ERROR $line"
-                done
-            fi
-            rm -f "$mirror_log"
+            log "ERROR Failed to mirror image"
             return 1
         fi
 
         log "WARN Mirror attempt $i failed; retrying in 60s"
         sleep 60
     done
-
-    rm -f "$mirror_log"
 }
 
 if ! mirror_image "$IMAGE_TAG"; then
