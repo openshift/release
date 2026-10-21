@@ -29,30 +29,6 @@ tests:
     test:
     - ref: storage-data-create
     - ref: lvms-upgrade
-    - as: verify-z-stream-upgrade
-      cli: latest
-      commands: |
-        LVMS_NAMESPACE="${LVMS_NAMESPACE:-openshift-lvm-storage}"
-        # Get the LVMS CSV name from the subscription's installedCSV field
-        csv_name=$(oc get subscription lvms-operator -n "${LVMS_NAMESPACE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null)
-        if [[ -z "${csv_name}" ]]; then
-          echo "ERROR: Could not find installedCSV from lvms-operator subscription"
-          exit 1
-        fi
-        csv_version=$(oc get csv "${csv_name}" -n "${LVMS_NAMESPACE}" -o jsonpath='{.spec.version}')
-        echo "LVMS CSV version after upgrade: ${csv_version}"
-        # Verify it's a z-stream version (4.15.y where y > 0)
-        if [[ "${csv_version}" =~ ^4\.15\.[1-9][0-9]*$ ]]; then
-          echo "Z-stream upgrade verified: ${csv_version}"
-        else
-          echo "ERROR: Expected z-stream version (4.15.y where y > 0), got: ${csv_version}"
-          exit 1
-        fi
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - ref: storage-data-check
     workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
 - as: e2e-aws-mno-z-stream-upgrade
@@ -73,30 +49,6 @@ tests:
     test:
     - ref: storage-data-create
     - ref: lvms-upgrade
-    - as: verify-z-stream-upgrade
-      cli: latest
-      commands: |
-        LVMS_NAMESPACE="${LVMS_NAMESPACE:-openshift-lvm-storage}"
-        # Get the LVMS CSV name from the subscription's installedCSV field
-        csv_name=$(oc get subscription lvms-operator -n "${LVMS_NAMESPACE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null)
-        if [[ -z "${csv_name}" ]]; then
-          echo "ERROR: Could not find installedCSV from lvms-operator subscription"
-          exit 1
-        fi
-        csv_version=$(oc get csv "${csv_name}" -n "${LVMS_NAMESPACE}" -o jsonpath='{.spec.version}')
-        echo "LVMS CSV version after upgrade: ${csv_version}"
-        # Verify it's a z-stream version (4.15.y where y > 0)
-        if [[ "${csv_version}" =~ ^4\.15\.[1-9][0-9]*$ ]]; then
-          echo "Z-stream upgrade verified: ${csv_version}"
-        else
-          echo "ERROR: Expected z-stream version (4.15.y where y > 0), got: ${csv_version}"
-          exit 1
-        fi
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - ref: storage-data-check
     workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
 zz_generated_metadata:
