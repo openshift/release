@@ -42,17 +42,17 @@ mirror_image() {
     local tag="$1"
     local destination_image_ref="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$tag"
 
-    log "INFO Mirroring image"
+    log "INFO Mirroring $IMAGE_REPO:$tag"
 
     for i in {1..6}; do
         # Discard command output because it may contain registry credentials.
         if oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$destination_image_ref" >/dev/null 2>&1; then
-            log "INFO Mirrored image"
+            log "INFO Mirrored $IMAGE_REPO:$tag"
             return 0
         fi
 
         if [[ "${i}" == "6" ]]; then
-            log "ERROR Failed to mirror image"
+            log "ERROR Failed to mirror $IMAGE_REPO:$tag"
             return 1
         fi
 

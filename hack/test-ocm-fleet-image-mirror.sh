@@ -50,15 +50,15 @@ run_case() {
         printf 'FAIL: %s: unexpected attempt or retry count\n' "$scenario" >&2
         return 1
     fi
-    if grep -Eq 'sensitive-mirror-output|private-image|source\.example|destination\.example' \
+    if grep -Eq 'sensitive-mirror-output|source\.example|destination\.example' \
         "$case_dir/stdout" "$case_dir/stderr" "$case_dir/mirror.log"; then
         printf 'FAIL: %s: sensitive output was logged\n' "$scenario" >&2
         return 1
     fi
     if [[ "$scenario" == failure ]]; then
-        grep -Fq 'ERROR Failed to mirror image' "$case_dir/mirror.log"
+        grep -Fq 'ERROR Failed to mirror private-image:test-sha' "$case_dir/mirror.log"
     else
-        grep -Fq 'INFO Mirrored image' "$case_dir/mirror.log"
+        grep -Fq 'INFO Mirrored private-image:test-sha' "$case_dir/mirror.log"
     fi
     printf 'PASS: %s\n' "$scenario"
 }
