@@ -191,6 +191,11 @@ tests:
   steps:
     test:
     - ref: aro-hcp-verify
+- as: alert-gate
+  optional: true
+  steps:
+    test:
+    - ref: aro-hcp-alert-gate
 - as: lint
   capabilities:
   - arm64
@@ -728,22 +733,6 @@ tests:
   steps:
     test:
     - ref: aro-hcp-ci-images-push
-- as: cspr-pipeline-postsubmit
-  capabilities:
-  - arm64
-  max_concurrency: 1
-  postsubmit: true
-  reporter_config:
-    channel: '#aro-hcp-failures-dev'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    env:
-      DEPLOY_ENV: cspr
-    workflow: aro-hcp-cspr
 - as: dev-ci-pipeline-postsubmit
   capabilities:
   - arm64

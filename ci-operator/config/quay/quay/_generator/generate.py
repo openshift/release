@@ -42,6 +42,7 @@ from typing import Any
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
 from model import (
+    DATABASE_BY_CLOUD,
     EXTRA_STORAGE_BY_CLOUD,
     REPO_BY_TEST,
     STORAGE_BY_CLOUD,
@@ -51,6 +52,7 @@ from model import (
 
 GENERATOR_DIR = Path(__file__).resolve().parent
 SOURCES = ("nightly", "stable")
+OCP_CHANNELS = ("stable", "candidate")
 CRON_ALIASES = {
     "daily": "@daily",
     "nightly": "@daily",
@@ -76,7 +78,9 @@ JOB_KEYS = {
     "fips",
     "storage",
     "upgrade_from",
+    "ocp_channel",
     "sts",
+    "database",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -374,6 +378,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             sts = _job_bool_field(job, "sts", where)
             if sts is not None and "aws" not in clouds:
                 raise ValueError(f"{where}.sts is only valid when clouds include aws")
+            database = _job_bool_field(job, "database", where) or False
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -424,7 +429,10 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
+            ocp_channel = _job_str_field(job, "ocp_channel", where)
             if test == "upgrade":
+                if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
+                    raise ValueError(f"{where} ocp_channel must be one of {OCP_CHANNELS}, got {ocp_channel!r}")
                 if not upgrade_from:
                     raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
                 if not re.match(r"^\d+\.\d+$", upgrade_from):
@@ -444,8 +452,15 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     )
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
+            elif ocp_channel is not None:
+                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
+                if database and cloud not in DATABASE_BY_CLOUD:
+                    raise ValueError(
+                        f"{where}.database: true is not supported for cloud {cloud!r}; "
+                        f"supported: {sorted(DATABASE_BY_CLOUD)}"
+                    )
                 cells.append(
                     Cell(
                         org=org,
@@ -471,6 +486,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         sts=cloud == "aws" and sts is not False,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
+                        database=database,
+                        ocp_channel=ocp_channel or "stable",
                     )
                 )
     return cells
