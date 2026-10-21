@@ -64,6 +64,42 @@ tests:
     test:
     - chain: stackrox-perfscale
   timeout: 14h0m0s
+- always_run: false
+  as: berserker-scale-test
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      ACS_IMAGE_TAG: 5.1.x-243-gdc2b8c2a1a
+      BASE_DOMAIN: perfscale.rox.systems
+      BERSERKER_EXTRA_FLAGS: --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      COMPUTE_NODE_REPLICAS: "24"
+      DAEMONSET_REPLICAS: "5"
+      JOB_ITERATIONS: "5"
+      MAIN_IMAGE_TAG: 5.1.x-243-gdc2b8c2a1a
+      MAX_WAIT_TIMEOUT: 10m
+      ROX_SCANNER_V4_ENABLED: "true"
+      TEST_SUITE: ocp-perf-scale-tests
+      USER_TAGS: |
+        TicketId 382
+        RoxProject PerfScale
+      ZONES_COUNT: "3"
+    post:
+    - ref: stackrox-stackrox-perf-scale-post
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    - ref: stackrox-stackrox-end
+    pre:
+    - ref: stackrox-stackrox-begin
+    - ref: stackrox-stackrox-e2e-test
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: stackrox-install-roxie
+    test:
+    - chain: stackrox-perfscale-berserker-test
+  timeout: 14h0m0s
 zz_generated_metadata:
   branch: master
   org: stackrox
