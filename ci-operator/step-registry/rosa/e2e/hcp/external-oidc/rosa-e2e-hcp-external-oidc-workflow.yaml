@@ -19,6 +19,13 @@ workflow:
       # See the chain for why the public rosa-e2e-hcp-rosa-cli-provision chain
       # cannot be reused as-is.
       - chain: rosa-e2e-hcp-rosa-cli-external-oidc-provision
+      # Wait for the HostedCluster to settle (Available, not Degraded) before
+      # the validation tail: the external-auth rollout restarts the
+      # kube-apiserver and can leave dependent control-plane deployments
+      # (openshift-apiserver) briefly unavailable, which the platform-plane
+      # HostedCluster health spec asserts against. The head's dedicated
+      # readiness step only covers the kube-apiserver rollout.
+      - ref: rosa-cluster-wait-ready-hosted-cp
       # Platform-plane kubeconfigs (mc/sc) plus the raw bp-kubeconfig fallback.
       - ref: rosa-backplane-login
     test:
@@ -55,6 +62,10 @@ workflow:
     backplane-cluster-admin — external-auth clusters have no OAuth stack, and
     the raw bp-kubeconfig lacks the RBAC the customer-plane specs need), and
     publishes the SHARED_DIR provisioner-to-validator contract.
+    rosa-cluster-wait-ready-hosted-cp then waits for the HostedCluster to
+    settle (Available, not Degraded) after the external-auth rollout, since
+    dependent control-plane deployments (openshift-apiserver) can be briefly
+    unavailable while the kube-apiserver rollout completes.
     rosa-backplane-login adds the platform-plane kubeconfigs (mc/sc).
 
     The provisioner-agnostic validation tail then runs the customer plane
