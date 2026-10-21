@@ -184,10 +184,22 @@ export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}
 # Configure authentication placement for HyperFleet (API auth by default).
 export AUTH_MODE="${AUTH_MODE:-API}"
 
-# Install hyperfleet components via infra repo
-# Will inherit all exported values here
+# Install hyperfleet components via infra repo.
+# Retry transient clone failures, removing any partial checkout before retrying.
 log "Cloning hyperfleet-infra at ref: ${INFRA_REF}"
-git clone --depth 1 --branch "${INFRA_REF}" "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
+for attempt in 1 2 3; do
+  if git clone --depth 1 --branch "${INFRA_REF}" "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra; then
+    break
+  fi
+  rm -rf /tmp/hyperfleet-infra
+  if (( attempt == 3 )); then
+    log "ERROR: hyperfleet-infra clone failed after 3 attempts"
+    exit 1
+  fi
+  retry_delay=$(( attempt * 15 ))
+  log "WARNING: hyperfleet-infra clone attempt ${attempt}/3 failed, retrying in ${retry_delay}s..."
+  sleep "${retry_delay}"
+done
 cd /tmp/hyperfleet-infra
 
 HELMFILE_ENV="e2e-gcp"
@@ -254,3 +266,7 @@ wait_for_api() {
 if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
   exit 1
 fi
+
+# Last step: mark setup as finished. The cluster-resources cleanup uses this
+# marker to tell an early setup failure from a setup that succeeded.
+touch "${SHARED_DIR}/setup_succeeded"

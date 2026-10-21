@@ -37,6 +37,8 @@ DEPLOY_REF_BY_STORAGE = {
 # No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).
 # The build root only builds the Playwright runner image, so older clusters reuse it.
 BUILD_ROOT_OCP_FLOOR = "4.22"
+# Tests that target another repo in the same org; the rest use global_defaults.repo.
+REPO_BY_TEST = {"e2e-chainsaw": "quay-operator"}
 
 
 @dataclass(frozen=True)
