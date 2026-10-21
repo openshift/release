@@ -285,7 +285,7 @@ tests:
         else
             fail "could not select cloud ${AZURE_IL6_CLOUD_LABEL}."
         fi
-        on_bastion "${az_run} ${AZURE_CLI_IMAGE} az configure --defaults location=${AZURE_IL6_REGION}" || true
+        on_bastion "${az_run} ${AZURE_CLI_IMAGE} az configure --defaults location=${AZURE_IL6_CLUSTER_REGION}" || true
 
         echo
         echo "=== 3/6 ARM metadata from the emulated endpoint ==="
@@ -371,8 +371,8 @@ tests:
                 fail "${AZURE_IL6_RESOURCE_GROUP} is not visible through the emulated ARM."
             else
                 echo "The emulated plane reports ${AZURE_IL6_RESOURCE_GROUP} in region '${il6_rg_region}'."
-                if [[ "${il6_rg_region}" != "${AZURE_IL6_REGION}" ]]; then
-                    echo "NOTE: that is not AZURE_IL6_REGION (${AZURE_IL6_REGION}). The emulator"
+                if [[ "${il6_rg_region}" != "${AZURE_IL6_CLUSTER_REGION}" ]]; then
+                    echo "NOTE: that is not AZURE_IL6_CLUSTER_REGION (${AZURE_IL6_CLUSTER_REGION}). The emulator"
                     echo "  relabels the commercial region rather than hosting a separate one, so"
                     echo "  '${il6_rg_region}' is what platform.azure.region has to be set to."
                 fi
@@ -406,11 +406,21 @@ tests:
           Local az cloud label, per the SHIFT article. This is CLI-local configuration and is not
           the SDK cloudName an install-config would use.
         name: AZURE_IL6_CLOUD_LABEL
-      - default: usseceast
+      - default: ussecwest
         documentation: |-
-          The emulated IL6 region, set as the az default location. Distinct from the
-          commercial-plane region the resource group lives in.
-        name: AZURE_IL6_REGION
+          The emulated IL6 region, set as the az default location. Deliberately NOT named
+          AZURE_IL6_REGION: azure-il6-check-prereqs already uses that name for the commercial
+          region the resource group physically lives in (westus2), and one job carrying the same
+          variable name with two opposite meanings is a trap. The emulator relabels westus2 as
+          ussecwest rather than hosting a region of its own, which is why this is ussecwest and
+          not the usseceast the original plan assumed.
+        name: AZURE_IL6_CLUSTER_REGION
+      - default: CI-Azure-IL6-DoNotDelete
+        documentation: |-
+          The shared, permanent resource group. Checked explicitly because the emulator fronts the
+          whole commercial subscription, so this is the only group the job can meaningfully assert
+          anything about.
+        name: AZURE_IL6_RESOURCE_GROUP
       from_image:
         name: "4.19"
         namespace: ocp
