@@ -1476,8 +1476,9 @@ def test_aws_cells_install_with_sts_by_default() -> None:
             steps = test["steps"]
             if steps.get("workflow") == "ipi-aws":
                 aws += 1
-                assert steps["pre"] == [{"chain": "ipi-aws-pre-manual-oidc-sts"}]
-                assert steps["post"][-1] == {"chain": "ipi-aws-post-manual-oidc-sts"}
+                # e2e-chainsaw appends quay-sts-provision and quay-sts-cleanup.
+                assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+                assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
             elif steps.get("workflow") == "ipi-gcp":
                 gcp += 1
                 assert "pre" not in steps
