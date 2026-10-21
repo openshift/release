@@ -892,7 +892,7 @@ for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(1):
+for i in range(21):
     CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
