@@ -449,6 +449,59 @@ def test_upgrade_edge_is_derived_from_versions() -> None:
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
 
 
+def test_ocp_channel_only_valid_for_upgrade() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "ocp_channel": "candidate",
+        }
+    )
+    with pytest.raises(ValueError, match="ocp_channel is only valid for test: upgrade"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_unknown_ocp_channel() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "ocp_channel": "fast",
+        }
+    )
+    with pytest.raises(ValueError, match="ocp_channel must be one of"):
+        expand_cells(matrix)
+
+
+def test_upgrade_nightlies() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    expected = {
+        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": ("from-316", "stable", "4.22", "3.16", "3.17"),
+        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": ("from-317", "stable", "4.22", "3.17", "3.18"),
+        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": ("from-318", "candidate", "5.0", "3.18", "5.0"),
+    }
+    for filename, (as_name, channel, ocp, source, target) in expected.items():
+        config = by_name[filename]
+        assert config["releases"]["latest"] == {
+            "release": {"architecture": "amd64", "channel": channel, "version": ocp}
+        }
+        test = config["tests"][0]
+        assert test["as"] == as_name
+        assert test["cron"] == "@daily"
+        env = test["steps"]["env"]
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+
+
 def test_redhat_318_aws_upgrade_cell() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
@@ -465,7 +518,7 @@ def test_redhat_318_aws_upgrade_cell() -> None:
 
     test = config["tests"][0]
     assert test["as"] == "from-317"
-    assert test["cron"] == "@weekly"
+    assert test["cron"] == "@daily"
     # The upgrade lane spans cluster install, n-1 seed, channel upgrade and the
     # full functional suite on top; it needs a larger budget than e2e-install.
     assert test["timeout"] == "6h0m0s"
