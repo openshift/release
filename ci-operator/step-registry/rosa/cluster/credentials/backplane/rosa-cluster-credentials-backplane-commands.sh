@@ -70,7 +70,30 @@ fi
 $WAS_TRACING && set -x
 
 log "Running ocm-backplane login for ${CLUSTER_ID}"
-ocm-backplane login "${CLUSTER_ID}"
+# A freshly-ready cluster can reject the first backplane login with 406
+# "failed to obtain credentials from target cluster. The cluster could be down
+# or under heavy load" while the backplane agent's connection to the hosted
+# cluster (and, for private clusters, the private-link endpoint) is still
+# converging. Retry with backoff instead of failing the step on the first
+# attempt.
+bp_login_retries=${BACKPLANE_LOGIN_RETRIES:-10}
+bp_login_delay=60
+bp_login_ok=false
+for ((bp_attempt = 1; bp_attempt <= bp_login_retries; bp_attempt++)); do
+  if ocm-backplane login "${CLUSTER_ID}"; then
+    bp_login_ok=true
+    break
+  fi
+  log "ocm-backplane login attempt ${bp_attempt}/${bp_login_retries} failed"
+  if (( bp_attempt < bp_login_retries )); then
+    log "retrying in ${bp_login_delay}s"
+    sleep "${bp_login_delay}"
+  fi
+done
+if [[ "${bp_login_ok}" != "true" ]]; then
+  log "ERROR: ocm-backplane login failed after ${bp_login_retries} attempts"
+  exit 1
+fi
 # Verify elevation works before dumping the kubeconfig.
 ocm-backplane elevate "${elevate_reason}" -- whoami
 
