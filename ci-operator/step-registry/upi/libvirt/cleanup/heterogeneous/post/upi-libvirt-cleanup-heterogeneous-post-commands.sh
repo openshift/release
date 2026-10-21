@@ -56,6 +56,7 @@ resolve_expected_additional_bridge() {
   case "${LEASED_RESOURCE}" in
     libvirt-s390x-vpn-amd64-0-0) printf '%s\n' "ocp1-amd" ;;
     libvirt-s390x-vpn-amd64-0-1) printf '%s\n' "ocp3-amd" ;;
+    libvirt-s390x-arm64-0-0|libvirt-s390x-vpn-arm64-0-0|*-arm64-0-0) printf '%s\n' "ocp2-arm" ;;
     *) printf '%s\n' "" ;;
   esac
 }
