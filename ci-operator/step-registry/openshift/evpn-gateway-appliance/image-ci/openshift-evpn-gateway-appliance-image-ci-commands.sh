@@ -28,7 +28,7 @@ export REGISTRY_AUTH_FILE="${pull_secret}"
 rm -rf "${WORKROOT}"
 mkdir -p "${WORKROOT}"
 repo_slug="${EVPN_APPLIANCE_REPO#https://github.com/}"
-sha="$(curl -fsSL "https://api.github.com/repos/${repo_slug}/commits/refs/pull/${EVPN_APPLIANCE_PR}/head" | sed -n 's/^  "sha": "\([0-9a-f]\{40\}\)".*/\1/p' | head -n 1)"
+sha="$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/${repo_slug}/commits/refs/pull/${EVPN_APPLIANCE_PR}/head")"
 if [[ ! "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
 	echo "image-ci: could not read a full pull request head sha" >&2
 	exit 1
