@@ -2,15 +2,12 @@ build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
 releases:
-  initial:
-    integration:
-      name: "4.19"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.19"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -24,6 +21,8 @@ tests:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
     test:
     - as: test
       cli: latest
@@ -32,12 +31,14 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: devworkspace-happy-path
   steps:
     cluster_profile: che-aws
     env:
       BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: devworkspace-happy-path
       cli: latest
@@ -47,9 +48,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
-  branch: 7.120.x
+  branch: 7.122.x
   org: eclipse-che
   repo: che-operator
-  variant: v19
+  variant: v22
