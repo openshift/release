@@ -179,6 +179,18 @@ tests:
         fi
         on_bastion "mkdir -p /var/home/core/.azure"
 
+        # The resolver lives on the host's loopback, which a bridged container cannot use: podman
+        # rewrites the localhost nameserver to a public one, so the container resolves commercial
+        # Azure fine and NXDOMAINs the IL6 namespace. az then falls back to AzureCloud and reports
+        # success against the wrong plane. Prove the container sees the split before relying on it.
+        if on_bastion "sudo podman run --rm --network host ${AZURE_CLI_IMAGE} getent hosts ${AZURE_IL6_ARM_HOST}"; then
+            echo "OK: ${AZURE_IL6_ARM_HOST} resolves inside the az container."
+        else
+            echo "ERROR: ${AZURE_IL6_ARM_HOST} does not resolve inside the az container, even on"
+            echo "the host network. The split resolver works for the host but not for podman."
+            exit 1
+        fi
+
         echo "Bastion is ready: split DNS, emulator CA in the trust store, az available under podman."
       env:
       - default: mcr.microsoft.com/azure-cli:latest
@@ -241,7 +253,13 @@ tests:
 
         # az runs as a container with the emulator CA and a persistent config dir, so that the
         # cloud registration and the login survive across these invocations.
-        az_run="sudo podman run --rm -v /opt/azureil6:/ca:z -v /var/home/core/.azure:/root/.azure:z"
+        # --network host is load-bearing. The split-horizon resolver listens on the bastion's
+        # 127.0.0.1, so a container on podman's bridge network cannot reach it: inside the
+        # container 127.0.0.1 is its own loopback. podman notices the localhost nameserver and
+        # substitutes a public resolver, which answers for commercial Azure and NXDOMAINs for
+        # *.microsoft.scloud -- so az silently falls back to AzureCloud instead of failing.
+        # Sharing the host network namespace makes 127.0.0.1 mean the host's dnsmasq.
+        az_run="sudo podman run --rm --network host -v /opt/azureil6:/ca:z -v /var/home/core/.azure:/root/.azure:z"
         az_run="${az_run} -e REQUESTS_CA_BUNDLE=/ca/ca-bundle.pem -e AZURE_CONFIG_DIR=/root/.azure"
         az_env="--env-file /tmp/azil6.env"
 
@@ -302,19 +320,41 @@ tests:
 
         login_ok=0
         if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} sh -c 'az login --service-principal -u \"\$AZURE_IL6_APP_ID\" -p \"\$AZURE_IL6_SECRET\" --tenant \"\$AZURE_IL6_TENANT\" --output none && echo logged-in'"; then
-            echo "OK: the azure-qe principal authenticates against the emulated plane."
             login_ok=1
         else
-            fail "az login against ${AZURE_IL6_ARM_ENDPOINT} failed with the azure-qe principal."
+            fail "az login failed with the azure-qe principal."
             echo "  If the emulator runs its own directory, this job needs a dedicated IL6"
             echo "  service principal rather than the commercial-plane one."
         fi
 
+        # A successful login proves nothing on its own. If the cloud registration failed, az is
+        # still pointed at AzureCloud, and this principal authenticates there happily -- every
+        # query below would then describe commercial Azure while claiming to describe IL6. So
+        # confirm which plane we are actually on before reporting anything about it.
+        active_cloud=""
+        active_arm=""
         if [[ "${login_ok}" -eq 1 ]]; then
+            active_cloud="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az account show --query environmentName -o tsv" | tr -d '\r')"
+            active_arm="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az cloud show --query 'endpoints.resourceManager' -o tsv" | tr -d '\r')"
+            echo "active cloud: ${active_cloud:-<unknown>}"
+            echo "active ARM  : ${active_arm:-<unknown>}"
+        fi
+
+        on_emulated_plane=0
+        if [[ "${active_arm}" == "${AZURE_IL6_ARM_ENDPOINT}"* ]]; then
+            on_emulated_plane=1
+            echo "OK: the azure-qe principal authenticates against the EMULATED plane."
+        elif [[ "${login_ok}" -eq 1 ]]; then
+            fail "az is logged in, but against '${active_cloud}' (${active_arm}), not the emulated plane."
+            echo "  This is the commercial plane. Nothing below would say anything about IL6, so"
+            echo "  the remaining checks are skipped rather than reported as passing."
+        fi
+
+        if [[ "${on_emulated_plane}" -eq 1 ]]; then
             echo
             echo "=== 5/6 list resource groups on the emulated plane ==="
             if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az group list -o table"; then
-                echo "OK: ARM answered a real authenticated query."
+                echo "OK: the emulated ARM answered a real authenticated query."
             else
                 fail "az group list failed after a successful login."
             fi
@@ -332,7 +372,7 @@ tests:
             fi
         else
             echo
-            echo "=== 5/6, 6/6 skipped: not logged in ==="
+            echo "=== 5/6, 6/6 skipped: not on the emulated plane ==="
         fi
 
         # Always remove the credential, including on the failure paths above.
