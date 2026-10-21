@@ -430,6 +430,7 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${NAME} || true
     ${VIRSH} vol-create-as \
       --name ${NAME} \
       --pool ${POOL_NAME} \
@@ -469,6 +470,9 @@ clone_volume () {
     echo "Must specify a name for the cloned volume..."
     exit 1
   fi
+
+  # Delete stale clone volume left from a previous run before recreating.
+  ${VIRSH} vol-delete --pool ${POOL_NAME} ${1} 2>/dev/null || true
 
   echo "Cloning ${VOLUME_NAME} volume as ${1} volume..."
   ${VIRSH} vol-clone \
