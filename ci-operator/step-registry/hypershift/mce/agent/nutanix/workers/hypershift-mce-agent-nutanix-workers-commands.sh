@@ -54,7 +54,13 @@ if [[ -z "$iso_url" ]]; then
   echo "InfraEnv $INFRAENV_NAME has no ISO download URL."
   exit 1
 fi
-curl --fail --location --silent --show-error --insecure "$iso_url" -o "$WORK_DIR/$IMAGE_NAME"
+if [[ ! -s "$SHARED_DIR/nutanix_proxy_url" ]]; then
+  echo "The baremetal Squid proxy URL is not available."
+  exit 1
+fi
+proxy_url=$(<"$SHARED_DIR/nutanix_proxy_url")
+curl --fail --location --silent --show-error --insecure \
+  --proxy "$proxy_url" --noproxy '' "$iso_url" -o "$WORK_DIR/$IMAGE_NAME"
 
 export WORK_DIR AGENT_IMAGE="$IMAGE_NAME" SHARED_DIR
 export NUTANIX_HOST NUTANIX_PORT NUTANIX_USERNAME NUTANIX_PASSWORD NUTANIX_PC_URL
