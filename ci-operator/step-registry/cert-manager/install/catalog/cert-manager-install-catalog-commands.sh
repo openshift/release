@@ -121,6 +121,7 @@ kind: ImageSetConfiguration
 mirror:
   operators:
   - catalog: ${CATSRC_IMG}
+    targetCatalog: redhat/cert-manager-operator-index
     packages:
     - name: openshift-cert-manager-operator
 EOF
@@ -131,9 +132,9 @@ EOF
     # Copy complete manifest lists: oc-mirror's platform filtering can edit
     # these lists while requiring their original digests to be preserved.
     for image in helm:3.17.0 vault:1.19.0 letsencrypt-pebble:2.7.0 hello-openshift:1.2.0; do
-        skopeo copy --all --preserve-digests --retry-times 5 \
-            --authfile "${XDG_RUNTIME_DIR}/containers/auth.json" --dest-tls-verify=false \
-            "docker://quay.io/openshifttest/${image}" "docker://${MIRROR_REGISTRY_HOST}/openshifttest/${image}"
+        oc image mirror --keep-manifest-list=true --filter-by-os='.*' --insecure=true \
+            --registry-config="${XDG_RUNTIME_DIR}/containers/auth.json" \
+            "quay.io/openshifttest/${image}=${MIRROR_REGISTRY_HOST}/openshifttest/${image}"
     done
     jq -n --arg mirror "${MIRROR_REGISTRY_HOST}" '{
         apiVersion: "config.openshift.io/v1", kind: "ImageTagMirrorSet",

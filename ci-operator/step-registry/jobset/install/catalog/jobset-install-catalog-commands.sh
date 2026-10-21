@@ -121,6 +121,7 @@ kind: ImageSetConfiguration
 mirror:
   operators:
   - catalog: ${CATSRC_IMG}
+    targetCatalog: redhat/jobset-operator-index
     packages:
     - name: job-set
 EOF

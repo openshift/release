@@ -753,7 +753,12 @@ tests:
     - as: kueue-must-gather-disconnected
       cli: latest
       commands: |
-        source "${SHARED_DIR}/env"
+        if [[ -s "${SHARED_DIR}/env" ]]; then source "${SHARED_DIR}/env"; fi
+        if [[ -z "${MUST_GATHER_IMAGE:-}" ]]; then
+          echo "Kueue must-gather image was not prepared; skipping Kueue-specific must-gather"
+          exit 0
+        fi
+        source "${SHARED_DIR}/proxy-conf.sh"
         export MUST_GATHER_IMAGE
         echo "Running must-gather to gather diagnostics..."
         mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
@@ -765,7 +770,9 @@ tests:
           memory: 500Mi
     - as: kueue-cleanup-disconnected
       cli: latest
-      commands: make undeploy-ocp
+      commands: |
+        source "${SHARED_DIR}/proxy-conf.sh"
+        make undeploy-ocp
       from: kueue-operator-src
       resources:
         requests:
@@ -781,7 +788,8 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
-        # Wait for intermittent build-farm API DNS failures before starting.
+        source "${SHARED_DIR}/proxy-conf.sh"
+        # Wait for API availability through the bastion proxy before starting.
         for i in $(seq 1 60); do oc whoami --request-timeout=15s >/dev/null 2>&1 && break; sleep 30; done
         oc whoami --request-timeout=15s >/dev/null 2>&1 || { echo "Cluster API unavailable at e2e start"; exit 1; }
         # Retry the CLI import after the mirror CA has propagated to importers.

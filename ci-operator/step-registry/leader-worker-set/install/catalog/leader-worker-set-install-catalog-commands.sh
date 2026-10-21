@@ -121,6 +121,7 @@ kind: ImageSetConfiguration
 mirror:
   operators:
   - catalog: ${CATSRC_IMG}
+    targetCatalog: redhat/leader-worker-set-operator-index
     packages:
     - name: leader-worker-set
 EOF
