@@ -214,8 +214,18 @@ export SSH_KEY="${WORK_DIR}/ssh_key.pub"
 echo "SSH public key(s) for VM injection: ${SSH_KEY}"
 
 cp "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" "${WORK_DIR}/dpf_pull_secret.json"
+if ! jq empty "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null; then
+  echo "DPF pull secret is not raw JSON, attempting base64 decode..."
+  base64 -d "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" > "${WORK_DIR}/dpf_pull_secret.json"
+  if ! jq empty "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null; then
+    echo "ERROR: DPF pull secret is not valid JSON (even after base64 decode)"
+    echo "First 80 chars: $(head -c 80 "${WORK_DIR}/dpf_pull_secret.json")"
+    exit 1
+  fi
+  echo "DPF pull secret decoded from base64"
+fi
 export DPF_PULL_SECRET="${WORK_DIR}/dpf_pull_secret.json"
-echo "DPF pull secret copied from Vault cluster profile"
+echo "DPF pull secret ready ($(jq -r '.auths | keys | join(", ")' "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null || echo "unknown format"))"
 
 # Handle CI release payload
 if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
