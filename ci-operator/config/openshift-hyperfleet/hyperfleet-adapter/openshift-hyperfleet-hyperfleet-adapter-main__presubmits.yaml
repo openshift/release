@@ -42,10 +42,27 @@ tests:
     test:
     - as: test
       commands: |
-        go get github.com/testcontainers/testcontainers-go
+        set -euo pipefail
         export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
-        podman system service --time=120 &
-        systemctl --user start podman.socket || true
+        PODMAN_PID=""
+        cleanup() {
+            if [[ -n "$PODMAN_PID" ]]; then
+                kill "$PODMAN_PID" 2>/dev/null || true
+                wait "$PODMAN_PID" 2>/dev/null || true
+            fi
+        }
+        trap cleanup EXIT
+
+        podman system service --time=0 &
+        PODMAN_PID=$!
+
+        # Wait for the podman socket to be available
+        SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+        for i in $(seq 1 30); do
+            [ -S "$SOCKET_PATH" ] && break
+            sleep 1
+        done
+
         export TESTCONTAINERS_RYUK_DISABLED=true
         mkdir -p "$HOME/.docker"
         cp /var/secrets/registry-pull-secret/.dockerconfigjson "$HOME/.docker/config.json"
@@ -59,6 +76,7 @@ tests:
       - env: INTEGRATION_ENVTEST_IMAGE
         name: hyperfleet-integration-test
       from: golang-test
+      grace_period: 1m0s
       nested_podman: true
       resources:
         requests:
