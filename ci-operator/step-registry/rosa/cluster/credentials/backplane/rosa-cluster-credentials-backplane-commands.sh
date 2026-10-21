@@ -84,8 +84,11 @@ for ((bp_attempt = 1; bp_attempt <= bp_login_retries; bp_attempt++)); do
     bp_login_ok=true
     break
   fi
-  log "ocm-backplane login attempt ${bp_attempt}/${bp_login_retries} failed; retrying in ${bp_login_delay}s"
-  sleep "${bp_login_delay}"
+  log "ocm-backplane login attempt ${bp_attempt}/${bp_login_retries} failed"
+  if (( bp_attempt < bp_login_retries )); then
+    log "retrying in ${bp_login_delay}s"
+    sleep "${bp_login_delay}"
+  fi
 done
 if [[ "${bp_login_ok}" != "true" ]]; then
   log "ERROR: ocm-backplane login failed after ${bp_login_retries} attempts"
