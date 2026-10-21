@@ -381,17 +381,29 @@ tests:
                 # one, so it is a gap in the emulated Microsoft.Resources API rather than anything
                 # about a particular group. It is also not what matters: openshift-install talks to
                 # Microsoft.Network and Microsoft.Compute, so those are what this needs to prove.
-                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az network vnet list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
-                    echo "OK: the emulated ARM enumerates Microsoft.Network resources in the group."
+                # Assert on the contents, not just the exit status. 'az network vnet list' exits 0
+                # with an empty table when a group has no VNets, so testing only the return code
+                # would print OK for an emulated ARM that answered with nothing at all. Both of
+                # these resources are known to exist at this point, so their absence is a failure.
+                on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az network vnet list -g ${AZURE_IL6_RESOURCE_GROUP} -o table" || true
+                found_vnet="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az network vnet list -g ${AZURE_IL6_RESOURCE_GROUP} --query \"[?name=='${AZURE_IL6_VNET_NAME}'].name\" -o tsv" | tr -d '\r')"
+                if [[ "${found_vnet}" == "${AZURE_IL6_VNET_NAME}" ]]; then
+                    echo "OK: the emulated ARM returned ${AZURE_IL6_VNET_NAME} from Microsoft.Network."
                 else
-                    fail "az network vnet list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                    fail "${AZURE_IL6_VNET_NAME} was not returned by az network vnet list."
                     echo "  This one matters: the installer cannot read the BYO VNet without it."
                 fi
 
-                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
-                    echo "OK: the emulated ARM enumerates Microsoft.Compute resources in the group."
+                # The bastion this job just created, named by azure-provision-bastionhost.
+                bastion_vm="${NAMESPACE}-${UNIQUE_HASH}-bastion"
+                on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} -o table" || true
+                found_vm="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} --query \"[?name=='${bastion_vm}'].name\" -o tsv" | tr -d '\r')"
+                if [[ "${found_vm}" == "${bastion_vm}" ]]; then
+                    echo "OK: the emulated ARM returned ${bastion_vm} from Microsoft.Compute."
                 else
-                    fail "az vm list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                    fail "${bastion_vm} was not returned by az vm list on the emulated plane."
+                    echo "  The VM demonstrably exists -- the CI pod has been SSHing to it -- so the"
+                    echo "  emulated Compute view disagrees with the commercial one."
                 fi
 
                 # Informational. Recorded so the gap is visible to the emulator team, but not
@@ -446,6 +458,11 @@ tests:
           whole commercial subscription, so this is the only group the job can meaningfully assert
           anything about.
         name: AZURE_IL6_RESOURCE_GROUP
+      - default: RHOCP-CI-AzureIL6-virtual-network
+        documentation: |-
+          The emulator-provisioned VNet. Asserted by name so an empty Microsoft.Network response
+          cannot pass as a successful enumeration.
+        name: AZURE_IL6_VNET_NAME
       from_image:
         name: "4.19"
         namespace: ocp
