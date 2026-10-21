@@ -132,10 +132,9 @@ tests:
         set -euo pipefail
         MODULE_NS=opendatahub-feast-system
         FS_NS=feast-tls-scan
-        MODULE_OPERATOR_IMAGE=quay.io/opendatahub/odh-feast-module-operator:odh-stable
 
         # Deploy the Feast module operator with the same manifests its Helm chart is generated from.
-        git clone --depth 1 https://github.com/opendatahub-io/feast-module-operator.git /tmp/feast-module-operator
+        git clone --depth 1 --branch "${MODULE_OPERATOR_REF}" https://github.com/opendatahub-io/feast-module-operator.git /tmp/feast-module-operator
         oc kustomize /tmp/feast-module-operator/config/default > /tmp/feast-module-operator.yaml
         grep -q 'image: ttl.sh/opendatahub-feast-operator:latest' /tmp/feast-module-operator.yaml
         sed -i "s#image: ttl.sh/opendatahub-feast-operator:latest#image: ${MODULE_OPERATOR_IMAGE}#" /tmp/feast-module-operator.yaml
@@ -183,6 +182,15 @@ tests:
         name: feast-operator
       - env: FEAST_FEATURE_SERVER_IMAGE
         name: feast-feature-server
+      env:
+      - default: quay.io/opendatahub/odh-feast-module-operator:odh-stable
+        documentation: The Feast module operator image to deploy. odh-stable is built
+          from the main branch of opendatahub-io/feast-module-operator.
+        name: MODULE_OPERATOR_IMAGE
+      - default: main
+        documentation: The opendatahub-io/feast-module-operator branch or tag to take
+          the manifests from. It should match MODULE_OPERATOR_IMAGE.
+        name: MODULE_OPERATOR_REF
       from: src
       resources:
         requests:
