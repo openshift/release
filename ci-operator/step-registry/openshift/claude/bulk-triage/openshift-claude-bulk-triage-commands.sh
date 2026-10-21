@@ -240,10 +240,27 @@ EOF
     echo "JUnit XML written to ${ARTIFACT_DIR}/junit_claude-ci.xml"
 }
 
+# Job history location: a periodic's runs live under logs/<job>/ in the results bucket; a rehearsal (the
+# periodic run as a presubmit of an openshift/release PR) lives under pr-logs/pull/<org>_<repo>/<pr>/<job>/
+# in the public bucket. Reading the right place lets chained rehearsals exercise the receipt/baseline path.
+if [[ -n "${PULL_NUMBER:-}" ]]; then
+    HISTORY_BUCKET="${GCS_BUCKET_PR_LOGS:-test-platform-results-public}"
+    HISTORY_PREFIX="pr-logs/pull/${REPO_OWNER:-openshift}_${REPO_NAME:-release}/${PULL_NUMBER}"
+else
+    HISTORY_BUCKET="${GCS_BUCKET}"
+    HISTORY_PREFIX="logs"
+fi
+history_url() {
+    # history_url <job-name> -> gs:// prefix holding that job's runs
+    printf 'gs://%s/%s/%s' "${HISTORY_BUCKET}" "${HISTORY_PREFIX}" "$1"
+}
+
 latest_preceding_attempt() {
-    # Prints the greatest run id of this job in GCS that is strictly below the current build, or nothing.
-    # A listing that fails is discarded entirely (partial output must never select a run).
-    local prefix="gs://${GCS_BUCKET}/logs/${JOB_NAME:-}/" listing
+    # latest_preceding_attempt [job-name]: prints the greatest run id of that job (default: this job) in GCS
+    # that is strictly below the current build, or nothing. A listing that fails is discarded entirely
+    # (partial output must never select a run).
+    local job="${1:-${JOB_NAME:-}}" listing
+    local prefix="$(history_url "${job}")/"
     if ! listing="$(gcloud storage ls "${prefix}" 2>/dev/null)"; then
         return 0
     fi
@@ -255,14 +272,14 @@ latest_preceding_attempt() {
 }
 
 fetch_prev_artifact() {
-    # fetch_prev_artifact <run-id> <artifact-name> <dest>; non-zero when absent.
-    local run="$1" name="$2" dest="$3"
+    # fetch_prev_artifact <run-id> <artifact-name> <dest> [job-name]; non-zero when absent.
+    local run="$1" name="$2" dest="$3" job="${4:-${JOB_NAME:-}}"
     gcloud storage cp \
-        "gs://${GCS_BUCKET}/logs/${JOB_NAME:-}/${run}/artifacts/*/openshift-claude-bulk-triage/artifacts/${name}" \
+        "$(history_url "${job}")/${run}/artifacts/*/openshift-claude-bulk-triage/artifacts/${name}" \
         "${dest}" >/dev/null 2>&1
 }
 
-PROW_RUN_URL="https://prow.ci.openshift.org/view/gs/${GCS_BUCKET}/logs/${JOB_NAME:-unknown-job}/${BUILD_ID:-0}"
+PROW_RUN_URL="https://prow.ci.openshift.org/view/gs/${HISTORY_BUCKET}/${HISTORY_PREFIX}/${JOB_NAME:-unknown-job}/${BUILD_ID:-0}"
 PREV_RUN=""
 MODE_EFFECTIVE="${TRIAGE_WRITE_MODE}"
 MODE_REASON=""
@@ -289,6 +306,8 @@ write_receipt_now() {
     [[ -n "${PREV_RUN}" ]] && extra+=(--previous-run "${PREV_RUN}")
     if [[ "${DECISION}" == "report" && -n "${DECISION_ORIGIN}" ]]; then
         extra+=(--downgrade-origin "${DECISION_ORIGIN}" --downgrade-reason "${MODE_REASON}")
+        # per-origin reasons are copied from the receipt we inherited from (best-effort, never blocking)
+        [[ -s "${WORKDIR:-}/previous-receipt.json" ]] && extra+=(--previous-receipt "${WORKDIR}/previous-receipt.json")
     fi
     if python3 "${AIH_SCRIPTS_DIR}/audit.py" receipt-write --out "${ARTIFACT_DIR}/runner-receipt.json" \
         --run-id "${BUILD_ID:-local}" --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${mode}" \
@@ -321,7 +340,7 @@ postga_finalize_on_exit() {
 if [[ "${TRIAGE_POLICY}" == "post-ga" || "${TRIAGE_MODE}" == "tripwire" ]]; then
     PREV_RUN="$(latest_preceding_attempt)"
     if [[ -z "${PREV_RUN}" ]]; then
-        echo "No preceding attempt found in gs://${GCS_BUCKET}/logs/${JOB_NAME:-} (or job history unreadable); baseline none."
+        echo "No preceding attempt found in $(history_url "${JOB_NAME:-}") (or job history unreadable); baseline none."
     else
         echo "Latest preceding attempt: ${PREV_RUN}"
     fi
@@ -335,9 +354,21 @@ if [[ "${TRIAGE_MODE}" == "tripwire" ]]; then
         PREV_STATUS_ARG="${WORKDIR}/previous-burst-status.json"
     fi
     echo "Previous status: ${PREV_STATUS_ARG}"
+    # Growth of known clusters is judged against the latest WEEKLY manifest (a different job): derive its
+    # name from ours unless given explicitly.
+    BASELINE_JOB="${TRIAGE_BASELINE_JOB:-${JOB_NAME/cr-burst-tripwire/bulk-triage-post-ga}}"
+    WEEKLY_BASELINE_ARG="none"
+    WEEKLY_RUN=""
+    if [[ "${TRIAGE_BASELINE}" == "auto" && -n "${BASELINE_JOB}" ]]; then
+        WEEKLY_RUN="$(latest_preceding_attempt "${BASELINE_JOB}")"
+        if [[ -n "${WEEKLY_RUN}" ]] && fetch_prev_artifact "${WEEKLY_RUN}" triage-manifest.json "${WORKDIR}/weekly-baseline.json" "${BASELINE_JOB}"; then
+            WEEKLY_BASELINE_ARG="${WORKDIR}/weekly-baseline.json"
+        fi
+    fi
+    echo "Weekly baseline: ${WEEKLY_BASELINE_ARG}${WEEKLY_RUN:+ (run ${WEEKLY_RUN} of ${BASELINE_JOB})}"
     TRIPWIRE_OK=true
     python3 "${AIH_SCRIPTS_DIR}/prepass.py" --tripwire --views "${TRIAGE_VIEWS_ARR[@]}" \
-        --window-hours 24 --previous-status "${PREV_STATUS_ARG}" --run-id "${BUILD_ID:-local}" \
+        --window-hours 24 --previous-status "${PREV_STATUS_ARG}" --baseline "${WEEKLY_BASELINE_ARG}" --run-id "${BUILD_ID:-local}" \
         ${PREPASS_INVENTORY_ARGS[@]+"${PREPASS_INVENTORY_ARGS[@]}"} --out "${ARTIFACT_DIR}/burst-status.json" || TRIPWIRE_OK=false
     if [[ "${TRIPWIRE_OK}" == "true" && -s "${ARTIFACT_DIR}/burst-status.json" ]]; then
         junit_case "tripwire: burst-status.json produced" true ""
