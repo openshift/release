@@ -91,7 +91,59 @@ tests:
         - kind: ServiceAccount
           name: kubeflow-trainer-controller-manager
           namespace: kubeflow-system
+        ---
+        # The generic manager overlay does not include the RHAI progression
+        # permissions from manifests/rhoai/rbac_progression_patch.yaml. Grant
+        # them additively for this E2E job instead of modifying the shared
+        # tls-scanner-run step.
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-rhai-e2e
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-rhai-e2e
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-rhai-e2e
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
         EOF
+
+        # Fail immediately if the controller cannot start its NetworkPolicy
+        # informer or read pods for progression tracking.
+        controller_sa="system:serviceaccount:kubeflow-system:kubeflow-trainer-controller-manager"
+        oc auth can-i list pods --all-namespaces --as="${controller_sa}"
+        oc auth can-i list networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i watch networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i create networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
 
         oc -n kubeflow-system set image \
           deployment/kubeflow-trainer-controller-manager \
