@@ -61,8 +61,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     env:
-      LVM_CLUSTER_DEVICE_PATH: /dev/vda
-      LVM_CLUSTER_TOLERATE_MASTER: "true"
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
@@ -73,22 +71,13 @@ tests:
         if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
           source "${SHARED_DIR}/proxy-conf.sh"
         fi
-        if ./integration-test run-suite -c 1 --output json --junit-path "${ARTIFACT_DIR}/junit_results.xml" openshift/lvm-operator/test/integration/qe_tests/mno > "${ARTIFACT_DIR}/ote-results.json" 2> "${ARTIFACT_DIR}/test.log"; then
-          result=0
-        else
-          result=$?
-        fi
-        if [ -f "${ARTIFACT_DIR}/junit_results.xml" ]; then
-          cp "${ARTIFACT_DIR}/junit_results.xml" "${SHARED_DIR}/lvms-tnf-junit.xml"
-        fi
-        exit "${result}"
+        ./integration-test run-suite -c 1 --output json --junit-path "${ARTIFACT_DIR}/junit_results.xml" openshift/lvm-operator/test/integration/qe_tests/mno > "${ARTIFACT_DIR}/ote-results.json" 2> "${ARTIFACT_DIR}/test.log"
       from: lvm-operator-integration-test
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
       timeout: 4h0m0s
-    - ref: baremetalds-two-node-fencing-lvms-mno-validate-results
     workflow: baremetalds-two-node-fencing-lvms-mno
 - as: e2e-aws-sno-qe-integration-tests
   cron: 0 8 * * 5
