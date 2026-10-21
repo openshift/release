@@ -14,4 +14,7 @@ if [[ -n "${CATALOG_SOURCE_NAME}" && "${CATALOG_SOURCE_NAME}" != "redhat-operato
 fi
 oc delete imagedigestmirrorset "${IDMS_NAME}" --ignore-not-found || true
 
+# Best-effort removal of the oc-debug SSH jump namespace from the bastion step.
+oc delete ns test-ssh-bastion --ignore-not-found --timeout=120s || true
+
 echo "=== Component cleanup complete ==="
