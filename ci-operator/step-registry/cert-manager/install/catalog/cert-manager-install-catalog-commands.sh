@@ -123,15 +123,24 @@ mirror:
   - catalog: ${CATSRC_IMG}
     packages:
     - name: openshift-cert-manager-operator
-  additionalImages: # additional images used in e2e test code
-  - name: quay.io/openshifttest/helm:3.17.0
-  - name: quay.io/openshifttest/vault:1.19.0
-  - name: quay.io/openshifttest/letsencrypt-pebble:2.7.0
-  - name: quay.io/openshifttest/hello-openshift:1.2.0
 EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
-    run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
+    run_command "env -u REGISTRY_AUTH_FILE ./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
+
+    # Copy complete manifest lists: oc-mirror's platform filtering can edit
+    # these lists while requiring their original digests to be preserved.
+    for image in helm:3.17.0 vault:1.19.0 letsencrypt-pebble:2.7.0 hello-openshift:1.2.0; do
+        skopeo copy --all --preserve-digests --retry-times 5 \
+            --authfile "${XDG_RUNTIME_DIR}/containers/auth.json" --dest-tls-verify=false \
+            "docker://quay.io/openshifttest/${image}" "docker://${MIRROR_REGISTRY_HOST}/openshifttest/${image}"
+    done
+    jq -n --arg mirror "${MIRROR_REGISTRY_HOST}" '{
+        apiVersion: "config.openshift.io/v1", kind: "ImageTagMirrorSet",
+        metadata: {name: "cert-manager-test-images"},
+        spec: {imageTagMirrors: (["helm", "vault", "letsencrypt-pebble", "hello-openshift"] |
+            map({source: ("quay.io/openshifttest/" + .), mirrors: [($mirror + "/openshifttest/" + .)]}))}
+    }' > "${OC_MIRROR_OUTPUT_DIR}/itms-cert-manager-test-images.json"
 
     echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CATSRC_NAME'..."
     run_command "curl -k -L -o yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && chmod +x ./yq"

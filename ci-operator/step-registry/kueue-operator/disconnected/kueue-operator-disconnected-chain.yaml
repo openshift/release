@@ -4,6 +4,7 @@ chain:
   - ref: kueue-operator-disconnected-compute
   - ref: kueue-operator-disconnected-install
   - as: run-sdk
+    grace_period: 10s
     cli: latest
     commands: |
       # Run everything on the BASTION — its VPC DNS always resolves the cluster
@@ -55,13 +56,11 @@ chain:
 
       # Copy prerequisites to the bastion (ssh + cat, no scp dependency)
       echo "Copying kubeconfig, oc, operator-sdk, IDMS/ITMS, and auth to the bastion (${BASTION_SSH_USER}@${BASTION_IP})..."
-      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kubeconfig" < "${KUBECONFIG}"
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "umask 077; cat > /tmp/kubeconfig" < "${KUBECONFIG}"
       OC_BIN=$(which oc)
       ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/oc" < "${OC_BIN}"
-      # The binary goes to the bastion's HOME, not /tmp — run 23 saw /tmp/operator-sdk
-      # exec fail with EACCES while /tmp/oc (same copy path) exec'd fine; HOME is the
-      # canonical exec-allowed location on RHCOS and is not tmpfs.
-      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > \${HOME}/operator-sdk" < "${OPERATOR_SDK_BIN}"
+      # Streaming with cat does not preserve the local executable mode.
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > \${HOME}/operator-sdk; chmod +x \${HOME}/operator-sdk" < "${OPERATOR_SDK_BIN}"
       REMOTE_SHA256=$(ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "sha256sum \${HOME}/operator-sdk" | awk '{print $1}')
       echo "operator-sdk on bastion: sha256 ${REMOTE_SHA256:0:16}..."
       if [[ "${REMOTE_SHA256}" != "${SDK_SHA256}" ]]; then
@@ -69,7 +68,7 @@ chain:
           exit 1
       fi
       if test -f "${SHARED_DIR}/containers-auth.json"; then
-          ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/containers-auth.json" < "${SHARED_DIR}/containers-auth.json"
+          ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "umask 077; cat > /tmp/containers-auth.json" < "${SHARED_DIR}/containers-auth.json"
       fi
       if test -f "${SHARED_DIR}/kueue-idms.yaml"; then
           ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kueue-idms.yaml" < "${SHARED_DIR}/kueue-idms.yaml"
@@ -78,11 +77,17 @@ chain:
           ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/kueue-itms.yaml" < "${SHARED_DIR}/kueue-itms.yaml"
       fi
 
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "cat > /tmp/mirror-ca.pem" < "${SHARED_DIR}/additional_trust_bundle"
+
       # Apply mirror policies, create namespace, and install the operator —
       # all on the bastion where the cluster API is always reachable
       echo "Running installation on the bastion..."
-      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "
+      ssh ${ssh_options} "${BASTION_SSH_USER}@${BASTION_IP}" "BUNDLE_IMAGE='${BUNDLE_IMAGE}' bash -s" <<'BASTION'
+          set -euo pipefail
           chmod +x /tmp/oc
+          export PATH=/tmp:$PATH
+          sudo cp /tmp/mirror-ca.pem /etc/pki/ca-trust/source/anchors/kueue-mirror.pem
+          sudo update-ca-trust
           export KUBECONFIG=/tmp/kubeconfig
 
           # Apply the image mirror policies prepared by the install step
@@ -106,17 +111,64 @@ chain:
 
           # Install the operator — operator-sdk provides the bundle-serving
           # machinery (a plain bundle image cannot be a CatalogSource)
-          if test -f /tmp/containers-auth.json; then
-              export REGISTRY_AUTH_FILE=/tmp/containers-auth.json
+          export REGISTRY_AUTH_FILE=/tmp/containers-auth.json
+          mirror=${BUNDLE_IMAGE%%/*}
+          # Image imports need mirror trust independently of the nodes and bastion.
+          ca_config=$(oc get image.config.openshift.io cluster -o jsonpath='{.spec.additionalTrustedCA.name}')
+          if [[ -z "$ca_config" ]]; then
+              ca_config=disconnected-mirror-ca
+              oc create configmap "$ca_config" -n openshift-config
           fi
-          echo 'operator-sdk canary:'
-          ls -laZ \"\${HOME}/operator-sdk\" /tmp/oc 2>&1 || true
-          mount | grep -E 'on /tmp |on \${HOME} ' || true
-          if ! \"\${HOME}/operator-sdk\" version; then
-              echo '=== operator-sdk does not execute on the bastion'
-              exit 1
-          fi
-          if ! \"\${HOME}/operator-sdk\" run bundle --timeout=10m -n openshift-kueue-operator --skip-tls-verify --security-context-config restricted '${BUNDLE_IMAGE}'; then
+          oc set data configmap/"$ca_config" -n openshift-config \
+              --from-file="${mirror//:/..}=/tmp/mirror-ca.pem"
+          oc patch image.config.openshift.io cluster --type=merge \
+              -p "{\"spec\":{\"additionalTrustedCA\":{\"name\":\"$ca_config\"}}}"
+          umask 077
+          jq --arg mirror "$mirror" '{auths:{($mirror):.auths[$mirror]}}' "$REGISTRY_AUTH_FILE" > /tmp/mirror-auth.json
+          oc create secret generic kueue-mirror-pull-secret -n openshift-kueue-operator \
+              --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=/tmp/mirror-auth.json \
+              --dry-run=client -o yaml | oc apply -f -
+          oc secrets link default kueue-mirror-pull-secret --for=pull -n openshift-kueue-operator
+          "$HOME/operator-sdk" version
+          "$HOME/operator-sdk" run bundle --timeout=15m -n openshift-kueue-operator \
+              --skip-tls-verify --security-context-config restricted --pull-secret-name=kueue-mirror-pull-secret \
+              --index-image="$mirror/operator-framework/opm:latest" \
+              --decompression-image="$mirror/ubi9/ubi:9.4" "$BUNDLE_IMAGE" &
+          sdk_pid=$!
+          trap 'kill "$sdk_pid" 2>/dev/null || true' EXIT
+          # SDK v1.39.2 mounts auth under /root with mode 0400, inaccessible
+          # to restricted pods. Recreate its catalog pod with readable auth.
+          pod=""
+          for i in $(seq 1 60); do
+              pod=$(oc get catalogsource kueue-operator-catalog -n openshift-kueue-operator \
+                  -o jsonpath='{.metadata.annotations.operators\.operatorframework\.io/registry-pod-name}' 2>/dev/null) || true
+              if [[ -n "$pod" ]] && oc get pod "$pod" -n openshift-kueue-operator >/dev/null 2>&1; then break; fi
+              sleep 5
+          done
+          # Wait until SDK has finished creating and annotating the catalog
+          # before replacing its pod, so it cannot overwrite the new address.
+          for i in $(seq 1 60); do
+              if oc get subscriptions -n openshift-kueue-operator -o json | \
+                  jq -e 'any(.items[]; .spec.name == "kueue-operator")' >/dev/null; then break; fi
+              sleep 5
+          done
+          oc get subscriptions -n openshift-kueue-operator -o json | \
+              jq -e 'any(.items[]; .spec.name == "kueue-operator")' >/dev/null
+          oc get pod "$pod" -n openshift-kueue-operator -o json | jq '
+              del(.status,.metadata.uid,.metadata.resourceVersion,.metadata.creationTimestamp,.metadata.managedFields) |
+              (.spec.volumes[] | select(.name=="kueue-mirror-pull-secret").secret.defaultMode)=292 |
+              (.spec.containers[].volumeMounts[] | select(.name=="kueue-mirror-pull-secret").mountPath)="/registry-auth" |
+              .spec.containers[0].env=[{"name":"HOME","value":"/registry-auth"},
+                  {"name":"DOCKER_CONFIG","value":"/registry-auth/.docker"},
+                  {"name":"REGISTRY_AUTH_FILE","value":"/registry-auth/.docker/config.json"}]
+          ' > /tmp/kueue-catalog-pod.json
+          oc delete pod "$pod" -n openshift-kueue-operator --wait=true --timeout=1m
+          oc create -f /tmp/kueue-catalog-pod.json
+          oc wait pod "$pod" -n openshift-kueue-operator --for=condition=Ready --timeout=3m
+          ip=$(oc get pod "$pod" -n openshift-kueue-operator -o jsonpath='{.status.podIP}')
+          oc patch catalogsource kueue-operator-catalog -n openshift-kueue-operator \
+              --type=merge -p "{\"spec\":{\"address\":\"$ip:50051\"}}"
+          if ! wait "$sdk_pid"; then
               echo '=== run bundle failed; dumping OLM state for diagnostics'
               /tmp/oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
               /tmp/oc get csv -A 2>&1 | grep -i kueue || true
@@ -125,19 +177,19 @@ chain:
           fi
 
           echo 'Waiting for the operator CSV to succeed...'
-          for i in \$(seq 1 40); do
+          for i in $(seq 1 40); do
               if /tmp/oc get csv -n openshift-kueue-operator -o name 2>/dev/null | grep -q kueue-operator; then break; fi
               sleep 15
           done
-          /tmp/oc wait csv -n openshift-kueue-operator --for=condition=Succeeded --timeout=15m
+          /tmp/oc wait csv -n openshift-kueue-operator --all --for=jsonpath='{.status.phase}'=Succeeded --timeout=15m
 
           echo 'Waiting for the operator deployment to become available...'
-          for i in \$(seq 1 20); do
+          for i in $(seq 1 20); do
               if /tmp/oc get deployment -n openshift-kueue-operator -o name 2>/dev/null | grep -q .; then break; fi
               sleep 15
           done
           /tmp/oc wait --for=condition=Available deployment -n openshift-kueue-operator --timeout=10m
-      "
+      BASTION
     from: upi-installer
     resources:
       requests:

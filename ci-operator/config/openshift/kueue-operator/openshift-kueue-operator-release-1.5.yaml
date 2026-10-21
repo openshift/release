@@ -749,8 +749,6 @@ tests:
       MUST_GATHER_COMPONENT: kueue-must-gather-1-5
       OPERAND_COMPONENT: kueue-operand-1-5
       OPERATOR_COMPONENT: kueue-operator-1-5
-      PR_ONLY: "true"
-      TIMEOUT: +5 hours
     post:
     - as: kueue-must-gather-disconnected
       cli: latest
@@ -775,7 +773,6 @@ tests:
           memory: 500Mi
     - chain: ipi-aws-post-disconnected
     test:
-    - ref: wait
     - ref: kueue-operator-disconnected-endpoint
     - chain: cert-manager-install
     - chain: jobset-install
@@ -784,25 +781,15 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
-        # CI DNS flake: the build-farm resolver intermittently returns NXDOMAIN
-        # for the cluster API name (seconds up to ~30 minutes). Probe with oc
-        # (same Go resolver as the tests; getent is unusable in step pods).
-        # Don't start the suite while it is down, and retry once after recovery.
-        for i in $(seq 1 60); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        oc whoami >/dev/null 2>&1 || { echo "Cluster API unresolvable at e2e start"; exit 1; }
+        # Wait for intermittent build-farm API DNS failures before starting.
+        for i in $(seq 1 60); do oc whoami --request-timeout=15s >/dev/null 2>&1 && break; sleep 30; done
+        oc whoami --request-timeout=15s >/dev/null 2>&1 || { echo "Cluster API unavailable at e2e start"; exit 1; }
+        # Retry the CLI import after the mirror CA has propagated to importers.
+        for i in $(seq 1 20); do oc import-image cli:latest -n openshift --confirm && break; sleep 15; done
+        oc get imagestreamtag cli:latest -n openshift
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        if make test-e2e; then
-          exit 0
-        fi
-        echo "e2e failed; waiting up to 45m for the cluster API to become resolvable again"
-        for i in $(seq 1 90); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        if oc whoami >/dev/null 2>&1; then
-          echo "Cluster API recovered; retrying e2e once"
-          make test-e2e
-        else
-          echo "Cluster API still unresolvable after 45m; giving up"
-          exit 1
-        fi
+        make e2e-ci-test
+      timeout: 3h
       from: kueue-operator-src
       resources:
         requests:
