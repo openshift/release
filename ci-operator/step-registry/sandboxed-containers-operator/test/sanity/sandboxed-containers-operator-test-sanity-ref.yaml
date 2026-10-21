@@ -1,0 +1,80 @@
+ref:
+  as: sandboxed-containers-operator-test-sanity
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-test-sanity-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 30m0s
+  grace_period: 10m0s
+  env:
+  - name: TESTS_SANITY_ENABLE
+    default: "true"
+    documentation: |-
+      Enable-gate for the sanity check.
+      "true"  -> the step runs the sanity test.
+      "false" -> the step writes a skipped JUnit and exits 0, leaving the rest
+      of the test phase untouched. Disconnected jobs set this, as the workload
+      image is not mirrored into their registry.
+  - name: TESTS_SANITY_IMAGE
+    default: ""
+    documentation: |-
+      Image the workload pod runs. Empty uses the runner default
+      (registry.access.redhat.com/ubi9/ubi-minimal:latest). A confidential
+      containers job has to name an image its cluster's image security policy
+      admits, as the guest refuses to pull anything else.
+  - name: TESTS_SANITY_RUNNER_REPO
+    default: "https://github.com/openshift/sandboxed-containers-operator"
+    documentation: |-
+      Repository providing test/e2e/run_sanity_tests.sh. Point this at a fork
+      to try out changes to the sanity suite before they merge.
+  - name: TESTS_SANITY_RUNNER_REPO_REF
+    default: "devel"
+    documentation: |-
+      Branch, tag or full commit SHA of TESTS_SANITY_RUNNER_REPO to check out.
+  - name: TESTS_SANITY_TIMEOUT
+    default: ""
+    documentation: |-
+      Seconds to wait for the workload pod to be ready, passed to the runner
+      via --timeout. Empty uses the runner default for the workload
+      (180 for kata, 420 for peerpods, 600 for coco).
+  - name: WORKLOAD_TO_TEST
+    default: "kata"
+    documentation: |-
+      Workload the cluster was installed with: kata, peer-pods or coco. Shared
+      with the env-cm step, which records it in the osc-config config map, and
+      passed to the runner as it is via --workload. Deliberately not under the
+      TESTS_SANITY_ prefix: it describes how the cluster itself was installed,
+      not a sanity-specific parameter, and other suites rely on the same value
+      through osc-config.
+  - name: RUNTIMECLASS
+    default: "kata"
+    documentation: |-
+      RuntimeClass the workload pod runs with, passed to the runner via
+      --runtime_class. Shared with the env-cm step, same reasoning as
+      WORKLOAD_TO_TEST above.
+  documentation: |-
+    Check that a single workload runs on the cluster, before anything else is
+    tested: create a pod, wait for it to run, delete it and check it is gone.
+    The confidential containers workload additionally reads a resource from
+    Trustee, which only succeeds once the pod has attested.
+
+    The step runs in the `test` phase, ahead of
+    sandboxed-containers-operator-testsuites-gate. A failure here stops the
+    test phase, so the gate file is never created and the post-phase test
+    suites skip themselves: a broken installation is reported by this one
+    short test instead of being diagnosed from the output of hundreds of them.
+
+    On failure the runner prints the logs that explain it - pod state and
+    description, and then the node journal, the cloud-api-adaptor logs or the
+    Trustee logs depending on the workload - and they are published to the
+    artifacts directory along with the JUnit results.
+
+    It fetches test/e2e/run_sanity_tests.sh from TESTS_SANITY_RUNNER_REPO and
+    runs on the src image (which provides git) with oc injected via cli; the
+    tools the runner needs that are missing from the image (bats, envsubst)
+    are installed on-demand. When the Trustee install step left an initdata in
+    ${SHARED_DIR}/INITDATA, it is passed to the coco workload so that its pod
+    can reach Trustee.
