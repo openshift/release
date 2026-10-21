@@ -81,7 +81,11 @@ $(ls ${WORKDIR}/channels/)
   target_release="$($cmd_yq -r .versions[] "${WORKDIR}/channels/${upgrade_to_channel}.yaml" | grep "${target_version_xy}." | tail -n1)"
 
   echo "Found target version [${target_release}], getting Digest..."
-  TARGET_RELEASE_IMAGE=$(oc adm release info "${target_release}" -o jsonpath='{.image}')
+  # Resolve via explicit pullspec instead of a bare version: "oc adm release info <version>"
+  # only resolves versions already present in the installed cluster's own ClusterVersion
+  # status (history/availableUpdates/conditionalUpdates), which won't include a cross-major
+  # upgrade target (e.g. 4.22 -> 5.0) even though it's listed in the downloaded channel file.
+  TARGET_RELEASE_IMAGE=$(oc adm release info "quay.io/openshift-release-dev/ocp-release:${target_release}-x86_64" -o jsonpath='{.image}')
   popd
 fi
 
