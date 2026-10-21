@@ -650,6 +650,396 @@ tests:
           memory: 200Mi
     workflow: rosa-aws-sts
   timeout: 8h0m0s
+- always_run: false
+  as: build-farm-114nodes-kas-residual
+  cron: 0 8 10 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      KUBE_BURNER_VERSION: 1.11.18
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      ORION_CONFIG: examples/build-farm.yaml
+      REPLICAS: "114"
+      RUN_ORION: "true"
+    test:
+    - as: kas-residual-idle
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+
+        echo "kube-apiserver residual memory capture (idle/pre-workload)"
+        OUT="${ARTIFACT_DIR}/kas-residual"
+        mkdir -p "${OUT}"
+
+        # FIX (same as crio-residual): the build-cluster namespace leaks into the
+        # target kubeconfig context; oc debug would create its pod there and fail.
+        oc config set-context --current --namespace=default 2>/dev/null || true
+
+        # Cluster identity for the record
+        {
+          oc get clusterversion -o jsonpath='{range .items[*]}{.spec.desired.version}{"\n"}{end}'
+        } > "${OUT}/clusterversion.txt" || true
+        oc get nodes -l node-role.kubernetes.io/master= \
+          -o custom-columns=NAME:.metadata.name,KUBELET:.status.nodeInfo.kubeletVersion,KERNEL:.status.nodeInfo.kernelVersion,OS:.status.nodeInfo.osImage \
+          --no-headers > "${OUT}/masters.txt" || true
+
+        # ------------------------------------------------------------------
+        # Node capture script. Two modes:
+        #   MODE=snapshot  one-shot, prints to stdout. FULL=1 appends smaps.
+        #   MODE=sampler   loop: cheap capture every INTERVAL s into
+        #                  ${KAS_PREFIX}/tmp/kas-residual-samples/<ts>/, full
+        #                  smaps every FULL_EVERY rounds. Runs for DURATION s.
+        # KAS_PREFIX is the host root as seen from the execution context:
+        # "" inside `chroot /host`, "/host" inside the sampler pod.
+        # /proc is used directly in both contexts (hostPID).
+        # ------------------------------------------------------------------
+        cat > "${SHARED_DIR}/kas-capture-node.sh" << 'NODEOF'
+        #!/bin/bash
+        MODE="${MODE:-snapshot}"
+        FULL="${FULL:-0}"
+        KAS_PREFIX="${KAS_PREFIX:-}"
+        INTERVAL="${INTERVAL:-60}"
+        FULL_EVERY="${FULL_EVERY:-10}"
+        DURATION="${DURATION:-14400}"
+
+        kas_find_pid() {
+          # main kube-apiserver process only; skips kube-apiserver-check-endpoints
+          # sidecar and guard pods. Matches bare "kube-apiserver" entrypoint and
+          # legacy "hyperkube kube-apiserver" invocation.
+          local d p cl first second
+          for d in /proc/[0-9]*; do
+            p=${d#/proc/}
+            cl=$(tr '\0' '\n' < "${d}/cmdline" 2>/dev/null) || continue
+            first=$(printf '%s\n' "${cl}" | sed -n 1p); first=${first##*/}
+            second=$(printf '%s\n' "${cl}" | sed -n 2p)
+            if { [ "${first}" = "kube-apiserver" ] || [ "${second}" = "kube-apiserver" ]; } \
+               && printf '%s\n' "${cl}" | grep -q -- '--etcd-servers'; then
+              printf '%s' "${p}"; return 0
+            fi
+          done
+          return 1
+        }
+
+        kas_capture_cheap() {
+          # $1 = pid. Everything the residual/THP analysis needs, ~30 KB.
+          local pid="$1" cg podcg c f s k v d
+          echo "===META==="
+          echo "time_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "kas_pid: ${pid}"
+          echo "node: $(hostname)"
+          grep -E '^(VmRSS|VmHWM|VmData|VmSwap|Threads):' "/proc/${pid}/status" 2>/dev/null
+          echo "===CGROUPS==="
+          cat "/proc/${pid}/cgroup" 2>/dev/null
+          cg="${KAS_PREFIX}/sys/fs/cgroup$(sed -n 's/^0:://p' "/proc/${pid}/cgroup" 2>/dev/null)"
+          podcg=$(dirname "${cg}")
+          # container cgroup, parent pod cgroup, aggregate kubepods.slice (the ceiling)
+          for c in "${cg}" "${podcg}" "${KAS_PREFIX}/sys/fs/cgroup/kubepods.slice"; do
+            [ -d "${c}" ] || continue
+            echo "--- cgroup ${c#${KAS_PREFIX}/sys/fs/cgroup/}"
+            for f in memory.current memory.peak memory.max memory.events memory.stat memory.pressure; do
+              [ -r "${c}/${f}" ] && { echo "[${f}]"; cat "${c}/${f}"; }
+            done
+          done
+          echo "===THP==="
+          for f in enabled defrag; do
+            [ -r "${KAS_PREFIX}/sys/kernel/mm/transparent_hugepage/${f}" ] && \
+              echo "${f}: $(cat ${KAS_PREFIX}/sys/kernel/mm/transparent_hugepage/${f})"
+          done
+          for d in "${KAS_PREFIX}"/sys/kernel/mm/transparent_hugepage/hugepages-*kB; do
+            [ -d "${d}" ] || continue
+            echo "[$(basename "${d}")]"
+            for f in "${d}"/enabled "${d}"/defrag; do
+              [ -r "${f}" ] && echo "  $(basename "${f}"): $(cat "${f}")"
+            done
+            # per-size THP stats (kernel 6.8+; includes split counters)
+            for s in "${d}"/stats/*; do
+              [ -r "${s}" ] && echo "  stats/$(basename "${s}"): $(cat "${s}")"
+            done
+            for k in "${d}"/khugepaged/*; do
+              [ -r "${k}" ] && echo "  khugepaged/$(basename "${k}"): $(cat "${k}")"
+            done
+          done
+          for f in max_ptes_none max_ptes_swap max_ptes_shared pages_to_scan scan_sleep_millisecs alloc_sleep_millisecs; do
+            v=$(cat "${KAS_PREFIX}/sys/kernel/mm/transparent_hugepage/khugepaged/${f}" 2>/dev/null) && echo "khugepaged/${f}=${v}"
+          done
+          echo "===VMSTAT==="
+          grep -E '^(thp_|nr_anon_pages|nr_active_anon|nr_inactive_anon|nr_file_pages|nr_slab_reclaimable|nr_free_pages|workingset_|pgmajfault|pswpin|pswpout)' /proc/vmstat
+          echo "===MEMINFO==="
+          grep -E '^(AnonHugePages|AnonPages|MemFree|MemAvailable|Cached|SwapTotal|SwapFree|Slab|PageTables):' /proc/meminfo
+          echo "===ROLLUP==="
+          grep -E '^(Rss|Pss|Private_Clean|Private_Dirty|Private_Hugetlb|Anonymous|AnonHugePages|Swap|Locked):' \
+            "/proc/${pid}/smaps_rollup" 2>/dev/null
+        }
+
+        case "${MODE}" in
+        snapshot)
+          pid=$(kas_find_pid) || { echo "FATAL: kube-apiserver process not found"; exit 1; }
+          kas_capture_cheap "${pid}"
+          if [ "${FULL}" = "1" ]; then
+            echo "===SMAPS==="
+            cat "/proc/${pid}/smaps"
+          fi
+          ;;
+        sampler)
+          OUTDIR="${KAS_PREFIX}/tmp/kas-residual-samples"
+          mkdir -p "${OUTDIR}"
+          end=$(( $(date +%s) + DURATION ))
+          i=0
+          while :; do
+            [ "$(date +%s)" -ge "${end}" ] && exit 0
+            [ -f "${KAS_PREFIX}/tmp/kas-residual-stop" ] && exit 0
+            pid=$(kas_find_pid) || { sleep "${INTERVAL}"; continue; }
+            i=$((i+1))
+            d="${OUTDIR}/$(date -u +%Y%m%dT%H%M%S)"
+            mkdir -p "${d}"
+            { echo "round: ${i}"; kas_capture_cheap "${pid}"; } > "${d}/capture.txt" 2>&1
+            if [ $((i % FULL_EVERY)) -eq 1 ]; then
+              cat "/proc/${pid}/smaps" > "${d}/smaps.txt" 2>/dev/null
+            fi
+            sleep "${INTERVAL}"
+          done
+          ;;
+        esac
+        NODEOF
+
+        BASE64_CAP=$(base64 -w0 "${SHARED_DIR}/kas-capture-node.sh")
+
+        # ------------------------------------------------------------------
+        # 1. One-shot full snapshot per master (before the workload)
+        # ------------------------------------------------------------------
+        MASTERS=$(oc get nodes -l node-role.kubernetes.io/master= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+        while read -r node; do
+          [[ -z "${node}" ]] && continue
+          echo "capturing ${node} (idle)..."
+          oc debug node/"${node}" -- chroot /host bash -c \
+            "echo ${BASE64_CAP} | base64 -d | MODE=snapshot FULL=1 bash" \
+            | gzip > "${OUT}/idle-${node}.txt.gz" || true
+        done <<NODES
+        ${MASTERS}
+        NODES
+
+        # ------------------------------------------------------------------
+        # 2. go_memstats cross-check (Prometheus, as in crio-residual)
+        # ------------------------------------------------------------------
+        oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- curl -sG \
+          http://localhost:9090/api/v1/query \
+          --data-urlencode 'query={__name__=~"go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|heap_alloc|stack_inuse)_bytes",job="apiserver"}' \
+          > "${OUT}/go-memstats-prometheus-idle.json" || true
+
+        # ------------------------------------------------------------------
+        # 3. Per-master live go_memstats + heap pprof via the API server itself.
+        #    (kube-apiserver has no node-local metrics port like crio's :9637)
+        # ------------------------------------------------------------------
+        oc config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' \
+          | base64 -d > "${SHARED_DIR}/kapi-ca.crt" || true
+
+        cat > "${SHARED_DIR}/kas-api-capture.sh" << 'APIEOF'
+        #!/bin/bash
+        # $1 = phase label (idle|during|post)
+        phase="$1"
+        OUT="$2"
+        STAMP=$(date -u +%Y%m%dT%H%M%S)
+        MASTER_IPS=$(oc get nodes -l node-role.kubernetes.io/master= -o jsonpath='{range .items[*]}{.status.addresses[?(@.type=="InternalIP")].address}{"\n"}{end}')
+        while read -r ip; do
+          [[ -z "${ip}" ]] && continue
+          oc --server="https://${ip}:6443" --certificate-authority="${SHARED_DIR}/kapi-ca.crt" \
+            --request-timeout=30s get --raw /metrics 2>/dev/null \
+            | grep -E '^(go_memstats_(heap_inuse|heap_idle|heap_released|heap_sys|heap_alloc)_bytes|go_goroutines|go_info) ' \
+            > "${OUT}/gostats-${phase}-${ip}-${STAMP}.txt" || true
+          oc --server="https://${ip}:6443" --certificate-authority="${SHARED_DIR}/kapi-ca.crt" \
+            --request-timeout=60s get --raw '/debug/pprof/heap?gc=1' \
+            > "${OUT}/heap-${phase}-${ip}-${STAMP}.pb.gz" 2>/dev/null || true
+        done <<IPS
+        ${MASTER_IPS}
+        IPS
+        APIEOF
+        bash "${SHARED_DIR}/kas-api-capture.sh" idle "${OUT}"
+
+        # ------------------------------------------------------------------
+        # 4. Deploy the during-workload sampler (autonomous, API-independent).
+        #    A DaemonSet pod per master runs MODE=sampler with hostPID and the
+        #    host root at /host. It writes to the host disk, so samples survive
+        #    even if the pod dies, and needs no API access once scheduled.
+        # ------------------------------------------------------------------
+        echo "deploying kas-residual sampler DaemonSet..."
+        BASE64_SAMES="${BASE64_CAP}"
+        oc create -f - <<DSEOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: kas-residual
+        ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: kas-residual-sampler
+          namespace: kas-residual
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: kas-residual-sampler-privileged
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: system:openshift:scc:privileged
+        subjects:
+        - kind: ServiceAccount
+          name: kas-residual-sampler
+          namespace: kas-residual
+        ---
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: kas-residual-sampler
+          namespace: kas-residual
+        spec:
+          selector:
+            matchLabels:
+              app: kas-residual-sampler
+          template:
+            metadata:
+              labels:
+                app: kas-residual-sampler
+            spec:
+              serviceAccountName: kas-residual-sampler
+              nodeSelector:
+                node-role.kubernetes.io/master: ""
+              tolerations:
+              - operator: Exists
+              hostPID: true
+              containers:
+              - name: sampler
+                image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+                command:
+                - /bin/bash
+                - -c
+                - echo ${BASE64_SAMES} | base64 -d > /tmp/kas-capture.sh && MODE=sampler KAS_PREFIX=/host bash /tmp/kas-capture.sh
+                securityContext:
+                  privileged: true
+                volumeMounts:
+                - name: host
+                  mountPath: /host
+                resources:
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+              volumes:
+              - name: host
+                hostPath:
+                  path: /
+        DSEOF
+
+        oc rollout status daemonset/kas-residual-sampler -n kas-residual --timeout=180s || \
+          echo "WARNING: sampler DaemonSet not fully rolled out (continuing)"
+
+        # ------------------------------------------------------------------
+        # 5. Best-effort per-master heap pprof DURING the workload.
+        #    Detached background loop; API-dependent, so it may miss rounds
+        #    during the stall waves (the node-local sampler does not).
+        # ------------------------------------------------------------------
+        setsid nohup bash -c '
+          for i in $(seq 1 120); do
+            bash '"${SHARED_DIR}"'/kas-api-capture.sh during '"${OUT}"' || true
+            sleep 120
+          done
+        ' > "${OUT}/heap-during.log" 2>&1 < /dev/null &
+        echo "background heap sampler started (pid $!)"
+
+        echo "kas-residual-idle complete: ${OUT}"
+      from: cli
+      grace_period: 10s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-qe-build-farm
+    - as: kas-residual-post
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+
+        echo "kube-apiserver residual memory capture (post-workload)"
+        OUT="${ARTIFACT_DIR}/kas-residual"
+        mkdir -p "${OUT}"
+
+        oc config set-context --current --namespace=default 2>/dev/null || true
+
+        BASE64_CAP=$(base64 -w0 "${SHARED_DIR}/kas-capture-node.sh")
+
+        # 1. One-shot full snapshot per master (after the workload; the
+        #    residual plateau persists, so the retention is still measurable)
+        MASTERS=$(oc get nodes -l node-role.kubernetes.io/master= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+        while read -r node; do
+          [[ -z "${node}" ]] && continue
+          echo "capturing ${node} (post)..."
+          oc debug node/"${node}" -- chroot /host bash -c \
+            "echo ${BASE64_CAP} | base64 -d | MODE=snapshot FULL=1 bash" \
+            | gzip > "${OUT}/post-${node}.txt.gz" || true
+        done <<NODES
+        ${MASTERS}
+        NODES
+
+        # 2. Record sampler pod status, then stop the samplers
+        oc get pods -n kas-residual -o wide > "${OUT}/sampler-pods.txt" || true
+        oc delete namespace kas-residual --ignore-not-found --wait=false || true
+
+        # 3. Collect the during-workload samples from each master's disk
+        while read -r node; do
+          [[ -z "${node}" ]] && continue
+          echo "collecting samples from ${node}..."
+          oc debug node/"${node}" -- chroot /host tar czf - -C /tmp kas-residual-samples \
+            > "${OUT}/samples-${node}.tar.gz" 2>/dev/null || \
+            echo "WARNING: no samples collected from ${node}"
+        done <<NODES
+        ${MASTERS}
+        NODES
+
+        # 4. Final go_memstats + heap pprof via the API
+        bash "${SHARED_DIR}/kas-api-capture.sh" post "${OUT}" || true
+
+        # 5. Quick summary: last sampler round per node (eyeball check)
+        echo "=== last-round summary ==="
+        for f in "${OUT}"/samples-*.tar.gz; do
+          [ -f "${f}" ] || continue
+          node=$(basename "${f}" .tar.gz | sed 's/^samples-//')
+          last=$(tar tzf "${f}" 2>/dev/null | grep '/capture.txt$' | sort | tail -1)
+          [ -z "${last}" ] && continue
+          echo "--- ${node}: ${last}"
+          tar xzOf "${f}" "${last}" 2>/dev/null | \
+            grep -E '^(kas_pid|round|VmRSS|--- cgroup kubepods.slice|\[memory.current\]|\[memory.peak\]|Rss:|Anonymous:|AnonHugePages:)' | head -12
+        done
+
+        echo "kas-residual-post complete: ${OUT}"
+      from: cli
+      grace_period: 10s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-qe-orion
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
