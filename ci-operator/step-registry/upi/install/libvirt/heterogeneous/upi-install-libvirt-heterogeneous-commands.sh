@@ -254,15 +254,16 @@ trap cleanup_heterogeneous_step EXIT TERM INT
 
 function wait_for_domain_deletion() {
   local domain="$1"
-  # RHCOS live install over VXLAN can exceed 10m; allow 25m before failing.
-  local wait_until=$(($(date +%s) + 1500))
+  # From PR 87254 successful rehearsals, install-domain wait averaged ~6.3m
+  # (upper bound wait→node created: 4.9–7.5m). Allow avg + 5m ≈ 12m.
+  local wait_until=$(($(date +%s) + 720))
 
   echo "[$(date -Is)] waiting for install domain ${domain} to complete and power off..."
   until [ $((wait_until - $(date +%s))) -le 0 ] || ! (${VIRSH_ADDITIONAL} domid "$domain" > /dev/null 2>&1); do
     sleep 5
   done
   if [ $((wait_until - $(date +%s))) -le 0 ]; then
-    echo "ERROR: install domain ${domain} did not shut down before timeout (1500s)."
+    echo "ERROR: install domain ${domain} did not shut down before timeout (720s)."
     echo "Destroying and undefining timed-out install domain ${domain}..."
     destroy_and_undefine_domain "${VIRSH_ADDITIONAL}" "${domain}"
     return 1
