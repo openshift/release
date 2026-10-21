@@ -109,6 +109,15 @@ function bssh() {
   # shellcheck disable=SC2086,SC2029
   ssh ${ssh_opts} "${bastion_user}@${bastion_ip}" "$@"
 }
+function bssh_args() {
+  # SSH passes a command string to the remote shell, not an argv array. Quote
+  # each argument with POSIX single quotes, escaping embedded quotes separately.
+  local command="" arg
+  for arg in "$@"; do
+    command+="'${arg//\'/\'\\\'\'}' "
+  done
+  bssh "${command}"
+}
 function bscp() {
   # shellcheck disable=SC2086
   scp ${ssh_opts} "$1" "${bastion_user}@${bastion_ip}:$2"
@@ -120,17 +129,48 @@ verify_targets=()              # destination pullspecs to confirm landed
 declare -A digest_mirrors=()   # source_repo -> mirror_repo   (digest references)
 declare -A tag_mirrors=()      # source_repo -> mirror_repo   (tag references)
 
+# Docker reference components supported by oc image mirror, including registry ports.
+# Validate before producing either SSH commands or YAML; this step supports SHA-256 digests.
+domain_component='[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?'
+registry_re="${domain_component}(\.${domain_component})*(:[0-9]+)?"
+path_component='[a-z0-9]+(([._]|__|-+)[a-z0-9]+)*'
+tag_re='[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}'
+pullspec_re="^${registry_re}/${path_component}(/${path_component})*(:${tag_re})?(@sha256:[a-f0-9]{64})?$"
+
 IFS=',' read -ra _tokens <<< "${MIRROR_CUSTOM_IMAGES}"
 for _raw in "${_tokens[@]}"; do
-  tok="${_raw//[[:space:]]/}"
+  # Trim surrounding whitespace without turning an invalid embedded space into
+  # a different, valid image name.
+  tok="${_raw#"${_raw%%[![:space:]]*}"}"
+  tok="${tok%"${tok##*[![:space:]]}"}"
   [[ -z "${tok}" ]] && continue
   if [[ "${tok}" == *"/"* ]]; then
     src="${tok}"                                   # external pullspec, used verbatim
   else
+    if [[ ! "${tok}" =~ ^${tag_re}$ ]]; then
+      echo "ERROR: invalid custom pipeline image tag." >&2
+      exit 1
+    fi
     src="$(resolve_pipeline_tag "${tok}")"         # pipeline tag -> repo@digest
   fi
+  if [[ "${src}" == "["* ]]; then
+    echo "ERROR: oc image mirror does not support IPv6 registry literals; use a registry hostname." >&2
+    exit 1
+  fi
+  if [[ ! "${src}" =~ ${pullspec_re} ]]; then
+    echo "ERROR: invalid custom image pullspec; expected registry/repository[:tag][@sha256:digest]." >&2
+    exit 1
+  fi
+  # A tagless source means ALL tags to oc image mirror, not just latest. Pin
+  # the source as well as the destination to mirror exactly one image.
+  if [[ "${src}" != *"@"* && "${src##*/}" != *":"* ]]; then
+    src="${src}:latest"
+  fi
   echo "resolved '${tok}' -> ${src}"
-  src_repo="${src%@*}"; src_repo="${src_repo%:*}"  # strip @digest or :tag
+  src_repo="${src%@*}"                            # strip the digest, if present
+  if [[ "${src_repo##*/}" == *":"* ]]; then
+    src_repo="${src_repo%:*}"                     # strip only a final-component tag
+  fi
   repo_path="${src_repo#*/}"                       # drop registry host, keep repo path
   dest_repo="${MIRROR_REGISTRY_HOST}/${repo_path}"
   if [[ "${src}" == *"@sha256:"* ]]; then
@@ -139,7 +179,7 @@ for _raw in "${_tokens[@]}"; do
     verify_targets+=("${dest_repo}@${digest}")
     digest_mirrors["${src_repo}"]="${dest_repo}"
   else
-    tag="${src##*:}"; [[ "${tag}" == "${src}" ]] && tag="latest"
+    tag="${src##*:}"
     mirror_pairs+=("${src}=${dest_repo}:${tag}")   # preserve the tag
     verify_targets+=("${dest_repo}:${tag}")
     tag_mirrors["${src_repo}"]="${dest_repo}"
@@ -210,21 +250,21 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
   # Remove the uploaded credential when the step ends.
   REMOTE_CLEANUP_CMD="bssh 'rm -f ${remote_auth}'"
 
-  mirror_flags="--insecure=true"
+  mirror_flags=(--insecure=true)
   if bssh "${oc_bin} image mirror --help 2>&1 | grep -q -- --keep-manifest-list"; then
-    mirror_flags="${mirror_flags} --keep-manifest-list=true"
+    mirror_flags+=(--keep-manifest-list=true)
   fi
   # Mirror one image per invocation: several images (e.g. handler + operator) share the
   # same destination repo (.../pipeline), which `oc image mirror` refuses to accept in a
   # single mapping set ("each destination tag may only be specified once").
   for pair in "${mirror_pairs[@]}"; do
     echo "mirroring (bastion): ${pair}"
-    retry 3 bssh "${oc_bin} image mirror ${mirror_flags} --registry-config=${remote_auth} ${pair}"
+    retry 3 bssh_args "${oc_bin}" image mirror "${mirror_flags[@]}" "--registry-config=${remote_auth}" "${pair}"
   done
 
   echo "verifying mirrored images exist in the bastion registry"
   for t in "${verify_targets[@]}"; do
-    retry 3 bssh "${oc_bin} image info --insecure=true -a ${remote_auth} ${t} >/dev/null" \
+    retry 3 bssh_args "${oc_bin}" image info --insecure=true -a "${remote_auth}" "${t}" >/dev/null \
       || { echo "ERROR: mirrored image not found in registry: ${t}" >&2; exit 1; }
     echo "  ok: ${t}"
   done
@@ -251,7 +291,7 @@ fi
 function digest_mirror_entries() {
   local src
   for src in "${!digest_mirrors[@]}"; do
-    printf '  - mirrors:\n    - %s\n    source: %s\n' "${digest_mirrors[$src]}" "${src}"
+    printf '  - mirrors:\n    - "%s"\n    source: "%s"\n' "${digest_mirrors[$src]}" "${src}"
     if [[ "${1:-}" == "idms" ]]; then
       printf '    mirrorSourcePolicy: NeverContactSource\n'
     fi
@@ -281,7 +321,7 @@ if [[ "${family}" == "idms" ]]; then
       echo "spec:"
       echo "  imageTagMirrors:"
       for src in "${!tag_mirrors[@]}"; do
-        printf '  - mirrors:\n    - %s\n    source: %s\n    mirrorSourcePolicy: NeverContactSource\n' "${tag_mirrors[$src]}" "${src}"
+        printf '  - mirrors:\n    - "%s"\n    source: "%s"\n    mirrorSourcePolicy: NeverContactSource\n' "${tag_mirrors[$src]}" "${src}"
       done
     } > "${SHARED_DIR}/manifest_mirror-images-custom-itms.yaml"
     echo "wrote ITMS manifest:"; cat "${SHARED_DIR}/manifest_mirror-images-custom-itms.yaml"

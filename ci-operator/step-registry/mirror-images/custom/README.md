@@ -111,8 +111,8 @@ emitted). Under ICSP, a tag source fails fast with a clear error.
 
 Written by the cloud bastion provisioning: `mirror_registry_url`, `bastion_public_address`,
 `bastion_private_address`, `bastion_ssh_user`; and `install-config-mirror.yaml.patch` (family
-detection). Requires the `openshift-custom-mirror-registry` credential, and
-`CLUSTER_PROFILE_DIR/ssh-privatekey` when `MIRROR_IN_BASTION=yes`.
+detection). Requires the `mirror-registry` credential group from the `openshift-qe`
+collection, and `CLUSTER_PROFILE_DIR/ssh-privatekey` when `MIRROR_IN_BASTION=yes`.
 
 ## Gotchas
 
@@ -120,3 +120,13 @@ detection). Requires the `openshift-custom-mirror-registry` credential, and
   refs are redirected — declaring your images as `dependencies:` on the e2e ref gives you both.
 - List **every** image the workload pulls (a missed sidecar/plugin will ImagePullBackOff).
 - Azure dual-stack is TechPreview (`FEATURE_SET=TechPreviewNoUpgrade`).
+- External pullspecs may include a registry port. A missing tag means `latest` and requires
+  IDMS/ITMS; both sides of the mirror mapping are pinned to that tag. Digest references use
+  SHA-256. Invalid image references are rejected before SSH.
+- `oc image mirror` does not accept bracketed IPv6 registry literals. Use a registry hostname
+  instead; this does not change the IPv6/dual-stack cloud jobs above.
+
+## Local regression tests
+
+From the repository root, run `python3 hack/test_mirror_images_custom.py`. These tests use
+fixture credentials and mocked `oc`/SSH boundaries; they do not contact registries or clusters.

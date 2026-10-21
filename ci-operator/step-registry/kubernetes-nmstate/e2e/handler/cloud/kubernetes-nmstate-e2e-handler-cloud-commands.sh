@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # On disconnected/Internal-publish clusters the API is only reachable via the bastion egress
