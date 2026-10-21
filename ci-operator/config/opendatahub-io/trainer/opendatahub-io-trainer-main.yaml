@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+    tag: rhel-9-release-golang-1.26-openshift-4.23
 images:
   items:
   - dockerfile_path: cmd/trainer-controller-manager/Dockerfile.odh
@@ -97,6 +97,13 @@ tests:
           deployment/kubeflow-trainer-controller-manager \
           manager="${TRAINER_IMAGE}"
 
+        # The RHAI E2E suite exercises TrainJob progression tracking, which is
+        # guarded by an alpha feature gate and disabled by default.
+        oc -n kubeflow-system patch \
+          deployment/kubeflow-trainer-controller-manager \
+          --type=json \
+          -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--feature-gates=TrainJobStatus=true"}]'
+
         actual_image="$(oc -n kubeflow-system get \
           deployment/kubeflow-trainer-controller-manager \
           -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].image}')"
@@ -107,6 +114,13 @@ tests:
 
         oc -n kubeflow-system rollout status \
           deployment/kubeflow-trainer-controller-manager --timeout=10m
+
+        # The manager overlay also installs JobSet. Wait for all control-plane
+        # workloads so the E2E suite does not race its controller or webhooks.
+        oc -n kubeflow-system wait --for=condition=Available \
+          deployment --all --timeout=10m
+        oc -n kubeflow-system wait --for=condition=Ready \
+          pod --all --timeout=10m
 
         oc apply --server-side -k manifests/overlays/runtimes
 
