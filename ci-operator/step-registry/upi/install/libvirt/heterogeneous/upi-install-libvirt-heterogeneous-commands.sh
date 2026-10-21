@@ -27,18 +27,13 @@ require_commands \
   date mkdir rm cp touch sleep chmod uname cat tr mv
 
 case "${ADDITIONAL_WORKER_ARCHITECTURE:-}" in
-  arm64|aarch64)
-    STREAM_ARCH="aarch64"
-    EXPECTED_NODE_ARCH="arm64"
-    TEMPLATE_ARCH="arm64"
-    ;;
   amd64|x86_64)
     STREAM_ARCH="x86_64"
     EXPECTED_NODE_ARCH="amd64"
     TEMPLATE_ARCH="amd64"
     ;;
   *)
-    echo "ERROR: upi-install-libvirt-heterogeneous currently supports arm64 or amd64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
+    echo "ERROR: upi-install-libvirt-heterogeneous currently supports amd64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
     exit 1
     ;;
 esac
@@ -161,20 +156,11 @@ HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
 # ---------------------------------------------------------------------------
 # Additional-host libvirt network — attach to the infra VXLAN bridge rather
 # than pointing guests at the primary NAT network (which only exists on Z).
-# Bridge name is published by the network step (SHARED_DIR/additional-bridge-name
-# or legacy arm-bridge-name). Working ARM path uses ocp2-arm; AMD leases use
-# ocp1-amd / ocp3-amd.
+# Bridge name is published by the network step (SHARED_DIR/additional-bridge-name).
+# AMD leases use ocp1-amd / ocp3-amd.
 # ---------------------------------------------------------------------------
-ADDITIONAL_BRIDGE_FILE=""
-for candidate in \
-  "${SHARED_DIR}/additional-bridge-name" \
-  "${SHARED_DIR}/arm-bridge-name"; do
-  if [[ -f "${candidate}" ]]; then
-    ADDITIONAL_BRIDGE_FILE="${candidate}"
-    break
-  fi
-done
-if [[ -z "${ADDITIONAL_BRIDGE_FILE}" ]]; then
+ADDITIONAL_BRIDGE_FILE="${SHARED_DIR}/additional-bridge-name"
+if [[ ! -f "${ADDITIONAL_BRIDGE_FILE}" ]]; then
   echo "ERROR: additional-bridge-name not found in SHARED_DIR; ensure the network step ran successfully"
   exit 1
 fi
@@ -470,8 +456,7 @@ fi
 
 # Primary upi-install-libvirt creates ignition volumes at a fixed 1MiB capacity.
 # vol-download therefore often returns JSON + trailing NUL padding. coreos-installer
-# rejects that ("trailing characters"); ARM leases sometimes avoided this by chance
-# with smaller effective payloads. Strip at the first NUL before staging on HTTPD.
+# rejects that ("trailing characters"). Strip at the first NUL before staging on HTTPD.
 ign_bytes_before="$(stat -c '%s' "${TMP_WORKER_IGN}")"
 ign_trimmed="$(mktemp /tmp/worker.ign.trimmed.XXXXXX)"
 awk 'BEGIN{RS="\0"; ORS=""} {print; exit}' < "${TMP_WORKER_IGN}" > "${ign_trimmed}"
@@ -583,7 +568,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export DISK_SOURCE_PATH="${domain_qcow2_image_host_path}"
   export MAC_ADDRESS="${node_mac}"
   export NETWORK_NAME="${ADDITIONAL_NETWORK_NAME}"
-  # amd64 VPN domain templates use ${ADDITIONAL_NETWORK_NAME}; arm templates may use NETWORK_NAME/LEASED_RESOURCE.
+  # amd64 VPN domain templates use ${ADDITIONAL_NETWORK_NAME}.
   export ADDITIONAL_NETWORK_NAME
   export DOMAIN_MAC="${node_mac}"
   export LEASED_RESOURCE

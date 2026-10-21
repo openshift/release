@@ -79,9 +79,8 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
-# Ensure the lease libvirt network exists and is active before guests are created.
-# Concurrent bridge reclaim on shared Z hypervisors can drop the network between
-# the network step and virt-install (seen in amd64 VPN hetero rehearsals).
+# Heterogeneous VPN installs only (ENSURE_LIBVIRT_NETWORK=true from
+# upi-install-libvirt-heterogeneous). Homogeneous / other consumers keep prior behavior.
 ensure_libvirt_network() {
   echo "Verifying libvirt network '${CLUSTER_NAME}' on ${LIBVIRT_CONNECTION}..."
   ${VIRSH} net-list --all || true
@@ -484,7 +483,9 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
-    ${VIRSH} vol-delete --pool ${POOL_NAME} ${NAME} || true
+    if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+      ${VIRSH} vol-delete --pool ${POOL_NAME} ${NAME} || true
+    fi
     ${VIRSH} vol-create-as \
       --name ${NAME} \
       --pool ${POOL_NAME} \
@@ -525,8 +526,10 @@ clone_volume () {
     exit 1
   fi
 
-  # Delete stale clone volume left from a previous run before recreating.
-  ${VIRSH} vol-delete --pool ${POOL_NAME} ${1} 2>/dev/null || true
+  if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+    # Delete stale clone volume left from a previous run before recreating.
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${1} 2>/dev/null || true
+  fi
 
   echo "Cloning ${VOLUME_NAME} volume as ${1} volume..."
   ${VIRSH} vol-clone \
@@ -616,25 +619,42 @@ create_node () {
       ${VIRSH} start "${NAME}"
       ${VIRSH} autostart "${NAME}" || true
     else
-      # Use mock-nss.sh so virt-install resolves the hypervisor the same way virsh does.
-      mock-nss.sh virt-install \
-        --connect ${LIBVIRT_CONNECTION} \
-        --name ${NAME} \
-        --memory ${DOMAIN_MEMORY} \
-        --vcpus ${DOMAIN_VCPUS} \
-        --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
-        --disk="vol=${POOL_NAME}/${NAME}-volume" \
-        --osinfo ${VIRT_INSTALL_OSINFO} \
-        --graphics=none \
-        --import \
-        --noautoconsole \
-        --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      # Hetero VPN: mock-nss so virt-install resolves the hypervisor like virsh.
+      if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+        mock-nss.sh virt-install \
+          --connect ${LIBVIRT_CONNECTION} \
+          --name ${NAME} \
+          --memory ${DOMAIN_MEMORY} \
+          --vcpus ${DOMAIN_VCPUS} \
+          --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+          --disk="vol=${POOL_NAME}/${NAME}-volume" \
+          --osinfo ${VIRT_INSTALL_OSINFO} \
+          --graphics=none \
+          --import \
+          --noautoconsole \
+          --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      else
+        virt-install \
+          --connect ${LIBVIRT_CONNECTION} \
+          --name ${NAME} \
+          --memory ${DOMAIN_MEMORY} \
+          --vcpus ${DOMAIN_VCPUS} \
+          --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+          --disk="vol=${POOL_NAME}/${NAME}-volume" \
+          --osinfo ${VIRT_INSTALL_OSINFO} \
+          --graphics=none \
+          --import \
+          --noautoconsole \
+          --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      fi
     fi
   fi
 }
 
-# Re-confirm the network immediately before guest creation (bridge reclaim races).
-ensure_libvirt_network
+# Re-confirm the network before guest creation (Z hetero VPN bridge reclaim races only).
+if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+  ensure_libvirt_network
+fi
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Create the bootstrap node.

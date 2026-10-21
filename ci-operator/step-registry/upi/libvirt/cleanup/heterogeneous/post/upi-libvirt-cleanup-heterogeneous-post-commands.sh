@@ -48,20 +48,14 @@ resolve_expected_additional_bridge() {
     printf '%s\n' "$(< "${SHARED_DIR}/additional-bridge-name")"
     return 0
   fi
-  if [[ -f "${SHARED_DIR}/arm-bridge-name" ]]; then
-    printf '%s\n' "$(< "${SHARED_DIR}/arm-bridge-name")"
-    return 0
-  fi
   if [[ -n "${VXLAN_ADDITIONAL_BRIDGE:-}" ]]; then
     printf '%s\n' "${VXLAN_ADDITIONAL_BRIDGE}"
     return 0
   fi
   # Last-resort lease→bridge map when leases.yaml / SHARED_DIR omit additional-bridge.
-  # Prefer lease/SHARED_DIR; these only match current VPN amd64 / arm64 infra wiring.
   case "${LEASED_RESOURCE}" in
     libvirt-s390x-vpn-amd64-0-0) printf '%s\n' "ocp1-amd" ;;
     libvirt-s390x-vpn-amd64-0-1) printf '%s\n' "ocp3-amd" ;;
-    libvirt-s390x-arm64-0-0|*-arm64-0-0) printf '%s\n' "ocp2-arm" ;;
     *) printf '%s\n' "" ;;
   esac
 }
@@ -190,7 +184,7 @@ if [[ -n "${ADD_RETRY_DOMAINS}" ]]; then
   done
 fi
 
-# Remove the job-owned additional libvirt network (bridge-forward to ocp*-amd / ocp2-arm)
+# Remove the job-owned additional libvirt network (bridge-forward to ocp*-amd)
 # only after its domains are gone. Refuse removal if bridge does not match expectation.
 ADDITIONAL_NETWORK_NAME="${LEASED_RESOURCE}"
 ADD_CURRENT_NETS=$(${VIRSH_ADDITIONAL} net-list --all --name 2>/dev/null || true)

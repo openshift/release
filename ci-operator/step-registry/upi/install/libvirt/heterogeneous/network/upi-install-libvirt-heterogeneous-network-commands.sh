@@ -70,16 +70,13 @@ resolve_additional_bridge() {
   fi
 
   # Last-resort infra VXLAN bridges when leases.yaml omits vxlan.additional-bridge.
-  # Observed VPN amd64 wiring: ...-0-0 → ocp1-amd, ...-0-1 → ocp3-amd; arm64 → ocp2-arm.
+  # Observed VPN amd64 wiring: ...-0-0 → ocp1-amd, ...-0-1 → ocp3-amd.
   case "${LEASED_RESOURCE}" in
     libvirt-s390x-vpn-amd64-0-0)
       bridge="ocp1-amd"
       ;;
     libvirt-s390x-vpn-amd64-0-1)
       bridge="ocp3-amd"
-      ;;
-    libvirt-s390x-arm64-0-0|*-arm64-0-0)
-      bridge="ocp2-arm"
       ;;
     *)
       bridge=""
@@ -121,9 +118,7 @@ if [[ -z "${ADDITIONAL_BRIDGE_NAME}" || "${ADDITIONAL_BRIDGE_NAME}" =~ [^a-zA-Z0
 fi
 
 # Publish for the heterogeneous installer / cleanup steps.
-# arm-bridge-name is a legacy alias kept for the upcoming arm64 VPN follow-up.
 printf '%s\n' "${ADDITIONAL_BRIDGE_NAME}" > "${SHARED_DIR}/additional-bridge-name"
-printf '%s\n' "${ADDITIONAL_BRIDGE_NAME}" > "${SHARED_DIR}/arm-bridge-name"
 echo "Additional-host VXLAN bridge: ${ADDITIONAL_BRIDGE_NAME}"
 
 echo "Using libvirt connection ${REMOTE_LIBVIRT_URI}"

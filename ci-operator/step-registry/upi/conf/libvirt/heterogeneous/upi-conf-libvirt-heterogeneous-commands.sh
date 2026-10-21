@@ -322,8 +322,7 @@ EOF
 fi
 
 # Chrony configuration:
-# s390x control-plane and s390x workers need chrony pointed at the s390x hypervisor gateway and VPN subnets,
-# whereas arm64 workers may not have an NTP server on their local gateway and can use the s390x gateway / pool NTP servers.
+# Point chrony at the s390x hypervisor gateway and VPN subnets for control-plane and workers.
 s390x_gateway="192.168.${SUBNET}.1"
 echo "Saving chrony configuration for cluster..."
 chrony_s390x_b64="$(base64 -w0 <<EOF
