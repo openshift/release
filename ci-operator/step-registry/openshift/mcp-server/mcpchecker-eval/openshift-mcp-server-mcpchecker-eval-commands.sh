@@ -23,6 +23,8 @@ export MCP_CONFIG_DIR=dev/config/mcp-configs
 
 netobserv_mock=false
 netobserv_port_forward=false
+kiali_port_forward=false
+kiali_suite=false
 cleanup() {
     make stop-server || true
     if [[ "${netobserv_port_forward}" == true ]]; then
@@ -30,6 +32,12 @@ cleanup() {
     fi
     if [[ "${netobserv_mock}" == true ]]; then
         make teardown-netobserv || true
+    fi
+    if [[ "${kiali_port_forward}" == true ]] && [[ -f .kiali-pf.pid ]]; then
+        kill "$(cat .kiali-pf.pid)" 2>/dev/null || true
+    fi
+    if [[ "${kiali_suite}" == true ]]; then
+        make clean-kiali-openshift KUBERNETES_CLI=oc || true
     fi
 }
 trap cleanup EXIT
@@ -90,6 +98,33 @@ case "${EVAL_SUITE:-}" in
             --field-selector=status.phase=Running -o name | grep -q .; then
             echo "ERROR: ovn-kubernetes eval requires running ovnkube-node pods" >&2
             exit 1
+        fi
+        ;;
+    kiali)
+        kiali_suite=true
+        kiali_cp_namespace="${KIALI_CP_NAMESPACE:-istio-system}"
+        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1; then
+            make setup-kiali-openshift KUBERNETES_CLI=oc
+        fi
+        if ! ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
+            oc -n "${kiali_cp_namespace}" port-forward svc/kiali 20001:20001 >/dev/null 2>&1 &
+            pf_pid=$!
+            echo "${pf_pid}" > .kiali-pf.pid
+            kiali_port_forward=true
+            for ((attempt=0; attempt<60; attempt++)); do
+                if ! kill -0 "${pf_pid}" 2>/dev/null; then
+                    echo "ERROR: Kiali port-forward exited before localhost:20001 was ready" >&2
+                    exit 1
+                fi
+                if ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
+                    break
+                fi
+                sleep 2
+            done
+            if (( attempt == 60 )); then
+                echo "ERROR: Kiali port-forward did not reach localhost:20001 within 120 seconds" >&2
+                exit 1
+            fi
         fi
         ;;
     *)
