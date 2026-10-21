@@ -51,6 +51,7 @@ args = sys.argv[1:]
 clock = int((root / "clock").read_text())
 iteration = clock // 120
 mode = os.environ["TEST_MODE"]
+ready_at = int(os.environ.get("TEST_READY_AT", "-1"))
 with (root / "calls").open("a") as output:
     output.write(json.dumps(args) + "\\n")
 if args[:2] == ["get", "clusteroperators"]:
@@ -59,7 +60,7 @@ if args[:2] == ["get", "clusteroperators"]:
     else:
         if mode == "operator-query-failure" and iteration == 1:
             sys.exit(1)
-        ready = mode == "healthy" or (mode in ["restart", "replacement", "container-id", "reordered", "init", "ephemeral", "late", "late-replacement"] and iteration >= 3)
+        ready = mode == "healthy" or (mode in ["restart", "replacement", "container-id", "init", "ephemeral", "late", "late-replacement"] and iteration >= 3) or (ready_at >= 0 and clock >= ready_at)
         print(json.dumps({"items": [{"metadata": {"name": "console"}, "status": {"conditions": [
             {"type": "Progressing", "status": "False" if ready else "True"},
             {"type": "Available", "status": "True" if ready else "False"},
@@ -69,12 +70,16 @@ elif args[:2] == ["get", "pods"]:
         sys.exit(1)
     if mode == "query-always-fails":
         sys.exit(1)
+    if clock == int(os.environ.get("TEST_QUERY_FAILURE_AT", "-1")):
+        sys.exit(1)
     if mode == "malformed":
         print("{}"); sys.exit(0)
     if "json" not in args:
         print(f"console-pod 0/1 CrashLoopBackOff {iteration + 1} 1m")
     else:
         restarts = iteration + 1 if mode in ["restart", "endless", "init", "ephemeral", "late"] else 1
+        if mode == "backoff":
+            restarts = clock // 360 + 1
         status = {"name": "console", "ready": False, "restartCount": restarts,
                   "containerID": "cri://" + str(iteration if mode == "container-id" else 1),
                   "state": {"waiting": {"reason": "CrashLoopBackOff", "message": "SECRET_SENTINEL"}},
@@ -100,6 +105,10 @@ elif args[:2] == ["get", "pods"]:
             pods *= 50
         if mode == "missing-status":
             pods[0]["status"] = {}
+        if mode == "mixed-pending" or (mode == "pending-reset" and clock == 360):
+            pods.append({"metadata": {"name": "pending-pod", "uid": "pending"}, "status": {"phase": "Pending"}})
+        if mode == "malformed-status":
+            pods[0]["status"]["containerStatuses"] = {}
         if mode == "unsafe-identity":
             pods[0]["metadata"] = {"name": "https://SECRET_SENTINEL", "uid": "Bearer SECRET_SENTINEL"}
             status["name"] = "SECRET_SENTINEL" * 100
@@ -113,8 +122,12 @@ elif args[:1] == ["logs"]:
     if mode == "diagnostic-failure":
         print("SECRET_SENTINEL", file=sys.stderr); sys.exit(1)
     if mode == "diagnostic-slow":
-        import time
-        time.sleep(20)
+        (root / "clock").write_text(str(clock + 5))
+        if not (root / "slow-log-seen").exists():
+            (root / "slow-log-seen").touch()
+            import time
+            time.sleep(20)
+        sys.exit(1)
     if mode == "logs-small":
         print("panic: SECRET_SENTINEL\\nAuthorization: Bearer SECRET_SENTINEL")
         sys.exit(0)
@@ -158,7 +171,7 @@ class CrashProgressTests(CrashProgressHarness):
     def test_static_crash_fails_early(self):
         self.assertEqual(self.run_step("static").returncode, 1, self.output)
         self.assertIn("no restart progress", self.output)
-        self.assertEqual((self.directory / "clock").read_text().strip(), "120")
+        self.assertEqual((self.directory / "clock").read_text().strip(), "480")
 
     def test_order_is_not_progress(self):
         self.assertEqual(self.run_step("reordered").returncode, 1, self.output)
@@ -175,7 +188,7 @@ class CrashProgressTests(CrashProgressHarness):
 
     def test_query_failure_breaks_stationary_evidence(self):
         self.assertEqual(self.run_step("query-failure").returncode, 1, self.output)
-        self.assertEqual((self.directory / "clock").read_text().strip(), "360")
+        self.assertEqual((self.directory / "clock").read_text().strip(), "720")
 
     def test_unknown_queries_never_claim_stationary(self):
         for mode in ["query-always-fails", "malformed", "missing-counter", "missing-status", "no-crashes"]:
@@ -196,7 +209,7 @@ class CrashProgressTests(CrashProgressHarness):
 
     def test_operator_query_failure_breaks_stationary_evidence(self):
         self.assertEqual(self.run_step("operator-query-failure").returncode, 1, self.output)
-        self.assertEqual((self.directory / "clock").read_text().strip(), "360")
+        self.assertEqual((self.directory / "clock").read_text().strip(), "720")
 
     def test_diagnostic_commands_are_time_bounded(self):
         self.assertEqual(self.run_step("diagnostic-slow").returncode, 1, self.output)
@@ -214,7 +227,7 @@ class CrashProgressTests(CrashProgressHarness):
     def test_container_capture_count_is_bounded(self):
         self.assertEqual(self.run_step("many").returncode, 1, self.output)
         captures = list((self.directory / "artifacts").glob("crash*"))
-        self.assertEqual(len(captures), 2)
+        self.assertEqual(len(captures), 5)
         for capture in captures:
             self.assertLessEqual(len(list(capture.glob("*.log"))), 8)
 
@@ -239,8 +252,8 @@ class LateCrashProgressTests(CrashProgressHarness):
         files = sorted((self.directory / "artifacts").glob("crash*/status.json"))
         calls = [json.loads(line) for line in (self.directory / "calls").read_text().splitlines()]
         logs = [arguments for arguments in calls if arguments[0] == "logs"]
-        self.assertEqual(len(files), 2)
-        self.assertEqual(len(logs), 8)
+        self.assertEqual(len(files), 5)
+        self.assertEqual(len(logs), 20)
         for capture, path in enumerate(files):
             metadata = json.loads(path.read_text())
             self.assertEqual([(entry["pod"], entry["container"]) for entry in metadata], [
@@ -308,6 +321,56 @@ class LateCrashProgressTests(CrashProgressHarness):
         self.assertEqual(len(log_calls), 8)
         self.assertLess(event_calls[0], log_calls[0])
         self.assertIn('"--previous"', calls[log_calls[0]])
+
+
+class BackoffObservationTests(CrashProgressHarness):
+    """Distinguish incomplete sampling and normal restart backoff from stagnation."""
+
+    def test_mixed_pending_preserves_diagnostics_without_stagnation(self):
+        self.assertEqual(self.run_step("mixed-pending").returncode, 1, self.output)
+        self.assertNotIn("no restart progress", self.output)
+        self.assertEqual((self.directory / "clock").read_text().strip(), "3600")
+        files = list((self.directory / "artifacts").glob("crash*/status.json"))
+        self.assertTrue(files, "A Pending sibling must not hide observed crash diagnostics")
+        self.assertEqual(json.loads(files[0].read_text())[0]["pod"], "console-pod")
+
+    def test_identical_backoff_observations_then_restart_and_success(self):
+        self.assertEqual(self.run_step("backoff", TEST_READY_AT="720").returncode, 0, self.output)
+        self.assertNotIn("no restart progress", self.output)
+
+    def test_strict_elapsed_boundary_for_different_poll_intervals(self):
+        for poll in [60, 100, 120, 300, 600, 1000]:
+            with self.subTest(poll=poll):
+                (self.directory / "clock").write_text("0")
+                self.assertEqual(self.run_step("static", OPERATOR_POLL_INTERVAL=str(poll)).returncode, 1)
+                expected = ((300 + poll) // poll + 1) * poll
+                self.assertEqual(int((self.directory / "clock").read_text()), expected, self.output)
+
+    def test_long_poll_can_observe_success_after_identical_checks(self):
+        self.assertEqual(self.run_step("static", OPERATOR_POLL_INTERVAL="600", TEST_READY_AT="1200").returncode, 0, self.output)
+
+    def test_query_failure_restarts_elapsed_evidence(self):
+        self.assertEqual(self.run_step("static", TEST_QUERY_FAILURE_AT="360").returncode, 1, self.output)
+        self.assertEqual((self.directory / "clock").read_text().strip(), "960")
+
+    def test_pending_pod_restarts_elapsed_evidence(self):
+        self.assertEqual(self.run_step("pending-reset").returncode, 1, self.output)
+        self.assertEqual((self.directory / "clock").read_text().strip(), "960")
+
+    def test_malformed_status_remains_unknown_not_stationary(self):
+        self.assertEqual(self.run_step("malformed-status").returncode, 1, self.output)
+        self.assertNotIn("no restart progress", self.output)
+        self.assertFalse(list((self.directory / "artifacts").glob("crash*")))
+
+    def test_normal_backoff_activity_cannot_extend_absolute_timeout(self):
+        self.assertEqual(self.run_step("backoff").returncode, 1, self.output)
+        self.assertEqual((self.directory / "clock").read_text().strip(), "3600")
+        self.assertNotIn("no restart progress", self.output)
+
+    def test_long_poll_window_cannot_override_absolute_timeout(self):
+        self.assertEqual(self.run_step("static", OPERATOR_POLL_INTERVAL="1800").returncode, 1, self.output)
+        self.assertEqual((self.directory / "clock").read_text().strip(), "3600")
+        self.assertNotIn("no restart progress", self.output)
 
 
 if __name__ == "__main__":

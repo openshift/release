@@ -115,10 +115,11 @@ function check_crashloop_pods() {
     head -c 1048576 | jq -ce '
       if (.items | type) != "array" then error("missing pod list") else . end |
       [.items[] |
+        if (.metadata | type) != "object" then error("invalid pod metadata") else . end |
         .metadata as $pod |
         ((.status.initContainerStatuses // []) + (.status.containerStatuses // []) +
           (.status.ephemeralContainerStatuses // [])) as $statuses |
-        if ($statuses | length) == 0 then error("missing container status") else $statuses[] end |
+        {complete: (($statuses | length) > 0), crashes: [$statuses[] |
         select(.state.waiting.reason == "CrashLoopBackOff") |
         if ($pod.uid | type) != "string" or ($pod.name | type) != "string" or
           (.name | type) != "string" or (.restartCount | type) != "number" or .restartCount < 0
@@ -128,7 +129,9 @@ function check_crashloop_pods() {
            finishedAt: (.lastState.terminated.finishedAt // ""),
            exitCode: .lastState.terminated.exitCode, signal: .lastState.terminated.signal,
            oomKilled: (.lastState.terminated.reason == "OOMKilled")}
-        end] | sort_by(.uid, .container)'
+        end]}] as $observations |
+      {complete: all($observations[]; .complete),
+       crashes: ([$observations[].crashes[]] | sort_by(.uid, .container))}'
 }
 
 function crash_diagnostic_command() {
@@ -219,7 +222,8 @@ function wait_for_operator_condition() {
   local previous_not_ready_set=""
   local stall_start_time=${start_time}
   local iteration=0
-  local crashloop_consecutive=0
+  local crashloop_stall_start=""
+  local crashloop_stall_window=$(( 300 + poll_interval ))
   local previous_crashloop_state=""
   local readiness_deadline=$(( start_time + timeout ))
   local diagnostic_budget=40 diagnostic_deadline=0
@@ -245,7 +249,7 @@ function wait_for_operator_condition() {
     local co_json
     co_json=$(oc get clusteroperators -o json 2>/dev/null) || {
       previous_crashloop_state=""
-      crashloop_consecutive=0
+      crashloop_stall_start=""
       log "WARNING: Failed to query clusteroperators, will retry in ${poll_interval}s..."
       sleep "${poll_interval}"
       continue
@@ -334,11 +338,16 @@ function wait_for_operator_condition() {
     local crashloop_operators="" crashloop_state="" crashloop_queries_ok=true
     while IFS= read -r op; do
       [[ -z "${op}" ]] && continue
-      local clb
-      if ! clb=$(check_crashloop_pods "${op}"); then
+      local clb_result clb
+      if ! clb_result=$(check_crashloop_pods "${op}"); then
         crashloop_queries_ok=false
         log "  WARNING: Pod crash status unavailable for operator '${op}'; not evidence of restart stagnation"
         continue
+      fi
+      clb=$(jq -c '.crashes' <<< "${clb_result}")
+      if ! jq -e '.complete' <<< "${clb_result}" >/dev/null; then
+        crashloop_queries_ok=false
+        log "  WARNING: Incomplete pod observation for operator '${op}'; restart stagnation evidence reset"
       fi
       if [[ "${clb}" != '[]' ]]; then
         crashloop_operators="${crashloop_operators}${op},"
@@ -357,16 +366,17 @@ function wait_for_operator_condition() {
     done <<< "${not_ready_operators}"
 
     if [[ -n "${crashloop_operators}" && "${crashloop_queries_ok}" == true ]]; then
-      if [[ "${crashloop_state}" == "${previous_crashloop_state}" ]]; then
-        crashloop_consecutive=$((crashloop_consecutive + 1))
-      else
-        crashloop_consecutive=1
+      local crashloop_observed_at
+      crashloop_observed_at=$(date +%s)
+      if [[ "${crashloop_state}" != "${previous_crashloop_state}" ]]; then
+        crashloop_stall_start=${crashloop_observed_at}
       fi
       previous_crashloop_state="${crashloop_state}"
+      local crashloop_stall_elapsed=$(( crashloop_observed_at - crashloop_stall_start ))
 
-      if (( crashloop_consecutive >= 2 )); then
+      if (( crashloop_stall_elapsed > crashloop_stall_window )); then
         local affected="${crashloop_operators%,}"
-        check_failed="${description} - CrashLoopBackOff with no restart progress for 2 consecutive checks. Affected operators: ${affected}"
+        check_failed="${description} - CrashLoopBackOff with no restart progress observed for ${crashloop_stall_elapsed}s (required >${crashloop_stall_window}s). Affected operators: ${affected}"
         log "ERROR: ${check_failed}"
         while IFS= read -r op; do
           [[ -z "${op}" ]] && continue
@@ -375,7 +385,7 @@ function wait_for_operator_condition() {
         return
       fi
     else
-      crashloop_consecutive=0
+      crashloop_stall_start=""
       previous_crashloop_state=""
     fi
 

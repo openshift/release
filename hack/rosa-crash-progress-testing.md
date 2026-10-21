@@ -8,10 +8,26 @@ timeout; it does not use cluster credentials or make network requests.
 An unchanged set of affected operator names does not establish unchanged pod
 restart activity. Crash observations compare sorted pod UIDs, container names,
 container IDs, restart counts, and last termination timestamps. Failed or
-incomplete pod observations interrupt consecutive stationary evidence. Two
-identical complete crash observations still fail early. Restart activity never
+incomplete pod observations reset stationary evidence, while valid sibling crash
+records remain available for diagnostics. Malformed responses still invalidate
+the query. Complete unchanged observations fail early only after an elapsed
+period strictly longer than 300 seconds plus one configured poll interval.
+The timer begins at the first complete observation and resets on progress,
+empty crashes, unavailable queries, or incomplete observations. Restart activity never
 satisfies an operator condition, extends a phase deadline, or resets the
 existing operator-set stall timer.
+
+The [Kubernetes container restart policy documentation](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts)
+describes a 300-second maximum restart backoff (configurable/reduced defaults can
+lower it). The extra poll allows a subsequent observation to see the restart;
+the strict inequality avoids treating the exact boundary as stagnation. At the
+default 120-second poll, unchanged samples at 0/120/240/360 seconds are allowed;
+failure first becomes eligible at 480 seconds, exceeding 420. At a 100-second
+poll, the exact 400-second boundary is allowed and failure occurs at 500. At a
+600-second poll, a second identical sample at 600 is insufficient; failure can
+occur at 1200 (>900). This is elapsed-time logic, not a rounded check count.
+The separate existing operator-set stall timer and absolute phase deadline can
+still fail an unhealthy cluster sooner; neither is extended by restart activity.
 
 Crash diagnostics use the same observation before the next poll can replace
 the failing pod. Per phase, collection is limited to 40 cumulative seconds,
