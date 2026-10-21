@@ -31,9 +31,17 @@ chain:
   # management cluster.
   - ref: rosa-conf-external-oidc-create
   - ref: rosa-cluster-wait-ready-external-oidc
-  # Publish the SHARED_DIR contract (cluster-id, cluster-metadata.json). No
-  # customer-plane kubeconfig exists (no OAuth stack), so it is left for
-  # rosa-backplane-login to provide via bp-kubeconfig.
+  # Mint an elevated (backplane-cluster-admin) customer-plane kubeconfig.
+  # External-auth clusters have no OAuth stack, so there is no oc login path;
+  # the raw bp-kubeconfig from rosa-backplane-login authenticates as the
+  # backplane SREP service account, which lacks RBAC to create the namespaces
+  # and workloads the customer-plane specs need (403 Forbidden). The elevated
+  # kubeconfig written here is what rosa-e2e-validate-customer consumes, and
+  # rosa-cluster-credentials-backplane also writes proxy-conf.sh for the
+  # oc-based steps below.
+  - ref: rosa-cluster-credentials-backplane
+  # Publish the SHARED_DIR contract (cluster-id, kubeconfig,
+  # cluster-metadata.json).
   - ref: rosa-e2e-rosa-cli-publish-contract
   - ref: aws-provision-tags-for-byo-vpc
   documentation: >-
@@ -45,7 +53,10 @@ chain:
     It differs from the public chain in the guest-access steps: external-auth
     clusters have no built-in OAuth stack, so rosa-conf-idp-htpasswd and
     rosa-cluster-wait-ready-operators are replaced by rosa-conf-external-oidc-create
-    and rosa-cluster-wait-ready-external-oidc. No customer-plane kubeconfig is
-    published: consumers must run rosa-backplane-login between this chain and the
-    validation tail so rosa-e2e-validate-customer can fall back to bp-kubeconfig
-    and rosa-e2e-validate-platform gets mc-kubeconfig.
+    and rosa-cluster-wait-ready-external-oidc. The customer-plane kubeconfig is
+    minted by rosa-cluster-credentials-backplane (elevated backplane-cluster-admin):
+    the raw bp-kubeconfig from rosa-backplane-login authenticates as the backplane
+    SREP service account, which cannot create the namespaces/workloads the
+    customer-plane specs require. Consumers must still run rosa-backplane-login
+    between this chain and the validation tail so rosa-e2e-validate-platform gets
+    mc-kubeconfig (and sc-kubeconfig best-effort).

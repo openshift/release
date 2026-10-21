@@ -13,13 +13,13 @@ workflow:
     pre:
       # rosa-CLI provisioner head, external-OIDC variant: provisions the HCP
       # cluster with external auth enabled, configures the external auth provider,
-      # and publishes the SHARED_DIR contract (cluster-id,
-      # cluster-metadata.json). See the chain for why the public
-      # rosa-e2e-hcp-rosa-cli-provision chain cannot be reused as-is.
+      # and publishes the SHARED_DIR contract (cluster-id, kubeconfig,
+      # cluster-metadata.json) — the customer-plane kubeconfig is the elevated
+      # backplane one, since external-auth clusters have no OAuth stack.
+      # See the chain for why the public rosa-e2e-hcp-rosa-cli-provision chain
+      # cannot be reused as-is.
       - chain: rosa-e2e-hcp-rosa-cli-external-oidc-provision
-      # External-auth clusters have no built-in OAuth stack, so there is no
-      # direct guest kubeconfig: backplane provides bp-kubeconfig (customer
-      # plane) and mc/sc-kubeconfig (platform plane).
+      # Platform-plane kubeconfigs (mc/sc) plus the raw bp-kubeconfig fallback.
       - ref: rosa-backplane-login
     test:
       # Provisioner-agnostic two-plane validation tail (ROSAENG-67581): each ref
@@ -50,10 +50,12 @@ workflow:
     This workflow provisions a ROSA HCP cluster with external authentication
     (external OIDC) enabled at provision time via the rosa-CLI head
     (rosa-e2e-hcp-rosa-cli-external-oidc-provision), which also configures an
-    external auth provider via rosa-conf-external-oidc-create and publishes the
-    SHARED_DIR provisioner-to-validator contract. External-auth clusters have no
-    built-in OAuth stack, so rosa-backplane-login supplies the customer-plane
-    kubeconfig (bp-kubeconfig) and the platform-plane kubeconfigs (mc/sc).
+    external auth provider via rosa-conf-external-oidc-create, mints the
+    customer-plane kubeconfig via rosa-cluster-credentials-backplane (elevated
+    backplane-cluster-admin — external-auth clusters have no OAuth stack, and
+    the raw bp-kubeconfig lacks the RBAC the customer-plane specs need), and
+    publishes the SHARED_DIR provisioner-to-validator contract.
+    rosa-backplane-login adds the platform-plane kubeconfigs (mc/sc).
 
     The provisioner-agnostic validation tail then runs the customer plane
     (rosa-e2e-validate-customer: Area:DataPlane, Area:CustomerFeatures — the
