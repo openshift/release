@@ -21,7 +21,10 @@ validate_inputs() {
   [[ "${SEED_SPOKE_CLUSTER}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]
   [[ "${IBI_REPLACEMENT_HOST}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
   [[ "${IBI_REPLACEMENT_MAC}" =~ ^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$ ]]
-  [[ "${IBI_REPLACEMENT_IP}" =~ ^[0-9]+(\.[0-9]+){3}$ ]]
+  [[ "${IBI_REPLACEMENT_IP}" =~ ^[0-9A-Fa-f:.]+$ ]]
+  IBI_REPLACEMENT_IP=$(python3 -c \
+    'import ipaddress, sys; print(ipaddress.ip_address(sys.argv[1]))' \
+    "${IBI_REPLACEMENT_IP}")
   [[ "${MIRROR_REGISTRY}" =~ ^[a-zA-Z0-9.:-]+$ ]]
   [[ "${ZTP_GIT_REPO}" =~ ^https://[a-zA-Z0-9./:_-]+$ ]]
   [[ "${ZTP_GIT_BRANCH}" =~ ^[a-zA-Z0-9._/-]+$ ]]
@@ -184,25 +187,45 @@ jq -e --arg host "$3" --arg mac "${4,,}" '
 template=$(curl --fail --silent --show-error --max-time 60 \
   "$2/preinstall-test/image-based-installation-config.yaml")
 disk=$(jq -er '.spec.nodes[0].rootDeviceHints.wwn' <<<"$instance")
-grep -Fxq "installationDisk: /dev/disk/by-id/wwn-$disk" <<<"$template"
+if [[ ! "$disk" =~ ^(0x[[:xdigit:]]+|eui\.[[:xdigit:]]+)$ ]]; then
+  echo "Unsupported installation disk WWN format." >&2
+  exit 1
+fi
+case "$disk" in
+  eui.*) disk_path="/dev/disk/by-id/nvme-$disk" ;;
+  *) disk_path="/dev/disk/by-id/wwn-$disk" ;;
+esac
+grep -Fxq "installationDisk: $disk_path" <<<"$template"
 grep -Fxq "extraPartitionLabel: varlibcontainers" <<<"$template"
 REMOTE
 }
 
 verify_http_and_dns() {
+  local address_lookup=ahostsv4
+  if [[ "${IBI_REPLACEMENT_IP}" == *:* ]]; then
+    address_lookup=ahostsv6
+  fi
   ansible bastion -i "${INVENTORY_PATH}/build-inventory.py" \
     --private-key "${TEMP_DIR}/ssh-key" \
     --extra-vars "ibi_http_subdir=${HTTP_SUBDIR} eco_gotests_image=quay.io/ocp-edge-qe/eco-gotests:latest" \
     --extra-vars "replacement_host=${IBI_REPLACEMENT_HOST} replacement_ip=${IBI_REPLACEMENT_IP}" \
+    --extra-vars "replacement_address_lookup=${address_lookup}" \
     -m ansible.builtin.shell -a 'set -eu
 resolved=$(podman run --rm --pull=never --net=host \
   --userns=keep-id:uid=1000,gid=1000 \
   -v "{{ http_store_path | default("/opt/http_store/data") }}/{{ ibi_http_subdir }}:/ibi-http:rw,z" \
   --entrypoint /bin/bash {{ eco_gotests_image | quote }} \
-  -c '"'"'set -eu; printf "%s\n" "$1" > /ibi-http/.write-check; getent ahostsv4 "$2"'"'"' \
-  bash {{ ibi_http_subdir | quote }} {{ replacement_host | quote }})
-addresses=$(printf "%s\n" "$resolved" | cut -d " " -f1 | sort -u)
-test "$addresses" = {{ replacement_ip | quote }}
+  -c '"'"'set -eu; printf "%s\n" "$1" > /ibi-http/.write-check; getent "$3" "$2"'"'"' \
+  bash {{ ibi_http_subdir | quote }} {{ replacement_host | quote }} {{ replacement_address_lookup | quote }})
+python3 -c '"'"'
+import ipaddress
+import sys
+
+expected = ipaddress.ip_address(sys.argv[1])
+addresses = {ipaddress.ip_address(line.split()[0]) for line in sys.argv[2].splitlines() if line.strip()}
+if addresses != {expected}:
+    raise SystemExit("Replacement DNS does not resolve only to the configured address")
+'"'"' {{ replacement_ip | quote }} "$resolved"
 content=$(curl --fail --silent --show-error --max-time 30 \
   "http://{{ ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}/.write-check")
 test "$content" = {{ ibi_http_subdir | quote }}
