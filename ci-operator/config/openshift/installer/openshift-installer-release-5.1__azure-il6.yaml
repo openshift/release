@@ -360,15 +360,27 @@ tests:
             fi
 
             echo
-            echo "=== 6/6 list resources in the first resource group ==="
-            rg="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az group list --query '[0].name' -o tsv" | tr -d '\r')"
-            if [[ -n "${rg}" && "${rg}" != "null" ]]; then
-                echo "Listing resources in '${rg}'..."
-                on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az resource list -g '${rg}' -o table" \
-                    || fail "az resource list failed for group '${rg}'."
+            echo "=== 6/6 resources in ${AZURE_IL6_RESOURCE_GROUP} on the emulated plane ==="
+            # Specifically this group, not whatever happens to sort first. The emulator fronts the
+            # whole commercial subscription, so [0] lands on some unrelated team's group whose
+            # resource types the emulated ARM may not even be able to render -- which is how a
+            # previous run got 'Bad Request' from groupbshared0805-rg and failed on someone else's
+            # resources. The only group this job has any claim on is its own.
+            il6_rg_region="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az group show -n ${AZURE_IL6_RESOURCE_GROUP} --query location -o tsv" | tr -d '\r')"
+            if [[ -z "${il6_rg_region}" ]]; then
+                fail "${AZURE_IL6_RESOURCE_GROUP} is not visible through the emulated ARM."
             else
-                echo "No resource groups visible to this principal on the emulated plane."
-                echo "That is not necessarily an error -- it may simply own nothing there yet."
+                echo "The emulated plane reports ${AZURE_IL6_RESOURCE_GROUP} in region '${il6_rg_region}'."
+                if [[ "${il6_rg_region}" != "${AZURE_IL6_REGION}" ]]; then
+                    echo "NOTE: that is not AZURE_IL6_REGION (${AZURE_IL6_REGION}). The emulator"
+                    echo "  relabels the commercial region rather than hosting a separate one, so"
+                    echo "  '${il6_rg_region}' is what platform.azure.region has to be set to."
+                fi
+                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az resource list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
+                    echo "OK: the emulated ARM can enumerate resources in the job's own group."
+                else
+                    fail "az resource list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                fi
             fi
         else
             echo
