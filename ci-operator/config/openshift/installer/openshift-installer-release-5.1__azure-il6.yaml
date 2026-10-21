@@ -376,10 +376,35 @@ tests:
                     echo "  relabels the commercial region rather than hosting a separate one, so"
                     echo "  '${il6_rg_region}' is what platform.azure.region has to be set to."
                 fi
-                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az resource list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
-                    echo "OK: the emulated ARM can enumerate resources in the job's own group."
+                # Typed provider queries, not the generic resources list. 'az resource list'
+                # returns Bad Request on the emulator for every group tried so far, including this
+                # one, so it is a gap in the emulated Microsoft.Resources API rather than anything
+                # about a particular group. It is also not what matters: openshift-install talks to
+                # Microsoft.Network and Microsoft.Compute, so those are what this needs to prove.
+                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az network vnet list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
+                    echo "OK: the emulated ARM enumerates Microsoft.Network resources in the group."
                 else
-                    fail "az resource list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                    fail "az network vnet list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                    echo "  This one matters: the installer cannot read the BYO VNet without it."
+                fi
+
+                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
+                    echo "OK: the emulated ARM enumerates Microsoft.Compute resources in the group."
+                else
+                    fail "az vm list failed for ${AZURE_IL6_RESOURCE_GROUP}."
+                fi
+
+                # Informational. Recorded so the gap is visible to the emulator team, but not
+                # fatal: nothing in the install path depends on the generic resources API.
+                echo
+                echo "--- generic resources API (known emulator gap, non-fatal) ---"
+                if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az resource list -g ${AZURE_IL6_RESOURCE_GROUP} -o table"; then
+                    echo "NOTE: 'az resource list' now works; the earlier Bad Request is gone."
+                else
+                    echo "NOTE: 'az resource list' returns Bad Request on the emulated plane."
+                    echo "  Seen for every group tried, so Microsoft.Resources/resources is simply"
+                    echo "  not served here. Worth reporting to the SHIFT team; nothing in the"
+                    echo "  install path uses it."
                 fi
             fi
         else
