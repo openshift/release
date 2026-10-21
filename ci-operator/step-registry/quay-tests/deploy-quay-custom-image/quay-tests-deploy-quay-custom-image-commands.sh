@@ -68,6 +68,74 @@ if [[ -z "${QUAY_DEPLOY}" ]]; then
 fi
 echo "Found quay-app deployment: ${QUAY_DEPLOY}"
 
+# Add CI build-cluster registry credentials so ROSA/external clusters can
+# pull CI-built images.
+echo "Injecting CI registry credentials..."
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
+CI_REGISTRY_AUTH=$(mktemp)
+
+# Extract registry hostname from the CI image reference so credentials target
+# the exact host the kubelet will contact (e.g. registry.build01.ci.openshift.org).
+CI_REGISTRY=$(echo "${QUAY_CI_IMAGE}" | cut -d/ -f1)
+echo "CI image: ${QUAY_CI_IMAGE}"
+echo "CI registry: ${CI_REGISTRY}"
+
+# Build Docker auth directly from the build-cluster SA token.
+# Previous attempts with `oc registry login` were unreliable:
+#  - KUBECONFIG="" does not fall back to in-cluster auth on all images
+#  - oc registry login may register credentials for the internal hostname
+#    (image-registry.openshift-image-registry.svc) instead of the external one
+# Using the SA token as HTTP Basic Auth (serviceaccount:<token>) targets the
+# exact hostname the ROSA nodes will pull from.
+SA_TOKEN_FILE="/var/run/secrets/kubernetes.io/serviceaccount/token"
+if [[ -f "${SA_TOKEN_FILE}" ]]; then
+  SA_TOKEN=$(cat "${SA_TOKEN_FILE}")
+  AUTH=$(printf 'serviceaccount:%s' "${SA_TOKEN}" | base64 | tr -d '\n')
+  printf '{"auths":{"%s":{"auth":"%s"}}}' "${CI_REGISTRY}" "${AUTH}" > "${CI_REGISTRY_AUTH}"
+  echo "CI registry auth created for ${CI_REGISTRY} via SA token"
+else
+  echo "SA token not found at ${SA_TOKEN_FILE}, trying oc registry login fallback..."
+  (unset KUBECONFIG; oc registry login --to="${CI_REGISTRY_AUTH}") 2>&1 || true
+fi
+
+if [[ -s "${CI_REGISTRY_AUTH}" ]]; then
+  jq -r '.auths | keys[]' "${CI_REGISTRY_AUTH}" 2>/dev/null || true
+
+  # 1) Merge into global pull secret so nodes can pull the image
+  CURRENT_PS=$(oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d)
+  MERGED_PS=$(echo "${CURRENT_PS}" | jq -s '.[0] * .[1]' - "${CI_REGISTRY_AUTH}")
+  echo "${MERGED_PS}" > /tmp/merged-pull-secret.json
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json
+  echo "Global pull secret updated"
+
+  # 2) Create namespace-level pull secret for immediate use (global pull secret
+  #    propagation to nodes can take minutes on ROSA HCP)
+  oc -n "${NAMESPACE}" create secret docker-registry ci-registry-pull-secret \
+    --from-file=.dockerconfigjson=/tmp/merged-pull-secret.json \
+    --dry-run=client -o yaml | oc apply -f -
+  for sa in default deployer $(oc -n "${NAMESPACE}" get sa -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -i quay); do
+    oc -n "${NAMESPACE}" secrets link "${sa}" ci-registry-pull-secret --for=pull 2>/dev/null || true
+  done
+  echo "Namespace pull secret configured"
+
+  rm -f /tmp/merged-pull-secret.json
+else
+  echo "ERROR: Could not obtain CI registry credentials — aborting" >&2
+  rm -f "${CI_REGISTRY_AUTH}"
+  $WAS_TRACING && set -x
+  exit 1
+fi
+rm -f "${CI_REGISTRY_AUTH}"
+$WAS_TRACING && set -x
+
+# 3) Add imagePullSecret directly to the deployment pod template so the
+#    kubelet definitely has credentials regardless of SA linking propagation
+oc -n "${NAMESPACE}" patch "deployment/${QUAY_DEPLOY}" --type=strategic \
+  -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ci-registry-pull-secret"}]}}}}'
+echo "Deployment imagePullSecrets patched"
+
 # Patch the container image
 oc -n "${NAMESPACE}" set image "deployment/${QUAY_DEPLOY}" "quay-app=${QUAY_CI_IMAGE}"
 

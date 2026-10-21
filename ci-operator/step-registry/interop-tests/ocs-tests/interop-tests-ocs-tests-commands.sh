@@ -1,58 +1,102 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euo pipefail
+shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
 
 CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
 OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
 OCP_VERSION="${OCP_MAJOR_MINOR}"
 
-OCS_VERSION=$(oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | startswith("ocs-operator")).spec.version' | cut -d. -f1,2)
+OCS_VERSION=$(
+  oc get csv -n openshift-storage -o json 2>/dev/null |
+    jq -r '
+      [ .items[] | select(.metadata.name | test("^(ocs-(client-)?|odf-)operator")) ] |
+      first | .spec.version // empty
+    ' | cut -d. -f1,2
+) || true
+if [[ -z "${OCS_VERSION}" ]]; then
+    # ERROR: OCS_VERSION not set or CSV lookup failed; list openshift-storage CSVs after failure (namespace may be missing).
+    oc get csv -n openshift-storage -o custom-columns=NAME:.metadata.name,VERSION:.spec.version,PHASE:.status.phase 2>&1 || true
+    exit 1
+fi
 
 CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
-LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
+LOGS_CONFIG="$(mktemp /tmp/ocs-tests-config.XXXXXX.yaml)"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
 export BIN_FOLDER="${LOGS_FOLDER}/bin"
 
 # Function to clean up folders
 cleanup() {
-    echo "Cleaning up..."
-    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -fvr "${CLUSTER_PATH}/auth"
+    rm -f "${LOGS_CONFIG}"
+    if [[ -n "${_cluster_ps:-}" ]]; then
+        rm -f "${_cluster_ps}"
+    fi
+    if [[ -n "${_merged_ps:-}" ]]; then
+        rm -f "${_merged_ps}"
+    fi
+    # Tear down local auth copy created for run-ci.
+    [[ -d "${CLUSTER_PATH}/auth" ]] && rm -rf "${CLUSTER_PATH}/auth"
 }
-# Set trap to catch EXIT and run cleanup on any exit code
-trap cleanup EXIT SIGINT
 
-function install_yq_if_not_exists() {
-    # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
+_propagate_junit() {
+    local shared_junit="${SHARED_DIR}/junit"
+    mkdir -p "${shared_junit}"
+    # ocs-tests writes JUnit into ${ARTIFACT_DIR}/ocs-tests/
+    local ocs_dir="${ARTIFACT_DIR}/ocs-tests"
+    if compgen -G "${ocs_dir}"/junit*.xml > /dev/null 2>&1; then
+        cp -v "${ocs_dir}"/junit*.xml "${shared_junit}/"
+    fi
+}
+
+if [ "${MAP_TESTS}" = "true" ]; then
+    # Avoid conflicts with the older versioned yq from the image:
+    # Write /tmp/bin/yq as a tiny script (#!/bin/sh; exit 1), so yq --version fails and ExitTrap EnsureReqs downloads latest yq (replacing the stub).
+    eval "$(
+        curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    trap '
+        _opp_cleanup
+        cleanup
+        _propagate_junit
         mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
-}
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            export REPORTPORTAL_CMP
-            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
-        fi
-    fi
-}
+        printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
+        PATH="/tmp/bin:${PATH}"
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--odf__interop-tests__ocs-tests__interop-tests-ocs-tests.xml
+    ' EXIT
+else
+    trap '_opp_cleanup; cleanup; _propagate_junit' EXIT
+fi
 
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
@@ -73,8 +117,29 @@ mkdir -p "${BIN_FOLDER}"
 
 export PATH="${BIN_FOLDER}:${PATH}"
 
-cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
-cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+if [ -s "${KUBECONFIG}" ]; then
+    oc whoami
+    cp -v "${KUBECONFIG}"              "${CLUSTER_PATH}/auth/kubeconfig"
+    cp -v "${KUBEADMIN_PASSWORD_FILE}" "${CLUSTER_PATH}/auth/kubeadmin-password"
+else #login for ROSA & Hypershift platforms
+    (set +x; eval "$(cat "${SHARED_DIR}/api.login")")
+fi
+
+# --- Merge ODF Quay pull credentials into the cluster pull secret ---
+ODF_QUAY_CREDENTIALS_FILE="/tmp/secrets/odf-quay-credentials/rhceph-dev"
+if [[ -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+    echo ">>> Merging ODF Quay pull credentials into cluster pull secret"
+    _cluster_ps=$(mktemp)
+    _merged_ps=$(mktemp)
+    oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${_cluster_ps}"
+    jq -s '.[0] * .[1]' "${_cluster_ps}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${_merged_ps}"
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${_merged_ps}"
+    rm -f "${_cluster_ps}" "${_merged_ps}"
+    echo ">>> quay.io/rhceph-dev credentials merged — ocs-must-gather will authenticate"
+else
+    echo ">>> WARNING: ODF Quay credentials not found at ${ODF_QUAY_CREDENTIALS_FILE}"
+    echo ">>> ocs-must-gather may fail with 'unauthorized' errors"
+fi
 
 # Create ocs-tests config overwrite file
 cat > "${LOGS_CONFIG}" << __EOF__
@@ -83,8 +148,8 @@ RUN:
   bin_dir: "${BIN_FOLDER}"
   log_dir: "${LOGS_FOLDER}"
 REPORTING:
-  default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
-  default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
+  default_ocs_must_gather_image: "registry.redhat.io/odf4/ocs-must-gather-rhel9"
+  default_ocs_must_gather_latest_tag: "v${ODF_VERSION_MAJOR_MINOR}"
 DEPLOYMENT:
   skip_download_client: True
 __EOF__
@@ -94,6 +159,9 @@ if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
     declare vsphere_datacenter
     declare vsphere_datastore
     declare vsphere_cluster
+    # Tracing is disabled while govc.sh is sourced, otherwise xtrace expands
+    # GOVC_PASSWORD into the publicly readable build log.
+    set +x
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
 
@@ -106,10 +174,14 @@ ENV_DATA:
   vsphere_cluster: "${vsphere_cluster}"
   vsphere_datastore: "${vsphere_datastore}"
 __APPENDED_ENV_DATA__
+    set -x
 fi
 
+EXTRA_ARGS=""
+if [[ "${DISABLE_ENVIRONMENT_CHECKER}" == "true" ]]; then
+    EXTRA_ARGS="--disable-environment-checker"
+fi
 
-set -x
 START_TIME=$(date "+%s")
 
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
@@ -121,27 +193,15 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --cluster-name "${CLUSTER_NAME}"                   \
   --html         "${CLUSTER_PATH}/test-results.html" \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
+  ${EXTRA_ARGS} \
   || /bin/true
-
 
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
-set +x
-
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
-
-# Send junit file to shared dir for Data Router Reporter step
-cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
-    echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
-    sleep 7200
+    # ERROR: tests finished too quickly (DIFF_TIME sec <= 1800)
     exit 1
-else
-    echo "Finished in: ${DIFF_TIME} sec"
 fi
 
 #
@@ -150,3 +210,5 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
+
+true

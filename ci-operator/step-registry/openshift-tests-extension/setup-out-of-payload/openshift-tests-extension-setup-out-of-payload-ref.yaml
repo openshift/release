@@ -1,0 +1,83 @@
+ref:
+  as: openshift-tests-extension-setup-out-of-payload
+  from: tests
+  commands: openshift-tests-extension-setup-out-of-payload-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  dependencies:
+  - name: EXTENSION_IMAGE
+    env: EXTENSION_IMAGE
+  env:
+  - name: EXTENSION_COMPONENT_NAME
+    default: ""
+    documentation: |-
+      REQUIRED: Name of the component being tested (e.g., "cli-manager-operator", "run-once-duration-override-operator").
+      This is used in annotations and resource naming.
+  - name: EXTENSION_BINARY_PATH
+    default: ""
+    documentation: |-
+      REQUIRED: Path to the test binary inside the extension container image.
+      Example: "/usr/bin/cli-manager-operator-tests-ext.gz"
+  - name: EXTENSION_IMAGE
+    default: ""
+    documentation: |-
+      REQUIRED: Container image containing the test extension binary.
+      Typically set automatically by CI configuration referencing the built operator image.
+  - name: EXTENSION_IMAGESTREAM_NAME
+    default: ""
+    documentation: |-
+      Optional: Name for the ImageStream resource. Defaults to "${EXTENSION_COMPONENT_NAME}-tests" if not set.
+  - name: EXTENSION_ADMISSION_NAME
+    default: ""
+    documentation: |-
+      Optional: Name for the TestExtensionAdmission CR. Defaults to "${EXTENSION_COMPONENT_NAME}-extensions" if not set.
+  - name: EXTENSION_NAMESPACE
+    default: "test-extensions"
+    documentation: |-
+      Optional: Namespace where the ImageStream will be created. Defaults to "test-extensions".
+  - name: EXTENSION_PERMIT_PATTERN
+    default: "test-extensions/*"
+    documentation: |-
+      Optional: Pattern for the TestExtensionAdmission permit rule. Defaults to "test-extensions/*".
+  - name: EXTENSION_IMAGESTREAM_TAG
+    default: "latest"
+    documentation: |-
+      Optional: Tag for the ImageStream. Defaults to "latest".
+  - name: EXTENSION_WAIT_TIMEOUT
+    default: "300"
+    documentation: |-
+      Optional: Timeout in seconds to wait for ImageStream import to complete. Defaults to 300 seconds (5 minutes).
+  - name: EXTENSION_SKIP_CRD_INSTALL
+    default: "false"
+    documentation: |-
+      Optional: Skip TestExtensionAdmission CRD installation if set to "true". Useful when the CRD is already installed
+      by a previous step or chain. Defaults to "false".
+  documentation: |-
+    Sets up the OpenShift cluster for out-of-payload test extension discovery and execution.
+
+    This step creates the necessary resources for openshift-tests to discover and execute test binaries
+    from operator containers that are not part of the OpenShift release payload. It is designed to be
+    reusable across different operators by parameterizing component-specific values via environment variables.
+
+    The step performs the following actions:
+    1. Installs the TestExtensionAdmission CRD (unless EXTENSION_SKIP_CRD_INSTALL=true)
+    2. Creates a TestExtensionAdmission CR to permit test extensions
+    3. Creates a namespace for test extensions (default: test-extensions)
+    4. Creates an ImageStream pointing to the operator image with OTE annotations
+    5. Waits for ImageStream import to complete with configurable timeout
+    6. Verifies the setup by checking resources and annotations
+
+    After this step completes, openshift-tests can discover and run the extension test suite using:
+      openshift-tests run <suite-name> --junit-dir=<output-dir>
+
+    Example usage in a workflow:
+      - ref: openshift-tests-extension-setup-out-of-payload
+        env:
+        - name: EXTENSION_COMPONENT_NAME
+          default: "my-operator"
+        - name: EXTENSION_BINARY_PATH
+          default: "/usr/bin/my-operator-tests-ext.gz"
+        - name: EXTENSION_IMAGE
+          default: "pipeline:my-operator-image"

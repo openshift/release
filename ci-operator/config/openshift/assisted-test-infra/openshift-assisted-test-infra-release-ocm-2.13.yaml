@@ -30,13 +30,14 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-test-infra
-- dockerfile_path: Dockerfile.assisted-test-infra
-  to: assisted-test-infra-internal
+  items:
+  - dockerfile_literal: |
+      FROM base
+      COPY . .
+    from: src
+    to: assisted-test-infra
+  - dockerfile_path: Dockerfile.assisted-test-infra
+    to: assisted-test-infra-internal
 promotion:
   to:
   - name: ocm-2.13
@@ -116,11 +117,12 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.13
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-ha-kube-api-ipv4-4-18
+- always_run: false
+  as: e2e-metal-assisted-ha-kube-api-ipv4-4-18
   capabilities:
   - intranet
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:

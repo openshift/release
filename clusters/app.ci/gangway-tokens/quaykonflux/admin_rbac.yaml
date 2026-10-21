@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quaykonflux
+  annotations:
+    openshift.io/description: Service Accounts for quaykonflux
+    openshift.io/display-name: quaykonflux CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: quaykonflux
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: quaykonflux
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: quaykonflux
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-quaykonflux
+  namespace: quaykonflux
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: quaykonflux
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

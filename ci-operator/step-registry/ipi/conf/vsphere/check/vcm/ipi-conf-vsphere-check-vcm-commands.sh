@@ -13,6 +13,11 @@ set -o pipefail
 #      domain.
 # VSPHERE_MULTI_NETWORKS - Configures script to create a unique subnet for each
 #      failure domain.
+# POOL_SELECTOR - Specifies pool selector labels as comma-separated key=value
+#      pairs (e.g., "vcf=true,region=us-east").
+# RESERVE_EXTRA_NETWORK - Requests an additional network that won't be attached
+#      to cluster nodes. Reserved networks are saved to reserved_networks.json
+#      for later use (e.g., remote worker installation).
 ################################################################################
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
@@ -30,6 +35,10 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+log "POOLS: ${POOLS}"
+log "POOL_COUNT: ${POOL_COUNT}"
+log "MAX_VCENTERS: ${MAX_VCENTERS}"
+
 # Make sure POOLS and POOL_COUNT are not both configured
 if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
   echo "Cannot set both POOL_COUNT and POOLS"
@@ -46,17 +55,18 @@ declare PORTGROUP_RETVAL
 declare LEASES
 
 
-declare MULTI_TENANT_CAPABLE_WORKFLOWS
+declare SINGLE_TENANT_LEASE_JOB_SAFE_NAMES
 # shellcheck source=/dev/null
 source "/var/run/vault/vsphere-ibmcloud-config/multi-capable-workflows.sh"
 
 LEASES=()
 
-DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"single-tenant"}
-for workflow in ${MULTI_TENANT_CAPABLE_WORKFLOWS}; do
-  if [ "${workflow}" == "${JOB_NAME_SAFE}" ]; then
-    log "workflow ${JOB_NAME_SAFE} is multi-tenant capable. will request a multi-tenant network if there is no override in the job yaml."
-    DEFAULT_NETWORK_TYPE="multi-tenant"
+DEFAULT_NETWORK_TYPE=${DEFAULT_NETWORK_TYPE:-"multi-tenant"}
+for job_safe_name in ${SINGLE_TENANT_LEASE_JOB_SAFE_NAMES}; do
+  job_safe_name=$(echo "${job_safe_name}" | tr -d '[:space:]\r')
+  if [[ "${JOB_NAME_SAFE}" == "${job_safe_name}"* ]]; then
+    log "job ${JOB_NAME_SAFE} requires a single-tenant lease. will request a single-tenant network if there is no override in the job yaml."
+    DEFAULT_NETWORK_TYPE="single-tenant"
     break
   fi
 done
@@ -254,19 +264,29 @@ if [[ "${PROW_JOB_TYPE}" == "presubmit" ]]; then
 fi
 
 # Handle POOL_SELECTOR if provided (parse once and use for all leases)
+# Supports multiple key=value pairs separated by commas, e.g., "vcf=true,region=us-east"
 poolSelector=""
 if [ -n "${POOL_SELECTOR:-}" ]; then
-  # Parse POOL_SELECTOR in format "key=value"
-  if [[ "${POOL_SELECTOR}" =~ ^([^=]+)=([^=]+)$ ]]; then
-    selector_key="${BASH_REMATCH[1]}"
-    selector_value="${BASH_REMATCH[2]}"
-    poolSelector="poolSelector:
+  # Split by comma and process each key=value pair
+  IFS=',' read -ra selector_pairs <<< "${POOL_SELECTOR}"
+
+  poolSelector="poolSelector:"
+  for pair in "${selector_pairs[@]}"; do
+    # Trim whitespace from pair
+    pair=$(echo "${pair}" | xargs)
+
+    # Parse each pair in format "key=value"
+    if [[ "${pair}" =~ ^([^=]+)=([^=]+)$ ]]; then
+      selector_key="${BASH_REMATCH[1]}"
+      selector_value="${BASH_REMATCH[2]}"
+      poolSelector="${poolSelector}
     ${selector_key}: \"${selector_value}\""
-    log "setting poolSelector with ${selector_key}=${selector_value}"
-  else
-    log "ERROR: POOL_SELECTOR must be in format 'key=value', got: ${POOL_SELECTOR}"
-    exit 1
-  fi
+      log "setting poolSelector with ${selector_key}=${selector_value}"
+    else
+      log "ERROR: Each POOL_SELECTOR pair must be in format 'key=value', got: ${pair}"
+      exit 1
+    fi
+  done
 fi
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
@@ -292,7 +312,8 @@ spec:
   network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
   ${poolSelector}
-  networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  networks: 1
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 fi
 
 POOLS=${POOLS:-}
@@ -352,6 +373,12 @@ for POOL in "${pools[@]}"; do
     networks_number=2
   fi
 
+  # RESERVE_EXTRA_NETWORK requests an additional network that won't be attached to nodes.
+  # Useful for remote worker installations that need a separate network.
+  if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
+    networks_number=2
+  fi
+
   # For this flag, we need to make sure each FD has a unique name so it gets a unique subnet.
   unique_name=""
   if [[ "${VSPHERE_MULTI_NETWORKS:-}" == "true" ]]; then
@@ -377,10 +404,11 @@ spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
-  pool-count: ${POOL_COUNT}
+  pools: ${POOL_COUNT}
   ${requiredPool}
   ${poolSelector}
-  networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  networks: $networks_number
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 done
 
 log "waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled..."
@@ -410,10 +438,36 @@ if [ "$n" -ge 5 ]; then
   exit 1
 fi
 
-# shellcheck disable=SC2046
-oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}")
+LEASE_WAIT_TIMEOUT_SECONDS=$((120 * 60))
+LEASE_WAIT_POLL_INTERVAL=15
+elapsed=0
+while true; do
+  # shellcheck disable=SC2046
+  lease_phases=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}") -o json | jq -r 'if has("items") then .items[].status.phase else .status.phase end')
+
+  if grep -q "^Failed$" <<< "${lease_phases}"; then
+    log "ERROR: lease entered Failed phase, the requested configuration is invalid or cannot be fulfilled"
+    # shellcheck disable=SC2046
+    oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}") -o yaml
+    exit 1
+  fi
+
+  if [[ -z "$(grep -v '^Fulfilled$' <<< "${lease_phases}")" ]]; then
+    log "all leases fulfilled"
+    break
+  fi
+
+  if [[ ${elapsed} -ge ${LEASE_WAIT_TIMEOUT_SECONDS} ]]; then
+    log "ERROR: timed out waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled"
+    exit 1
+  fi
+
+  sleep ${LEASE_WAIT_POLL_INTERVAL}
+  elapsed=$((elapsed + LEASE_WAIT_POLL_INTERVAL))
+done
 
 declare -A vcenter_portgroups
+declare -A vcenter_reserved_portgroups
 
 # reconcile leases
 log "Extracting portgroups from leases..."
@@ -444,11 +498,37 @@ EOF
       getPortGroup $i
       portgroup_name=${PORTGROUP_RETVAL}
 
-      previousValue=""
-      if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
-        previousValue="${vcenter_portgroups[$VCENTER]},"
+      # If RESERVE_EXTRA_NETWORK is enabled, only use the first network for installation
+      # Additional networks are reserved for later use (e.g., remote workers)
+      if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]] && [[ $i -gt 0 ]]; then
+        log "Reserving network ${portgroup_name} for later use (not adding to platform spec)"
+        previousReservedValue=""
+        if [[ -n "${vcenter_reserved_portgroups[$VCENTER]:-}" ]]; then
+          previousReservedValue="${vcenter_reserved_portgroups[$VCENTER]},"
+        fi
+        vcenter_reserved_portgroups[$VCENTER]="${previousReservedValue}${portgroup_name}"
+      else
+        previousValue=""
+        if [[ -n "${vcenter_portgroups[$VCENTER]:-}" ]]; then
+          previousValue="${vcenter_portgroups[$VCENTER]},"
+        fi
+        vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
       fi
-      vcenter_portgroups[$VCENTER]="${previousValue}${portgroup_name}"
+    done
+  fi
+
+  # When pools > 1, each pool's portgroup is in status.poolInfo[N].topology.networks[0]
+  # rather than the top-level status.topology.networks. Populate vcenter_portgroups
+  # for each additional pool so the platformSpec loop can find them by pool name.
+  pool_info_count=$(jq '.status.poolInfo | length' < /tmp/lease.json)
+  if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 1 ]]; then
+    log "Multi-pool lease detected (${pool_info_count} pools) — extracting per-pool portgroups from poolInfo"
+    for ((pi = 0; pi < pool_info_count; pi++)); do
+      pi_pool_name=$(jq -r ".status.poolInfo[${pi}].name" < /tmp/lease.json)
+      pi_network_path=$(jq -r ".status.poolInfo[${pi}].topology.networks[0]" < /tmp/lease.json)
+      pi_portgroup=$(echo "${pi_network_path}" | cut -d '/' -f 4)
+      log "Pool ${pi_pool_name}: portgroup ${pi_portgroup}"
+      vcenter_portgroups[${pi_pool_name}]="${pi_portgroup}"
     done
   fi
 
@@ -464,20 +544,46 @@ declare -A pool_passwords
 # shellcheck disable=SC2089
 platformSpec='{"vcenters": [],"failureDomains": []}'
 
+# Track the number of unique vCenters to enforce MAX_VCENTERS limit
+vcenter_count=0
+
 log "building local variables and failure domains"
 
 # Iterate through each lease and generate the failure domain and vcenters information
 for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
-  RESOURCE_POOL=$(jq -r .status.name < "${_leaseJSON}")
-  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
+  # Skip the LEASE_single copy to avoid double-processing — the original named file
+  # is iterated separately and covers the same content.
+  if [[ ${_leaseJSON} =~ "single" ]]; then
+    continue
+  fi
 
+  PRIMARY_LEASED_CPUS=$(jq -r .spec.vcpus < "${_leaseJSON}")
   if [[ ${PRIMARY_LEASED_CPUS} != "null" ]]; then
     log "storing primary lease as LEASE_single"
     cp "${_leaseJSON}" "${SHARED_DIR}"/LEASE_single.json
   fi
 
-  log "building local variables and platform spec for pool ${RESOURCE_POOL}"
-  oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
+  # Determine how many pools are in this lease.  When pools > 1, VCM returns all
+  # pools in status.poolInfo[].  When pools == 1, fall back to status.name.
+  lease_pool_count=$(jq '.status.poolInfo | length' < "${_leaseJSON}")
+  if [[ "${lease_pool_count}" == "null" || "${lease_pool_count}" -eq 0 ]]; then
+    lease_pool_count=0
+  fi
+
+  if [[ ${lease_pool_count} -gt 0 ]]; then
+    log "Multi-pool lease: processing ${lease_pool_count} pool(s) from poolInfo"
+    pool_names=()
+    for ((lpi = 0; lpi < lease_pool_count; lpi++)); do
+      pool_names+=("$(jq -r ".status.poolInfo[${lpi}].name" < "${_leaseJSON}")")
+    done
+  else
+    log "Single-pool lease: processing pool from status.name"
+    pool_names=("$(jq -r .status.name < "${_leaseJSON}")")
+  fi
+
+  for RESOURCE_POOL in "${pool_names[@]}"; do
+    log "building local variables and platform spec for pool ${RESOURCE_POOL}"
+    oc get pools.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers "${RESOURCE_POOL}" -o json > /tmp/pool.json
   VCENTER_AUTH_PATH=$(jq -r '.metadata.annotations["ci-auth-path"]' < /tmp/pool.json)
 
   declare vcenter_usernames
@@ -529,12 +635,25 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
       platformSpec=$(echo "${platformSpec}" | jq -r --arg VCENTER "$VCENTER" --arg DC "$datacenter" '(.vcenters[] | select(.server == $VCENTER)) |= (.datacenters[.datacenters | length] |= .+ $DC)')
     fi
   else
-    log "Adding vcenter ${VCENTER} to config"
+    # Check if we've reached the maximum number of vCenters - this validates VCM honored the limit
+    if [[ ${vcenter_count} -ge ${MAX_VCENTERS} ]]; then
+      log "ERROR: VCM returned more vCenters than requested maximum (${MAX_VCENTERS})"
+      log "Attempted to add vCenter: ${VCENTER}"
+      log "Current vCenters already in configuration:"
+      echo "${platformSpec}" | jq -r '.vcenters[].server'
+      log "This indicates VCM did not honor the spec.vcenters limit in the lease request"
+      exit 1
+    fi
+    log "Adding vcenter ${VCENTER} to config (${vcenter_count}/${MAX_VCENTERS})"
     platformSpec=$(echo "${platformSpec}" | jq -r '.vcenters += [{"server": "'"${VCENTER}"'", "user": "'"${pool_usernames[$VCENTER]}"'", "password": "'"${pool_passwords[$VCENTER]}"'", "datacenters": ["'"${datacenter}"'"]}]')
+    vcenter_count=$((vcenter_count + 1))
   fi
 
-  cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
-done
+    cp /tmp/pool.json "${SHARED_DIR}"/POOL_"${RESOURCE_POOL}".json
+  done  # end for RESOURCE_POOL
+done  # end for _leaseJSON
+
+log "Successfully configured ${vcenter_count} vCenter(s) (max allowed: ${MAX_VCENTERS})"
 
 # For legacy spec, the below will merge the following json to the existing json.
 if [ -n "${POPULATE_LEGACY_SPEC}" ]; then
@@ -576,6 +695,68 @@ EOF
 
 log "Creating vsphere_context.sh file..."
 cp "${SHARED_DIR}/govc.sh" "${SHARED_DIR}/vsphere_context.sh"
+
+log "Creating individual govc files for each pool..."
+for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
+  # Skip the LEASE_single copy — the original named lease file covers the same content
+  if [[ ${_leaseJSON} =~ "single" ]]; then
+    continue
+  fi
+
+  # Get the number of pools in this lease's poolInfo array
+  pool_count=$(jq -r '.status.poolInfo | length' < "${_leaseJSON}")
+
+  if [[ "${pool_count}" == "null" || "${pool_count}" -eq 0 ]]; then
+    log "No poolInfo found in ${_leaseJSON}, skipping"
+    continue
+  fi
+
+  log "Processing ${pool_count} pool(s) from lease $(basename ${_leaseJSON})"
+
+  # Iterate through each pool in the poolInfo array
+  for ((pool_idx = 0; pool_idx < pool_count; pool_idx++)); do
+    # Get the pool name from poolInfo
+    pool_name=$(jq -r ".status.poolInfo[${pool_idx}].name" < "${_leaseJSON}")
+
+    log "Processing pool: ${pool_name}"
+
+    # Get envVars for this specific pool from envVarsMap using the pool name as key
+    jq -r ".status.envVarsMap.\"${pool_name}\"" < "${_leaseJSON}" > /tmp/envvars_pool
+
+    # Get topology info from poolInfo
+    vcenter_cluster=$(jq -r ".status.poolInfo[${pool_idx}].topology.computeCluster" < "${_leaseJSON}")
+
+    # Source the envVars to get vsphere_url and other variables
+    # shellcheck source=/dev/null
+    source /tmp/envvars_pool
+
+    # Build resource pool path
+    if [ $IPI -eq 0 ]; then
+      vcenter_resource_pool=${vcenter_cluster}/Resources/${NAMESPACE}-${UNIQUE_HASH}
+    else
+      vcenter_resource_pool=${vcenter_cluster}/Resources/ipi-ci-clusters
+    fi
+
+    # Create a sanitized filename from the pool name
+    # Pool names look like: vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
+    pool_filename=$(echo "${pool_name}" | tr '.' '_' | tr ':' '_')
+
+    log "Creating govc_${pool_filename}.sh for pool ${pool_name}"
+    cat >"${SHARED_DIR}/govc_${pool_filename}.sh" <<EOF
+$(cat /tmp/envvars_pool)
+export LEASE_PATH=${_leaseJSON}
+export POOL_NAME=${pool_name}
+export GOVC_INSECURE=1
+export vsphere_resource_pool=${vcenter_resource_pool}
+export GOVC_RESOURCE_POOL=${vcenter_resource_pool}
+export cloud_where_run=IBM
+export GOVC_USERNAME="${pool_usernames[${vsphere_url}]}"
+export GOVC_PASSWORD='${pool_passwords[${vsphere_url}]}'
+export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
+EOF
+  done
+done
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
@@ -631,3 +812,15 @@ done
 log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+
+# Save reserved networks for later use
+if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
+  log "Saving reserved networks to reserved_networks.json"
+  reserved_spec='{}'
+  for VCENTER in "${!vcenter_reserved_portgroups[@]}"; do
+    networks="${vcenter_reserved_portgroups[$VCENTER]}"
+    reserved_spec=$(echo "$reserved_spec" | jq -r --arg vcenter "$VCENTER" --arg networks "$networks" '.[$vcenter] = $networks')
+  done
+  echo "$reserved_spec" > "${SHARED_DIR}"/reserved_networks.json
+  log "Reserved networks: $(cat "${SHARED_DIR}"/reserved_networks.json)"
+fi

@@ -20,7 +20,7 @@ tar -czf - --exclude='.git' --exclude='logs' --exclude='*.log' . | \
 
 # Prepare .env configuration from Vault
 echo "Setting up environment configuration..."
-cat /var/run/dpf-ci/env | base64 -d > /tmp/dpf-ci.env
+cat ${CLUSTER_PROFILE_DIR}/env | base64 -d > /tmp/dpf-ci.env
 
 # Generate dynamic cluster name for CI
 CLUSTER_NAME="dpf-ci-$(date +%Y%m%d-%H%M%S)"
@@ -33,8 +33,8 @@ scp /tmp/dpf-ci.env ${REMOTE_HOST}:${REMOTE_WORK_DIR}/.env
 echo "Setting up pull secrets..."
 
 # Process OpenShift pull secret
-if [[ -f /var/run/dpf-ci/openshift-pull-secret ]]; then
-    cat /var/run/dpf-ci/openshift-pull-secret | base64 -d > /tmp/openshift_pull.json
+if [[ -f ${CLUSTER_PROFILE_DIR}/openshift-pull-secret ]]; then
+    cat ${CLUSTER_PROFILE_DIR}/openshift-pull-secret | base64 -d > /tmp/openshift_pull.json
     scp /tmp/openshift_pull.json ${REMOTE_HOST}:${REMOTE_WORK_DIR}/
 else
     echo "ERROR: OpenShift pull secret not found in Vault"
@@ -42,8 +42,8 @@ else
 fi
 
 # Process DPF pull secret
-if [[ -f /var/run/dpf-ci/dpf-pull-secret ]]; then
-    cat /var/run/dpf-ci/dpf-pull-secret | base64 -d > /tmp/pull-secret.txt
+if [[ -f ${CLUSTER_PROFILE_DIR}/dpf-pull-secret ]]; then
+    cat ${CLUSTER_PROFILE_DIR}/dpf-pull-secret | base64 -d > /tmp/pull-secret.txt
     scp /tmp/pull-secret.txt ${REMOTE_HOST}:${REMOTE_WORK_DIR}/
 else
     echo "ERROR: DPF pull secret not found in Vault"

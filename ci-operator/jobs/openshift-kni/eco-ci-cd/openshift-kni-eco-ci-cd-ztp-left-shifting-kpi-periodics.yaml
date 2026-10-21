@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build09
   cron: 0 23 * * *
   decorate: true
   decoration_config:
@@ -13,10 +13,10 @@ periodics:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: equinix-ocp-metal
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-    ci-operator.openshift.io/variant: ci-4.21
+    ci-operator.openshift.io/variant: ci-4.22
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-eco-ci-cd-ztp-left-shifting-kpi-ci-4.21-telcov10n-virtualised-single-node-hub-ztp
+  name: periodic-ci-openshift-kni-eco-ci-cd-ztp-left-shifting-kpi-ci-4.22-telcov10n-virtualised-single-node-hub-ztp
   reporter_config:
     slack:
       channel: '#eco-ci-cd-notifications'
@@ -32,13 +32,17 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=telcov10n-virtualised-single-node-hub-ztp
-      - --variant=ci-4.21
+      - --variant=ci-4.22
       command:
       - ci-operator
       env:
@@ -65,6 +69,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -85,6 +95,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

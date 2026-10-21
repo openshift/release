@@ -15,11 +15,18 @@ trap 'exit_with_failure' ERR
 env
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
     MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
+fi
+
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE" ]]; then
+    OVERRIDE_HO_IMAGE="$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE"
 fi
 
 echo "$MCE_VERSION"
@@ -322,7 +329,22 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
-  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+  # The HCP CLI download route may not be ready immediately after the operator becomes available.
+  # Retry with backoff to avoid failing on a transient HTML error page instead of the binary.
+  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+  _hcp_downloaded=false
+  for i in $(seq 1 10); do
+    if curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz "${downURL}" && tar -tzf /tmp/${HYPERSHIFT_NAME}.tar.gz &>/dev/null; then
+      _hcp_downloaded=true
+      break
+    fi
+    echo "HCP CLI download failed or archive is invalid, retrying in 30s... ($i/10)"
+    sleep 30
+  done
+  if [ "$_hcp_downloaded" = false ]; then
+    echo "ERROR: Failed to download valid HCP CLI after 5 minutes."
+    exit 1
+  fi
   cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -

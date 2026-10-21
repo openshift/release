@@ -2,6 +2,13 @@
 
 set -o nounset
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -48,9 +55,11 @@ temp_cred_provider_private_key_b64=$(jq -r ".\"${REGION}\".private_key" ${shift_
 
 if [ X"${CLUSTER_TYPE}" == X"aws-c2s" ]; then
     # C2S
+    cred_provider_name="CAP"
     temp_cred_request_url="${temp_cred_provider_endpoint}?agency=${agency}&mission=${shift_project_name}&role=${temp_cred_provider_role}"
 else
     # SC2S
+    cred_provider_name="GEOAxIS"
     temp_cred_request_url="${temp_cred_provider_endpoint}?agency=${agency}&accountName=${shift_project_name}&roleName=${temp_cred_provider_role}"
 fi
 echo "temp_cred_request_url: $temp_cred_request_url"
@@ -69,27 +78,43 @@ temp_cred_file=$(mktemp)
 
 # request credential must be in enmulator env.
 source "${SHARED_DIR}/proxy-conf.sh"
-while ([ X"${key_id}" == X"" ] || [ X"${key_id}" == X"null" ]) && [ $try -lt $retries ]; do
-    echo "tring to get credential from CAP endpoint $(expr $try + 1)/${retries}"
+
+# Disable errexit so a non-zero curl/jq exit does not abort the script at the
+# command substitution; the retry loop below handles failures itself.
+set +o errexit
+while ([ X"${key_id}" == X"" ] || [ X"${key_id}" == X"null" ] || [ X"${key_sec}" == X"" ] || [ X"${key_sec}" == X"null" ]) && [ $try -lt $retries ]; do
+    echo "trying to get credential from ${cred_provider_name} endpoint $(expr $try + 1)/${retries}"
     
-    curl -sS "${temp_cred_request_url}" \
+    http_code=$(curl -sS -o "${temp_cred_file}" -w "%{http_code}" "${temp_cred_request_url}" \
             --cert "${SHARED_DIR}/temp_cred_provider_cert.pem" \
             --cacert "${shift_ca_file}" \
-            --key "${SHARED_DIR}/temp_cred_provider_private_key.pem" > "${temp_cred_file}"
+            --key "${SHARED_DIR}/temp_cred_provider_private_key.pem")
+    curl_rc=$?
 
-    key_id=$(cat ${temp_cred_file}  | jq -j .Credentials.AccessKeyId)
-    key_sec=$(cat ${temp_cred_file}  | jq -j .Credentials.SecretAccessKey)
+    # Suppress jq stderr here: a non-JSON error body would otherwise emit a
+    # cryptic "parse error" that obscures the diagnostics logged below.
+    key_id=$(cat ${temp_cred_file}  | jq -j .Credentials.AccessKeyId 2>/dev/null)
+    key_sec=$(cat ${temp_cred_file}  | jq -j .Credentials.SecretAccessKey 2>/dev/null)
     if [ X"${key_id}" == X"" ] || [ X"${key_sec}" == X"" ] || [ X"${key_id}" == X"null" ] || [ X"${key_sec}" == X"null" ]; then
-        echo "failed, retry, sleeping 60 seconds"
+        # Surface the failure details to help debug credential endpoint issues.
+        # This branch also triggers on partial/malformed success responses, so
+        # redact any credential field values before logging.
+        # Non-credential content is printed unchanged.
+        echo "failed to get credential from ${cred_provider_name} endpoint (curl exit code: ${curl_rc}, HTTP status code: ${http_code})"
+        echo "response payload content (credential values redacted):"
+        sed -E 's/("(AccessKeyId|SecretAccessKey|SessionToken|Token)"[[:space:]]*:[[:space:]]*")[^"]*/\1[redacted]/g' "${temp_cred_file}"
+        echo ""
+        echo "retry, sleeping 60 seconds"
         try=$(expr $try + 1)
 	      sleep 60
     fi
 done
+set -o errexit
 
 source "${SHARED_DIR}/unset-proxy.sh"
 
 if [ X"${key_id}" == X"" ] || [ X"${key_sec}" == X"" ] || [ X"${key_id}" == X"null" ] || [ X"${key_sec}" == X"null" ]; then
-    echo "ERROR: can not get AWS credential from CAP"
+    echo "ERROR: can not get AWS credential from ${cred_provider_name} after ${retries} attempts (last curl exit code: ${curl_rc:-unknown}, last HTTP status code: ${http_code:-unknown})"
     exit 2
 fi
 
@@ -313,7 +338,7 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 
 registry_host=$(head -n 1 ${SHARED_DIR}/mirror_registry_url)
-token_refresh_repo=${registry_host}/yunjiang/cap-token-refresh
+token_refresh_repo=${registry_host}/openshift-install/cap-token-refresh
 cat <<EOF > ${SHARED_DIR}/manifest_cap-token-cronjob.yaml
 apiVersion: batch/v1beta1
 kind: CronJob
@@ -381,11 +406,9 @@ EOF
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
+if version_ge "${ocp_version}" "4.12"; then
   echo "For 4.12+, using batch API version: batch/v1"
   cat <<EOF > /tmp/cap-token-cronjob_412plus-patch.yaml
 apiVersion: batch/v1

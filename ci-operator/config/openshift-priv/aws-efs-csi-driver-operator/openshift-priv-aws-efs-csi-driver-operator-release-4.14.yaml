@@ -1,31 +1,31 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
   driver-operand:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: aws-efs-csi-driver
   livenessprobe-operand:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: csi-livenessprobe
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
   provisioner-operand:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: csi-external-provisioner
   proxy-operand:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: kube-rbac-proxy
   registrar-operand:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: csi-node-driver-registrar
   tests-private:
     name: tests-private
@@ -36,12 +36,13 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/aws-efs-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: aws-efs-csi-driver-operator
-- dockerfile_path: Dockerfile.create_efs
-  from: base
-  to: aws-efs-csi-operator-create-efs
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: aws-efs-csi-driver-operator
+  - dockerfile_path: Dockerfile.create_efs
+    from: base
+    to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -64,18 +65,20 @@ operator:
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -96,7 +99,7 @@ tests:
   as: operator-e2e
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:

@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
   govulncheck:
     name: govulncheck
     namespace: ci
@@ -11,25 +15,26 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
-  to: jira-lifecycle-plugin
-- dockerfile_literal: |-
-    FROM pipeline:govulncheck
-    COPY jira-lifecycle-plugin /workdir
-    WORKDIR /workdir
-  from: govulncheck
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
-  to: govulncheck-src
+  items:
+  - dockerfile_path: images/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
+    to: jira-lifecycle-plugin
+  - dockerfile_literal: |-
+      FROM pipeline:govulncheck
+      COPY jira-lifecycle-plugin /workdir
+      WORKDIR /workdir
+    from: govulncheck
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
+    to: govulncheck-src
 promotion:
   to:
   - excluded_images:
@@ -48,11 +53,20 @@ tests:
   commands: make verify
   container:
     from: src
+- as: fix
+  commands: go fix -diff ./...
+  container:
+    from: src
 - as: unit
   commands: make test
   container:
     from: src
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
 - as: govulncheck
+  optional: true
   steps:
     test:
     - as: govulncheck

@@ -4,9 +4,19 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_path: Containerfile
-  to: nvidia-ci
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
 releases:
+  arm64-latest:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.14.0-0
+        stream: 4-stable
+        upper: 4.15.0-0
   latest:
     prerelease:
       product: ocp
@@ -24,6 +34,19 @@ resources:
 tests:
 - always_run: false
   as: nvidia-gpu-operator-e2e-master
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
     env:
@@ -31,20 +54,51 @@ tests:
       NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
-  as: nvidia-gpu-operator-e2e-25-10-x
+  as: nvidia-gpu-operator-e2e-26-3-x
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
-      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.10
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.3
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
-  as: nvidia-gpu-operator-e2e-25-3-x
+  as: nvidia-gpu-operator-e2e-arm64
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       BASE_DOMAIN: edge-sro.rhecoeng.com
-      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.3
+      COMPUTE_NODE_TYPE: g5g.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
     workflow: nvidia-gpu-operator-e2e-aws
 zz_generated_metadata:
   branch: main

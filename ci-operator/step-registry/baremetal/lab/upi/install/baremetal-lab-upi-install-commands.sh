@@ -57,11 +57,12 @@ function destroy_bootstrap() {
   . <(yq -P e -I0 -o=p '.[] | select(.name|test("bootstrap"))' "$SHARED_DIR/hosts.yaml" | sed 's/^\(.*\) = \(.*\)$/\1="\2"/')
   # shellcheck disable=SC2154
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${CLUSTER_NAME}" "${mac}" "${ip}" "${DISCONNECTED}"<< 'EOF'
+    "${CLUSTER_NAME}" "${mac}" "${ip}" "${DISCONNECTED}" "${INTERNAL_NET_CIDR}" << 'EOF'
   BUILD_ID="$1"
   mac="$2"
   ip="$3"
   DISCONNECTED="$4"
+  INTERNAL_NET_CIDR="$5"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
   sed -i "/^$mac/d" /opt/dnsmasq/hosts/hostsdir/"${BUILD_ID}"
   kill -s HUP "$(podman inspect -f '{{ .State.Pid }}' "dhcp")"
@@ -71,9 +72,7 @@ function destroy_bootstrap() {
   sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
   if [ "${DISCONNECTED}" == "true" ]; then
     echo "Destroying bootstrap: removing drop rule for disconnected network..."
-    rule=$(iptables -S FORWARD | grep "${ip}" | grep DROP | sed 's/^-A /-D /')
-    read -r -a RULE <<< "${rule}"
-    [[ "${rule}" =~ D.*$ip.*DROP ]] && iptables "${RULE[@]}"
+    firewall-cmd --zone=internal --remove-rich-rule="rule family='ipv4' source address='${ip}' destination not address='${INTERNAL_NET_CIDR}' drop" || true
   fi
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
@@ -222,8 +221,7 @@ function update_image_registry() {
   oc wait co image-registry  --for=condition=Progressing=False --timeout=10m
   sleep 60
   echo "$(date -u --rfc-3339=seconds) - Waits for kube-apiserver and openshift-apiserver to finish rolling out..."
-  oc wait co kube-apiserver  openshift-apiserver --for=condition=Progressing=False  --timeout=30m
-  oc wait co kube-apiserver  openshift-apiserver  --for=condition=Degraded=False  --timeout=1m
+  oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=30m
 }
 
 function update_sno_bip_live_iso {
@@ -262,6 +260,8 @@ INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+echo "[INFO] Set OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY to true for nightly payload"
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
 
@@ -276,13 +276,12 @@ fi
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+DATA_STORAGE=/var/mnt/data-storage
 
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
-platform:
-  none: {}
 controlPlane:
    architecture: ${architecture}
    hyperthreading: Enabled
@@ -309,7 +308,7 @@ if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
 
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
+grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
 ### Create manifests
 echo "Creating manifests..."
@@ -340,7 +339,7 @@ cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
 
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}/"
 scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/auth/* "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."

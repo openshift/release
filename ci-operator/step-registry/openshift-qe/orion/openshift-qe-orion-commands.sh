@@ -5,43 +5,38 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
-fi
+MAX_RETRIES=5
 
 python --version
 pushd /tmp
+
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+
+for attempt in $(seq 1 "$MAX_RETRIES"); do
+  rm -rf orion
+  if git clone -q --branch "$LATEST_TAG" "$ORION_REPO" --depth 1; then
+    break
+  fi
+  if [[ "$attempt" -eq "$MAX_RETRIES" ]]; then
+    echo "git clone failed after $MAX_RETRIES attempts, exiting..." >&2
+    exit 1
+  fi
+  echo "git clone failed (attempt $attempt/$MAX_RETRIES), retrying in 10s..." >&2
+  sleep 10
+done
+
+pushd orion
+pip install -q --retries "$MAX_RETRIES" -r requirements.txt
+pip install -q --retries "$MAX_RETRIES" .
+popd
+
 pushd orion
 
 # Invoked from orion repo by the openshift-ci bot
@@ -51,21 +46,60 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
   git switch ${PULL_NUMBER}
 fi
 
-pip install -r requirements.txt
-
 case "$ES_TYPE" in
   qe)
+    # Disable xtrace: reading QE ElasticSearch credentials and JIRA token
+    set +x
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    if [[ -f "/secret/qe/jira-api-key" ]]; then
+        JIRA_TOKEN=$(<"/secret/qe/jira-api-key")
+        JIRA_EMAIL=ocp-perfscale-cpt@redhat.com
+        JIRA_URL=https://redhat.atlassian.net/
+        export JIRA_TOKEN JIRA_EMAIL JIRA_URL
+        # Use existing Jira ACKs for all QE jobs with credentials.
+        ORION_EXTRA_FLAGS+=" --jira-ack"
+
+        # Rehearsals can carry pull refs without PULL_NUMBER. Only create
+        # issues for periodic payload jobs with verified PR-free metadata.
+        if [[ "${JOB_TYPE:-}" == "periodic" ]] &&
+           [[ "${JOB_NAME:-}" == *"payload"* ]] &&
+           [[ -z "${PULL_NUMBER:-}" ]] &&
+           printf '%s' "${JOB_SPEC:-}" | jq -se '
+             def no_pulls:
+               type == "object" and
+               (.pulls | . == null or (type == "array" and length == 0));
+             length == 1 and
+             (.[0] |
+               type == "object" and
+               .type == "periodic" and
+               (.refs == null or (.refs | no_pulls)) and
+               (.extra_refs == null or
+                 (.extra_refs | type == "array" and all(.[]; no_pulls))))
+           ' >/dev/null; then
+            # We use orion's default Jira project and components.
+            ORION_EXTRA_FLAGS+=" --jira-auto-create"
+        else
+            echo "Skipping automatic Jira issue creation: job is ineligible or PR metadata could not be verified."
+        fi
+    else
+        echo "Skipping Jira integration: credentials are unavailable."
+    fi
+    set -x
     ;;
   quay-qe)
+    # Disable xtrace: reading quay-qe ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/quay-qe/password")
     ES_USERNAME=$(<"/secret/quay-qe/username")
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    set -x
     ;;
   stackrox)
+    # Disable xtrace: reading StackRox ElasticSearch credentials
+    set +x
     ES_SECRETS_PATH='/secret_stackrox'
     ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
     ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
@@ -73,28 +107,67 @@ case "$ES_TYPE" in
         ES_HOST=$(<"${ES_SECRETS_PATH}/host")
     fi
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    set -x
     ;;
   *)
+    # Disable xtrace: reading credentials and constructing authenticated URL
+    set +x
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    set -x
     ;;
 esac
 
 export ES_SERVER
 
-pip install .
-
-# Print Orion version
-orion_version=$(orion --version 2>&1)
-orion_version_exit=$?
-if [ "$orion_version_exit" -ne 0 ]; then
-  echo "orion version prior to v0.1.7"
-else
-  echo "Orion version: $orion_version"
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    echo "Loading proxy settings from ${SHARED_DIR}/proxy-conf.sh"
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
+    source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+
+if ! curl -fsSL --fail --retry 8 --retry-all-errors https://github.com/cloud-bulldozer/go-commons/releases/latest/download/ocp-metadata-linux-amd64 -o ocp-metadata; then
+    echo "Error: Failed to download ocp-metadata binary"
+    exit 1
+fi
+chmod +x ocp-metadata
+CLUSTER_METADATA=$(./ocp-metadata)
+
+# HCP clusters have no visible master nodes, so ocp-metadata omits masterNodesType
+# and masterNodesCount. Inject defaults so Orion Jinja templates don't fail.
+if ! echo "${CLUSTER_METADATA}" | python -c "import sys,json; d=json.load(sys.stdin); d['masterNodesType']" 2>/dev/null; then
+    CLUSTER_METADATA=$(echo "${CLUSTER_METADATA}" | python -c "
+import sys, json
+d = json.load(sys.stdin)
+d.setdefault('masterNodesType', '')
+d.setdefault('masterNodesCount', 0)
+json.dump(d, sys.stdout, separators=(',', ':'))
+")
+fi
+
+EXTRA_FLAGS+=" --input-vars=${CLUSTER_METADATA}"
+
+# Generic workload auto-config: select ORION_CONFIG based on worker count and workload type
+if [[ -n "${ORION_WORKLOAD_TYPE:-}" ]] && [[ -z "${ORION_CONFIG:-}" ]]; then
+    ORION_PREFIX=""
+    if echo "${CLUSTER_METADATA}" | jq -e '.clusterType == "rosa-hcp"' &>/dev/null; then
+        ORION_PREFIX="rosa-hcp-"
+    fi
+    ORION_CONFIG="examples/${ORION_PREFIX}${ORION_WORKLOAD_TYPE}.yaml"
+fi
+
+export VERSION="${VERSION:-$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')}"
+
+# Unset proxy so we can pip install, reach sippy, etc.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+fi
+
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
@@ -107,31 +180,22 @@ else
     exit 1
 fi
 
-if [[ -n "$ORION_CONFIG" ]]; then
-    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="$(basename ${ORION_CONFIG})"
-        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
-        else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
-        fi
+if [[ -n "${ORION_CONFIG}" ]] && [[ "${ORION_CONFIG}" =~ ^https?:// ]]; then
+    fileBasename="$(basename ${ORION_CONFIG})"
+    if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+        ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+    else
+        echo "Error: Failed to download $ORION_CONFIG" >&2
+        exit 1
     fi
 fi
 
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-export VERSION
-if [[ -n "$ACK_FILE" ]]; then
-    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
-        ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
-        if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
-            echo "Error: Failed to download $ACK_FILE" >&2
-            exit 1
-        fi
-    else
-        # Download the latest ACK file
-        ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
-        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
+if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
+    ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
+    if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+        echo "Error: Failed to download $ACK_FILE" >&2
+        exit 1
     fi
     EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
@@ -163,11 +227,36 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
+# pull_number input variable is required and
+# it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
+pull_number='0'
+if [[ "${JOB_TYPE}" == "periodic" ]]; then
+    if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
+        pull_number="(${PULL_NUMBER} OR 0)"
+        job_type="(periodic OR pull)"
+    else
+        job_type="periodic"
+    fi
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a ci test triggered in PR against a pull request
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(periodic OR pull)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a rehearse job triggered from a PR
+    pull_number="(${PULL_NUMBER} OR 0)"
+    job_type="(rehearse OR pull OR periodic)"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
+    # Indicates a rehearsal in PR against openshift/release repo
+    job_type="(periodic OR rehearse)"
+fi
+
 set +e
 set -o pipefail
-FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
-export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
+export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
+if [[ -n $pull_number ]]; then
+    export pull_number=${pull_number}
+fi
+orion --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/orion-output.txt
 orion_exit_status=$?
 set -e
 
@@ -175,13 +264,13 @@ process_change_point() {
 
     [[ -z "${CHANGE_POINT_REPOS}" ]] && return
 
-    GCS_BUCKET="gs://test-platform-results"
+    GCS_BUCKET="gs://test-platform-results-public"
     GCS_PATH=""
 
     # Determine the path to prowjob.json based on prow ENV variables
     case "${JOB_TYPE:-}" in
         presubmit)
-            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && "${JOB_NAME}" != *rehearse* ]]; then
                 GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
             fi
             ;;
@@ -235,8 +324,8 @@ process_change_point() {
 
     echo "Owners loaded as JSON array: $OWNERS_JSON"
 
-    for f in junit*.json; do
-        [ -e "$f" ] || { echo "No junit*.json files found"; return; }
+    for f in output*.json; do
+        [ -e "$f" ] || { echo "No output*.json files found"; return; }
 
         echo "Processing file: $f"
 
@@ -266,11 +355,17 @@ process_change_point() {
 }
 process_change_point
 
-cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
+
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
+
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
   exit 0
 fi
 

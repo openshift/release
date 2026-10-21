@@ -1,5 +1,6 @@
 ref:
   as: interop-tests-ocs-tests
+  best_effort: true
   from: ocs-ci-tests
   commands: interop-tests-ocs-tests-commands.sh
   resources:
@@ -8,6 +9,13 @@ ref:
       memory: 200Mi
   timeout: 3h0m0s
   grace_period: 10m
+  credentials:
+    - collection: cnv-qe
+      group: interop-tests-deploy
+      mount_path: /tmp/secrets/odf-quay-credentials
+    - collection: vsphere
+      group: ibmcloud/ci
+      mount_path: /var/run/vault/vsphere-ibmcloud-ci
   documentation: |-
     Run containerized OCS tests
   env:
@@ -17,7 +25,9 @@ ref:
   - name: MAP_TESTS
     default: "false"
     documentation: Specify whether to update the test suite name for reporting tools
-  - name: REPORTPORTAL_CMP
-    default: "CNV-lp-interop"
+  - name: DR__RP__CR_COMP_NAME
+    default: "lp-ocp-compat--ODF"
     documentation: If test mapping is applied, differentiate between the CNV and ODF jobs
-
+  - name: DISABLE_ENVIRONMENT_CHECKER
+    default: "false"
+    documentation: If true, skip the OCS environment checker during teardown

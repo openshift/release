@@ -5,41 +5,11 @@ postsubmits:
     - ^main$
     cluster: app.ci
     decorate: true
-    labels:
-      ci.openshift.io/role: infra
-    max_concurrency: 1
-    name: branch-ci-openshift-release-main-app-ci-apply
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/app.ci
-        - --confirm=true
-        - --as=
-        command:
-        - applyconfig
-        env:
-        - name: PAGERDUTY_INTEGRATION_KEY
-          valueFrom:
-            secretKeyRef:
-              key: integration_key
-              name: pagerduty
-        - name: SLACK_API_URL
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: quay.io/openshift/ci-public:ci_applyconfig_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 500m
-      serviceAccountName: config-updater
-  - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: app.ci
-    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./ci-operator/config
+      - ./ci-operator/jobs
+      - ./core-services/prow/02_config
     labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
@@ -78,6 +48,8 @@ postsubmits:
     decorate: true
     decoration_config:
       grace_period: 0s
+      sparse_checkout_files:
+      - ./core-services/sync-rover-groups/_config.yaml
       timeout: 1h0m0s
     labels:
       ci.openshift.io/role: infra
@@ -105,12 +77,15 @@ postsubmits:
             cpu: 100m
         volumeMounts:
         - mountPath: /tmp/gcp-credentials
-          name: gcp-sa-key
+          name: gsm-secrets-reconciler-sa-key
           readOnly: true
       volumes:
-      - name: gcp-sa-key
-        secret:
-          secretName: gsm-secrets-reconciler-sa-credentials
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: gsm-secrets-reconciler
+        name: gsm-secrets-reconciler-sa-key
   - agent: kubernetes
     branches:
     - ^main$
@@ -118,6 +93,8 @@ postsubmits:
     decorate: true
     decoration_config:
       grace_period: 0s
+      sparse_checkout_files:
+      - ./core-services/prow/02_config/_labels.yaml
       timeout: 8h0m0s
     labels:
       ci.openshift.io/role: infra
@@ -152,8 +129,12 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^main$
-    cluster: app.ci
+    cluster: core-ci
     decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./core-services/release-controller/_releases
+      - ./hack/annotate.sh
     labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
@@ -162,17 +143,30 @@ postsubmits:
       containers:
       - command:
         - hack/annotate.sh
+        env:
+        - name: KUBECONFIG
+          value: /etc/build-farm-credentials/kubeconfig
         image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
-      serviceAccountName: config-updater
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.app.ci.config
+            path: kubeconfig
+          secretName: config-updater
   - agent: kubernetes
     branches:
     - ^main$
-    cluster: app.ci
+    cluster: core-ci
     decorate: true
     labels:
       ci.openshift.io/build-farm: vsphere02
@@ -183,10 +177,10 @@ postsubmits:
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/vsphere02
         - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --config-dir=clusters/build-clusters/vsphere02
         - --confirm=true
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         image: quay.io/openshift/ci-public:ci_applyconfig_latest
@@ -199,7 +193,6 @@ postsubmits:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
-      serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
         secret:

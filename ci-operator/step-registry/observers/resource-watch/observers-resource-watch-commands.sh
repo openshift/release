@@ -4,6 +4,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+if [[ "${RESOURCE_WATCH_ENABLED:-false}" != "true" ]]; then
+  echo "resource watch observer is disabled, set RESOURCE_WATCH_ENABLED=true to enable"
+  exit 0
+fi
+
 export STORE_PATH="${ARTIFACT_DIR}/resource-watch-store"
 export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
 
@@ -68,7 +73,14 @@ then
   echo "using additional run-monitor args ${MONITOR_ARGS}"
 fi
 
-openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
-DISABLED_MONITOR_TESTS="apiserver-new-disruption-invariant,disruption-summary-serializer,incluster-disruption-serializer,pod-network-avalibility"
-openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
+EVENTS_FLAG=""
+if [[ "${RESOURCE_EVENT_COLLECTION_ENABLED:-false}" == "true" ]]; then
+  EVENTS_FLAG="--enable-events"
+fi
+openshift-tests run-resourcewatch ${EVENTS_FLAG} > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
+
+if [[ "${RESOURCE_MONITOR_ENABLED:-false}" == "true" ]]; then
+  DISABLED_MONITOR_TESTS="apiserver-new-disruption-invariant,disruption-summary-serializer,incluster-disruption-serializer,pod-network-avalibility"
+  openshift-tests run-monitor ${MONITOR_ARGS:-} --artifact-dir $STORE_PATH --disable-monitor=${DISABLED_MONITOR_TESTS} > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
+fi
 wait

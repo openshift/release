@@ -4,8 +4,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-- dockerfile_path: Containerfile
-  to: nvidia-ci
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
 resources:
   '*':
     limits:
@@ -18,6 +20,19 @@ tests:
   as: nvidia-network-operator-legacy-sriov-rdma
   capabilities:
   - intranet
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
   restrict_network_access: false
   steps:
     env:
@@ -57,10 +72,6 @@ tests:
           set +o allexport
         fi
         make run-tests
-      credentials:
-      - mount_path: /var/run/nvidia-ci
-        name: nvidia-ci-doca4
-        namespace: test-credentials
       env:
       - name: DUMP_FAILED_TESTS
       - name: NVIDIANETWORK_CLEANUP
@@ -94,6 +105,19 @@ tests:
   as: nvidia-network-operator-shared-device-eth-rdma
   capabilities:
   - intranet
+  reporter_config:
+    channel: '#wg-nvidia-gpu-nno-operator-ci'
+    job_states_to_report:
+    - failure
+    - error
+    - aborted
+    report_template: |-
+      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
+      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
+      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
+      {{- if eq .Status.State "aborted" }}
+        The job was aborted, check for orphaned cloud resources.
+      {{- end }}
   restrict_network_access: false
   steps:
     env:
@@ -133,10 +157,6 @@ tests:
           set +o allexport
         fi
         make run-tests
-      credentials:
-      - mount_path: /var/run/nvidia-ci
-        name: nvidia-ci-doca4
-        namespace: test-credentials
       env:
       - name: DUMP_FAILED_TESTS
       - name: NVIDIANETWORK_CLEANUP

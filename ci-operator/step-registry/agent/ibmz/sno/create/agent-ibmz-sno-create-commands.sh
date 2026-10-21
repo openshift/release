@@ -28,7 +28,7 @@ else
   exit 1
 fi
 echo "Installing oc...."
-wget -q -O $HOME/openshift-client-linux.tar.gz https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
+wget -q -O $HOME/openshift-client-linux.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz
 tar -xzf $HOME/openshift-client-linux.tar.gz -C /tmp/bin
 which oc
 if [ $? -eq 0 ]; then
@@ -223,8 +223,12 @@ fi
 # Fetch the zVSI mac address
 set -e
 echo "Fetching the mac address of zVSI $zvsi_fip"
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/httpd-vsi-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----

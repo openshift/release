@@ -8,11 +8,12 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-proxy-addon
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-proxy-addon
 promotion:
   to:
   - name: "2.7"
@@ -20,12 +21,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.17"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.17"
       namespace: ocp
 resources:
   '*':
@@ -96,9 +97,9 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

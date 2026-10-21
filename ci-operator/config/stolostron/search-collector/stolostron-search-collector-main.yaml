@@ -10,12 +10,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: search-collector
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: search-collector
 promotion:
   to:
-  - name: "2.17"
+  - name: "5.1"
+    namespace: stolostron
+  - name: "5.2"
     namespace: stolostron
 resources:
   '*':
@@ -62,7 +65,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.17
+      DESTINATION_BRANCH: release-5.1
     workflow: ocm-ci-fastforward
 - as: lint
   commands: |
@@ -80,24 +83,28 @@ tests:
     export SELF="make -f Makefile.prow"
     export DEPLOYED_IN_HUB=true
     export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
     export DEPLOYED_IN_HUB=true
     export SONAR_GO_TEST_ARGS="./... -coverpkg=./..."
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

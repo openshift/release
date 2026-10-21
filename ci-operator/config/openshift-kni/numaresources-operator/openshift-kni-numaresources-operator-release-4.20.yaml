@@ -17,35 +17,36 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
 images:
-- dockerfile_path: Dockerfile.must-gather
-  from: os-min9
-  to: numaresources-must-gather
-- dockerfile_path: Dockerfile.openshift
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: numaresources-operator
-- dockerfile_path: bundle.Dockerfile
-  to: numaresources-operator-bundle
-- dockerfile_path: Dockerfile.openshift.rte
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: resource-topology-exporter
-- dockerfile_path: Dockerfile.openshift.tests
-  from: os-min9
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
-  to: numaresources-operator-tests
+  items:
+  - dockerfile_path: Dockerfile.must-gather
+    from: os-min9
+    to: numaresources-must-gather
+  - dockerfile_path: Dockerfile.openshift
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: numaresources-operator-bundle
+  - dockerfile_path: Dockerfile.openshift.rte
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: resource-topology-exporter
+  - dockerfile_path: Dockerfile.openshift.tests
+    from: os-min9
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+    to: numaresources-operator-tests
 operator:
   bundles:
   - as: tested-numaresources-operator-bundle
@@ -78,9 +79,9 @@ tests:
   commands: make test-unit
   container:
     from: src
-  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
 - as: ci-install-e2e
-  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -107,7 +108,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e
-  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -134,7 +135,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-must-gather-e2e
-  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -161,7 +162,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e-install-hypershift
-  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -189,11 +190,13 @@ tests:
     workflow: hypershift-optional-operators
 - as: security
   optional: true
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     env:
       PROJECT_NAME: numaresources-operator
     workflow: openshift-ci-security
 - as: ci-install-e2e-compact
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -205,8 +208,8 @@ tests:
       SIZE_VARIANT: compact
       USER_TAGS: |
         ci-job-source prowci
-        ci-job-branch main
-        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-main
+        ci-job-branch release-4.20
+        ci-job-fullname openshift-kni-ci-install-e2e-numaresources-operator-release-4.20
         ci-job-type ci-install-e2e
         ci-repo-name numaresources-operator
         ci-org-name openshift-kni
@@ -221,6 +224,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: ci-e2e-compact
+  skip_if_only_changed: ^docs/|^hack/.*\.md$|^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|\-konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE|renovate\.json)$
   steps:
     cluster_profile: aws-telco
     dependencies:
@@ -232,8 +236,8 @@ tests:
       SIZE_VARIANT: compact
       USER_TAGS: |
         ci-job-source prowci
-        ci-job-branch main
-        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-main
+        ci-job-branch release-4.20
+        ci-job-fullname openshift-kni-ci-e2e-numaresources-operator-release-4.20
         ci-job-type ci-e2e
         ci-repo-name numaresources-operator
         ci-org-name openshift-kni

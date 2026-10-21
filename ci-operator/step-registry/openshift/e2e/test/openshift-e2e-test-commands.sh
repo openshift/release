@@ -11,6 +11,14 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+# Optional shared test-tool environment. Projects that install developer tools
+# in a preceding step can expose them to openshift-tests and its extensions by
+# writing this file into SHARED_DIR.
+if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/cluster-debug-tools.env"
+fi
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
@@ -51,8 +59,14 @@ fi
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
 fi
 
 # OpenShift clusters intalled with platform type External is handled as 'None'
@@ -73,14 +87,42 @@ fi
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function cleanup() {
-    echo "Requesting risk analysis for test failures in this job run from sippy:"
-    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    #echo "Requesting risk analysis for test failures in this job run from sippy:"
+    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
     echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
 }
 trap cleanup EXIT
 
 mkdir -p "${HOME}"
+
+# OpenSSH in this pod needs a passwd row for the random CI UID and a default
+# identity so tests can SSH to the bastion host in SHARED_DIR.
+if [[ -n "${TEST_USE_PROVISIONED_BASTION-}" ]]; then
+    if [[ ! -s "${SHARED_DIR}/bastion_public_address" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${SHARED_DIR}/bastion_public_address is missing"
+        exit 1
+    fi
+    if [[ ! -s "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
+        echo >&2 "TEST_USE_PROVISIONED_BASTION is set but ${CLUSTER_PROFILE_DIR}/ssh-privatekey is missing"
+        exit 1
+    fi
+    if ! whoami &>/dev/null; then
+        if [[ ! -w /etc/passwd ]]; then
+            echo >&2 "Cannot register UID $(id -u): /etc/passwd is not writable"
+            exit 1
+        fi
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        if ! whoami &>/dev/null; then
+            echo >&2 "Failed to register UID $(id -u) in /etc/passwd"
+            exit 1
+        fi
+    fi
+    mkdir -p "${HOME}/.ssh"
+    chmod 0700 "${HOME}/.ssh"
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/id_rsa"
+    chmod 0600 "${HOME}/.ssh/id_rsa"
+fi
 
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
@@ -151,7 +193,7 @@ gcp|gcp-arm64)
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
-aws|aws-arm64)
+aws|aws-arm64|aws-eusc)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
@@ -168,13 +210,18 @@ azurestack)
     export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     ;;
 vsphere)
+    # The test suite requires a vSphere config file with explicit user and password fields.
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
     oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     export TEST_PROVIDER=vsphere;;
 alibabacloud)
     mkdir -p ~/.ssh
@@ -186,8 +233,13 @@ alibabacloud)
     export KUBE_SSH_USER=core
 ;;
 openstack*)
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
         export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
     else
@@ -197,16 +249,26 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 powervs*)
     #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
     export TEST_PROVIDER='{"type":"ibmcloud"}'
-    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' "${SHARED_DIR}/powervs-config.json")
     IBMCLOUD_API_KEY=${IC_API_KEY}
     export IC_API_KEY
     export IBMCLOUD_API_KEY
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 external) export TEST_PROVIDER='{"type":"external"}' ;;
@@ -216,15 +278,25 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64" ]]; then
     pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-318.0.0-linux-x86_64.tar.gz
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
+    tar -xzf google-cloud-sdk-468.0.0-linux-x86_64.tar.gz
     export PATH=$PATH:/tmp/google-cloud-sdk/bin
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    UNIVERSE_DOMAIN=$(jq -r ".universe_domain // empty" "${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null)
+    if [[ -n "${UNIVERSE_DOMAIN}" ]]; then
+      export GOOGLE_CLOUD_UNIVERSE_DOMAIN="${UNIVERSE_DOMAIN}"
+      gcloud config set universe_domain "${UNIVERSE_DOMAIN}"
+    fi
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
     gcloud config set project "${PROJECT}"
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     popd
 fi
 
@@ -285,10 +357,21 @@ function upgrade_paused() {
     OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f1 -d,)"
     OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f2 -d,)"
 
+    # Mimic https://github.com/openshift/installer/blob/98d5859f6cb6d2660cf9ffbed8885d9c9907ec56/pkg/asset/ignition/bootstrap/cvoignore.go#L142-L158
+    # which is available from 4.21+
+    installed_version=$(oc get clusterversion version -o jsonpath='{.status.history[-1].version}')
+    echo "The installed version is $installed_version"
+    if [[ $installed_version == "4.20."* ]]; then
+        echo "Overriding the cluster-scoped 'openshift' ClusterImagePolicy"
+        oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/overrides", "value": [{"group": "config.openshift.io", "kind": "ClusterImagePolicy", "name": "openshift", "namespace": "", "unmanaged": true}]}]'
+        echo "Showing the ClusterVersion spec"
+        oc get clusterversion version -o jsonpath-as-json='{.spec}'
+    fi
+
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
-    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" "${TEST_ARGS:-}" \
         --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
@@ -299,7 +382,7 @@ function upgrade_paused() {
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
-        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" "${TEST_ARGS_2:-}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -326,9 +409,17 @@ function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
-        echo "Skipping tests:" &&
+        echo "Tests to be skipped:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
-        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests" &&
+
+        # Warn about individual skip patterns that match nothing.
+        # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
+        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+            [[ -z "${pattern}" ]] && continue
+            echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
+                echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
+        done
     fi &&
 
     set -x &&
@@ -555,7 +646,7 @@ suite-conformance)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
-    suite
+    TEST_LIMIT_START_TIME="$(date +%s)" suite
     ;;
 ipsec-suite)
      # Rollout IPsec Full mode and run the suite.

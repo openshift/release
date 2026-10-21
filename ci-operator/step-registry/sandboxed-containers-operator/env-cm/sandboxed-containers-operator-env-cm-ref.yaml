@@ -8,19 +8,11 @@ ref:
       cpu: 100m
       memory: 100Mi
   env:
-  - name: CATALOG_SOURCE_IMAGE
-    default: ""
-    documentation: |-
-      Requires TEST_RELEASE_TYPE==Pre-GA; creates a catalog source for
-      ose-osc-tenant which might be used by openshift-tests-private to
-      deploy the osc operator. Example:
-      quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
   - name: CATALOG_SOURCE_NAME
     default: "redhat-operators"
     documentation: |-
-      Configures a special openshift-tests-private configmap to install
-      OSC operator from this catalog; particularly useful for
-      TEST_RELEASE_TYPE=Pre-GA which creates custom catalogs.
+      Stored in osc-config ConfigMap for openshift-tests-private.
+      CatalogSource creation is handled by the install-osc-operator step.
   - name: ENABLEGPU
     default: "false"
     documentation: |-
@@ -30,11 +22,6 @@ ref:
     default: "false"
     documentation: |-
       Configures a special openshift-tests-private configmap to enablePeerPods
-  - name: EXPECTED_OPERATOR_VERSION
-    default: ""
-    documentation: |-
-      Configures a special openshift-tests-private configmap to ensure the
-      deployed osc operator is of this version
   - name: INITDATA
     default: ""
     documentation: |-
@@ -70,19 +57,33 @@ ref:
   - name: TEST_RELEASE_TYPE
     default: "GA"
     documentation: |-
-      When TEST_RELEASE_TYPE==Pre-GA the osc operator and trustee development
-      repositories are being mirrored into production ones to allow pre-release
-      testing; other values do currently nothing.
+      Stored in osc-config ConfigMap for use by test steps. Does not control
+      CatalogSource creation; set CATALOG_SOURCE_IMAGE on install-osc-operator
+      for pre-release testing.
   - name: TRUSTEE_URL
     default: ""
     documentation: |-
       Configures a special openshift-tests-private configmap to point
       the osc operator to an existing external Trustee instance
   - name: WORKLOAD_IMAGE
-    default: "quay.io/openshift/origin-hello-openshift"
+    default: "ghcr.io/nginxinc/nginx-unprivileged:alpine@sha256:e234d4f7e346c098f7b22245690372382aded5be988611eb2c53ae62231eece7"
     documentation: |-
       Configures a special openshift-tests-private configmap to use this image
-      for test workloads
+      for test workloads. The image must serve HTTP on port 8080 and run as a
+      non-root user.
+
+      quay.io/openshift/origin-hello-openshift cannot be used at the moment:
+      two of its layers carry empty SCHILY.xattr.user.overlay.origin PAX
+      records, which astral-tokio-tar >= 0.6.3 rejects, so image-rs fails the
+      pull with "Failed to read entries from the tar". Restore it, together
+      with WORKLOAD_MESSAGE, once image-rs picks up a tar reader that accepts
+      empty PAX values.
+  - name: WORKLOAD_MESSAGE
+    default: "Welcome to nginx!"
+    documentation: |-
+      Text WORKLOAD_IMAGE is expected to serve over HTTP; the expose-service
+      test asserts the response body contains it. Always set it together with
+      WORKLOAD_IMAGE ("Hello OpenShift!" for origin-hello-openshift).
   - name: WORKLOAD_TO_TEST
     default: "kata"
     documentation: |-
@@ -90,6 +91,14 @@ ref:
       a workload to test; you also need to specify RUNTIMECLASS
       and ENABLEPEERPODS accordingly; supported values: "kata",
       "peer-pods" or "coco"
+  - name: CREDENTIALS_MODE
+    default: "cco"
+    documentation: |-
+      Configures a special openshift-tests-private configmap to specify
+      the cloud identity mode. Options: "cco" (Cloud Credential Operator -
+      default), "manual" (manual secret creation), "sts" (workload identity/
+      federated credentials). Tests read this to understand how credentials
+      are managed.
   documentation: |-
     Creates the env-cm configmap used by openshift-tests-private when executing
     "[sig-kata]" group of tests; mainly used to tweak Openshift Sandboxed

@@ -9,9 +9,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.15-openshift-4.8
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
-  to: ci-artifacts
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    to: ci-artifacts
 releases:
   latest:
     candidate:
@@ -28,15 +29,11 @@ resources:
 tests:
 - as: nvidia-gpu-operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: presubmit-operatorhub
       commands: |
         run prow gpu-operator test_operatorhub
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -45,10 +42,6 @@ tests:
     - as: presubmit-operatorhub-cleanup
       commands: |
         run prow gpu-operator cleanup_cluster
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -57,10 +50,6 @@ tests:
     - as: presubmit-master
       commands: |
         run prow gpu-operator test_master_branch
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
@@ -69,15 +58,11 @@ tests:
     workflow: ipi-aws
 - as: test-commit
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test-commit
       commands: |
         run test-commit
-      credentials:
-      - mount_path: /var/run/nvidia-ci-secrets
-        name: nvidia-ci-secrets
-        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:

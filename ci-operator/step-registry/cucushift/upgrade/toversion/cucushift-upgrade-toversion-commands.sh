@@ -14,7 +14,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
@@ -257,7 +257,7 @@ function check_signed() {
     response=0
     while (( try < max_retries && response != 200 )); do
         echo "Trying #${try}"
-        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+        response=$(https_proxy="" HTTPS_PROXY="" curl -L --silent --output /dev/null --write-out %"{http_code}" "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
         (( try += 1 ))
         sleep 60
     done

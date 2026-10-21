@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -99,6 +99,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -194,6 +198,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -219,8 +229,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -243,6 +262,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -353,6 +376,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws
+          - as: launch-devpreview
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
           - as: launch-sdn
             steps:
               cluster_profile: aws-3
@@ -398,6 +430,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -423,8 +461,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -447,6 +494,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -509,6 +560,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -532,8 +589,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -556,6 +622,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -615,6 +685,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -640,6 +716,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build01
   cron: '@yearly'
@@ -665,6 +750,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -741,6 +830,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -766,8 +861,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -790,6 +894,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -878,6 +986,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-sdn
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -923,6 +1040,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -948,8 +1071,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -972,6 +1104,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1040,6 +1176,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1065,8 +1207,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -1089,6 +1240,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1148,6 +1303,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1173,6 +1334,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build08
   cron: '@yearly'
@@ -1196,6 +1366,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1307,6 +1481,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-sdn
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -1359,6 +1542,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1379,6 +1568,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build07
   cron: '@yearly'
@@ -1403,6 +1601,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1595,6 +1797,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1620,6 +1828,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: vsphere02
   cron: '@yearly'
@@ -1645,6 +1862,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1698,23 +1919,6 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
-          - as: launch-multi-zone
-            steps:
-              cluster_profile: vsphere-multizone-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
-          - as: launch-multi-zone-techpreview
-            steps:
-              cluster_profile: vsphere-multizone-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                FEATURE_SET: TechPreviewNoUpgrade
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1729,6 +1933,15 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)
@@ -1813,6 +2026,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1838,6 +2057,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: vsphere02
   cron: '@yearly'
@@ -1863,6 +2091,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1930,6 +2162,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1955,11 +2193,22 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
+    ci-operator.openshift.io/cloud: nutanix
+    ci-operator.openshift.io/cloud-cluster-profile: nutanix
     ci-operator.openshift.io/cluster: build01
     config-type: modern
     job-architecture: amd64
@@ -1980,6 +2229,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -1991,7 +2244,7 @@ periodics:
       - name: CLUSTER_DURATION
         value: "18000"
       - name: BRANCH
-        value: "4.9"
+        value: "4.19"
       - name: CLUSTER_TYPE
         value: nutanix
       - name: UNRESOLVED_CONFIG
@@ -2069,6 +2322,15 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2091,8 +2353,20 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2116,6 +2390,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2171,6 +2449,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2196,8 +2480,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2220,6 +2513,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2337,6 +2634,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-devpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-sdn
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -2382,6 +2688,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2407,8 +2719,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -2429,6 +2750,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2491,6 +2816,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2513,8 +2844,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -2535,6 +2875,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2568,21 +2912,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2606,6 +2952,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2628,8 +2980,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -2650,6 +3011,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2683,21 +3048,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2721,6 +3088,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2743,6 +3116,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build08
   cron: '@yearly'
@@ -2764,6 +3146,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2824,6 +3210,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2841,6 +3233,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build08
   cron: '@yearly'
@@ -2862,6 +3263,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2886,22 +3291,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -2923,6 +3329,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2940,6 +3352,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build08
   cron: '@yearly'
@@ -2961,6 +3382,10 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -2985,22 +3410,23 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-serial
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
           - as: launch-$(CLUSTER_TYPE)
-            commands: sleep 9000 & wait
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
@@ -3022,6 +3448,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3039,8 +3471,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3063,6 +3504,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3133,6 +3578,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3158,8 +3609,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3176,6 +3636,10 @@ periodics:
       - --target=release-analysis-aggregator
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3229,6 +3693,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3251,8 +3721,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3276,6 +3755,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3348,6 +3831,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-devpreview
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: DevPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
           - as: launch-upi
             steps:
               cluster_profile: openstack-vexxhost
@@ -3382,6 +3874,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3407,8 +3905,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -3433,6 +3940,10 @@ periodics:
       - --secret-dir=/usr/local/launch-cluster-profile
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3501,6 +4012,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3527,8 +4044,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -3550,6 +4076,10 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --namespace=$(NAMESPACE)
       - --target=launch
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3611,6 +4141,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3634,8 +4170,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -3657,6 +4202,10 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --namespace=$(NAMESPACE)
       - --target=launch
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3718,6 +4267,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3741,8 +4296,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3764,6 +4328,10 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --namespace=$(NAMESPACE)
       - --target=launch
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3825,6 +4393,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3848,6 +4422,15 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
   cluster: build07
   cron: '@yearly'
@@ -3872,6 +4455,10 @@ periodics:
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -3927,6 +4514,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -3952,8 +4545,17 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -3977,6 +4579,10 @@ periodics:
       - --secret-dir=/usr/local/pull-secret
       - --target=launch
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --enable-secrets-store-csi-driver=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       command:
       - ci-operator
       env:
@@ -4045,6 +4651,12 @@ periodics:
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -4070,3 +4682,12 @@ periodics:
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key

@@ -66,6 +66,18 @@ components:
           step: "30s"
           severity: "Down"
   - component_slug: "prow"
+    sub_component_slug: "horologium"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
+      queries:
+        - query: "max(up{job=\"horologium\"}) > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+  - component_slug: "prow"
     sub_component_slug: "prow-controller-manager"
     prometheus_monitor:
       prometheus_location:
@@ -77,6 +89,16 @@ components:
           duration: "5m"
           step: "30s"
           severity: "Down"
+        - query: "(sum(prowjobs{job=\"prow-controller-manager\",state=\"triggered\"}) or vector(0)) < 450"
+          failure_query: "sum by (state) (prowjobs{job=\"prow-controller-manager\"})"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "((sum(prowjobs{job=\"prow-controller-manager\",state=~\"triggered|pending|running|scheduling\"}) or vector(0)) < 500) or (((sum(prowjobs{job=\"prow-controller-manager\",state=\"triggered\"}) or vector(0)) / clamp_min((sum(prowjobs{job=\"prow-controller-manager\",state=~\"triggered|pending|running|scheduling\"}) or vector(0)), 1)) < 0.25)"
+          failure_query: "sum by (state) (prowjobs{job=\"prow-controller-manager\"})"
+          duration: "10m"
+          step: "1m"
+          severity: "Degraded"
   - component_slug: "prow"
     sub_component_slug: "tide"
     prometheus_monitor:
@@ -89,6 +111,16 @@ components:
           duration: "5m"
           step: "30s"
           severity: "Down"
+        - query: "(sum(increase(merges_sum[1h])) >= 0.25 * avg_over_time((sum(increase(merges_sum[1h])))[7d:1d])) or on() (day_of_week() < 1 or day_of_week() > 5) or on() (hour() <= 7 or hour() >= 22)"
+          failure_query: "sum(increase(merges_sum[1h]))"
+          duration: "30m"
+          step: "5m"
+          severity: "Degraded"
+        - query: "(sum(rate(merges_count[1h])) > 0) or on() (day_of_week() < 1 or day_of_week() > 5) or on() (hour() <= 7 or hour() >= 22)"
+          failure_query: "sum(increase(merges_sum[1h]))"
+          duration: "30m"
+          step: "5m"
+          severity: "Degraded"
   - component_slug: "prow"
     sub_component_slug: "gangway"
     prometheus_monitor:
@@ -104,7 +136,7 @@ components:
   - component_slug: "prow"
     sub_component_slug: "gcsweb"
     http_monitor:
-      url: "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+      url: "https://gcs.ci.openshift.org/gcs/test-platform-results-public"
       code: 200
       retry_after: 4m
       severity: "Down"
@@ -156,13 +188,20 @@ components:
           duration: "5m"
           step: "30s"
           severity: "Down"
+  - component_slug: "trt-incidents"
+    sub_component_slug: "incidents"
+    frequency: 30m
+    jira_monitor:
+      url: "https://redhat.atlassian.net"
+      jql: 'labels = trt-incident AND status in ("Planning", "New", "Refinement", "To Do", "Approved", "Dev Complete", "Review", "In Progress", "Testing", "ASSIGNED", "POST")'
+      severity: "Degraded"
   - component_slug: "boskos"
     sub_component_slug: "leasing-server"
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
       - query: "max(up{job=\"boskos\"}) > 0"
         duration: "5m"
@@ -170,131 +209,913 @@ components:
         severity: "Down"
   - component_slug: "boskos"
     sub_component_slug: "aws"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
-      - query: "sum(boskos_resources{type=\"aws-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-aws-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-aws-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-aws-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-aws-ovn"
+      artifact_path: "artifacts/e2e-aws-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
-    sub_component_slug: "aws-2"
+    sub_component_slug: "azure"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
-      - query: "sum(boskos_resources{type=\"aws-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-2-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-azure-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-azure-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-3"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-3-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-3-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-4"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-4-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-4-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "aws-5"
-    prometheus_monitor:
-      prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
-      queries:
-      - query: "sum(boskos_resources{type=\"aws-5-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"aws-5-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-azure-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-azure-ovn"
+      artifact_path: "artifacts/e2e-azure-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
     sub_component_slug: "gcp"
+    frequency: 15m
     prometheus_monitor:
       prometheus_location:
-        cluster: "app.ci"
-        namespace: "openshift-monitoring"
-        route: "thanos-querier"
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
       queries:
-      - query: "sum(boskos_resources{type=\"gcp-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-quota-slice\"})"
+      - query: "sum(boskos_resources{type=\"openshift-org-gcp-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-quota-slice\"})"
         duration: "30m"
         step: "1m"
         severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-release-main-ci-5.1-e2e-gcp-ovn"
+        - "periodic-ci-openshift-release-main-ci-5.0-e2e-gcp-ovn"
+      artifact_path: "artifacts/e2e-gcp-ovn/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
   - component_slug: "boskos"
-    sub_component_slug: "gcp-2"
+    sub_component_slug: "gcp-arm64"
+    frequency: 15m
+    prometheus_monitor:
+      prometheus_location:
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
+      queries:
+      - query: "sum(boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"openshift-org-gcp-arm64-quota-slice\"})"
+        duration: "30m"
+        step: "1m"
+        severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-multiarch-main-nightly-5.1-ocp-e2e-gcp-ovn-multi-a-a"
+        - "periodic-ci-openshift-multiarch-main-nightly-5.0-ocp-e2e-gcp-ovn-multi-a-a"
+      artifact_path: "artifacts/ocp-e2e-gcp-ovn-multi-a-a/gather-must-gather/artifacts/junit_install.xml"
+      testcase_prefix: "install should succeed:"
+      missing_artifact_unhealthy: false
+      group_by: "lease-resource-prefix"
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
+  - component_slug: "boskos-hypershift"
+    sub_component_slug: "aws"
+    frequency: 15m
+    prometheus_monitor:
+      prometheus_location:
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
+      queries:
+      - query: "sum(boskos_resources{type=\"hypershift-aws-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"hypershift-aws-quota-slice\"})"
+        duration: "30m"
+        step: "1m"
+        severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-hypershift-release-5.1-periodics-e2e-aws-ovn-conformance"
+        - "periodic-ci-openshift-hypershift-release-5.0-periodics-e2e-aws-ovn-conformance"
+      artifact_path: "artifacts/junit_operator.xml"
+      testcase_prefix: "Run multi-stage step create-hostedcluster"
+      missing_artifact_unhealthy: false
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
+  - component_slug: "boskos-hypershift"
+    sub_component_slug: "aks"
+    frequency: 15m
+    prometheus_monitor:
+      prometheus_location:
+        cluster: in-cluster
+        namespace: ci-monitoring
+        service: thanos-query-frontend-ci-query
+      queries:
+      - query: "sum(boskos_resources{type=\"hypershift-aks-quota-slice\",state=\"free\"}) > 0"
+        failure_query: "sum by (state) (boskos_resources{type=\"hypershift-aks-quota-slice\"})"
+        duration: "30m"
+        step: "1m"
+        severity: "CapacityExhausted"
+    junit_monitor:
+      job_names:
+        - "periodic-ci-openshift-hypershift-release-5.1-periodics-e2e-aks"
+        - "periodic-ci-openshift-hypershift-release-5.0-periodics-e2e-aks"
+      artifact_path: "artifacts/junit_operator.xml"
+      testcase_prefix: "Run multi-stage step aks-provision"
+      missing_artifact_unhealthy: false
+      max_age: "48h"
+      latest_run_group_window: "30m"
+      severity: "Degraded"
+      history_runs: 20
+      failed_runs_threshold: 3
+  # BEGIN: auto-generated build-farm entries (hack/generate-build-farm-monitor-config.py)
+  - component_slug: "build-farm"
+    sub_component_slug: "build01"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"gcp-openshift-gce-devel-ci-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-openshift-gce-devel-ci-2-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "gcp-3"
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build01.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build01\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build01"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build01"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build01"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build02"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"gcp-3-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"gcp-3-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "azure-2"
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build02.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build02\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build02"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build02"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build02"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build03"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"azure-2-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"azure-2-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
-  - component_slug: "boskos"
-    sub_component_slug: "azure4"
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build03.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build03\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build03"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build03"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build03"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build04"
     prometheus_monitor:
       prometheus_location:
         cluster: "app.ci"
         namespace: "openshift-monitoring"
         route: "thanos-querier"
       queries:
-      - query: "sum(boskos_resources{type=\"azure4-quota-slice\",state=\"free\"}) > 0"
-        failure_query: "sum by (state) (boskos_resources{type=\"azure4-quota-slice\"})"
-        duration: "30m"
-        step: "1m"
-        severity: "CapacityExhausted"
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build04.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build04\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build04"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build04"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build04"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build05"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build05.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build05\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build05"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build05"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build05"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build06"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build06.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build06\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build06"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build06"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build06"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build07"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build07.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build07\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build07"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build07"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build07"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build08"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build08.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build08\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build08"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build08"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build08"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build09"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build09.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build09\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build09"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build09"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build09"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build10"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build10.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build10\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build10"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build10"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build10"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build11"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build11.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build11\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build11"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build11"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build11"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build12"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.build12.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build12\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build12"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build12"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build12"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "build13"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console.build13.ci.openshift.org\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+        - query: "rate(prowjob_state_transitions{cluster=\"build13\",state=\"success\"}[2h]) > 0"
+          duration: "2h"
+          step: "5m"
+          severity: "Degraded"
+    junit_monitor:
+      job_names:
+        - "periodic-build-farm-canary-build13"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
+      max_age: "2h"
+      severity: "Degraded"
+      artifact_url_style: "gcs"
+      history_runs: 5
+      failed_runs_threshold: 3
+  - component_slug: "build-farm"
+    sub_component_slug: "build13"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "build13"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"ci-scheduling-webhook\",deployment=\"ci-scheduling-admission-webhook\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+  - component_slug: "build-farm"
+    sub_component_slug: "hosted-mgmt"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "app.ci"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "probe_success{job=\"blackbox\",instance=\"https://console-openshift-console.apps.hosted-mgmt.ci.devcluster.openshift.com\"} > 0"
+          duration: "5m"
+          step: "30s"
+          severity: "Down"
+  - component_slug: "build-farm"
+    sub_component_slug: "hosted-mgmt"
+    prometheus_monitor:
+      prometheus_location:
+        cluster: "hosted-mgmt"
+        namespace: "openshift-monitoring"
+        route: "thanos-querier"
+      queries:
+        - query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\"openshift-machine-api\",deployment=\"cluster-autoscaler-default\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+        - query: "(increase(cluster_autoscaler_failed_scale_ups_total[30m]) or vector(0)) == 0"
+          failure_query: "increase(cluster_autoscaler_failed_scale_ups_total[30m])"
+          duration: "5m"
+          step: "1m"
+          severity: "Degraded"
+        - query: "(cluster_autoscaler_unschedulable_pods_count or vector(0)) <= 20"
+          failure_query: "cluster_autoscaler_unschedulable_pods_count"
+          duration: "15m"
+          step: "1m"
+          severity: "Degraded"
+  # END: auto-generated build-farm entries

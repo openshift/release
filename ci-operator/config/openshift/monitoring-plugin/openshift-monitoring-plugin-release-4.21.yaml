@@ -6,15 +6,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: monitoring-plugin
-- dockerfile_path: Dockerfile.test
-  to: monitoring-plugin-test
-- dockerfile_path: Dockerfile.mcp
-  to: monitoring-console-plugin
-- context_dir: .
-  dockerfile_path: web/cypress/Dockerfile
-  to: monitoring-ui-tests-runner
+  items:
+  - dockerfile_path: Dockerfile
+    to: monitoring-plugin
+  - dockerfile_path: Dockerfile.test
+    to: monitoring-plugin-test
+  - dockerfile_path: Dockerfile.mcp
+    to: monitoring-console-plugin
+  - context_dir: .
+    dockerfile_path: web/cypress/Dockerfile
+    to: monitoring-ui-tests-runner
 promotion:
   to:
   - excluded_images:
@@ -34,10 +35,10 @@ releases:
 resources:
   '*':
     limits:
-      memory: 8Gi
+      memory: 16Gi
     requests:
       cpu: 1000m
-      memory: 8Gi
+      memory: 16Gi
 tests:
 - as: lint
   commands: |
@@ -49,15 +50,22 @@ tests:
     make test-translations
   container:
     from: monitoring-plugin-test
-- as: e2e-aws-ovn
+- as: test-frontend-unit
+  commands: |
+    make test-frontend-unit
+  container:
+    from: monitoring-plugin-test
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-hypershift-conformance
@@ -71,7 +79,7 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- always_run: true
+- always_run: false
   as: e2e-monitoring
   cluster_claim:
     architecture: amd64
@@ -83,6 +91,18 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
@@ -99,6 +119,18 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-coo-ui
@@ -115,6 +147,18 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-incidents-ui
@@ -211,6 +255,18 @@ tests:
     timeout: 2h0m0s
     version: "4.21"
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-virtualization-ui
@@ -218,8 +274,20 @@ tests:
 - always_run: false
   as: e2e-monitoring-dev
   optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: monitoring-plugin-tests-monitoring-dev-ui
     workflow: ipi-aws

@@ -11,27 +11,30 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/console
 images:
-- dockerfile_path: Dockerfile
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-8-base-nodejs-openshift-4.15
-  to: console-plugin-demo
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-8-base-nodejs-openshift-4.15
+    to: console-plugin-demo
 promotion:
   to:
   - additional_images:
       console-tests: src
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -43,11 +46,11 @@ resources:
       memory: 14Gi
   console:
     requests:
-      cpu: "1"
-      memory: 8Gi
+      cpu: "2"
+      memory: 10Gi
   frontend:
     requests:
-      cpu: "1"
+      cpu: "2"
       memory: 10Gi
   test-bin:
     requests:
@@ -75,9 +78,10 @@ tests:
   commands: ./analyze.sh
   container:
     from: test-bin
-- as: e2e-gcp-console
+- always_run: false
+  as: e2e-gcp-console
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

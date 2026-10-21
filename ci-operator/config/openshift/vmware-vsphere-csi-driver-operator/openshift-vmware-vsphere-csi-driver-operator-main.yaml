@@ -2,32 +2,33 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "5.0"
   virtctl:
-    name: "4.22"
+    name: "5.1"
     namespace: ocp
     tag: virtctl
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: vsphere-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: vsphere-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: vsphere-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: vsphere-csi-driver-operator-test
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -45,11 +46,13 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-operator-test
+- always_run: false
+  as: e2e-vsphere-operator-test
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -62,7 +65,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-vsphere
-- as: e2e-vsphere-csi
+- always_run: false
+  as: e2e-vsphere-csi
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-csi
@@ -86,7 +90,8 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
     workflow: openshift-e2e-vsphere-csi-hybrid
-- as: e2e-vsphere-ovn-upgrade
+- always_run: false
+  as: e2e-vsphere-ovn-upgrade
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-upgrade-vsphere
@@ -98,7 +103,8 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]
     workflow: openshift-e2e-vsphere-csi-extended
-- as: e2e-vsphere-csi-vcf9
+- always_run: false
+  as: e2e-vsphere-csi-vcf9
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -121,6 +127,38 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
+- always_run: false
+  as: tls-scanner-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "2"
+      SCANNER_MEMORY: 2Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-vsphere
+- always_run: false
+  as: tls-groups-scanner-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-storage-operator,openshift-cluster-csi-drivers
+      SCANNER_CPU: "2"
+      SCANNER_MEMORY: 2Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: main
   org: openshift

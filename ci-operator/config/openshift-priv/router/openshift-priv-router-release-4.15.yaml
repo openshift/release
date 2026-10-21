@@ -7,26 +7,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
-- dockerfile_path: images/router/base/Dockerfile.rhel
-  optional: true
-  to: haproxy-router-base
-- dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: haproxy-router-base
-  to: haproxy-router
+  items:
+  - dockerfile_path: images/router/base/Dockerfile.rhel
+    optional: true
+    to: haproxy-router-base
+  - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
+    from: haproxy-router-base
+    to: haproxy-router
 promotion:
   to:
-  - name: 4.15-priv
-    namespace: ocp-private
+  - name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -41,9 +44,10 @@ tests:
   commands: go test -race ./...
   container:
     from: src
-- as: e2e-agnostic
+- always_run: false
+  as: e2e-agnostic
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -69,9 +73,10 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-aws-serial
+- always_run: false
+  as: e2e-aws-serial
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-ipi-ovn-router
@@ -128,9 +133,10 @@ tests:
           memory: 500Mi
     - ref: baremetalds-e2e-test
     workflow: baremetalds-e2e
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: perfscale-aws-ingress-perf

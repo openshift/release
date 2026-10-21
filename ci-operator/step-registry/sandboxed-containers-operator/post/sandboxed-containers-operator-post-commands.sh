@@ -12,7 +12,7 @@ cleanup_kata() {
 			# PeerPods enabled, delete the kataconfig
 			if ! oc delete kataconfig --all --wait; then
 				echo "Failed to delete kata-config, resources might be left-behind"
-				exit 1
+				return 1
 			fi
 			echo "All kata configs deleted"
 		else
@@ -21,46 +21,138 @@ cleanup_kata() {
 	else
 		echo "No kata configs found"
 	fi
-	exit 0
+	return 0
 }
 
-# Delete AMI/snapshot if not provided manually, fall-backs to
-# kata-config cleanup if something goes wrong
+# Security groups created by the operator contain cross-references and can not
+# be deleted by "openshift-install destroy". Prune the rules and leave them
+# present.
+prune_aws_security_groups() {
+	local aws_region="$1"
+	local infra_id sg_ids sg_id
+
+	# Get infrastructure name (used in resource tags)
+	infra_id=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null) || true
+	if [[ -z "${infra_id}" ]]; then
+		echo "Could not get infrastructure name, skipping security group cleanup"
+		return 0
+	fi
+
+	echo "Cleaning up security groups for cluster ${infra_id} in region ${aws_region}..."
+
+	# Find security groups tagged with the cluster's infrastructure name
+	sg_ids=$(aws ec2 describe-security-groups \
+		--region "${aws_region}" \
+		--filters "Name=tag-key,Values=kubernetes.io/cluster/${infra_id}" \
+		--query 'SecurityGroups[*].GroupId' \
+		--output text 2>/dev/null) || true
+
+	if [[ -z "${sg_ids}" ]]; then
+		echo "No tagged security groups found for cluster ${infra_id}"
+		return 0
+	fi
+
+	echo "Found security groups: ${sg_ids}"
+
+	# Revoke all ingress and egress rules to remove cross-references
+	for sg_id in ${sg_ids}; do
+		echo "Revoking rules from security group ${sg_id}..."
+
+		# Get and revoke all ingress rules
+		local ingress_rules
+		ingress_rules=$(aws ec2 describe-security-groups \
+			--region "${aws_region}" \
+			--group-ids "${sg_id}" \
+			--query 'SecurityGroups[0].IpPermissions' \
+			--output json 2>/dev/null) || true
+
+		if [[ -n "${ingress_rules}" && "${ingress_rules}" != "[]" && "${ingress_rules}" != "null" ]]; then
+			aws ec2 revoke-security-group-ingress \
+				--region "${aws_region}" \
+				--group-id "${sg_id}" \
+				--ip-permissions "${ingress_rules}" 2>/dev/null || echo "Note: Could not revoke some ingress rules from ${sg_id}"
+		fi
+
+		# Get and revoke all egress rules
+		local egress_rules
+		egress_rules=$(aws ec2 describe-security-groups \
+			--region "${aws_region}" \
+			--group-ids "${sg_id}" \
+			--query 'SecurityGroups[0].IpPermissionsEgress' \
+			--output json 2>/dev/null) || true
+
+		if [[ -n "${egress_rules}" && "${egress_rules}" != "[]" && "${egress_rules}" != "null" ]]; then
+			aws ec2 revoke-security-group-egress \
+				--region "${aws_region}" \
+				--group-id "${sg_id}" \
+				--ip-permissions "${egress_rules}" 2>/dev/null || echo "Note: Could not revoke some egress rules from ${sg_id}"
+		fi
+	done
+
+	echo "Security group rules revoked, cross-references removed"
+}
+
+# Cleanup persistent AWS resources
+# * AMI/snapshot (on failure just delete kata-config)
+# * prune aws security groups (they contain cross-references and can not be removed otherwised)
+# * IRSA role + policy created in peerpods-param-cm (STS mode only)
 cleanup_aws() {
 	local ami_id aws_region aws_creds cm_data snapshot_id
 
-	# Get aws credentials from secrets
-	aws_creds=$(oc -n kube-system get secret aws-creds -o json)
-	AWS_ACCESS_KEY_ID="$(echo "${aws_creds}" | jq -r .data.aws_access_key_id | base64 -d)"
-	export AWS_ACCESS_KEY_ID
-	AWS_SECRET_ACCESS_KEY="$(echo "${aws_creds}" | jq -r .data.aws_secret_access_key | base64 -d)"
-	export AWS_SECRET_ACCESS_KEY
+	if [[ "${CREDENTIALS_MODE:-cco}" == "sts" ]]; then
+		# STS clusters do not have kube-system/aws-creds; use the CI profile credentials
+		export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+		# Clean up the IRSA role and policy created during peerpods setup
+		if [[ -s "${SHARED_DIR}/osc-irsa-role-arn" ]]; then
+			local role_arn role_name policy_arn
+			role_arn=$(cat "${SHARED_DIR}/osc-irsa-role-arn")
+			role_name=$(basename "${role_arn}")
+			if [[ -s "${SHARED_DIR}/osc-irsa-policy-arn" ]]; then
+				policy_arn=$(cat "${SHARED_DIR}/osc-irsa-policy-arn")
+				aws iam detach-role-policy --role-name "${role_name}" --policy-arn "${policy_arn}" || true
+				aws iam delete-policy --policy-arn "${policy_arn}" || true
+			fi
+			aws iam delete-role --role-name "${role_name}" || true
+			echo "Deleted IRSA role: ${role_arn}"
+		fi
+	else
+		# Get aws credentials from secrets
+		aws_creds=$(oc -n kube-system get secret aws-creds -o json)
+		AWS_ACCESS_KEY_ID="$(echo "${aws_creds}" | jq -r .data.aws_access_key_id | base64 -d)"
+		export AWS_ACCESS_KEY_ID
+		AWS_SECRET_ACCESS_KEY="$(echo "${aws_creds}" | jq -r .data.aws_secret_access_key | base64 -d)"
+		export AWS_SECRET_ACCESS_KEY
+	fi
 
 	# Check if cm exists
 	if ! oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o yaml; then
 		echo
 		echo '"oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm" failed, fallback to kata deletion'
-		cleanup_kata
+	else
+		cm_data=$(oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o jsonpath='{.data}')
+		ami_id=$(echo "${cm_data}" | jq -r '.PODVM_AMI_ID')
+		aws_region=$(echo "${cm_data}" | jq -r '.AWS_REGION')
 	fi
-
-	# Get peer-pods-cm once, extract PODVM_AMI_ID and AWS_REGION
-	cm_data=$(oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o jsonpath='{.data}')
-	ami_id=$(echo "${cm_data}" | jq -r '.PODVM_AMI_ID')
-	aws_region=$(echo "${cm_data}" | jq -r '.AWS_REGION')
 
 	if [[ -z "${aws_region}" ]]; then
 		echo
 		echo "No AWS_REGION in cm/peer-pods-cm, fallback to kata-cleanup"
-		cleanup_kata
 	fi
 
+	# Delete kataconfig first to prevent the operator from creating new resources
+	cleanup_kata
+
+	# Clean up security group cross-references
+	prune_aws_security_groups "${aws_region}"
+
+	# Delete AMI/snapshot if possible
 	if [[ -z "${ami_id}" ]]; then
 		echo
 		echo "No ami_id in cm/peer-pods-cm:"
 		oc get -n openshift-sandboxed-containers-operator cm/peer-pods-cm -o yaml
 		echo
 		echo "Running kata-cleanup as fallback..."
-		cleanup_kata
 	fi
 
 	# Describe image to get snapshot ID
@@ -69,35 +161,53 @@ cleanup_aws() {
 	if [[ -z "${snapshot_id}" ]]; then
 		echo
 		echo "No snapshot found for AMI ${ami_id}, running kata-cleanup as fallback..."
-		cleanup_kata
 	fi
 
 	# Deregister AMI
 	if ! aws ec2 deregister-image --image-id "${ami_id}" --region "${aws_region}"; then
 		echo
 		echo "Failed to deregister image ${ami_id}, running kata-cleanup as fallback..."
-		cleanup_kata
+	else
+		echo "Deleted AMI: ${ami_id}"
 	fi
-	echo "Deleted AMI: ${ami_id}"
 
 	# Delete snapshot
 	if ! aws ec2 delete-snapshot --snapshot-id "${snapshot_id}" --region "${aws_region}"; then
 		echo
 		echo "Failed to delete snapshot ${snapshot_id}, running kata-cleanup as fallback..."
-		cleanup_kata
+	else 
+		echo "Deleted snapshot: ${snapshot_id}"
 	fi
-	echo "Deleted snapshot: ${snapshot_id}"
 
-	echo "Skipping kata-cleanup as the default resources were removed manually"
-	exit 0
+	cleanup_kata
+	exit $?
 }
 
-# Remove our NSG on ARO+peer-pods (do nothing on plain azure)
+# Remove our NSG on ARO+peer-pods; also cleans up STS role assignments on plain azure
 cleanup_azure() {
 	local IS_ARO
 	IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
+
 	if [[ "${IS_ARO}" != "true" ]]; then
-		echo "We are not on ARO"
+		# STS mode: delete subscription-level role assignments saved during peerpods setup.
+		# These live outside the cluster resource group and survive cluster destroy.
+		if [[ "${CREDENTIALS_MODE:-cco}" == "sts" ]] && [[ -s "${SHARED_DIR}/osc-azure-role-assignment-ids" ]]; then
+			local AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+			az login \
+				--service-principal \
+				--username "$(jq -r .clientId "${AZURE_AUTH_LOCATION}")" \
+				--password "$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")" \
+				--tenant "$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")" \
+				--output none
+			echo "Deleting subscription-level role assignments for OSC managed identity..."
+			while IFS= read -r assignment_id; do
+				[[ -z "${assignment_id}" ]] && continue
+				az role assignment delete --ids "${assignment_id}" || \
+					echo "Warning: failed to delete role assignment ${assignment_id}"
+			done < "${SHARED_DIR}/osc-azure-role-assignment-ids"
+		else
+			echo "We are not on ARO"
+		fi
 		return
 	fi
 	if [[ "${ENABLEPEERPODS:-false}" != "true" ]]; then

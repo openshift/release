@@ -252,7 +252,7 @@ minimalISO: ${MINIMAL_ISO}
 EOF
 fi
 
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file for post installation..."

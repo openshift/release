@@ -53,17 +53,46 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   BMC_NETWORK="${2}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
+
+  LOCK="/tmp/firewall_file.lock"
+  LOCK_FD=200
+  exec 200>"$LOCK"
+
+  cleanup() {
+    echo "Releasing lock"
+    exec 200>&- || true
+  }
+
+  trap cleanup EXIT INT TERM
+
+  echo "Acquiring lock $LOCK_FD ($LOCK) (waiting up to 5 minutes)"
+  flock -w 300 $LOCK_FD
+  echo "Lock acquired $LOCK_FD ($LOCK)"
+
+  remove_rule_safely() {
+    local err_msg
+    echo "+ firewall-cmd $*"
+    set +o errexit
+    err_msg=$(firewall-cmd "$@" 2>&1)
+    local exit_code=$?
+    set -o errexit
+
+    if [ $exit_code -eq 0 ] || [[ "$err_msg" == *"NOT_SET"* ]]; then
+      return 0
+    fi
+    
+    echo "ERROR: remove_rule_safely failed with exit code $exit_code: $err_msg" >&2
+    return $exit_code
+  }
+
   for ip in "${IP_ARRAY[@]}"; do
-    # TODO: change to firewalld or nftables
-    while read -r line; do
-      read -r -a RULE <<< "${line}"
-      [[ "${line}" =~ D.*s.*${ip}.*j ]] && iptables "${RULE[@]}"
-    done < <(iptables -S FORWARD | grep "${ip}" | sed 's/^-A /-D /')
+    if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
+      remove_rule_safely --zone=internal --remove-rich-rule="rule family='ipv4' source address='${ip}' destination address='${BMC_NETWORK}' accept"
+    fi
+    remove_rule_safely --zone=internal --remove-rich-rule="rule family='ipv4' source address='${ip}' destination not address='${INTERNAL_NET_CIDR}' drop"
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
-    while read -r line; do
-      read -r -a RULE <<< "${line}"
-      [[ "${line}" =~ D.*s.*${IPI_BOOTSTRAP_IP}.*j ]] && iptables "${RULE[@]}"
-    done < <(iptables -S FORWARD | grep "${IPI_BOOTSTRAP_IP}" | sed 's/^-A /-D /')
+    remove_rule_safely --zone=internal --remove-rich-rule="rule family='ipv4' source address='${IPI_BOOTSTRAP_IP}' destination address='${BMC_NETWORK}' accept"
+    remove_rule_safely --zone=internal --remove-rich-rule="rule family='ipv4' source address='${IPI_BOOTSTRAP_IP}' destination not address='${INTERNAL_NET_CIDR}' drop"
   fi
 EOF

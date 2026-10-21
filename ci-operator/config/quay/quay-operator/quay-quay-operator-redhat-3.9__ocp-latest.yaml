@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.21"
     namespace: ocp
     tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi
     namespace: ocp
@@ -11,26 +15,27 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
-- dockerfile_path: Dockerfile
-  from: ubi
-  to: quay-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi
+    to: quay-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
 operator:
   bundles:
   - as: quay
     context_dir: bundle/
-    dockerfile_path: Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/projectquay/quay-operator:v3.6.1
     with: quay-operator
@@ -43,7 +48,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.13"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -52,39 +57,23 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: aws-2
-    dependencies:
-      OO_INDEX: ci-index-quay
+    cluster_profile: openshift-org-aws
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: quay-operator
-      OO_TARGET_NAMESPACES: '!all'
+      COMPUTE_NODE_TYPE: m5.4xlarge
     post:
     - ref: quay-gather
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - ref: quay-install-odf-operator
-    - ref: optional-operators-subscribe
+    - ref: quay-install-operator-bundle
     - ref: quay-install-quay
-    - ref: quay-create-admin
+    - ref: quay-create-admin-user
     test:
-    - as: tests
-      commands: |
-        set -eux
-        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
-        registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
-      from: src-oc
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
+    - ref: quay-test-mirror-image
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: redhat-3.9
   org: quay

@@ -8,6 +8,9 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     candidate:
@@ -25,10 +28,21 @@ resources:
 tests:
 - as: quay-omr-tests-omr-ocp414-disconnected
   cron: 0 12 * * 3
+  reporter_config:
+    channel: '#quay-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
+      OMR_RELEASE: "true"
     post:
     - chain: quay-tests-aws-ipi-disconnected-private-deprovision
     test:

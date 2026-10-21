@@ -7,15 +7,18 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: ./cmd/pure.Dockerfile
-  from: base
-  to: cluster-proxy
+  items:
+  - dockerfile_path: ./cmd/pure.Dockerfile
+    from: base
+    to: cluster-proxy
 promotion:
   to:
   - name: "2.10"
     namespace: stolostron
+prowgen:
+  disable_sparse_checkout: true
 resources:
   '*':
     requests:
@@ -68,9 +71,9 @@ tests:
         export OSCI_COMPONENT_VERSION="2.10"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

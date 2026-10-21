@@ -591,8 +591,12 @@ jq '.[0] as $headers | [.[1:][] | [., $headers] | transpose | map({(.[1]): .[0]}
 # Filter results by each key
 for column in $(echo "$RESULT_SELECT_BY_COLUMNS" | jq -r '.[]');
 do
-  value="$(jq -r --arg c "$column" '.[$c]' "$OUT_SELECT_DICT")"
-  cat <<< "$(jq -r --arg c "$column" --arg v "$value" 'map(select(.[$c] == $v))' "$candidate_results")" > "$candidate_results"
+  if ! jq -e --arg c "$column" 'has($c)' "$OUT_SELECT_DICT" > /dev/null 2>&1; then
+    echo "Skipping filter for column '$column': not present in selected record"
+    continue
+  fi
+  value="$(jq -r --arg c "$column" '.[$c] // ""' "$OUT_SELECT_DICT")"
+  cat <<< "$(jq -r --arg c "$column" --arg v "$value" 'map(select((.[$c] // "") == $v))' "$candidate_results")" > "$candidate_results"
 done
 
 cat <<< "$(jq -r 'map(select(.OverallResult == "PASS")) | sort_by( (.CreatedDate | sub(",[ ]*$"; "") | strptime("%Y-%m-%d %H:%M:%S%z") | mktime) ) | reverse' "$candidate_results")" > "$candidate_results"

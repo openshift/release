@@ -2,21 +2,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.19
+    tag: rhel-9-release-golang-1.24-openshift-4.19
 images:
-- build_args:
-  - name: GOLANG_IMAGE
-    value: golang:1.23
-  - name: GOLANG_DIR
-    value: /usr/local/go
-  dockerfile_path: Dockerfile.rhoai
-  to: kueue-operator
+  items:
+  - build_args:
+    - name: GOLANG_IMAGE
+      value: golang:1.23
+    - name: GOLANG_DIR
+      value: /usr/local/go
+    dockerfile_path: Dockerfile.rhoai
+    to: kueue-operator
 releases:
   latest:
     release:
       architecture: multi
       channel: stable
-      version: "4.15"
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -45,8 +46,12 @@ tests:
         sed -i "s|odh-kueue-controller-image=.*|odh-kueue-controller-image=${KUEUE_CONTROLLER_IMAGE}|g" config/rhoai/params.env
         oc apply --server-side -k ./config/rhoai
         oc wait --for=condition=ready --timeout=360s -n opendatahub $(oc get pods -n opendatahub -o name | grep kueue)
-        oc apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/latest/download/manifests.yaml
+        oc apply --server-side -f https://github.com/kubernetes-sigs/jobset/releases/download/v0.8.0/manifests.yaml
         oc wait --for=condition=ready --timeout=360s -n jobset-system $(oc get pods -n jobset-system -o name | grep jobset)
+        oc apply --server-side -f https://github.com/kubernetes-sigs/lws/releases/download/v0.5.1/manifests.yaml
+        oc wait --for=condition=ready --timeout=360s -n lws-system $(oc get pods -n lws-system -o name | grep lws)
+        oc apply --server-side -f https://github.com/project-codeflare/appwrapper/releases/download/v1.1.0/install.yaml
+        oc wait --for=condition=ready --timeout=360s -n appwrapper-system $(oc get pods -n appwrapper-system -o name | grep appwrapper)
         echo "Adding label on worker node ..."
         oc label node --selector=node-role.kubernetes.io/worker instance-type=on-demand
         go version

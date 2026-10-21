@@ -5,14 +5,15 @@ build_root:
     tag: ubi9-v1.23
 canonical_go_repository: github.com/openshift/velero
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.ubi
-  to: velero-oadp-1.4
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile-velero-restore-helper.ubi
-  to: velero-restore-helper-oadp-1.4
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.ubi
+    to: velero-oadp-1.4
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile-velero-restore-helper.ubi
+    to: velero-restore-helper-oadp-1.4
 promotion:
   to:
   - additional_images:
@@ -21,11 +22,8 @@ promotion:
     disabled: true
     name: velero
     namespace: konveyor
-releases:
-  latest:
-    release:
-      channel: fast
-      version: "4.13"
+prowgen:
+  private: true
 resources:
   '*':
     limits:
@@ -33,30 +31,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: unit-test
-  optional: true
-  steps:
-    test:
-    - as: unit
-      commands: PATH="/go/bin:$PATH" make -f Makefile.prow ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: lint
-  run_if_changed: .*\.go$
-  steps:
-    test:
-    - as: lint
-      commands: |
-        PATH="/go/bin:$PATH" make -f Makefile.prow lint
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 zz_generated_metadata:
   branch: oadp-1.4
   org: openshift-priv

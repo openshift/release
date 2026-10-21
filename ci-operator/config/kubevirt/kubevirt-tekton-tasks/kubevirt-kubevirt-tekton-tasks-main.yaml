@@ -2,23 +2,24 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.26-openshift-5.0
 images:
-- dockerfile_path: automation/generatetasks/build/Dockerfile
-  to: base-tests
-- dockerfile_path: build/Containerfile
-  to: tekton-tasks
-- dockerfile_path: build/Containerfile.DiskVirt
-  to: tekton-task-disk-virt
+  items:
+  - dockerfile_path: automation/generatetasks/build/Dockerfile
+    to: base-tests
+  - dockerfile_path: build/Containerfile
+    to: tekton-tasks
+  - dockerfile_path: build/Containerfile.DiskVirt
+    to: tekton-task-disk-virt
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "5.0"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "5.0"
       namespace: ocp
 resources:
   '*':
@@ -69,9 +70,9 @@ tests:
         NUM_NODES=4 \
           make e2e-tests
       credentials:
-      - mount_path: /tmp/secrets
-        name: tekton-tasks-pusher
-        namespace: test-credentials
+      - collection: tekton-tasks-secrets
+        group: tekton-tasks-pusher
+        mount_path: /tmp/secrets
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks
@@ -94,9 +95,9 @@ tests:
       cli: latest
       commands: TARGET=windows10 ./automation/e2e-pipelines/example-pipelines-test.sh
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
-        namespace: test-credentials
+      - collection: common-templates-secrets
+        group: common-templates-container-disk-puller
+        mount_path: /tmp/secrets
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks
@@ -119,9 +120,9 @@ tests:
       cli: latest
       commands: TARGET=windows11 ./automation/e2e-pipelines/example-pipelines-test.sh
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
-        namespace: test-credentials
+      - collection: common-templates-secrets
+        group: common-templates-container-disk-puller
+        mount_path: /tmp/secrets
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks
@@ -144,9 +145,9 @@ tests:
       cli: latest
       commands: TARGET=windows2k22 ./automation/e2e-pipelines/example-pipelines-test.sh
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
-        namespace: test-credentials
+      - collection: common-templates-secrets
+        group: common-templates-container-disk-puller
+        mount_path: /tmp/secrets
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks
@@ -169,9 +170,9 @@ tests:
       cli: latest
       commands: TARGET=windows2k25 ./automation/e2e-pipelines/example-pipelines-test.sh
       credentials:
-      - mount_path: /tmp/secrets
-        name: common-templates-container-disk-puller
-        namespace: test-credentials
+      - collection: common-templates-secrets
+        group: common-templates-container-disk-puller
+        mount_path: /tmp/secrets
       dependencies:
       - env: TEKTON_TASKS_IMAGE
         name: tekton-tasks

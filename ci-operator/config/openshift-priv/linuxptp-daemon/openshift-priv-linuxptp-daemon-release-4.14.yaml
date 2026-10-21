@@ -1,32 +1,35 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base-rhel9
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/linuxptp-daemon
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: ptp
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: ptp
 promotion:
   to:
   - disabled: true
     name: ptp-4.14
     namespace: origin
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -41,10 +44,6 @@ tests:
   commands: make fmt
   container:
     from: src
-- as: e2e-aws
-  steps:
-    cluster_profile: aws-3
-    workflow: openshift-e2e-aws
 - as: security
   optional: true
   skip_if_only_changed: ^hack/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$

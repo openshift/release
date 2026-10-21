@@ -7,13 +7,25 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 
-ES_PASSWORD=$(cat "/secret/es/password" || true)
-ES_USERNAME=$(cat "/secret/es/username" || true)
+typeset secretDir=/secret/es
+ES_PASSWORD=$(<"${secretDir}/es-password--${CHAOS_TEAM_NAME}")
+ES_USERNAME=$(<"${secretDir}/es-username--${CHAOS_TEAM_NAME}")
 
 export ES_PASSWORD
 export ES_USERNAME
 
-export ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+case "${CHAOS_TEAM_NAME}" in
+  chaos)
+    ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    ;;
+  lp-chaos)
+    ES_SERVER="https://open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com"
+    ;;
+  *)
+    ES_SERVER=""
+    ;;
+esac
+export ES_SERVER
 
 # # read passwords from vault
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
@@ -59,12 +71,22 @@ elif [ "$platform" = "GCP" ]; then
     export ZONE
 fi
 
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running zone outages
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
 ./zone-outages/prow_run.sh
-rc=$?
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-
-echo "Finished running zone outages"
-echo "Return code: $rc"

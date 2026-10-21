@@ -15,8 +15,12 @@ export ROLE_WORKER_CNF=worker-cnf
 TELCO_CI_REPO="https://github.com/openshift-kni/telco-ci.git"
 NTO_REPO="https://github.com/openshift/cluster-node-tuning-operator.git"
 NTO_BRANCH=$(git ls-remote --heads ${NTO_REPO} main | grep -q 'refs/heads/main'  && echo 'main' || echo 'master')
-GINKGO_LABEL="uncore-cache"
-GINKGO_SUITES="test/e2e/performanceprofile/functests/13_llc"
+if [[ -n "${TEST_RUN_FEATURES:-}" ]]; then
+    GINKGO_LABEL="${TEST_RUN_FEATURES}"
+else
+    GINKGO_LABEL='(tier-0 || tier-1 || tier-2 || tier-3 || uncore-cache || workload-hints || tuned-deferred) && !mixed-cpus'
+fi
+GINKGO_SUITES="test/e2e/performanceprofile/functests"
 
 [[ -f "${SHARED_DIR}"/main.env ]] && source "${SHARED_DIR}"/main.env || echo "No main.env file found"
 
@@ -132,6 +136,7 @@ export GOPATH="${HOME}"/go
 export GOBIN="${GOPATH}"/bin
 export IMAGE_REGISTRY=quay.io/openshift-kni/
 export CNF_TESTS_IMAGE=cnf-tests:latest
+export BUSY_CPUS_IMAGE=cnf-tests:latest
 
 ## Print the nodes in the cluster
 oc get nodes
@@ -160,36 +165,69 @@ echo "Ginkgo command failed with exit code: ${run_tests_status}"
 
 python3 -m venv "${SHARED_DIR}"/myenv
 source "${SHARED_DIR}"/myenv/bin/activate
-git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci
+for attempt in $(seq 1 5); do
+  git clone https://github.com/openshift-kni/telco5gci "${SHARED_DIR}"/telco5gci && break
+  echo "WARNING: telco5gci clone attempt ${attempt}/5 failed, retrying in 10s..."
+  rm -rf "${SHARED_DIR}"/telco5gci
+  sleep 10
+done
+if [[ ! -d "${SHARED_DIR}"/telco5gci ]]; then
+  echo "ERROR: Failed to clone telco5gci after 5 attempts"
+  exit 1
+fi
 pip install -r "${SHARED_DIR}"/telco5gci/requirements.txt
 
-for junit_file in "${ARTIFACT_DIR}"/*.xml; do
-    if [ ! -e "${junit_file}" ]; then
-        echo "No XML files found in ${ARTIFACTS_DIR}."
+# Report generation strategy:
+# 1. Filter: ginkgo with --keep-separate-reports produces per-directory XMLs, but
+#    directories with no tests matching our label filter produce empty XMLs (0 test
+#    cases). Remove those to avoid cluttering artifacts with empty reports.
+# 2. Merge: combine only non-empty XMLs into a single junit.xml so the merged
+#    report reflects only directories where tests actually ran.
+# 3. Reports: generate HTML and JSON for all XMLs including the merged junit.xml,
+#    giving us both per-directory and consolidated reports.
+# 4. Cleanup: remove per-directory XMLs after report generation so Prow only sees
+#    the merged junit.xml. Without this, Prow shows every test result twice.
+non_empty_xml=()
+for xml_file in "${ARTIFACT_DIR}"/*.xml; do
+    if [ ! -e "${xml_file}" ]; then
+        echo "No XML files found in ${ARTIFACT_DIR}."
         exit 0
     fi
+    test_count=$(grep -o 'tests="[0-9]*"' "${xml_file}" | head -1 | grep -o '[0-9]*')
+    if [[ -z "${test_count}" || "${test_count}" -eq 0 ]]; then
+        echo "Removing empty XML: ${xml_file}"
+        rm -f "${xml_file}"
+    else
+        non_empty_xml+=("${xml_file}")
+    fi
+done
+
+if [ ${#non_empty_xml[@]} -eq 0 ]; then
+    echo "No non-empty XML files found."
+    exit 0
+fi
+
+# Merge non-empty XMLs into junit.xml
+echo "Merging ${#non_empty_xml[@]} XML files into ${ARTIFACT_DIR}/junit.xml"
+junitparser merge "${non_empty_xml[@]}" "${ARTIFACT_DIR}"/junit.xml
+
+# Generate HTML and JSON reports for all XMLs including the merged junit.xml
+for junit_file in "${ARTIFACT_DIR}"/*.xml; do
     output_file="${junit_file%.xml}.html"
-    # Run j2html.py on the XML file
     echo "Processing ${junit_file} -> ${output_file}"
-    python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"
-    if [[ $? -ne 0 ]]; then
-         echo "Error: Failed to process ${junit_file}."
-         exit 1;
+    if ! python "${SHARED_DIR}"/telco5gci/j2html.py "${junit_file}" -o "${output_file}"; then
+        echo "Error: Failed to process ${junit_file}."
+        exit 1
     fi
 
-    # create json reports
     json_output_file="${junit_file%.xml}.json"
     python "${SHARED_DIR}"/telco5gci/junit2json.py "${junit_file}" -o "${json_output_file}"
 done
 
-# Run junitparser merge
-
-xml_files=("$ARTIFACT_DIR"/*.xml)
-output_file="${ARTIFACT_DIR}"/junit.xml
-
-# Merge XML files using junitparser
-echo "Merging XML files into ${output_file}"
-junitparser merge "${xml_files[@]}" "${output_file}"
+# Remove per-directory XMLs, keep only the merged junit.xml
+for xml_file in "${non_empty_xml[@]}"; do
+    rm -f "${xml_file}"
+done
 
 rm -rf "${SHARED_DIR}"/myenv "${SHARED_DIR}"/telco5gci
 set +x

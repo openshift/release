@@ -64,7 +64,7 @@ function install_opm() {
 
 function install_oc() {
     echo "Install oc"
-    run_command "curl -L --retry 5 https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz | tar -xz -C ${TOOLS_DIR} oc && chmod +x ${TOOLS_DIR}/oc"
+    run_command "curl -L --retry 5 https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/ocp/stable/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz | tar -xz -C ${TOOLS_DIR} oc && chmod +x ${TOOLS_DIR}/oc"
 }
 
 function install_deps() {

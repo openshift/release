@@ -4,14 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Get OCP version from the release image metadata.
-# Must run before proxy setup: the build farm registry needs a direct connection.
-export HOME="${HOME:-/tmp/home}"
-export XDG_RUNTIME_DIR="${HOME}/run"
-mkdir -p "${XDG_RUNTIME_DIR}"
-KUBECONFIG="" oc registry login
-OCP_VERSION="$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f1,2)"
-
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -35,25 +27,50 @@ UNCOMPRESSED_SHA256="$(jq --raw-output '.architectures.x86_64.artifacts.openstac
 IMAGE_VERSION="$(jq --raw-output '.architectures.x86_64.artifacts.openstack.release' "$COREOS_JSON")"
 rm -f "$COREOS_JSON"
 
-IMAGE_NAME="${OPENSTACK_RHCOS_IMAGE_NAME}-${OCP_VERSION}"
+# Include the RHCOS stream version in the image name so that each
+# RHCOS build gets its own immutable Glance image (e.g.
+# "rhcos-422.94.202506120833-0"). The RHCOS version already encodes
+# the OCP minor version (422 = 4.22, 500 = 5.0), so it is unique
+# across releases. This makes each job pick their respective release.
+IMAGE_NAME="${OPENSTACK_RHCOS_IMAGE_NAME}-${IMAGE_VERSION}"
 
 echo "RHCOS version from installer: ${IMAGE_VERSION}"
+echo "Target image name: ${IMAGE_NAME}"
 echo "Image URL: ${IMAGE_URL}"
 
-# Check if the image already exists and is up-to-date
-CURRENT_SHA256=""
-if IMAGE_PROPS="$(openstack image show -c properties -f json "$IMAGE_NAME" 2>/dev/null)"; then
-	CURRENT_SHA256="$(echo "$IMAGE_PROPS" | jq --raw-output '
-		.properties["owner_specified.openstack.sha256"] //
-		.properties["sha256"] //
-		empty
-	')"
+# Use `openstack image list` instead of `openstack image show` for all
+# name-based lookups and always operate by image ID. This avoids failures
+# when multiple images share the same name (e.g. after a concurrent upload
+# race) and makes the script self-healing: duplicate images are cleaned up
+# on the next run.
+
+# List all images with the target name
+EXISTING_IMAGES="$(openstack image list --name "$IMAGE_NAME" -f json)"
+EXISTING_COUNT="$(echo "$EXISTING_IMAGES" | jq 'length')"
+
+# If there are duplicates, clean them up (keep the newest one)
+if [[ "$EXISTING_COUNT" -gt 1 ]]; then
+	echo "WARNING: Found ${EXISTING_COUNT} images named '${IMAGE_NAME}'. Cleaning up duplicates..."
+	DUPLICATE_IDS="$(echo "$EXISTING_IMAGES" | jq -r 'sort_by(.["Created At"]) | reverse | .[1:] | .[].ID')"
+	for id in $DUPLICATE_IDS; do
+		echo "  Deleting duplicate image ${id}..."
+		openstack image delete "$id" 2>/dev/null || true
+	done
+
+	# Re-list after cleanup and abort if duplicates persist, to prevent
+	# creating yet another image and making the problem worse.
+	EXISTING_IMAGES="$(openstack image list --name "$IMAGE_NAME" -f json)"
+	EXISTING_COUNT="$(echo "$EXISTING_IMAGES" | jq 'length')"
+	if [[ "$EXISTING_COUNT" -gt 1 ]]; then
+		echo "ERROR: Failed to clean up duplicate images named '${IMAGE_NAME}' (${EXISTING_COUNT} remaining). Aborting to prevent further accumulation."
+		exit 1
+	fi
 fi
 
-if [[ "$CURRENT_SHA256" == "$UNCOMPRESSED_SHA256" ]]; then
-	echo "RHCOS image '${IMAGE_NAME}' already at the expected version (${IMAGE_VERSION}). Skipping upload."
+if [[ "$EXISTING_COUNT" -eq 1 ]]; then
+	echo "RHCOS image '${IMAGE_NAME}' already exists. Skipping upload."
 else
-	echo "RHCOS image '${IMAGE_NAME}' needs to be uploaded (current sha256: '${CURRENT_SHA256}', expected: '${UNCOMPRESSED_SHA256}')"
+	echo "RHCOS image '${IMAGE_NAME}' not found. Uploading..."
 
 	WORK_DIR="$(mktemp -d)"
 
@@ -72,27 +89,19 @@ else
 	echo "Verifying uncompressed image checksum..."
 	echo "${UNCOMPRESSED_SHA256}  ${UNCOMPRESSED_FILE}" | sha256sum --check --quiet
 
-	# Clean up leftover from any previous failed run
-	openstack image delete "${IMAGE_NAME}-new" 2>/dev/null || true
-
-	echo "Uploading image to '${OS_CLOUD}' as '${IMAGE_NAME}-new'..."
-	NEW_IMAGE_ID="$(openstack image create "${IMAGE_NAME}-new" \
+	echo "Uploading image to '${OS_CLOUD}' as '${IMAGE_NAME}'..."
+	IMAGE_ID=$(openstack image create "${IMAGE_NAME}" \
 		--container-format bare \
 		--disk-format qcow2 \
 		--file "$UNCOMPRESSED_FILE" \
 		--private \
 		--property sha256="$UNCOMPRESSED_SHA256" \
 		--property rhcos_version="$IMAGE_VERSION" \
-		--format value --column id)"
-
-	echo "Replacing old '${IMAGE_NAME}' image with new one..."
-	openstack image delete "${IMAGE_NAME}-old" 2>/dev/null || true
-	openstack image set --name "${IMAGE_NAME}-old" "$IMAGE_NAME" 2>/dev/null || true
-	openstack image set --name "$IMAGE_NAME" "$NEW_IMAGE_ID"
+        --format value --column id)
 
 	rm -rf "$WORK_DIR"
 
-	echo "RHCOS image '${IMAGE_NAME}' updated to version ${IMAGE_VERSION}."
+	echo "RHCOS image '${IMAGE_NAME}' with ID '${IMAGE_ID}' uploaded."
 fi
 
 # Patch install-config.yaml to use the pre-uploaded image

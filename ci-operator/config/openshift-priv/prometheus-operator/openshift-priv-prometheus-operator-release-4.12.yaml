@@ -1,35 +1,38 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 build_root:
   from_repository: true
 canonical_go_repository: github.com/coreos/prometheus-operator
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  to: prometheus-operator
-- dockerfile_path: Dockerfile.config-reloader.ocp
-  from: base
-  to: prometheus-config-reloader
-- dockerfile_path: Dockerfile.admission-webhook.ocp
-  from: base
-  to: prometheus-operator-admission-webhook
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: prometheus-operator
+  - dockerfile_path: Dockerfile.config-reloader.ocp
+    from: base
+    to: prometheus-config-reloader
+  - dockerfile_path: Dockerfile.admission-webhook.ocp
+    from: base
+    to: prometheus-operator-admission-webhook
 promotion:
   to:
-  - name: 4.12-priv
-    namespace: ocp-private
+  - name: "4.12"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -44,17 +47,20 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-agnostic-cmo
+- always_run: false
+  as: e2e-agnostic-cmo
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest

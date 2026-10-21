@@ -9,9 +9,10 @@ build_root:
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: search-aggregator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: search-aggregator
 promotion:
   to:
   - name: "2.7"
@@ -48,8 +49,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -58,8 +60,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

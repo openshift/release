@@ -1,5 +1,8 @@
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: deck
+  namespace: openshift
 parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
@@ -18,7 +21,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 8080
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -34,7 +37,7 @@ objects:
       haproxy.router.openshift.io/timeout: "90s"
   spec:
     port:
-      targetPort: 8080
+      targetPort: main
     tls:
       insecureEdgeTerminationPolicy: Redirect
       termination: edge
@@ -83,9 +86,26 @@ objects:
           app: prow
           component: deck
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck
+              topologyKey: kubernetes.io/hostname
         serviceAccountName: deck
         initContainers:
         - name: git-sync-init
+          resources:
+            requests:
+              memory: "256Mi"
           command:
           - /git-sync
           args:
@@ -100,26 +120,14 @@ objects:
           - name: release
             mountPath: /tmp/git-sync
         containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=main
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
         - name: deck
-          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260217-999e46ca7
+          # Forked Deck: adds --history-bucket*, which upstream Deck rejects on
+          # startup. Built weekly from upstream main plus the patch by
+          # supplemental-ci-images/prow-deck. The upstream image bumper does
+          # not manage this internal registry image.
+          image: registry.ci.openshift.org/ci/deck:history-bucket
+          # Mutable tag, so a re-push plus `oc rollout restart` is enough to ship a fix.
+          imagePullPolicy: Always
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -135,10 +143,17 @@ objects:
           - --oauth-url=/github-login
           - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
+          - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
+          - --history-bucket=test-platform-results
+          # Points at deck-history, which serves this same path behind SSO with
+          # the full set of lenses. The prefix is joined to the run path, so the
+          # Artifacts link resolves to the identical URL on the other host.
+          - --history-bucket-browser-prefix=https://deck-history-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/
+          - --history-bucket-banner=The artifacts for this job were archived to a private bucket and are not served here. Use the Artifacts link to proceed to the SSO-protected version of this page.
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
-          - --plugin-config=/etc/plugins/plugins.yaml
-          - --supplemental-plugin-config-dir=/etc/plugins
+          - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+          - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
           - --kubeconfig-dir=/etc/build-farm-credentials
           - --kubeconfig-suffix=config
           - --tenant-id=GlobalDefaultID
@@ -173,11 +188,11 @@ objects:
             readOnly: true
           - name: service-account-token
             mountPath: /var/sa-token
+          - name: test-platform-results-viewer
+            mountPath: /etc/test-platform-results-viewer
+            readOnly: true
           - name: config
             mountPath: /etc/config
-            readOnly: true
-          - name: plugins
-            mountPath: /etc/plugins
             readOnly: true
           - name: extensions
             mountPath: /var/run/ko/static/extensions
@@ -195,8 +210,26 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "11Gi"
-              cpu: "500m"
+              memory: "28Gi"
+              cpu: "2"
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --ref=main
+          - --period=30s
+          - --root=/tmp/git-sync
+          - --max-failures=3
+          - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "100m"
         volumes:
         - name: github-app-credentials
           secret:
@@ -209,9 +242,6 @@ objects:
         - name: config
           configMap:
             name: config
-        - name: plugins
-          configMap:
-            name: plugins
         - name: extensions
           configMap:
             name: deck-extensions
@@ -221,6 +251,9 @@ objects:
         - name: cookie-secret
           secret:
             secretName: cookie
+        - name: test-platform-results-viewer
+          secret:
+            secretName: test-platform-results-viewer
         - name: release
           emptyDir: {}
         - name: build-farm-credentials
@@ -284,9 +317,26 @@ objects:
           app: prow
           component: deck-internal
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    component: deck-internal
+                topologyKey: topology.kubernetes.io/zone
+            requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  component: deck-internal
+              topologyKey: kubernetes.io/hostname
         serviceAccountName: deck
         initContainers:
         - name: git-sync-init
+          resources:
+            requests:
+              memory: "256Mi"
           command:
           - /git-sync
           args:
@@ -317,9 +367,13 @@ objects:
             mountPath: /tmp/git-sync
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "0.5"
+              memory: "512Mi"
+              cpu: "100m"
         - name: oauth-proxy
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
           image: quay.io/openshift/origin-oauth-proxy:4.16
           imagePullPolicy: IfNotPresent
           ports:
@@ -334,8 +388,8 @@ objects:
           - -client-id=system:serviceaccount:ci:deck
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}'
-          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
+          - '-openshift-sar={"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "subresource": "layers", "namespace": "ocp-priv"}'
+          - '-openshift-delegate-urls={"/": {"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "subresource": "layers", "namespace": "ocp-priv"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
           - -cookie-samesite=none
@@ -347,7 +401,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260217-999e46ca7
+          image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20261007-6ed406f29
           args:
           - --github-oauth-config-file=/etc/oauth/config.json
           - --github-app-id=$(GITHUB_APP_ID)
@@ -367,8 +421,8 @@ objects:
           - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
-          - --plugin-config=/etc/plugins/plugins.yaml
-          - --supplemental-plugin-config-dir=/etc/plugins
+          - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
+          - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
           - --kubeconfig-dir=/etc/build-farm-credentials
           - --kubeconfig-suffix=config
           env:
@@ -409,9 +463,6 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
-          - name: plugins
-            mountPath: /etc/plugins
-            readOnly: true
           - name: extensions
             mountPath: /var/run/ko/static/extensions
             readOnly: true
@@ -425,8 +476,8 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "11Gi"
-              cpu: "500m"
+              memory: "20Gi"
+              cpu: "2"
         volumes:
         - name: github-app-credentials
           secret:
@@ -439,9 +490,6 @@ objects:
         - name: config
           configMap:
             name: config
-        - name: plugins
-          configMap:
-            name: plugins
         - name: extensions
           configMap:
             name: deck-internal-extensions
@@ -462,6 +510,28 @@ objects:
         - name: build-farm-credentials
           secret:
             secretName: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
+- apiVersion: policy/v1
+  kind: PodDisruptionBudget
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck-internal
+  spec:
+    minAvailable: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: deck-internal
 - apiVersion: v1
   kind: Secret
   metadata:

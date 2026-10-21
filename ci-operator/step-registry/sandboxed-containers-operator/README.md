@@ -6,9 +6,9 @@ Here is the list of steps and their explanation.
 
 Please refer to the `*-ref.yaml` file in their source code for the full list of parameters accepted by each step.
 
-### sandboxed-containers-operator-get-kata-rpm
+### sandboxed-containers-operator-update-kata-rpm
 
-The [sandboxed-containers-operator-get-kata-rpm](./get-kata-rpm/) step downloads the kata-containers rpm from Brew and copy it over the cluster worker nodes.
+When `INSTALL_KATA_RPM` is `true`, the [sandboxed-containers-operator-update-kata-rpm](./update-kata-rpm/) step downloads the kata-containers rpm from Brew, copies it to each worker node and installs it. If the target version is already installed on a node it is skipped. After installation CRI-O is restarted on the updated nodes. The step is a no-op when `INSTALL_KATA_RPM` is `false` (the default).
 
 This step run in a `upi-installer` container, therefore, the image should be referenced
 in the `base_images` section of the job's yaml, as for example:
@@ -31,6 +31,182 @@ The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-confi
 
 Currently not all parameters are enabled. In particular, only GA release type is supported, meaning it doesn't install development builds of OSC.
 
+### sandboxed-containers-operator-install-trustee-operator
+
+The [sandboxed-containers-operator-install-trustee-operator](./install-trustee-operator/) step installs the Trustee operator for Confidential Containers (CoCo) workloads. This step is only needed for CoCo tests.
+
+## Catalog Source Configuration
+
+Both OSC and Trustee operators can be installed from different catalog sources depending on whether you're testing pre-release builds or using production catalogs.
+
+### OSC Catalog Source
+
+Controlled by environment variables in job configurations:
+
+- **`CATALOG_SOURCE_NAME`** - Name of the CatalogSource to use
+  - Default: `"redhat-operators"` (production catalog)
+  - For testing: `"brew-catalog"` or custom names
+
+- **`CATALOG_SOURCE_IMAGE`** - Custom FBC (File-Based Catalog) image
+  - Default: `""` (empty, uses existing catalog specified by `CATALOG_SOURCE_NAME`)
+  - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest"`
+
+**Behavior:**
+- If `CATALOG_SOURCE_IMAGE` is empty: uses existing catalog specified by `CATALOG_SOURCE_NAME`
+- If `CATALOG_SOURCE_IMAGE` is set: creates a new CatalogSource with that image
+
+### Trustee Catalog Source
+
+Controlled by the Trustee helm chart and `TRUSTEE_CATALOG_SOURCE_IMAGE` environment variable:
+
+- **`TRUSTEE_CATALOG_SOURCE_IMAGE`** - Custom FBC image for Trustee operator
+  - Default: `""` (empty)
+  - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656"`
+
+**Behavior:**
+- If `TRUSTEE_CATALOG_SOURCE_IMAGE` is **empty**:
+  - Helm chart sets `dev.enabled=false`
+  - Uses existing `redhat-operators` CatalogSource (production)
+  - No new CatalogSource is created
+
+- If `TRUSTEE_CATALOG_SOURCE_IMAGE` is **set**:
+  - Helm chart sets `dev.enabled=true`
+  - Creates new CatalogSource named `trustee-operator-dev-catalog` (hardcoded in helm chart)
+  - Uses the specified custom image
+  - **Note:** CatalogSource name cannot be overridden - it's always `trustee-operator-dev-catalog`
+
+**Example job configuration for CoCo testing:**
+
+```yaml
+tests:
+- as: azure-ipi-coco
+  steps:
+    env:
+      # OSC operator catalog
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+
+      # Trustee operator catalog (CatalogSource name is hardcoded to trustee-operator-dev-catalog)
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+      TRUSTEE_INSTALL: "true"
+
+      # Test configuration
+      WORKLOAD_TO_TEST: coco
+      ENABLEPEERPODS: "true"
+      RUNTIMECLASS: kata-remote
+```
+
+**Why the different approaches?**
+- OSC workflow was designed with flexibility to use any catalog name
+- Trustee uses upstream helm charts from [confidential-devhub/charts](https://github.com/confidential-devhub/charts) which hardcode the dev CatalogSource name
+- This keeps Trustee CI aligned with upstream tooling
+
+### Image Tag Resolution: `:latest` vs Specific Build Tags
+
+Catalog images can be referenced using different tag strategies with distinct tradeoffs:
+
+#### Using `:latest` Tags
+
+```yaml
+CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+```
+
+**How it resolves:**
+1. At job execution time, container runtime queries Quay.io registry
+2. Registry returns the current image digest that `:latest` points to
+3. That specific digest is pulled and used for the job
+4. Different jobs can get different images if builds happen between runs
+
+**Managed by:** Konflux/RHTAP automatically updates `:latest` after each successful build
+
+**Advantages:**
+- ✅ Automatically tests newest builds without config changes
+- ✅ Good for continuous validation of rolling builds
+- ✅ No manual maintenance needed
+
+**Disadvantages:**
+- ❌ Non-reproducible (different runs may use different builds)
+- ❌ Hard to bisect regressions ("which build broke this?")
+- ❌ Can break unexpectedly if bad build gets tagged
+
+#### Using Specific Build Tags
+
+```yaml
+TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:1.1.0-1776506656
+```
+
+**Tag format:** `<version>-<konflux-build-id>`
+- Version: `1.1.0` (semantic version from project)
+- Build ID: `1776506656` (Konflux pipeline run identifier)
+
+**How it resolves:**
+- Tag is **immutable** - always points to the same image digest
+- Never changes after creation
+- Reproducible across all job runs
+
+**Advantages:**
+- ✅ Reproducible test results
+- ✅ Easy to bisect issues (pin to specific builds)
+- ✅ Stable - won't break from new builds
+- ✅ Direct traceability to Konflux pipeline runs
+
+**Disadvantages:**
+- ❌ Requires manual config updates to test new builds
+- ❌ Can become stale if not maintained
+
+#### How Konflux Creates Multiple Tags
+
+When a catalog build completes in Konflux, multiple tags point to the same image:
+
+```bash
+# All these reference the same image digest:
+quay.io/.../osc-test-fbc:latest              # Moves to newest build
+quay.io/.../osc-test-fbc:1.2.0-1776506656   # Immutable build-specific tag
+quay.io/.../osc-test-fbc:1.2.0              # Moves within version series
+quay.io/.../osc-test-fbc:sha256-abc123...   # Direct digest reference
+```
+
+#### Finding Specific Build Tags
+
+To find the current build tag that `:latest` points to:
+
+```bash
+# Option 1: Query Quay.io API
+curl -s https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc/tag/ | \
+  jq -r '.tags[] | select(.name | startswith("1.1.0")) | .name' | sort -V | tail -5
+
+# Option 2: Pull and inspect
+podman pull quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
+podman inspect quay.io/.../trustee-test-fbc:latest | jq '.[0].RepoTags[]'
+
+# Option 3: Check Konflux pipeline runs
+# Navigate to Konflux UI → Application → Component → Pipeline Runs
+# Find successful run ID and use format: <version>-<pipeline-run-id>
+```
+
+#### Strategy Comparison
+
+| Aspect | `:latest` | `1.1.0-1776506656` (Specific build) |
+|--------|----------------|------------------------------|
+| **Resolution** | Dynamic (query registry each time) | Static (immutable) |
+| **Reproducibility** | ❌ Different builds over time | ✅ Always same build |
+| **Maintenance** | Automatic | Manual updates |
+| **Traceability** | Hard (logs needed) | Easy (build ID in tag) |
+| **Use Case** | Daily/nightly rolling tests | Stable/release validation |
+
+#### When to Use Each Strategy
+
+**Use `:latest` when:**
+- Running frequent jobs (daily/nightly) that should pick up new builds automatically
+- Testing the latest code is more important than reproducibility
+- You have good monitoring/alerting for failures
+
+**Use specific build tags when:**
+- You need reproducible results for debugging
+- Testing specific release candidates or milestones
+- You want to correlate failures to specific builds
+- Running less frequently (weekly/release gates)
+
 ## Chains
 
 Here is the list of chains.
@@ -52,45 +228,45 @@ Here is the list of workflows.
 
 ### sandboxed-containers-operator-e2e-azure
 
-The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow implements an entire e2e execution for testing OSC on Azure. It will deploy Openshift on Azure, evoke the [sandboxed-containers-operator-pre](#sandboxed-containers-operator-pre) chain for preparing the environment and finally execute the `platform-extended-tests`.
+The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow implements an entire e2e execution for testing OSC on Azure. It will deploy Openshift on Azure, evoke the [sandboxed-containers-operator-pre](#sandboxed-containers-operator-pre) chain for preparing the environment and finally execute the `test:` and `post:` phases.
 
-As the [openshift-extended-test](../openshift-extended/test/) step is referenced in the `test` condition, any job using this workflow should import the `tests-private` image. This is done by adding an entry to the `base_images` section in the job's yaml, as for example:
-
-```yaml
-base_images:
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.18"
-```
-
-> **Important:** updates to our tests in `platform-extended-tests` are made to `master` and never backported to release branches, however, the `tests-private` image hasn't `latest` builds from the `master` branch. Meaning that if you need to pick the latest and greatest code of `platform-extended-tests` then you must find and use the latest image version available at that point in time (usually it is next major OCP version under development).
+The `test:` phase only runs the `sandboxed-containers-operator-testsuites-gate` step
+(it no longer runs `openshift-extended-test`/OTP, so importing the `tests-private`
+image is not required for this workflow). The actual tests run in the `post:` phase
+via the `sandboxed-containers-operator-testsuites` chain — see
+[testsuites/README.md](./testsuites/README.md).
 
 ## Managing secrets
 
-There are some steps (e.g. sandboxed-containers-operator-get-kata-rpm) that require access to secrets. Our secrets are stored on Vault’s key-value engine at https://vault.ci.openshift.org/ under the `sandboxed-containers-operator/sandboxed-containers-operator-ci-secrets` path.
+There are some steps (e.g. sandboxed-containers-operator-update-kata-rpm) that require access to secrets. Our secrets are stored on Vault’s key-value engine at https://vault.ci.openshift.org/ under the `sandboxed-containers-operator/sandboxed-containers-operator-ci-secrets` path.
 
 In case you want to manage secrets on that path, first must log-in https://selfservice.vault.ci.openshift.org at least once, then ask @tbuskey, @ldoktor or @wainersm to add you in the list of members of the `sandboxed-containers-operator` collection. Please refer to https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/ for further information.
 
 ## Clusterbot
 
 The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) and
-[sandboxed-containers-operator-e2e-azure](./e2e/aws/) workflows are
+[sandboxed-containers-operator-e2e-aws](./e2e/aws/) workflows are
 available in [clusterbot](https://github.com/openshift/ci-chat-bot/blob/main/README.md).
 You have 2 main options:
 
+Both commands run the workflow's ``pre:`` phase, which installs OSC itself via the
+``sandboxed-containers-operator-install-osc-operator`` step in the
+``sandboxed-containers-operator-pre`` chain — installation no longer depends on
+any ``test:``-phase step or on a ``TEST_SCENARIOS``/``TEST_FILTERS`` parameter
+(those were OTP-specific and OTP has been removed from ``test:``).
+
 * ``workflow-launch``
-  * creates OCP cluster
+  * creates OCP cluster and installs OSC via the ``pre:`` chain
   * gives you KUBECONFIG via clusterbot
-  * **does not install OSC**, but prepares cm and mirrorlists to let you install it yourself via ``extended-platform-tests``
   * allows extended reservation via ``SLEEP_DURATION`` timeout, but you have to delete ``launch-cucushift-installer-wait`` pod do return it!
 * ``workflow-test``
-  * creates OCP cluster
+  * creates OCP cluster and installs OSC via the ``pre:`` chain
   * clusterbot will not send you KUBECONFIG, but you can obtain it from the build farm secrets
   * allows creating multiple OCP clusters concurrently
   * allows extended reservation after the testing is done via ``SLEEP_DURATION`` timeout, but you have to delete ``launch-cucushift-installer-wait`` pod do return it!
-  * **can install OSC** when any of ``[sig-kata]`` tests are specified in ``TEST_SCENARIOS`` parameter
-  * can be used to simply test your RPM/scratch/... build against the usual set of sig-kata tests by setting ``TEST_SCENARIOS`` and ``SLEEP_DURATION=0`` (to avoid the need to return the cluster)
+  * additionally runs the ``post:``-phase ``sandboxed-containers-operator-testsuites``
+    chain (see [testsuites/README.md](./testsuites/README.md)) — use the
+    ``TESTS_<SUITE_NAME>_ENABLE`` parameters to opt a suite in
 
 **Please always return the clusters as soon as possible, they do not
 use spot-instances so they are costly. With ``SLEEP_DURATION=0``
@@ -116,7 +292,7 @@ Cloud overview:
 ```
 
 * ``main build OCP`` installs the testing OCP and runs the steps
-  required to run the workflow (like openshift-tests, sleep,
+  required to run the workflow (like OSC install, test suites, sleep,
   deprovisioning) and it contains all the secrets required
   for the job and is responsible for returning the cluster
   when the ``testing OCP`` is destroyed
@@ -125,16 +301,15 @@ Cloud overview:
 Workflow overview:
 
 ```
-                                                                       workflow-test
-                                                                +-------------------------+
-                      +----------------------------------+      | extended-platform-tests |
-                      | configure configmaps/mirrorlists |  +-> | $TEST_SCENARIOS         | -+
-+---------------+     | to run extended-platform-tests   |  |   | (oc get cm/osc-config)  |  |   +--------------------------+     +-----------------+
-| provision OCP | --> | [sig-kata] tests                 | -+   +-------------------------+  +-> | cucushift-installer-wait | --> | deprovision OCP |
-+---------------+     | $ENABLEPEERPODS,$INSTALL_KATA_R  |  |                                |   | $SLEEP_DURATION          |     +-----------------+
-                      | PM,$KATA_RPM_VERSION,$WORKLOAD_  |  |      +------------------+      |   +--------------------------+
-                      | TO_TEST,$CATALOG_SOURCE_IMAGE,.. |  +----> | clusterbot sleep | -----+
-                      +----------------------------------+         +------------------+
+                                                                      workflow-test
+                                                               +------------------------+
+                     +----------------------------------+      | testsuites chain       |
+                     | install-osc-operator              |  +-> | TESTS_<SUITE>_ENABLE   | -+
++---------------+    | $ENABLEPEERPODS,$INSTALL_KATA_RPM |  |   +------------------------+  |   +--------------------------+     +-----------------+
+| provision OCP | -->| $KATA_RPM_VERSION,$WORKLOAD_      | -+                                +-> | cucushift-installer-wait | --> | deprovision OCP |
++---------------+    | TO_TEST,$CATALOG_SOURCE_IMAGE,..  |  |      +------------------+      |   | $SLEEP_DURATION          |     +-----------------+
+                     +----------------------------------+  +----> | clusterbot sleep | -----+    +--------------------------+
+                                                                    +------------------+
                                                                      workflow-launch
 ```
 
@@ -144,11 +319,11 @@ Copy, paste & modify those examples to clusterbot to use our workflow,
 replace the suffix `-azure` with `-aws` to do the same on `aws`:
 
 * Check your kata-container.rpm from brew via ``KATA_RPM_BUILD_TASK`` (no need to return these, you'll get the status via slack as well as url to check the individual test results):
-  * kata - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=false","RUNTIMECLASS=kata","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=kata","TEST_TIMEOUT=90"``
-  * peer-pods - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=peer-pods","TEST_TIMEOUT=90"``
-  * coco - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*","WORKLOAD_TO_TEST=coco","TEST_TIMEOUT=90"``
-* Get a cluster without OSC installed for ~8h - ``workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"`` (clusterbot will send you ``KUBECONFIG`` of the testing OSC, you can use ``extended-platform-tests`` to install sandboxed constainers operator as all the config maps are prepared, you need to use ``done`` followed by deleting the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
-* Get a cluster with OSC installed for ~8h - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","TEST_SCENARIOS=sig-kata.*Operator installation","WORKLOAD_TO_TEST=peer-pods","TEST_TIMEOUT=90"`` (clusterbot will **not** notify you nor give you ``KUBECONFIG``, see below how to get access; after the testing you have to delete the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
+  * kata - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=false","RUNTIMECLASS=kata","WORKLOAD_TO_TEST=kata"``
+  * peer-pods - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=peer-pods"``
+  * coco - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=coco"``
+* Get a cluster for ~8h - ``workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"`` (clusterbot sends you ``KUBECONFIG`` directly; OSC is already installed via the ``pre:`` chain; you need to use ``done`` followed by deleting the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
+* Get a cluster and also run the post-phase test suites for ~8h - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=peer-pods","TESTS_OSC_ENABLE=true"`` (clusterbot will **not** notify you nor give you ``KUBECONFIG``, see below how to get access; after the testing you have to delete the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
 
 ### AWS Cleanup
 
@@ -190,9 +365,12 @@ deletion takes some time (unless you specify ``--now``).
 ### Using workflow-test cluster
 
 This workflow executes the standard testing, therefore clusterbot
-will not notify and will not give you the ``KUBECONFIG``. On the
-other hand you can specify ``TEST_SCENARIOS`` and let the job
-to configure OCP including sandboxed-containers-operator deployment.
+will not notify and will not give you the ``KUBECONFIG``. OSC is
+installed automatically by the ``pre:`` chain's
+``sandboxed-containers-operator-install-osc-operator`` step; set
+``TESTS_<SUITE_NAME>_ENABLE=true`` (see
+[testsuites/README.md](./testsuites/README.md)) if you also want the
+``post:``-phase test suites to run.
 
 If you only care about the results, simply keep the ``SLEEP_DURATION=0s``
 and clusterbot will let you know about the results and deprovisions
@@ -209,7 +387,7 @@ for ``Running step launch-cucushift-installer-wait.`` line
 in there. Once it shows there the cluster is ready and waiting
 for you for the specified amount of time.
 
-Getting access to your testing cluster is slightly harder as first 
+Getting access to your testing cluster is slightly harder as first
 you need to get to the ``main build OCP``. To do so:
 
 1. open the ``job started...`` link by clusterbot
@@ -226,16 +404,18 @@ to this ``main build OCP`` and extract the ``KUBECONFIG`` by
 ``oc get secrets/launch -o jsonpath='{.data.kubeconfig}' | base64 -d``*
 
 Using that KUBECONFIG you should be able to interact with
-the ``testing OCP`` and provided it ran any of the ``[sig-kata]``
-tests before (and they succeeded) the OSC should be installed
+the ``testing OCP`` — OSC is installed by the ``pre:`` chain before the
+``test:``/``post:`` phases even start, so it should already be present
 (double-check by ``oc get all -n openshift-sandboxed-containers-operator``).
 
 To return this cluster you **can not** use the ``done`` clusterbot
 command (as a matter of fact you can actually request multiple OCPs).
 If you did not specified the ``SLEEP_DURATION`` then you can
 simply leave it and it'll return the cluster right after the
-testing (you can interrupt the testing by destroying the
-``launch-openshift-extended-test`` pod on the ``main build OCP``).
+testing (you can interrupt the testing early by destroying the
+currently-running post-phase test-suite pod, e.g.
+``launch-sandboxed-containers-operator-testsuites-osc``, on the
+``main build OCP``).
 If you specified the ``SLEEP_DURATION`` **you have to interrupt**
 the ``launch-cucushift-installer-wait`` pod, otherwise it will
 sleep and hold the cluster for the whole ``SLEEP_DURATION`` period.
@@ -268,20 +448,24 @@ launch-ipi-install-times-collection                           0/2     Completed 
 launch-multiarch-validate-nodes                               0/2     Completed   0          4m52s
 launch-nodes-readiness                                        0/2     Completed   0          5m1s
 launch-openshift-cluster-bot-rbac                             0/2     Completed   0          64m
-launch-openshift-extended-test                                2/2     Running     0          2m9s
 launch-sandboxed-containers-operator-env-cm                   0/2     Completed   0          2m16s
-launch-sandboxed-containers-operator-get-kata-rpm             0/2     Completed   0          4m36s
+launch-sandboxed-containers-operator-install-osc-operator     0/2     Completed   0          3m50s
+launch-sandboxed-containers-operator-update-kata-rpm          0/2     Completed   0          4m36s
 launch-sandboxed-containers-operator-peerpods-param-cm        0/2     Completed   0          3m14s
+launch-sandboxed-containers-operator-testsuites-osc           2/2     Running     0          2m9s
 release-images-latest                                         0/2     Completed   0          68m
 release-images-latest-cli                                     0/1     Completed   0          69m
 
 # Note there is no launch-cucushift-installer-wait pod running
-# because the workflow is still in the openshift-extended-test
-# phase. To return the cluster you have to first interrupt that
-# one, wait for the launch-cucushift-installer-wait to appear
-# and delete it as well
+# because the workflow is still running the post-phase test-suite
+# chain (only shown here if a TESTS_<SUITE_NAME>_ENABLE was set to
+# "true" — otherwise the chain skips instantly and
+# launch-cucushift-installer-wait appears right away). To return the
+# cluster early you have to first interrupt the running suite pod,
+# wait for launch-cucushift-installer-wait to appear, and delete it
+# as well
 
-oc delete --now pods/launch-openshift-extended-test
+oc delete --now pods/launch-sandboxed-containers-operator-testsuites-osc
 oc get pods
 ...
 launch-cucushift-installer-wait                                2/2     Running     0          12s
@@ -291,6 +475,18 @@ oc delete --now pods/launch-cucushift-installer-wait
 # new "Running" pods will appear to cleanup and return the cluster
 # DO NOT DELETE THEM!
 ```
+
+### Running openshift-extended-test manually
+
+> **Note:** The `test:` phase of our e2e workflows no longer runs
+> `openshift-extended-test` (OTP) — it only runs the
+> `sandboxed-containers-operator-testsuites-gate` step, and OSC itself is
+> installed earlier by the `pre:` chain, not by an OTP `Operator install`
+> test. The sections below are kept purely as a reference for manually
+> running OTP's `[sig-kata]` suite against a cluster you obtained via
+> clusterbot (e.g. for broader ad-hoc validation beyond what the
+> `sandboxed-containers-operator-testsuites` chain's `osc` suite covers) —
+> they are not exercised by our automated CI.
 
 ### Running openshift-extended-test from your laptop
 

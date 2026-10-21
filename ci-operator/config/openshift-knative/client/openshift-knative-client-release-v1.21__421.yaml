@@ -12,74 +12,75 @@ build_root:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: github.com/knative/client
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/cli-artifacts/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-cli-artifacts
-- dockerfile_path: openshift/ci-operator/knative-images/kn/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-kn
-- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-test-grpc-ping
-- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-test-helloworld
-- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-test-servingcontainer
-- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
-  inputs:
-    ocp_ubi-minimal_9:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
-      as:
-      - $GO_BUILDER
-  to: knative-client-test-sidecarcontainer
-- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
-  from: src
-  to: knative-client-source-image
+  items:
+  - dockerfile_path: openshift/ci-operator/knative-images/cli-artifacts/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-cli-artifacts
+  - dockerfile_path: openshift/ci-operator/knative-images/kn/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-kn
+  - dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-test-grpc-ping
+  - dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-test-helloworld
+  - dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-test-servingcontainer
+  - dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+    inputs:
+      ocp_ubi-minimal_9:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-9-release-golang-1.25-openshift-4.21:
+        as:
+        - $GO_BUILDER
+    to: knative-client-test-sidecarcontainer
+  - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+    from: src
+    to: knative-client-source-image
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
 promotion:
   to:
   - additional_images:
       client-src: src
+    name: knative-v1.21
     namespace: openshift
-    tag: knative-v1.21
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.21"
 resources:
   '*':
@@ -87,16 +88,18 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- always_run: false
-  as: test-e2e
+- as: test-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -143,7 +146,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -165,7 +167,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-v1.21
   org: openshift-knative

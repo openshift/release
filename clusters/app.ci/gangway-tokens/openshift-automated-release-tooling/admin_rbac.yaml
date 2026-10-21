@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-automated-release-tooling
+  annotations:
+    openshift.io/description: Service Accounts for openshift-automated-release-tooling
+    openshift.io/display-name: openshift-automated-release-tooling CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: openshift-automated-release-tooling
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: openshift-automated-release-tooling
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: openshift-automated-release-tooling
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-openshift-automated-release-tooling
+  namespace: openshift-automated-release-tooling
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-automated-release-tooling
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

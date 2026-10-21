@@ -7,25 +7,28 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/metallb
 images:
-- dockerfile_path: Dockerfile.openshift
-  to: metallb
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    to: metallb
 promotion:
   to:
   - disabled: true
     name: metallb-4.18
     namespace: origin
-  - name: 4.18-priv
-    namespace: ocp-private
+  - name: "4.18"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -67,6 +70,12 @@ tests:
       PROJECT_NAME: metallb
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

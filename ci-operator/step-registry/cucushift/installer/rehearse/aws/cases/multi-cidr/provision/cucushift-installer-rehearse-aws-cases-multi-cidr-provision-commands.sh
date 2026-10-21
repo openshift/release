@@ -543,13 +543,18 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 ocp_version=$(oc adm release info ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_minor_version <= 18 && ocp_major_version == 4 )); then
+# Version comparison functions using sort -V
+function version_le() {
+  # Returns 0 (true) if $1 <= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
+if version_le "${ocp_version}" "4.18"; then
     patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_priv}
     patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_pub}
     patch_legcy_subnets ${install_dir2}/install-config.yaml ${subnet_2_priv}
@@ -600,14 +605,14 @@ function save_artifacts()
 
 
 echo "Creating cluster 1"
-cat ${install_dir1}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-1-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir1}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-1-install-config.yaml"
 openshift-install --dir="${install_dir1}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"
 
 echo "Creating cluster 2"
-cat ${install_dir2}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-2-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir2}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-2-install-config.yaml"
 openshift-install --dir="${install_dir2}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"

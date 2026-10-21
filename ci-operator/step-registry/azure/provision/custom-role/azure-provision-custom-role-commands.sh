@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_ge() {
+  # Returns 0 (true) if $1 >= $2
+  [[ "$1" == "$2" ]] && return 0
+  [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -43,7 +50,7 @@ function run_cmd_with_retries_save_output()
 
 function create_role_definition_json() {
 
-    local role_name=$1 permissions=$2 role_definition_file=$3
+    local role_name=$1 permissions=$2 role_definition_file=$3 data_permissions=${4:-}
 
     role_description="the custom role ${role_name} with minimal permissions for cluster ${CLUSTER_NAME}"
     assignable_scopes="""
@@ -55,7 +62,8 @@ function create_role_definition_json() {
        --arg role_name "${role_name}" \
        --arg description "${role_description}" \
        --argjson assignable_scopes "[ ${assignable_scopes} ]" \
-       --argjson permission_list "[ ${permissions} ]" '
+       --argjson permission_list "[ ${permissions} ]" \
+       --argjson data_permission_list "[ ${data_permissions:-} ]" '
 {
   "Name": $role_name,
   "IsCustom": true,
@@ -63,7 +71,7 @@ function create_role_definition_json() {
   "assignableScopes": $assignable_scopes,
   "Actions": $permission_list,
   "notActions": [],
-  "dataActions": [],
+  "dataActions": $data_permission_list,
   "notDataActions": []
 }' > "${role_definition_file}"
 }
@@ -94,11 +102,9 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
-ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
 command -v az
@@ -218,6 +224,7 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 \"Microsoft.Storage/storageAccounts/fileServices/shares/read\",
 \"Microsoft.Storage/storageAccounts/fileServices/shares/write\",
 \"Microsoft.Storage/storageAccounts/fileServices/shares/delete\",
+\"Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action\",
 \"Microsoft.Storage/storageAccounts/listKeys/action\",
 \"Microsoft.Storage/storageAccounts/read\",
 \"Microsoft.Storage/storageAccounts/write\",
@@ -264,7 +271,7 @@ ${required_permissions}
 """
 
     # New permissions are instroduced when using CAPZ to provision IPI cluster
-    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && version_ge "${ocp_version}" "4.17"; then
         # routeTables relevant perssions can be removed once OCPBUGS-37663 is fixed.
         required_permissions="""
 \"Microsoft.Network/routeTables/read\",
@@ -374,7 +381,7 @@ ${required_permissions}
     fi
 
     # optional permissions when installing cluster in existing vnet
-    if [[ -n ${install_config_vnet} ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ -n ${install_config_vnet} ]] && version_ge "${ocp_version}" "4.17"; then
         required_permissions="""
 \"Microsoft.Network/virtualNetworks/checkIpAddressAvailability/read\",
 ${required_permissions}
@@ -429,7 +436,12 @@ ${required_permissions}
 
     fi
 
-    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}"
+    required_data_permissions="""
+\"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read\",
+\"Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write\"
+"""
+
+    create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}" "${required_data_permissions}"
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}"
     # for destroy

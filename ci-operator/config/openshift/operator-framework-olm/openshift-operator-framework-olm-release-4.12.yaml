@@ -6,15 +6,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  from: base
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  from: base
-  to: operator-registry
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    from: base
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    from: base
+    to: operator-registry
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
   to:
   - excluded_images:
@@ -41,9 +42,10 @@ tests:
   commands: make verify
   container:
     from: ci-image
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: unit-olm
   commands: |
@@ -67,9 +69,10 @@ tests:
   commands: make unit/psm
   container:
     from: ci-image
-- as: e2e-gcp-olm
+- always_run: false
+  as: e2e-gcp-olm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -89,7 +92,7 @@ tests:
   as: e2e-gcp-olm-flaky
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -99,9 +102,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-console-olm
+- always_run: false
+  as: e2e-gcp-console-olm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -111,9 +115,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.12

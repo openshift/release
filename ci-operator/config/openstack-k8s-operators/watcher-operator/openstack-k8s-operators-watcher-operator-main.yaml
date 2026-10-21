@@ -1,11 +1,12 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN pip3 install pre-commit
-  from: src
-  to: openstack-operator-ci-pre-commit
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN pip3 install pre-commit
+    from: src
+    to: openstack-operator-ci-pre-commit
 resources:
   '*':
     limits:
@@ -33,6 +34,7 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
+  skip_if_only_changed: ^(\.github/.*|renovate.json|.*\.md|tests?/kuttl/.*|OWNERS.*|LICENSE.*|zuul.d/.*)$
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators

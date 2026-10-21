@@ -27,7 +27,10 @@ if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
         echo "Executing cluster-density-v2 in hypershift cluster"
         if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
                 echo "Set http proxy for hypershift cluster"
+                # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+                set +x
                 . $SHARED_DIR/proxy-conf.sh
+                set -x
         fi
         echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
         export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
@@ -49,13 +52,13 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
 fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=crd-scale
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
-export EXTRA_FLAGS+="${CRD_SCALE_EXTRA_FLAGS} --gc-metrics=true --profile-type=${PROFILE_TYPE} --iterations=${ITERATIONS}"
+export EXTRA_FLAGS="${KB_FLAGS} ${CRD_SCALE_EXTRA_FLAGS} --gc-metrics=false --profile-type=${PROFILE_TYPE} --iterations=${ITERATIONS}"
 
 ./run.sh

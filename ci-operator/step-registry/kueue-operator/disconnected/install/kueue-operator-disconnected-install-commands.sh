@@ -50,8 +50,14 @@ function configure_host_pull_secret () {
 }
 
 function install_oc_mirror () {
+    CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
+    ARCH=$(uname -m)
+    case ${ARCH} in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+    esac
     echo "[$(timestamp)] Installing the latest oc-mirror client..."
-    run_command "curl -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
+    run_command "curl -k -fL -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
     run_command "tar -xvzf oc-mirror.tar.gz && chmod +x ./oc-mirror && rm -f oc-mirror.tar.gz"
 }
 

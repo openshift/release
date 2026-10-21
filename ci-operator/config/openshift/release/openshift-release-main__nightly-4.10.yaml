@@ -55,14 +55,6 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: upi-installer
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
-  vsphere-csi-driver-operator-test:
-    name: "4.10"
-    namespace: ocp
-    tag: vsphere-csi-driver-operator-test
 releases:
   initial:
     candidate:
@@ -92,12 +84,12 @@ tests:
 - as: e2e-aws-single-node
   cron: 25 9 8 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-single-node-serial
   cron: 49 6 9 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node
@@ -113,14 +105,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-sdn-ipv4
   capabilities:
   - intranet
   cron: 3 10 9 */12 *
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   capabilities:
@@ -185,59 +175,19 @@ tests:
 - as: e2e-aws-proxy
   cron: 5 2 6 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-proxy
-- as: e2e-vsphere
-  cron: 35 9 13 10 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-serial
-  cron: 47 14 10 7 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-serial
-- as: e2e-vsphere-upi
-  cron: 17 2 2 1 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-upi
-- as: e2e-vsphere-upi-serial
-  cron: 34 13 14 9 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-upi-serial
-- as: e2e-vsphere-techpreview
-  cron: 11 16 3 1 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-techpreview
 - as: e2e-aws-ovn-local-gateway
   cron: 30 4 5 */12 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
-- as: e2e-vsphere-ovn
-  cron: 11 8 4 4 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-ovn
-- as: e2e-vsphere-techpreview-serial
-  cron: 7 8 1 6 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-techpreview-serial
-- as: e2e-vsphere-csi
-  cron: 58 13 25 5 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-csi
 - as: e2e-aws-workers-rhel8
   cron: 40 1 7 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
@@ -261,7 +211,7 @@ tests:
 - as: e2e-azure-fips
   cron: 39 10 5 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -271,7 +221,7 @@ tests:
 - as: e2e-aws-fips
   cron: 16 2 8 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -281,12 +231,12 @@ tests:
 - as: e2e-gcp
   cron: 2 9 8 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-fips
   cron: 27 3 10 */12 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -296,17 +246,17 @@ tests:
 - as: e2e-gcp-csi
   cron: 10 2 10 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-csi-migration
   cron: 27 1 6 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-csi-migration
 - as: e2e-azure-fips-serial
   cron: 49 9 6 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -317,7 +267,7 @@ tests:
 - as: e2e-aws-fips-serial
   cron: 34 6 6 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -328,7 +278,7 @@ tests:
 - as: e2e-gcp-fips-serial
   cron: 47 1 7 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -339,7 +289,7 @@ tests:
 - as: console-aws
   cron: 19 2 6 */12 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: e2e-test
       cli: latest
@@ -355,7 +305,7 @@ tests:
 - as: e2e-gcp-rt
   cron: 35 10 6 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
@@ -363,14 +313,14 @@ tests:
 - as: e2e-aws-upgrade
   cron: 26 6 9 */12 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-aws-upgrade-rollback-oldest-supported
   cron: 49 9 10 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -388,37 +338,37 @@ tests:
 - as: e2e-aws
   cron: 21 10 6 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   cron: 34 5 8 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-csi
   cron: 25 8 7 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-migration
   cron: 43 8 9 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi-migration
 - as: e2e-azure
   cron: 13 3 7 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
   cron: 29 10 8 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
 - as: e2e-azure-csi-migration
   cron: 8 3 5 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi-migration
 - as: e2e-azurestack-csi
   cluster: build01
@@ -431,17 +381,17 @@ tests:
 - as: e2e-aws-cgroupsv2
   cron: 29 5 5 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cgroupsv2
 - as: e2e-aws-crun
   cron: 10 7 9 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-crun
 - as: e2e-azure-deploy-cnv
   cron: 14 5 6 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -452,9 +402,9 @@ tests:
         cd /tmp/cnv-ci
         make deploy_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME
@@ -479,7 +429,7 @@ tests:
 - as: e2e-azure-upgrade-cnv
   cron: 51 7 5 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       commands: |
@@ -489,9 +439,9 @@ tests:
         cd /tmp/cnv-ci
         make upgrade_test
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME
@@ -528,7 +478,9 @@ tests:
 - as: e2e-gcp-serial
   cron: 43 3 6 */12 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     workflow: openshift-e2e-gcp-serial
 - as: e2e-alibaba-csi
   cron: 53 2 10 */12 *
@@ -540,12 +492,12 @@ tests:
 - as: e2e-aws-upi
   cron: 28 9 9 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-upi
 - as: e2e-azure-upi
   cron: 25 8 7 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-upi
 - as: e2e-azurestack-upi
   cluster: build01
@@ -556,7 +508,7 @@ tests:
 - as: e2e-gcp-upi
   cron: 49 2 6 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upi
 - as: e2e-ibmcloud-csi
   cron: 22 7 6 */12 *

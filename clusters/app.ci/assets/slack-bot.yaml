@@ -56,7 +56,7 @@ metadata:
     keel.sh/trigger: poll
     keel.sh/pollSchedule: "@every 5m"
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 2
   selector:
     matchLabels:
@@ -67,8 +67,21 @@ spec:
         app: slack-bot
     spec:
       serviceAccountName: slack-bot
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -101,8 +114,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "4Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       - name: slack-bot
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_slack-bot_latest
         imagePullPolicy: Always
@@ -110,24 +123,75 @@ spec:
         - --slack-token-path=/etc/slack/oauth_token
         - --slack-signing-secret-path=/etc/slack/signing_secret
         - --log-level=debug
-        - --jira-bearer-token-file=/etc/jira/token
-        - --jira-endpoint=https://issues.redhat.com
+        - --jira-endpoint=https://redhat.atlassian.net
+        - --jira-username=aos-team-dp-testplatform@redhat.com
+        - --jira-password-file=/etc/jira/password
+        - --pager-duty-token-file=/etc/pagerduty/token
         - --prow-config-path=/etc/prow-config/config.yaml
         - --supplemental-prow-config-dir=/etc/prow-config
         - --prow-job-config-path=/var/repo/release/ci-operator/jobs
         - --keywords-config-path=/etc/slack-bot-config/config.yaml
         - --helpdesk-alias=subteam^STSR51Q76
+        - --dispatcher-control-url=http://prowjob-dispatcher.ci.svc.cluster.local:8080
+        - --dispatcher-control-token-path=/etc/dispatcher-control/token
+        - --dispatch-command-channel-id=$(DISPATCH_COMMAND_CHANNEL_ID)
+        - --enable-dispatch-capacity=true
+        - --enable-dispatch-drain=true
+        - --enable-dispatch-capability-scope=true
+        - --alert-proxy-interaction-url=http://alert-proxy.ci.svc:8080/interactions
+        - --alert-proxy-mention-url=http://alert-proxy.ci.svc:8080/mentions
+        - --alert-proxy-forwarder-secret-path=/etc/alert-proxy-forwarder/hmac_secret
+        - --alert-proxy-channel-id=CHY2E1BL4
+        env:
+        - name: DISPATCH_COMMAND_CHANNEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: prowjob-dispatcher-control
+              key: channel_id
+        resources:
+          requests:
+            memory: "18Gi"
+            cpu: "100m"
         ports:
         - name: main
           containerPort: 8888
         - name: metrics
           containerPort: 9090
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          failureThreshold: 60
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 60
+          periodSeconds: 10
         volumeMounts:
+        - name: dispatcher-control
+          mountPath: /etc/dispatcher-control
+          readOnly: true
         - name: slack
           mountPath: /etc/slack
           readOnly: true
+        - name: alert-proxy-forwarder
+          mountPath: /etc/alert-proxy-forwarder
+          readOnly: true
         - name: jira
           mountPath: /etc/jira
+          readOnly: true
+        - name: pagerduty
+          mountPath: /etc/pagerduty
           readOnly: true
         - name: prow-config
           mountPath: /etc/prow-config
@@ -137,17 +201,22 @@ spec:
         - name: slack-bot-config
           mountPath: /etc/slack-bot-config
           readOnly: true
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "100m"
       volumes:
+      - name: dispatcher-control
+        secret:
+          secretName: prowjob-dispatcher-control
       - name: slack
         secret:
           secretName: slack-credentials-dptp-bot
+      - name: alert-proxy-forwarder
+        secret:
+          secretName: alert-proxy-forwarder
       - name: jira
         secret:
           secretName: jira-token-dptp-bot
+      - name: pagerduty
+        secret:
+          secretName: pagerduty
       - name: prow-config
         configMap:
           name: config

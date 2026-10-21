@@ -1,35 +1,39 @@
 base_images:
   must_gather:
-    name: 4.17-priv
-    namespace: ocp-private
+    name: "4.17"
+    namespace: ocp-priv
     tag: must-gather
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/csi-driver-shared-resource
 images:
-- to: csi-driver-shared-resource
-- dockerfile_path: Dockerfile.mustgather
-  from: must_gather
-  to: csi-driver-shared-resource-mustgather
-- dockerfile_path: Dockerfile.webhook
-  to: csi-driver-shared-resource-webhook
+  items:
+  - to: csi-driver-shared-resource
+  - dockerfile_path: Dockerfile.mustgather
+    from: must_gather
+    to: csi-driver-shared-resource-mustgather
+  - dockerfile_path: Dockerfile.webhook
+    to: csi-driver-shared-resource-webhook
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 promotion:
   to:
   - additional_images:
       csi-driver-shared-resource-scripts: src
-    name: 4.17-priv
-    namespace: ocp-private
+    name: "4.17"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -48,10 +52,11 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws-csi-driver
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-csi-driver
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -63,10 +68,11 @@ tests:
         requests:
           cpu: 100m
     workflow: csi-driver-shared-resource-e2e-test
-- as: e2e-aws-csi-driver-no-refreshresource
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-csi-driver-no-refreshresource
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -78,10 +84,11 @@ tests:
         requests:
           cpu: 100m
     workflow: csi-driver-shared-resource-e2e-test
-- as: e2e-aws-csi-driver-disruptive
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-csi-driver-disruptive
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -93,10 +100,11 @@ tests:
         requests:
           cpu: 100m
     workflow: csi-driver-shared-resource-e2e-test
-- as: e2e-aws-csi-driver-slow
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-csi-driver-slow
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:

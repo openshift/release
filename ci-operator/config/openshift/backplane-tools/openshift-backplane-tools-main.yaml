@@ -1,9 +1,6 @@
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.21-openshift-4.16
+  from_repository: true
 resources:
   '*':
     limits:
@@ -27,8 +24,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: backplane-tools-codecov-token
     mount_path: /tmp/secret
-    name: backplane-tools-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -37,8 +35,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: backplane-tools-codecov-token
     mount_path: /tmp/secret
-    name: backplane-tools-codecov-token
 zz_generated_metadata:
   branch: main
   org: openshift

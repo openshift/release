@@ -5,14 +5,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/ci-index-hco-bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-ci-index-hco-bundle
     rerun_command: /test ci-index-hco-bundle
@@ -61,14 +65,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/ci-index-hco-upgrade-operator-sdk-bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-ci-index-hco-upgrade-operator-sdk-bundle
     rerun_command: /test ci-index-hco-upgrade-operator-sdk-bundle
@@ -117,16 +125,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-consecutive-operator-sdk-upgrades-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-consecutive-operator-sdk-upgrades-aws
     rerun_command: /test hco-e2e-consecutive-operator-sdk-upgrades-aws
@@ -134,7 +146,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -166,6 +182,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -186,6 +208,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -201,16 +232,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-consecutive-operator-sdk-upgrades-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-consecutive-operator-sdk-upgrades-azure
     rerun_command: /test hco-e2e-consecutive-operator-sdk-upgrades-azure
@@ -218,7 +253,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -250,6 +289,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -270,6 +315,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -285,16 +339,21 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-kv-smoke-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-kv-smoke-azure
     rerun_command: /test hco-e2e-kv-smoke-azure
@@ -302,7 +361,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -334,6 +397,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -354,6 +423,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -373,12 +451,16 @@ presubmits:
     context: ci/prow/hco-e2e-kv-smoke-gcp
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-kv-smoke-gcp
     rerun_command: /test hco-e2e-kv-smoke-gcp
@@ -386,7 +468,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -418,6 +504,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -438,6 +530,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -453,16 +554,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-operator-sdk-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-operator-sdk-aws
     rerun_command: /test hco-e2e-operator-sdk-aws
@@ -470,7 +575,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -502,6 +611,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -522,6 +637,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -537,16 +661,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-operator-sdk-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-operator-sdk-azure
     rerun_command: /test hco-e2e-operator-sdk-azure
@@ -554,7 +682,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -586,6 +718,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -606,6 +744,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -625,12 +772,16 @@ presubmits:
     context: ci/prow/hco-e2e-operator-sdk-gcp
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-operator-sdk-gcp
     rerun_command: /test hco-e2e-operator-sdk-gcp
@@ -638,7 +789,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -670,6 +825,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -690,6 +851,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -705,16 +875,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-operator-sdk-sno-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-operator-sdk-sno-aws
     optional: true
@@ -723,7 +897,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -755,6 +933,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -775,6 +959,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -790,16 +983,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-operator-sdk-sno-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-operator-sdk-sno-azure
     optional: true
@@ -808,7 +1005,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -840,6 +1041,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -860,6 +1067,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -875,16 +1091,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-upgrade-operator-sdk-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-operator-sdk-aws
     rerun_command: /test hco-e2e-upgrade-operator-sdk-aws
@@ -892,7 +1112,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -924,6 +1148,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -944,6 +1174,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -959,16 +1198,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-upgrade-operator-sdk-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-operator-sdk-azure
     rerun_command: /test hco-e2e-upgrade-operator-sdk-azure
@@ -976,7 +1219,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1008,6 +1255,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1028,6 +1281,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1043,16 +1305,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-upgrade-operator-sdk-sno-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-operator-sdk-sno-aws
     optional: true
@@ -1061,7 +1327,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1093,6 +1363,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1113,6 +1389,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1128,16 +1413,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-upgrade-operator-sdk-sno-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-operator-sdk-sno-azure
     optional: true
@@ -1146,7 +1435,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1178,6 +1471,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1198,6 +1497,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1213,16 +1521,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-upgrade-prev-operator-sdk-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-operator-sdk-aws
     rerun_command: /test hco-e2e-upgrade-prev-operator-sdk-aws
@@ -1230,7 +1542,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1262,6 +1578,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1282,6 +1604,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1297,16 +1628,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-upgrade-prev-operator-sdk-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-operator-sdk-azure
     rerun_command: /test hco-e2e-upgrade-prev-operator-sdk-azure
@@ -1314,7 +1649,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1346,6 +1685,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1366,6 +1711,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1381,16 +1735,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
+    cluster: build11
     context: ci/prow/hco-e2e-upgrade-prev-operator-sdk-sno-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-operator-sdk-sno-aws
     optional: true
@@ -1399,7 +1757,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1431,6 +1793,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1451,6 +1819,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1466,16 +1843,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/hco-e2e-upgrade-prev-operator-sdk-sno-azure
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-virtualization
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-operator-sdk-sno-azure
     optional: true
@@ -1484,7 +1865,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -1516,6 +1901,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1536,6 +1927,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1551,14 +1951,18 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build13
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - build/Dockerfile.artifacts
+      - build/Dockerfile.functest.ci
+      - build/Dockerfile.okd
+      - build/Dockerfile.wh.okd
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.22"
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-images
     optional: true

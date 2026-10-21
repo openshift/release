@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-for mabc_path in clusters/build-clusters/multiarch_builds/supplemental-ci-images/*; do
+for mabc_path in clusters/build-clusters/build-shared/supplemental-ci-images/*; do
 	mabc_name=$(basename $mabc_path | sed -s 's,_mabc.yaml,,')
 
 	multiarch_build="$(oc -n ci get "mabc/$mabc_name" -o json)"
@@ -16,6 +16,13 @@ for mabc_path in clusters/build-clusters/multiarch_builds/supplemental-ci-images
 
 	oc -n ci delete --cascade=foreground --wait=true "mabc/$mabc_name"
 	echo "mabc/$mabc_name deleted"
+
+	for arch in amd64 arm64; do
+		while oc -n ci get "build/${mabc_name}-${arch}" &>/dev/null; do
+			echo "Waiting for build/${mabc_name}-${arch} to be cleaned up..."
+			sleep 5
+		done
+	done
 
 	oc -n ci apply --wait=true -f "$mabc_path"
 	echo "mabc/$mabc_name created"

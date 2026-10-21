@@ -5,24 +5,139 @@ set -eux
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
-if [[ $HO_MULTI == "true" ]]; then
-  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
-elif [[ $INSTALL_FROM_LATEST == "true" ]]; then
-  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
-  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-  mkdir /tmp/hs-cli
-  oc image extract $HYPERSHIFT_RELEASE_LATEST --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli/hypershift
-  HCP_CLI="/tmp/hs-cli/hypershift"
+
+extract_hcp_cli() {
+  local image=$1
+  local cli_dir
+  cli_dir="$(mktemp -d "${TMPDIR:-/tmp}/hs-cli.XXXXXX")"
+  oc image extract "${image}" --path "/usr/bin/hypershift:${cli_dir}" \
+    --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+    --filter-by-os="linux/amd64" --confirm
+  chmod +x "${cli_dir}/hypershift"
+  HCP_CLI="${cli_dir}/hypershift"
+}
+
+# Gangway does not strip the MULTISTAGE_PARAM_OVERRIDE_ prefix, so the HO release
+# controller passes the image via the prefixed variable and we copy it here.
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
 fi
+
+OVERRIDE_COUNT=0
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${HO_MULTI}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+if [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  OVERRIDE_COUNT=$((OVERRIDE_COUNT + 1))
+fi
+
+if [[ ${OVERRIDE_COUNT} -gt 1 ]]; then
+  echo "WARNING: Multiple image override flags are set. Precedence (highest to lowest):"
+  echo "  1. OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE"
+  echo "  2. HO_MULTI"
+  echo "  3. INSTALL_FROM_LATEST"
+fi
+
+if [[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]]; then
+  echo "WARNING: Overriding OPERATOR_IMAGE"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: ${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  OPERATOR_IMAGE="${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${HO_MULTI}" == "true" ]]; then
+  # extract_hcp_cli uses --filter-by-os=linux/amd64 because the step container is always amd64
+  echo "WARNING: Using ACM downstream multi-arch operator image (CI pipeline builds amd64 only)"
+  echo "  Default: ${HYPERSHIFT_RELEASE_LATEST}"
+  echo "  Override: quay.io/acm-d/rhtap-hypershift-operator:latest"
+  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+elif [[ "${INSTALL_FROM_LATEST}" == "true" ]]; then
+  # We should use the hypershift cli from the HYPERSHIFT_RELEASE_LATEST
+  echo "WARNING: Extracting hcp CLI from dependency image instead of step container"
+  echo "  Image: ${OPERATOR_IMAGE}"
+  extract_hcp_cli "${OPERATOR_IMAGE}"
+fi
+
+# --- Helper functions for operator-image verification ---
+# Defined before the install command so the operator-image artifact can be
+# written early enough to survive an install failure under set -e.
+
+# Extract a sha256 digest from an image reference or runtime imageID.
+# Handles pullspec digests ("…@sha256:abc"), CRI-O runtime imageIDs
+# ("docker://sha256:abc"), and returns "tag-only" or "unavailable" otherwise.
+# Never emits a raw pullspec.
+_safe_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  elif [[ "${ref}" == "unavailable" ]]; then
+    echo "unavailable"
+  else
+    echo "tag-only"
+  fi
+}
+
+# Extract a sha256 digest from a raw image reference for comparison.
+_extract_digest() {
+  local ref="$1"
+  if [[ "${ref}" == *@sha256:* ]]; then
+    echo "${ref##*@}"
+  elif [[ "${ref}" == docker://sha256:* ]]; then
+    echo "${ref#docker://}"
+  else
+    echo "${ref}"
+  fi
+}
+
+# --- Record operator-image artifacts before the install command ---
+# Writing here ensures the artifacts survive a set -e exit during install.
+# SHARED_DIR is for downstream steps; ARTIFACT_DIR is the public Prow artifact.
+echo "${OPERATOR_IMAGE}" > "${SHARED_DIR}/hypershift-operator-image"
+# Suppress xtrace around _safe_digest so raw pullspec arguments are not logged.
+{ set +x; } 2>/dev/null
+_safe_digest "${OPERATOR_IMAGE}" > "${ARTIFACT_DIR}/hypershift-operator-image.txt"
+
+# --- Verification artifact state (defaults for the EXIT trap) ---
+_VERIFY_INTENDED=$(_safe_digest "${OPERATOR_IMAGE}")
+_VERIFY_DEPLOYED="unavailable"
+_VERIFY_POD="unavailable"
+_VERIFY_OVERRIDE="false"
+[[ -n "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE:-}" ]] && _VERIFY_OVERRIDE="true"
+set -x
+
+# EXIT trap: always emit the structured verification JSON, even on failure.
+_write_verification_artifact() {
+  { set +ex; } 2>/dev/null   # run to completion, suppress trace
+  if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    cat > "${ARTIFACT_DIR}/hypershift-operator-image-verification.json" <<TRAP_EOF
+{
+  "intended_digest": "${_VERIFY_INTENDED}",
+  "deployed_digest": "${_VERIFY_DEPLOYED}",
+  "pod_digest": "${_VERIFY_POD}",
+  "override_supplied": ${_VERIFY_OVERRIDE}
+}
+TRAP_EOF
+    echo "INFO: HyperShift Operator image verification artifact written"
+    echo "  Intended: ${_VERIFY_INTENDED}"
+    echo "  Deployed: ${_VERIFY_DEPLOYED}"
+    echo "  Pod: ${_VERIFY_POD}"
+  fi
+}
+trap _write_verification_artifact EXIT
+
+INSTALL_HELP=$("${HCP_CLI}" install --help 2>&1 || true)
 
 if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
+fi
+
+if [ "${ENABLE_STANDALONE_KARPENTER_OPERATOR}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-standalone-karpenter-operator"
 fi
 
 if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
@@ -55,8 +170,17 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
+OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
+if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
+fi
+
 case "${CLOUD_PROVIDER}" in
   AWS)
+    if echo "${INSTALL_HELP}" | grep -q -- '--scale-from-zero-provider'; then
+      EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -69,8 +193,6 @@ case "${CLOUD_PROVIDER}" in
     --external-dns-provider=aws \
     --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
-    --scale-from-zero-provider aws \
-    --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials \
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;
@@ -86,12 +208,40 @@ case "${CLOUD_PROVIDER}" in
       oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
     fi
 
+    AZURE_MANAGED_SERVICE_ARGS="--managed-service=ARO-HCP"
+    AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+      --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
+      --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
+
+    if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
+      AZURE_MANAGED_SERVICE_ARGS=""
+      if [[ "${AZURE_EXTERNAL_DNS_DOMAIN}" != *"aks-e2e"* ]] && [ -f "/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json" ]; then
+        AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+          --external-dns-credentials=/etc/hypershift-ci-jobs-self-managed-azure-e2e/dns-creds.json \
+          --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
+      fi
+
+      # Enable Azure private platform support (Private Link Services) if credentials and resource group are provided.
+      # Values can come from env vars or from SHARED_DIR files written by the
+      # hypershift-azure-setup-private-link step.
+      PLS_RG="${AZURE_PLS_RESOURCE_GROUP:-}"
+      if [ -z "${PLS_RG}" ] && [ -f "${SHARED_DIR}/azure_pls_resource_group" ]; then
+        PLS_RG="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
+      fi
+      PRIVATE_CREDS="${AZURE_PRIVATE_CREDS_FILE:-}"
+      if [ -z "${PRIVATE_CREDS}" ] && [ -f "${SHARED_DIR}/azure_private_link_creds_file" ]; then
+        PRIVATE_CREDS="$(cat "${SHARED_DIR}/azure_private_link_creds_file")"
+      fi
+      if [ -n "${PRIVATE_CREDS}" ] && [ -f "${PRIVATE_CREDS}" ] && [ -n "${PLS_RG}" ]; then
+        AZURE_MANAGED_SERVICE_ARGS="--private-platform=Azure \
+          --azure-private-creds=${PRIVATE_CREDS} \
+          --azure-pls-resource-group=${PLS_RG}"
+      fi
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --enable-conversion-webhook=false \
-    --managed-service=ARO-HCP \
-    --external-dns-provider=azure \
-    --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
-    --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
+    ${AZURE_MANAGED_SERVICE_ARGS} \
+    ${AZURE_EXTERNAL_DNS_ARGS} \
     --platform-monitoring=All \
     --enable-ci-debug-output \
     --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
@@ -100,72 +250,51 @@ case "${CLOUD_PROVIDER}" in
     ;;
 
   GCP)
-  # The kubeconfig from gke-provision uses a static access token,
+  # The kubeconfig from hypershift-gcp-gke-provision uses a static access token,
   # so no gcloud/auth-plugin installation is needed here.
 
-  # Install CRDs that GKE doesn't have by default (unlike OpenShift)
-  # Same approach as AKS - required for HyperShift functionality
-  echo "Installing required CRDs..."
-  # Prometheus operator CRDs (for monitoring resources)
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
-  # OpenShift Route CRD (for hosted cluster ingress)
-  oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
-  # DNSEndpoint CRD (for external-dns zone delegation)
-  oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
-
-  # Read GCP environment variables from SHARED_DIR (saved by gke-provision)
+  # Read GCP environment variables from SHARED_DIR (saved by hypershift-gcp-gke-provision)
   # These are required by the operator's GCPPrivateServiceConnect controller
   GCP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
   GCP_REGION_VALUE="$(<"${SHARED_DIR}/gcp-region")"
 
+  # CI DNS config (read from SHARED_DIR since hypershift-install is a shared step)
+  HYPERSHIFT_CI_PROJECT="$(<"${SHARED_DIR}/hypershift-ci-project")"
+  HYPERSHIFT_CI_DNS_DOMAIN="$(<"${SHARED_DIR}/hypershift-ci-dns-domain")"
+
+  # Shared install flags, reused for both the feature-detection render below
+  # and the real install so they can never drift apart.
+  CMD_ARGS=(
+    --hypershift-image="${OPERATOR_IMAGE}"
+    --external-dns-provider=google
+    --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}"
+    --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}"
+    --private-platform=GCP
+    --gcp-project="${GCP_PROJECT_ID}"
+    --gcp-region="${GCP_REGION_VALUE}"
+    --platform-monitoring=All
+    --enable-ci-debug-output
+    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+  )
+
+  # Older hypershift branches don't bundle the DNSEndpoint CRD (openshift/hypershift#9433).
+  # Detect via the operator's own render output instead of branching on version,
+  # so behavior always tracks what install would actually do.
+  # Captured separately from the grep so a failed render (as opposed to a
+  # successful render simply missing the CRD) surfaces as a hard failure
+  # instead of silently falling through to the manual-apply branch.
+  RENDERED_CRDS="$("${HCP_CLI}" install render --outputs=crds "${CMD_ARGS[@]}")"
+  if ! echo "${RENDERED_CRDS}" | grep -q 'name: dnsendpoints.externaldns.k8s.io'; then
+    echo "DNSEndpoint CRD not bundled by this hypershift version, installing manually..."
+    # Pinned to the commit tagged v0.15.0 (immutable, unlike the mutable tag ref).
+    oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/bf70e3f0acbfbf2fce0bc71a4ca2fd6850de4903/docs/contributing/crd-source/crd-manifest.yaml
+  fi
+
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
-  # (same approach as AKS - see hypershift-install logs)
-  # Disable conversion webhook - same approach as AKS
-  # GKE Autopilot has compatibility issues with cert-manager webhook initialization
-  # Webhooks can be enabled later once cert-manager integration is stabilized
-  #
-  # NOTE: We do NOT use --wait-until-available here because the operator needs
-  # GCP_PROJECT and GCP_REGION env vars to start, but we can only set those
-  # after the deployment is created. We'll wait manually after setting env vars.
-  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --enable-conversion-webhook=false \
-  --external-dns-provider=google \
-  --external-dns-domain-filter=dummy \
-  --private-platform=GCP \
-  --platform-monitoring=All \
-  --enable-ci-debug-output \
-  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-  ${EXTRA_ARGS}
-
-  # TODO(GCP-402): Remove this workaround once hypershift install supports
-  # --gcp-project and --gcp-region flags. See https://issues.redhat.com/browse/GCP-402
-  #
-  # Set GCP environment variables on the operator deployment
-  # This must be done after install creates the deployment, but before
-  # the operator can become ready (it requires these to start)
-  echo "Setting GCP_PROJECT=${GCP_PROJECT_ID} and GCP_REGION=${GCP_REGION_VALUE} on operator deployment"
-  oc set env deployment/operator -n hypershift \
-    GCP_PROJECT="${GCP_PROJECT_ID}" \
-    GCP_REGION="${GCP_REGION_VALUE}"
-
-  # Wait for the operator to become ready with the env vars set
-  echo "Waiting for operator to become available..."
-  oc rollout status deployment/operator -n hypershift --timeout=300s
-  oc wait --for=condition=Available --namespace hypershift deployments/operator --timeout=300s
-    ;;
-
-  Kubevirt)
-    "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --additional-operator-env-vars="IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/4.18:cluster-api-provider-kubevirt" \
-    --platform-monitoring=All \
-    --enable-ci-debug-output \
-    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-    --wait-until-available \
-    ${EXTRA_ARGS}
-    ;;
+  "${HCP_CLI}" install "${CMD_ARGS[@]}" \
+  --wait-until-available \
+  ${EXTRA_ARGS}     ;;
 
   *)
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
@@ -176,3 +305,86 @@ case "${CLOUD_PROVIDER}" in
     ${EXTRA_ARGS}
     ;;
 esac
+
+# --- Post-install operator image verification ---
+# Update the verification state with data from the live deployment. The EXIT
+# trap (registered before the install) writes the JSON artifact on any exit,
+# so these values are captured even if a later command fails.
+# Disable xtrace so raw pullspecs and imageIDs are never logged.
+[[ $- == *x* ]] && _XTRACE_WAS_ON=true || _XTRACE_WAS_ON=false
+set +x
+
+# Query the actual deployed operator from the management cluster.
+# Prefer the explicit management_cluster_kubeconfig written by the nested-management-cluster
+# setup chain; fall back to the default KUBECONFIG (covers 2-tier root-management-cluster
+# workflows where management_cluster_kubeconfig does not exist).
+VERIFY_KUBECONFIG="${KUBECONFIG:-}"
+if [[ -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
+  VERIFY_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+fi
+
+DEPLOYED_IMAGE="unavailable"
+POD_IMAGE_ID="unavailable"
+
+if [[ -n "${VERIFY_KUBECONFIG}" ]] && [[ -f "${VERIFY_KUBECONFIG}" ]]; then
+  # Select the "operator" container by name (not positional index) to avoid reading
+  # a sidecar when container ordering varies.
+  DEPLOYED_IMAGE=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get deployment -n hypershift operator \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}' 2>/dev/null) || DEPLOYED_IMAGE="unavailable"
+  # Select the newest Running operator pod by creation time and read the "operator"
+  # container's imageID by name. During a deployment rollout the newest Running pod
+  # belongs to the current ReplicaSet revision; sorting by creationTimestamp avoids
+  # reading a stale imageID from an old-revision pod that has not yet terminated.
+  # Pending, completed, or terminating pods are excluded by the phase filter.
+  POD_IMAGE_ID=$(oc --kubeconfig="${VERIFY_KUBECONFIG}" get pods -n hypershift -l app=operator \
+    --field-selector=status.phase=Running --sort-by=.metadata.creationTimestamp \
+    -o jsonpath='{range .items[*]}{.status.containerStatuses[?(@.name=="operator")].imageID}{"\n"}{end}' 2>/dev/null \
+    | tail -1) || POD_IMAGE_ID="unavailable"
+  # Normalize empty oc output (exit 0 with no matching jsonpath result) to "unavailable".
+  [[ -z "${DEPLOYED_IMAGE}" ]] && DEPLOYED_IMAGE="unavailable"
+  [[ -z "${POD_IMAGE_ID}" ]] && POD_IMAGE_ID="unavailable"
+fi
+
+# Update the verification state for the EXIT trap.
+_VERIFY_DEPLOYED=$(_safe_digest "${DEPLOYED_IMAGE}")
+_VERIFY_POD=$(_safe_digest "${POD_IMAGE_ID}")
+
+# When an explicit override was supplied, verify the deployment converged to the
+# intended image. Digest-pinned overrides (image@sha256:…) require a matching
+# deployed digest — exit non-zero when the deployed digest cannot be resolved or
+# does not match. Tag-only overrides have no immutable digest to compare, so
+# verification is explicitly skipped with an informational message. Ordinary e2e
+# jobs that use the default pipeline image are unaffected.
+if [[ "${_VERIFY_OVERRIDE}" == "true" ]]; then
+  # Extract sha256 digest from the intended override image if it contains one.
+  INTENDED_DIGEST=$(_extract_digest "${OVERRIDE_HYPERSHIFT_OPERATOR_IMAGE}")
+
+  if [[ "${INTENDED_DIGEST}" == sha256:* ]]; then
+    # Override is digest-pinned — deployed digest must be resolvable and matching.
+    DEPLOYED_DIGEST=$(_extract_digest "${POD_IMAGE_ID}")
+    if [[ "${DEPLOYED_DIGEST}" != sha256:* ]]; then
+      echo "ERROR: HyperShift Operator image digest could not be verified"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Pod digest: $(_safe_digest "${POD_IMAGE_ID}")"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x || true
+      exit 1
+    elif [[ "${INTENDED_DIGEST}" != "${DEPLOYED_DIGEST}" ]]; then
+      echo "ERROR: HyperShift Operator image digest mismatch"
+      echo "  Intended digest: ${INTENDED_DIGEST}"
+      echo "  Deployed digest: ${DEPLOYED_DIGEST}"
+      # Restore xtrace before exiting so post-step cleanup is visible.
+      ${_XTRACE_WAS_ON} && set -x || true
+      exit 1
+    else
+      echo "INFO: HyperShift Operator image digest verified"
+      echo "  Digest: ${DEPLOYED_DIGEST}"
+    fi
+  else
+    # Override is tag-only — no immutable digest to compare.
+    echo "INFO: digest verification skipped (tag-only override, no immutable digest to compare)"
+  fi
+fi
+
+# Restore xtrace to its previous state.
+${_XTRACE_WAS_ON} && set -x || true

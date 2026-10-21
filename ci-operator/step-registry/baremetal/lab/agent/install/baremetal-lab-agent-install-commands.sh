@@ -8,7 +8,7 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
@@ -120,13 +120,16 @@ cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # Also, we assume that the agent-config.yaml is already in place in the SHARED_DIR.
 # We can create the installation dir with the install-config.yaml and agent-config.yaml.
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
-### TODO check if we can support the following
 ### Create manifests
-#echo "Creating manifests..."
-#oinst agent create cluster-manifests
+# this will be removed once AGENT-626 is done
+if [ "${LOAD_BALANCER_TYPE:-cluster-managed}" == "user-managed" ]; then
+  echo "Creating manifests..."
+  oinst agent create cluster-manifests
+  yq -i '.spec.loadBalancer.type = "UserManaged"' "${INSTALL_DIR}/"cluster-manifests/agent-cluster-install.yaml
+fi
 
 ### Inject customized manifests
 #echo -e "\nThe following manifests will be included at installation time:"
@@ -137,9 +140,15 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 #  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
 #done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
+DATA_STORAGE="/var/mnt/data-storage"
 
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
+if [ "${IMAGE_POLICY_DISABLED:-true}" = "true" ]; then
+    ### Disable image policy for nightly build
+    export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
 fi
 
 case "${BOOT_MODE}" in
@@ -150,9 +159,9 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
   if [[ "${MINIMAL_ISO:-false}" == "true" ]]; then
-    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:/opt/html/agent.$gnu_arch-rootfs.img"
+    scp "${SSHOPTS[@]}" "${INSTALL_DIR}/boot-artifacts/agent.$gnu_arch-rootfs.img" "root@${AUX_HOST}:${DATA_STORAGE}/html/agent.$gnu_arch-rootfs.img"
   fi
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}.${gnu_arch}.iso"
   echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
   # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -190,7 +199,7 @@ case "${BOOT_MODE}" in
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
     "root@${AUX_HOST}:/opt/dnsmasq/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
-    "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
+    "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
 ;;
 *)
   echo "Unknown install mode: ${BOOT_MODE}"
@@ -239,7 +248,6 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
 if ! wait $!; then
   # Used by observer pod
   touch "${SHARED_DIR}/failure"
-  # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
   exit 1
 fi
@@ -251,7 +259,6 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   # Used by observer pod
   touch "${SHARED_DIR}/failure"
-  # TODO: gather logs??
   exit 1
 fi
 

@@ -12,8 +12,9 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: openstack-cluster-api-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: openstack-cluster-api-controllers
 promotion:
   to:
   - name: "5.0"
@@ -55,7 +56,8 @@ tests:
     make -C openshift verify
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -66,9 +68,10 @@ tests:
       resource_type: openstack-vexxhost-quota-slice
     test:
     - chain: hypershift-openstack-e2e
-    workflow: hypershift-aws-e2e-external
-- as: e2e-openstack-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    workflow: hypershift-aws-e2e-nested
+- always_run: false
+  as: e2e-openstack-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:

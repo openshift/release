@@ -21,12 +21,30 @@ spec:
         component: tide
     spec:
       serviceAccountName: "tide"
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: git-sync
+          mountPath: /tmp/git-sync
       containers:
       - name: tide
-        image: us-docker.pkg.dev/k8s-infra-prow/images/tide:v20260217-999e46ca7
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tide:v20261007-6ed406f29
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        # Keep git-sync's published link (release-staging) in the path. Never
+        # point the recursive job loader at the root containing .git/.worktrees.
+        - --job-config-path=/etc/jobs/release-staging/release-staging/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -54,6 +72,32 @@ spec:
         - name: gcs-credentials
           mountPath: /etc/gcs-credentials
           readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
+        - name: git-sync
+          mountPath: /etc/jobs/release-staging
+          readOnly: true
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/Prucek/release-staging.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release-staging
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: git-sync
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       volumes:
       - name: github-app-credentials
         secret:
@@ -64,6 +108,13 @@ spec:
       - name: gcs-credentials
         secret:
           secretName: gce-sa-credentials-gcs-private
+      - name: combined-jobs
+        emptyDir: {}
+      - name: git-sync
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
 ---
 apiVersion: v1
 kind: Service

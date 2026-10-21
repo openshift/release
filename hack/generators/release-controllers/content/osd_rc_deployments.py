@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.21:tools'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/5.0:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -266,7 +266,7 @@ def get_oc_prepare_container():
             DURATION=$SECONDS
             echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
                         """],
-            "image": "release-controller:latest",
+            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest",
             "volumeMounts": get_oc_volume_mounts(),
             "env": get_oc_env_vars(),
         }
@@ -359,7 +359,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "11Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
@@ -377,11 +377,12 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-endpoint=http://ghproxy',
                                         '--github-graphql-endpoint=http://ghproxy/graphql',
                                         '--github-throttle=250',
-                                        '--jira-endpoint=https://issues.redhat.com',
-                                        '--jira-bearer-token-file=/etc/jira/api',
+                                        "--jira-endpoint=https://redhat.atlassian.net",
+                                        "--jira-username=openshift-release-controller-jira-bot@redhat.com",
+                                        "--jira-password-file=/etc/jira/bot-password",
                                         '--verify-jira',
-                                        '--plugin-config=/etc/plugins/plugins.yaml',
-                                        '--supplemental-plugin-config-dir=/etc/plugins',
+                                        '--plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml',
+                                        '--supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
                                         "--manifest-list-mode"
@@ -449,7 +450,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "4Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller-api',
@@ -464,8 +465,10 @@ def _add_osd_rc_deployment(gendoc):
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
                                         '--enable-jira',
-                                        '--jira-endpoint=https://issues.redhat.com',
-                                        '--jira-bearer-token-file=/etc/jira/api',
+                                        "--jira-endpoint=https://redhat.atlassian.net",
+                                        "--jira-username=openshift-release-controller-jira-bot@redhat.com",
+                                        "--jira-password-file=/etc/jira/bot-password",
+                                        '--release-qualifiers-config-path=/etc/qualifiers-config/release-qualifiers.yaml',
                                         ],
                             'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
                             'imagePullPolicy': 'Always',

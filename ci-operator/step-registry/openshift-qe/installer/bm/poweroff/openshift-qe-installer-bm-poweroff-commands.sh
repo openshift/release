@@ -20,16 +20,45 @@ export LAB_CLOUD
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 
+set +x
+QUADS_SSO_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/quads_sso_token_${LAB} 2>/dev/null || echo "")
+export QUADS_SSO_TOKEN
+CURL_AUTH=""
+if [[ -n "$QUADS_SSO_TOKEN" ]]; then
+  # shellcheck disable=SC2089
+  CURL_AUTH="-H 'Authorization: Bearer ${QUADS_SSO_TOKEN}'"
+fi
+# shellcheck disable=SC2090
+export CURL_AUTH
+set -x
+
+if [[ "${OCP_INVENTORY_OVERRIDE}" == "true" ]]; then
+  OCPINV=$(cat ${CLUSTER_PROFILE_DIR}/ocp_inventory_path)
+  export OCPINV
+else
+  OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
+  export OCPINV
+fi
+
 cat > /tmp/poweroff.sh << 'EOF'
 echo 'Running poweroff.sh'
-OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-USER=$(curl -sSk $OCPINV | jq -r ".nodes[0].pm_user")
-PWD=$(curl -sSk $OCPINV  | jq -r ".nodes[0].pm_password")
-for i in $(curl -sSk $OCPINV | jq -r ".nodes[1:][].name"); do
-   podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --power-off
-done
+if [[ "$OCP_INVENTORY_OVERRIDE" == "true" ]]; then
+  OCPINV=${OCPINV}
+  USER=$(jq -r ".nodes[0].pm_user" ${OCPINV})
+  PWD=$(jq -r ".nodes[0].pm_password" ${OCPINV})
+  for i in $(jq -r ".nodes[1:][].name" ${OCPINV}); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+else
+  OCPINV=${OCPINV}
+  USER=$(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[0].pm_user")
+  PWD=$(curl -sSk $CURL_AUTH $OCPINV  | jq -r ".nodes[0].pm_password")
+  for i in $(curl -sSk $CURL_AUTH $OCPINV | jq -r ".nodes[1:][].name"); do
+    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PWD --insecure --power-off
+  done
+fi
 EOF
-envsubst '${LAB_CLOUD},${QUADS_INSTANCE}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
+envsubst '${CURL_AUTH},${LAB_CLOUD},${QUADS_INSTANCE},${OCP_INVENTORY_OVERRIDE},${OCPINV}' < /tmp/poweroff.sh > /tmp/poweroff_updated-$LAB_CLOUD.sh
 
 scp -q ${SSH_ARGS} /tmp/poweroff_updated-$LAB_CLOUD.sh root@${bastion}:/tmp/
 

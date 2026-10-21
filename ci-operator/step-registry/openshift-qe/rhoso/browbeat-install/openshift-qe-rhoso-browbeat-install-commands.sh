@@ -6,7 +6,7 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 es_host=$(cat ${CLUSTER_PROFILE_DIR}/elastic_host)
 es_port=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".elastic_port")
 build_id="${BUILD_ID:-unknown}"
@@ -19,6 +19,8 @@ set -o pipefail
 set -x
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   echo 'Hostname: \$(hostname)'
   rm -rf browbeat
   git clone https://github.com/openstack/browbeat.git

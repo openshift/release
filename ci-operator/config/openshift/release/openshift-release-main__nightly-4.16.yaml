@@ -106,7 +106,7 @@ tests:
 - as: e2e-aws-ovn-single-node-workers-serial
   cron: 27 13 1 3 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -116,7 +116,7 @@ tests:
 - as: e2e-aws-ovn-single-node-workers
   cron: 29 17 19 1 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -124,7 +124,7 @@ tests:
 - as: e2e-aws-ovn-single-node
   cron: 41 7 18 6 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -132,7 +132,7 @@ tests:
 - as: e2e-aws-ovn-single-node-techpreview
   cron: 44 3 15 2 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -142,7 +142,7 @@ tests:
 - as: e2e-aws-ovn-single-node-serial
   cron: 15 23 12 10 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -152,7 +152,7 @@ tests:
 - as: e2e-aws-ovn-single-node-techpreview-serial
   cron: 50 15 25 8 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -169,27 +169,13 @@ tests:
   cron: 47 2 11 4 *
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
   cron: 15 3 10 10 *
   steps:
     cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-bm
-  capabilities:
-  - intranet
-  cron: 36 0 3 8 *
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     observers:
       enable:
       - observers-resource-watch
@@ -281,7 +267,7 @@ tests:
 - as: e2e-aws-ovn-proxy
   cron: 36 7 22 7 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -292,26 +278,27 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
   cron: 51 19 6 1 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-local-gateway
   cron: 39 5 11 3 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     observers:
@@ -320,110 +307,168 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
   cron: 10 23 12 9 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
   cron: 6 2 23 8 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-staticip
 - as: e2e-vsphere-externallb-ovn
   cron: 12 15 26 12 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
   cron: 17 6 28 10 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 16 3 17 12 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
   cron: 17 4 24 5 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
   cron: 15 9 18 9 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
+  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-csi
   cron: 28 6 3 8 *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-ovn-zones
   cron: 23 4 27 5 *
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-zones
-- as: e2e-vsphere-ovn-upi-zones
-  cron: 48 17 12 6 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-vsphere-ovn-upi-zones
+  cron: 48 17 12 6 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      MAX_VCENTERS: "1"
+      POOL_COUNT: "3"
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-external-vsphere-ccm
   cron: 28 10 4 7 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: upi-vsphere-platform-external-ccm
 - as: e2e-aws-ovn-workers-rhel8
   cron: 29 4 27 4 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     observers:
@@ -433,7 +478,7 @@ tests:
 - as: e2e-aws-ovn-workers-rhel8-upgrade
   cron: 1 20 11 6 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_VERSION: "8.10"
     observers:
@@ -443,7 +488,7 @@ tests:
 - as: e2e-azure-sdn-fips
   cron: 53 21 28 1 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FIPS_ENABLED: "true"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
@@ -457,7 +502,7 @@ tests:
 - as: e2e-aws-ovn-fips
   cron: 26 0 24 9 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -470,7 +515,7 @@ tests:
 - as: e2e-gcp-sdn
   cron: 56 12 25 10 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -480,7 +525,7 @@ tests:
 - as: e2e-gcp-ovn-upgrade
   cron: 23 13 6 6 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       TEST_TYPE: upgrade-conformance
     observers:
@@ -490,7 +535,7 @@ tests:
 - as: e2e-gcp-sdn-upgrade
   cron: 35 19 4 12 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_TYPE: upgrade-conformance
@@ -501,7 +546,7 @@ tests:
 - as: e2e-gcp-ovn-fips
   cron: 15 7 25 5 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -514,7 +559,7 @@ tests:
 - as: e2e-gcp-ovn-csi
   cron: 58 18 22 1 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -522,7 +567,7 @@ tests:
 - as: e2e-azure-sdn-fips-serial
   cron: 35 11 10 6 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FIPS_ENABLED: "true"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
@@ -537,7 +582,7 @@ tests:
 - as: e2e-aws-ovn-fips-serial
   cron: 43 8 19 6 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -551,7 +596,7 @@ tests:
 - as: e2e-gcp-sdn-fips-serial
   cron: 55 12 8 7 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       FIPS_ENABLED: "true"
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
@@ -566,7 +611,7 @@ tests:
 - as: console-aws
   cron: 56 2 12 7 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -585,7 +630,7 @@ tests:
 - as: e2e-gcp-ovn-rt
   cron: 5 4 17 12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
@@ -596,12 +641,12 @@ tests:
 - as: e2e-gcp-ovn-xpn
   cron: 36 20 10 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - as: e2e-aws-sdn-upgrade
   cron: 50 7 10 10 *
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
       TEST_TYPE: upgrade-conformance
@@ -612,7 +657,7 @@ tests:
 - as: e2e-aws-sdn
   cron: 56 7 10 11 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -622,7 +667,7 @@ tests:
 - as: e2e-aws-sdn-serial
   cron: 54 13 23 10 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -632,7 +677,7 @@ tests:
 - as: e2e-aws-ovn-serial
   cron: 1 11 15 8 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -640,7 +685,7 @@ tests:
 - as: e2e-aws-csi
   cron: 19 16 8 4 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -648,7 +693,7 @@ tests:
 - as: e2e-azure-sdn
   cron: 56 1 14 3 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -658,7 +703,7 @@ tests:
 - as: e2e-azure-csi
   cron: 29 12 12 2 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -677,7 +722,7 @@ tests:
 - as: e2e-aws-sdn-cgroupsv2
   cron: 48 10 22 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -687,7 +732,7 @@ tests:
 - as: e2e-aws-sdn-crun
   cron: 59 2 5 9 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
@@ -697,7 +742,7 @@ tests:
 - as: e2e-aws-driver-toolkit
   cron: 43 11 2 2 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -710,20 +755,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-telco5g-ptp
-  capabilities:
-  - intranet
-  cron: 0 19 * * 2,5
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "false"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "4.16"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
 - as: telco5g-network-flow-matrix-bm
   capabilities:
   - intranet
@@ -768,7 +799,7 @@ tests:
 - as: aws-ovn-network-flow-matrix
   cron: 0 23 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: network-flow-matrix-tests
     - ref: openshift-e2e-test
@@ -776,7 +807,7 @@ tests:
 - as: aws-ovn-network-flow-matrix-single-node
   cron: 0 23 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
@@ -820,7 +851,7 @@ tests:
 - as: e2e-aws-ovn-upi
   cron: 28 0 3 7 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -828,7 +859,7 @@ tests:
 - as: e2e-azure-ovn-upi
   cron: 12 13 7 12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -836,7 +867,7 @@ tests:
 - as: e2e-gcp-ovn-upi
   cron: 55 21 28 6 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -862,8 +893,9 @@ tests:
 - as: e2e-gcp-sdn-serial
   cron: 24 16 5 7 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     observers:
       enable:
@@ -872,7 +904,7 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   cron: 2 12 6 7 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
@@ -880,7 +912,7 @@ tests:
 - as: e2e-gcp-ovn-etcd-scaling
   cron: 47 2 19 9 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -888,7 +920,7 @@ tests:
 - as: e2e-azure-ovn-etcd-scaling
   cron: 6 15 22 5 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     observers:
       enable:
       - observers-resource-watch
@@ -897,20 +929,12 @@ tests:
   cron: 25 4 8 7 *
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-cpu-partitioning
   cron: 55 13 19 8 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cpu-partitioning
-- as: e2e-gcp-graceful-shutdown
-  cron: 1 22 3 10 *
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-e2e-gcp-graceful-shutdown
 - as: e2e-openstack-ovn-techpreview
   cron: 52 5 20 2 *
   steps:
@@ -986,49 +1010,49 @@ tests:
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 30d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-60d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 60d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-180d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-360d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 360d
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-30d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 30d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d-age-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "90"
       SKEW: 90d
@@ -1036,7 +1060,7 @@ tests:
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d-age-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "180"
       SKEW: 90d
@@ -1044,7 +1068,7 @@ tests:
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-1y-age-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "365"
       CLUSTER_AGE_STEP: "150"
@@ -1053,7 +1077,7 @@ tests:
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       CLUSTER_AGE_DAYS: "730"
       CLUSTER_AGE_STEP: "300"
@@ -1062,105 +1086,105 @@ tests:
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 60d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 360d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-30d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 30d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-60d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 60d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-180d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 360d
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-30d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 30d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-60d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 60d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-180d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-360d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       SKEW: 360d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-aws-ovn-ha-cert-rotation-suspend-30d
   cron: 0 12 1 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
         Ingress
@@ -1170,30 +1194,58 @@ tests:
     workflow: openshift-e2e-aws-cert-rotation
 - as: e2e-aws-ovn-edge-zones
   cron: 25 0 4 7 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-shared-vpc-edge-zones
   cron: 20 20 25 6 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
 - as: e2e-aws-ovn-edge-zones-manifest-validation
   cron: 34 13 25 1 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-installer-manifests-aws-edge-zones
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: 10 12 1 12 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CLUSTER_NETWORK_MTU: "5000"
     workflow: openshift-e2e-aws-network-mtu
 - as: e2e-aws-overlay-mtu-ovn-edge-1100
   cron: 22 17 27 3 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
@@ -1210,7 +1262,7 @@ tests:
 - as: fips-payload-scan
   cron: '@yearly'
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
       MAJOR_MINOR: "4.16"
@@ -1220,24 +1272,30 @@ tests:
     workflow: ipi-aws
 - as: e2e-external-aws
   cron: 1 15 16 2 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-external-aws
 - as: e2e-external-aws-ccm
   cron: 23 22 19 11 *
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts-aws'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-external-aws-ccm
-  cron: 10 11 8 8 *
-  steps:
-    cluster_profile: aws
-    env:
-      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

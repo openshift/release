@@ -1,22 +1,35 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   image_stream_tag:
-    name: builder-priv
-    namespace: ocp-private
+    name: builder
+    namespace: ocp-priv
     tag: rhel-9-golang-1.24-openshift-4.20
 canonical_go_repository: github.com/openshift/installer-aro-wrapper
 images:
-- dockerfile_path: Dockerfile.aro
-  to: azure-installer-aro-wrapper
+  items:
+  - dockerfile_path: Dockerfile.aro
+    from: ubi9-minimal
+    inputs:
+      src:
+        as:
+        - ${BUILDER_REGISTRY}/${BUILDER_REPOSITORY}:${BUILDER_TAG}
+    to: azure-installer-aro-wrapper
 promotion:
   to:
-  - name: 4.20-priv
-    namespace: ocp-private
+  - name: "4.20"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
 resources:
   '*':
     limits:

@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.19"
     namespace: ocp
     tag: cli
   dvo-tests:
@@ -8,15 +8,16 @@ base_images:
     namespace: ci
     tag: latest
   operator-sdk:
-    name: "4.17"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile
-  from: src
-  to: dvo-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: src
+    to: dvo-operator
 operator:
   bundles:
   - as: dvo-operator-bundle
@@ -40,8 +41,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: deployment-validation-operator-codecov-token
     mount_path: /tmp/secret
-    name: deployment-validation-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -50,8 +52,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: deployment-validation-operator-codecov-token
     mount_path: /tmp/secret
-    name: deployment-validation-operator-codecov-token
 - as: lint
   commands: make lint
   container:
@@ -74,7 +77,7 @@ tests:
     owner: obs
     product: ocp
     timeout: 2h0m0s
-    version: "4.17"
+    version: "4.19"
   steps:
     test:
     - as: install
@@ -93,18 +96,18 @@ tests:
       commands: pytest.sh -m "not ui" --junitxml=$(pwd)/test-report.xml --rp_enabled
         --rp_name=deployment_validation_operator_e2e_pr_checks
       credentials:
-      - mount_path: /secret/aws/aws-bucket
-        name: aws-bucket
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-access-key-id
-        name: aws-access-key-id
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-region
-        name: aws-region
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-secret-access-key
-        name: aws-secret-access-key
-        namespace: test-credentials
+      - collection: insights-operator-secrets
+        group: aws-bucket
+        mount_path: /secret/aws/aws-bucket
+      - collection: insights-operator-secrets
+        group: aws-access-key-id
+        mount_path: /secret/aws/aws-access-key-id
+      - collection: insights-operator-secrets
+        group: aws-region
+        mount_path: /secret/aws/aws-region
+      - collection: insights-operator-secrets
+        group: aws-secret-access-key
+        mount_path: /secret/aws/aws-secret-access-key
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -129,7 +132,7 @@ tests:
     owner: obs
     product: ocp
     timeout: 2h0m0s
-    version: "4.17"
+    version: "4.19"
   cron: 0 0 * * *
   steps:
     test:
@@ -150,18 +153,18 @@ tests:
         --rp_name=deployment_validation_operator_e2e_periodic && cp $(pwd)/test-report.xml
         ${ARTIFACT_DIR}/test-report.xml
       credentials:
-      - mount_path: /secret/aws/aws-bucket
-        name: aws-bucket
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-access-key-id
-        name: aws-access-key-id
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-region
-        name: aws-region
-        namespace: test-credentials
-      - mount_path: /secret/aws/aws-secret-access-key
-        name: aws-secret-access-key
-        namespace: test-credentials
+      - collection: insights-operator-secrets
+        group: aws-bucket
+        mount_path: /secret/aws/aws-bucket
+      - collection: insights-operator-secrets
+        group: aws-access-key-id
+        mount_path: /secret/aws/aws-access-key-id
+      - collection: insights-operator-secrets
+        group: aws-region
+        mount_path: /secret/aws/aws-region
+      - collection: insights-operator-secrets
+        group: aws-secret-access-key
+        mount_path: /secret/aws/aws-secret-access-key
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH

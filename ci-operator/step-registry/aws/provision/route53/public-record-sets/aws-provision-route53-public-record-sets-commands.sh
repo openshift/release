@@ -94,4 +94,8 @@ echo "$(date -u --rfc-3339=seconds) - INFO: Waiting for DNS records to sync..."
 aws route53 wait resource-record-sets-changed --id "$id"
 
 echo "$(date -u --rfc-3339=seconds) - INFO: DNS records created."
+
+echo "Waiting for ${AWS_NEW_PUBLIC_DNS_RECORD_WAITING_TIME}s to ensure DNS records can be resolved ..."
+sleep $AWS_NEW_PUBLIC_DNS_RECORD_WAITING_TIME
+
 exit "${ret}"

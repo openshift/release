@@ -1,30 +1,33 @@
 base_images:
   base:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/service-ca-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: service-ca-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: service-ca-operator
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -44,13 +47,15 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -60,9 +65,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.13

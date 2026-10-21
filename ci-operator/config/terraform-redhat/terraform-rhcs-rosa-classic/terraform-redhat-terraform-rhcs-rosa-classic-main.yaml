@@ -4,8 +4,9 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.14
 images:
-- dockerfile_path: Dockerfile
-  to: terraform-rhcs-rosa-clients
+  items:
+  - dockerfile_path: Dockerfile
+    to: terraform-rhcs-rosa-clients
 promotion:
   to:
   - namespace: ci
@@ -25,17 +26,18 @@ resources:
       memory: 200Mi
 tests:
 - always_run: true
-  as: verify-format
-  commands: make verify
+  as: pre-push-checks
+  commands: make pre-push-checks
   container:
     from: terraform-rhcs-rosa-clients
 - always_run: true
-  as: verify-gen
-  commands: make verify-gen
+  as: security-check
+  commands: make security-check
   container:
     from: terraform-rhcs-rosa-clients
-- always_run: true
+- always_run: false
   as: rosa-classic-public
+  skip_if_only_changed: \.md$
   steps:
     cluster_profile: oex-aws-qe
     env:
@@ -90,8 +92,9 @@ tests:
       EXAMPLE_NAME: rosa-classic-public-with-multiple-machinepools-and-idps
     test:
     - ref: rhcs-module-run-example
-- always_run: true
+- always_run: false
   as: rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
+  skip_if_only_changed: \.md$
   steps:
     cluster_profile: oex-aws-qe
     env:

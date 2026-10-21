@@ -55,7 +55,10 @@ ref:
     documentation: Labels for the default machine pool. Format should be a comma-separated list of 'key=value'.
   - name: OPENSHIFT_VERSION
     default: ""
-    documentation: The openshift version for rosa to install (e.g. "4.10.12"). Specify a major/minor (e.g. "4.10") to get the latest version from that stream.
+    documentation: The openshift version for rosa to install (e.g. "4.10.12"). Specify a major/minor (e.g. "4.10") to get the latest version from that stream. When empty and VERSION_OFFSET_FROM_LATEST is set, the version is resolved dynamically.
+  - name: VERSION_OFFSET_FROM_LATEST
+    default: ""
+    documentation: "When OPENSHIFT_VERSION is empty, resolve it as an offset from the latest available Y-stream. E.g., 1 means latest-1, 3 means latest-3."
   - name: CHANNEL_GROUP
     default: "nightly,candidate,stable"
     documentation: The channel group where to to get the openshift version. The supported groups are [stable, candidate, nightly].
@@ -76,7 +79,21 @@ ref:
     documentation: Restrict master API endpoint and application routes to direct, private connectivity.
   - name: PRIVATE_LINK
     default: "false"
-    documentation: Provides private connectivity between VPCs, AWS services, and your on-premises networks, without exposing your traffic to the public internet.
+    documentation: >-
+      Provides private connectivity between VPCs, AWS services, and your on-premises
+      networks, without exposing your traffic to the public internet. Classic clusters
+      only: per `rosa create cluster --hosted-cp --help`, --private-link is only to be
+      used with Classic clusters after ROSA CLI v1.2.55. For HCP clusters, set PRIVATE
+      plus PRIVATE_DEFAULT_INGRESS instead; PRIVATE_LINK=true on HCP is honored for
+      backward compatibility and maps to --default-ingress-private.
+  - name: PRIVATE_DEFAULT_INGRESS
+    default: "false"
+    documentation: >-
+      HCP only. Make the default apps ingress (router) listen internally, via
+      --default-ingress-private. Per the rosa CLI this is the HCP equivalent of classic
+      PrivateLink ingress privacy: "For Hosted Control Plane clusters, use the '--private'
+      and '--default-ingress-private' flags instead." Implies ENABLE_BYOVPC and
+      private-subnets-only. Ignored for Classic clusters.
   - name: ENABLE_PROXY
     default: "false"
     documentation: Use proxy to create HTTP/HTTPs connections outside the cluster.
@@ -107,6 +124,9 @@ ref:
   - name: CLUSTER_SECTOR
     default: ""
     documentation: Sector groups a set of service clusters for HCP. The supported values are [canary, main].
+  - name: ADDITIONAL_PROPERTIES
+    default: ""
+    documentation: Additional properties to pass to rosa create cluster via --properties flag. Comma-separated key:value pairs.
   - name: ENABLE_SHARED_VPC
     default: "no"
     documentation: Create a Shared VPC cluster.

@@ -35,6 +35,13 @@ fips: true
 EOF
 fi
 
+if [[ -n "${OS_IMAGE_STREAM}" ]]; then
+    echo "Adding 'osImageStream: ${OS_IMAGE_STREAM}' to install-config.yaml"
+    cat >> "${out}" << EOF
+osImageStream: ${OS_IMAGE_STREAM}
+EOF
+fi
+
 if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
 	echo "Adding 'capabilities: ...' to install-config.yaml"
 	cat >> "${out}" << EOF

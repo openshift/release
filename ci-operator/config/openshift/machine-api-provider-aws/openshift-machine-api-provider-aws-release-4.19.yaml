@@ -11,8 +11,9 @@ binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: aws-machine-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: aws-machine-controllers
 promotion:
   to:
   - name: "4.19"
@@ -53,17 +54,19 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       SPOT_INSTANCES: "true"
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -73,21 +76,23 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: regression-clusterinfra-aws-ipi-mapi
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi

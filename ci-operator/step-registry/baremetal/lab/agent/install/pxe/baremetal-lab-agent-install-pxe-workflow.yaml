@@ -1,6 +1,8 @@
 workflow:
   as: baremetal-lab-agent-install-pxe
   steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     env:
       USE_CONSOLE_HOOK: "false"
       BOOT_MODE: "pxe"
@@ -9,8 +11,10 @@ workflow:
       - ref: baremetal-lab-agent-conf-static
       - chain: baremetal-lab-agent-install
     post:
+      - chain: gather
+        optional_on_success: true
       - chain: baremetal-lab-agent-post
-      - ref: send-results-to-reportportal
+        best_effort: true
   documentation: |-
     The baremetal-lab-agent-install-pxe workflow provides pre- and post- steps that provision and
     deprovision an ABI OpenShift cluster with a default configuration on a Baremetal lab,

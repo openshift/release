@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--servicemesh-operator__kiali-int-tests-execute.xml
+    ' EXIT
+fi
+
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"

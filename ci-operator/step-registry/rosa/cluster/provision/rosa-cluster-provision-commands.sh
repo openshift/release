@@ -26,6 +26,7 @@ FIPS=${FIPS:-false}
 POD_CIDR=${POD_CIDR:-""}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
+PRIVATE_DEFAULT_INGRESS=${PRIVATE_DEFAULT_INGRESS:-false}
 PRIVATE_SUBNET_ONLY="false"
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
@@ -184,7 +185,7 @@ echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
+if [[ ! -z "$REGION" ]]; then
   CLOUD_PROVIDER_REGION="${REGION}"
 fi
 
@@ -208,18 +209,77 @@ read_profile_file() {
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
-if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+
+# DNS diagnostics for login endpoints
+log "Running DNS diagnostics for sso.redhat.com..."
+if command -v dig &>/dev/null; then
+  echo "  A records:    $(dig +short sso.redhat.com A 2>&1 || true)"
+  echo "  AAAA records: $(dig +short sso.redhat.com AAAA 2>&1 || true)"
+elif command -v getent &>/dev/null; then
+  echo "  DNS resolution (getent ahosts):"
+  getent ahosts sso.redhat.com 2>&1 || true
 else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
-  exit 1
+  echo "  Note: neither dig nor getent available, skipping DNS diagnostics"
 fi
+
+# Login with retry logic for transient network errors
+LOGIN_MAX_RETRIES=3
+LOGIN_RETRY_DELAY=30
+login_exit_code=1
+login_output=""
+
+for login_attempt in $(seq 1 ${LOGIN_MAX_RETRIES}); do
+  echo "Login attempt ${login_attempt} of ${LOGIN_MAX_RETRIES}..."
+
+  set +o errexit
+  if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+    login_exit_code=$?
+    if [[ ${login_exit_code} -eq 0 ]]; then
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+      login_exit_code=$?
+    fi
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with offline token"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+    login_exit_code=$?
+    if [[ ${login_exit_code} -eq 0 ]]; then
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+      login_exit_code=$?
+    fi
+  else
+    echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+    exit 1
+  fi
+  set -o errexit
+
+  if [[ ${login_exit_code} -eq 0 ]]; then
+    echo "Login successful"
+    break
+  fi
+
+  # Check for transient network errors
+  if [[ "${login_output}" =~ "network is unreachable" ]] || \
+     [[ "${login_output}" =~ "connection refused" ]] || \
+     [[ "${login_output}" =~ "dial tcp" ]] || \
+     [[ "${login_output}" =~ "connection reset" ]] || \
+     [[ "${login_output}" =~ "no such host" ]]; then
+    echo "Transient network error detected: ${login_output}"
+    if [[ ${login_attempt} -lt ${LOGIN_MAX_RETRIES} ]]; then
+      echo "Retrying in ${LOGIN_RETRY_DELAY} seconds..."
+      sleep ${LOGIN_RETRY_DELAY}
+    else
+      echo "[INFRA] Login failed due to build farm network issue — not a ROSA test failure"
+      echo "${login_output}"
+      exit 1
+    fi
+  else
+    echo "Login failed with non-retryable error:"
+    echo "${login_output}"
+    exit 1
+  fi
+done
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
@@ -258,6 +318,34 @@ else
 fi
 versionList=$(eval $version_cmd)
 echo -e "Available cluster versions:\n${versionList}"
+
+# Resolve version from offset when OPENSHIFT_VERSION is not explicitly set
+if [[ -z "$OPENSHIFT_VERSION" && -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
+  readarray -t y_streams < <(echo "$versionList" | cut -d'.' -f1,2 | sort -Vu)
+  total=${#y_streams[@]}
+  offset=${VERSION_OFFSET_FROM_LATEST}
+  source_index=$((total - offset - 1))
+  if (( source_index < 0 )); then
+    log "ERROR: Not enough Y-streams for offset ${offset}. Have ${total}: ${y_streams[*]}"
+    exit 1
+  fi
+  OPENSHIFT_VERSION=${y_streams[$source_index]}
+  log "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+fi
+
+# If account-roles-create fell back to a different version, use it. This overrides
+# release:latest resolution so the cluster version matches the account roles.
+if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
+  FALLBACK_VERSION=$(cat "${SHARED_DIR}/openshift_version")
+  REQUESTED_MAJOR_MINOR=$(echo "${OPENSHIFT_VERSION}" | cut -d'.' -f1,2)
+  FALLBACK_MAJOR_MINOR=$(echo "${FALLBACK_VERSION}" | cut -d'.' -f1,2)
+  if [[ "${REQUESTED_MAJOR_MINOR}" =~ ^[0-9]+\.[0-9]+$ && "${REQUESTED_MAJOR_MINOR}" != "${FALLBACK_MAJOR_MINOR}" ]]; then
+    log "ERROR: Requested version ${OPENSHIFT_VERSION} but account-roles fell back to ${FALLBACK_VERSION}. Version ${OPENSHIFT_VERSION} may not be available for this cluster type."
+    exit 1
+  fi
+  OPENSHIFT_VERSION="${FALLBACK_VERSION}"
+  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
+fi
 
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable
 # supplied by CI for the payload to use. This only really works for nightlies. ROSA
@@ -333,9 +421,11 @@ fi
 TAG_Author=${TAG_Author:-"periodic"}
 TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
 TAG_Job_Type=$JOB_TYPE
+TAG_Job_Name=$(echo "${JOB_SPEC}" | jq -r '.job // empty' || true)
+TAG_Job_Name=${TAG_Job_Name:-"unknown"}
 TAG_CI="prow"
 TAG_Cluster_Type=$([ "$HOSTED_CP" == "true" ] && echo -n "rosa-hcp" || echo -n "rosa")
-TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type}"
+TAGS="usage-user:${TAG_Author},usage-pull-request:${TAG_Pull_Number},usage-cluster-type:${TAG_Cluster_Type},usage-ci-type:${TAG_CI},usage-job-type:${TAG_Job_Type},usage-job-name:${TAG_Job_Name}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
@@ -360,7 +450,8 @@ cat > ${cluster_config_file} << EOF
   "enable_customer_managed_key": ${STORAGE_ENCRYPTION},
   "fips": ${FIPS},
   "private": ${PRIVATE},
-  "private_link": ${PRIVATE_LINK}
+  "private_link": ${PRIVATE_LINK},
+  "default_ingress_private": ${PRIVATE_DEFAULT_INGRESS}
 }
 EOF
 
@@ -471,19 +562,33 @@ HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp"
   if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
-    psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
-    if [[ -z "$psList" ]]; then
-      echo "no ready provision shard found, trying to find maintenance status provision shard"
-      # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
-      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
+    MAX_SHARD_RETRIES=5
+    SHARD_RETRY_DELAY=30
+    psList=""
+    for attempt in $(seq 1 ${MAX_SHARD_RETRIES}); do
+      psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
       if [[ -z "$psList" ]]; then
-        echo "No available provision shard!"
-        exit 1
+        echo "no ready provision shard found, trying to find maintenance status provision shard"
+        # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
+        psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
       fi
+      if [[ -n "$psList" ]]; then
+        break
+      fi
+      if [[ $attempt -lt ${MAX_SHARD_RETRIES} ]]; then
+        echo "Attempt ${attempt}/${MAX_SHARD_RETRIES}: no provision shard found for sector '${CLUSTER_SECTOR}' in '${CLOUD_PROVIDER_REGION}', retrying in ${SHARD_RETRY_DELAY}s..."
+        sleep ${SHARD_RETRY_DELAY}
+      fi
+    done
+    if [[ -z "$psList" ]]; then
+      echo "No available provision shard after ${MAX_SHARD_RETRIES} attempts!"
+      echo "Sector: ${CLUSTER_SECTOR}, Region: ${CLOUD_PROVIDER_REGION}"
+      echo "Debug: querying OSDFM API directly..."
+      ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}'" || true
+      exit 1
     fi
 
     PROVISION_SHARD_ID=""
-    # ensure the SC is not for ibm usage so that it could support the latest version of the hosted cluster
     for ps in $psList ; do
       topology=$(ocm get /api/clusters_mgmt/v1/provision_shards/${ps} | jq -r '.hypershift_config.topology')
       if [[ "$topology" == "dedicated" ]] || [[ "$topology" == "dedicated-v2" ]] ; then
@@ -497,6 +602,9 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+    if [[ -n "${ADDITIONAL_PROPERTIES:-}" ]]; then
+      HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties ${ADDITIONAL_PROPERTIES}"
+    fi
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
 
@@ -518,12 +626,35 @@ fi
 
 PRIVATE_SWITCH=""
 if [[ "$PRIVATE" == "true" ]]; then
-  PRIVATE_SWITCH="--private"
+  # Classic PrivateLink uses --private-link instead. Passing --private to an STS
+  # Classic cluster is rejected by the ROSA CLI before provisioning starts.
+  if [[ "$HOSTED_CP" == "true" ]] || [[ "$PRIVATE_LINK" != "true" ]]; then
+    PRIVATE_SWITCH="--private"
+  fi
 fi
 
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
-  PRIVATE_LINK_SWITCH="--default-ingress-private"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    # HCP has no PrivateLink concept (see `rosa create cluster --hosted-cp --help`):
+    # honor PRIVATE_LINK=true on HCP for backward compatibility by mapping it to
+    # the HCP ingress-privacy flag. New HCP jobs should use PRIVATE_DEFAULT_INGRESS.
+    PRIVATE_LINK_SWITCH="--default-ingress-private"
+  else
+    PRIVATE_LINK_SWITCH="--private-link"
+  fi
+
+  ENABLE_BYOVPC="true"
+  PRIVATE_SUBNET_ONLY="true"
+fi
+
+PRIVATE_DEFAULT_INGRESS_SWITCH=""
+if [[ "$PRIVATE_DEFAULT_INGRESS" == "true" ]]; then
+  # HCP-only: make the default apps ingress (router) listen internally
+  # (--default-ingress-private). Per the rosa CLI this is the HCP equivalent of
+  # classic PrivateLink ingress privacy: "For Hosted Control Plane clusters, use
+  # the '--private' and '--default-ingress-private' flags instead."
+  PRIVATE_DEFAULT_INGRESS_SWITCH="--default-ingress-private"
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"
@@ -562,6 +693,15 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
   fi
 
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
+    # Classic PrivateLink only passes private subnets to the installer. Mark any
+    # public subnets in the BYO VPC as unmanaged so subnet discovery excludes
+    # them while they continue to provide NAT gateway egress.
+    if [[ "${HOSTED_CP}" != "true" ]] && [[ "${PRIVATE_LINK}" == "true" ]] && [[ -n "${PUBLIC_SUBNET_IDs}" ]]; then
+      UNUSED_PUBLIC_SUBNET_IDs=${PUBLIC_SUBNET_IDs//,/ }
+      echo "Marking unused public subnets ${PUBLIC_SUBNET_IDs} with kubernetes.io/cluster/unmanaged=true"
+      # shellcheck disable=SC2086
+      aws --region "${CLOUD_PROVIDER_REGION}" ec2 create-tags --resources ${UNUSED_PUBLIC_SUBNET_IDs} --tags Key=kubernetes.io/cluster/unmanaged,Value=true
+    fi
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
     record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
   else
@@ -721,6 +861,7 @@ ${FIPS_SWITCH} \
 ${POD_CIDR_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
+${PRIVATE_DEFAULT_INGRESS_SWITCH} \
 ${PROXY_SWITCH} \
 ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \

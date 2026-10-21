@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -77,12 +76,20 @@ function check_signed() {
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
-  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  echo "User specified a custom payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
   export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+elif [[ "${USE_ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" == "true" ]]; then
+  ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(KUBECONFIG="" oc get is release -o jsonpath='{range .status.tags[*].items[*]}{.image}{" "}{.dockerImageReference}{"\n"}{end}' | grep "^$(echo "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" | sed 's/.*@//')" | awk '{print $2}')
+  echo "User want the original payload for cluster install, overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ORIGINAL_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
 fi
 
-echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
+  exit 1
+fi
 
 # target release
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
@@ -92,18 +99,62 @@ echo "target_release_image_repo: $target_release_image_repo"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
 # unset KUBECONFIG to ensure this step always interact with the build farm.
-unset KUBECONFIG
-oc registry login
+KUBECONFIG="" oc registry login
 
 run_command "which oc"
 run_command "oc version --client"
+
+# Create combined pull secret early (needed to access private mirror for version detection)
+combined_pull_secret_tmp=$(mktemp)
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | tr -d '\n' | base64 -w 0)
+cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${combined_pull_secret_tmp}"
+
+# Extract the full OCP version from the target release (using combined pull secret to access mirror)
+ocp_full_version=$(oc adm release info --registry-config ${combined_pull_secret_tmp} ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} -o jsonpath='{.metadata.version}')
+echo "Target OCP version: ${ocp_full_version}"
+
+# Detect architecture for oc-mirror download
+ARCH=$(uname -m)
+case ${ARCH} in
+    x86_64) ARCH="amd64" ;;
+    aarch64) ARCH="arm64" ;;
+esac
+
+# oc-mirror is now distributed via CGW which only publishes "latest"
+oc_mirror_version="latest"
+
+# Download oc-mirror from CGW (Content Gateway)
+CGWURL="https://mirror.openshift.com/pub/cgw"
+oc_mirror_download_dir=$(mktemp -d)
+pushd "${oc_mirror_download_dir}"
+echo "Downloading oc-mirror from ${CGWURL}/oc-mirror/${oc_mirror_version}/"
+curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+    "${CGWURL}/oc-mirror/${oc_mirror_version}/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+
+# Verify the integrity of the downloaded tarball
+echo "Verifying oc-mirror.tar.gz integrity..."
+curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
+    "${CGWURL}/oc-mirror/${oc_mirror_version}/sha256sum.txt"
+grep "oc-mirror-rhel9-linux-${ARCH}.tar.gz" sha256sum.txt | sed "s/oc-mirror-rhel9-linux-${ARCH}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c - || {
+    echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+    exit 1
+}
+echo "Checksum verification passed"
+
+tar -xzf oc-mirror.tar.gz
+chmod +x oc-mirror
+oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+popd
+
+run_command "'${oc_mirror_bin}' version --output=yaml"
+
 oc_mirror_dir=$(mktemp -d)
 pushd "${oc_mirror_dir}"
 new_pull_secret="${oc_mirror_dir}/new_pull_secret"
 
-# combine custom registry credential and default pull secret
-registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-cat "${CLUSTER_PROFILE_DIR}/pull-secret" | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${MIRROR_REGISTRY_HOST}'"]={"auth":"'${registry_cred}'"};j["auths"]=a;print(json.dumps(j))' > "${new_pull_secret}"
+# Reuse the combined pull secret created earlier
+cp "${combined_pull_secret_tmp}" "${new_pull_secret}"
+rm -f "${combined_pull_secret_tmp}"
 oc registry login --to "${new_pull_secret}"
 
 # This is required by oc-mirror since 4.18, refer to OCPBUGS-43986.
@@ -134,9 +185,6 @@ oc registry login --to "${new_pull_secret}"
 #        fi
 #    fi
 #done
-
-oc_mirror_bin="oc-mirror"
-run_command "'${oc_mirror_bin}' version --output=yaml"
 
 
 # set the imagesetconfigure

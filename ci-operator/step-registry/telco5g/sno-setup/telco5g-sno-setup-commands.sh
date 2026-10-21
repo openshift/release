@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+exec > >(tee -i /tmp/setup-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-sno-setup.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-sno-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
+
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
@@ -57,7 +66,7 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=${BASTION_USER} ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno "
+ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} --topology sno --topology 1b1v"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -233,6 +242,13 @@ cat << EOF > ~/fetch-kubeconfig.yml
       dest: $SHARED_DIR/kubeconfig
       flat: true
 
+  - name: Save original kubeconfig before modification
+    copy:
+      src: $SHARED_DIR/kubeconfig
+      dest: $SHARED_DIR/kubeconfig.original
+      remote_src: false
+    delegate_to: localhost
+
   - name: Modify local copy of kubeconfig
     replace:
       path: $SHARED_DIR/kubeconfig
@@ -311,9 +327,22 @@ EOF
 
 #Set status and run playbooks
 status=0
+
+rm -f "${SHARED_DIR}/diagnose-telco5g-sno-setup.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-sno-setup" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-sno-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+EOF
+
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 sleep 300  # Wait for cluster to be ready after a reboot
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv
+gzip -c /tmp/setup-output.log > ${SHARED_DIR}/setup-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-sno-setup"
 exit ${status}

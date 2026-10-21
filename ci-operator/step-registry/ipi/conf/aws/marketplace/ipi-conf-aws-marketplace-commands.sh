@@ -69,17 +69,61 @@ popd
 ocp_major_version=$( echo "${version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${version}" | awk --field-separator=. '{print $2}' )
 
-v=$ocp_minor_version
+# Function to search for marketplace image for a given major.minor version range
+# Exit status:
+#   0 - a compatible marketplace image was found (image_id/image_name set)
+#   1 - no matching image found (expected; callers fall back or report cleanly)
+#   2 - an operational failure occurred (e.g. jq could not query the image list)
+# NOTE: callers invoke this via search_marketplace_image_or_exit.
+function search_marketplace_image() {
+  local major=$1
+  local start_minor=$2
+  local end_minor=$3
+
+  local v=$start_minor
+  while [ $v -gt $end_minor ]
+  do
+    local v_xy="${major}${v}"
+    echo "Checking ${v_xy} ..."
+    if ! jq --arg r "${v_xy}" '.Images[] | select(.Description | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.CreationDate) | last' > $selected_image; then
+      echo "ERROR: failed to query AWS Marketplace images for ${v_xy}"
+      return 2
+    fi
+    image_id=$(jq -r '.ImageId' $selected_image) || return 2
+
+    if ! is_empty "$image_id"; then
+      image_name=$(jq -r '.Name' $selected_image) || return 2
+      image_location=$(jq -r '.ImageLocation' $selected_image) || return 2
+      echo "Using AWS Marketplace image ${image_name} for compute nodes, image id: ${image_id}, location: ${image_location}"
+      return 0
+    fi
+    v=$((v-1))
+  done
+  return 1
+}
+
+# Wrapper that ignores only the documented "no image found" status (1) so the
+# is_empty/fallback logic below can run, while propagating operational failures.
+function search_marketplace_image_or_exit() {
+  local rc=0
+  search_marketplace_image "$@" || rc=$?
+  if [ "$rc" -gt 1 ]; then
+    echo "ERROR: AWS Marketplace image search failed (status ${rc}) for args: $*"
+    exit "$rc"
+  fi
+  return 0
+}
+
 image_id=""
 
-# from current version to 4.11 select the latest compatible image
+# from current version backwards to 4.11 select the latest compatible image
 #
 # e.g.for the image list
 # "rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
 # "rhcos-411.86.202207150124-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
 # "rhcos-x86_64-415.92.202402201450-0-59ead7de-2540-4653-a8b0-fa7926d5c845"
 # "rhcos-412.86.202212081411-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845"
-# 
+#
 # 4.11 -> rhcos-411.86.202207150124-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
 # 4.13 -> rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
 # 4.14 -> rhcos-413.92.202305021736-0-x86_64-Marketplace-59ead7de-2540-4653-a8b0-fa7926d5c845
@@ -87,21 +131,19 @@ image_id=""
 # 4.16 -> rhcos-x86_64-415.92.202402201450-0-59ead7de-2540-4653-a8b0-fa7926d5c845
 #
 
-while [ $v -gt 10 ]
-do
-  v_xy="${ocp_major_version}${v}"
-  echo "Checking ${v_xy} ..."
-  jq --arg r "${v_xy}" '.Images[] | select(.Description | test($r))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.CreationDate) | last' > $selected_image
-  image_id=$(jq -r '.ImageId' $selected_image)
+# Try current major version first (from current minor down to a reasonable minimum)
+min_minor=0
+if [ $ocp_major_version -eq 4 ]; then
+  min_minor=10  # For 4.x, stop at 4.11
+fi
 
-  if ! is_empty "$image_id"; then
-    image_name=$(jq -r '.Name' $selected_image)
-    image_location=$(jq -r '.ImageLocation' $selected_image)
-    echo "Using AWS Marketplace image ${image_name} for compute nodes, image id: ${image_id}, location: ${image_location}"
-    break
-  fi
-  v=$((v-1))
-done
+search_marketplace_image_or_exit "$ocp_major_version" "$ocp_minor_version" "$min_minor"
+
+# If not found in current major version and major > 4, fall back to 4.x versions
+if is_empty "$image_id" && [ $ocp_major_version -gt 4 ]; then
+  echo "No marketplace image found for ${ocp_major_version}.x, trying 4.x versions..."
+  search_marketplace_image_or_exit "4" "23" "10"
+fi
 
 if is_empty "$image_id"; then
   echo "ERROR: Can not find images on AWS Marketplace, region: $REGION, product code: $product_code, exit now"

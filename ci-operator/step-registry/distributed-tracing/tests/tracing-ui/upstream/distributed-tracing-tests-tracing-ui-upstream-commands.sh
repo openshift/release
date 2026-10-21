@@ -15,6 +15,7 @@ vars=(
   CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
   CYPRESS_LIGHTSPEED_PROVIDER_URL
   CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -76,16 +77,40 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   exit 0
 fi
 
-# Function to copy artifacts to the artifact directory after test run.
+# Function to copy artifacts to the artifact directory and SHARED_DIR/qe-agent after test run.
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
-    cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
     # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
     cp gui_test_screenshots/junit_cypress-*.xml "${ARTIFACT_DIR}/junit_distributed-tracing-console-plugin.xml" 2>/dev/null || true
+    # Remove the duplicate junit file from gui_test_screenshots before copying to artifact dir
+    rm -f gui_test_screenshots/junit_cypress-*.xml 2>/dev/null || true
+    cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
     echo "Artifacts copied successfully."
   else
     echo "Directory gui_test_screenshots does not exist. Nothing to copy."
   fi
+
+  # Write flat context file and JUnit XMLs to SHARED_DIR for the qe-agent post-step.
+  # SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
+  local has_failures=false
+  grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
+
+  local i=0
+  while IFS= read -r xml; do
+      cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
+      i=$((i + 1))
+  done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+
+  cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
+{
+  "step_script_ref": "distributed-tracing/tests/tracing-ui/upstream/distributed-tracing-tests-tracing-ui-upstream-commands.sh",
+  "has_test_failures": ${has_failures},
+  "env": {
+    "CYPRESS_SKIP_TESTS": "${CYPRESS_SKIP_TESTS:-}"
+  }
+}
+EOF
+  echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
 }
 
 ## Add IDP for testing
@@ -160,8 +185,33 @@ export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
+# Always run the tests from the main branch, regardless of the branch/PR under test.
+# Define the repository URL and target directory.
+# The obs-tests-runner image already has /tmp/distributed-tracing-console-plugin
+# populated from the branch/PR under test (see tests/Dockerfile), so clone into a
+# different path to avoid "destination path already exists" failures.
+repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
+target_dir="/tmp/distributed-tracing-console-plugin-main"
+
+# Clone the repository, explicitly selecting the main branch.
+echo "Cloning the repository."
+git clone --branch main --single-branch "$repo_url" "$target_dir"
+if [ $? -eq 0 ]; then
+  cd "$target_dir/tests" || exit 1
+  echo "Successfully cloned the repository and changed directory to $target_dir/tests."
+else
+  echo "Error cloning the repository."
+  exit 1
+fi
+
 # Install npm modules
 npm install
 
-# Run the Cypress tests
-npm run test-cypress-console-headless
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless
+fi

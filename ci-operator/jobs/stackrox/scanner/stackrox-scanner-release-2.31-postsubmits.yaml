@@ -4,10 +4,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -15,8 +21,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-db-integration-tests
         command:
@@ -36,8 +47,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -50,6 +70,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -63,10 +98,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -74,8 +115,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-e2e-tests
         command:
@@ -95,8 +141,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -109,6 +164,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -122,10 +192,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -133,8 +209,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-push-images
         command:
@@ -154,8 +235,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -168,6 +258,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -181,10 +286,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -192,8 +303,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-slim-e2e-tests
         command:
@@ -213,8 +329,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -227,6 +352,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -240,10 +380,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -251,8 +397,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-store-db-dump
         command:
@@ -272,8 +423,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -286,6 +446,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -299,10 +474,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -310,8 +491,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-store-genesis-dump
         command:
@@ -331,8 +517,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -345,6 +540,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -358,10 +568,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -369,8 +585,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-style-checks
         command:
@@ -390,8 +611,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -404,6 +634,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -417,10 +662,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -428,8 +679,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-unit-tests
         command:
@@ -449,8 +705,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -463,6 +728,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -476,10 +756,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.31$
-    cluster: build10
+    cluster: build04
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .openshift-ci/build/Dockerfile.build-bundle
+      - .openshift-ci/build/Dockerfile.build-db-bundle
+      - .openshift-ci/build/Dockerfile.generate-db-dump
+      - .openshift-ci/build/Dockerfile.generate-genesis-dump
+      - Dockerfile
+      - Dockerfile.slim
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -487,8 +773,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --target=merge-upload-dumps-for-downstream
         command:
@@ -508,8 +799,17 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -522,6 +822,21 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

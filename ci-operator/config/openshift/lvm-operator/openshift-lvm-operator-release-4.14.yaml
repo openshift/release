@@ -18,13 +18,14 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: Dockerfile
-  from: ubi_minimal
-  to: lvm-operator
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: lvms-must-gather
+  items:
+  - dockerfile_path: Dockerfile
+    from: ubi_minimal
+    to: lvm-operator
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: lvms-must-gather
 operator:
   bundles:
   - as: lvm-operator-bundle
@@ -50,29 +51,32 @@ resources:
       cpu: 100m
       memory: 200Mi
 test_binary_build_commands: |
-  go mod vendor
+  unset GOFLAGS
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
 - as: verify
-  commands: make verify
+  commands: unset GOFLAGS && make verify
   container:
     from: src
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: unit-test
   commands: |
+    unset GOFLAGS
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make test
   container:
     from: test-bin
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: lvm-operator-e2e-aws
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: lvm-operator-e2e-aws
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -81,7 +85,7 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: make e2e
+      commands: unset GOFLAGS && make e2e
       from: test-bin
       resources:
         requests:

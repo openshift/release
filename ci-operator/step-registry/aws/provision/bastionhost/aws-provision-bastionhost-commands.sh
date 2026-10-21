@@ -66,8 +66,8 @@ echo "VpcId: $VpcId"
 echo "PublicSubnet: $PublicSubnet"
 echo "ControlPlaneSecurityGroup: $ControlPlaneSecurityGroup"
 EnableIpv6="no"
-if [[ "${IPSTACK}" == "dualstack" ]]; then
-    echo "IPSTACK: $IPSTACK"
+if [[ "$IP_FAMILY" == *"DualStack"* ]]; then
+    echo "IP_FAMILY: $IP_FAMILY"
     EnableIpv6="yes"
     VpcIpv6Cidr=$(jq -r '.vpc_ipv6_cidr //"2600:1f18:2b0a:7f00:aabb:aabb:aabb:aabb/128"' "${SHARED_DIR}/vpc_info.json")
 fi
@@ -99,6 +99,12 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
     elif [[ "${REGION}" == "us-gov-west-1" ]]; then
       ami_id="ami-01cdd82c43022852b"
     fi
+  elif [[ "${CLUSTER_PROFILE_NAME:-}" == "aws-eusc" ]]; then
+    # Fedora CoreOS 43.20260301.3.1 x86_64 bastion host AMI for EUSC
+    # Source AMI: ami-06cac406e53158eb6 (us-east-1)
+    if [[ "${REGION}" == "eusc-de-east-1" ]]; then
+      ami_id="ami-0e43802c8b4ad242e"
+    fi
   else
     if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
         bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
@@ -123,8 +129,12 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   fi  
 
   ign_location="s3://${s3_bucket_name}/bastion.ign"
-  aws --region $REGION s3 mb "s3://${s3_bucket_name}"
-  echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
+  if aws --region "${REGION}" s3api head-bucket --bucket "${s3_bucket_name}" 2>/dev/null; then
+    echo "WARNING: S3 bucket s3://${s3_bucket_name} already exists and is accessible to this account (likely a leaked bucket from a prior run). Reusing it."
+  else
+    aws --region "${REGION}" s3 mb "s3://${s3_bucket_name}"
+  fi
+  echo "s3://${s3_bucket_name}" > "${SHARED_DIR}/to_be_removed_s3_bucket_list"
   aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
   echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 else
@@ -140,6 +150,10 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
+# EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
+elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
+    # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types
+    BastionHostInstanceType="m6id.large"
 fi
 
 ## ----------------------------------------------------------------
@@ -285,6 +299,18 @@ Resources:
         FromPort: 8080
         ToPort: 8080
         CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: udp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
       VpcId: !Ref VpcId
   BastionSecurityGroupIpv6:
     Condition: AssignIpv6
@@ -315,6 +341,22 @@ Resources:
       - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 9095
+        ToPort: 9095
+        CidrIpv6: ::/0
+      - IpProtocol: tcp
+        FromPort: 12000
+        ToPort: 65535
+        CidrIpv6: ::/0
+      - IpProtocol: udp
+        FromPort: 12000
+        ToPort: 65535
         CidrIpv6: ::/0
       VpcId: !Ref VpcId
   BastionInstance:

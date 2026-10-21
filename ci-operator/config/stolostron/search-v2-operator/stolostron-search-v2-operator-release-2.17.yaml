@@ -14,17 +14,17 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.25-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-  to: search-v2-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    inputs:
+      stolostron_builder_go1.25-linux:
+        as:
+        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+    to: search-v2-operator
 promotion:
   to:
-  - disabled: true
-    name: "2.17"
+  - name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -58,8 +58,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: publish
   postsubmit: true
   steps:
@@ -77,9 +78,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -104,8 +105,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: release-2.17
   org: stolostron

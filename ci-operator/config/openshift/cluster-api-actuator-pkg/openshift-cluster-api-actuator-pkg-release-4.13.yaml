@@ -39,10 +39,11 @@ tests:
   commands: make lint
   container:
     from: src
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -65,10 +66,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-operator
+  pipeline_skip_if_only_changed: ^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -82,7 +84,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -113,7 +115,7 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -126,7 +128,7 @@ tests:
 - as: e2e-aws-operator-periodic
   cron: 59 15 3 6 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -167,7 +169,7 @@ tests:
   as: e2e-azure-operator-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -180,7 +182,7 @@ tests:
 - as: e2e-azure-operator-periodic
   cron: 25 7 25 12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -194,7 +196,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -207,7 +209,7 @@ tests:
 - as: e2e-gcp-operator-periodic
   cron: 15 1 11 7 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -236,6 +238,13 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-operator-periodic
   minimum_interval: 72h
+  reporter_config:
+    channel: '#shiftstack-bot'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> :volcano:'
   steps:
     cluster_profile: openstack-vexxhost
     env:

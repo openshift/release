@@ -156,14 +156,14 @@ create_install_config $cluster_name2 $install_dir2
 source "${SHARED_DIR}/proxy-conf.sh"
 
 echo "Creating cluster 1"
-cat ${install_dir1}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-1-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir1}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-1-install-config.yaml"
 openshift-install --dir="${install_dir1}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"
 echo "Installer exit with code $ret"
 
 echo "Creating cluster 2"
-cat ${install_dir2}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-2-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir2}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-2-install-config.yaml"
 openshift-install --dir="${install_dir2}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"
 ret="$?"

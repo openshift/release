@@ -22,5 +22,7 @@ fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 echo "Deleting ARO cluster ${CLUSTER}"
 
-az aro delete --yes --name="${CLUSTER}" --resource-group="${RESOURCEGROUP}"
+if az aro show --name="${CLUSTER}" --resource-group="${RESOURCEGROUP}" --output none 2>/dev/null; then
+    az aro delete --yes --name="${CLUSTER}" --resource-group="${RESOURCEGROUP}"
+fi
 az group delete --yes --name="${RESOURCEGROUP}"

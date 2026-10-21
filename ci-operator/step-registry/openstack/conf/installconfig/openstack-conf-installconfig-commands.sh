@@ -85,6 +85,11 @@ case "$CONFIG_TYPE" in
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
     			" "$INSTALL_CONFIG"
+			if [[ "${FEATURE_SET:-}" == "TechPreviewNoUpgrade" ]]; then
+    				yq --yaml-output --in-place ".
+    				    | .platform.openstack.dnsRecordsType = \"External\"
+    				" "$INSTALL_CONFIG"
+			fi
 		fi
 		;;
 	dualstack*)

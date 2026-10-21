@@ -7,8 +7,9 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-autoscaler-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-autoscaler-operator
 promotion:
   to:
   - name: "4.21"
@@ -49,15 +50,17 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -67,10 +70,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-upgrade
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-nutanix-operator
@@ -91,7 +95,7 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -105,7 +109,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -119,7 +123,7 @@ tests:
   as: e2e-azure-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -161,7 +165,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       E2E_RUN_TAGS: '@cas'
       TEST_FILTERS: NonHyperShiftHOST

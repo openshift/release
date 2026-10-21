@@ -7,21 +7,26 @@ ref:
   cli: latest
   commands: openshift-qe-node-density-commands.sh
   credentials:
-  - namespace: test-credentials # this entry injects the custom credential
-    name: ocp-qe-perfscale-es
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
     mount_path: /secret
-  - namespace: test-credentials
-    name: stackrox-perfscale-elasticsearch
+  - collection: stackrox-perfscale-elasticsearch
+    group: credentials
     mount_path: /secret_stackrox
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   env:
-  - name: EXTRA_FLAGS
+  - name: ND_EXTRA_FLAGS
     default: ""
     documentation: |-
+      Extra flags for node-density workload
       Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: KB_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags for the kube-burner command. Reused across other kube-burner based workloads
   - name: E2E_VERSION
     default: "default"
     documentation: |-
@@ -64,4 +69,4 @@ ref:
       JSON value to upload additonal metadata to the fingerprint
   documentation: >-
     This step runs the perfscale node-density workload in the deployed cluster
-  timeout: 2h30m
+  timeout: 4h

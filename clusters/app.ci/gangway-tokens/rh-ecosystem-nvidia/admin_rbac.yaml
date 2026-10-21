@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rh-ecosystem-nvidia
+  annotations:
+    openshift.io/description: Service Accounts for rh-ecosystem-nvidia
+    openshift.io/display-name: rh-ecosystem-nvidia CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: rh-ecosystem-nvidia
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: rh-ecosystem-nvidia
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: rh-ecosystem-nvidia
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-rh-ecosystem-nvidia
+  namespace: rh-ecosystem-nvidia
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: rh-ecosystem-nvidia
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

@@ -1,27 +1,27 @@
 base_images:
   base:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: base
   base-machine:
     name: centos
     namespace: openshift
     tag: stream9
   cli:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cli
   cloud-provider-aws-rpms:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cloud-provider-aws-rpms
   cloud-provider-azure-rpms:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cloud-provider-azure-rpms
   cloud-provider-gcp-rpms:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cloud-provider-gcp-rpms
   commitchecker:
     name: commitchecker
@@ -31,77 +31,75 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
   oc-rpms:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: oc-rpms
   rhel-coreos-base:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: rhel-coreos
   tools:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/kubernetes
 images:
-- dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  to: hyperkube
-- dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
-  to: kube-proxy
-- dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  to: kubernetes-tests
-- dockerfile_literal: |
-    # We want to test the PR using the code from it. Now, this repo ships RPMs
-    # which are normally part of RHCOS. We need to make sure that RHCOS itself
-    # is updated with the freshly built RPMs from the PR run. To do this, we do a
-    # multi-stage build: the first stage downloads the RPMs that were just built
-    # (the `base-machine-with-rpms` contains the RPMs), and the second stage
-    # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
-    # bootable container).
-    # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
-    FROM quay.io/centos/centos:stream9 as build
-    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
-    # in a container https://github.com/coreos/rpm-ostree/issues/4034
-    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
-    # See also https://issues.redhat.com/browse/ART-4352
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
-    COPY --from=build /*.rpm /
-    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
-    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - quay.io/centos/centos:stream9
-    rhel-coreos-base:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
-  to: rhel-coreos
-- context_dir: build/pause
-  dockerfile_path: Dockerfile.Rhel
-  to: pod
-- dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
-  to: installer-kube-apiserver-artifacts
+  items:
+  - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+    to: hyperkube
+  - dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
+    to: kube-proxy
+  - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
+    to: kubernetes-tests
+  - dockerfile_literal: |
+      # We want to test the PR using the code from it. Now, this repo ships RPMs
+      # which are normally part of RHCOS. We need to make sure that RHCOS itself
+      # is updated with the freshly built RPMs from the PR run. To do this, we do a
+      # multi-stage build: the first stage downloads the RPMs that were just built
+      # (the `base-machine-with-rpms` contains the RPMs), and the second stage
+      # installs the RPMs into RHCOS (this uses the fact that RHCOS is now a native
+      # bootable container).
+      # See also: https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+      FROM quay.io/centos/centos:stream9 as build
+      # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+      # in a container https://github.com/coreos/rpm-ostree/issues/4034
+      RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-\*
+      # See also https://issues.redhat.com/browse/ART-4352
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      COPY --from=build /*.rpm /
+      # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+      RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+  - context_dir: build/pause
+    dockerfile_path: Dockerfile.Rhel
+    to: pod
+  - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+    to: installer-kube-apiserver-artifacts
 promotion:
   to:
   - additional_images:
       artifacts: artifacts
-    disabled: true
     excluded_images:
     - rhel-coreos
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -151,13 +149,13 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -235,21 +233,23 @@ tests:
     commitchecker --start ${PULL_BASE_SHA:-master}
   container:
     from: commitchecker
-- as: k8s-e2e-gcp-ovn
+- always_run: false
+  as: k8s-e2e-gcp-ovn
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-kubernetes-e2e-gcp
 - always_run: false
   as: k8s-e2e-gcp-five-control-plane-replicas
   optional: true
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       CONTROL_PLANE_REPLICAS: "5"
     workflow: openshift-kubernetes-e2e-gcp
-- as: k8s-e2e-gcp-serial
+- always_run: false
+  as: k8s-e2e-gcp-serial
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
@@ -258,42 +258,45 @@ tests:
   as: k8s-e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws
 - always_run: false
   as: k8s-e2e-aws-ovn-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-kubernetes-e2e-aws-serial
 - always_run: false
   as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview-serial
+- always_run: false
+  as: e2e-aws-ovn-techpreview-serial
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -302,13 +305,13 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
@@ -316,49 +319,55 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-aws-jenkins
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-jenkins
 - always_run: false
   as: e2e-gcp-ovn-upgrade
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-ovn-upgrade
-  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-azure-ovn-upgrade
-  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+- always_run: false
+  as: e2e-azure-ovn-upgrade
+  pipeline_run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-aws-ovn-downgrade
-  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
+- always_run: false
+  as: e2e-aws-ovn-downgrade
+  pipeline_run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-csi
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - always_run: false
   as: e2e-vsphere
@@ -368,9 +377,10 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere
-- as: k8s-e2e-conformance-aws
+- always_run: false
+  as: k8s-e2e-conformance-aws
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -380,7 +390,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
   steps:
@@ -413,12 +424,15 @@ tests:
 - always_run: false
   as: configmap-scale
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-perfscale-e2e-configmap-scale
-- as: e2e-aws-ovn-fips
+- always_run: false
+  as: e2e-aws-ovn-fips
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/parallel
     pre:
@@ -427,8 +441,9 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- as: e2e-aws-ovn-hypershift
-  run_if_changed: \.go$
+- always_run: false
+  as: e2e-aws-ovn-hypershift
+  pipeline_run_if_changed: \.go$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -436,12 +451,12 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-openstack
   optional: true
-  run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)
+  pipeline_run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -459,19 +474,27 @@ tests:
   as: e2e-openstack-csi-manila
   optional: true
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
-- as: e2e-aws-ovn-cgroupsv2
+- always_run: false
+  as: e2e-aws-ovn-cgroupsv2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-cgroupsv2
-- as: e2e-aws-ovn-crun
+- always_run: false
+  as: e2e-aws-ovn-crun
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-crun
-- as: e2e-aws-ovn-runc
+- always_run: false
+  as: e2e-aws-ovn-runc
+  optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-runc
 - always_run: false
   as: perfscale-control-plane-6nodes
@@ -494,13 +517,21 @@ tests:
   as: e2e-external-aws-ccm
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
+- always_run: false
+  as: e2e-aws-hpa
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_SUITE: kubernetes/autoscaling/hpa
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv

@@ -29,20 +29,4 @@ if [ "${NETWORK_WORKLOAD}" == "netperf-external" ]; then
 EOF
 fi
 
-# shellcheck disable=SC2087
-if [ "${NETWORK_WORKLOAD}" == "udn-bgp" ]; then
-    ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
-        rm -rf ~/frr-k8s
-	# Removing frr routers
-	podman stop frr >/dev/null 2>&1 || true
-        sleep 5
-	podman rm -f frr >/dev/null 2>&1 || true
-        sleep 5
-	# workload already deleted dummy interfaces and imported routes. We are manually trying to cleanup for safer side
-	echo "Deleting stale dummy interfaces and Routes"
-	ip -o link show | awk -F': ' '{print \$2}' | grep '^dummy' | xargs -I {} sudo ip link delete {}
-	ip route show proto bgp | grep '^40\.' | awk '{print \$1}' | xargs -I {} ip route del {}
-EOF
-fi
-
 echo "[CLEANUP] Done."

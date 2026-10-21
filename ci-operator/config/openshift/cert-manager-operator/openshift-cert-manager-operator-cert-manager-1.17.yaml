@@ -3,6 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   operator-sdk:
     name: "4.19"
     namespace: origin
@@ -11,12 +15,13 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/ci/Dockerfile
-  from: base-rhel9
-  to: cert-manager-operator
-- dockerfile_path: images/ci/operand.Dockerfile
-  from: base-rhel9
-  to: cert-manager
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    from: base-rhel9
+    to: cert-manager-operator
+  - dockerfile_path: images/ci/operand.Dockerfile
+    from: base-rhel9
+    to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
@@ -82,6 +87,7 @@ tests:
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
+    - ref: merge-stage-registry-credentials
     - as: install
       cli: latest
       commands: |
@@ -108,7 +114,7 @@ tests:
   optional: true
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -124,7 +130,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-hypershift
+    workflow: optional-operators-ci-operator-sdk-hypershift-stage-registry
 zz_generated_metadata:
   branch: cert-manager-1.17
   org: openshift

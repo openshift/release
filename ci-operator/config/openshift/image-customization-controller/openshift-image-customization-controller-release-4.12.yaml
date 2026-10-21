@@ -10,8 +10,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- from: base
-  to: machine-image-customization-controller
+  items:
+  - from: base
+    to: machine-image-customization-controller
 promotion:
   to:
   - name: "4.12"
@@ -48,19 +49,19 @@ tests:
   container:
     from: src
   run_if_changed: (go\.(mod|sum)$)|(^vendor/)
-- as: e2e-metal-ipi-sdn-bm
+- always_run: false
+  as: e2e-metal-ipi-sdn-ipv4
   capabilities:
   - intranet
-  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  pipeline_skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
-- as: e2e-metal-ipi-serial-ipv4
+- always_run: false
+  as: e2e-metal-ipi-serial-ipv4
   capabilities:
   - intranet
-  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  pipeline_skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4

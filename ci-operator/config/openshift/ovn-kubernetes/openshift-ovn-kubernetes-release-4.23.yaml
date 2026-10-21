@@ -14,14 +14,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.base
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes-microshift
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: "4.23"
@@ -52,10 +53,20 @@ tests:
   as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
+- always_run: false
+  as: e2e-aws-ovn-multi-cidr
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_ARGS: --disable-monitor=legacy-test-framework-invariants-alerts,metrics-endpoints-down
+      TEST_SKIPS: alerts in firing state
+    workflow: openshift-e2e-aws-ovn-multi-cidr
 - always_run: false
   as: e2e-agent-compact-ipv4
   capabilities:
@@ -66,21 +77,26 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
-- as: e2e-aws-ovn-edge-zones
+- always_run: false
+  as: e2e-aws-ovn-edge-zones
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
-- as: e2e-aws-ovn-local-gateway
+- always_run: false
+  as: e2e-aws-ovn-local-gateway
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws-ovn-microshift
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       MICROSHIFT_OS: rhel-9.6
       SRC_FROM_GIT: "true"
@@ -96,39 +112,131 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   capabilities:
   - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-fdp-qe
+- always_run: false
+  as: e2e-aws-core-networking-ote
+  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
+  as: e2e-aws-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
+  as: e2e-aws-ovn-fdp-qe
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
@@ -153,9 +261,11 @@ tests:
     - chain: openshift-e2e-test-network-qe
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 6h0m0s
-- as: e2e-aws-ovn-windows
+- always_run: false
+  as: e2e-aws-ovn-windows
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -174,13 +284,33 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-azure-core-networking-ote
+  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
+  as: e2e-azure-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
@@ -189,7 +319,7 @@ tests:
   as: e2e-aws-ovn-upgrade-ipsec
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
@@ -197,21 +327,25 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-- as: e2e-aws-ovn-upgrade-local-gateway
+- always_run: false
+  as: e2e-aws-ovn-upgrade-local-gateway
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -220,12 +354,32 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-gcp-core-networking-bastion
+- always_run: false
+  as: e2e-gcp-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-gcp-core-networking-bastion
 - always_run: false
   as: e2e-vsphere-windows
   optional: true
@@ -248,15 +402,19 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- always_run: false
+  as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
-- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- always_run: false
+  as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -278,19 +436,46 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-dualstack-bgp
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp
   capabilities:
   - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
-- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   capabilities:
   - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-- as: e2e-aws-ovn-hypershift
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-serial
+  capabilities:
+  - intranet
+  optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw-serial
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: CPU Partitioning cluster platform workloads should be annotated
+        correctly for Deployments
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- always_run: false
+  as: e2e-aws-ovn-hypershift
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
@@ -304,8 +489,13 @@ tests:
     from: src
 - as: lint
   commands: |
+    status=0
     cd go-controller
-    make lint
+    make lint || status=$?
+    cd ../openshift
+    go mod vendor
+    make -f ../go-controller/Makefile lint || status=$?
+    exit $status
   container:
     from: src
 - as: gofmt
@@ -314,36 +504,43 @@ tests:
     make gofmt
   container:
     from: src
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
 - as: security
-  optional: true
   steps:
     env:
       ALL_PROJECTS: "true"
       PROJECT_NAME: ovn-kubernetes
     workflow: openshift-ci-security
-- always_run: true
-  as: qe-perfscale-payload-control-plane-6nodes
+- as: qe-perfscale-payload-control-plane-6nodes
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      ADDITIONAL_WORKER_NODES: "3"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
       CDV2_ITERATION_MULTIPLIER: "15"
-      COMPUTE_NODE_REPLICAS: "6"
-      ENABLE_LOCAL_INDEX: "true"
+      ENABLE_LAYER_3: "false"
       ES_TYPE: qe
-      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      IGNORE_JOB_ITERATIONS: "true"
+      KB_FLAGS: --local-indexing
+      ND_CNI_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50
+        --churn-cycles=2
+      ND_EXTRA_FLAGS: --churn-mode=objects --churn-delay=1m --churn-percent=50 --churn-cycles=2
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "false"
       UDN_ITERATION_MULTIPLIER: "12"
       VERSION: "4.22"
       ZONES_COUNT: "3"
     test:
+    - ref: openshift-qe-workers-scale
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
@@ -366,9 +563,9 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
-- always_run: true
-  as: qe-perfscale-aws-ovn-small-udn-density-l3
+- as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -384,9 +581,9 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
-- always_run: true
-  as: qe-perfscale-aws-ovn-small-udn-density-l2
+- as: qe-perfscale-aws-ovn-small-udn-density-l2
   optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|test|dist|helm|LICENSES)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -404,10 +601,84 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
 - always_run: false
+  as: cudn-density-single-ns-800-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-density-single-ns-800.yaml
+      OVERRIDE_ITERATIONS: "800"
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-density-single-ns-1000-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-density-single-ns-1000.yaml
+      OVERRIDE_ITERATIONS: "1000"
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
+  as: cudn-incremental-1000-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTRA_FLAGS: --incremental-step-size=200 --incremental-step-delay=5m --incremental-pattern=linear
+        --timeout=8h
+      NAMESPACES_PER_CUDN: "1"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: examples/small-scale-cudn-incremental-1000.yaml
+      OVERRIDE_ITERATIONS: "1000"
+      RUN_ORION: "true"
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    test:
+    - chain: openshift-qe-cudn-density
+- always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -416,7 +687,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -425,24 +696,34 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
-- always_run: true
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
+  as: e2e-aws-ovn-rhcos10-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
   as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -589,6 +870,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -617,6 +924,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -643,6 +976,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -676,6 +1035,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -705,6 +1090,129 @@ tests:
     test:
     - chain: workers-scale
     - ref: openshift-qe-node-density-cni
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-xxlarge-cluster-density-v2
+  optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=12h --set=metricsEndpoints.0.step=5m
+        --set=metricsEndpoints.1.step=5m
+      CDV2_ITERATION_MULTIPLIER: "6"
+      CLUSTER_NETWORK_CIDR: 20.0.0.0/8
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
+      CONTROL_PLANE_REPLICAS: "5"
+      GC: "false"
+      GC_METRICS: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 250Gi
+      PPROF: "false"
+      PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "1500"
+      ZONES_COUNT: "6"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+  timeout: 16h0m0s
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-xxlarge-node-density-cni
+  optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 20.0.0.0/8
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
+      CONTROL_PLANE_REPLICAS: "5"
+      GC: "false"
+      GC_METRICS: "false"
+      ND_CNI_EXTRA_FLAGS: --timeout=12h --set=metricsEndpoints.0.step=5m --set=metricsEndpoints.1.step=5m
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 250Gi
+      PODS_PER_NODE: "100"
+      PPROF: "false"
+      PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "1500"
+      ZONES_COUNT: "6"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-node-density-cni
+  timeout: 16h0m0s
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

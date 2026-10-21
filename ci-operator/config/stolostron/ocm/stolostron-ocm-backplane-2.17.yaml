@@ -8,23 +8,24 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: build/Dockerfile.registration-operator
-  from: base
-  to: registration-operator
-- dockerfile_path: build/Dockerfile.registration
-  from: base
-  to: registration
-- dockerfile_path: build/Dockerfile.work
-  from: base
-  to: work
-- dockerfile_path: build/Dockerfile.placement
-  from: base
-  to: placement
-- dockerfile_path: build/Dockerfile.addon
-  from: base
-  to: addon-manager
+  items:
+  - dockerfile_path: build/Dockerfile.registration-operator
+    from: base
+    to: registration-operator
+  - dockerfile_path: build/Dockerfile.registration
+    from: base
+    to: registration
+  - dockerfile_path: build/Dockerfile.work
+    from: base
+    to: work
+  - dockerfile_path: build/Dockerfile.placement
+    from: base
+    to: placement
+  - dockerfile_path: build/Dockerfile.addon
+    from: base
+    to: addon-manager
 promotion:
   to:
   - name: "2.17"
@@ -32,12 +33,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -72,9 +73,9 @@ tests:
   commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^go\.mod$|^go\.sum$|^vendor/
 - as: e2e
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^go\.mod$|^go\.sum$|^vendor/
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: src
@@ -99,7 +100,7 @@ tests:
         echo "PLACEMENT_IMAGE=$PLACEMENT_IMAGE"
         echo "ADDON_MANAGER_IMAGE=$ADDON_MANAGER_IMAGE"
         set -o pipefail
-        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        SKIP_IMAGE_BUILD=true make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
       dependencies:
       - env: OPERATOR_IMAGE_NAME
@@ -137,9 +138,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -175,9 +176,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -213,9 +214,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -251,9 +252,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -289,9 +290,9 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

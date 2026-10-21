@@ -13,7 +13,7 @@ Currently, both jobs are daily executed and thus it might take up to two days to
 ## Special Cluster Role and their Rover groups
 
 A useful cluster role binding is
-[cluster-reader](/clusters/build-clusters/common_except_app.ci/admin_cluster-reader-0_list.yaml) which defines cluster readers for all CI clusters except `app.ci`.
+[cluster-reader](/clusters/build-clusters/build-shared/admin_cluster-reader-0_list.yaml) which defines cluster readers for all CI clusters except `app.ci`.
 The existing Rover groups are referred there to give them the permissions.
 
 | Rover Group Name                                                                                                 | Group Name On Cluster   | Role                                                                   |
@@ -27,5 +27,5 @@ In reality, the groups `ci-sudoers` and `ci-monitoring-viewers` are there on the
 The Rover groups `test-platform-ci-sudoers` and `test-platform-ci-monitoring-viewers` are created to keep the permissions for the members.
 Until they are replaced by the groups they belong to, we have to maintain these two groups.
 
-Note that the group name `ci-monitoring-viewers` is misleading because they can modify alerts which is because it is bound to [monitoring-alertmanager-edit](/clusters/build-clusters/common/monitoring-alertmanager-edit.yaml).
+Note that the group name `ci-monitoring-viewers` is misleading because they can modify alerts which is because it is bound to [monitoring-alertmanager-edit](/clusters/build-clusters/build-shared/monitoring/monitoring-alertmanager-edit.yaml).
 There is [no read-only role to view alert-manager](https://issues.redhat.com/browse/MON-2637).

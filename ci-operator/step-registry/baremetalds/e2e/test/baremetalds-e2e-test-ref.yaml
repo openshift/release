@@ -16,10 +16,18 @@ ref:
     documentation: |-
       If set to "true", skips the checks for nodes & cluster operators to be ready before running the test suite.
       This is useful for testing the cluster in a degraded state.
+  - name: CLUSTEROPERATOR_WAIT_TIMEOUT
+    default: "15m"
+    documentation: |-
+      Timeout for waiting on all cluster operators to reach Progressing=false.
+      Increase for topologies that require longer stabilization (e.g. two-node
+      clusters after MCO-driven rolling reboots).
   - name: DEGRADED_NODE
     default: "false"
     documentation: |-
       If set to "true", indicates openshift-tests is running against an intentionally degraded cluster.
+      For disconnected IPv6 jobs using IDMS, the node-degradation step must prepare
+      the test image mirror configuration before shutting down the node.
   - name: ARCHITECTURE
     default: "amd64"
     documentation: Set the architecturefor
@@ -56,6 +64,9 @@ ref:
   - name: TEST_ARGS
     default: ""
     documentation: Arguments to be passed to the test
+  - name: TEST_UPGRADE_ARGS
+    default: ""
+    documentation: Arguments to be passed to the upgrade test
   - name: TEST_SKIPS
     default: |-
       \[sig-auth\] \[Feature:NodeAuthenticator\] The kubelet can delegate ServiceAccount tokens to the API server

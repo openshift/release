@@ -111,27 +111,12 @@ tests:
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-48-x86-64-202210040145
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: installer-rehearse-vsphere
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: vsphere-elastic
-    workflow: cucushift-installer-rehearse-vsphere-ipi-external-lb-post
-- as: installer-rehearse-vsphere-dis
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: vsphere-dis-2
-    leases:
-    - env: VSPHERE_BASTION_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
-    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected
 - as: installer-rehearse-nutanix
   cluster: build01
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
@@ -139,8 +124,20 @@ tests:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
-      DEDICATEDHOST_ZONE: "2"
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-dedicatedhost-static
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      RT_ENABLED: "true"
+      SLEEP_DURATION: 5m
+    post:
+    - ref: gather-ibmcloud-resource
+    - ref: cucushift-installer-wait
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

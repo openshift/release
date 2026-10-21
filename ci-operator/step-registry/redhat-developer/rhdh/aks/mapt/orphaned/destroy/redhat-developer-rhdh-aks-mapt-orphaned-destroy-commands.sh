@@ -37,7 +37,7 @@ failed_count=0
 echo "[INFO] 📋 Found ${total} blob top-level folders to process"
 
 # Create files to track results
-SUCCESSFUL_DESTROYS="${ARTIFACT_DIR}/successful_destroys.txt"
+SUCCESSFUL_DESTROYS="${SHARED_DIR}/successful_destroys.txt"
 FAILED_DESTROYS="${ARTIFACT_DIR}/failed_destroys.txt"
 touch "${SUCCESSFUL_DESTROYS}"
 touch "${FAILED_DESTROYS}"
@@ -58,7 +58,8 @@ for BLOB_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
       --project-name "aks" \
-      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}" 2>&1)
+      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}" \
+      --force-destroy 2>&1)
   exit_code=$?
   
   # Check for both exit code and error patterns in output
@@ -83,25 +84,7 @@ echo "[INFO]Total processed: ${total}"
 echo "[INFO]Successful: ${success_count}"
 echo "[INFO]Failed: ${failed_count}"
 
-# Batch delete successfully destroyed folders from Azure Blob Storage
-if [ "${success_count}" -gt 0 ]; then
-  echo "[INFO] 🗑️ Deleting ${success_count} successfully destroyed folders from Azure Blob Storage..."
-
-  while IFS= read -r folder; do
-    if [ -n "$folder" ]; then
-      echo "[INFO] 🗑️ Deleting ${folder}/ from container ${AZURE_STORAGE_BLOB}..."
-      az storage blob delete-batch \
-        --source "${AZURE_STORAGE_BLOB}" \
-        --account-name "${AZURE_STORAGE_ACCOUNT}" \
-        --account-key "${AZURE_STORAGE_KEY}" \
-        --pattern "${folder}/*"
-    fi
-  done < "${SUCCESSFUL_DESTROYS}"
-
-  echo "[SUCCESS] ✅ Successfully deleted all folders from Azure Blob Storage"
-else
-  echo "[INFO] 🫙 No folders to delete from Azure Blob Storage"
-fi
+cp "${SUCCESSFUL_DESTROYS}" "${ARTIFACT_DIR}/successful_destroys.txt"
 
 echo "[SUCCESS] ✅ Finished processing all ${total} MAPT folders"
 

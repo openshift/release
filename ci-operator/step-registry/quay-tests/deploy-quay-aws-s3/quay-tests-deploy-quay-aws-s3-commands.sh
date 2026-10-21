@@ -4,6 +4,33 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"; trap '
+        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+            ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml
+    ' EXIT
+fi
+
+function archive_pod_info() {
+  local ns="quay-enterprise"
+  echo "Archiving pod status and logs from namespace ${ns}..."
+  oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/pods_status.txt" 2>&1 || true
+  oc get pods -n "${ns}" -o yaml > "${ARTIFACT_DIR}/pods_full.yaml" 2>&1 || true
+  mkdir -p "${ARTIFACT_DIR}/pod_logs"
+  while read -r pod; do
+    containers=$(oc get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true)
+    for container in ${containers}; do
+      oc logs "${pod}" -n "${ns}" -c "${container}" > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}.log" 2>&1 || true
+      oc logs "${pod}" -n "${ns}" -c "${container}" --previous > "${ARTIFACT_DIR}/pod_logs/${pod}_${container}_previous.log" 2>&1 || true
+    done
+  done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
+}
+
 #Get the credentials and Email of new Quay User
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
@@ -102,17 +129,49 @@ EOF
 
 echo "The Quay Operator subscription is $SUB"
 
+CSV_READY=false
 for _ in {1..60}; do
   CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
   if [[ -n "$CSV" ]]; then
     if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
       echo "ClusterServiceVersion \"$CSV\" ready"
+      CSV_READY=true
       break
     fi
   fi
   sleep 10
 done
+if [[ "$CSV_READY" != "true" ]]; then
+  echo "Timed out waiting for Quay Operator CSV to reach Succeeded phase" >&2
+  echo "=== CSV Status ===" >&2
+  oc -n quay-enterprise get csv -o wide 2>&1 || true
+  echo "=== Subscription Status ===" >&2
+  oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status}' 2>&1 || true
+  echo "" >&2
+  echo "=== CatalogSource Status ===" >&2
+  oc get catalogsource -n openshift-marketplace -o wide 2>&1 || true
+  archive_pod_info
+  exit 1
+fi
 echo "Quay Operator is deployed successfully"
+
+echo "Waiting for QuayRegistry CRD to be available..."
+for _ in {1..30}; do
+  if oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+    echo "QuayRegistry CRD is available"
+    break
+  fi
+  sleep 5
+done
+if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
+  echo "Timed out waiting for QuayRegistry CRD" >&2
+  echo "=== Operator Pod Logs ===" >&2
+  oc logs -n quay-enterprise -l name=quay-operator --tail=100 2>&1 || true
+  echo "=== Events ===" >&2
+  oc get events -n quay-enterprise --sort-by='.lastTimestamp' 2>&1 | tail -30 || true
+  archive_pod_info
+  exit 1
+fi
 
 #Deploy Quay, here disable monitoring component
 cat >>config.yaml <<EOF
@@ -131,7 +190,7 @@ FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
 SUPER_USERS:
-  - quay
+  - test007
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -164,6 +223,8 @@ TAG_EXPIRATION_OPTIONS:
   - 1d
 REDIS_FLUSH_INTERVAL_SECONDS: 30
 FEATURE_IMAGE_PULL_STATS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_IMMUTABLE_TAGS: true
 PULL_METRICS_REDIS:
         host: quay-quay-redis
         port: 6379
@@ -217,8 +278,11 @@ for _ in {1..60}; do
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
+    archive_pod_info
     exit 0
   fi
   sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+archive_pod_info
+exit 1

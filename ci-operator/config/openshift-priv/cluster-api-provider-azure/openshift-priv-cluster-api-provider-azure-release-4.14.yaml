@@ -1,30 +1,33 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: make manager
 build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  from: base
-  to: azure-cluster-api-controllers
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    from: base
+    to: azure-cluster-api-controllers
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -38,23 +41,25 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-azure
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
-- as: e2e-azure-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-azure-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-serial
 zz_generated_metadata:
   branch: release-4.14

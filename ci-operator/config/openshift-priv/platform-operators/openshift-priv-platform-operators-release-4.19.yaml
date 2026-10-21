@@ -2,22 +2,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/platform-operators
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-platform-operators-manager
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-platform-operators-manager
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -38,9 +41,10 @@ tests:
   commands: make unit
   container:
     from: src
-- as: openshift-e2e-aws-techpreview
+- always_run: false
+  as: openshift-e2e-aws-techpreview
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws

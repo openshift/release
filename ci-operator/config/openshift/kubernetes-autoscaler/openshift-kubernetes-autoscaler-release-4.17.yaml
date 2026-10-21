@@ -1,8 +1,4 @@
 base_images:
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -12,11 +8,12 @@ build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
-  to: cluster-autoscaler
-- context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.openshift
-  to: vertical-pod-autoscaler
+  items:
+  - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+    to: cluster-autoscaler
+  - context_dir: vertical-pod-autoscaler
+    dockerfile_path: Dockerfile.openshift
+    to: vertical-pod-autoscaler
 promotion:
   to:
   - name: "4.17"
@@ -76,15 +73,17 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -98,7 +97,7 @@ tests:
   as: e2e-azure-operator
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -112,7 +111,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -122,8 +121,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -131,7 +131,7 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -145,7 +145,7 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -159,7 +159,7 @@ tests:
   as: e2e-azure-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest

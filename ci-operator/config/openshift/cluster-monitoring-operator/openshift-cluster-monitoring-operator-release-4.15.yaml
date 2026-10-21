@@ -1,12 +1,13 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-monitoring-operator
-- dockerfile_literal: |
-    FROM src
-  from: src
-  to: cluster-monitoring-operator-src
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-monitoring-operator
+  - dockerfile_literal: |
+      FROM src
+    from: src
+    to: cluster-monitoring-operator-src
 promotion:
   to:
   - name: "4.15"
@@ -71,15 +72,17 @@ tests:
     make golangci-lint
   container:
     from: src
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -87,11 +90,12 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-agnostic-operator
+- always_run: false
+  as: e2e-agnostic-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TELEMETRY_ENABLED: "true"
     test:
@@ -103,9 +107,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-upgrade-aws

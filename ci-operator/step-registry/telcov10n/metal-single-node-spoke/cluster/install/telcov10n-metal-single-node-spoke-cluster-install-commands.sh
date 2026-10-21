@@ -20,6 +20,35 @@ function set_hub_cluster_kubeconfig {
   fi
 }
 
+function setup_socks5_proxy_via_aux_host {
+
+  # The lab publishes the '*.apps' wildcard at the internal ingress VIP, which is only
+  # routable from inside the lab network. AUX_HOST sits on that network and serves its
+  # DNS zone, so tunnel through it and let the proxy resolve names remotely (socks5h).
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    echo "************ telcov10n Using the SOCKS5 proxy given by the job config ************"
+    return
+  fi
+
+  echo "************ telcov10n Open a SOCKS5 tunnel through AUX_HOST ************"
+
+  ssh -f -N -D "127.0.0.1:${SOCKS5_LOCAL_PORT}" \
+    -o ExitOnForwardFailure=yes \
+    "${SSHOPTS[@]}" "root@${AUX_HOST}"
+
+  for ((attempts = 0 ; attempts < 10 ; attempts++)); do
+    if timeout 5 bash -c "> /dev/tcp/127.0.0.1/${SOCKS5_LOCAL_PORT}" 2>/dev/null; then
+      export SOCKS5_PROXY="socks5h://127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      echo "SOCKS5 tunnel listening on 127.0.0.1:${SOCKS5_LOCAL_PORT}"
+      return
+    fi
+    sleep 3
+  done
+
+  echo "[FAIL] The SOCKS5 tunnel through ${AUX_HOST} did not come up..."
+  exit 1
+}
+
 function generate_cluster_image_set {
 
   echo "************ telcov10n Generate Custom Cluster Image Set ************"
@@ -91,18 +120,31 @@ function generate_host_firmware_settings_manifest {
     set +x
     echo
 
-    oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
+    desired_settings_json=$(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+
+    # Skip patch when desired settings already match current BIOS state to prevent
+    # Metal3 generation/observedGeneration deadlock (BMH stuck in "preparing" forever).
+    current_bios_subset=$(oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" \
+      -ojson | jq -c --argjson desired "${desired_settings_json}" \
+      '[.status.settings | to_entries[] | select(.key as $k | $desired | has($k))] | sort_by(.key) | from_entries')
+    desired_sorted=$(echo "${desired_settings_json}" | jq -c 'to_entries | sort_by(.key) | from_entries')
+
+    if [ "${desired_sorted}" = "${current_bios_subset}" ]; then
+      echo "All BIOS settings already match current state. Skipping HFS patch."
+    else
+      oc -n ${SPOKE_CLUSTER_NAME} patch HostFirmwareSettings/${hostname_with_base_domain} --type=merge --patch-file=/dev/stdin <<-EO-hfs-patch
 spec:
-  settings: $(jq -c '.' <<< "$(yq -o=json '.' <<< "$(echo "${BIOS_SETTINGS}" | sed '/^\s*#/d; /^\s*$/d; s/^[ \t]*//')")")
+  settings: ${desired_settings_json}
 EO-hfs-patch
 
-    echo
-    echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
-    echo "-----------------------------------------------------------------"
-    set -x
-    oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
-    set +x
-    echo
+      echo
+      echo "${hostname_with_base_domain} HostFirmwareSettings after patch:"
+      echo "-----------------------------------------------------------------"
+      set -x
+      oc -n ${SPOKE_CLUSTER_NAME} get HostFirmwareSettings "${hostname_with_base_domain}" -oyaml
+      set +x
+      echo
+    fi
   fi
 }
 
@@ -254,6 +296,7 @@ function main {
   # Setup SSH and load lock info for quit checks
   setup_ssh_and_lock_info
 
+  setup_socks5_proxy_via_aux_host
   set_hub_cluster_kubeconfig
   generate_cluster_image_set
   create_spoke_namespace

@@ -1,25 +1,26 @@
 base_images:
   base:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: base
   must_gather:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: must-gather
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/local-storage-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: local-storage-operator
-- dockerfile_path: Dockerfile.diskmaker.rhel7
-  from: base
-  to: local-storage-diskmaker
-- dockerfile_path: Dockerfile.mustgather
-  from: must_gather
-  to: local-storage-mustgather
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: local-storage-operator
+  - dockerfile_path: Dockerfile.diskmaker.rhel7
+    from: base
+    to: local-storage-diskmaker
+  - dockerfile_path: Dockerfile.mustgather
+    from: must_gather
+    to: local-storage-mustgather
 operator:
   bundles:
   - as: local-storage-operator-bundle
@@ -32,18 +33,20 @@ operator:
     with: pipeline:local-storage-diskmaker
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -54,9 +57,10 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-local-storage-operator-bundle
     env:

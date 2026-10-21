@@ -2,20 +2,23 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager-operator
 images:
-- dockerfile_path: Dockerfile.ci
-  to: cli-manager-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cli-manager-operator
 promotion:
   to:
-  - name: 4.19-priv
-    namespace: ocp-private
+  - name: "4.19"
+    namespace: ocp-priv
+prowgen:
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.19-priv
-  namespace: ocp-private
+  name: "4.19"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: make verify-gofmt
@@ -32,10 +35,11 @@ tests:
       SCAN_IMAGE: cli-manager-operator
     test:
     - ref: fips-check-image-scan
-- as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     test:

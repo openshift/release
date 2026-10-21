@@ -6,6 +6,30 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+retry_with_backoff() {
+  local max_retries="${1}"
+  shift
+  local cmd=("$@")
+  local attempt=1
+  local rc=0
+  local backoff=30
+
+  while [[ ${attempt} -le ${max_retries} ]]; do
+    echo "Attempt ${attempt}/${max_retries}: ${cmd[*]}"
+    rc=0
+    "${cmd[@]}" && return 0 || rc=$?
+    if [[ ${attempt} -lt ${max_retries} ]]; then
+      echo "Attempt ${attempt} failed (exit code ${rc}), retrying in ${backoff}s..."
+      sleep ${backoff}
+      backoff=$((backoff * 2))
+    else
+      echo "Attempt ${attempt} failed (exit code ${rc}), no more retries."
+    fi
+    attempt=$((attempt + 1))
+  done
+  return ${rc}
+}
+
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
 # Configure aws
@@ -46,7 +70,14 @@ if [[ -e "${ACCOUNT_ROLES_PREFIX_FILE}" ]]; then
   ACCOUNT_ROLES_PREFIX=$(cat "${ACCOUNT_ROLES_PREFIX_FILE}")
 
   echo "Start deleting the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}..."
-  rosa delete account-roles --prefix "${ACCOUNT_ROLES_PREFIX}" -y --mode auto
+  set +e
+  retry_with_backoff 3 rosa delete account-roles --prefix "${ACCOUNT_ROLES_PREFIX}" -y --mode auto
+  ret=$?
+  set -e
+  if [[ ${ret} -ne 0 ]]; then
+    echo "ERROR: Failed to delete account roles after all retries (exit code ${ret})"
+    exit ${ret}
+  fi
 else
   echo "No account roles created in the pre step"
 fi

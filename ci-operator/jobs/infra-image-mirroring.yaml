@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   decoration_config:
@@ -46,6 +46,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -53,8 +55,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -90,6 +95,8 @@ periodics:
         subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -97,8 +104,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -134,6 +144,8 @@ periodics:
         subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -141,96 +153,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: kubefed
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-kubefed
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - curl -sL https://raw.githubusercontent.com/openshift/release/refs/heads/main/hack/periodic-mirroring.sh
-        | bash
-      command:
-      - bash
-      env:
-      - name: HOME
-        value: /tmp/user
-      - name: MAPPING_FILE_PREFIX
-        value: mapping_kubefed
-      - name: dry_run
-        value: "false"
-      image: registry.redhat.io/openshift4/ose-cli-rhel9
-      imagePullPolicy: IfNotPresent
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /tmp/user/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
+    - name: qci-robot-credentials
       secret:
-        secretName: registry-push-credentials-openshift
-    - configMap:
-        name: image-mirror-mappings
-      name: config
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: openshift-container-storage
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-red-hat-storage
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - curl -sL https://raw.githubusercontent.com/openshift/release/refs/heads/main/hack/periodic-mirroring.sh
-        | bash
-      command:
-      - bash
-      env:
-      - name: HOME
-        value: /tmp/user
-      - name: MAPPING_FILE_PREFIX
-        value: mapping_red-hat-storage
-      - name: dry_run
-        value: "false"
-      image: registry.redhat.io/openshift4/ose-cli-rhel9
-      imagePullPolicy: IfNotPresent
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /tmp/user/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: .dockerconfigjson
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay.io-ocs-dev
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -266,6 +193,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -273,8 +202,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -318,6 +250,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -325,8 +259,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -362,6 +299,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -369,8 +308,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@every 20m'
   decorate: true
   labels:
@@ -406,6 +348,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -413,8 +357,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -456,6 +403,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -463,8 +412,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -508,6 +460,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -515,8 +469,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -552,6 +509,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -559,8 +518,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -596,6 +558,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -603,8 +567,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -640,6 +607,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -647,8 +616,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -684,6 +656,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -691,8 +665,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -728,6 +705,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -735,8 +714,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -772,6 +754,11 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
+      - mountPath: /etc/qci-pruner-credentials
+        name: qci-pruner-credentials
+        readOnly: true
     volumes:
     - name: push
       secret:
@@ -779,8 +766,14 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
+    - name: qci-pruner-credentials
+      secret:
+        secretName: qci-pruner-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   decoration_config:
@@ -826,6 +819,11 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
+      - mountPath: /etc/qci-pruner-credentials
+        name: qci-pruner-credentials
+        readOnly: true
     volumes:
     - name: push
       secret:
@@ -833,8 +831,14 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
+    - name: qci-pruner-credentials
+      secret:
+        secretName: qci-pruner-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -871,6 +875,8 @@ periodics:
         subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -878,8 +884,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -915,6 +924,8 @@ periodics:
         subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -922,58 +933,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
-    ci.openshift.io/area: observability-ui
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-observability-ui
-  reporter_config:
-    slack:
-      channel: '#announce-observability-ui'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - curl -sL https://raw.githubusercontent.com/openshift/release/refs/heads/main/hack/periodic-mirroring.sh
-        | bash
-      command:
-      - bash
-      env:
-      - name: HOME
-        value: /tmp/user
-      - name: MAPPING_FILE_PREFIX
-        value: mapping_observability_ui
-      - name: dry_run
-        value: "false"
-      image: registry.redhat.io/openshift4/ose-cli-rhel9
-      imagePullPolicy: IfNotPresent
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /tmp/user/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
+    - name: qci-robot-credentials
       secret:
-        secretName: registry-push-credentials-quay-io-observability-ui
-    - configMap:
-        name: image-mirror-mappings
-      name: config
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -1009,6 +973,11 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
+      - mountPath: /etc/qci-pruner-credentials
+        name: qci-pruner-credentials
+        readOnly: true
     volumes:
     - name: push
       secret:
@@ -1016,8 +985,14 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
+    - name: qci-pruner-credentials
+      secret:
+        secretName: qci-pruner-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   decoration_config:
@@ -1063,6 +1038,8 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
     volumes:
     - name: push
       secret:
@@ -1070,8 +1047,11 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
 - agent: kubernetes
-  cluster: app.ci
+  cluster: core-ci
   cron: '@hourly'
   decorate: true
   labels:
@@ -1107,6 +1087,11 @@ periodics:
         subPath: config.json
       - mountPath: /etc/imagemirror
         name: config
+      - mountPath: /etc/qci-robot-credentials
+        name: qci-robot-credentials
+      - mountPath: /etc/qci-pruner-credentials
+        name: qci-pruner-credentials
+        readOnly: true
     volumes:
     - name: push
       secret:
@@ -1114,3 +1099,9 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+    - name: qci-robot-credentials
+      secret:
+        secretName: qci-robot-credentials
+    - name: qci-pruner-credentials
+      secret:
+        secretName: qci-pruner-credentials

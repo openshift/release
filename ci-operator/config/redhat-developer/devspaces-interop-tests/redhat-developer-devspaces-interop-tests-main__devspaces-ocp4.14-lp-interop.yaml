@@ -9,9 +9,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.14
 images:
-- context_dir: .
-  dockerfile_path: interop/Dockerfile
-  to: devspaces-runner
+  items:
+  - context_dir: .
+    dockerfile_path: interop/Dockerfile
+    to: devspaces-runner
 releases:
   latest:
     prerelease:
@@ -28,6 +29,16 @@ resources:
 tests:
 - as: devspaces-interop-aws
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#devspaces-interop-testing'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:
@@ -50,6 +61,16 @@ tests:
     workflow: firewatch-ipi-aws
 - as: devspaces-interop-ibmcloud
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#devspaces-interop-testing'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: ibmcloud-cspi-qe
     env:

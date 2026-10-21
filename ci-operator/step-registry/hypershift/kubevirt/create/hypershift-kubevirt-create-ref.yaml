@@ -17,6 +17,9 @@ ref:
     - name: HYPERSHIFT_NETWORK_TYPE
       default: "OVNKubernetes"
       documentation: "Specifies the cluster SDN provider."
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
     - name: RUN_HOSTEDCLUSTER_CREATION
       default: "true"
       documentation: |-
@@ -36,7 +39,7 @@ ref:
     - name: ATTACH_DEFAULT_NETWORK
       default: ""
       documentation: |-
-        if true, config additional network for hostedcluster and attach-default-network true; 
+        if true, config additional network for hostedcluster and attach-default-network true;
         if false, config additional network for hostedcluster and attach-default-network false
         if the default empty string will skip all additional network config.
     - name: ETCD_STORAGE_CLASS
@@ -61,6 +64,14 @@ ref:
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra args to pass to the create cluster kubevirt command"
+    - name: IP_STACK
+      default: v4
+      documentation: |-
+        Configures the IP_STACK for the devscripts cluster. The possible values are v4, v6 or
+        v4v6 for dual stack. The default is v4.
+    - name: HYPERSHIFT_NP_AUTOREPAIR
+      default: "false"
+      documentation: "Enables machine autorepair with machine health checks."
   commands: hypershift-kubevirt-create-commands.sh
   resources:
     requests:
@@ -68,7 +79,7 @@ ref:
       memory: 100Mi
   credentials:
     - mount_path: /etc/ci-pull-credentials
-      name: ci-pull-credentials
+      bundle: ci-pull-credentials
       namespace: test-credentials
   dependencies:
     - name: "release:latest"

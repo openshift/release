@@ -1,14 +1,20 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: ibmcloud
     ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
@@ -30,7 +36,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -67,6 +77,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -87,9 +103,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -100,15 +122,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: ibmcloud
     ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
@@ -130,7 +158,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -167,6 +199,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -187,9 +225,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -200,15 +244,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -231,7 +281,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -268,6 +322,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -288,9 +348,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -301,15 +367,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -332,7 +404,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -369,6 +445,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -389,9 +471,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -402,15 +490,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -433,7 +527,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -470,6 +568,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -490,9 +594,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -503,15 +613,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -534,7 +650,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -571,6 +691,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -591,9 +717,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -604,15 +736,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -635,7 +773,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -672,6 +814,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -692,9 +840,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -705,15 +859,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -736,7 +896,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -773,6 +937,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -793,9 +963,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -806,15 +982,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   extra_refs:
   - base_ref: v1.2
     org: windup
     repo: windup-ui-tests
+    sparse_checkout_files:
+    - dockerfiles/interop/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
@@ -837,7 +1019,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -874,6 +1060,12 @@ periodics:
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -894,9 +1086,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

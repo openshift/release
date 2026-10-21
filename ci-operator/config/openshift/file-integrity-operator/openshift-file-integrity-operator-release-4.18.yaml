@@ -17,8 +17,9 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.22-openshift-4.17
 images:
-- dockerfile_path: Dockerfile.ci
-  to: file-integrity-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: file-integrity-operator
 operator:
   bundles:
   - as: file-integrity-operator-bundle
@@ -61,9 +62,10 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -105,9 +107,9 @@ tests:
 - always_run: false
   as: e2e-bundle-aws
   optional: true
-  run_if_changed: ^(config|bundle)
+  pipeline_run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest
@@ -137,9 +139,9 @@ tests:
 - always_run: false
   as: e2e-bundle-aws-upgrade
   optional: true
-  run_if_changed: ^(config|bundle)
+  pipeline_run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest

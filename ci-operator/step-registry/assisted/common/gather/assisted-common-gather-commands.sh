@@ -6,7 +6,8 @@ set -o pipefail
 
 echo "************ assisted common gather command ************"
 
-cat > gather_logs.yaml <<-EOF
+# shellcheck disable=SC2154
+cat > gather_logs.yaml <<-'EOF'
 - name: Gather logs and debug information and save them for debug purpose
   hosts: all
   vars:
@@ -32,7 +33,26 @@ cat > gather_logs.yaml <<-EOF
           setsid sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
             -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf
             -k podman.all -k podman.logs
-      ignore_errors: true
+        ignore_errors: true
+
+      # Strip libvirt auth token from sosreport archives. The libvirt plugin
+      # collects /run/libvirt/ which includes the daemon authentication token
+      # at /run/libvirt/common/system.token — sensitive data that must not
+      # appear in CI artifacts.
+      - name: Strip libvirt system.token from sosreport archives
+        ansible.builtin.shell: |
+          for sos_tar in {{ LOGS_DIR }}/sosreport-*.tar.xz; do
+            [ -f "$sos_tar" ] || continue
+            if tar tf "$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
+              tmpdir=$(mktemp -d)
+              tar xf "$sos_tar" -C "$tmpdir"
+              find "$tmpdir" -path "*/run/libvirt/common/system.token" -delete
+              tar cf - -C "$tmpdir" . | xz > "${sos_tar}.new" && mv "${sos_tar}.new" "$sos_tar"
+              rm -rf "$tmpdir"
+              echo "Stripped system.token from $sos_tar"
+            fi
+          done
+        ignore_errors: true
 
     - name: Gather logs and debug information from primary host
       block:

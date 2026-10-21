@@ -14,14 +14,15 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.base
-  to: ovn-kubernetes-base
-- dockerfile_path: Dockerfile
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  to: ovn-kubernetes-microshift
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
 promotion:
   to:
   - name: "4.18"
@@ -46,10 +47,20 @@ tests:
   as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
+- always_run: false
+  as: e2e-aws-ovn-multi-cidr
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_ARGS: --disable-monitor=legacy-test-framework-invariants,legacy-test-framework-invariants-alerts,metrics-endpoints-down
+      TEST_SKIPS: alerts in firing state
+    workflow: openshift-e2e-aws-ovn-multi-cidr
 - always_run: false
   as: e2e-agent-compact-ipv4
   capabilities:
@@ -60,13 +71,15 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: agent-e2e-compact-ipv4
-- as: e2e-aws-ovn-edge-zones
+- always_run: false
+  as: e2e-aws-ovn-edge-zones
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
-- as: e2e-aws-ovn-local-gateway
+- always_run: false
+  as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -81,7 +94,8 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
   steps:
@@ -89,7 +103,8 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   capabilities:
   - intranet
   steps:
@@ -98,22 +113,108 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-fdp-qe
+- always_run: false
+  as: e2e-aws-core-networking-ote
+  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
+  as: e2e-aws-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
+  as: e2e-aws-ovn-fdp-qe
+  steps:
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
@@ -138,9 +239,10 @@ tests:
     - chain: openshift-e2e-test-network-qe
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 6h0m0s
-- as: e2e-aws-ovn-windows
+- always_run: false
+  as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -159,28 +261,49 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-azure-core-networking-ote
+  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
+  as: e2e-azure-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-aws-ovn-upgrade-local-gateway
+- always_run: false
+  as: e2e-aws-ovn-upgrade-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -189,12 +312,31 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-gcp-core-networking-bastion
+- always_run: false
+  as: e2e-gcp-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-gcp-core-networking-bastion
 - always_run: false
   as: e2e-vsphere-windows
   optional: true
@@ -217,33 +359,38 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-ibmcloud-ipi-ovn-periodic
+- always_run: false
+  as: e2e-ibmcloud-ipi-ovn-periodic
   cron: 35 2 15 12 *
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-ovn
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- always_run: false
+  as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+- always_run: false
+  as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
   cron: 0 7 15 6 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
-- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- always_run: false
+  as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
-- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+- always_run: false
+  as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
   cron: 37 4 20 11 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -284,7 +431,8 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-- as: e2e-aws-ovn-hypershift
+- always_run: false
+  as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
@@ -310,9 +458,10 @@ tests:
     make gofmt
   container:
     from: src
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -320,7 +469,7 @@ tests:
   as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - as: security
   optional: true
@@ -455,7 +604,7 @@ tests:
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -464,7 +613,7 @@ tests:
   as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -481,15 +630,15 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
-- always_run: true
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -498,7 +647,7 @@ tests:
   as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -570,7 +719,7 @@ tests:
   as: e2e-aws-ovn-virt
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -655,6 +804,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -683,6 +858,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -709,6 +910,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -742,6 +969,32 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-node-density-cni
   optional: true
+  reporter_config:
+    channel: '#coreovn'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    - triggered
+    report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale

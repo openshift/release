@@ -1,12 +1,8 @@
 base_images:
   base:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: base
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -16,26 +12,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/aws-ebs-csi-driver-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: aws-ebs-csi-driver-operator
-- dockerfile_path: Dockerfile.test
-  from: src
-  to: aws-ebs-csi-driver-operator-test
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: aws-ebs-csi-driver-operator
+  - dockerfile_path: Dockerfile.test
+    from: src
+    to: aws-ebs-csi-driver-operator-test
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -52,9 +51,10 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
   container:
     from: src
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-csi
 - as: hypershift-aws-e2e-external
   steps:

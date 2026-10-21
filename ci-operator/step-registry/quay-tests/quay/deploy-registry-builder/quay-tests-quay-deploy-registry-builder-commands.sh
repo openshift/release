@@ -46,6 +46,9 @@ PULL_METRICS_REDIS:
   host: quay-quay-redis
   port: 6379
   db: 1
+FEATURE_IMMUTABLE_TAGS: true
+FEATURE_ORG_MIRROR: true
+FEATURE_SPARSE_INDEX: true
 EOF
 
 # Create secret bundle upon env variable TLS, by default it is false.
@@ -114,3 +117,10 @@ for i in {1..60}; do
   echo "Wait for quay registry ready $((i*15))s"
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+oc -n ${QUAYNAMESPACE} get pods -o wide >"$ARTIFACT_DIR/debug_pods.txt" 2>&1 || true
+oc -n ${QUAYNAMESPACE} get quayregistries -o yaml >"$ARTIFACT_DIR/debug_quayregistries.yaml" 2>&1 || true
+oc -n ${QUAYNAMESPACE} get events --sort-by='.lastTimestamp' >"$ARTIFACT_DIR/debug_events.txt" 2>&1 || true
+for pod in $(oc -n ${QUAYNAMESPACE} get pods -o name 2>/dev/null); do
+  podname=$(basename "$pod")
+  oc -n ${QUAYNAMESPACE} logs "$pod" --all-containers >"$ARTIFACT_DIR/debug_logs_${podname}.txt" 2>&1 || true
+done

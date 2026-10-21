@@ -8,11 +8,12 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: klusterlet-addon-controller
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: klusterlet-addon-controller
 promotion:
   to:
   - name: "2.14"
@@ -20,12 +21,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -45,26 +46,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: sonarcloud
-  commands: |
-    export HOME="/tmp"
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-  skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
-    env:
-      IMAGE_REPO: klusterlet-addon-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
@@ -91,9 +72,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

@@ -13,6 +13,65 @@ function create_winc_test_configmap()
   oc get cm winc-test-config -oyaml -n winc-test
 }
 
+function setup_image_mirroring()
+{
+  # Create ImageTagMirrorSet to redirect Windows container images to CI registry
+  # Images are pre-mirrored via core-services/image-mirroring/_config.yaml
+  # This works for both connected Prow (registry.ci.openshift.org) and disconnected (ephemeral mirror)
+
+  echo "Setting up ImageTagMirrorSet for Windows container images..."
+
+  # Determine mirror registry based on environment
+  if [ -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    # Disconnected environment with ephemeral mirror registry
+    MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    echo "Disconnected mode: Using ephemeral mirror registry at ${MIRROR_REGISTRY_HOST}"
+    echo "Skipping ImageTagMirrorSet creation - already created by windows-e2e-operator-test-mirror-images step"
+    echo "DEBUG: Existing ImageTagMirrorSets:"
+    oc get imagetagmirrorset -o yaml
+    return 0
+  else
+    # Connected Prow CI - use pre-mirrored images from CI registry
+    MIRROR_REGISTRY_HOST="registry.ci.openshift.org"
+    echo "Connected mode: Using pre-mirrored images from ${MIRROR_REGISTRY_HOST}"
+  fi
+
+  # Create ImageTagMirrorSet to redirect Windows images to mirror
+  # Includes PowerShell containers and CSI driver images for storage tests
+  # PowerShell: Server 2019 (1809), Server 2022 (ltsc2022)
+  # CSI: Azure File and vSphere drivers for OCP-66352
+  # TODO: Remove Server 2019 support after AMI/image upgrades to Server 2022
+  cat <<EOF | oc create -f -
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: winc-test-tagmirrorset
+spec:
+  imageTagMirrors:
+  - source: mcr.microsoft.com/powershell
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/powershell
+  - source: mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/csi-node-driver-registrar
+  - source: mcr.microsoft.com/k8s/csi/azurefile-csi
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/azurefile-csi
+  - source: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/csi-node-driver-registrar
+  - source: registry.k8s.io/csi-vsphere/driver
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/vsphere-csi-driver
+  - source: registry.k8s.io/sig-storage/livenessprobe
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/livenessprobe
+EOF
+
+  echo "ImageTagMirrorSet created successfully"
+  oc get imagetagmirrorset winc-test-tagmirrorset -o yaml
+}
+
 function create_workloads()
 {
   oc new-project winc-test
@@ -75,7 +134,26 @@ spec:
 EOF
 
   # Wait up to 5 minutes for Windows workload to be ready
-  oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m
+  echo "Waiting for Windows workload deployment to become available..."
+  if ! oc wait deployment win-webserver -n winc-test --for condition=Available=True --timeout=5m; then
+    echo "ERROR: Windows deployment failed to become available"
+    echo "DEBUG: Final Windows deployment status:"
+    oc get deployment win-webserver -n winc-test -o yaml
+    echo "DEBUG: Final Windows pod status:"
+    oc get pods -n winc-test -o wide
+    echo "DEBUG: Final Windows pod descriptions:"
+    for pod in $(oc get pods -n winc-test -o name); do
+      echo "=== ${pod} ==="
+      oc describe -n winc-test ${pod}
+    done
+    echo "DEBUG: Events in winc-test namespace:"
+    oc get events -n winc-test --sort-by='.lastTimestamp' | tail -50
+    exit 1
+  fi
+
+  echo "Windows deployment is available"
+  echo "DEBUG: Final Windows pod status:"
+  oc get pods -n winc-test -o wide
 
   # Create Linux workload
   oc create -f - <<EOF
@@ -117,8 +195,28 @@ spec:
         ports:
         - containerPort: 8080
 EOF
+
   # Wait up to 5 minutes for Linux workload to be ready
-  oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m
+  echo "Waiting for Linux workload deployment to become available..."
+  if ! oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m; then
+    echo "ERROR: Linux deployment failed to become available"
+    echo "DEBUG: Final Linux deployment status:"
+    oc get deployment linux-webserver -n winc-test -o yaml
+    echo "DEBUG: Final Linux pod status:"
+    oc get pods -n winc-test -o wide
+    echo "DEBUG: Final Linux pod descriptions:"
+    for pod in $(oc get pods -n winc-test -o name | grep linux); do
+      echo "=== ${pod} ==="
+      oc describe -n winc-test ${pod}
+    done
+    echo "DEBUG: Events in winc-test namespace:"
+    oc get events -n winc-test --sort-by='.lastTimestamp' | tail -50
+    exit 1
+  fi
+
+  echo "Linux deployment is available"
+  echo "DEBUG: Final Linux pod status:"
+  oc get pods -n winc-test -o wide
 }
 
 # Function to get Windows machineset name based on platform
@@ -199,23 +297,47 @@ echo "Windows OS image ID: $windows_os_image_id"
 # Get replica count
 winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
 
-echo "Waiting for Windows nodes to come up in Running state"
+echo "DEBUG: Windows machineset configuration:"
+oc get machineset -n openshift-machine-api ${winworker_machineset_name} -o yaml
+
+echo "Waiting for ${winworker_machineset_replicas} Windows machines to become ready..."
 while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do echo -n "." && sleep 10; done
+echo ""
+echo "${winworker_machineset_replicas} Windows machines are ready in machineset"
+
+echo "DEBUG: Windows machines status:"
+oc get machines -n openshift-machine-api | grep winworker || echo "No Windows machines found"
+
+echo "DEBUG: Describing Windows machines:"
+for machine in $(oc get machines -n openshift-machine-api -o name | grep winworker); do
+  echo "=== ${machine} ==="
+  oc describe -n openshift-machine-api ${machine}
+done
 
 # Make sure the Windows nodes get in Ready state
 # Timeout increased to 30m to accommodate BYOH node configuration time
+echo "Waiting for ${winworker_machineset_replicas} Windows nodes to reach Ready state (timeout: 30m)..."
 oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=30m
 
-# Choose the Windows container vesion depending on the Windows version
-# installed on the Windows workers
+echo ""
+echo "All Windows nodes are Ready:"
+oc get nodes -l kubernetes.io/os=windows -o wide
+
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
-windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
-if [[ "$os_version" == *"2019"* ]]
-then
-    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
+if [[ "$os_version" == *"2025"* ]]; then
+    # TODO: Update to lts-nanoserver-ltsc2025 when Microsoft publishes the image
+    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
+else
+    windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
 fi
 
+# Setup image mirroring for Prow CI (if mirror registry is available)
+# This creates ImageTagMirrorSet to redirect Windows image pulls to CI registry
+setup_image_mirroring
+
+# Create workloads using the original image (ITMS will redirect to mirror)
 create_workloads $windows_container_image
 
+# Create ConfigMap with the original image (ITMS will redirect to mirror)
 create_winc_test_configmap $windows_os_image_id $windows_container_image

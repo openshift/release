@@ -1,25 +1,50 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 0 * * 3,5,0
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-disconnected-capi-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -52,6 +77,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -72,6 +103,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -82,26 +122,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 30 21 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-3masters-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -134,6 +199,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -154,6 +225,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -164,26 +244,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 15 21 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-4masters-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -216,6 +321,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -236,6 +347,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -246,26 +366,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 30 23 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-capi-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -298,6 +443,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -318,6 +469,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -328,26 +488,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 22 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-disconnected-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -380,6 +565,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -400,6 +591,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -410,26 +610,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 23 * * 1,4
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-node-labels-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -462,6 +687,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -482,6 +713,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -492,26 +732,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 21 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -544,6 +809,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -564,6 +835,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -574,26 +854,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 30 0 * * 3,5,0
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-remove-node-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -626,6 +931,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -646,6 +957,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -656,26 +976,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 23 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -708,6 +1053,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -728,6 +1079,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -738,26 +1098,51 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 30 22 * * 2,4,6
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -790,6 +1175,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -810,6 +1201,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -820,31 +1220,56 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 0 1 * * 3,5,0
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     capability/intranet: intranet
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-dual-primary-v6-compact-4-20-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-dual-primary-v6-compact-5-0-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-assisted-dual-primary-v6-compact-4-20-periodic
+      - --target=e2e-metal-assisted-dual-primary-v6-compact-5-0-periodic
       - --variant=edge
       command:
       - ci-operator
@@ -872,6 +1297,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -892,6 +1323,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -905,21 +1345,47 @@ periodics:
   cluster: build05
   cron: 0 20 * * *
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-mirror-nightly-image
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mirror-nightly-image
@@ -941,11 +1407,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
@@ -958,9 +1433,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -974,22 +1464,48 @@ periodics:
   cluster: build05
   cron: 0 22 * * 0-5
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-subsystem-aws-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=subsystem-aws-periodic
@@ -1011,11 +1527,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -1031,9 +1556,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -1050,22 +1590,48 @@ periodics:
   cluster: build05
   cron: 0 23 * * 0-5
   decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-service
+    sparse_checkout_files:
+    - .ci-operator.yaml
+    - Dockerfile.assisted-service
+    - Dockerfile.assisted-service-build
+    - Dockerfile.assisted-service-debug
+    - ci-images/Dockerfile.base
+    - ci-images/Dockerfile.code-generation
+    - ci-images/Dockerfile.lint
+    - ci-images/Dockerfile.subsystem
+    - ci-images/Dockerfile.unit-tests
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.21"
+    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-service-master-edge-subsystem-kubeapi-aws-periodic
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=subsystem-kubeapi-aws-periodic
@@ -1087,11 +1653,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -1107,9 +1682,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials

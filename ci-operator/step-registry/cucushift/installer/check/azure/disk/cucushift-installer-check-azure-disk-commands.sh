@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_lt() {
+  # Returns 0 (true) if $1 < $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ]]
+}
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -173,8 +179,9 @@ fi
 
 # os disk cache check
 # will remove the version check when OCPBUGS-33470 backport to old version
-ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 16 )); then
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+
+if version_lt "${ocp_version}" "4.16"; then
     echo "Disk cache checking is available on 4.16+ cluster currently, skip the check!"
     exit ${check_result}
 fi

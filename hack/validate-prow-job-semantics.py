@@ -5,12 +5,19 @@ import os
 import re
 import sys
 from argparse import ArgumentParser
+from concurrent.futures import ProcessPoolExecutor
 
 import yaml
 
 
 JOBS_DIR = 'ci-operator/jobs'
 logger = logging.getLogger('validate-prow-job-semantics.py')
+
+# Use C-accelerated YAML loader when available (~7x faster)
+try:
+    _YAMLLoader = yaml.CSafeLoader
+except AttributeError:
+    _YAMLLoader = yaml.SafeLoader
 
 
 def parse_args():
@@ -23,7 +30,17 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def _init_worker(log_level):
+    """Initialize logger in worker processes."""
+    logger.setLevel(log_level)
+    if not logger.handlers:
+        sh = logging.StreamHandler()
+        sh.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+        logger.addHandler(sh)
+
+
+def _validate_file(path):
+    """Validate a single YAML file. Returns True if validation failed."""
     PATH_CHECKS = (
         validate_filename,
     )
@@ -35,13 +52,31 @@ def main():
         validate_pod_name,
         validate_resources,
     )
-    validate = lambda funcs, *args: all(f(*args) for f in funcs)
+    def _validate(funcs, *args):
+        return all(f(*args) for f in funcs)
+
+    if not _validate(PATH_CHECKS, path):
+        return True
+
+    with open(path, encoding='utf-8') as f:
+        data = yaml.load(f, Loader=_YAMLLoader)
+
+    if not _validate(CONTENT_CHECKS, path, data):
+        return True
+
+    return False
+
+
+def main():
     failed = False
     args = parse_args()
-    logger.setLevel(getattr(logging, args.log_level.upper()))
+    log_level = getattr(logging, args.log_level.upper())
+    logger.setLevel(log_level)
     sh = logging.StreamHandler()
     sh.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
     logger.addHandler(sh)
+
+    yaml_files = []
     for root, _, files in os.walk(os.path.join(args.release_repo_dir, JOBS_DIR)):
         for filename in files:
             if filename.endswith(".yml"):
@@ -51,14 +86,12 @@ def main():
                 continue
             if os.path.basename(filename).startswith("infra-"):
                 continue
-            path = os.path.join(root, filename)
-            if not validate(PATH_CHECKS, path):
-                failed = True
-                continue
-            with open(path, encoding='utf-8') as f:
-                data = yaml.load(f, Loader=yaml.SafeLoader)
-            if not validate(CONTENT_CHECKS, path, data):
-                failed = True
+            yaml_files.append(os.path.join(root, filename))
+
+    with ProcessPoolExecutor(initializer=_init_worker, initargs=(log_level,)) as executor:
+        results = executor.map(_validate_file, yaml_files, chunksize=50)
+        if any(results):
+            failed = True
 
     if failed:
         sys.exit(1)
@@ -301,4 +334,5 @@ def validate_resources(path, data):
     return out
 
 
-main()
+if __name__ == '__main__':
+    main()

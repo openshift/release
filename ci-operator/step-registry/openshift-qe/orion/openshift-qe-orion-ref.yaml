@@ -61,7 +61,9 @@ ref:
   - name: ACK_FILE
     default: ""
     documentation:
-      Orion ack file name that has a list of acknowledged issues/regressions.
+      Optional. When set to a URL, that file is downloaded and passed as --ack (additive
+      with Orion's auto-loaded ack/all_ack.yaml). When empty or a filename, no --ack is
+      passed; Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack in ORION_EXTRA_FLAGS).
   - name: COLLAPSE
     default: "false"
     documentation:
@@ -78,20 +80,27 @@ ref:
     default: ""
     documentation:
       Comma separated list of repositories to monitor before and after change points.
+  - name: ORION_WORKLOAD_TYPE
+    default: ""
+    documentation:
+      When set, auto-selects ORION_CONFIG based on worker node count and this workload suffix.
+      Matches orion example configs named {scale-prefix}-{ORION_WORKLOAD_TYPE}.yaml.
+      Ignored if ORION_CONFIG is explicitly set.
+
   commands: openshift-qe-orion-commands.sh
   timeout: 6h
   credentials:
-  - namespace: test-credentials # this entry injects the custom credential
-    name: ocp-qe-perfscale-es
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
     mount_path: /secret/qe
-  - namespace: test-credentials # this entry injects the custom credential
-    name: ocp-perfscale-es-creds
+  - collection: ocp-perfscale-cpt
+    group: ocp-perfscale-es-creds
     mount_path: /secret/internal
-  - namespace: test-credentials
-    name: quay-qe-elk-secret
+  - collection: quay-tests
+    group: elk
     mount_path: /secret/quay-qe
-  - namespace: test-credentials
-    name: stackrox-perfscale-elasticsearch
+  - collection: stackrox-perfscale-elasticsearch
+    group: credentials
     mount_path: /secret_stackrox
   resources:
     requests:

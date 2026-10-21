@@ -279,7 +279,7 @@ compute:
 EOF
     yq-go m -x -i "${config}" "${patch_file}"
     echo_date ">> Install Config:"
-    grep -v "password\|username\|pullSecret\|{\"auths\":{\|sshKey\|ssh-" "$INSTALL_DIR/install-config.yaml" | tee "${result_file}.ic.yaml"
+    grep -v "password\|username\|pullSecret\|{\"auths\":{\|sshKey\|ssh-\|httpProxy\|httpsProxy" "$INSTALL_DIR/install-config.yaml" | tee "${result_file}.ic.yaml"
 }
 
 function test_render_validations() {

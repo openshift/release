@@ -151,7 +151,7 @@ fi
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" | tee "${ARTIFACT_DIR}/install-config.yaml"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo "Creating manifests"

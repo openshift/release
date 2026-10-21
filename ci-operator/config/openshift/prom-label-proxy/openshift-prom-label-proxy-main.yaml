@@ -1,21 +1,22 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: prom-label-proxy
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: prom-label-proxy
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -24,20 +25,26 @@ resources:
       memory: 200Mi
 tests:
 - as: vendor
-  commands: make unused && git diff --exit-code
+  commands: |
+    [ -f .ci-operator.rc ] && . .ci-operator.rc
+    make unused && git diff --exit-code
   container:
     from: src
 - as: test-unit
-  commands: make test
+  commands: |
+    [ -f .ci-operator.rc ] && . .ci-operator.rc
+    make test
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-agnostic-cmo
+- always_run: false
+  as: e2e-agnostic-cmo
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -46,11 +53,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 2h40m0s
     workflow: ipi-azure
 - as: ginkgo-tests-cmo
-  optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest

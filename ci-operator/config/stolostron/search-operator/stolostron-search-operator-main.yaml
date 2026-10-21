@@ -9,9 +9,10 @@ build_root:
     namespace: stolostron
     tag: go1.20-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: search-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: search-operator
 promotion:
   to:
   - name: "2.7"
@@ -44,9 +45,9 @@ tests:
         make -f Makefile.prow test-e2e
         set +o pipefail
       credentials:
-      - mount_path: /etc/secret
-        name: ocm-obs-usa-quaytoken
-        namespace: test-credentials
+      - collection: ocm-observability-usa-secrets
+        group: ocm-obs-usa-quaytoken
+        mount_path: /etc/secret
       dependencies:
       - env: COMPONENT_IMAGE_REF
         name: search-operator
@@ -77,8 +78,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -87,8 +89,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

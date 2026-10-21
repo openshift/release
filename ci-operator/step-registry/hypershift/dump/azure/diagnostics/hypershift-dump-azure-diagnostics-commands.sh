@@ -44,7 +44,11 @@ if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
 fi
 
-CLUSTER_NAME="$(echo -n "$PROW_JOB_ID" | sha256sum | cut -c -20)"
+if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+else
+  CLUSTER_NAME="$(echo -n "$PROW_JOB_ID" | sha256sum | cut -c -20)"
+fi
 RESOURCE_GROUP=$(oc get hc -n clusters "$CLUSTER_NAME" -o jsonpath='{.spec.platform.azure.resourceGroup}')
 NODES=$(KUBECONFIG="${SHARED_DIR}"/nested_kubeconfig oc get node -o jsonpath='{.items[*].metadata.name}')
 for NODE in $NODES; do

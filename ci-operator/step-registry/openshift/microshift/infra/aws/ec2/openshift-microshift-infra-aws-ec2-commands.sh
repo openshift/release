@@ -23,18 +23,30 @@ declare -A ami_map=(
   [us-east-1,arm64,rhel-9.4]=ami-04e40399249acc576      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [us-east-1,x86_64,rhel-9.6]=ami-03f1d522d98841360     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [us-east-1,arm64,rhel-9.6]=ami-04db3c91a597912d6      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.8]=ami-07290b6b6b1f4d7b4     # RHEL-9.8.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.8]=ami-0a376e93640765210      # RHEL-9.8.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-10.2]=ami-00adafae70b8029d8    # RHEL-10.2.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-10.2]=ami-0f094b852a615ea36     # RHEL-10.2.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.2]=ami-0828b5584587b20b2     # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.2]=ami-0fe01cf6276fcc8c5      # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.4]=ami-0afbb67255ef6e726     # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.4]=ami-0ff4bae26d5e7e36a      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [us-west-2,x86_64,rhel-9.6]=ami-022daef1002763216     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [us-west-2,arm64,rhel-9.6]=ami-0b2dc437bf4878d14      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.8]=ami-030d5b6e47409757a     # RHEL-9.8.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.8]=ami-035574bcee654582e      # RHEL-9.8.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-10.2]=ami-0da467f007dfebd6b    # RHEL-10.2.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-10.2]=ami-0697a1da79ebefa36     # RHEL-10.2.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.2]=ami-02ad2ca65425af1c8  # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.2]=ami-0334bf2525c55070d   # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.4]=ami-0f7fa5d86c8e44172  # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.4]=ami-078e99bcb609a9931   # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
   [eu-central-1,x86_64,rhel-9.6]=ami-0066d4651999e27f1  # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
   [eu-central-1,arm64,rhel-9.6]=ami-0f0cd53332525ff39   # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.8]=ami-0d76860244f0428b1  # RHEL-9.8.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.8]=ami-0c000260e7ded1684   # RHEL-9.8.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-10.2]=ami-0004a9f3eb59c2f39 # RHEL-10.2.0_HVM_GA-20260521-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-10.2]=ami-0541a87d4007269af  # RHEL-10.2.0_HVM_GA-20260521-arm64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
@@ -42,6 +54,11 @@ if [ -f "${MICROSHIFT_CLUSTERBOT_SETTINGS}" ]; then
   : Overriding step defaults by sourcing clusterbot settings
   # shellcheck disable=SC1090
   source "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+  # Always assemble CLONEREFS for cloning when using clusterbot.
+  # The only sitation it would have JOB_SPEC with clonerefs is for rehearsal which is not the main usecase.
+  # When running via cluster bot, it's always empty and the decision "what to clone" is made based on the sourced
+  # `microshift-clusterbot-settings` file (envs like MICROSHIFT_PR, MICROSHIFT_GIT, MICROSHIFT_NIGHTLY, *AND* OCP_VERSION).
+  SRC_FROM_GIT=true
 fi
 
 # All graviton instances have a lower case g in the family part. Using
@@ -57,7 +74,17 @@ REGION=""
 stack_name="microshift-$(cat /proc/sys/kernel/random/uuid)"
 cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
-curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
+# To clone a private branch for testing cross-repository source changes, comment
+# out the 'ci_clone_src' function call and add the following commands instead.
+#
+# GUSR=myuser
+# GBRN=mybranch
+# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+#
+ci_clone_src "${SRC_FROM_GIT}"
+src_path="/go/src/github.com/openshift/microshift"
+
+cp "${src_path}"/scripts/aws/cf-gen.yaml "${cf_tpl_file}"
 
 ec2Type="VirtualMachine"
 if [[ "$EC2_INSTANCE_TYPE" =~ metal ]]; then
@@ -116,11 +143,12 @@ for aws_region in "${regions[@]}"; do
       echo "ec2-user" > "${SHARED_DIR}/ssh_user"
       echo "${CACHE_REGION}" > "${SHARED_DIR}/cache_region"
 
+      echo "Waiting up to 5 min for RHEL host to be up."
+      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-ids "${INSTANCE_ID}"
+
       ci_script_prologue
       scp -F "${HOME}/.ssh/config" "ec2-user@${HOST_PUBLIC_IP}:/tmp/init_output.txt" "${ARTIFACT_DIR}/init_ec2_output.txt"
 
-      echo "Waiting up to 5 min for RHEL host to be up."
-      timeout 5m "${aws}" --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"
       exit 0
   fi
   save_stack_events_to_shared

@@ -3,22 +3,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
 images:
-- dockerfile_path: images/Dockerfile
-  to: csi-driver-nfs
+  items:
+  - dockerfile_path: images/Dockerfile
+    to: csi-driver-nfs
 promotion:
   to:
-  - name: 4.15-priv
-    namespace: ocp-private
+  - name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -37,9 +40,14 @@ tests:
   commands: make test-vendor
   container:
     from: src
-- as: e2e-openstack-csi
+- always_run: false
+  as: e2e-openstack-csi
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
 - as: verify-deps
   steps:

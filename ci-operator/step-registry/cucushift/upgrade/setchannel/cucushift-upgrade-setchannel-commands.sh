@@ -18,7 +18,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 
 valid_channels=("fast" "stable" "candidate" "eus")
 valid_channel="false"
@@ -54,7 +54,7 @@ x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
 ver="${x_ver}.${y_ver}"
 target_channel="${UPGRADE_CHANNEL}-${ver}"
-if ! oc adm upgrade channel ${target_channel}; then
+if ! oc adm upgrade channel ${target_channel} --allow-explicit-channel; then
     echo "Fail to change channel to ${target_channel}!"
     exit 1
 fi

@@ -9,14 +9,15 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
-  to: cloud-resource-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: os
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
+    to: cloud-resource-operator
 promotion:
   to:
   - name: mgdapi-3425-gcp
@@ -77,8 +78,9 @@ tests:
   container:
     from: src
   secret:
+    collection: integr8ly
+    group: cloud-resource-operator-codecov-token
     mount_path: /tmp/secret
-    name: cloud-resource-operator-codecov-token
 - as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -87,8 +89,9 @@ tests:
     from: src
   postsubmit: true
   secret:
+    collection: integr8ly
+    group: cloud-resource-operator-codecov-token
     mount_path: /tmp/secret
-    name: cloud-resource-operator-codecov-token
 - as: gosec
   commands: make gosec
   container:

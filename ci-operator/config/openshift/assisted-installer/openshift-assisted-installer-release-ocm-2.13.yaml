@@ -26,12 +26,13 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted-installer
-  to: assisted-installer
-- dockerfile_path: Dockerfile.assisted-installer-controller
-  to: assisted-installer-controller
-- dockerfile_path: Dockerfile.assisted-installer-build
-  to: assisted-installer-build
+  items:
+  - dockerfile_path: Dockerfile.assisted-installer
+    to: assisted-installer
+  - dockerfile_path: Dockerfile.assisted-installer-controller
+    to: assisted-installer-controller
+  - dockerfile_path: Dockerfile.assisted-installer-build
+    to: assisted-installer-build
 promotion:
   to:
   - name: ocm-2.13
@@ -114,8 +115,9 @@ tests:
     clone: true
     from: assisted-installer-build
   secret:
+    collection: edge-group
+    group: assisted-installer-codecov-token
     mount_path: /tmp/secret
-    name: assisted-installer-codecov-token
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
@@ -127,12 +129,15 @@ tests:
     from: assisted-installer-build
   postsubmit: true
   secret:
+    collection: edge-group
+    group: assisted-installer-codecov-token
     mount_path: /tmp/secret
-    name: assisted-installer-codecov-token
-- as: e2e-ai-operator-ztp
+- always_run: false
+  as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  optional: true
+  pipeline_skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

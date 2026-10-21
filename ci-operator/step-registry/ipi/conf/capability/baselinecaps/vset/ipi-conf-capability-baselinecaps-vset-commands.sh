@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
@@ -40,7 +46,7 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 # A direct connection is required while communicating with build-farm, instead of through proxy
-KUBECONFIG="" oc --loglevel=8 registry login
+KUBECONFIG="" oc registry login
 ocp_version=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
@@ -60,7 +66,9 @@ latest_version_set="v418_set"
 
 # the content of each capset
 v411="baremetal marketplace openshift-samples"
-(( ocp_minor_version > 13 )) && v411="${v411} MachineAPI"
+if version_gt "${ocp_version}" "4.13"; then
+    v411="${v411} MachineAPI"
+fi
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
 v414=" ${v413} Build DeploymentConfig ImageRegistry"

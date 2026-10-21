@@ -14,19 +14,20 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile.build
-  from: os
-  to: ocs-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry
-  to: ocs-registry
-- context_dir: openshift-ci/
-  dockerfile_path: index.Dockerfile
-  from: operator-index
-  to: noobaa-index
-- dockerfile_path: openshift-ci/Dockerfile.registry
-  from: operator-registry
-  to: ocs-registry-quay
+  items:
+  - dockerfile_path: build/Dockerfile.build
+    from: os
+    to: ocs-operator
+  - dockerfile_path: openshift-ci/Dockerfile.registry.build
+    from: operator-registry
+    to: ocs-registry
+  - context_dir: openshift-ci/
+    dockerfile_path: index.Dockerfile
+    from: operator-index
+    to: noobaa-index
+  - dockerfile_path: openshift-ci/Dockerfile.registry
+    from: operator-registry
+    to: ocs-registry-quay
 operator:
   bundles:
   - as: ocs-operator-bundle
@@ -73,7 +74,7 @@ tests:
       CATALOG_FULL_IMAGE_NAME: ocs-registry
       OO_INDEX: ci-index-ocs-operator-bundle
     env:
-      BASE_DOMAIN: makestoragegreatagain.com
+      BASE_DOMAIN: ocs.syseng.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       OCP_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocp-must-gather
       OCS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocs-must-gather
@@ -81,6 +82,8 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-storage
       OO_PACKAGE: ocs-operator
       OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        createdBy gh-openshift-ci
       ZONES_COUNT: "3"
     post:
     - as: ocs-must-gather

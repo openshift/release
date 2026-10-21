@@ -1,0 +1,20 @@
+ref:
+  as: openstack-conf-externallb-verify
+  from: openstack-installer
+  commands: openstack-conf-externallb-verify-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: CONFIG_TYPE
+      documentation: |-
+        Install topology variant. When the value contains "externallb"
+        (for example proxy-externallb), this step verifies Infrastructure
+        status for External DNS and UserManaged LB. Otherwise the step is skipped.
+  documentation: |-
+    For externallb jobs, verify the cluster Infrastructure status reflects external DNS
+    (dnsRecordsType: External) and a user-managed load balancer. When LB_HOSTS is
+    present, check that dns_up.json published that many addresses for api, and that
+    api-int includes the machines-net API VIP. Also probe each LB_HOST(S):6443/readyz
+    from the CI network (outside); in-cluster FIP hairpin is not available on this cloud.

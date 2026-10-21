@@ -16,22 +16,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-capi-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-capi-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-capi-operator
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "5.1"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -47,10 +50,10 @@ resources:
       memory: 3Gi
   unit:
     limits:
-      memory: 6Gi
+      memory: 10Gi
     requests:
       cpu: "1"
-      memory: 3Gi
+      memory: 5Gi
 tests:
 - as: lint
   commands: make lint
@@ -70,22 +73,22 @@ tests:
     from: src
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  pipeline_run_if_changed: ^manifests/
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-serial
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  pipeline_run_if_changed: ^manifests/
   shard_count: 2
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -93,7 +96,7 @@ tests:
   as: e2e-aws-ovn-techpreview-upgrade
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-upgrade
@@ -101,7 +104,7 @@ tests:
   as: e2e-aws-capi-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -117,10 +120,50 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-capi-techpreview-post-install
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-techpreview-post-install
+- always_run: false
+  as: e2e-aws-capi-disconnected-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - as: test
+      commands: |-
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
   as: e2e-gcp-ovn-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -128,7 +171,7 @@ tests:
   as: e2e-gcp-capi-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -141,7 +184,7 @@ tests:
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-openstack-ovn-techpreview
-  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -169,7 +212,7 @@ tests:
   optional: true
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
@@ -177,7 +220,7 @@ tests:
   as: e2e-azure-ovn-techpreview-upgrade
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure-upgrade
@@ -185,7 +228,7 @@ tests:
   as: e2e-azure-capi-techpreview
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -197,12 +240,13 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-azure
 - always_run: false
-  as: e2e-vsphere-capi-techpreview
+  as: e2e-vsphere-capi-customnoupgrade-migration
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: '["MachineAPIMigration=true","MachineAPIMigrationVSphere=true","ClusterAPIMachineManagement=true","ClusterAPIMachineManagementVSphere=true"]'
+      FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
       commands: make e2e
@@ -239,7 +283,7 @@ tests:
   optional: true
   pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
@@ -250,8 +294,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: verify-deps
   steps:
-    env:
-      CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
 zz_generated_metadata:

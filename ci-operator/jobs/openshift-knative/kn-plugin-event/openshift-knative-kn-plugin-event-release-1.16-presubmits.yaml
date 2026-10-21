@@ -5,11 +5,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build05
+    cluster: build11
     context: ci/prow/420-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -20,9 +25,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e
@@ -44,11 +54,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -64,9 +83,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -85,11 +119,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build05
+    cluster: build11
     context: ci/prow/420-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -144,11 +183,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build05
+    cluster: build11
     context: ci/prow/420-unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -210,11 +254,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build11
+    cluster: build12
     context: ci/prow/421-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -227,7 +276,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -260,6 +313,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -280,6 +339,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -295,11 +363,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build05
+    cluster: build11
     context: ci/prow/421-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "421"
       ci.openshift.io/generator: prowgen
@@ -355,11 +428,16 @@ presubmits:
     branches:
     - ^release-1\.16$
     - ^release-1\.16-
-    cluster: build05
+    cluster: build11
     context: ci/prow/421-unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/images/kn-event-sender/Dockerfile
+      - openshift/ci-operator/images/kn-event/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/test-images/eventshub/Dockerfile
+      - openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "421"
       ci.openshift.io/generator: prowgen

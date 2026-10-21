@@ -27,7 +27,10 @@ support_np_skew() {
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 HYPERSHIFT_NAME=hcp
@@ -89,8 +92,20 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 fi
 
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE" ]]; then
+    OVERRIDE_CPO_IMAGE="$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE"
+fi
+
+if [[ -n "${OVERRIDE_CPO_IMAGE}" ]]; then
+  EXTRA_ARGS+=" --annotations=hypershift.openshift.io/control-plane-operator-image=${OVERRIDE_CPO_IMAGE} "
+fi
+
 if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
+fi
+
+if [[ "${HYPERSHIFT_NP_AUTOREPAIR}" == "true" ]]; then
+  EXTRA_ARGS+=" --auto-repair"
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then

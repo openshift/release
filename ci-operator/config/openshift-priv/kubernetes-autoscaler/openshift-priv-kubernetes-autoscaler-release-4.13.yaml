@@ -1,42 +1,45 @@
 base_images:
   base:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: base
   hypershift-operator:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: hypershift-operator
   hypershift-tests:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: hypershift-tests
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
-  from: base
-  to: cluster-autoscaler
-- context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.rhel
-  from: base
-  to: vertical-pod-autoscaler
+  items:
+  - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+    from: base
+    to: cluster-autoscaler
+  - context_dir: vertical-pod-autoscaler
+    dockerfile_path: Dockerfile.rhel
+    from: base
+    to: vertical-pod-autoscaler
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -82,15 +85,17 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -104,7 +109,7 @@ tests:
   as: e2e-azure-operator
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
@@ -118,7 +123,7 @@ tests:
   as: e2e-gcp-operator
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest

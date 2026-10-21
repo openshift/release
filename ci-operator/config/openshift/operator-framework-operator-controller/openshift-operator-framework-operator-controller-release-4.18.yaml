@@ -6,10 +6,11 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
+  - dockerfile_path: openshift/registry.Dockerfile
+    to: e2e-test-registry
 promotion:
   to:
   - excluded_images:
@@ -54,10 +55,11 @@ tests:
   commands: commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
-- as: openshift-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+- always_run: false
+  as: openshift-e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: upstream-e2e
       cli: latest
@@ -81,8 +83,8 @@ tests:
         cd openshift/default-catalog-consistency
         REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
       credentials:
-      - mount_path: /var/run/secrets/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /var/run/secrets/ci-pull-credentials
         namespace: ci
       from: src
       resources:

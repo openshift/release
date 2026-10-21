@@ -3,7 +3,7 @@ set -xeuo pipefail
 function download_oc() {
     local tmp_bin_path='/tmp/oc-bin/'
     mkdir -p "$tmp_bin_path"
-    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+    curl -sSL --retry 3 --retry-delay 5 https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
     export PATH=${tmp_bin_path}:$PATH
     which oc
     oc version --client
@@ -24,8 +24,11 @@ oc version --client
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 # ensure we're stable to start
 oc adm wait-for-stable-cluster --minimum-stable-period=5s

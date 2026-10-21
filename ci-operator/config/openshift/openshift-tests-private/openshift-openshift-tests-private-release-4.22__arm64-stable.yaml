@@ -55,6 +55,9 @@ base_images:
     name: verification-tests
     namespace: ci
     tag: latest
+prowgen:
+  expose: true
+  private: true
 releases:
   arm64-latest:
     release:
@@ -80,7 +83,7 @@ resources:
       memory: 1Gi
 tests:
 - as: aws-ipi-disc-priv-sts-ep-f28
-  cron: 57 7 2 * *
+  cron: 0 0 31 2 *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -92,11 +95,12 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-ovn-ipsec-to-multiarch-f28
-  cron: 1 1 16 * *
+  cron: 0 0 31 2 *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-qe
@@ -112,11 +116,12 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       ENABLE_OTA_TEST: OCP-60397
       OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: azure-ipi-to-multiarch-f28
-  cron: 58 15 1 * *
+  cron: 0 0 31 2 *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -131,11 +136,12 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_OTA_TEST: OCP-60397
       OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: gcp-ipi-to-multiarch-mini-perm-f28
-  cron: 37 14 4 * *
+  cron: 0 0 31 2 *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -149,6 +155,7 @@ tests:
       COMPUTE_NODE_TYPE: t2a-standard-4
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: ""
     test:
     - chain: openshift-upgrade-qe-sanity-arch-migration
     workflow: cucushift-installer-rehearse-gcp-ipi

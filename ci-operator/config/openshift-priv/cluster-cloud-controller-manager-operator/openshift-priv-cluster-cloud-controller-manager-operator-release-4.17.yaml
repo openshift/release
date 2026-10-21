@@ -12,22 +12,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-cloud-controller-manager-operator
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-cloud-controller-manager-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - name: 4.17-priv
-    namespace: ocp-private
+  - name: "4.17"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -64,38 +67,40 @@ tests:
       resources:
         requests:
           cpu: 200m
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - always_run: false
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: level0-clusterinfra-azure-ipi-proxy-tests
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       E2E_RUN_TAGS: '@level0 and (@mapi or @capi or @ccm)'
       TEST_FILTERS: ~ChkUpgrade&;LEVEL0
@@ -108,18 +113,18 @@ tests:
   as: e2e-gcp-ovn
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-upgrade
 - always_run: false
   as: e2e-ibmcloud-ovn
   optional: true
-  run_if_changed: ibm
+  pipeline_run_if_changed: ibm
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
@@ -155,7 +160,7 @@ tests:
   as: e2e-nutanix-ovn
   cluster: build01
   optional: true
-  run_if_changed: .*nutanix.*
+  pipeline_run_if_changed: .*nutanix.*
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix

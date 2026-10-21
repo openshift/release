@@ -23,9 +23,9 @@ releases:
       channel: fast
       version: "4.19"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      architecture: amd64
+      channel: fast
       version: "4.20"
 resources:
   '*':
@@ -40,7 +40,14 @@ resources:
       memory: 5Gi
 tests:
 - as: platform-external-vsphere
-  cron: 0 10 * * 0
+  cron: 0 8 1 * *
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:

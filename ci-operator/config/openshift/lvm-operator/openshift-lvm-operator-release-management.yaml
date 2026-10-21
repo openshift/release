@@ -1,19 +1,20 @@
 base_images:
-  ocp_4.21_cli:
-    name: "4.21"
+  ocp_4.22_cli:
+    name: "4.22"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.22
 images:
-- dockerfile_literal: |-
-    FROM ocp_cli
-    RUN dnf install -y jq
-  from: ocp_4.21_cli
-  to: lvms-releaser
+  items:
+  - dockerfile_literal: |-
+      FROM ocp_cli
+      RUN dnf install -y jq
+    from: ocp_4.22_cli
+    to: lvms-releaser
 resources:
   '*':
     limits:
@@ -34,8 +35,9 @@ tests:
     from: lvms-releaser
   run_if_changed: releases/.*
   secret:
+    collection: lvms
+    group: konflux-bot
     mount_path: /tmp/secret
-    name: lvms-konflux-bot-creds
 - as: release
   commands: |
     export KONFLUX_SA_TOKEN=$(cat /tmp/secret/sa-token)
@@ -48,8 +50,9 @@ tests:
   postsubmit: true
   run_if_changed: releases/.*
   secret:
+    collection: lvms
+    group: konflux-bot
     mount_path: /tmp/secret
-    name: lvms-konflux-bot-creds
 zz_generated_metadata:
   branch: release-management
   org: openshift

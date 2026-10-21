@@ -8,13 +8,23 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 remote_machineset_name="remote-worker"
 remote_worker_number="${REMOTEWORKER_NUMBER}"
-declare vsphere_extra_portgroup_1
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/vsphere_context.sh"
-remote_network_name="${vsphere_extra_portgroup_1}"
+
+# Get the reserved network from reserved_networks.json (created by RESERVE_EXTRA_NETWORK)
+if [[ -f "${SHARED_DIR}/reserved_networks.json" ]]; then
+  # Extract the first reserved portgroup name (we only need one for remote workers)
+  remote_network_name=$(jq -r '.[]' "${SHARED_DIR}/reserved_networks.json" | head -n1)
+  echo "Using reserved network: ${remote_network_name}"
+else
+  # Fallback to legacy vsphere_extra_portgroup_1 for backward compatibility
+  declare vsphere_extra_portgroup_1
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/vsphere_context.sh"
+  remote_network_name="${vsphere_extra_portgroup_1}"
+  echo "Using legacy extra portgroup: ${remote_network_name}"
+fi
 
 if [[ -z "${remote_network_name}" ]]; then
-   echo "The required extra leases is not defined!"
+   echo "No reserved network found! Either RESERVE_EXTRA_NETWORK or VSPHERE_EXTRA_LEASED_RESOURCE must be configured."
    exit 1
 fi
 

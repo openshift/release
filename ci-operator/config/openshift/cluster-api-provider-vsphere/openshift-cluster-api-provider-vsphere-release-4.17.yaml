@@ -16,8 +16,9 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-vsphere
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  to: vsphere-cluster-api-controllers
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    to: vsphere-cluster-api-controllers
 promotion:
   to:
   - name: "4.17"
@@ -50,15 +51,17 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-vsphere-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-capi-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-vsphere-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -71,8 +74,9 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-vsphere-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial

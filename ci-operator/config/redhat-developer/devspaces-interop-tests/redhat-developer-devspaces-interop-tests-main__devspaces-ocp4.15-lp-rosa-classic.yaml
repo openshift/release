@@ -17,9 +17,10 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.19-openshift-4.15
 images:
-- context_dir: .
-  dockerfile_path: interop/Dockerfile
-  to: devspaces-runner
+  items:
+  - context_dir: .
+    dockerfile_path: interop/Dockerfile
+    to: devspaces-runner
 releases:
   latest:
     candidate:
@@ -34,6 +35,16 @@ resources:
 tests:
 - as: devspaces-rosa-aws
   cron: 0 6 25 10 *
+  reporter_config:
+    channel: '#devspaces-interop-testing'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:

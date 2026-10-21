@@ -9,6 +9,11 @@ cat > "/tmp/50-runc" << EOF
 default_runtime = "runc"
 [crio.runtime.runtimes.runc]
 runtime_root = "/run/runc"
+allowed_annotations = [
+	"io.containers.trace-syscall",
+	"io.kubernetes.cri-o.Devices",
+	"io.kubernetes.cri-o.LinkLogs",
+]
 EOF
 
 cat > "${SHARED_DIR}/manifest_mc-master-runc.yml" << EOF

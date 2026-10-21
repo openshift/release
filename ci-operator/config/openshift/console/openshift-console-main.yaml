@@ -1,35 +1,70 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.20:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-9-base-nodejs-openshift-4.22
+  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.26-openshift-5.1
 build_root:
-  from_repository: true
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      USER root
+      RUN mkdir -p /go/src && chmod -R 777 /go
+      ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+      RUN npm install -g corepack@0.36.0 && corepack enable
+      USER 1001
 images:
-- dockerfile_path: Dockerfile
-  to: console
-- dockerfile_path: Dockerfile.plugins.demo
-  from: ocp_builder_rhel-9-base-nodejs-openshift-4.20
-  to: console-plugin-demo
+  items:
+  - dockerfile_path: Dockerfile
+    to: console
+  - dockerfile_path: Dockerfile.downloads
+    to: console-downloads
+  - dockerfile_path: Dockerfile.plugins.demo
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    to: console-plugin-demo
+  - dockerfile_literal: |
+      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      USER root
+      RUN dnf install -y \
+          alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
+          libXdamage libXrandr mesa-libgbm pango nss nss-util nspr \
+          libxkbcommon libXfixes libXcursor libXext libXi libXtst \
+          libwayland-client && \
+          dnf clean all
+      COPY . /go/src/github.com/openshift/console/
+      WORKDIR /go/src/github.com/openshift/console
+      ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+      RUN YARN_PATH="frontend/$(awk '/yarnPath:/{print $2}' frontend/.yarnrc.yml)" && \
+          printf '%s\n' '#!/bin/sh' "exec node /go/src/github.com/openshift/console/$YARN_PATH \"\$@\"" > /usr/local/bin/yarn && \
+          chmod +x /usr/local/bin/yarn
+      RUN cd frontend && \
+          yarn install --immutable && \
+          yarn playwright install chromium
+      RUN dnf install -y python3 git jq && dnf clean all
+      RUN npm install -g @anthropic-ai/claude-code@2.1.273 && claude --version
+    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/console/.
+    to: console-tests
 promotion:
   to:
-  - additional_images:
-      console-tests: src
-    name: "4.22"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -42,8 +77,12 @@ resources:
       memory: 14Gi
   console:
     requests:
-      cpu: "4"
+      cpu: "2"
       memory: 10Gi
+  console-tests:
+    requests:
+      cpu: "1"
+      memory: 12Gi
   frontend:
     requests:
       cpu: "2"
@@ -63,7 +102,7 @@ tests:
     go install -mod= github.com/jstemmer/go-junit-report@latest
     /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: ocp_builder_rhel-9-golang-1.24-openshift-4.20
+    from: ocp_builder_rhel-9-golang-1.26-openshift-5.1
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
@@ -77,22 +116,58 @@ tests:
   container:
     from: test-bin
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
-- as: e2e-gcp-console
-  skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: false
+  as: e2e-gcp-console
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    allow_skip_on_success: true
+    cluster_profile: openshift-org-gcp
+    env:
+      CONSOLE_FLAKE_AGENT_ENABLED: "true"
+      CONSOLE_FLAKE_DRIVER_SHA256: 9d0a79ca0a5ab3e9847c830822b8383afd7661e931235856ccc22c9e68115a3e
+      CONSOLE_FLAKE_SKILL_REVISION: main
+      CONSOLE_FLAKE_SKILL_SHA256: 8dea3696de872902b10dd642a330dc6eb13aa4477fb2108db4cd5acbc85a8ef0
+    post:
+    - ref: openshift-console-qe-agent
+    - chain: ipi-gcp-post
+    - ref: send-results-to-reportportal
     test:
     - as: test
       cli: latest
-      commands: ./test-prow-e2e.sh
+      commands: |
+        ./test-prow-e2e.sh
       dependencies:
-      - env: CYPRESS_PLUGIN_PULL_SPEC
+      - env: PLUGIN_PULL_SPEC
         name: console-plugin-demo
-      from: src
+      from: console-tests
       resources:
         requests:
-          cpu: 100m
-      timeout: 6h0m0s
+          cpu: "4"
+          memory: 10Gi
+      timeout: 2h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-console-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        ./test-prow-e2e-techpreview.sh
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
+      from: console-tests
+      resources:
+        requests:
+          cpu: "4"
+          memory: 10Gi
+      timeout: 2h0m0s
     workflow: ipi-gcp
 zz_generated_metadata:
   branch: main

@@ -44,14 +44,28 @@ spec:
         app: prow
         component: retester
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -60,26 +74,10 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
         name: retester
         imagePullPolicy: Always
@@ -92,12 +90,20 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-token-path=/etc/oauth/oauth
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        # Keep git-sync's published link (release) in the path. Never point the
+        # recursive job loader at the git-sync root containing .git/.worktrees.
+        - --job-config-path=/etc/jobs/git/release/ci-operator/jobs
         - --cache-file=/cache/backoff
         - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
         env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-merge-bot
+              key: appid
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -112,14 +118,20 @@ spec:
         - name: metrics
           containerPort: 9090
         volumeMounts:
-        - name: github-token
-          mountPath: /etc/oauth
+        - name: github-app-credentials
+          mountPath: /etc/github
           readOnly: true
         - name: prow-config
           mountPath: /etc/config
           readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         - name: release
-          mountPath: /var/repo
+          mountPath: /etc/jobs/git
+          readOnly: true
         - name: config
           mountPath: /etc/retester
           readOnly: true
@@ -127,15 +139,47 @@ spec:
           requests:
             memory: "5Gi"
             cpu: "250m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
+        - --max-failures=3
+        - --link=release
+        - --sync-timeout=300s
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: prow-config
         configMap:
           name: config
-      - name: github-token
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-merge-bot
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: jobs-sparse-checkout
+        configMap:
+          name: prow-jobs-sparse-checkout
       - name: config
         configMap:
           name: retester-config

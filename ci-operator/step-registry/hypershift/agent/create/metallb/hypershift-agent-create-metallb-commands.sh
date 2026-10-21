@@ -5,9 +5,15 @@ set -o errexit
 set -o pipefail
 set -x
 
+export METALLB_OPERATOR_SUB_CHANNEL="${METALLB_OPERATOR_SUB_CHANNEL:-stable}"
+export METALLB_OPERATOR_SUB_SOURCE="${METALLB_OPERATOR_SUB_SOURCE:-redhat-operators}"
+
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 echo "install metallb operator"
@@ -39,7 +45,7 @@ metadata:
   name: metallb-operator
   namespace: metallb-system
 spec:
-  channel: stable
+  channel: "${METALLB_OPERATOR_SUB_CHANNEL}"
   installPlanApproval: Automatic
   name: metallb-operator
   source: "${METALLB_OPERATOR_SUB_SOURCE}"

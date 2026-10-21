@@ -33,6 +33,7 @@ external_plugins:
     events:
     - issue_comment
     - pull_request
+    - pull_request_review
     name: jira-lifecycle-plugin
   - endpoint: http://pipeline-controller
     events:
@@ -43,6 +44,16 @@ external_plugins:
     events:
     - issue_comment
     name: multi-pr-prow-plugin
+  - endpoint: http://ship-hook
+    events:
+    - pull_request
+    - issue_comment
+    - pull_request_review
+    name: ship-hook
+  - endpoint: http://repo-brancher-controller
+    events:
+    - push
+    name: repo-brancher-controller
 plugins:
   openshift:
     excluded_repos:
@@ -50,6 +61,8 @@ plugins:
     - cluster-version-operator
     - cincinnati
     - cincinnati-operator
+    - kueue-operator
+    - sippy
     plugins:
     - assign
     - blunderbuss
@@ -75,3 +88,8 @@ plugins:
     - owners-label
     - wip
     - yuks
+triggers:
+- repos:
+  - openshift
+  trusted_apps:
+  - openshift-merge-bot

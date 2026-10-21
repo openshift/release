@@ -17,16 +17,17 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.14-openshift-4.8
 images:
-- context_dir: images/os/
-  from: base
-  inputs:
-    base-machine-with-rpms:
-      as:
-      - fedora:29
-    machine-os-content-base:
-      as:
-      - registry.svc.ci.openshift.org/rhcos/machine-os-content:4.8
-  to: machine-os-content
+  items:
+  - context_dir: images/os/
+    from: base
+    inputs:
+      base-machine-with-rpms:
+        as:
+        - fedora:29
+      machine-os-content-base:
+        as:
+        - registry.svc.ci.openshift.org/rhcos/machine-os-content:4.8
+    to: machine-os-content
 raw_steps:
 - rpm_image_injection_step:
     from: base-machine
@@ -50,7 +51,7 @@ rpm_build_commands: hack/build-rpms.sh
 tests:
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-1.21

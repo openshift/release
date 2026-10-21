@@ -14,7 +14,7 @@ These images are build using `BuildConfig` and `CronJob`:
 
 - [ ] `gcr.io/distroless/static:nonroot`
 - [ ] `gcr.io/kubebuilder/kube-rbac-proxy`
-- [x] `gcr.io/k8s-prow/commenter`
+- [x] `gcr.io/k8s-prow/commenter` (retargeted to `ci_test-infra-commenter_latest` — `ci_commenter_latest` is now managed by `openshift/ci-tools-standalone`)
 - [ ] `gcr.io/istio-testing/build-tools`
 - [ ] `gcr.io/envoy-ci/envoy-build`
 - [x] `gcr.io/k8s-staging-test-infra/git`

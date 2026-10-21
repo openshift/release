@@ -4,22 +4,23 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.18-priv
-    namespace: ocp-private
+    name: "4.18"
+    namespace: ocp-priv
     tag: cluster-resource-override-admission-operator-bundle
   previous-operator:
-    name: 4.18-priv
-    namespace: ocp-private
+    name: "4.18"
+    namespace: ocp-priv
     tag: cluster-resource-override-admission-operator
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-resource-override-admission-operator
 images:
-- dockerfile_path: images/ci/Dockerfile
-  to: cluster-resource-override-admission-operator
-- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  to: cluster-resource-override-admission-operator-registry
+  items:
+  - dockerfile_path: images/ci/Dockerfile
+    to: cluster-resource-override-admission-operator
+  - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+    to: cluster-resource-override-admission-operator-registry
 operator:
   bundles:
   - as: cluster-resource-override-admission-operator-bundle
@@ -34,18 +35,20 @@ promotion:
   to:
   - additional_images:
       cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
-    name: 4.19-priv
-    namespace: ocp-private
+    name: "4.19"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.19-priv
-      namespace: ocp-private
+      name: "4.19"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -71,10 +74,11 @@ tests:
     env:
       PROJECT_NAME: cluster-resource-override-admission-operator
     workflow: openshift-ci-security
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -91,10 +95,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-olm
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-olm
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -111,10 +116,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-upgrade
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest

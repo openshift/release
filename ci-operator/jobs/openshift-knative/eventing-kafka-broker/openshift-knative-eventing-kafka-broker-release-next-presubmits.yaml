@@ -5,11 +5,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/414-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
@@ -64,11 +88,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build10
+    cluster: build09
     context: ci/prow/414-test-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -80,7 +128,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -113,6 +165,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -133,6 +191,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -148,11 +215,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build10
+    cluster: build09
     context: ci/prow/414-test-reconciler
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -164,7 +255,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -197,6 +292,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -217,6 +318,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -232,11 +342,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build10
+    cluster: build09
     context: ci/prow/414-test-reconciler-encryption-auth
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -248,7 +382,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -281,6 +419,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -301,6 +445,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -316,11 +469,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build10
+    cluster: build09
     context: ci/prow/414-test-reconciler-keda
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -332,7 +509,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -365,6 +546,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -385,6 +572,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -400,11 +596,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/420-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -459,11 +679,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/420-test-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -474,9 +718,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-e2e
@@ -498,11 +747,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -518,9 +776,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -539,11 +812,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/420-test-reconciler
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -554,9 +851,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-reconciler
@@ -578,11 +880,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -598,9 +909,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -619,11 +945,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/420-test-reconciler-encryption-auth
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -634,9 +984,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-reconciler-encryption-auth
@@ -658,11 +1013,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -678,9 +1042,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -699,11 +1078,35 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build06
+    cluster: build05
     context: ci/prow/420-test-reconciler-keda
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/event_display/Dockerfile
+      - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+      - openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+      - openshift/ci-operator/knative-images/migrate/Dockerfile
+      - openshift/ci-operator/knative-images/post-install/Dockerfile
+      - openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+      - openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
+      - openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
+      - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+      - openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
+      - openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+      - openshift/ci-operator/knative-test-images/print/Dockerfile
+      - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+      - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+      - openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+      - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+      - openshift/ci-operator/static-images/dispatcher/Dockerfile
+      - openshift/ci-operator/static-images/receiver/Dockerfile
     labels:
       ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
@@ -714,9 +1117,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=test-reconciler-keda
@@ -738,11 +1146,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -758,9 +1175,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials

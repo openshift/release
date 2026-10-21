@@ -10,9 +10,10 @@ build_root:
     namespace: stolostron
     tag: go1.19-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: cluster-lifecycle-e2e
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: cluster-lifecycle-e2e
 promotion:
   to:
   - name: "2.15"
@@ -61,9 +62,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

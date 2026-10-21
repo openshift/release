@@ -46,6 +46,20 @@ else
   CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 fi
 
+# Build platform section based on PLATFORM_TYPE
+if [[ "${PLATFORM_TYPE:-none}" == "external" ]]; then
+  if [[ -z "${PLATFORM_NAME:-}" ]]; then
+    echo "PLATFORM_NAME must be set when PLATFORM_TYPE=external" >&2
+    exit 1
+  fi
+  PLATFORM_BLOCK="platform:
+  external:
+    platformName: \"${PLATFORM_NAME}\""
+else
+  PLATFORM_BLOCK="platform:
+  none: {}"
+fi
+
 # Default UPI installation
 echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
@@ -72,8 +86,7 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: ${COMPUTE_COUNT}
-platform:
-  none: {}
+${PLATFORM_BLOCK}
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
@@ -84,6 +97,13 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 	echo "Adding 'fips: true' to the install config..."
 	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 fips: true
+EOF
+fi
+
+if [ ! -z "${OS_IMAGE_STREAM}" ]; then
+	echo "Adding 'OSImageStream: ${OS_IMAGE_STREAM}' to the install config..."
+	cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+osImageStream: "${OS_IMAGE_STREAM}"
 EOF
 fi
 
@@ -160,6 +180,67 @@ spec:
       files:
       - contents:
           source: data:text/plain;charset=utf-8;base64,c2VydmVyIGNsb2NrLmNvcnAucmVkaGF0LmNvbSBpYnVyc3QKZHJpZnRmaWxlIC92YXIvbGliL2Nocm9ueS9kcmlmdAptYWtlc3RlcCAxLjAgMwpydGNzeW5jCmxvZ2RpciAvdmFyL2xvZy9jaHJvbnkK
+        filesystem: root
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+elif [ "${ARCH}" = "s390x" ]; then
+  # RHCOS 10 KVM guests use a broken PHC refclock and cannot reach
+  # clock.corp.redhat.com. LPARs already allow 192.168.0.0/16; point chrony
+  # at this lease's libvirt gateway plus known VPN subnets as fallbacks.
+  s390x_gateway="192.168.$(leaseLookup subnet).1"
+  echo "Saving chrony config for s390x using LPAR gateway ${s390x_gateway}..."
+  chrony_b64="$(base64 -w0 <<EOF
+server ${s390x_gateway} iburst
+server 192.168.1.1 iburst
+server 192.168.2.1 iburst
+server 192.168.3.1 iburst
+server 192.168.126.1 iburst
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony
+EOF
+)"
+  echo "Saving chrony worker yaml config..."
+  cat > "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-chrony-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${chrony_b64}
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
+  echo "Saving chrony master yaml config..."
+  cat > "${SHARED_DIR}/99-chrony-master.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-chrony-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,${chrony_b64}
         filesystem: root
         mode: 420
         overwrite: true

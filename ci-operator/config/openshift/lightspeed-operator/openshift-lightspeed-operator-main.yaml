@@ -11,12 +11,14 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: lightspeed-operator
-- dockerfile_path: bundle.Dockerfile
-  to: lightspeed-operator-bundle
-- dockerfile_path: lightspeed-catalog.Dockerfile
-  to: lightspeed-operator-catalog
+  items:
+  - dockerfile_path: Dockerfile
+    to: lightspeed-operator
+  - dockerfile_path: bundle.Dockerfile
+    to: lightspeed-operator-bundle
+  - dockerfile_path: lightspeed-catalog.Dockerfile
+    to: lightspeed-operator-catalog
+  run_if_changed: ^(api/.*|cmd/.*|hack/.*|internal/.*|Dockerfile|Makefile|go\.mod|go\.sum)$
 operator:
   bundles:
   - as: lightspeed-bundle-test
@@ -59,7 +61,8 @@ resources:
       memory: 200Mi
 tests:
 - as: generate
-  commands: GOFLAGS="-mod=readonly" make generate --always-make && git diff --exit-code
+  commands: GOFLAGS="-mod=readonly" make manifests generate --always-make && git diff
+    --exit-code
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
@@ -106,7 +109,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -118,19 +121,19 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
       from: src
       resources:
         requests:
@@ -174,7 +177,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -186,19 +189,19 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
       from: src
       resources:
         requests:
@@ -242,7 +245,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -254,19 +257,19 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
       from: src
       resources:
         requests:
@@ -310,7 +313,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -322,19 +325,19 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
       from: src
       resources:
         requests:
@@ -349,8 +352,76 @@ tests:
       variant: fips
     owner: obs
     product: ocp
-    timeout: 1h0m0s
+    timeout: 1h30m0s
     version: "4.20"
+  cron: 10 2 * * *
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - ref: fips-check-fips-or-die
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-bundle-test
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export GOFLAGS="-mod=readonly"
+
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-6-luna
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-6-luna"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+      credentials:
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: bundle-e2e-4-21
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+      variant: fips
+    owner: obs
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.21"
   cron: 10 2 * * *
   presubmit: true
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^renovate\.json|^\.golangci\.yaml|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
@@ -380,7 +451,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-3.5-turbo
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -392,19 +463,87 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
-      - mount_path: /var/run/openai
-        name: openai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azure_openai
-        name: azureopenai-apitoken
-        namespace: test-credentials
-      - mount_path: /var/run/azureopenai-entra-id
-        name: azureopenai-entra-id
-        namespace: test-credentials
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: bundle-e2e-4-22
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+      variant: fips
+    owner: obs
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.22"
+  cron: 10 2 * * *
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - ref: fips-check-fips-or-die
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace openshift-lightspeed
+        oc label namespaces openshift-lightspeed openshift.io/cluster-monitoring=true --overwrite=true
+        operator-sdk run bundle --timeout=10m -n openshift-lightspeed "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: lightspeed-bundle-test
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export GOFLAGS="-mod=readonly"
+
+        export LLM_PROVIDER=openai
+        export LLM_MODEL=gpt-6-luna
+        export LLM_TOKEN=$(cat /var/run/openai/token)
+        export CONDITION_TIMEOUT=600
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+
+        export AZUREOPENAI_PROVIDER_KEY_PATH=/var/run/azure_openai/token
+        export AZUREOPENAI_ENTRA_ID_TENANT_ID=$(cat /var/run/azureopenai-entra-id/tenant_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_ID=$(cat /var/run/azureopenai-entra-id/client_id)
+        export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
+        export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
+        export LLM_PROVIDER="azure_openai"
+        export LLM_MODEL="gpt-6-luna"
+        echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
+        make test-e2e
+      credentials:
+      - collection: openshift-lightspeed-service-creds
+        group: openai
+        mount_path: /var/run/openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-apitoken
+        mount_path: /var/run/azure_openai
+      - collection: openshift-lightspeed-service-creds
+        group: azureopenai-entra-id
+        mount_path: /var/run/azureopenai-entra-id
       from: src
       resources:
         requests:

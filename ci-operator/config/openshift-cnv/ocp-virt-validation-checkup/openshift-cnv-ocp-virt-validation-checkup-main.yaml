@@ -2,16 +2,17 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 images:
-- dockerfile_path: ci/Dockerfile.ci
-  to: ocp-virt-validation-checkup
+  items:
+  - dockerfile_path: ci/Dockerfile.ci
+    to: ocp-virt-validation-checkup
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -29,7 +30,7 @@ tests:
     cluster_profile: aws-virtualization
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      CNV_VERSION: "4.21"
+      CNV_VERSION: "5.0"
     test:
     - ref: interop-tests-deploy-cnv
     - as: run-validation-checkup
@@ -46,6 +47,23 @@ tests:
         requests:
           cpu: 100m
           memory: 600Mi
+    - as: run-validation-checkup-disconnected
+      cli: latest
+      commands: |
+        export XDG_RUNTIME_DIR=/tmp
+        make ci-validate-disconnected
+      dependencies:
+      - env: OCP_VIRT_VALIDATION_IMAGE
+        name: ocp-virt-validation-checkup
+      env:
+      - default: gp3
+        name: STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 3h0m0s
     workflow: cnv-e2e-ipi-aws
 zz_generated_metadata:
   branch: main

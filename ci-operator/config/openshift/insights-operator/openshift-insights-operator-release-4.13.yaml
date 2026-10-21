@@ -14,8 +14,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- from: base
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
   to:
   - name: "4.13"
@@ -45,20 +46,23 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: e2e
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-agnostic-upgrade
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: e2e-agnostic-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: insights-operator-e2e-tests
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
+- always_run: false
+  as: insights-operator-e2e-tests
+  pipeline_skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -67,18 +71,19 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
       from: insights-operator-tests
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: insights-operator-e2e-tests-periodic
+- always_run: false
+  as: insights-operator-e2e-tests-periodic
   cron: 40 7 4 5 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -87,9 +92,9 @@ tests:
       cli: latest
       commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
       from: insights-operator-tests
       resources:
         requests:
@@ -98,7 +103,7 @@ tests:
 - as: insights-operator-test-time-periodic
   cron: 56 18 5 * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live

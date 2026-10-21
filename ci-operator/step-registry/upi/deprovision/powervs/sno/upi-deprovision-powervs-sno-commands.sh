@@ -10,7 +10,10 @@ BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 if [ -f "${SHARED_DIR}/kubeconfig" ]; then
   echo "Test cluster accessiblity"
   if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
   fi
   CLUSTER_INFO="/tmp/cluster-${CLUSTER_NAME}-after-e2e.txt"
   touch ${CLUSTER_INFO}

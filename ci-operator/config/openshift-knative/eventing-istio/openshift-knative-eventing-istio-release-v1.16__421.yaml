@@ -11,18 +11,20 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
-  inputs:
-    ocp_ubi-minimal_8:
-      as:
-      - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
-      as:
-      - $GO_BUILDER
-  to: knative-eventing-istio-controller
-- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
-  from: src
-  to: knative-eventing-istio-source-image
+  items:
+  - dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+    inputs:
+      ocp_ubi-minimal_8:
+        as:
+        - $GO_RUNTIME
+      openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+        as:
+        - $GO_BUILDER
+    to: knative-eventing-istio-controller
+  - dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+    from: src
+    to: knative-eventing-istio-source-image
+  run_if_changed: ^non-existing$
 releases:
   latest:
     candidate:

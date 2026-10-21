@@ -5,14 +5,16 @@ set -o pipefail
 
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << 'EOFTOP'
+ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE' ADVERTISE_DEFAULT_NETWORK='${ADVERTISE_DEFAULT_NETWORK:-true}'" bash -x - << 'EOFTOP'
 #!/bin/bash
 set -o nounset
 set -o errexit
 set -o pipefail
 set -x
 
-FRR_K8S_VERSION=v0.0.14
+echo "[$(date +'%Y-%m-%d %H:%M:%S')] Starting baremetalds-e2e-ovn-bgp-pre setup"
+
+FRR_K8S_VERSION=v0.0.21
 FRR_TMP_DIR=$(mktemp -d -u)
 
 AGNHOST_SUBNET_V4=172.20.0.0/16
@@ -123,9 +125,15 @@ deploy_frr_external_container() {
   # create a $CLI network attached to the cluster network by attaching to the existing ostestbm bridge
   $CLI network create --driver bridge --ipam-driver=none --opt com.docker.network.bridge.name=ostestbm ostestbm_net
 
-  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:9.1.0
+  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:10.4.3
   # ipv4 forwarding is enabled by default, we only need to turn on ipv6 forwarding
   $CLI exec frr sysctl -w net.ipv6.conf.all.forwarding=1
+  # Enable keep_addr_on_down to preserve IPv6 addresses during VRF enslavement.
+  # Without this, IPv6 global addresses are removed when interfaces are moved to a VRF,
+  # causing FRR/zebra to fail creating FIB nexthop groups ("no fib nhg" bug).
+  # See: https://docs.kernel.org/networking/vrf.html (section 4: Enslave L3 interfaces)
+  #      https://github.com/FRRouting/frr/issues/1666
+  $CLI exec frr sysctl -w net.ipv6.conf.all.keep_addr_on_down=1
   
   # attach the frr container to the ostestbm bridge, so it can talk with the OCP nodes.
   # use primary network gateway as the default route
@@ -232,7 +240,20 @@ fi
 
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
-vrf_neighbors["default"]=$($KCLI get nodes -o jsonpath={.items[*].status.addresses[?\(@.type==\"InternalIP\"\)].address})
+
+# Optionally advertise the default/pod network. When disabled, only extra networks (e.g. extranet)
+# get external FRR peering, FRRConfiguration, and RouteAdvertisements.
+if [ "$ADVERTISE_DEFAULT_NETWORK" = "true" ]; then
+  # Collect IPs for the default VRF from both current cluster nodes and any spare baremetal hosts
+  # pre-configured in the ostestbm network (via virsh DHCP entries). This ensures nodes provisioned
+  # dynamically during tests (e.g. via MachineSet scaling) are already known to the external FRR,
+  # preventing BGP session rejections that cause frr-status container crashes on new nodes.
+  node_ips=$($KCLI get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')
+  spare_ips=$(sudo virsh net-dumpxml ostestbm | xmllint --xpath '/network//host/@ip' - | cut -d '=' -f2 | tr -d \" | xargs 2>/dev/null || true)
+  vrf_neighbors["default"]=$(echo "$node_ips $spare_ips" | tr ' ' '\n' | sort -u | xargs)
+else
+  echo "ADVERTISE_DEFAULT_NETWORK=false: skipping default network BGP peering and RouteAdvertisements"
+fi
 
 # deploy an agnhost container isolated on a macvlan network
 deploy_agnhost_container agnhost
@@ -253,7 +274,9 @@ fi
 deploy_frr_external_container vrf_neighbors
 
 # apply FRR-K8s overrides to enable debug logging
-oc create namespace openshift-frr-k8s
+# (idempotent: the namespace may already exist when frr-k8s is pre-deployed,
+# e.g. by BGP-based VIP management static pods)
+oc create namespace openshift-frr-k8s --dry-run=client -o yaml | oc apply -f -
 oc apply -f - <<EOF
 kind: ConfigMap
 apiVersion: v1
@@ -267,6 +290,22 @@ EOF
 # enable route advertisement with FRR
 oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
 
+# The RouteAdvertisements CRD is created by CNO while reconciling the
+# routeAdvertisements enablement. On clusters where frr-k8s is already
+# deployed (e.g. BGP-based VIP management) the daemonset rollout waits below
+# return immediately, so wait for the CRD explicitly (and before a possible
+# FRR_IMAGE managementState=Unmanaged transition stops CNO reconciliation).
+echo "Waiting for the RouteAdvertisements CRD..."
+crd_deadline=$((SECONDS + 600))
+until oc wait --for condition=Established crd/routeadvertisements.k8s.ovn.org --timeout 10s &> /dev/null; do
+  if (( SECONDS >= crd_deadline )); then
+    oc get crd/routeadvertisements.k8s.ovn.org -o yaml || true
+    echo "Timed out waiting for routeadvertisements.k8s.ovn.org" >&2
+    exit 1
+  fi
+  sleep 5
+done
+
 echo "Waiting for daemonset 'frr-k8s' to be created..."
 until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
   sleep 5
@@ -276,6 +315,32 @@ echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..
 until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
   sleep 5
 done
+
+# Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
+# upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
+# This is used while waiting for OCP builds with FRR 10.
+# This will be removed once OCP builds with FRR 10 are available.
+if [ -n "${FRR_IMAGE:-}" ]; then
+  echo "Setting CNO to Unmanaged and waiting for reconciliation to stop..."
+  oc patch Network.operator.openshift.io cluster --type='merge' -p='{"spec":{"managementState":"Unmanaged"}}'
+  # Wait for CNO to complete any in-flight reconciliation after being set to Unmanaged.
+  # Note: Cannot restart CNO deployment as it resets managementState back to Managed
+  # (tracked in https://redhat.atlassian.net/browse/OCPBUGS-78974).
+  sleep 60s
+  # oc rollout restart deployment/network-operator -n openshift-network-operator
+  # until oc rollout status deployment/network-operator -n openshift-network-operator --timeout=2m &> /dev/null; do
+  #  sleep 5
+  # done
+
+  # Update the FRR and reloader container images
+  echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
+  oc set image daemonset/frr-k8s -n openshift-frr-k8s frr="${FRR_IMAGE}" reloader="${FRR_IMAGE}"
+
+  echo "Waiting for daemonset 'frr-k8s' to rollout with new image..."
+  until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
+    sleep 5
+  done
+fi
 
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
@@ -357,15 +422,18 @@ ${network_selector}
 EOF
 done
 
-CLUSTER_NETWORK_V4="10.128.0.0/14"
-$IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
-$IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
-$IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
+# Host routes for the advertised default pod network via the external FRR container.
+if [ "$ADVERTISE_DEFAULT_NETWORK" = "true" ]; then
+  CLUSTER_NETWORK_V4="10.128.0.0/14"
+  $IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
+  $IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
+  $IPTABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V4} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IPTABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V4} ! -d 192.168.111.1/24 -j MASQUERADE
 
-CLUSTER_NETWORK_V6="fd01::/48"
-$IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
-$IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
-$IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-$IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+  CLUSTER_NETWORK_V6="fd01::/48"
+  $IP -6 route add $CLUSTER_NETWORK_V6 via fd2e:6f44:5dd8:c956::3 dev ostestbm || true
+  $IP6TABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V6} -i ostestbm -j ACCEPT
+  $IP6TABLES -t filter -I FORWARD -d ${CLUSTER_NETWORK_V6} -o ostestbm -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+  $IP6TABLES -t nat -I POSTROUTING -s ${CLUSTER_NETWORK_V6} ! -d fd2e:6f44:5dd8:c956::1 -j MASQUERADE
+fi
 EOFTOP

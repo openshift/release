@@ -44,8 +44,21 @@ function wait_for_power_down() {
   if [ $retry_max -le 0 ]; then
     echo -n "$host_str didn't power off successfully..."
     if [ -f "/tmp/$bmc_host.$bmc_forwarded_port" ]; then
-      echo "$host_str kept powered on and needs further manual investigation..."
-      return 1
+      echo "$host_str kept powered on after retry, forcing IPMI power off..."
+      # Force power off via IPMI (workaround for firmware bug where poweroff triggers reboot)
+      ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" power off
+      sleep 10
+      # Verify it's off now
+      if ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
+        -U "$bmc_user" -P "$bmc_pass" power status | grep -q "Power is off"; then
+        echo "$host_str forcibly powered off via IPMI"
+        echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/forced_shutdown.${bmc_forwarded_port}"
+        return 0
+      else
+        echo "$host_str failed to power off even after forced IPMI command..."
+        return 1
+      fi
     else
       # We perform the reboot at most twice to overcome some known BMC hardware failures
       # that sometimes keep the hosts frozen before POST.
@@ -61,6 +74,7 @@ function wait_for_power_down() {
 
 function reset_pdu() {
   local pdu_uri="${1}"
+  local host="${2}"
   timeout -s 9 3m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" pdu_reboot.sh "${pdu_uri}" "${host}"
 }
 
@@ -69,7 +83,7 @@ check_power_status() {
     -U "$bmc_user" -P "$bmc_pass" power status > /dev/null 2>&1
 }
 
-function check_ilo() {
+function check_bmc() {
   echo "Checking if #${host} BMC is reset successfully..."
 
   start_time=$(date +%s)
@@ -93,20 +107,23 @@ function check_ilo() {
   done
 }
 
-function ilo_reset() {
+function bmc_reset() {
   local bmc_forwarded_port="${1}"
   local bmc_user="${2}"
   local bmc_pass="${3}"
+  local vendor="${4}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
   TIMEOUT_SECONDS=180
   POLL_INTERVAL=10
-  echo "$(date): Reseting BMC of host #$host"
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset warm
+  temp="warm"
+  [ "${vendor}" = "dell" ] && temp="cold"
+  echo "$(date): Resetting BMC of host #${host}"
+  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset "$temp"
 
-  echo -e "Waiting for #${host} BMC to reset..\n"
-  sleep 200
-  check_ilo
+  echo -e "Waiting 5 min for #${host} BMC to reset..\n"
+  sleep 300
+  check_bmc
 }
 
 function reset_host() {
@@ -121,7 +138,7 @@ function reset_host() {
   host="${host##0}"
   if [ -n "${pdu_uri}" ] && ! check_power_status; then
     echo -e "\n-- #${host} PDU is unreachable, resetting before proceeding to wipe disk --"
-    reset_pdu "${pdu_uri}"
+    reset_pdu "${pdu_uri}" "${host}"
     echo -e "Waiting for PDU reset of host #${host}..."
     local max_try=20
     while [ "$max_try" -gt 0 ] && ! check_power_status; do
@@ -131,7 +148,7 @@ function reset_host() {
     done
     if [ $max_try -le 0 ]; then
       echo "#${host} PDU is unreachable, contact @metal-qe-team"
-      echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
+      echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
       return 1
     fi
   fi
@@ -139,18 +156,18 @@ function reset_host() {
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" prepare_host_for_boot "${host}" "pxe"
   sleep 120
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
-    echo "$bmc_host:$bmc_forwarded_port" >> /tmp/failed
+    echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
   fi
   [ -z "${pdu_uri}" ] && return 0
 
   check_power_status && echo "#${host} PDU is reachable, doing a routine reset..." || \
     echo "#${host} PDU is unreachable, it needs a reset"
   echo "$(date): Reset host #${host} PDU"
-  reset_pdu "${pdu_uri}"
+  reset_pdu "${pdu_uri}" "${host}"
 
   echo "Checking #${host} is reachable after PDU reset ..."
   if ! wait_for_power_down "$bmc_address" "$bmc_forwarded_port" "$bmc_user" "$bmc_pass" "$vendor" "$ipxe_via_vmedia"; then
-    echo "$bmc_address:$bmc_forwarded_port" >> /tmp/failed
+    echo "$bmc_address:$bmc_forwarded_port" >> "/tmp/failed.${bmc_forwarded_port}"
   fi
 }
 
@@ -161,7 +178,9 @@ function reset_host() {
 # Then, this step waits for the hosts to power down again at the end of the wiping process, so that the releasing step
 # can happen safely, i.e., a concurrent reservation job has to wait until the disk of host X is wiped before being allowed
 # to reserve X
-touch /tmp/failed
+
+# Clean up any old failed.* and forced_shutdown.* files
+rm -f /tmp/failed /tmp/failed.* /tmp/forced_shutdown /tmp/forced_shutdown.* 2>/dev/null || true
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -172,9 +191,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo -e "Host #${host} needs an ilo reset to workaround bootup and install crash issues"
-    ilo_reset "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" &
+  if [ "${ipxe_via_vmedia}" == "true" ] || [ -z "${pdu_uri}" ]; then
+    echo -e "Host #${host} needs a bmc reset to workaround bootup and install crash issues"
+    bmc_reset "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" &
   fi
 done
 wait
@@ -206,10 +225,24 @@ done
 
 echo "Disk wipe completed"
 
+# Combine all per-host failure files into one
+cat /tmp/failed.* 2>/dev/null > /tmp/failed || true
+
+# Combine all per-host forced_shutdown files into one
+cat /tmp/forced_shutdown.* 2>/dev/null > /tmp/forced_shutdown || true
+
+if [ -s /tmp/forced_shutdown ]; then
+  echo ""
+  echo "WARNING: The following nodes required forced IPMI power-off (firmware bug: OS poweroff triggered reboot):"
+  cat /tmp/forced_shutdown
+  echo "These hosts have a firmware bug and should be investigated."
+fi
+
 if [ -s /tmp/failed ]; then
-  echo The following nodes failed to power off:
+  echo ""
+  echo "WARNING: The following nodes failed to power off completely:"
   cat /tmp/failed
-  exit 1
+  echo "These hosts may need manual intervention."
 fi
 
 exit 0

@@ -4,9 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# enable for debug
-# exec &> >(tee -i -a ${ARTIFACT_DIR}/_job.log )
-# set -x
+exec > >(tee -i /tmp/setup-output.log) 2>&1
+
+cat > "${SHARED_DIR}/diagnose-telco5g-hcp-cluster-setup.early" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-hcp-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+EOF
 
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
@@ -257,9 +262,9 @@ else
     SNO_CLUSTER_API_PORT="6443"
 fi
 
-if [[ "$T5CI_VERSION" == "4.21" ]] || [[ "$T5CI_VERSION" == "4.22" ]]; then
-    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.20"
-    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.20"
+if [[ "$T5CI_VERSION" == "5.0" ]] || [[ "$T5CI_VERSION" == "4.23" ]] || [[ "$T5CI_VERSION" == "5.1" ]] ; then
+    PLAYBOOK_ARGS+=" -e vsno_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.22"
+    PLAYBOOK_ARGS+=" -e hcp_custom_source=registry.redhat.io/redhat/redhat-operator-index:v4.22"
 fi
 
 cat << EOF > ~/fetch-kubeconfig.yml
@@ -299,6 +304,18 @@ cat << EOF > ~/fetch-kubeconfig.yml
       dest: $SHARED_DIR/kubeconfig
       flat: yes
 
+  - name: Save the original of the kubeconfig of management cluster
+    fetch:
+      src: /home/kni/.kube/config_${SNO_NAME}
+      dest: $SHARED_DIR/mgmt-kubeconfig.original
+      flat: yes
+
+  - name: Save the original of the Hypershift kubeconfig
+    fetch:
+      src: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+      dest: $SHARED_DIR/kubeconfig.original
+      flat: yes
+
   - name: Modify local copy of mgmt kubeconfig
     replace:
       path: $SHARED_DIR/mgmt-kubeconfig
@@ -330,12 +347,20 @@ EOF
 if [[ "$JOB_NAME" == *"e2e-telcov10n-functional-hcp-cnf-nrop"* ]]; then
     PLAYBOOK_ARGS+=" -e add_bm_host=$ADD_BM_HOST"
 fi
-if [[ "$JOB_NAME" != *"e2e-telcov10n-functional-hcp-cnf"* ]]; then
-    PLAYBOOK_ARGS+=" -e image_override=quay.io/hypershift/hypershift-operator:latest "
-fi
 # Run the playbook to install the cluster
 echo "Run the playbook to install the cluster"
 status=0
+
+rm -f "${SHARED_DIR}/diagnose-telco5g-hcp-cluster-setup.early"
+cat > "${SHARED_DIR}/diagnose-telco5g-hcp-cluster-setup" << EOF
+export JOB_NAME=${JOB_NAME:-unknown}
+export STEP_NAME=telco5g-hcp-cluster-setup
+export T5CI_VERSION=${T5CI_VERSION:-unknown}
+export T5CI_JOB_TYPE=${T5CI_JOB_TYPE:-unknown}
+export CLUSTER_NAME=${CLUSTER_NAME:-unknown}
+export SNO_NAME=${SNO_NAME:-unknown}
+export MGMT_VERSION=${MGMT_VERSION:-unknown}
+EOF
 
 ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook \
     playbooks/sno_hcp_e2e.yml \
@@ -366,5 +391,8 @@ if [[ "$status" == "0" ]]; then
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 fi
 
+gzip -c /tmp/setup-output.log > ${SHARED_DIR}/setup-output.log.gz 2>/dev/null || true
+
+[[ ${status} -eq 0 ]] && rm -f "${SHARED_DIR}/diagnose-telco5g-hcp-cluster-setup"
 echo "Exiting with status ${status}"
 exit ${status}

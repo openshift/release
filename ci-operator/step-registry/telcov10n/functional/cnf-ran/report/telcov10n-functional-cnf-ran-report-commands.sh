@@ -2,106 +2,106 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-
-process_inventory() {
-    local directory="$1"
-    local dest_file="$2"
-
-    if [ -z "$directory" ]; then
-        echo "Usage: process_inventory <directory> <dest_file>"
-        return 1
-    fi
-
-    if [ ! -d "$directory" ]; then
-        echo "Error: '$directory' is not a valid directory"
-        return 1
-    fi
-
-    find "$directory" -type f | while IFS= read -r filename; do
-        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        elif [[ $filename == *"ansible_ssh_private_key"* ]]; then
-          # SSH key needs YAML block format for multi-line content
-          echo -e "$(basename "${filename}")": \|"\n$(sed 's/^/  /' "${filename}")"
-        else
-          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
-        fi
-    done > "${dest_file}"
-
-    echo "Processing complete. Check \"${dest_file}\""
-}
-
-if [[ -f "${SHARED_DIR}/spoke_cluster" ]]; then
-  SPOKE_CLUSTER="$(cat "${SHARED_DIR}/spoke_cluster")"
-else
-  SPOKE_CLUSTER="kni-qe-100"
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt — skipping"
+  exit 0
 fi
 
-echo "SPOKE_CLUSTER=${SPOKE_CLUSTER}"
+ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-echo "Create group_vars directory"
+process_inventory() {
+  local directory="$1"
+  local dest_file="$2"
+
+  if [ -z "$directory" ]; then
+    echo "Usage: process_inventory <directory> <dest_file>"
+    return 1
+  fi
+
+  if [ ! -d "$directory" ]; then
+    echo "Error: '$directory' is not a valid directory"
+    return 1
+  fi
+
+  find "$directory" -type f | while IFS= read -r filename; do
+    if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+      continue
+    fi
+    local content
+    content=$(cat "$filename")
+    local varname
+    varname=$(basename "${filename}")
+    if [[ "$content" == *$'\n'* ]]; then
+      echo "${varname}: |"
+      echo "$content" | sed 's/^/  /'
+    else
+      echo "${varname}": \'"${content}"\'
+    fi
+  done > "${dest_file}"
+}
+
+echo "Processing common group_vars"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
-echo "Process common group variables (all, bastions)"
-find /var/group_variables/common/ -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
+find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+  echo "  group_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
 done
 
-echo "Process spoke cluster group variables"
-find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process group inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/$(basename "${dir}")"
-done
-
-echo "Create host_vars directory"
+echo "Processing hub host_vars (${CLUSTER_NAME})"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
 
-echo "Process bastion host variables (from hub kni-qe-99)"
-find /var/host_variables/kni-qe-99/ -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
+find "/var/host_variables/${CLUSTER_NAME}/" -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+  echo "  host_var: $(basename "${dir}")"
+  process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
 done
 
-echo "Process spoke cluster host variables"
-find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -maxdepth 1 -type d ! -name '..*' 2>/dev/null | while read -r dir; do
-    echo "Process host inventory file: ${dir}"
-    process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
+rm -rf /tmp/reports /tmp/junit
+
+mkdir -p /tmp/reports
+for f in "${SHARED_DIR}"/polarion_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f" | sed 's/^polarion_//')
+    cp "$f" "/tmp/reports/${filename}"
+  fi
 done
 
-HUB_KUBECONFIG="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
-PROJECT_DIR="/tmp"
-REPORT_DIR="/tmp/eco_gotests/report"
-JUNIT_DIR="/tmp/eco_gotests/junit"
-
-echo "Set bastion ssh configuration"
-# Read SSH key directly from vault mount (raw file, no YAML parsing needed)
-cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
-
-echo "Create local report directories"
-mkdir -p "${REPORT_DIR}"
-mkdir -p "${JUNIT_DIR}"
-
-echo "Fetch reports from bastion"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${PROJECT_DIR}/temp_ssh_key" "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*" "${REPORT_DIR}/" 2>/dev/null || true
-
-echo "Fetch junit reports from bastion"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "${PROJECT_DIR}/temp_ssh_key" "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/junit/*" "${JUNIT_DIR}/" 2>/dev/null || true
-
-echo "Copy reports to ARTIFACT_DIR"
-cp "${REPORT_DIR}"/*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true
-cp "${JUNIT_DIR}"/*.xml "${ARTIFACT_DIR}/" 2>/dev/null || true
+mkdir -p /tmp/junit
+for f in "${SHARED_DIR}"/junit_*.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f" | sed 's/^junit_//')
+    cp "$f" "/tmp/junit/${filename}"
+  fi
+done
 
 cd /eco-ci-cd
 
-echo "Upload reports to Polarion and Report Portal"
-ansible-playbook ./playbooks/ran/upload-report-ran.yml \
-  -i ./inventories/cnf/switch-config.yaml \
-  --extra-vars "kubeconfig=${HUB_KUBECONFIG} reporter_template_name='${REPORTER_TEMPLATE_NAME}' eco_gotests_report_dir=${REPORT_DIR} upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL}"
+METRICS_FILE="/tmp/metrics/ran-metrics.txt"
 
-rm -rf "${PROJECT_DIR}/temp_ssh_key"
+echo "Collecting metrics"
+ansible-playbook ./playbooks/collect-metrics.yml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
+    ci_lane='${REPORTER_LAUNCH_NAME}' \
+    output_file=${METRICS_FILE} \
+    metrics_list=${RAN_METRICS_LIST}" || true
+
+REPORTS_PORTAL_ATTRIBUTES=""
+if [[ -f "${METRICS_FILE}" ]]; then
+  REPORTS_PORTAL_ATTRIBUTES="$(cat "${METRICS_FILE}")"
+  echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
+fi
+
+echo "Uploading reports to Polarion and Report Portal"
+ansible-playbook ./playbooks/upload-report.yaml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
+    reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
+    processed_report_dir=/tmp/reports \
+    junit_report_dir=/tmp/junit \
+    reports_directory=/tmp/upload \
+    reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
+    upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
+    report_portal_url_filename='${REPORTPORTAL_FILES}' \
+    reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"

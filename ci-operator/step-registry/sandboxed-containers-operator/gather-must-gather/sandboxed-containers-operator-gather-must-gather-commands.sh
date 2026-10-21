@@ -70,7 +70,7 @@ echo "Running sandboxed containers operator must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather-osc
 
 # Download the MCO sanitizer binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 # Run must-gather with the sandboxed containers operator image

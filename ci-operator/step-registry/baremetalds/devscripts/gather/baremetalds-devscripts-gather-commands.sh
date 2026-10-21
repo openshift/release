@@ -23,6 +23,28 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
+if [[ ! -f "${SHARED_DIR}/devscripts-logs-collected" ]]; then
+  echo "### Dev-scripts logs not collected by setup, collecting as fallback..."
+  timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
+  if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
+    find "${ARTIFACT_DIR}/root/dev-scripts/logs" -type f -exec sed -i '
+      /auths/ s/.*/*** PULL_SECRET ***/;
+      s/password: .*/password: REDACTED/;
+      s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+      s/UserData:.*,/UserData: REDACTED,/;
+      ' {} + || true
+  fi
+fi
+
+if [[ ! -f "${SHARED_DIR}/install-status.txt" ]]; then
+  status_file="${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt"
+  if [[ -f "${status_file}" ]]; then
+    cp "${status_file}" "${SHARED_DIR}/install-status.txt"
+  else
+    echo "1" > "${SHARED_DIR}/install-status.txt"
+  fi
+fi
+
 echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd dev-scripts
@@ -38,6 +60,22 @@ sos report --batch \
   -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,dnf \
   -k podman.all -k podman.logs \
   --tmp-dir /tmp/artifacts
+
+# Strip libvirt auth token from sosreport archives. The libvirt plugin
+# collects /run/libvirt/ which includes the daemon authentication token
+# at /run/libvirt/common/system.token — sensitive data that must not
+# appear in CI artifacts.
+for sos_tar in /tmp/artifacts/sosreport-*.tar.xz; do
+  [ -f "\$sos_tar" ] || continue
+  if tar tf "\$sos_tar" | grep -F "run/libvirt/common/system.token" >/dev/null; then
+    tmpdir=\$(mktemp -d)
+    tar xf "\$sos_tar" -C "\$tmpdir"
+    find "\$tmpdir" -path "*/run/libvirt/common/system.token" -delete
+    tar cf - -C "\$tmpdir" . | xz > "\${sos_tar}.new" && mv "\${sos_tar}.new" "\$sos_tar"
+    rm -rf "\$tmpdir"
+    echo "Stripped system.token from \$sos_tar"
+  fi
+done
 
 echo "Get libvirt logs..."
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --transform "s?^\.?libvirt-logs?" .
@@ -69,9 +107,6 @@ then
   tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
 fi
 
-# Exit if we have access to the API, the other gather steps will get logs
-if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
-
 # Pass master and workers IPs to installer-gather script to collect info from nodes which didn't join the cluster
 NODE_NAMES=()
 for (( n=0; n<\$NUM_MASTERS; n++ ))
@@ -93,6 +128,33 @@ do
   node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
     NODE_IPS+=("\$node_ip")
 done
+
+echo "Checking for pacemaker and podman etcd logs on master nodes..."
+for (( n=0; n<\$NUM_MASTERS; n++ ))
+do
+  HAS_PACEMAKER=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo test -f /var/log/pacemaker/pacemaker.log && echo true || echo false)
+  HAS_ETCD=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo podman container exists etcd && echo true || echo false)
+  if \$HAS_PACEMAKER; then
+    ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+      sudo cat /var/log/pacemaker/pacemaker.log | \
+      sed -E 's/(name="(password|passwd|username)" value=")[^"]*/\1REDACTED/g' \
+      > /tmp/pacemaker_\${NODE_NAMES[\$n]//:/_}.log || true
+    tar -czf /tmp/artifacts/pacemaker_\${NODE_NAMES[\$n]//:/_}.tar.gz \
+      -C /tmp pacemaker_\${NODE_NAMES[\$n]//:/_}.log || true
+    rm -f /tmp/pacemaker_\${NODE_NAMES[\$n]//:/_}.log
+  fi
+  if \$HAS_ETCD; then
+    ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+      sudo podman logs etcd > /tmp/podman-etcd_\${NODE_NAMES[\$n]//:/_}.log 2>&1 || true
+    tar -czf /tmp/artifacts/podman-etcd_\${NODE_NAMES[\$n]//:/_}.tar.gz \
+      -C /tmp podman-etcd_\${NODE_NAMES[\$n]//:/_}.log || true
+    rm -f /tmp/podman-etcd_\${NODE_NAMES[\$n]//:/_}.log
+  fi
+done
+
+
+# Exit if we have access to the API, the other gather steps will get logs
+if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
 
 # Collect sos report from each known node
 for NODE_IP in \${NODE_IPS[@]}; do

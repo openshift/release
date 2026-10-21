@@ -7,13 +7,14 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: images/cli/Dockerfile.ci
-  from: base
-  to: oc-mirror
-- dockerfile_path: images/tests/Dockerfile.integration
-  from: base
-  optional: true
-  to: oc-mirror-integration
+  items:
+  - dockerfile_path: images/cli/Dockerfile.ci
+    from: base
+    to: oc-mirror
+  - dockerfile_path: images/tests/Dockerfile.integration
+    from: base
+    optional: true
+    to: oc-mirror-integration
 promotion:
   to:
   - excluded_images:
@@ -47,7 +48,8 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e
+- always_run: false
+  as: e2e
   commands: make test-e2e
   container:
     from: src
@@ -59,12 +61,12 @@ tests:
     - as: test-integration-delete
       commands: cd test/integration && make ci-delete
       credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
+      - collection: oc-mirror
+        group: aws_creds
+        mount_path: /etc/ci/aws-creds
+      - collection: oc-mirror
+        group: pull_secret
+        mount_path: /etc/ci/pull-secret
       from: oc-mirror-integration
       grace_period: 30m0s
       resources:
@@ -79,12 +81,12 @@ tests:
     - as: test-integration
       commands: cd test/integration && make ci
       credentials:
-      - mount_path: /etc/ci/aws-creds
-        name: oc-mirror-ci-aws-creds
-        namespace: test-credentials
-      - mount_path: /etc/ci/pull-secret
-        name: oc-mirror-ci-pull-secret
-        namespace: test-credentials
+      - collection: oc-mirror
+        group: aws_creds
+        mount_path: /etc/ci/aws-creds
+      - collection: oc-mirror
+        group: pull_secret
+        mount_path: /etc/ci/pull-secret
       from: oc-mirror-integration
       resources:
         limits:

@@ -9,9 +9,10 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  from: base
-  to: prometheus
+  items:
+  - dockerfile_path: Dockerfile.prow
+    from: base
+    to: prometheus
 promotion:
   to:
   - name: "2.14"
@@ -77,9 +78,9 @@ tests:
         export OSCI_COMPONENT_NAME="prometheus"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

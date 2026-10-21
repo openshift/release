@@ -5,11 +5,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/commits
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -68,11 +71,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/coverage
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -81,10 +87,13 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/integreatly-operator-codecov-token
         - --target=coverage
         command:
         - ci-operator
@@ -106,8 +115,11 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /secrets/integreatly-operator-codecov-token
-          name: integreatly-operator-codecov-token
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -120,9 +132,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: integreatly-operator-codecov-token
-        secret:
-          secretName: integreatly-operator-codecov-token
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -138,11 +156,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/format
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -201,11 +222,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -256,11 +280,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/kubebuilder
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -319,11 +346,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/manifest
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -382,11 +412,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/multitenant-rhoam-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -395,9 +428,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=multitenant-rhoam-e2e
@@ -418,11 +456,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -438,9 +485,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -459,11 +521,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/rhoam-e2e
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -473,9 +538,14 @@ presubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=rhoam-e2e
@@ -496,11 +566,20 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
@@ -516,9 +595,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
@@ -537,11 +631,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/test-cases-lint
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -601,11 +698,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/unit
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -664,11 +764,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/vendor
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -727,11 +830,14 @@ presubmits:
     branches:
     - ^mgdapi-1595-cluster-scoped-3scale$
     - ^mgdapi-1595-cluster-scoped-3scale-
-    cluster: build06
+    cluster: build12
     context: ci/prow/versions
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.functional
+      - Dockerfile.osde2e
+      - build/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

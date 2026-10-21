@@ -1,38 +1,39 @@
 base_images:
   openstack-installer:
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
     tag: openstack-installer
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
   sriov-cni:
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
     tag: sriov-cni
   sriov-dp-admission-controller:
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
     tag: sriov-dp-admission-controller
   sriov-infiniband-cni:
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
     tag: sriov-infiniband-cni
   sriov-network-device-plugin:
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
     tag: sriov-network-device-plugin
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: sriov-network-operator
-- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.rhel7
-  to: sriov-network-webhook
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: sriov-network-operator
+  - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+    to: sriov-network-config-daemon
+  - dockerfile_path: Dockerfile.webhook.rhel7
+    to: sriov-network-webhook
 operator:
   bundles:
   - as: sriov-network-operator-bundle
@@ -59,18 +60,20 @@ promotion:
   - disabled: true
     name: sriov-4.15
     namespace: origin
-  - name: 4.15-priv
-    namespace: ocp-private
+  - name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -93,9 +96,10 @@ tests:
   commands: make test-api
   container:
     from: src
-- as: operator-e2e
+- always_run: false
+  as: operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-sriov-network-operator-bundle
     env:

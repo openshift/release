@@ -26,35 +26,19 @@ set +o errexit
 # Capture both stdout and stderr to check for errors
 output=$(mapt aws eks destroy \
   --project-name "eks" \
-  --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}" 2>&1)
+  --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}" \
+  --force-destroy 2>&1)
 exit_code=$?
 
 # Re-enable exit on error
 set -o errexit
 
-# Check if the stack is locked
-if echo "$output" | grep -qiE "the stack is currently locked"; then
-  echo "$output"
-  echo "[WARN] ⚠️ Stack is currently locked, skipping destroy operations for ${CORRELATE_MAPT}"
-  echo "Possible reasons:"
-  echo "  a) Job was interrupted/cancelled: destroy post-step ran before create pre-step finished."
-  echo "     Cleanup will be handled by the trap in the create pre-step."
-  echo "  b) Other error occurred: infrastructure will be cleaned up by the weekly destroy-orphaned job."
-  exit 0
-fi
-
 # Check for both exit code and error patterns in output
 if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
   echo "$output"
   echo "[SUCCESS] ✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
-
-  echo "[INFO] 🗑️ Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
-  aws s3 rm "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/" --recursive
-
-  echo "[SUCCESS] ✅ Successfully deleted folder ${CORRELATE_MAPT} from S3 bucket"
 else
   echo "$output"
   echo "[ERROR] ❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
-  echo "[WARN] ⚠️ Skipping deletion of folder ${CORRELATE_MAPT} from S3 due to destroy failure"
   exit 1
 fi

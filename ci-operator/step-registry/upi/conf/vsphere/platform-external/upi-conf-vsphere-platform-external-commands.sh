@@ -129,6 +129,22 @@ export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+else
+  export INSTALLER_BINARY="openshift-install"
+fi
+
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+
 echo "$(date -u --rfc-3339=seconds) - Discovering controller image 'vsphere-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
 
 PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
@@ -161,7 +177,7 @@ fi
 
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
-if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+if ${INSTALLER_BINARY} coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
   echo "Using stream metadata"
   ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' <${SHARED_DIR}/coreos.json)
 else
@@ -273,13 +289,17 @@ fi
 
 VERSION=$(oc adm release info "${TESTING_RELEASE_IMAGE}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 
-Z_VERSION=1000
+MAJOR_VERSION=1000
+Z_VERSION=0
+OCP_VERSION=100000
 
 if [ ! -z "${VERSION}" ]; then
+  MAJOR_VERSION=$(echo "${VERSION}" | cut -d'.' -f1)
   Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
-  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+  OCP_VERSION=$((MAJOR_VERSION * 100 + Z_VERSION))
+  echo "$(date -u --rfc-3339=seconds) - determined version is ${MAJOR_VERSION}.${Z_VERSION}"
 else
-  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+  echo "$(date -u --rfc-3339=seconds) - unable to determine version stream, assuming this is master"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
@@ -311,7 +331,7 @@ SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
 # Older versions of UPI image do not support changing coresPerSocket.  It is hard coded to 4 for CPS.  In these environments, We'll default to 4 cores.
 control_plane_cpu=$(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
 compute_cpu=$(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
-if [ "${Z_VERSION}" -lt 20 ]; then
+if [ "${OCP_VERSION}" -lt 420 ]; then
     echo "$(date -u --rfc-3339=seconds) - Detected legacy jobs.  Configuring CPU counts to 4 ..."
     control_plane_cpu=4
     compute_cpu=4
@@ -387,7 +407,7 @@ echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 ### Create manifests
 echo "Creating manifests..."
-openshift-install --dir="${dir}" create manifests &
+${INSTALLER_BINARY} --dir="${dir}" create manifests &
 
 set +e
 wait "$!"
@@ -764,7 +784,7 @@ fi
 
 ### Create Ignition configs
 echo "Creating Ignition configs..."
-openshift-install --dir="${dir}" create ignition-configs &
+${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
 
 set +e
 wait "$!"

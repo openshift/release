@@ -3,10 +3,6 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: upi-installer
-  vsphere-ci-python:
-    name: vsphere-python
-    namespace: ci
-    tag: latest
 releases:
   initial:
     release:
@@ -26,19 +22,19 @@ tests:
 - as: e2e-aws-upgrade
   cron: 16 8 9 */12 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-upgrade
   cron: 42 7 24 */12 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - as: e2e-azure-upgrade
   cron: 37 5 25 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_REQUIRES_SSH: "true"
       TEST_TYPE: upgrade-conformance
@@ -48,15 +44,10 @@ tests:
   steps:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt
-- as: e2e-vsphere-upgrade
-  cron: '@yearly'
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-upgrade-vsphere
 - as: e2e-aws-ovn-upgrade
   cron: 21 4 23 */12 *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -64,29 +55,28 @@ tests:
 - as: e2e-gcp-ovn-upgrade
   cron: 2 6 7 */12 *
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
+    cluster_profile: openshift-org-gcp
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-rt-upgrade
   cron: 6 6 8 */12 *
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
-      STALLD_ENABLED: "false"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp-ovn-rt
 - as: e2e-azure-ovn-upgrade
   cron: 5 8 9 */12 *
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-aws-uwm
   cron: 23 8 23 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     pre:
     - ref: ipi-conf-user-workload-monitoring
     - chain: ipi-aws-pre-stableinitial
@@ -94,7 +84,7 @@ tests:
 - as: e2e-aws-upgrade-workload
   cron: 9 9 21 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTERNAL_MANIFESTS_POST_INSTALL: "true"
       EXTERNAL_MANIFESTS_SHA256_HASH: 6007d0022343793a2c40cc4862337eaf9d5e0f4bd8375578b762ee2a5eb298be
@@ -106,7 +96,7 @@ tests:
 - as: e2e-aws-upgrade-infra
   cron: 42 1 8 */12 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws-infra
 zz_generated_metadata:
   branch: main

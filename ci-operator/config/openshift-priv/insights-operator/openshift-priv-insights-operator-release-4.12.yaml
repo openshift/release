@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
   dev-scripts:
     name: test
@@ -15,22 +15,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
-- from: base
-  to: insights-operator
+  items:
+  - from: base
+    to: insights-operator
 promotion:
   to:
-  - name: 4.12-priv
-    namespace: ocp-private
+  - name: "4.12"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -46,17 +49,20 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e
+- always_run: false
+  as: e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-agnostic-upgrade
+- always_run: false
+  as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: insights-operator-e2e-tests
+- always_run: false
+  as: insights-operator-e2e-tests
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -65,9 +71,9 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
+      - collection: insights-qa
+        group: pull-secret
+        mount_path: /secrets
       from: insights-operator-tests
       resources:
         requests:

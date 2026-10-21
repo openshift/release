@@ -2,7 +2,7 @@ base_images:
   go_builder:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.26-openshift-4.23
   log-file-metric-exporter:
     name: 6.y
     namespace: logging
@@ -29,39 +29,40 @@ base_images:
     tag: "9"
 build_root:
   image_stream_tag:
-    name: builder-priv
-    namespace: ocp-private
-    tag: rhel-9-golang-1.24-openshift-4.20
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-4.23
 canonical_go_repository: github.com/openshift/cluster-logging-operator
 images:
-- from: ubi9-minimal
-  to: cluster-logging-operator
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: ubi9-minimal
-  to: cluster-logging-operator-registry
-- dockerfile_literal: |
-    FROM loki-operator-src AS lo-src
-    FROM registry.redhat.io/ubi9/go-toolset:latest
-    ADD . /go/src/github.com/openshift/cluster-logging-operator
-    COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
-    WORKDIR /go/src/github.com/openshift/cluster-logging-operator
-    USER 0
-    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
-      && chmod 755 kubectl && mv kubectl /go/bin
-    RUN dnf install -y gettext
-    RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
-    RUN go mod download
-    RUN make tools
-    RUN chmod -R 777 /go
-    RUN make bin/functional-benchmarker
-  inputs:
-    go_builder:
-      as:
-      - registry.redhat.io/ubi9/go-toolset:latest
-    loki-operator-src:
-      as:
-      - loki-operator-src
-  to: cluster-logging-operator-e2e
+  items:
+  - from: ubi9-minimal
+    to: cluster-logging-operator
+  - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+    from: ubi9-minimal
+    to: cluster-logging-operator-registry
+  - dockerfile_literal: |
+      FROM loki-operator-src AS lo-src
+      FROM registry.redhat.io/ubi9/go-toolset:latest
+      ADD . /go/src/github.com/openshift/cluster-logging-operator
+      COPY --from=lo-src /go/src/github.com/openshift/loki/operator /go/src/github.com/openshift/loki/operator
+      WORKDIR /go/src/github.com/openshift/cluster-logging-operator
+      USER 0
+      RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+        && chmod 755 kubectl && mv kubectl /go/bin
+      RUN dnf install -y gettext
+      RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
+      RUN go mod download
+      RUN make tools
+      RUN chmod -R 777 /go
+      RUN make bin/functional-benchmarker
+    inputs:
+      go_builder:
+        as:
+        - registry.redhat.io/ubi9/go-toolset:latest
+      loki-operator-src:
+        as:
+        - loki-operator-src
+    to: cluster-logging-operator-e2e
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
@@ -80,11 +81,13 @@ promotion:
     disabled: true
     name: "6.2"
     namespace: logging
+prowgen:
+  private: true
 releases:
   latest:
     release:
       channel: stable
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -108,7 +111,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -145,7 +148,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.18"
+    version: "4.20"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:

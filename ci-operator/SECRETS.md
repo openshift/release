@@ -141,11 +141,9 @@ The following GitHub users have their credentials stored in secrets on the
 cluster:
 
  - @openshift-bot
- - @openshift-build-robot
  - @openshift-cherrypick-robot
  - @openshift-ci-robot
  - @openshift-merge-robot
- - @openshift-publish-robot
 
 For each user, a secret named `github-credentials-${username}` holds the
 following fields:

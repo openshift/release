@@ -11,26 +11,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-node-tuning-operator-us-tuned
-- dockerfile_path: Dockerfile.rhel9
-  to: cluster-node-tuning-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-node-tuning-operator-us-tuned
+  - dockerfile_path: Dockerfile.rhel9
+    to: cluster-node-tuning-operator
 promotion:
   to:
   - excluded_images:
     - cluster-node-tuning-operator-us-tuned
-    name: 4.15-priv
-    namespace: ocp-private
+    name: "4.15"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.15-priv
-      namespace: ocp-private
+      name: "4.15"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -54,17 +57,20 @@ tests:
   commands: make vet
   container:
     from: src
-- as: e2e-hypershift
+- always_run: false
+  as: e2e-hypershift
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -78,9 +84,10 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -90,11 +97,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-pao
+- always_run: false
+  as: e2e-gcp-pao
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -106,11 +114,12 @@ tests:
           memory: 200Mi
       timeout: 2h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-updating-profile
+- always_run: false
+  as: e2e-gcp-pao-updating-profile
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -122,11 +131,12 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-pao-workloadhints
+- always_run: false
+  as: e2e-gcp-pao-workloadhints
   capabilities:
   - intranet
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -138,11 +148,13 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
-- as: e2e-no-cluster
+- always_run: false
+  as: e2e-no-cluster
   commands: make test-e2e-local
   container:
     from: src

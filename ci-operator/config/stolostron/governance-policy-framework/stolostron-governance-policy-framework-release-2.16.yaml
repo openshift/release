@@ -6,12 +6,13 @@ base_images:
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: build/Dockerfile.e2etest
-  from: base
-  optional: true
-  to: grc-policy-framework-tests
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: build/Dockerfile.e2etest
+    from: base
+    optional: true
+    to: grc-policy-framework-tests
 promotion:
   to:
   - name: "2.16"
@@ -23,6 +24,8 @@ resources:
       memory: 200Mi
 tests:
 - as: test-e2e-grc-framework
+  capabilities:
+  - arm64
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: grc-policy-framework-tests
@@ -61,9 +64,9 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

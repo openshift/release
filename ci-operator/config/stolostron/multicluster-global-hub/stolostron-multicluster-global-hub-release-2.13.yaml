@@ -7,17 +7,18 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: operator/Dockerfile
-  from: base
-  to: multicluster-global-hub-operator
-- dockerfile_path: manager/Dockerfile
-  from: base
-  to: multicluster-global-hub-manager
-- dockerfile_path: agent/Dockerfile
-  from: base
-  to: multicluster-global-hub-agent
+  items:
+  - dockerfile_path: operator/Dockerfile
+    from: base
+    to: multicluster-global-hub-operator
+  - dockerfile_path: manager/Dockerfile
+    from: base
+    to: multicluster-global-hub-manager
+  - dockerfile_path: agent/Dockerfile
+    from: base
+    to: multicluster-global-hub-agent
 promotion:
   to:
   - name: "2.13"
@@ -107,8 +108,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
   skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: sonarcloud-post-submit
   commands: |
@@ -126,8 +128,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
   skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: publish-multicluster-global-hub-operator
   postsubmit: true
@@ -145,9 +148,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

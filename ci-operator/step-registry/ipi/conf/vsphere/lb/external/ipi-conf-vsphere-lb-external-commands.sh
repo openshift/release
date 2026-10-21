@@ -219,7 +219,7 @@ EOF
 
 cat ${HAPROXY_PATH}
 
-curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
+curl -sSL "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${vsphere_portgroup}"

@@ -3,6 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -10,14 +14,14 @@ build_root:
     tag: rhel-8-golang-1.23-openshift-4.19
 canonical_go_repository: github.com/grafana/tempo-operator
 images:
-- context_dir: .
-  dockerfile_path: tests/Dockerfile
-  to: tempo-tests-runner
+  items:
+  - context_dir: .
+    dockerfile_path: tests/Dockerfile
+    to: obs-tests-runner
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.20"
 resources:
   '*':
@@ -26,18 +30,23 @@ resources:
       memory: 200Mi
 tests:
 - as: tempo-stage-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: obs
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
   cron: 0 0 30 2 *
+  reporter_config:
+    channel: '#distributed-tracing-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
+    cluster_profile: gcp-observability
     env:
+      AGENT_SKILL: tempo
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1205366
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_TESTS_BRANCH: rhosdt-3.11
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -49,12 +58,13 @@ tests:
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       SKIP_TESTS: tests/e2e-openshift-object-stores/*
+    post:
+    - ref: openshift-observability-qe-agent
     test:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: distributed-tracing-tests-tempo-stage
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

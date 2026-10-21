@@ -22,7 +22,7 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
@@ -30,15 +30,17 @@ export WORKLOAD=network-policy
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+# Use awk for fractional multiplier support; result is truncated to int
+iteration_multiplier=$ITERATION_MULTIPLIER_ENV
+ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
+export ITERATIONS
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}"
+EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR} --netpol-ready-threshold=${NETPOL_READY_THRESHOLD}"
 export EXTRA_FLAGS
 
 ./run.sh

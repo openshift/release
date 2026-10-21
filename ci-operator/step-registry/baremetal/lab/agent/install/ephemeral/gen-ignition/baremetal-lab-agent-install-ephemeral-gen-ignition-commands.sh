@@ -118,7 +118,7 @@ fi
 # From now on, we assume no more patches to the install-config.yaml are needed.
 # Also, we assume that the agent-config.yaml is already in place in the SHARED_DIR.
 # We can create the installation dir with the install-config.yaml and agent-config.yaml.
-grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config-unconfigured.yaml" > "${ARTIFACT_DIR}/agent-config-unconfigured.yaml" || true
@@ -147,4 +147,4 @@ oinst agent create image
 
 ### Copy the CoreOS image to the auxiliary host, it will be used to generate the unconfigured agent image
 echo -e "\nCopying the CoreOS ISO image into the bastion host..."
-scp "${SSHOPTS[@]}" "${CACHED_COREOS_IMAGE_PATH}" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}"
+scp "${SSHOPTS[@]}" "${CACHED_COREOS_IMAGE_PATH}" "root@${AUX_HOST}:/var/mnt/data-storage/html/${CLUSTER_NAME}/${COREOS_IMAGE_NAME}"

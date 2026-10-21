@@ -7,9 +7,10 @@ binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/ma
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-cloud-controller-manager-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-cloud-controller-manager-operator
 promotion:
   to:
   - name: "4.14"
@@ -60,50 +61,53 @@ tests:
       resources:
         requests:
           cpu: 200m
-- as: e2e-alibaba-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-alibaba-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: alibabacloud
     workflow: openshift-e2e-alibabacloud
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - always_run: false
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-gcp-ovn-ccm
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-ccm
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
@@ -126,7 +130,7 @@ tests:
   as: e2e-nutanix-ovn
   cluster: build01
   optional: true
-  run_if_changed: .*nutanix.*
+  pipeline_run_if_changed: .*nutanix.*
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix

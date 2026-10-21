@@ -40,24 +40,25 @@ build_root:
       ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/github.com/backube/volsync
 images:
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-oc
-- context_dir: .
-  from: ubi_minimal
-  inputs:
-    ocp_builder_volsync:
-      as:
-      - golang:1.25
-  to: volsync
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - context_dir: .
+    from: ubi_minimal
+    inputs:
+      ocp_builder_volsync:
+        as:
+        - golang:1.25
+    to: volsync
 operator:
   bundles:
   - as: volsync-bundle
@@ -168,13 +169,11 @@ tests:
         oc -n openshift-operators get deploy
         oc -n openshift-operators get pod
 
-        # Install MinIO for rclone & restic
-        ./hack/run-minio.sh
+        # Install RustFS for rclone & restic
+        ./hack/run-rustfs.sh
 
-        # Install MinIO again w/ TLS
-        export MINIO_NAMESPACE=minio-tls
-        export MINIO_USE_TLS=1
-        ./hack/run-minio.sh
+        # Install RustFS again w/ TLS
+        RUSTFS_NAMESPACE=rustfs-tls RUSTFS_USE_TLS=1 ./hack/run-rustfs.sh
 
         # Add .local/bin to path so we can execute Python packages we install below
         export PATH="${PATH}:/alabama/.local/bin"
@@ -260,13 +259,11 @@ tests:
         oc -n openshift-operators get deploy
         oc -n openshift-operators get pod
 
-        # Install MinIO for rclone & restic
-        ./hack/run-minio.sh
+        # Install RustFS for rclone & restic
+        ./hack/run-rustfs.sh
 
-        # Install MinIO again w/ TLS
-        export MINIO_NAMESPACE=minio-tls
-        export MINIO_USE_TLS=1
-        ./hack/run-minio.sh
+        # Install RustFS again w/ TLS
+        RUSTFS_NAMESPACE=rustfs-tls RUSTFS_USE_TLS=1 ./hack/run-rustfs.sh
 
         # Add .local/bin to path so we can execute Python packages we install below
         export PATH="${PATH}:/alabama/.local/bin"
@@ -334,13 +331,11 @@ tests:
           sleep $sleeptime
         done
 
-        # Install MinIO for rclone & restic
-        ./hack/run-minio.sh
+        # Install RustFS for rclone & restic
+        ./hack/run-rustfs.sh
 
-        # Install MinIO again w/ TLS
-        export MINIO_NAMESPACE=minio-tls
-        export MINIO_USE_TLS=1
-        ./hack/run-minio.sh
+        # Install RustFS again w/ TLS
+        RUSTFS_NAMESPACE=rustfs-tls RUSTFS_USE_TLS=1 ./hack/run-rustfs.sh
 
         # Install VolSync va Helm
         helm upgrade --install --create-namespace -n volsync-system \

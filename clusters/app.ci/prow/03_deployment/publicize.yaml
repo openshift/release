@@ -39,6 +39,16 @@ spec:
         app: prow
         component: publicize
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       containers:
       - name: publicize
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_publicize_latest
@@ -71,7 +81,7 @@ spec:
           mountPath: /tmp
         resources:
           requests:
-            memory: "300Mi"
+            memory: "1Gi"
             cpu: "50m"
         livenessProbe:
           httpGet:
@@ -95,3 +105,4 @@ spec:
           secretName: github-credentials-openshift-merge-robot
       - name: tmp
         emptyDir: {}
+

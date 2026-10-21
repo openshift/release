@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
   commitchecker:
     name: commitchecker
@@ -15,23 +15,26 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
 images:
-- dockerfile_path: Dockerfile.openshift.rhel7
-  from: base
-  to: azure-disk-csi-driver
+  items:
+  - dockerfile_path: Dockerfile.openshift.rhel7
+    from: base
+    to: azure-disk-csi-driver
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -48,17 +51,20 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-azure-csi
+- always_run: false
+  as: e2e-azure-csi
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-csi
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azure-csi-extended
@@ -72,7 +78,7 @@ tests:
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: verify-commits
   commands: |

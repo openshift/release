@@ -1,12 +1,18 @@
+base_images:
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.26-openshift-5.1
 images:
-- dockerfile_path: images/Dockerfile.ci
-  from: src
-  to: dev-scripts
+  items:
+  - dockerfile_path: images/Dockerfile.ci
+    from: src
+    to: dev-scripts
 promotion:
   to:
   - name: test
@@ -14,12 +20,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -27,16 +33,22 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: shellcheck
+  commands: |
+    set -x
+    echo "Searching for shell scripts..."
+    find . -type f -name "*.sh" -exec shellcheck -x -s bash {} \;
+    echo "Shellcheck completed successfully"
+  container:
+    from: shellcheck
+- as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-bm-bond
+- as: e2e-metal-ipi-ovn-ipv4-bond
   capabilities:
   - intranet
   optional: true
@@ -70,6 +82,35 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6-nat64
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        HOST_IP_STACK=v4
+        ENABLE_NAT64=true
+      TEST_SKIPS: |-
+        \[sig-auth\] \[Feature:NodeAuthenticator\] The kubelet can delegate ServiceAccount tokens to the API server
+        \[sig-auth\] \[Feature:NodeAuthenticator\] The kubelet's main port 10250 should reject requests with no credentials
+        \[sig-network\] Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service
+        \[sig-network\] Conntrack should be able to preserve UDP traffic when server pod cycles for a NodePort service
+        \[sig-network\] DNS should provide /etc/hosts entries for the cluster
+        \[sig-network\] DNS should provide DNS for ExternalName services
+        \[sig-network\] DNS should provide DNS for pods for Hostname
+        \[sig-network\] DNS should provide DNS for pods for Subdomain
+        \[sig-network\] DNS should provide DNS for services
+        \[sig-network\] DNS should provide DNS for the cluster
+        \[sig-network\] DNS should resolve DNS of partial qualified names for services
+        \[sig-network\] DNS should resolve DNS of partial qualified names for the cluster
+        \[sig-storage\] In-tree Volumes \[Driver: nfs\] \[Testpattern: Dynamic PV (default fs)\] provisioning should provision storage with mount options
+        \[sig-network-edge\]\[Conformance\]\[Area:Networking\]\[Feature:Router\] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it
+        \[Feature:EgressFirewall\]
+    workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   capabilities:
   - intranet
@@ -88,6 +129,25 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6v4
+        # For some reason the mixed driver doesn't work in v6v4 CI (it does locally).
+        # In the the interest of not further blocking this job, force it to something that does work.
+        # We can revisit in the future if we want full v6-primary coverage of all drivers.
+        BMC_DRIVER=redfish
+    workflow: baremetalds-e2e-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-v6-periodic
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        # For some reason the mixed driver doesn't work in v6v4 CI (it does locally).
+        # In the the interest of not further blocking this job, force it to something that does work.
+        # We can revisit in the future if we want full v6-primary coverage of all drivers.
+        BMC_DRIVER=redfish
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
   as: e2e-metal-ipi-upgrade-ovn-ipv6

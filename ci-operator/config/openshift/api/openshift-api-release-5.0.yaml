@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -11,8 +15,9 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
-  to: cluster-config-api
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: cluster-config-api
 promotion:
   to:
   - name: "5.0"
@@ -82,12 +87,15 @@ tests:
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
-    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
+    if [ ! -d $dir ]; then
+      git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
+    fi
     rm -rf $dir/vendor/github.com/openshift/api/*
     cp -Rf ./ $dir/api/
     rm -rf $dir/api/vendor
     cd $dir
-    echo "replace github.com/openshift/api => ./api" >> go.mod
+    go mod edit -dropreplace github.com/openshift/api
+    go mod edit -replace github.com/openshift/api=./api
     echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
     sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
     go mod vendor
@@ -99,13 +107,13 @@ tests:
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -114,14 +122,14 @@ tests:
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-serial-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -130,25 +138,39 @@ tests:
   as: e2e-gcp
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-azure
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-vsphere-ovn
+  pipeline_run_if_changed: ^(config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-Default\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-Default\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-Default\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-Default\.crd\.yaml)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-ovn
+- always_run: false
+  as: e2e-vsphere-ovn-techpreview
+  pipeline_run_if_changed: ^(config/v1/types_infrastructure\.go|.*/zz_generated\.featuregated-crd-manifests/.*/VSphere[^/]*\.yaml|payload-manifests/crds/0000_10_config-operator_01_infrastructures-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_10_control-plane-machine-set_01_controlplanemachinesets-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_50_csi-driver_01_clustercsidrivers-TechPreviewNoUpgrade\.crd\.yaml|payload-manifests/crds/0000_80_machine-config_01_controllerconfigs-TechPreviewNoUpgrade\.crd\.yaml)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere-ovn
 - always_run: false
   as: e2e-upgrade
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-upgrade-out-of-change
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -165,6 +187,14 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: api-review
+  optional: true
+  steps:
+    env:
+      EVAL_SKIP_LINT: "1"
+      REVIEW_MODEL: claude-opus-4-6
+    workflow: openshift-api-review
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

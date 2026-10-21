@@ -118,7 +118,10 @@ COMPONENT_INFIX = "__component__"
 prune_tag_match = re.compile(r"^(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)(?P<hour>\d\d)(?P<minute>\d\d)(?P<second>\d\d)_prune_(?P<ci_tag>.+)$")
 
 # Match release payload tags like "rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946"
-rc_payload_tag_match = re.compile(rf"^{re.escape(RC_PAYLOAD_PREFIX)}(?P<version>.+)$")
+# Exclude __component__ preservation tags via negative lookahead on version.
+rc_payload_tag_match = re.compile(
+    rf"^{re.escape(RC_PAYLOAD_PREFIX)}(?P<version>(?:(?!{re.escape(COMPONENT_INFIX)}).)+)$"
+)
 
 # Match preserved marker tags like "preserved__rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946"
 rc_payload_preserved_match = re.compile(rf"^{re.escape(PRESERVED_RC_PAYLOAD_PREFIX)}(?P<version>.+)$")
@@ -160,8 +163,13 @@ def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
         return False
 
 
-def delete_tag(repository: str, tag: str, token: str) -> bool:
+def delete_tag(repository: str, tag: str, token: str, *, log_prune_digest: bool = False) -> bool:
     """Delete a tag from a quay.io repository. Returns True on success, False on failure."""
+    digest_part = None
+    if log_prune_digest:
+        digest = get_tag_manifest_digest(repository, tag, token)
+        digest_part = digest if digest else 'manifest_digest_unknown'
+
     delete_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
     headers = {
         "Authorization": f"Bearer {token}"
@@ -175,7 +183,10 @@ def delete_tag(repository: str, tag: str, token: str) -> bool:
         with urllib.request.urlopen(request) as response:
             response_data = response.read()
             if response.status == 204:
-                logging.info('Successfully deleted %s', tag)
+                if log_prune_digest:
+                    logging.debug('Removed %s %s', tag, digest_part)
+                else:
+                    logging.info('Successfully deleted %s', tag)
                 return True
             logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
             return False
@@ -248,7 +259,18 @@ def get_release_component_images(payload_pullspec: str) -> List[Dict[str, str]]:
         # For that, we would need to get image info for all architectures.
         # Here, we assume a single manifest.
         cmd = ["oc", "adm", "release", "info", "--output=json", payload_pullspec]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=300)
+        dockerconfig_json = os.getenv(QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME)
+        run_env = os.environ.copy()
+        if dockerconfig_json:
+            run_env["REGISTRY_AUTH_FILE"] = dockerconfig_json
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=300,
+            env=run_env,
+        )
 
         data = json.loads(result.stdout)
         tags = data.get("references", {}).get("spec", {}).get("tags", [])
@@ -419,13 +441,6 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 mod_by = min(mod_by * 2, 1000)
                 logging.info('%d tags have been checked', tag_count)
 
-            # Check for rc_payload__ tags
-            payload_match = rc_payload_tag_match.match(image_tag)
-            if payload_match:
-                version = payload_match.group('version')
-                rc_payload_tags[version] = image_tag
-                continue
-
             # Check for preserved marker tags
             preserved_match = rc_payload_preserved_match.match(image_tag)
             if preserved_match:
@@ -440,13 +455,20 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 remove_requests.add(version)
                 continue
 
-            # Check for component preservation tags
+            # Component tags before payload tags (most specific rc_payload__ match first).
             component_match = rc_payload_component_match.match(image_tag)
             if component_match:
                 version = component_match.group('version')
                 if version not in component_tags:
                     component_tags[version] = []
                 component_tags[version].append(image_tag)
+                continue
+
+            # Check for rc_payload__ tags
+            payload_match = rc_payload_tag_match.match(image_tag)
+            if payload_match:
+                version = payload_match.group('version')
+                rc_payload_tags[version] = image_tag
                 continue
 
             # Check for prune tags
@@ -462,7 +484,9 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 if days_difference > ttl_days and image_tag not in prune_target_tags:
                     prune_target_tags.add(image_tag)
                     if confirm:
-                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, image_tag, token))
+                        delete_futures.append(delete_executor.submit(
+                            lambda r=QUAY_CI_REPO, tg=image_tag, tk=token: delete_tag(
+                                r, tg, tk, log_prune_digest=True)))
                     else:
                         logging.debug('Would have removed %s', image_tag)
 
@@ -588,7 +612,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument('--token', type=str, help=f'quay.io oauth application token (or set {QUAY_OAUTH_TOKEN_ENV_NAME} environment variable)')
-    parser.add_argument('--ttl-days', type=int, default=5, help='Only prune tags older than this (defaults to 5; -1 for all prunable tags)')
+    parser.add_argument('--ttl-days', type=int, default=60, help='Only prune tags older than this (defaults to 60; -1 for all prunable tags)')
     parser.add_argument('--confirm', action='store_true', help='Actually delete and refresh tags')
 
     run(parser.parse_args(), start_time)

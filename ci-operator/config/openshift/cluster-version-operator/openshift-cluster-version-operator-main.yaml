@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v2.3.1
+    tag: v2.10.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -15,6 +15,10 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.20"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   yamllint:
     name: rust
     namespace: cincinnati-ci-public
@@ -22,21 +26,22 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-version-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-version-operator
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -63,15 +68,17 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-agnostic-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-operator
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-operator
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     test:
     - as: e2e-test
       commands: make integration-test
@@ -92,48 +99,56 @@ tests:
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: e2e-agnostic-ovn-techpreview-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn-techpreview-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  shard_count: 3
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-ovn-upgrade-into-change
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-into-change
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
-- as: e2e-agnostic-ovn-upgrade-out-of-change
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-out-of-change
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-azure
-- as: e2e-hypershift-conformance
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift-conformance
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-ovn-techpreview
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-agnostic-operator-techpreview
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -147,15 +162,17 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-into-change-techpreview
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -166,7 +183,7 @@ tests:
   as: e2e-agnostic-operator-devpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: DevPreviewNoUpgrade
     test:
@@ -195,6 +212,31 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: tls-scanner-default-profile
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: openshift-cluster-version
+    test:
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- always_run: false
+  as: tls-scanner-modern-profile
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      SCAN_NAMESPACE: openshift-cluster-version
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

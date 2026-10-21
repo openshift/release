@@ -28,6 +28,8 @@ $WAS_TRACING && set -x
 export PLAYWRIGHT_BASE_URL="${QUAY_ROUTE}"
 export REACT_QUAY_APP_API_URL="${QUAY_ROUTE}"
 export PLAYWRIGHT_JUNIT_OUTPUT_NAME="${ARTIFACT_DIR}/junit_playwright.xml"
+# results.json is a structured Prow artifact from the Playwright json reporter (ref quay/quay#7049)
+export PLAYWRIGHT_JSON_OUTPUT_NAME="${ARTIFACT_DIR}/results.json"
 export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 export QUAY_USERNAME
 export QUAY_PASSWORD
@@ -48,7 +50,41 @@ function copyArtifacts {
 }
 trap copyArtifacts EXIT
 
+# Pre-create test users so Playwright's global-setup finds them already existing.
+# Without this, POST /api/v1/user/ auto-signs in the new user via common_login(),
+# which calls generate_csrf_token(force=True) — replacing the session CSRF token.
+# The Playwright ApiClient caches the old token and reuses it for signIn(), causing
+# a CSRF mismatch (403). When users already exist, createUser() gets "already exists"
+# which skips common_login(), keeping the cached CSRF token valid.
+echo "Pre-creating Playwright test users..."
+set +x
+for USER_JSON in \
+  '{"username":"admin","password":"password","email":"admin@example.com"}' \
+  '{"username":"testuser","password":"password","email":"testuser@example.com"}' \
+  '{"username":"readonly","password":"password","email":"readonly@example.com"}'; do
+
+  UNAME=$(echo "${USER_JSON}" | python3 -c "import sys,json; print(json.load(sys.stdin)['username'])")
+
+  CSRF=$(curl -sk -c /tmp/csrf_cookies -H 'X-Requested-With: XMLHttpRequest' \
+    "${QUAY_ROUTE}/csrf_token" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null) || true
+
+  if [[ -n "${CSRF}" ]]; then
+    HTTP_CODE=$(curl -sk -b /tmp/csrf_cookies -o /dev/null -w '%{http_code}' \
+      -X POST "${QUAY_ROUTE}/api/v1/user/" \
+      -H 'Content-Type: application/json' \
+      -H "X-CSRF-Token: ${CSRF}" \
+      -d "${USER_JSON}") || true
+    echo "  ${UNAME}: ${HTTP_CODE}"
+  else
+    echo "  ${UNAME}: skipped (no CSRF token)"
+  fi
+  rm -f /tmp/csrf_cookies
+done
+$WAS_TRACING && set -x
+echo "Test user pre-creation complete"
+
 echo "Running Playwright tests..."
 npx playwright test \
-  --reporter=junit,html \
+  --reporter=junit,html,json \
   2>&1 | tee "${ARTIFACT_DIR}/playwright-output.log"

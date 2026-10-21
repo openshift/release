@@ -29,7 +29,7 @@ ref:
     default: "3"
     documentation: Number of nodes for the aks cluster.
   - name: AKS_NODE_VM_SIZE
-    default: "Standard_D16_v3"
+    default: "Standard_D16_v5"
     documentation: Size of Virtual Machines to create as Kubernetes nodes.
   - name: AKS_OS_SKU
     default: "AzureLinux"
@@ -54,7 +54,7 @@ ref:
     default: ""
     documentation: Maximum number of nodes for the cluster autoscaler.
   - name: AKS_K8S_VERSION
-    default: "1.33.0"
+    default: "1.35.0"
     documentation: Sets the Kubernetes version for the AKS cluster. Overrides USE_LATEST_K8S_VERSION if provided.
   - name: USE_LATEST_K8S_VERSION
     default: "true"
@@ -62,7 +62,7 @@ ref:
   - name: AKS_ZONES
     default: ""
     documentation: |-
-      Specifies the availability zones for placing agent nodes. 
+      Specifies the availability zones for placing agent nodes.
       Note that not all regions support availability zones.
       Example: "1 2 3"
   - name: ENABLE_AKS_CERT_ROTATION
@@ -74,11 +74,40 @@ ref:
   - name: AKS_USE_HYPERSHIFT_MI
     default: "false"
     documentation: If set to true precreated Hypershift MIs will be used for AKS cluster creation.
+  - name: ENABLE_NAP
+    default: "false"
+    documentation: |-
+      Enable Node Auto Provisioning (NAP) for the AKS cluster. When enabled, Karpenter is
+      deployed on the cluster and automatically selects VM SKUs based on workload requirements.
+      This avoids OverconstrainedZonalAllocationRequest errors by allowing flexible VM SKU
+      selection within the specified family and CPU constraints. When enabled, manual zone-specific
+      node pool creation is skipped in favor of Karpenter-managed provisioning.
+  - name: NAP_SKU_FAMILY
+    default: "D"
+    documentation: The VM SKU family for NAP to use when provisioning nodes (e.g., D, E, F).
+  - name: NAP_SKU_NAMES
+    default: ""
+    documentation: |-
+      Optional comma-separated exact VM SKU names for NAP (e.g., Standard_D16s_v5,Standard_E16s_v5),
+      with no spaces. Names must start with Standard_ and contain only letters, digits, and underscores.
+      When set, replaces NAP_SKU_FAMILY selection; CPU, version, and zone constraints still apply.
+      Version 7 is allowed only when this list includes a name ending in _v7; versions 3-6 remain allowed.
+      When empty, the existing family selection is unchanged.
+  - name: NAP_SKU_CPU
+    default: "16"
+    documentation: The number of vCPUs for NAP-provisioned nodes.
+  - name: NAP_MAX_PODS
+    default: ""
+    documentation: |-
+      Optional maximum number of pods per NAP-provisioned node, from 10 to 250.
+      When empty, preserves the AKSNodeClass provider default. Does not change the system node pool.
   credentials:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
-      name: hypershift-ci-jobs-azurecreds
-      namespace: test-credentials
+      group: ops/hypershift-ci-jobs-azurecreds
+      collection: hypershift-team
   documentation: |-
-    This step provisions an AKS cluster into a dedicated resource group.  
-    The name of the resource group is written to ${SHARED_DIR}/resourcegroup_aks. 
-    The cluster's name is saved to `${SHARED_DIR}/cluster-name`.
+    This step provisions an AKS cluster into a dedicated resource group.
+    The name of the resource group is written to ${SHARED_DIR}/resourcegroup_aks.
+    The AKS management cluster's name is saved to `${SHARED_DIR}/aks-cluster-name`.
+    For compatibility with existing consumers of the generic cluster name, it is
+    also saved to `${SHARED_DIR}/cluster-name`.

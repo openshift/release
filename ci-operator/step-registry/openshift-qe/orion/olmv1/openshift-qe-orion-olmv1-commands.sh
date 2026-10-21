@@ -90,7 +90,7 @@ notify_slack_if_failure() {
 }
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/orion.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 else
     LATEST_TAG=$TAG
 fi
@@ -101,20 +101,29 @@ pip install -r requirements.txt
 
 case "$ES_TYPE" in
   qe)
+    # Disable xtrace: reading QE ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    set -x
     ;;
   quay-qe)
+    # Disable xtrace: reading quay-qe ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/quay-qe/password")
     ES_USERNAME=$(<"/secret/quay-qe/username")
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    set -x
     ;;
   *)
+    # Disable xtrace: reading credentials and constructing authenticated URL
+    set +x
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    set -x
     ;;
 esac
 
@@ -161,10 +170,14 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
-if [[ ! -z "$ACK_FILE" ]]; then
-    # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-    export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
+if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
+    ackFilePath="/tmp/$(basename ${ACK_FILE})"
+    if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+        echo "Error: Failed to download $ACK_FILE" >&2
+        exit 1
+    fi
+    export EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
 
 if [ ${COLLAPSE} == "true" ]; then
@@ -194,34 +207,41 @@ orion_exit_status=$?
 set -e
 
 if [[ "$OUTPUT_FORMAT" == "JUNIT" ]]; then
+  # Orion appends _{test_name} to --save-output-path, so junit.xml becomes junit_<name>.xml
+  shopt -s nullglob
+  JUNIT_FILES=(junit_*.xml)
+  if (( ${#JUNIT_FILES[@]} == 0 )); then
+    handle_error_and_exit "No junit_*.xml files found — Orion may have failed to produce output"
+  fi
+  JUNIT_FILE="${JUNIT_FILES[0]}"
+
   # Remove timestamps field since RP doesn't support it,
   # details: https://redhat-internal.slack.com/archives/CH76YSYSC/p1754418769901119?thread_ts=1754385612.115479&cid=CH76YSYSC
-  python3 <<'EOF'
+  if ! python3 <<EOF
 import xml.etree.ElementTree as ET
 import sys
+import glob
 
-file_path = "junit.xml"
+for file_path in glob.glob("junit_*.xml"):
+    try:
+        tree = ET.parse(file_path)
+        root = tree.getroot()
 
-try:
-    tree = ET.parse(file_path)
-    root = tree.getroot()
+        for testcase in root.findall('.//testcase'):
+            testcase.attrib.pop("timestamp", None)
 
-    for testcase in root.findall('.//testcase'):
-        testcase.attrib.pop("timestamp", None)
+        tree.write(file_path, encoding='utf-8', xml_declaration=True)
+        print(f"Successfully removed timestamps and saved to {file_path}")
 
-    tree.write(file_path, encoding='utf-8', xml_declaration=True)
-    print(f"Successfully removed timestamps and saved to {file_path}")
-
-except ET.ParseError as e:
-    print(f"Error parsing XML file: {e}", file=sys.stderr)
-    sys.exit(1)
-except IOError as e:
-    print(f"Error reading or writing file: {e}", file=sys.stderr)
-    sys.exit(1)
+    except ET.ParseError as e:
+        print(f"Error parsing XML file {file_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+    except IOError as e:
+        print(f"Error reading or writing file {file_path}: {e}", file=sys.stderr)
+        sys.exit(1)
 EOF
-
-  if [[ $? -ne 0 ]]; then
-    handle_error_and_exit "Failed to process junit.xml file"
+  then
+    handle_error_and_exit "Failed to process junit XML files"
   fi
 
   mkdir -p "${ARTIFACT_DIR}"
@@ -231,6 +251,6 @@ EOF
   fi
 fi
 
-notify_slack_if_failure "junit.xml"
+notify_slack_if_failure "$JUNIT_FILE"
 
 exit $orion_exit_status

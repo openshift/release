@@ -71,7 +71,7 @@ update_global_auth() {
 	# Read the konflux registry credentials from the JSON file
 	konflux_auth_user=$(jq -r '.user' $KONFLUX_REGISTRY_PATH)
 	konflux_auth_password=$(jq -r '.password' $KONFLUX_REGISTRY_PATH)
-	konflux_registry_auth=$(echo -n " " "$konflux_auth_user":"$konflux_auth_password" | base64 -w 0)
+	konflux_registry_auth=$(echo -n "${konflux_auth_user}:${konflux_auth_password}" | base64 -w 0)
 
 	# Add brew registry creds
 	reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
@@ -79,7 +79,7 @@ update_global_auth() {
 	brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
 
 	# Create a new dockerconfig with the konflux registry credentials without the "email" field
-	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
+	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
 
 	# update global auth
 	local -i ret=0
@@ -88,10 +88,10 @@ update_global_auth() {
 		apply_image_config
 		echo "update the cluster global auth successfully."
 	else
-		echo "failed to add QE optional registry auth, retry and enable log..."
+		echo "failed to add QE optional registry auth, retry without verbose logging..."
 		sleep 1
 		ret=0
-		run "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
+		run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
 		if [[ $ret -eq 0 ]]; then
 			echo "update the cluster global auth successfully after retry."
 		else
@@ -115,31 +115,44 @@ create_icsp_connected() {
 		return 1
 	}
 
-	cat <<EOF | oc apply -f - || {
-  apiVersion: operator.openshift.io/v1alpha1
-  kind: ImageContentSourcePolicy
-  metadata:
-    name: $ICSP_NAME
-  spec:
-    repositoryDigestMirrors:
-    - source: registry.redhat.io/rhosdt/opentelemetry-collector-rhel9
-      mirrors:
-      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-collector
-    - source: registry.redhat.io/rhosdt/opentelemetry-target-allocator-rhel9
-      mirrors:
-      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-target-allocator
-    - source: registry.redhat.io/rhosdt/opentelemetry-rhel9-operator
-      mirrors:
-      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-operator
-    - source: registry.redhat.io/rhosdt/opentelemetry-operator-bundle
-      mirrors:
-      - quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle
+	# The ART FBC catalogs reference registry.redhat.io/rhosdt/*@sha256 images that exist only on
+	# registry.stage.redhat.io/rhosdt until the release is published, so mirror the whole namespace.
+	# Prefer an ImageDigestMirrorSet, but fall back to an ImageContentSourcePolicy when the CRD is missing
+	# (OCP 4.12) or an ICSP already exists (the Tempo step creates one) because mixing ICSP and IDMS on one
+	# cluster is not supported.
+	if oc get crd imagedigestmirrorsets.config.openshift.io >/dev/null 2>&1 && [[ -z "$(oc get imagecontentsourcepolicy -o name)" ]]; then
+		cat <<EOF | oc apply -f - || {
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: $ICSP_NAME
+spec:
+  imageDigestMirrors:
+  - source: registry.redhat.io/rhosdt
+    mirrors:
+    - registry.stage.redhat.io/rhosdt
 EOF
-		echo "!!! fail to create the ICSP"
-		return 1
-	}
+			echo "!!! fail to create the IDMS"
+			return 1
+		}
+	else
+		cat <<EOF | oc apply -f - || {
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: $ICSP_NAME
+spec:
+  repositoryDigestMirrors:
+  - source: registry.redhat.io/rhosdt
+    mirrors:
+    - registry.stage.redhat.io/rhosdt
+EOF
+			echo "!!! fail to create the ICSP"
+			return 1
+		}
+	fi
 
-	echo "ICSP $ICSP_NAME created successfully"
+	echo "Registry mirror $ICSP_NAME created successfully"
 	return 0
 }
 
@@ -186,7 +199,7 @@ EOF
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
-		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
 		return 1
 	}
@@ -247,7 +260,10 @@ main() {
 	}
 
 	#support hypershift config guest cluster's icsp
-	oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+	# (clusters that got an IDMS above have no ICSP to export, so skip instead of failing on an empty list)
+	if [[ -n "$(oc get imagecontentsourcepolicy -o name)" ]]; then
+		oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+	fi
 
 }
 main

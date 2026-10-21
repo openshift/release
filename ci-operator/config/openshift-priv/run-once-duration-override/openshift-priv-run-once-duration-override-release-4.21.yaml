@@ -2,20 +2,23 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/run-once-duration-override
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: run-once-duration-override-webhook
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: run-once-duration-override-webhook
 promotion:
   to:
-  - name: 4.21-priv
-    namespace: ocp-private
+  - name: "4.21"
+    namespace: ocp-priv
+prowgen:
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.21-priv
-  namespace: ocp-private
+  name: "4.21"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: make verify-gofmt
@@ -25,9 +28,10 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -37,10 +41,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: security
-  optional: true
-  steps:
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

@@ -75,9 +75,12 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_SERVICE_ACCOUNT: installer-dev-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: installer-dev-control-plane-sa
+      XPN_MINIMAL_PERMISSIONS_WITHOUT_DNS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
@@ -106,18 +109,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: installer-rehearse-vsphere
-  cron: '@yearly'
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      MULTI_NIC_IPI: "true"
-      SLEEP_DURATION: 24h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-vsphere-ipi-provision
 - as: installer-rehearse-azurestack
   cluster: build01
   cron: '@yearly'

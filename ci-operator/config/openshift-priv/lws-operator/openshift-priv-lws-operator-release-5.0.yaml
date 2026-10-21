@@ -1,26 +1,29 @@
 base_images:
   kubernetes-sigs-lws:
-    name: 5.0-priv
-    namespace: ocp-private
+    name: "5.0"
+    namespace: ocp-priv
     tag: kubernetes-sigs-lws
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/lws-operator
 images:
-- dockerfile_path: Dockerfile.ci
-  to: lws-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: lws-operator
 promotion:
   to:
-  - name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 5.0-priv
-  namespace: ocp-private
+  name: "5.0"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
@@ -51,10 +54,11 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -69,10 +73,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operand
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operand
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

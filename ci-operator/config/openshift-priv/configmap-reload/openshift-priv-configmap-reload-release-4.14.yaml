@@ -1,29 +1,32 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/configmap-reload
 images:
-- dockerfile_path: Dockerfile.ocp
-  from: base
-  to: configmap-reloader
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: base
+    to: configmap-reloader
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -34,9 +37,10 @@ tests:
   commands: go mod vendor && git diff --exit-code
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.14

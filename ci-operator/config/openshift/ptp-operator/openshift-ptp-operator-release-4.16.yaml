@@ -6,8 +6,9 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: ptp-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: ptp-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
@@ -46,13 +47,15 @@ tests:
   commands: make vet
   container:
     from: src
-- as: e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: operator-e2e
+- always_run: false
+  as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:

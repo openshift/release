@@ -7,28 +7,27 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-operator-controller
 images:
-- dockerfile_path: openshift/catalogd.Dockerfile
-  to: olm-catalogd
-- dockerfile_path: openshift/operator-controller.Dockerfile
-  to: olm-operator-controller
-- dockerfile_path: openshift/registry.Dockerfile
-  to: e2e-test-registry
+  items:
+  - dockerfile_path: openshift/catalogd.Dockerfile
+    to: olm-catalogd
+  - dockerfile_path: openshift/operator-controller.Dockerfile
+    to: olm-operator-controller
 promotion:
   to:
-  - excluded_images:
-    - e2e-test-registry
-    name: 4.23-priv
-    namespace: ocp-private
+  - name: "4.23"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.23-priv
-      namespace: ocp-private
+      name: "4.23"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -54,7 +53,9 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: commitchecker --start ${PULL_BASE_SHA:-main}
+  commands: |
+    commitchecker --start "$(git merge-base ${PULL_BASE_SHA:-main} ${PULL_PULL_SHA:-HEAD})" \
+                  --end "${PULL_PULL_SHA:-HEAD}"
   container:
     from: commitchecker
 - as: check-sync-pr-valid
@@ -72,17 +73,15 @@ tests:
     fi
   container:
     from: src
-- as: openshift-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+- always_run: false
+  as: openshift-e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     test:
     - as: upstream-e2e
       cli: latest
       commands: make -C openshift test-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:
@@ -91,9 +90,8 @@ tests:
     workflow: openshift-e2e-aws
 - always_run: false
   as: openshift-e2e-aws-techpreview
-  optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -101,10 +99,6 @@ tests:
       cli: latest
       commands: |
         make -C openshift test-e2e
-        make -C openshift test-experimental-e2e
-      dependencies:
-      - env: E2E_REGISTRY_IMAGE
-        name: e2e-test-registry
       from: src
       resources:
         requests:
@@ -112,7 +106,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - as: default-catalog-consistency
-  run_if_changed: ^(openshift/default-catalog-consistency/|openshift/catalogd/kustomize/overlays/openshift/catalogs/)
+  run_if_changed: ^(openshift/default-catalog-consistency/|openshift/helm/catalogd\.yaml|openshift/catalogd/)
   steps:
     test:
     - as: default-catalog-tests
@@ -121,8 +115,8 @@ tests:
         cd openshift/default-catalog-consistency
         REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson make test-catalog
       credentials:
-      - mount_path: /var/run/secrets/ci-pull-credentials
-        name: ci-pull-credentials
+      - bundle: ci-pull-credentials
+        mount_path: /var/run/secrets/ci-pull-credentials
         namespace: ci
       from: src
       resources:
@@ -147,6 +141,7 @@ tests:
         make verify
         make build
         make verify-metadata
+        make verify-images-json
       from: src
       resources:
         requests:
@@ -167,16 +162,29 @@ tests:
   container:
     from: src
   run_if_changed: ^openshift/tests-extension/(test/qe/testdata/|pkg/bindata/qe/)
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-techpreview-olmv1-ext
+- always_run: false
+  as: e2e-aws-upgrade-ovn-single-node
+  optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node
+- always_run: false
+  as: e2e-aws-techpreview-olmv1-ext
+  steps:
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --monitor=watch-namespaces
@@ -184,9 +192,10 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: e2e-aws-olmv1-ext
+- always_run: false
+  as: e2e-aws-olmv1-ext
   steps:
-    cluster_profile: aws-5
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv1/all

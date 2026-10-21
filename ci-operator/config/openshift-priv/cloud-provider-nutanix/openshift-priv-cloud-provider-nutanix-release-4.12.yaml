@@ -1,7 +1,7 @@
 base_images:
   base:
-    name: 4.12-priv
-    namespace: ocp-private
+    name: "4.12"
+    namespace: ocp-priv
     tag: base
 binary_build_commands: go build .
 build_root:
@@ -11,23 +11,26 @@ build_root:
     tag: rhel-8-release-golang-1.17-openshift-4.11
 canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  from: base
-  to: nutanix-controller-manager
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    from: base
+    to: nutanix-controller-manager
 promotion:
   to:
-  - name: 4.12-priv
-    namespace: ocp-private
+  - name: "4.12"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
-      namespace: ocp-private
+      name: "4.12"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -36,7 +39,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-nutanix
+- always_run: false
+  as: e2e-nutanix
   cluster: build01
   steps:
     cluster_profile: nutanix

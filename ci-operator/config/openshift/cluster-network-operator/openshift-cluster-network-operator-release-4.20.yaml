@@ -19,8 +19,9 @@ binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: cluster-network-operator
+  items:
+  - dockerfile_path: Dockerfile
+    to: cluster-network-operator
 promotion:
   to:
   - name: "4.20"
@@ -49,16 +50,17 @@ tests:
   commands: hack/verify-style.sh
   container:
     from: src
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-upgrade-gcp-ovn
-- always_run: true
+- always_run: false
   as: e2e-aws-ovn-upgrade-ipsec
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
@@ -66,13 +68,14 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -85,20 +88,22 @@ tests:
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-ovn-ipsec-step-registry
+- always_run: false
+  as: e2e-ovn-ipsec-step-registry
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
@@ -106,11 +111,12 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
   steps:
@@ -121,7 +127,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-ipv6-ipsec
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6-ipsec
   capabilities:
   - intranet
   steps:
@@ -132,9 +139,10 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipsec
-- as: e2e-aws-ovn-windows
+- always_run: false
+  as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -174,7 +182,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
@@ -182,7 +190,7 @@ tests:
   as: e2e-azure-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn-dualstack
@@ -190,13 +198,14 @@ tests:
   as: e2e-azure-ovn-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -204,16 +213,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-gcp-ovn-techpreview
+  pipeline_run_if_changed: ^$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -222,7 +233,7 @@ tests:
   as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -249,17 +260,19 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+- always_run: false
+  as: e2e-aws-ovn-clusternetwork-cidr-expansion
   cron: 0 3 * * 0,2,4,6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
-- as: e2e-aws-ovn-subnet-configs
+- always_run: false
+  as: e2e-aws-ovn-subnet-configs
   cron: 0 3 * * 0,2,4,6
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: ovn-subnet-configs
@@ -267,11 +280,12 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-ovn-hypershift-conformance
+- always_run: false
+  as: e2e-aws-ovn-hypershift-conformance
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
@@ -288,7 +302,7 @@ tests:
   as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       EXTRA_MG_ARGS: --host-network
       MTU_DECREASE: "400"
@@ -318,7 +332,7 @@ tests:
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -326,7 +340,7 @@ tests:
   as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -335,7 +349,7 @@ tests:
   as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
@@ -408,7 +422,7 @@ tests:
   capabilities:
   - intranet
   optional: true
-  run_if_changed: ^bindata\/network\/frr-k8s.*$
+  pipeline_run_if_changed: ^bindata\/network\/frr-k8s.*$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -428,7 +442,8 @@ tests:
       ALL_PROJECTS: "true"
       PROJECT_NAME: cluster-network-operator
     workflow: openshift-ci-security
-- as: hypershift-e2e-aks
+- always_run: false
+  as: hypershift-e2e-aks
   steps:
     cluster_profile: hypershift-aks
     env:
@@ -442,18 +457,29 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- as: e2e-metal-ipi-ovn-dualstack-bgp
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp
   capabilities:
   - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
-- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   capabilities:
   - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- always_run: false
+  as: e2e-metal-ipi-ovn-secondary-encap
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^bindata\/network\/ovn-kubernetes\/common\/008-script-lib\.yaml$|^bindata\/network\/ovn-kubernetes\/(managed|self-hosted)\/ovnkube-node\.yaml$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: cluster-network-operator-ovn-secondary-encap
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

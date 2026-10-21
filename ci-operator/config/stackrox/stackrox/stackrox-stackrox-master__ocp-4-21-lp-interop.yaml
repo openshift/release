@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-ui-test-0.5.2
+    tag: stackrox-ui-test-stable
 releases:
   latest:
     candidate:
@@ -23,6 +23,16 @@ test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: acs-tests-aws-fips
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#acs-interops-testing'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:

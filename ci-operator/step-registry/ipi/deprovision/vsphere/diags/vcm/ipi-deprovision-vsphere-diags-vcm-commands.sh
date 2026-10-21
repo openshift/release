@@ -43,11 +43,16 @@ fi
 
 
 
-curl -kv "https://api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443" > ${ARTIFACT_DIR}/cluster-cert.txt
+for prefix in api api-int; do
+  API_HOSTNAME="${prefix}.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com"
+  echo "$(date -u --rfc-3339=seconds) - collecting certificate for ${API_HOSTNAME}"
 
-echo | \
-    openssl s_client -servername api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com -connect api-int.${NAMESPACE}-${UNIQUE_HASH}.vmc-ci.devcluster.openshift.com:6443 2>/dev/null | \
-    openssl x509 -text
+  curl -kv "https://${API_HOSTNAME}:6443" &> "${ARTIFACT_DIR}/cluster-cert-${prefix}.txt"
+
+  echo | \
+      openssl s_client -servername "${API_HOSTNAME}" -connect "${API_HOSTNAME}:6443" 2>/dev/null | \
+      openssl x509 -text
+done
 
 function collect_sosreport {
   ADDRESS=$1
@@ -240,8 +245,17 @@ function collect_diagnostic_data {
                       JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
                   fi
               fi
-              echo "Collecting VM metrics for ${vm}"
               vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
+              if [ -f "${vcenter_state}/${vmname}.metrics.json" ]; then
+                # Multi-network jobs put each VM on more than one network, so the
+                # outer network loop revisits the same VM once per network it's
+                # attached to. Skip re-collecting (and re-appending to JSON_DATA)
+                # a VM we've already processed, same as the host dedup above.
+                echo "Already collected metrics for ${vmname}, skipping"
+                continue
+              fi
+
+              echo "Collecting VM metrics for ${vm}"
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
               govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
 
@@ -258,7 +272,7 @@ function collect_diagnostic_data {
               # attempt to get and clean up node journals
               curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000
               curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000
-              
+
               METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
               JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" --arg screenshot "$(cat ${vcenter_state}/${vmname}.png | base64 -w0)" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm, "screenshot": $screenshot}')
           done
@@ -277,8 +291,125 @@ function collect_diagnostic_data {
     v_idx=$((v_idx+1));
   done
 
+  collect_vcenter_metric_table "machine-api-operator" "mapi_vsphere_request_duration_seconds_count" "mapi_vsphere_request_duration_seconds_bucket" "operation" "${vcenter_state}/mapi-vsphere-metrics.json"
+  collect_vcenter_metric_table "vsphere-csi-driver" "vsphere_request_ops_seconds_count" "vsphere_request_ops_seconds_bucket" "request" "${vcenter_state}/csi-vsphere-metrics.json"
+
   write_html
 
+}
+
+# Collects vCenter request latency/error metrics exposed by OpenShift
+# components that talk to vCenter directly: the machine-api-operator's
+# vSphere actuator (mapi_vsphere_request_duration_seconds, added in
+# https://github.com/openshift/machine-api-operator/pull/1552) and the
+# vSphere CSI driver (vsphere_request_ops_seconds, from upstream
+# kubernetes-sigs/vsphere-csi-driver). Both are scraped by the in-cluster
+# Prometheus, so they're queried through the thanos-querier pod rather than
+# via govc. Either metric may be absent on older releases; that's handled,
+# not treated as an error.
+#
+# $1: human-readable source name, used in log messages
+# $2: counter metric name (e.g. mapi_vsphere_request_duration_seconds_count)
+# $3: histogram bucket metric name (e.g. mapi_vsphere_request_duration_seconds_bucket)
+# $4: label shared by both metrics identifying the vCenter operation/request
+# $5: output JSON file path
+function collect_vcenter_metric_table() {
+  local label="$1" count_metric="$2" bucket_metric="$3" op_label="$4" out_file="$5"
+  echo "$(date -u --rfc-3339=seconds) - Collecting ${label} request metrics (${count_metric}) from in-cluster Prometheus"
+
+  local q_counts="sum by (client, ${op_label}, status) (${count_metric})"
+  local q_p50="histogram_quantile(0.50, sum by (le, client, ${op_label}) (${bucket_metric}))"
+  local q_p95="histogram_quantile(0.95, sum by (le, client, ${op_label}) (${bucket_metric}))"
+  local q_p99="histogram_quantile(0.99, sum by (le, client, ${op_label}) (${bucket_metric}))"
+
+  # Everything is fetched in a single oc rsh call, mirroring the
+  # gather-extra-commands.sh thanos-querier pattern (one bash -c script run
+  # remotely via curl against the pod's local Prometheus HTTP API), rather
+  # than invoking curl directly as the rsh command: that avoids depending on
+  # how oc rsh splits/forwards a bare multi-flag command line. stderr and the
+  # raw response are always saved so a bad query is debuggable from artifacts
+  # instead of silently producing an empty table.
+  local debug_log="${out_file%.json}-debug.log"
+  local remote_script
+  remote_script=$(cat <<REMOTE
+set -euo pipefail
+query() {
+  curl -f --silent http://localhost:9090/api/v1/query --data-urlencode "query=\$1" || echo '{"data":{"result":[]}}'
+}
+echo "{\"counts\":\$(query '${q_counts}')}"
+echo "{\"p50\":\$(query '${q_p50}')}"
+echo "{\"p95\":\$(query '${q_p95}')}"
+echo "{\"p99\":\$(query '${q_p99}')}"
+REMOTE
+)
+
+  local raw
+  raw=$(oc --insecure-skip-tls-verify rsh -T -n openshift-monitoring -c thanos-query deploy/thanos-querier /bin/bash -c "${remote_script}" 2>"${debug_log}")
+  echo "${raw}" >> "${debug_log}"
+
+  local merged
+  if [[ -z "${raw}" ]] || ! merged=$(jq -s 'reduce .[] as $o ({}; . + $o)' <<<"${raw}" 2>>"${debug_log}"); then
+    echo "$(date -u --rfc-3339=seconds) - unable to query ${count_metric}, see ${debug_log}"
+    echo '{"available": false}' > "${out_file}"
+    return
+  fi
+
+  if [[ "$(echo "${merged}" | jq -r '.counts.data.result | length // 0')" == "0" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ${count_metric} not found on this cluster, skipping"
+    echo '{"available": false}' > "${out_file}"
+    return
+  fi
+
+  echo "${merged}" | jq --arg oplabel "${op_label}" '
+    def quantiles(key): reduce (.[key].data.result[]?) as $r ({}; .[$r.metric.client + "|" + $r.metric[$oplabel]] = ($r.value[1] | tonumber));
+    . as $all |
+    (quantiles("p50")) as $p50 |
+    (quantiles("p95")) as $p95 |
+    (quantiles("p99")) as $p99 |
+    (reduce $all.counts.data.result[] as $r ({};
+      ($r.metric.client + "|" + $r.metric[$oplabel]) as $k |
+      ($r.value[1] | tonumber) as $v |
+      (if $r.metric.status == "success" then "success" else "error" end) as $bucket |
+      .[$k].client = $r.metric.client |
+      .[$k].operation = $r.metric[$oplabel] |
+      .[$k][$bucket] = ((.[$k][$bucket] // 0) + $v)
+    )) as $byOp |
+    {
+      available: true,
+      rows: ($byOp | to_entries | map(.value + {
+        key: .key,
+        success: (.value.success // 0),
+        error: (.value.error // 0),
+        total: ((.value.success // 0) + (.value.error // 0)),
+        p50: $p50[.key],
+        p95: $p95[.key],
+        p99: $p99[.key]
+      }) | sort_by(-.total))
+    }
+    ' > "${out_file}" || echo '{"available": false}' > "${out_file}"
+}
+
+function embed_vcenter_metrics_table() {
+  local file="$1" title="$2" no_data_note="$3"
+  cat >> "${RESULT_HTML}" << EOF
+        <h3>${title}</h3>
+EOF
+  if [[ ! -f "${file}" ]] || [[ "$(jq -r '.available' "${file}" 2>/dev/null)" != "true" ]]; then
+    cat >> "${RESULT_HTML}" << EOF
+        <p>${no_data_note}</p>
+EOF
+    return
+  fi
+  cat >> "${RESULT_HTML}" << 'EOF'
+        <table class="table table-striped table-sm">
+          <thead><tr><th>Client</th><th>Operation</th><th>Success</th><th>Errors</th><th>Total</th><th>p50 (s)</th><th>p95 (s)</th><th>p99 (s)</th></tr></thead>
+          <tbody>
+EOF
+  jq -r '.rows[] | "<tr><td>\(.client | @html)</td><td>\(.operation | @html)</td><td>\(.success // 0)</td><td>\(.error // 0)</td><td>\(.total)</td><td>\(.p50 // "n/a")</td><td>\(.p95 // "n/a")</td><td>\(.p99 // "n/a")</td></tr>"' "${file}" >> "${RESULT_HTML}"
+  cat >> "${RESULT_HTML}" << 'EOF'
+          </tbody>
+        </table>
+EOF
 }
 
 function write_html() {
@@ -288,6 +419,18 @@ function write_html() {
   write_results_html
 }
 
+function format_duration_seconds() {
+  local total_seconds=$1
+  local minutes=$((total_seconds / 60))
+  local seconds=$((total_seconds % 60))
+
+  if [[ ${minutes} -gt 0 ]]; then
+    echo "${minutes}m ${seconds}s"
+  else
+    echo "${seconds}s"
+  fi
+}
+
 function embed_topology_data() {
   echo "<hr>" >> "${RESULT_HTML}"
   for LEASE in "${SHARED_DIR}"/LEASE_*; do
@@ -295,21 +438,56 @@ function embed_topology_data() {
         continue
     fi
 
-    POOL=$(jq --compact-output -r .status.name < "${LEASE}")
-    SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
-    CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
-    DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
-    DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
-    NETWORKS=$(jq --compact-output -r .status.topology.networks[] < "${LEASE}")
     NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
-
     echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
-    echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
-    echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
-    echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
-    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
-    echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
-    echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+
+    CREATED=$(jq -r '.metadata.creationTimestamp // empty' < "${LEASE}")
+    FULFILLED=$(jq -r '[.status.conditions[]? | select(.type == "Fulfilled" and .status == "True")][0].lastTransitionTime // empty' < "${LEASE}")
+
+    # The lease's "Fulfilled" condition only tells us when it last became
+    # fulfilled, not how long the job waited for it, so pair it with the
+    # lease's creation time (when the job requested it) to get the actual
+    # wait duration.
+    FULFILLMENT_TIME="N/A"
+    if [[ -n "${CREATED}" && -n "${FULFILLED}" ]]; then
+      created_epoch=$(date -u -d "${CREATED}" +%s)
+      fulfilled_epoch=$(date -u -d "${FULFILLED}" +%s)
+      FULFILLMENT_TIME=$(format_duration_seconds $((fulfilled_epoch - created_epoch)))
+    fi
+
+    pool_info_count=$(jq '.status.poolInfo | length' < "${LEASE}")
+    if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 0 ]]; then
+      for ((pi = 0; pi < pool_info_count; pi++)); do
+        POOL=$(jq --compact-output -r ".status.poolInfo[${pi}].name" < "${LEASE}")
+        SERVER=$(jq --compact-output -r ".status.poolInfo[${pi}].server" < "${LEASE}")
+        CLUSTER=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.computeCluster" < "${LEASE}")
+        DATACENTER=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.datacenter" < "${LEASE}")
+        DATASTORE=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.datastore" < "${LEASE}")
+        NETWORKS=$(jq --compact-output -r ".status.poolInfo[${pi}].topology.networks[]" < "${LEASE}")
+
+        echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+        echo "&nbsp;&nbsp;- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+      done
+    else
+      POOL=$(jq --compact-output -r .status.name < "${LEASE}")
+      SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
+      CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
+      DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
+      DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
+      NETWORKS=$(jq --compact-output -r '.status.topology.networks[]' < "${LEASE}")
+
+      echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+      echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+      echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+      echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+      echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+      echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+    fi
+    echo "- Time to Fulfill Lease Request: ${FULFILLMENT_TIME}<br>" >> "${RESULT_HTML}"
     echo "<br>" >> "${RESULT_HTML}"
   done
 
@@ -434,6 +612,8 @@ function write_results_html() {
   Virtual Machines </button>
         <button class="list-group-item list-group-item-action" v-on:click="changeContent('host')">
   Hosts            </button>
+        <button class="list-group-item list-group-item-action" v-on:click="changeContent('vcenter')">
+  vCenter Metrics  </button>
          <a href="https://github.com/openshift/release/blob/master/ci-operator/step-registry/ipi/deprovision/vsphere/diags/ipi-deprovision-vsphere-diags-commands.sh" class="list-group-item list-group-item-action text-center" target="_blank">
          <img src="https://github.com/favicon.ico" alt="GitHub logo" title="Found a bug or issue? Visit this project's git repo.">
         </a>
@@ -512,6 +692,16 @@ EOF
             <canvas id="host-cpu-readiness"></canvas>
           </div>
         </div>
+      </div>
+    </data>
+    <data id="vcenter-data">
+      <div id="vcenter-data-content">
+        <h1>vCenter Metrics</h1>
+        <hr>
+EOF
+  embed_vcenter_metrics_table "${vcenter_state}/mapi-vsphere-metrics.json" "Machine API Operator (mapi_vsphere_request_duration_seconds)" 'No vSphere request metrics (<code>mapi_vsphere_request_duration_seconds</code>) were found on this cluster. This metric was introduced by <a href="https://github.com/openshift/machine-api-operator/pull/1552" target="_blank">machine-api-operator#1552</a> and may not be present on older releases.'
+  embed_vcenter_metrics_table "${vcenter_state}/csi-vsphere-metrics.json" "vSphere CSI Driver (vsphere_request_ops_seconds)" 'No vSphere request metrics (<code>vsphere_request_ops_seconds</code>) were found on this cluster.'
+  cat >> ${RESULT_HTML} << EOF
       </div>
     </data>
 

@@ -7,10 +7,6 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  hypershift-operator:
-    name: hypershift-operator
-    namespace: hypershift
-    tag: latest
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,22 +20,25 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-aws
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  to: aws-cluster-api-controllers
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    to: aws-cluster-api-controllers
 promotion:
   to:
-  - name: 4.18-priv
-    namespace: ocp-private
+  - name: "4.18"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -57,7 +56,7 @@ tests:
   as: e2e-aws-capi-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -68,28 +67,30 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-serial
 - as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       E2E_RUN_TAGS: '@capi'
       FEATURE_SET: TechPreviewNoUpgrade
@@ -98,8 +99,9 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-hypershift
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
@@ -109,11 +111,6 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-provider-aws
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.18
   org: openshift-priv

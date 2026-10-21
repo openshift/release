@@ -106,8 +106,21 @@ if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
 
     cmd="${OC_BIN} image mirror ${args[*]}"
     echo "Remote Command: ${cmd}"
-    # shellcheck disable=SC2090
-    ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${cmd}"
+    max_attempts=3
+    attempt=1
+    while [[ $attempt -le $max_attempts ]]; do
+        # shellcheck disable=SC2090
+        if ssh ${ssh_options} ${BASTION_SSH_USER}@${BASTION_IP} "${cmd}"; then
+            break
+        fi
+        if [[ $attempt -eq $max_attempts ]]; then
+            echo "mirror-images-tag-images failed after ${max_attempts} attempts"
+            exit 1
+        fi
+        echo "Attempt ${attempt} failed, retrying in 30s..."
+        sleep 30
+        ((attempt++))
+    done
 else
     args+=(--registry-config="${new_pull_secret}")
     args+=(--filename="${tag_images_list}")
@@ -120,5 +133,18 @@ else
         echo "This oc version does not support --keep-manifest-list, skip it."
     fi
     cmd="${OC_BIN} image mirror ${args[*]}"
-    run_command "${cmd}"
+    max_attempts=3
+    attempt=1
+    while [[ $attempt -le $max_attempts ]]; do
+        if run_command "${cmd}"; then
+            break
+        fi
+        if [[ $attempt -eq $max_attempts ]]; then
+            echo "mirror-images-tag-images failed after ${max_attempts} attempts"
+            exit 1
+        fi
+        echo "Attempt ${attempt} failed, retrying in 30s..."
+        sleep 30
+        ((attempt++))
+    done
 fi

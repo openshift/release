@@ -63,7 +63,11 @@ common_params=(--output json --anonymize --with-doc "$explain_arg" --filter "$ac
 
 mkdir -p "${ARTIFACT_DIR}/namespaces" "${ARTIFACT_DIR}/hostedcluster"
 
-CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+else
+  CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+fi
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' --ignore-not-found)
 
 mgmt_namespaces=(hypershift)

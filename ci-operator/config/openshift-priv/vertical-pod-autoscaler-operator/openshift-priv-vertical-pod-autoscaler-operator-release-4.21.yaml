@@ -4,12 +4,12 @@ base_images:
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
     tag: vertical-pod-autoscaler-operator
   ubi-python-311:
     name: ubi-python-311
@@ -17,21 +17,21 @@ base_images:
     tag: "9"
 build_root:
   from_repository: true
-  use_build_cache: true
 canonical_go_repository: github.com/openshift/vertical-pod-autoscaler-operator
 images:
-- build_args:
-  - name: TARGETOS
-    value: linux
-  - name: TARGETARCH
-    value: amd64
-  dockerfile_path: Dockerfile
-  to: vertical-pod-autoscaler-operator
-- dockerfile_literal: |
-    FROM ubi-python-311
-    RUN pip3 install yamllint
-  from: ubi-python-311
-  to: vpa-yamllint
+  items:
+  - build_args:
+    - name: TARGETOS
+      value: linux
+    - name: TARGETARCH
+      value: amd64
+    dockerfile_path: Dockerfile
+    to: vertical-pod-autoscaler-operator
+  - dockerfile_literal: |
+      FROM ubi-python-311
+      RUN pip3 install yamllint
+    from: ubi-python-311
+    to: vpa-yamllint
 operator:
   bundles:
   - as: vertical-pod-autoscaler-operator-bundle
@@ -46,18 +46,20 @@ promotion:
   to:
   - additional_images:
       vertical-pod-autoscaler-operator-bundle: vertical-pod-autoscaler-operator-bundle
-    name: 4.21-priv
-    namespace: ocp-private
+    name: "4.21"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.21-priv
-      namespace: ocp-private
+      name: "4.21"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.21-priv
-      namespace: ocp-private
+      name: "4.21"
+      namespace: ocp-priv
   multilatest:
     release:
       architecture: multi
@@ -106,10 +108,11 @@ tests:
     env:
       PROJECT_NAME: vertical-pod-autoscaler-operator
     workflow: openshift-ci-security
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -124,10 +127,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-olm
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-olm
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest
@@ -150,10 +154,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-upgrade
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest
@@ -204,10 +209,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-components
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator-components
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: deploy
       cli: latest
@@ -243,10 +249,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-actuation
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws-operator-actuation
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -266,7 +273,7 @@ tests:
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     allow_best_effort_post_steps: true
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       RELEASE_IMAGE_LATEST: release:multilatest
     test:

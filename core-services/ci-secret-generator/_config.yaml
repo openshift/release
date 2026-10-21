@@ -20,6 +20,8 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
     - vsphere02
     service_account:
@@ -56,7 +58,38 @@
     - ci-operator
     - cluster-display
     - ci-images-mirror
+    - ci-operator-configresolver
+    - payload-testing-ui
+    - horologium
     - promotion-quay-tagger
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - core-ci
+    service_account:
+    - pj-rehearse
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: trt-aggregator
+  params:
+    cluster:
+    - core-ci
+    service_account:
+    - trt-aggregator-waiter
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -102,6 +135,8 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
     - vsphere02
     service_account:
@@ -129,6 +164,8 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
     - vsphere02
     service_account:
@@ -156,6 +193,8 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
     service_account:
     - pod-scaler
@@ -182,9 +221,39 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
+    - hosted-mgmt
     service_account:
     - component-monitor
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ship-status mcp-server --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.mcp-server.$(cluster).token.txt
+  item_name: ship-status-dash-mcp-server
+  params:
+    cluster:
+    - core-ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - hosted-mgmt
+    - hosted-mgmt2
+    service_account:
+    - cluster-display
+    - github-ldap-user-group-creator
+    - hypershift-workload
+    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -198,12 +267,8 @@
     cluster:
     - hosted-mgmt
     service_account:
-    - cluster-display
     - clusterpool-manager
-    - github-ldap-user-group-creator
     - hive
-    - hypershift-workload
-    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token --namespace ci ci-monitoring --duration=2419200s --bound-object-kind=Secret
@@ -214,6 +279,7 @@
     cluster:
     - app.ci
     - hosted-mgmt
+    - hosted-mgmt2
     service_account:
     - ci-monitoring
 - fields:
@@ -229,7 +295,6 @@
     cluster:
     - build01
     - build02
-    - build04
     service_account:
     - sprint-automation
 - fields:
@@ -256,11 +321,50 @@
   item_name: build_farm
   params:
     cluster:
+    - build10
+- fields:
+  - cmd: /usr/bin/generate_thanos_tls.sh /tmp/thanos-tls /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      thanos-receive.core.ci.devcluster.openshift.com && cat /tmp/thanos-tls/server.crt
+    name: server.crt
+  - cmd: cat /tmp/thanos-tls/server.key
+    name: server.key
+  item_name: ci-monitoring-thanos-tls
+  params:
+    cluster:
+    - core-ci
+- fields:
+  - cmd: /usr/bin/generate_thanos_client_tls.sh /tmp/thanos-client-tls /tmp/build-farm-credentials/sa.config-updater.core-ci.config
+      $(cluster) && cat /tmp/thanos-client-tls/client.crt
+    name: client.$(cluster).crt
+  - cmd: cat /tmp/thanos-client-tls/client.key
+    name: client.$(cluster).key
+  item_name: ci-monitoring-thanos-tls
+  params:
+    cluster:
     - build01
+    - build02
     - build03
+    - build04
     - build05
     - build06
     - build07
+    - build08
     - build09
     - build10
     - build11
+    - build12
+    - build13
+    - core-ci
+    - app.ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n rosa-cluster-lease rosa-cluster-lease-manager --duration=2419200s
+      --bound-object-kind=Secret --bound-object-name=rosa-cluster-lease-manager-token
+    name: sa.rosa-cluster-lease-manager.$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      rosa-cluster-lease-manager rosa-cluster-lease
+    name: sa.rosa-cluster-lease-manager.$(cluster).config
+  item_name: rosa-cluster-lease-credentials
+  params:
+    cluster:
+    - hosted-mgmt

@@ -7,25 +7,29 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/driver-toolkit
 images:
-- dockerfile_path: Dockerfile
-  to: driver-toolkit
+  items:
+  - dockerfile_path: Dockerfile
+    to: driver-toolkit
+  - dockerfile_path: Dockerfile.rhel10
+    to: driver-toolkit-10
 promotion:
   to:
   - additional_images:
       driver-toolkit-tests: src
-    disabled: true
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -50,13 +54,22 @@ tests:
     cat /etc/driver-toolkit-release.json
   container:
     from: driver-toolkit
-- as: e2e-aws
+- as: verify-image-content-dtk-for-rhel-10
+  commands: |
+    ls /manifests/01-openshift-imagestream.yaml
+    ls /manifests/image-references
+    cat /etc/driver-toolkit-release.json
+  container:
+    from: driver-toolkit-10
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
-- as: e2e-upgrade
+- always_run: false
+  as: e2e-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.22

@@ -3,8 +3,11 @@ workflow:
   steps:
     pre:
       - chain: ipi-conf-aws
+      - ref: ipi-conf-aws-secureboot
       - chain: ipi-install
     test:
+      - ref: aws-secureboot-verify
+      - ref: nvidia-gpu-operator-merge-stage-credentials
       - as: gpu-operator-e2e
         commands: make run-tests
         from: nvidia-ci
@@ -36,18 +39,32 @@ workflow:
             documentation: |-
               The catalog source index image to use if the NVIDIA GPU operator
               does not exist in the default catalog source.
+          - name: NVIDIAGPU_PRECOMPILED_DRIVER_BRANCH
+            default: "all"
+            documentation: |-
+              The branch(es) of the precompiled driver to use for the NVIDIA GPU operator.
           - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
             default: ""
             documentation: |-
               The OLM subscription channel for the NVIDIA GPU operator.
               Latest if not specified.
+          - name: NVIDIAGPU_USE_PRECOMPILED_DRIVER
+            default: "false"
+            documentation: |-
+              Uses precompiled drivers for the NVIDIA GPU operator.
           - name: NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH
             default: ""
             documentation: |-
               A JSON patch that if specified, will be applied to the default cluster policy from ALM examples.
               The patch must be written according to RFC 6902, which is used with `kubectl patch` command.
     post:
-      - chain: ipi-aws-post
+      - ref: gather-must-gather
+      - ref: aws-deprovision-secureboot
+      - ref: ipi-deprovision-deprovision
+      - ref: aws-deprovision-users-and-policies
+      - ref: aws-deprovision-verification
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     env:
       CONTROL_PLANE_REPLICAS: "1"
       CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge

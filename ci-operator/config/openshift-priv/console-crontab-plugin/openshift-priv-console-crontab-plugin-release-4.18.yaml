@@ -5,22 +5,25 @@ build_root:
     tag: console-plugin-test-cypress
 canonical_go_repository: github.com/openshift/console-crontab-plugin
 images:
-- dockerfile_path: Dockerfile
-  to: console-crontab-plugin
+  items:
+  - dockerfile_path: Dockerfile
+    to: console-crontab-plugin
 promotion:
   to:
-  - name: 4.18-priv
-    namespace: ocp-private
+  - name: "4.18"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.18-priv
-      namespace: ocp-private
+      name: "4.18"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -39,9 +42,10 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: e2e-aws-console-crontab-plugin
+- always_run: false
+  as: e2e-aws-console-crontab-plugin
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

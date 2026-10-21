@@ -3,27 +3,34 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.22"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-autoscaler-operator
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: cluster-autoscaler-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: cluster-autoscaler-operator
 promotion:
   to:
-  - name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 5.0-priv
-      namespace: ocp-private
+      name: "5.0"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -50,28 +57,39 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-machine-api
+      SCANNER_CPU: 500m
+      SCANNER_MEMORY: 1Gi
+    test:
+    - ref: openshift-e2e-test
+    - ref: tls-scanner-run
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-upgrade
-  skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- always_run: false
+  as: e2e-upgrade
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^rpms\.(.*)\.yaml$|^renovate.json$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-nutanix-operator
@@ -82,7 +100,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -92,11 +110,11 @@ tests:
   as: e2e-aws-periodic-pre
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -106,11 +124,11 @@ tests:
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -120,11 +138,11 @@ tests:
   as: e2e-azure-periodic-pre
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -138,7 +156,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -152,7 +170,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic-autoscaler
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
@@ -162,7 +180,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     env:
       E2E_RUN_TAGS: '@cas'
       TEST_FILTERS: NonHyperShiftHOST

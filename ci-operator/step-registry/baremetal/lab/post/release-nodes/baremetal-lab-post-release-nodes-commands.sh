@@ -22,6 +22,7 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "$CLUSTER_NAME" << 'EOF'
 CLUSTER_NAME="$1"
+DATA_STORAGE="/var/mnt/data-storage"
 
 LOCK="/tmp/reserved_file.lock"
 LOCK_FD=200
@@ -49,11 +50,13 @@ flock -u $LOCK_FD
 # Delete mirror-registry tabs, if any
 if [ -f "/var/builds/${CLUSTER_NAME}/mirror_registry_url" ]; then
     REGISTRY_PORT=$(head -n 1 "/var/builds/${CLUSTER_NAME}/mirror_registry_url" | awk -F':' '{print $2}')
-    rm -rf /opt/registry-${REGISTRY_PORT}/data/docker/registry/v2/repositories/${CLUSTER_NAME}
+    rm -rf ${DATA_STORAGE}/registry-${REGISTRY_PORT}/data/docker/registry/v2/repositories/${CLUSTER_NAME}
 fi
 # TODO normalize and sanitize paths
-rm -rf /{var/builds,opt/html,opt/dnsmasq/tftpboot,opt/nfs}/${CLUSTER_NAME}
+for base in /var/builds ${DATA_STORAGE}/html /opt/dnsmasq/tftpboot /opt/nfs; do
+  rm -rf "${base}/${CLUSTER_NAME}"
+done
 # Delete agent-installer images, if any
-rm -f /opt/html/${CLUSTER_NAME}.*.iso
+rm -f ${DATA_STORAGE}/html/${CLUSTER_NAME}.*.iso
 
 EOF

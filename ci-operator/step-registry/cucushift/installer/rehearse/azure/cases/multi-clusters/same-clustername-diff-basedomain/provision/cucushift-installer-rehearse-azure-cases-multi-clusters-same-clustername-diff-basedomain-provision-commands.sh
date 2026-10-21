@@ -296,7 +296,7 @@ cat "${SHARED_DIR}/install-config.yaml" > "${install_dir}/install-config.yaml"
 yq-go w -i "${install_dir}/install-config.yaml" 'baseDomain' "${AZURE_SECOND_BASE_DOMAIN}"
 
 echo "Creating 2nd cluster with same cluster name in same region, but diffrent basedomain..."
-cat "${install_dir}/install-config.yaml" | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/cluster-2-install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${install_dir}/install-config.yaml" | tee "${ARTIFACT_DIR}/cluster-2-install-config.yaml"
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 openshift-install create cluster --dir="${install_dir}" 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 wait "$!"

@@ -383,6 +383,9 @@ config_updater:
       - build09
       - build10
       - build11
+      - build12
+      - build13
+      - core-ci
       - vsphere02
       namespaces:
       - ci
@@ -400,12 +403,19 @@ config_updater:
       - build09
       - build10
       - build11
+      - build12
+      - build13
       - core-ci
       - vsphere02
       namespaces:
       - ocp
   gzip: false
   maps:
+    ci-operator/lease/proxy-client.sh:
+      cluster_groups:
+      - build_farm_ci
+      key: client.sh
+      name: lease-proxy
     clusters/app.ci/backport-verifier/_config.yaml:
       clusters:
         app.ci:
@@ -418,28 +428,28 @@ config_updater:
         - ci
       key: config.yaml
       name: publicize-config
-    clusters/build-clusters/01_cluster/sshd-bastion/ppc64le-libvirt/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/ppc64le-libvirt/sshd_config:
       clusters:
         build01:
         - bastion-ppc64le-libvirt
         build02:
         - bastion-ppc64le-libvirt
       name: sshd-config-ppc64le-libvirt
-    clusters/build-clusters/01_cluster/sshd-bastion/ppc64le/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/ppc64le/sshd_config:
       clusters:
         build01:
         - bastion-ppc64le
         build02:
         - bastion-ppc64le
       name: sshd-config-ppc64le
-    clusters/build-clusters/01_cluster/sshd-bastion/telco/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/telco/sshd_config:
       clusters:
         build01:
         - bastion-telco
         build02:
         - bastion-telco
       name: sshd-config-telco
-    clusters/build-clusters/01_cluster/sshd-bastion/z/sshd_config:
+    clusters/build-clusters/build01/sshd-bastion/z/sshd_config:
       clusters:
         build01:
         - bastion-z
@@ -456,8 +466,14 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       name: ci-secret-bootstrap
     core-services/ci-secret-bootstrap/gsm-config.yaml:
+      cluster_groups:
+      - build_farm_ci
+      name: gsm-config
+    core-services/ci-secret-bootstrap/gsm-project-config.yaml:
       cluster_groups:
       - build_farm_ci
       name: gsm-config
@@ -465,10 +481,14 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       name: ci-secret-generator
     core-services/image-mirroring/**/mapping_*:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       name: image-mirror-mappings
     core-services/jira-lifecycle-plugin/config.yaml:
@@ -481,29 +501,29 @@ config_updater:
       clusters:
         app.ci:
         - ci
-      name: pr-reminder-config
-    core-services/prow/02_config/**/_pluginconfig.yaml:
-      clusters:
-        app.ci:
+        core-ci:
         - ci
-      name: plugins
-      use_full_path_as_key: true
+      name: pr-reminder-config
     core-services/prow/02_config/**/_prowconfig.yaml:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       gzip: true
       name: config
       use_full_path_as_key: true
     core-services/prow/02_config/_boskos.yaml:
       clusters:
-        app.ci:
+        core-ci:
         - ci
       key: boskos.yaml
       name: resources
     core-services/prow/02_config/_config.yaml:
       clusters:
         app.ci:
+        - ci
+        core-ci:
         - ci
       gzip: true
       key: config.yaml
@@ -512,14 +532,10 @@ config_updater:
       clusters:
         app.ci:
         - ci
+        core-ci:
+        - ci
       key: labels.yaml
       name: labels
-    core-services/prow/02_config/_plugins.yaml:
-      clusters:
-        app.ci:
-        - ci
-      key: plugins.yaml
-      name: plugins
     core-services/prow/02_config/deck-extensions/*:
       clusters:
         app.ci:
@@ -535,10 +551,30 @@ config_updater:
         app.ci:
         - ci
       name: qe-private-deck-extensions
-    core-services/release-controller/_repos/*:
+    core-services/release-controller/_repos/ocp-3.*:
       cluster_groups:
       - build_farm_ocp
-      name: base-repos
+      name: base-repos-4-early
+    core-services/release-controller/_repos/ocp-4.[1-9]-*:
+      cluster_groups:
+      - build_farm_ocp
+      name: base-repos-4-early
+    core-services/release-controller/_repos/ocp-4.1[0-5]-*:
+      cluster_groups:
+      - build_farm_ocp
+      name: base-repos-4-early
+    core-services/release-controller/_repos/ocp-4.1[6-9]-*:
+      cluster_groups:
+      - build_farm_ocp
+      name: base-repos-4-mid
+    core-services/release-controller/_repos/ocp-4.2[0-9]-*:
+      cluster_groups:
+      - build_farm_ocp
+      name: base-repos-4-late
+    core-services/release-controller/_repos/ocp-5.*:
+      cluster_groups:
+      - build_farm_ocp
+      name: base-repos-5
     core-services/release-controller/release-qualifiers.yaml:
       clusters:
         app.ci:
@@ -550,7 +586,16 @@ config_updater:
         app.ci:
         - ci
       name: retester-config
+    core-services/sync-rover-groups/_config.yaml:
+      clusters:
+        core-ci:
+        - ci
+      key: ownership.yaml
+      name: gsm-proxy-ownership
 dco:
+  openshift/rosa:
+    trusted_apps:
+    - red-hat-konflux
   stolostron/cert-policy-controller:
     trusted_apps:
     - red-hat-konflux
@@ -579,6 +624,7 @@ help:
   help_guidelines_url: https://git.k8s.io/community/contributors/guide/help-wanted.md
 jira:
   disabled_jira_projects:
+  - ac
   - ocpbugs
   - enterprise
   - patch
@@ -600,10 +646,15 @@ label:
   - qe-approved
   - ux-approved
   - no-qe
-  - downstream-change-needed
   - rebase/manual
   - cluster-config-api-changed
   - run-integration-tests
+  - verified
+  - ready-for-human-review
+  - reliability
+  - hotfix
+  - do-not-merge/needs-hotfix-approval
+  - do-not-merge/version-blocked
   restricted_labels:
     '*':
     - allowed_teams:
@@ -639,6 +690,12 @@ label:
       - openshift-patch-managers
       - openshift-staff-engineers
       - openshift-release-oversight
+      - openshift-sustaining-engineers
+      label: jira/skip-dependent-bug-check
+    - allowed_teams:
+      - openshift-patch-managers
+      - openshift-staff-engineers
+      - openshift-release-oversight
       label: bugzilla/valid-bug
     - allowed_teams:
       - openshift-release-oversight
@@ -649,28 +706,36 @@ label:
       - openshift-team-leads
       - openshift-staff-engineers
       label: stability-fix-approved
+    - allowed_teams:
+      - openshift-release-oversight
+      - openshift-staff-engineers
+      - technical-release-team
+      label: ci/severity-critical
 override:
   allow_top_level_owners: true
   allowed_github_teams:
     openshift:
+    - openshift-ci-job-overriders
     - openshift-release-oversight
     - openshift-staff-engineers
     - openshift-sustaining-engineers
+    osac-project:
+    - wg-infra
 owners:
   filenames:
     netobserv/flowlogs-pipeline:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    netobserv/netobserv-cli:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     netobserv/netobserv-ebpf-agent:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
-    netobserv/network-observability-cli:
+    netobserv/netobserv-operator:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
-    netobserv/network-observability-console-plugin:
-      owners: DOWNSTREAM_OWNERS
-      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
-    netobserv/network-observability-operator:
+    netobserv/netobserv-web-console:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift-kni/scheduler-plugins:
@@ -733,6 +798,8 @@ owners:
   labels_denylist:
   - approved
   - lgtm
+  skip_collaborators:
+  - openshift-online/hp-gitops-manifests
 project_config:
   project_org_configs:
     redhat-developer:
@@ -740,6 +807,8 @@ project_config:
         odo:
           repo_maintainers_team_id: 3240507
 project_manager: {}
+release_note:
+  guidelines_url: https://git.k8s.io/community/contributors/guide/release-notes.md
 repo_milestone:
   redhat-developer/odo:
     maintainers_friendly_name: odo maintainers
@@ -754,6 +823,10 @@ require_matching_label:
   repo: hypershift
 retitle:
   allow_closed_issues: true
+rifle:
+  ignore_drafts: true
+  max_request_count: 2
+  request_count: 2
 sigmention:
   regexp: (?m)@openshift/sig-([\w-]*)
 size:

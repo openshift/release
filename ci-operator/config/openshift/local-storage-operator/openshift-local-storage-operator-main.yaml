@@ -1,22 +1,27 @@
 base_images:
   ocp_4.14_cli:
-    name: "4.22"
+    name: "5.1"
     namespace: ocp
     tag: cli
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "5.0"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: local-storage-operator
-- dockerfile_path: Dockerfile.diskmaker.rhel7
-  to: local-storage-diskmaker
-- dockerfile_path: Dockerfile.mustgather
-  from: ocp_4.14_cli
-  to: local-storage-mustgather
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: local-storage-operator
+  - dockerfile_path: Dockerfile.diskmaker.rhel7
+    to: local-storage-diskmaker
+  - dockerfile_path: Dockerfile.mustgather
+    from: ocp_4.14_cli
+    to: local-storage-mustgather
 operator:
   bundles:
   - as: local-storage-operator-bundle
@@ -29,17 +34,17 @@ operator:
     with: pipeline:local-storage-diskmaker
 promotion:
   to:
-  - name: "4.22"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -55,9 +60,10 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-operator
+- always_run: false
+  as: e2e-operator
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index-local-storage-operator-bundle
     env:
@@ -92,6 +98,50 @@ tests:
       TEST_SCENARIOS: \[LSO\]
     test:
     - ref: openshift-extended-test
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-scanner-local-storage
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      SCAN_NAMESPACE: openshift-local-storage
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-groups-scanner-local-storage
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-local-storage
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
 - as: verify-deps
   steps:

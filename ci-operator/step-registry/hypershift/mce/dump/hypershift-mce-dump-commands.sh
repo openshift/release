@@ -3,10 +3,19 @@
 set -xeuo pipefail
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
-CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+else
+  CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+fi
+
+DUMP_GUEST_CLUSTER=${DUMP_GUEST_CLUSTER:-"true"}
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
 EXTRA_ARGS=""
 PLATFORM_TYPE=$(oc get hostedclusters -n ${HOSTED_CLUSTER_NS} ${CLUSTER_NAME} -ojsonpath="{.spec.platform.type}")
@@ -17,6 +26,6 @@ fi
 bin/hypershift dump cluster "${EXTRA_ARGS}" \
 --artifact-dir="${ARTIFACT_DIR}" \
 --namespace "${HOSTED_CLUSTER_NS}" \
---dump-guest-cluster=true \
+--dump-guest-cluster="${DUMP_GUEST_CLUSTER}" \
 --name="${CLUSTER_NAME}"
 

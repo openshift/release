@@ -1,7 +1,7 @@
 base_images:
   ocp_4.13_cli:
-    name: 4.13-priv
-    namespace: ocp-private
+    name: "4.13"
+    namespace: ocp-priv
     tag: cli
 build_root:
   image_stream_tag:
@@ -10,23 +10,26 @@ build_root:
     tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/network.offline_migration_sdn_to_ovnk
 images:
-- dockerfile_path: ci/Dockerfile
-  from: ocp_4.13_cli
-  to: ansible-test-runner
+  items:
+  - dockerfile_path: ci/Dockerfile
+    from: ocp_4.13_cli
+    to: ansible-test-runner
 promotion:
   to:
-  - name: 4.13-priv
-    namespace: ocp-private
+  - name: "4.13"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
-      namespace: ocp-private
+      name: "4.13"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -47,7 +50,7 @@ tests:
     from: ansible-test-runner
 - as: migration
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test-migration
       cli: latest
@@ -62,7 +65,7 @@ tests:
     workflow: ipi-aws-sdn
 - as: rollback
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     test:
     - as: test-rollback
       cli: latest

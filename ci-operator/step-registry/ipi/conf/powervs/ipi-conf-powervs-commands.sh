@@ -59,6 +59,18 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
   # Hopefully the entire hostname (including the BASE_DOMAIN) is less than 255 bytes.
   # Also, the CLUSTER_NAME seems to be truncated at 21 characters long.
   case "${LEASED_RESOURCE}" in
+    "dal10-powervs-3-quota-slice-0")
+      CLUSTER_NAME="p-dal10-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-1")
+      CLUSTER_NAME="p-dal10-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-2")
+      CLUSTER_NAME="p-dal10-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal10-powervs-3-quota-slice-3")
+      CLUSTER_NAME="p-dal10-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "lon04-powervs-6-quota-slice-0")
       CLUSTER_NAME="p-lon04-0-${CLUSTER_NAME_MODIFIER}"
     ;;
@@ -95,6 +107,24 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
     "fran-powervs-8-quota-slice-3")
       CLUSTER_NAME="p-fran-3-${CLUSTER_NAME_MODIFIER}"
     ;;
+    "sao04-powervs-9-quota-slice-0")
+      CLUSTER_NAME="p-sao04-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "sao04-powervs-9-quota-slice-1")
+      CLUSTER_NAME="p-sao04-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal14-powervs-10-quota-slice-0")
+      CLUSTER_NAME="p-dal14-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal14-powervs-10-quota-slice-1")
+      CLUSTER_NAME="p-dal14-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal14-powervs-10-quota-slice-2")
+      CLUSTER_NAME="p-dal14-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "dal14-powervs-10-quota-slice-3")
+      CLUSTER_NAME="p-dal14-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "mad02-powervs-5-quota-slice-0")
       CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
     ;;
@@ -122,15 +152,34 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-PLATFORM_ARGS_COMPUTE=( )
-PLATFORM_ARGS_WORKER=( )
+PLATFORM_ARGS_COMPUTE=( "sysType" "${POWERVS_SYS_TYPE}" )
+PLATFORM_ARGS_WORKER=( "sysType" "${POWERVS_SYS_TYPE}" )
 POWERVS_ZONE=${LEASED_RESOURCE}
 PERSISTENT_TG=""
 PERSISTENT_VPC=""
 case "${LEASED_RESOURCE}" in
-   "dal10")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10")
+   "dal10-powervs-3-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-0")
       POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-1")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-2")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
+      VPCREGION=us-south
+   ;;
+   "dal10-powervs-3-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10-3")
+      POWERVS_REGION=dal
+      POWERVS_ZONE=dal10
       VPCREGION=us-south
    ;;
    "fran-powervs-8-quota-slice-0")
@@ -138,9 +187,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=eu-de
       POWERVS_ZONE=eu-de-1
       VPCREGION=eu-de
-      # Override sysType for this leased resource
-      PLATFORM_ARGS_COMPUTE+=( "sysType" "s1022" )
-      PLATFORM_ARGS_WORKER+=( "sysType" "s1022" )
    ;;
    "fran-powervs-8-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
@@ -160,6 +206,42 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=eu-de-2
       VPCREGION=eu-de
    ;;
+   "sao04-powervs-9-quota-slice-0")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-0")
+       POWERVS_REGION=sao
+       POWERVS_ZONE=sao04
+       VPCREGION=br-sao
+    ;;
+   "sao04-powervs-9-quota-slice-1")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO04-1")
+       POWERVS_REGION=sao
+       POWERVS_ZONE=sao04
+       VPCREGION=br-sao
+    ;;
+   "dal14-powervs-10-quota-slice-0")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL14-0")
+       POWERVS_REGION=dal
+       POWERVS_ZONE=dal14
+       VPCREGION=us-south
+    ;;
+   "dal14-powervs-10-quota-slice-1")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL14-1")
+       POWERVS_REGION=dal
+       POWERVS_ZONE=dal14
+       VPCREGION=us-south
+    ;;
+   "dal14-powervs-10-quota-slice-2")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL14-2")
+       POWERVS_REGION=dal
+       POWERVS_ZONE=dal14
+       VPCREGION=us-south
+    ;;
+   "dal14-powervs-10-quota-slice-3")
+       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL14-3")
+       POWERVS_REGION=dal
+       POWERVS_ZONE=dal14
+       VPCREGION=us-south
+    ;;
    "lon04-powervs-6-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-0")
       POWERVS_REGION=lon
@@ -443,11 +525,10 @@ sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
-# Add the chrony config for ppc64le
+# Add the chrony config for powervs nodes.
 # Sets chrony server to clock.corp.redhat.com for both masters and workers.
-if [ "${ARCH}" = "ppc64le" ]; then
-  echo "Saving chrony worker yaml config..."
-  cat >> "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
+echo "Saving chrony worker yaml config..."
+cat >> "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -468,8 +549,8 @@ spec:
         path: /etc/chrony.conf
 EOF
 
-  echo "Saving chrony master yaml config..."
-  cat >> "${SHARED_DIR}/99-chrony-master.yaml" << EOF
+echo "Saving chrony master yaml config..."
+cat >> "${SHARED_DIR}/99-chrony-master.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -489,7 +570,97 @@ spec:
         overwrite: true
         path: /etc/chrony.conf
 EOF
-fi
+
+# Add the powervm-rmc manifests so that RSCT/RMC runs on every node.
+echo "Saving powervm-rmc namespace yaml config..."
+cat > "${SHARED_DIR}/powervm-rmc-namespace.yaml" << EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: powervm-rmc
+EOF
+
+echo "Saving powervm-rmc serviceaccount yaml config..."
+cat > "${SHARED_DIR}/powervm-rmc-serviceaccount.yaml" << EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: powervm-rmc
+  namespace: powervm-rmc
+EOF
+
+echo "Saving powervm-rmc scc rolebinding yaml config..."
+cat > "${SHARED_DIR}/powervm-rmc-scc-rolebinding.yaml" << EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: powervm-rmc-privileged-scc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: powervm-rmc
+  namespace: powervm-rmc
+EOF
+
+echo "Saving powervm-rmc daemonset yaml config..."
+cat > "${SHARED_DIR}/powervm-rmc-daemonset.yaml" << EOF
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: powervm-rmc
+  namespace: powervm-rmc
+spec:
+  selector:
+    matchLabels:
+      app: powervm-rmc
+  template:
+    metadata:
+      labels:
+        app: powervm-rmc
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: ppc64le
+      restartPolicy: Always
+      serviceAccountName: powervm-rmc
+      hostNetwork: true
+      containers:
+        - name: powervm-rmc
+          image: quay.io/powercloud/rsct-ppc64le:latest-ubi9
+          ports:
+            - name: rmc-tcp
+              hostPort: 657
+              containerPort: 657
+              protocol: TCP
+            - name: rmc-udp
+              hostPort: 657
+              containerPort: 657
+              protocol: UDP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 500Mi
+            limits:
+              memory: 4Gi
+          volumeMounts:
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+          securityContext:
+            privileged: true
+            runAsUser: 0
+      serviceAccount: powervm-rmc
+      volumes:
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+EOF
 
 echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
 read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
@@ -520,7 +691,7 @@ fi
 #   - Service Instance
 #   - Transit Gateway
 #   - Virtual Private Cloud
-if echo ${BRANCH} | awk -F. '{ if ($1 == 4 && $2 >= 18) { exit 0 } else { exit 1 } }'; then
+if printf '%s\n' "${BRANCH}" | awk -F. '{ if (($1 == 4 && $2 >= 18) || $1 >= 5) { exit 0 } else { exit 1 } }'; then
     echo "Removing existing service instance!"
     sed -i -e '/'${SERVICE_INSTANCE}'/d' "${CONFIG}"
     echo "Removing existing transit gateway!"

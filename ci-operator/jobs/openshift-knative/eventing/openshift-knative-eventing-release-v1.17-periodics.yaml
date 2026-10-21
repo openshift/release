@@ -1,14 +1,73 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
-  cron: 54 0 * * 2,6
+  cluster: build03
+  cron: 23 1 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -30,7 +89,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -63,6 +126,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -83,6 +152,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -93,15 +171,74 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 46 1 * * 2,6
+  cluster: build03
+  cron: 43 1 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -123,7 +260,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -156,6 +297,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -176,6 +323,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -186,15 +342,74 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 20 2 * * 2,6
+  cluster: build03
+  cron: 4 1 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -216,7 +431,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -249,6 +468,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -269,6 +494,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -279,15 +513,74 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 16 0 * * 2,6
+  cluster: build03
+  cron: 16 5 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
@@ -309,7 +602,11 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
@@ -342,6 +639,12 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -362,6 +665,15 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -372,20 +684,79 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 32 5 * * 2,6
+  cluster: build03
+  cron: 41 0 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-release-v1.17-420-test-conformance-c
+  name: periodic-ci-openshift-knative-eventing-release-v1.17-421-test-conformance-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -400,13 +771,18 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-conformance-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -424,11 +800,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -444,9 +829,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -460,20 +860,79 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 46 1 * * 2,6
+  cluster: build03
+  cron: 35 4 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-release-v1.17-420-test-e2e-c
+  name: periodic-ci-openshift-knative-eventing-release-v1.17-421-test-e2e-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -488,13 +947,18 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-e2e-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -512,11 +976,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -532,9 +1005,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -548,20 +1036,79 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 2 4 * * 2,6
+  cluster: build03
+  cron: 42 1 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-release-v1.17-420-test-encryption-auth-e2e-c
+  name: periodic-ci-openshift-knative-eventing-release-v1.17-421-test-encryption-auth-e2e-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -576,13 +1123,18 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-encryption-auth-e2e-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -600,11 +1152,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -620,9 +1181,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials
@@ -636,20 +1212,79 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 37 2 * * 2,6
+  cluster: build03
+  cron: 6 5 * * 2,6
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   extra_refs:
   - base_ref: release-v1.17
     org: openshift-knative
     repo: eventing
+    sparse_checkout_files:
+    - openshift/ci-operator/knative-images/apiserver_receive_adapter/Dockerfile
+    - openshift/ci-operator/knative-images/appender/Dockerfile
+    - openshift/ci-operator/knative-images/channel_controller/Dockerfile
+    - openshift/ci-operator/knative-images/channel_dispatcher/Dockerfile
+    - openshift/ci-operator/knative-images/controller/Dockerfile
+    - openshift/ci-operator/knative-images/event_display/Dockerfile
+    - openshift/ci-operator/knative-images/filter/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats/Dockerfile
+    - openshift/ci-operator/knative-images/heartbeats_receiver/Dockerfile
+    - openshift/ci-operator/knative-images/ingress/Dockerfile
+    - openshift/ci-operator/knative-images/jobsink/Dockerfile
+    - openshift/ci-operator/knative-images/migrate/Dockerfile
+    - openshift/ci-operator/knative-images/mqttsource/Dockerfile
+    - openshift/ci-operator/knative-images/mtchannel_broker/Dockerfile
+    - openshift/ci-operator/knative-images/mtping/Dockerfile
+    - openshift/ci-operator/knative-images/pong/Dockerfile
+    - openshift/ci-operator/knative-images/schema/Dockerfile
+    - openshift/ci-operator/knative-images/webhook/Dockerfile
+    - openshift/ci-operator/knative-images/websocketsource/Dockerfile
+    - openshift/ci-operator/knative-test-images/event-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/eventshub/Dockerfile
+    - openshift/ci-operator/knative-test-images/print/Dockerfile
+    - openshift/ci-operator/knative-test-images/recordevents/Dockerfile
+    - openshift/ci-operator/knative-test-images/request-sender/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-forwarder/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-receiver/Dockerfile
+    - openshift/ci-operator/knative-test-images/wathola-sender/Dockerfile
+    - openshift/ci-operator/source-image/Dockerfile
   labels:
-    ci-operator.openshift.io/variant: "420"
+    ci-operator.openshift.io/variant: "421"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-knative-eventing-release-v1.17-420-test-reconciler-c
+  name: periodic-ci-openshift-knative-eventing-release-v1.17-421-test-reconciler-c
   reporter_config:
     slack:
       channel: '#knative-eventing-ci'
@@ -664,13 +1299,18 @@ periodics:
   spec:
     containers:
     - args:
+      - --enable-secrets-store-csi-driver=true
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=test-reconciler-c
-      - --variant=420
+      - --variant=421
       command:
       - ci-operator
       env:
@@ -688,11 +1328,20 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
         readOnly: true
       - mountPath: /secrets/hive-hive-credentials
         name: hive-hive-credentials
@@ -708,9 +1357,24 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
     - name: hive-hive-credentials
       secret:
         secretName: hive-hive-credentials

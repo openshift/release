@@ -11,16 +11,16 @@ cat /etc/os-release
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 oc config view
 oc projects
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 UUID=$(uuidgen)
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
@@ -57,32 +57,40 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
 fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density
-EXTRA_FLAGS="--local-indexing --gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${ND_EXTRA_FLAGS} ${KB_FLAGS} --gc-metrics=false --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
-if [[ ${JOB_TYPE} == "periodic" ]] && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
-  OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
-  OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
-  METRICS="collected-metrics-${UUID}/*QuantilesMeasurement*.json collected-metrics-${UUID}/jobSummary.json"
-  SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  # Prevent ssh or scp to cause error
-  if ! ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"; then
-    echo "Warning: failed to create remote directory in ${OCP_PERF_DASH_HOST}"
-  fi
-  if ! scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}; then
-    echo "Warning: failed to copy metrics to ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}"
-  fi
+METRICS_FOLDER="collected-metrics-${UUID}"
+if [[ -d ${METRICS_FOLDER} ]]; then
+  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
 fi
+
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
+fi
+
+exit ${RUN_EXIT_CODE}

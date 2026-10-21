@@ -1,0 +1,88 @@
+chain:
+  as: openshift-qe-egress-ip
+  steps:
+  - ref: openshift-qe-egress-ip-setup
+  - ref: redhat-chaos-pod-scenarios-custom
+  - ref: redhat-chaos-node-disruptions-worker-outage
+  - ref: openshift-qe-egress-ip-tests
+  env:
+  # Pod disruption chaos step environment variables
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  - name: POD_LABEL
+    default: "app=ovnkube-node"
+  - name: DISRUPTION_COUNT
+    default: "3"
+  - name: EXPECTED_POD_COUNT
+    default: "3"
+  - name: KILL_TIMEOUT
+    default: "120"
+  - name: EXPECTED_RECOVERY_TIME
+    default: "90"
+  
+  # Node disruption chaos step environment variables
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "1"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "120"
+
+  # Disable telemetry to prevent IndexError bugs
+  - name: ENABLE_ALERTS
+    default: "False"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "False"
+  - name: WAIT_DURATION
+    default: "60"
+  - name: TELEMETRY_ENABLED
+    default: "False"
+  - name: TELEMETRY_PROMETHEUS_BACKUP
+    default: "False"
+  - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+    default: "False"
+  - name: TELEMETRY_LOGS_BACKUP
+    default: "False"
+  - name: TELEMETRY_EVENTS_BACKUP
+    default: "False"
+  - name: CAPTURE_METRICS
+    default: "False"
+  - name: ENABLE_ES
+    default: "False"
+  - name: JUNIT_TESTCASE
+    default: '[Egress-IP] OVN pod disruption resilience test'
+  documentation: >-
+    Executes comprehensive OpenShift QE egress IP resilience testing using chaos engineering
+    framework integration. The workflow orchestrates multiple independent steps in sequence.
+    
+    EXECUTION ORDER AND RESPONSIBILITIES:
+    ====================================
+    
+    1. SETUP (openshift-qe-egress-ip-setup):
+       - Configures egress IP using cloud-bulldozer methodology
+       - Deploys traffic generation workloads and external validation service
+       - Sets up cluster state for chaos testing
+    
+    2. POD CHAOS (redhat-chaos-pod-scenarios-custom):
+       - INDEPENDENT step that executes pod disruption using krkn framework
+       - Targets ovnkube-node pods in openshift-ovn-kubernetes namespace
+       - Configured via TARGET_NAMESPACE and POD_LABEL environment variables
+       - Validation script does NOT execute this - it's handled by the chaos framework
+    
+    3. NODE CHAOS (redhat-chaos-node-disruptions-worker-outage):
+       - INDEPENDENT step that executes node reboot using krkn framework  
+       - Targets worker nodes via ACTION=node_reboot_scenario
+       - Configured via LABEL_SELECTOR and RUNS environment variables
+       - Validation script does NOT execute this - it's handled by the chaos framework
+    
+    4. VALIDATION (openshift-qe-egress-ip-tests):
+       - Performs pre-chaos cluster readiness validation
+       - Performs post-chaos recovery validation using source IP testing
+       - Primary test: External traffic uses configured egress IP
+       - Secondary test: Internal OVN SNAT rules meet expected minimums
+       - This step does NOT perform chaos - only validation before/after
+    
+    The validation step assumes chaos has already been executed by the framework
+    and focuses on verifying egress IP functionality recovery through real traffic testing.

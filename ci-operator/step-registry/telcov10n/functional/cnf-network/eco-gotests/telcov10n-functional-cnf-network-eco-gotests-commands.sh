@@ -33,7 +33,7 @@ fi
 export CLUSTER_NAME=${CLUSTER_NAME}
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
-echo Load INTERFACE_LIST,SWITCH_INTERFACES,VLAN env variablies
+echo Load INTERFACE_LIST,SWITCH_INTERFACES,VLAN,NATIVE_VLAN env variables
 if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/set_ocp_net_vars.sh"
@@ -47,6 +47,11 @@ fi
 if [[ -n "${VLAN}" ]]; then
   echo "VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
   ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_VLAN=${VLAN%%,*} ${ECO_GOTESTS_ENV_VARS}"
+fi
+
+if [[ -n "${NATIVE_VLAN}" ]]; then
+  echo "NATIVE_VLAN env var is not empty append parameters to ECO_GOTESTS_ENV_VARS"
+  ECO_GOTESTS_ENV_VARS="-e ECO_CNF_CORE_NET_NATIVE_VLAN=${NATIVE_VLAN} ${ECO_GOTESTS_ENV_VARS}"
 fi
 
 if [[ -n "${SWITCH_INTERFACES}" ]]; then
@@ -68,7 +73,7 @@ echo "Setup test script"
 cd /eco-ci-cd
 
 # shellcheck disable=SC2154
-ansible-playbook ./playbooks/cnf/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
+ansible-playbook ./playbooks/deploy-run-eco-gotests.yaml -i ./inventories/cnf/switch-config.yaml \
     --extra-vars "features=${FEATURES} labels=${LABELS} \
     kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig additional_test_env_variables='${ECO_GOTESTS_ENV_VARS}'"
 
@@ -81,7 +86,7 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run eco-gotests via ssh tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/eco_gotests;./eco-gotests-run.sh || true"
 
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154

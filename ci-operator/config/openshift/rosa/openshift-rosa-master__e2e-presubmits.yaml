@@ -1,21 +1,22 @@
 base_images:
-  origin_4.21_cli:
-    name: scos-4.21
+  origin_4.22_cli:
+    name: scos-4.22
     namespace: origin
     tag: cli
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+  from_repository: true
 images:
-- dockerfile_path: images/Dockerfile.e2e
-  from: origin_4.21_cli
-  to: rosa-aws-cli
+  items:
+  - dockerfile_path: images/Dockerfile.e2e
+    from: origin_4.22_cli
+    to: rosa-aws-cli
+prowgen:
+  expose: true
+  private: true
 releases:
   latest:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -35,6 +36,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 6h0m0s
 - always_run: false
   as: pr-rosa-sts-advanced
   optional: true
@@ -47,6 +49,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 6h0m0s
 - always_run: false
   as: pr-rosa-hcp-private-link
   optional: true
@@ -58,6 +61,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 5h0m0s
 - always_run: false
   as: pr-rosa-sts-private-link
   optional: true
@@ -69,6 +73,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 5h0m0s
 - always_run: false
   as: pr-rosa-shared-vpc
   optional: true
@@ -80,6 +85,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 5h0m0s
 - always_run: false
   as: pr-rosa-hcp-arm
   optional: true
@@ -92,6 +98,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 5h0m0s
 - always_run: false
   as: pr-rosa-sts-shared-vpc
   optional: true
@@ -103,6 +110,7 @@ tests:
     test:
     - chain: rosa-tests-pull-request
     workflow: rosa-lifecycle
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

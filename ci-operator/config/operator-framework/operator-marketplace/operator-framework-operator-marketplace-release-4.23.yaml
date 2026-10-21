@@ -6,9 +6,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base-rhel9
-  to: operator-marketplace
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base-rhel9
+    to: operator-marketplace
 promotion:
   to:
   - name: "4.23"
@@ -33,17 +34,20 @@ tests:
   commands: make unit
   container:
     from: src
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
-- as: e2e-aws-ovn-serial
+- always_run: false
+  as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -53,9 +57,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-console-olm
+- always_run: false
+  as: e2e-gcp-console-olm
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -65,9 +70,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-upgrade-gcp
 - as: verify-deps
   steps:

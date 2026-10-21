@@ -2,33 +2,38 @@ presubmits:
   openshift-service-mesh/sail-operator:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: (^(docs|\.github|\.claude|\.cursor)/)|(\.md$)|((^|/)OWNERS$)|(^\.gitignore$)|(^LICENSE$)
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-e2e-ocp
+    cluster: build06
+    context: ci/prow/ocp-4.22-e2e-ocp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-e2e-ocp
-    rerun_command: /test ocp-4.20-e2e-ocp
-    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-e2e-ocp
+    rerun_command: /test ocp-4.22-e2e-ocp
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-ocp
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -55,6 +60,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -75,6 +86,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -84,36 +104,40 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-e2e-ocp,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-e2e-ocp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-e2e-ocp-arm
+    cluster: build06
+    context: ci/prow/ocp-4.22-e2e-ocp-arm-retest
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-e2e-ocp-arm
-    rerun_command: /test ocp-4.20-e2e-ocp-arm
-    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-e2e-ocp-arm-retest
+    optional: true
+    rerun_command: /test ocp-4.22-e2e-ocp-arm-retest
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-arm
-        - --variant=ocp-4.20
+        - --target=e2e-ocp-arm-retest
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -140,6 +164,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -160,6 +190,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -169,23 +208,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-e2e-ocp-arm,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-e2e-ocp-arm-retest,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-gencheck
+    cluster: build10
+    context: ci/prow/ocp-4.22-gencheck
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-gencheck
-    rerun_command: /test ocp-4.20-gencheck
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-gencheck
+    rerun_command: /test ocp-4.22-gencheck
     spec:
       containers:
       - args:
@@ -193,7 +232,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=gencheck
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -234,23 +273,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-gencheck,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-gencheck,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-integration
+    cluster: build10
+    context: ci/prow/ocp-4.22-integration
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-integration
-    rerun_command: /test ocp-4.20-integration
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-integration
+    rerun_command: /test ocp-4.22-integration
     spec:
       containers:
       - args:
@@ -258,7 +297,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=integration
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -299,14 +338,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-integration,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-istio-pr-perfscale
+    cluster: build06
+    context: ci/prow/ocp-4.22-istio-pr-perfscale
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -314,33 +353,34 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-istio-pr-perfscale
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-istio-pr-perfscale
     optional: true
     reporter_config:
       slack:
-        channel: '#ossm-qe-ci'
+        channel: '#team-ossm-quality'
         job_states_to_report:
-        - success
         - failure
         - error
-        report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-          ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-          Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-          logs> {{end}}'
-    rerun_command: /test ocp-4.20-istio-pr-perfscale
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
+    rerun_command: /test ocp-4.22-istio-pr-perfscale
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=istio-pr-perfscale
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -367,6 +407,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -387,6 +433,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -396,23 +451,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-istio-pr-perfscale,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-istio-pr-perfscale,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-lint
+    cluster: build10
+    context: ci/prow/ocp-4.22-lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-lint
-    rerun_command: /test ocp-4.20-lint
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-lint
+    rerun_command: /test ocp-4.22-lint
     spec:
       containers:
       - args:
@@ -420,7 +475,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -461,36 +516,41 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-lint,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_run_if_changed: ^bundle/
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-scorecard
+    cluster: build06
+    context: ci/prow/ocp-4.22-scorecard
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-scorecard
-    rerun_command: /test ocp-4.20-scorecard
-    run_if_changed: ^bundle/
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-scorecard
+    rerun_command: /test ocp-4.22-scorecard
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=scorecard
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -517,6 +577,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -537,6 +603,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -546,23 +621,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-scorecard,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-scorecard,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.20-unit
+    cluster: build10
+    context: ci/prow/ocp-4.22-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: ocp-4.20
+      ci-operator.openshift.io/variant: ocp-4.22
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.20-unit
-    rerun_command: /test ocp-4.20-unit
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.22-unit
+    rerun_command: /test ocp-4.22-unit
     spec:
       containers:
       - args:
@@ -570,7 +645,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
-        - --variant=ocp-4.20
+        - --variant=ocp-4.22
         command:
         - ci-operator
         env:
@@ -611,37 +686,41 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.20-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.22-unit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/ocp-4.21-e2e-ocp
+    cluster: build06
+    context: ci/prow/ocp-4.23-e2e-next-ocp-retest
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci-operator.openshift.io/variant: ocp-4.21
+      ci-operator.openshift.io/variant: ocp-4.23
       ci.openshift.io/generator: prowgen
-      job-release: "4.21"
+      job-release: "4.23"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.21-e2e-ocp
-    rerun_command: /test ocp-4.21-e2e-ocp
-    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+    name: pull-ci-openshift-service-mesh-sail-operator-main-ocp-4.23-e2e-next-ocp-retest
+    optional: true
+    rerun_command: /test ocp-4.23-e2e-next-ocp-retest
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp
-        - --variant=ocp-4.21
+        - --target=e2e-next-ocp-retest
+        - --variant=ocp-4.23
         command:
         - ci-operator
         env:
@@ -668,6 +747,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -688,6 +773,15 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -697,4 +791,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-4.21-e2e-ocp,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.23-e2e-next-ocp-retest,?($|\s.*)

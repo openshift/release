@@ -6,7 +6,7 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
-bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 
 kubeconfig=$(cat ${CLUSTER_PROFILE_DIR}/kubeconfig)
 
@@ -33,6 +33,8 @@ jumphost="${jumphost}"
 bastion="${bastion}"
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   echo 'Hostname: \$(hostname)'
   rm -rf JetBrew
   git clone https://github.com/redhat-performance/JetBrew.git

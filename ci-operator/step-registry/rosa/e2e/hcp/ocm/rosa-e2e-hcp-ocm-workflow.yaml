@@ -1,0 +1,46 @@
+workflow:
+  as: rosa-e2e-hcp-ocm
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+    pre:
+    - chain: rosa-e2e-hcp-ocm-provision
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: rosa-backplane-login
+    test:
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    - ref: rosa-gap-analysis-api-resources-and-crd
+      best_effort: true
+    - ref: rosa-gap-analysis-critical-alerts
+      best_effort: true
+    - ref: rosa-gap-analysis-cluster-install-delete-metrics
+      best_effort: true
+    - chain: rosa-gather-hcp-diagnostics
+      best_effort: true
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    Unified ROSA E2E for HCP using the OCM Go SDK provisioner (ROSAENG-308 /
+    ROSAENG-67580). The provisioner ("head") stands up an HCP cluster and publishes
+    the SHARED_DIR contract; rosa-backplane-login adds the management/service
+    cluster kubeconfigs; then the provisioner-agnostic validation "tail" runs the
+    customer plane (guest kubeconfig) followed by the platform plane (MC/SC
+    kubeconfigs). Swap the provision chain to test the same validation tail against
+    a different provisioner (CLI, Terraform, UI).
+
+    The platform plane requires corp-network reachability: run this workflow only
+    where backplane is reachable (capabilities: [intranet], restrict_network_access:
+    false, network-access-rehearsals-ok label). For farms without backplane access,
+    use a customer-only variant that drops rosa-backplane-login and
+    rosa-e2e-validate-platform.

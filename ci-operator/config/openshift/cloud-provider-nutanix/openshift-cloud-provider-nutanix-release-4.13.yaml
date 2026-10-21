@@ -11,9 +11,10 @@ build_root:
     tag: rhel-8-release-golang-1.19-openshift-4.13
 canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
-  from: base
-  to: nutanix-cloud-controller-manager
+  items:
+  - dockerfile_path: openshift/Dockerfile.openshift
+    from: base
+    to: nutanix-cloud-controller-manager
 promotion:
   to:
   - name: "4.13"
@@ -36,9 +37,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-nutanix
+- always_run: false
+  as: e2e-nutanix
   cluster: build01
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix

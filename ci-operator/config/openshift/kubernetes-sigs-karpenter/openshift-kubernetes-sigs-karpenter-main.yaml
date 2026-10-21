@@ -6,20 +6,20 @@ base_images:
 binary_build_commands: make openshift-toolchain
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
-- dockerfile_literal: |
-    FROM replaced-by-from
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
-  from: bin
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: bin-oc-kubectl-helm
+  items:
+  - dockerfile_literal: |
+      FROM replaced-by-from
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
+    from: bin
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: bin-oc-kubectl-helm
 releases:
   latest:
     integration:
@@ -45,12 +45,13 @@ tests:
     make openshift-verify
   container:
     from: bin
-- as: e2e-kwok
+- always_run: false
+  as: e2e-kwok
   cron: 0 5 * * 1
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   presubmit: true
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest

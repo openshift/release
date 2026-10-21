@@ -14,14 +14,15 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  to: backplane-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  to: backplane-operator-test
+  items:
+  - dockerfile_path: build/Dockerfile.prow
+    from: base
+    to: backplane-operator
+  - dockerfile_path: build/Dockerfile.test.prow
+    to: backplane-operator-test
 promotion:
   to:
-  - name: "2.17"
+  - name: "5.1"
     namespace: stolostron
 resources:
   '*':
@@ -62,8 +63,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export ocm_dir=$(mktemp -d -t ocm-XXXXX)
@@ -82,14 +84,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.17
-    workflow: ocm-ci-fastforward
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 zz_generated_metadata:
   branch: main
   org: stolostron

@@ -2,22 +2,25 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-kube-descheduler-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
-  to: cluster-kube-descheduler-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    to: cluster-kube-descheduler-operator
 promotion:
   to:
-  - name: 4.16-priv
-    namespace: ocp-private
+  - name: "4.16"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -32,9 +35,10 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -44,10 +48,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: security
-  optional: true
-  steps:
-    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

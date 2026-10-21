@@ -127,6 +127,9 @@ chain:
     - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
       default: "false"
       documentation: "Assign the service principal roles to the managed identities"
+    - name: AUTO_ASSIGN_ROLES
+      default: "false"
+      documentation: "assign required Azure RBAC roles to workload identities"    
     - name: DNS_ZONE_RG_NAME
       default: "os4-common"
       documentation: "dns zone resource group"
@@ -141,7 +144,13 @@ chain:
       documentation: "Enable marketplace flags"
     - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
       default: ""
-      documentation: "image generation value"  
+      documentation: "image generation value" 
+    - name: CLI
+      default: ""
+      documentation: "hcp or hypershift cli path"
+    - name: CNI_PROVIDER
+      default: ""
+      documentation: "The CNI provider to use for the cluster. Supported values: cilium"
     commands: |-
       set -exuo pipefail
 
@@ -222,8 +231,12 @@ chain:
         NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
       fi
       
+      if [[  -z $CLI ]]; then
+      CLI="/usr/bin/hypershift"
+      fi
+      
       COMMAND=(
-        /usr/bin/hypershift create cluster azure \
+        "${CLI}" create cluster azure \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
@@ -361,6 +374,11 @@ chain:
         COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
       fi
       
+      if [[ $AUTO_ASSIGN_ROLES == "true" ]]; then
+        COMMAND+=(--auto-assign-roles=true)
+        COMMAND+=(--dns-zone-rg-name=${DNS_ZONE_RG_NAME})
+      fi
+
       if [[ -n "${HYPERSHIFT_INSTANCE_TYPE}" ]]; then
         COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
       fi
@@ -373,6 +391,7 @@ chain:
           COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
       fi
 
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -380,6 +399,11 @@ chain:
         fi
         "${COMMAND[@]}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
+      fi
+
+      # Required for Cilium, see OCPBUGS-85607.
+      if [[ "$CNI_PROVIDER" == "cilium" ]]; then
+        COMMAND+=(--annotations=hypershift.openshift.io/azure-load-balancer-health-probe-mode=servicenodeport)
       fi
       
       "${COMMAND[@]}"
@@ -426,17 +450,17 @@ chain:
     timeout: 45m0s
     credentials:
     - mount_path: /etc/ci-pull-credentials
-      name: ci-pull-credentials
+      bundle: ci-pull-credentials
       namespace: test-credentials
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
-      name: hypershift-ci-jobs-azurecreds
-      namespace: test-credentials
+      group: ops/hypershift-ci-jobs-azurecreds
+      collection: hypershift-team
     - mount_path: /etc/hypershift-aro-azurecreds
-      name: hypershift-aro-azurecreds
-      namespace: test-credentials
+      group: hypershift-aro-azurecreds
+      collection: hypershiftqe
     - mount_path: /etc/hypershift-selfmanaged-azurecreds
-      name: hypershift-selfmanaged-azurecreds
-      namespace: test-credentials  
+      group: hypershift-selfmanaged-azurecreds
+      collection: hypershiftqe
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST

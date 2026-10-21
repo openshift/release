@@ -39,6 +39,9 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
+prowgen:
+  expose: true
+  private: true
 releases:
   custom:
     candidate:
@@ -76,7 +79,7 @@ resources:
       memory: 200Mi
 tests:
 - as: ibmcloud-ipi-proxy-private-rt-f28
-  cron: 10 16 1 * *
+  cron: 0 0 31 2 *
   steps:
     cluster_profile: ibmcloud-qe
     env:
@@ -87,9 +90,9 @@ tests:
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: nutanix-ipi-boot-categories-project-rt-f28
   cluster: build01
-  cron: 13 0 27 * *
+  cron: 0 0 31 2 *
   steps:
-    cluster_profile: nutanix-qe
+    cluster_profile: nutanix
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
       RT_ENABLED: "true"
@@ -97,19 +100,6 @@ tests:
     - ref: cucushift-upgrade-setedge-3hops
     - chain: openshift-upgrade-qe-test-chainupgrade
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
-- as: vsphere-ipi-proxy-fips-f28
-  cron: 18 4 16 * *
-  steps:
-    cluster_profile: vsphere-dis-2
-    env:
-      FIPS_ENABLED: "true"
-    leases:
-    - env: VSPHERE_BASTION_LEASED_RESOURCE
-      resource_type: vsphere-connected-2-quota-slice
-    test:
-    - ref: cucushift-upgrade-setedge-3hops
-    - chain: openshift-upgrade-qe-test-chainupgrade
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

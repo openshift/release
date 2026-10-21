@@ -6,9 +6,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
-  to: aws-efs-operator
+  items:
+  - dockerfile_path: build/Dockerfile
+    from: base
+    to: aws-efs-operator
 resources:
   '*':
     requests:
@@ -22,8 +23,9 @@ tests:
   container:
     from: src
   secret:
+    collection: sd-sre-secrets
+    group: aws-efs-operator-codecov-token
     mount_path: /tmp/secret
-    name: aws-efs-operator-codecov-token
 - as: lint
   commands: make lint
   container:

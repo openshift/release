@@ -91,7 +91,6 @@ function validate_hosted_cluster_conditions() {
     validate_condition "${conditions}" "ReconciliationSucceeded" "True" || ((++failed))
     validate_condition "${conditions}" "ValidHostedControlPlaneConfiguration" "True" || ((++failed))
     validate_condition "${conditions}" "ValidReleaseImage" "True" || ((++failed))
-    validate_condition "${conditions}" "PlatformCredentialsFound" "True" || ((++failed))
 
     # Expected False conditions
     validate_condition "${conditions}" "Progressing" "False" || ((++failed))
@@ -107,6 +106,11 @@ function validate_hosted_cluster_conditions() {
     validate_condition "${conditions}" "ExternalDNSReachable" "Unknown" || ((++failed))
 
     # Version-specific conditions
+
+    # PlatformCredentialsFound: only validate if version >= 4.17
+    if [[ -n "${openshift_version}" ]] && version_ge "${openshift_version}" "4.17"; then
+      validate_condition "${conditions}" "PlatformCredentialsFound" "True" || ((++failed))
+    fi
 
     # DataPlaneConnectionAvailable: only validate if version >= 4.21
     if [[ -n "${openshift_version}" ]] && version_ge "${openshift_version}" "4.21"; then
@@ -143,7 +147,10 @@ function validate_hosted_cluster_conditions() {
 }
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"

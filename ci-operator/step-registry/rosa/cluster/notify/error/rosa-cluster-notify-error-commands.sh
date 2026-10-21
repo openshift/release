@@ -12,7 +12,7 @@ fi
 
 function notify_ocmqe() {
   message=$1
-  slack_message='{"text": "'"${message}"'. Sleep 4 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
+  slack_message='{"text": "'"${message}"'. Sleep 4 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <!subteam^S0BEMESJS83>"}'
   if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
     slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")    
     curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"

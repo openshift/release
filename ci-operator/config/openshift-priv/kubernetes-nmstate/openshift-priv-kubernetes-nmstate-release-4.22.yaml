@@ -1,7 +1,7 @@
 base_images:
   cli:
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
     tag: cli
   dev-scripts:
     name: test
@@ -11,38 +11,40 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-nmstate
 images:
-- dockerfile_path: build/Dockerfile.openshift
-  to: kubernetes-nmstate-handler
-- dockerfile_path: build/Dockerfile.operator.openshift
-  to: kubernetes-nmstate-operator
-- dockerfile_literal: |
-    FROM src
-    COPY oc /usr/bin/oc
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: src-with-oc-and-kubectl
+  items:
+  - dockerfile_path: build/Dockerfile.openshift
+    to: kubernetes-nmstate-handler
+  - dockerfile_path: build/Dockerfile.operator.openshift
+    to: kubernetes-nmstate-operator
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-with-oc-and-kubectl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-with-oc-and-kubectl
-    name: 4.22-priv
-    namespace: ocp-private
+    name: "4.22"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   nightly:
     candidate:
       product: ocp
@@ -55,18 +57,11 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: security
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    env:
-      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
-      SNYK_ENABLE_DEPS_SCAN: "true"
-    workflow: openshift-ci-security
 - as: unit
   commands: make test/unit
   container:
@@ -103,7 +98,7 @@ tests:
   - intranet
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: kubernetes-nmstate-e2e-azure
 - as: verify-deps
   steps:

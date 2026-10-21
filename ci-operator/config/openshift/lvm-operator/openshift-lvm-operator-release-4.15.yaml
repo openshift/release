@@ -18,33 +18,41 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.15
 images:
-- dockerfile_literal: |-
-    FROM ubi_minimal
-    RUN microdnf install -y make git python3 python3-pip
-    RUN pip3 install pre-commit
+  items:
+  - dockerfile_literal: |-
+      FROM ubi_minimal
+      RUN microdnf install -y make git python3 python3-pip nodejs npm
+      RUN pip3 install pre-commit
 
-    COPY --from=root:current /usr/lib/golang /usr/local/go
-    ENV PATH=$PATH:/usr/local/go/bin
+      COPY --from=root:current /usr/lib/golang /usr/local/go
+      ENV PATH=$PATH:/usr/local/go/bin
 
-    ENV GOPATH=/tmp/go
-    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
-    RUN mkdir /.local && chmod 777 /.local
+      ENV GOPATH=/tmp/go
+      RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+      RUN mkdir /.local && chmod 777 /.local
 
-    ENV PRE_COMMIT_HOME=/.cache/precommit
-    ENV GOLANGCI_LINT_CACHE=/.cache/golangci
-  from: ubi_minimal
-  inputs:
-    root:
-      as:
-      - root:current
-  to: lvms-pre-commit
-- dockerfile_path: Dockerfile
-  from: ubi_minimal
-  to: lvm-operator
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: lvms-must-gather
+      ENV PRE_COMMIT_HOME=/.cache/precommit
+      ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+
+      COPY .pre-commit-config.yaml /tmp/pre-commit-config.yaml
+      RUN cd /tmp && git init && \
+          pre-commit install-hooks -c /tmp/pre-commit-config.yaml && \
+          rm -rf /tmp/.git && \
+          rm -rf /.cache/golangci && mkdir /.cache/golangci && \
+          chmod -R 777 /.cache
+    from: ubi_minimal
+    inputs:
+      root:
+        as:
+        - root:current
+    to: lvms-pre-commit
+  - dockerfile_path: Dockerfile
+    from: ubi_minimal
+    to: lvm-operator
+  - context_dir: must-gather/
+    dockerfile_path: Dockerfile
+    from: must-gather
+    to: lvms-must-gather
 operator:
   bundles:
   - as: lvm-operator-bundle
@@ -69,6 +77,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  precommit-check:
+    requests:
+      cpu: "2"
+      memory: 4Gi
 test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
@@ -77,7 +89,9 @@ tests:
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
-    pre-commit run --all-files --show-diff-on-failure
+    export GOMEMLIMIT=3500MiB
+    export GOGC=50
+    pre-commit run --all-files --show-diff-on-failure --verbose
   container:
     clone: true
     from: lvms-pre-commit
@@ -88,8 +102,9 @@ tests:
   container:
     from: test-bin
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
@@ -99,13 +114,15 @@ tests:
     from: test-bin
   postsubmit: true
   secret:
+    collection: sd-sre-secrets
+    group: lvm-operator-codecov-token
     mount_path: /tmp/secret
-    name: lvm-operator-codecov-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: e2e-aws-single-node
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: e2e-aws-single-node
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
@@ -121,10 +138,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
-- as: e2e-aws
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:

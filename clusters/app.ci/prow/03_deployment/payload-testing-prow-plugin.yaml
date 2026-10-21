@@ -40,6 +40,31 @@ roleRef:
   kind: Role
   name: payload-testing-prow-plugin
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: payload-testing-prow-plugin-groups
+rules:
+- apiGroups:
+  - user.openshift.io
+  resources:
+  - groups
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: payload-testing-prow-plugin-groups
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: payload-testing-prow-plugin-groups
+subjects:
+- kind: ServiceAccount
+  name: payload-testing-prow-plugin
+  namespace: ci
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -82,6 +107,9 @@ spec:
     spec:
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
@@ -97,25 +125,6 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
       - name: payload-testing-prow-plugin
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-prow-plugin_latest
         imagePullPolicy: Always
@@ -130,6 +139,7 @@ spec:
         - --ci-op-config-dir=/var/repo/release/ci-operator/config
         - --log-level=debug
         - --trusted-app=openshift-pr-manager[bot]
+        - --private-payload-rbac-group=aos-staff-engineers
         env:
         - name: GITHUB_APP_ID
           valueFrom:
@@ -162,7 +172,7 @@ spec:
           mountPath: /var/repo
         resources:
           requests:
-            memory: "300Mi"
+            memory: "2Gi"
             cpu: "50m"
         livenessProbe:
           httpGet:
@@ -174,6 +184,25 @@ spec:
           httpGet:
             path: /healthz/ready
             port: 8081
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
       serviceAccountName: payload-testing-prow-plugin
       volumes:
       - name: hmac

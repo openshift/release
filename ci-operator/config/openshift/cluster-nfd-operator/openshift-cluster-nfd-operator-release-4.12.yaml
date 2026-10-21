@@ -10,9 +10,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: cluster-nfd-operator
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: cluster-nfd-operator
 operator:
   bundles:
   - context_dir: manifests/4.12
@@ -45,9 +46,10 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -56,10 +58,11 @@ tests:
       OO_PACKAGE: nfd
       OO_TARGET_NAMESPACES: '!install'
     workflow: optional-operators-ci-aws
-- as: e2e-master
+- always_run: false
+  as: e2e-master
   postsubmit: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     dependencies:
       OO_INDEX: ci-index
     env:

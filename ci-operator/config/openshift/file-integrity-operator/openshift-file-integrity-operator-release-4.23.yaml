@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: latest
   operator-sdk:
-    name: "4.23"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
   rosa-aws-cli:
@@ -13,12 +13,13 @@ base_images:
     tag: release
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
 images:
-- dockerfile_path: Dockerfile.ci
-  to: file-integrity-operator
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: file-integrity-operator
 operator:
   bundles:
   - as: file-integrity-operator-bundle
@@ -61,10 +62,11 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
+- always_run: false
+  as: e2e-aws
+  pipeline_skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     test:
     - as: test
       cli: latest
@@ -106,9 +108,9 @@ tests:
 - always_run: false
   as: e2e-bundle-aws
   optional: true
-  run_if_changed: ^(config|bundle)
+  pipeline_run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest
@@ -138,9 +140,9 @@ tests:
 - always_run: false
   as: e2e-bundle-aws-upgrade
   optional: true
-  run_if_changed: ^(config|bundle)
+  pipeline_run_if_changed: ^(config|bundle)
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     test:
     - as: install
       cli: latest

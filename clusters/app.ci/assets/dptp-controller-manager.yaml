@@ -13,6 +13,18 @@ rules:
   - watch
   - update
 - apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - ephemeralclusters/status
+  verbs:
+  - update
+- apiGroups:
   - prow.k8s.io
   resources:
   - prowjobs
@@ -109,8 +121,23 @@ spec:
       tolerations:
       - key: manual-provision
         operator: Exists
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: NotIn
+                values:
+                - r5.4xlarge
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
+          limits:
+            memory: "48Gi"
         command:
         - /git-sync
         args:
@@ -143,8 +170,8 @@ spec:
           mountPath: /tmp/git-sync
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_dptp-controller-manager_latest
         name: dptp-controller-manager
         imagePullPolicy: Always
@@ -196,7 +223,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "15Gi"
+            memory: "24Gi"
             cpu: "1"
       serviceAccountName: dptp-controller-manager
       volumes:

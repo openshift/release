@@ -2,16 +2,17 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  from: base
-  to: thanos-receive-controller
+  items:
+  - dockerfile_path: Dockerfile.prow
+    from: base
+    to: thanos-receive-controller
 promotion:
   to:
   - name: "2.11"
@@ -49,9 +50,9 @@ tests:
         export OSCI_COMPONENT_VERSION="2.11.0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

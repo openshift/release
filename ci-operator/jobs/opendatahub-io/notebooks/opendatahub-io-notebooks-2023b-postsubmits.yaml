@@ -7,7 +7,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
@@ -67,7 +93,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -75,8 +127,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-base-c9s-python-3-9-image-mirror
@@ -97,11 +154,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -114,9 +180,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -133,7 +214,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -141,8 +248,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-base-ubi8-python-3-8-image-mirror
@@ -163,11 +275,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -180,9 +301,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -199,7 +335,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -207,8 +369,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-base-ubi9-python-3-9-image-mirror
@@ -229,11 +396,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -246,9 +422,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -265,7 +456,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -273,8 +490,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-codeserver-c9s-python-3-9-image-mirror
@@ -295,11 +517,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -312,9 +543,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -331,7 +577,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -355,8 +627,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-codeserver-ubi9-python-3-9-image-mirror
@@ -377,11 +654,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -394,9 +680,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -413,7 +714,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -421,8 +748,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-c9s-python-3-9-image-mirror
@@ -443,11 +775,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -460,9 +801,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -479,7 +835,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -487,8 +869,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-ds-ubi8-python-3-8-image-mirror
@@ -509,11 +896,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -526,9 +922,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -545,7 +956,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -569,8 +1006,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-ds-ubi9-python-3-9-image-mirror
@@ -591,11 +1033,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -608,9 +1059,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -627,7 +1093,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -635,8 +1127,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-min-ubi8-python-3-8-image-mirror
@@ -657,11 +1154,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -674,9 +1180,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -693,7 +1214,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -717,8 +1264,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-min-ubi9-python-3-9-image-mirror
@@ -739,11 +1291,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -756,9 +1317,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -775,7 +1351,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -799,8 +1401,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
@@ -821,11 +1428,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -838,9 +1454,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -857,7 +1488,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -881,8 +1538,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-rstudio-c9s-python-3-9-image-mirror
@@ -903,11 +1565,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -920,9 +1591,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -939,7 +1625,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -947,8 +1659,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-ubi8-python-3-8-image-mirror
@@ -969,11 +1686,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -986,9 +1712,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1005,7 +1746,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1013,8 +1780,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-cuda-ubi9-python-3-9-image-mirror
@@ -1035,11 +1807,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1052,9 +1833,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1071,7 +1867,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1079,8 +1901,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
@@ -1101,11 +1928,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1118,9 +1954,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1137,7 +1988,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1145,8 +2022,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-ds-ubi8-python-3-8-image-mirror
@@ -1167,11 +2049,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1184,9 +2075,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1203,7 +2109,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1227,8 +2159,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-ds-ubi9-python-3-9-image-mirror
@@ -1249,11 +2186,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1266,9 +2212,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1285,7 +2246,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1293,8 +2280,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
@@ -1315,11 +2307,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1332,9 +2333,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1351,7 +2367,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1375,8 +2417,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-minimal-ubi9-python-3-9-image-mirror
@@ -1397,11 +2444,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1414,9 +2470,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1433,7 +2504,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1457,8 +2554,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
@@ -1479,11 +2581,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1496,9 +2607,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1515,7 +2641,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1523,8 +2675,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
@@ -1545,11 +2702,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1562,9 +2728,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1581,7 +2762,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1605,8 +2812,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-jupyter-trustyai-ubi9-python-3-9-image-mirror
@@ -1627,11 +2839,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1644,9 +2865,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1663,7 +2899,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1687,8 +2949,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=notebook-rstudio-c9s-python-3-9-image-mirror
@@ -1709,11 +2976,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1726,9 +3002,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1745,7 +3036,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1753,8 +3070,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-cuda-tensorflow-ubi8-python-3-8-image-mirror
@@ -1775,11 +3097,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1792,9 +3123,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1811,7 +3157,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1835,8 +3207,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-cuda-tensorflow-ubi9-python-3-9-image-mirror
@@ -1857,11 +3234,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1874,9 +3260,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1893,7 +3294,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1901,8 +3328,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-datascience-ubi8-python-3-8-image-mirror
@@ -1923,11 +3355,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1940,9 +3381,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1959,7 +3415,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -1983,8 +3465,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-datascience-ubi9-python-3-9-image-mirror
@@ -2005,11 +3492,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2022,9 +3518,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2041,7 +3552,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -2049,8 +3586,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-minimal-ubi8-python-3-8-image-mirror
@@ -2071,11 +3613,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2088,9 +3639,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2107,7 +3673,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -2131,8 +3723,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-minimal-ubi9-python-3-9-image-mirror
@@ -2153,11 +3750,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2170,9 +3776,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2189,7 +3810,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -2197,8 +3844,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-pytorch-ubi8-python-3-8-image-mirror
@@ -2219,11 +3871,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2236,9 +3897,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -2255,7 +3931,33 @@ postsubmits:
     cluster: build08
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - base/c9s-python-3.9/Dockerfile
+      - base/ubi8-python-3.8/Dockerfile
+      - base/ubi9-python-3.9/Dockerfile
+      - codeserver/c9s-python-3.9/Dockerfile
+      - codeserver/ubi9-python-3.9/Dockerfile
+      - cuda/c9s-python-3.9/Dockerfile
+      - cuda/ubi8-python-3.8/Dockerfile
+      - cuda/ubi9-python-3.9/Dockerfile
+      - habana/1.10.0/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi8-python-3.8/Dockerfile
+      - jupyter/datascience/ubi9-python-3.9/Dockerfile
+      - jupyter/minimal/ubi8-python-3.8/Dockerfile
+      - jupyter/minimal/ubi9-python-3.9/Dockerfile
+      - jupyter/pytorch/ubi9-python-3.9/Dockerfile
+      - jupyter/tensorflow/ubi9-python-3.9/Dockerfile
+      - jupyter/trustyai/ubi8-python-3.8/Dockerfile
+      - jupyter/trustyai/ubi9-python-3.9/Dockerfile
+      - rstudio/c9s-python-3.9/Dockerfile
+      - runtimes/datascience/ubi8-python-3.8/Dockerfile
+      - runtimes/datascience/ubi9-python-3.9/Dockerfile
+      - runtimes/minimal/ubi8-python-3.8/Dockerfile
+      - runtimes/minimal/ubi9-python-3.9/Dockerfile
+      - runtimes/pytorch/ubi8-python-3.8/Dockerfile
+      - runtimes/pytorch/ubi9-python-3.9/Dockerfile
+      - runtimes/tensorflow/ubi8-python-3.8/Dockerfile
+      - runtimes/tensorflow/ubi9-python-3.9/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
@@ -2279,8 +3981,13 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=runtime-pytorch-ubi9-python-3-9-image-mirror
@@ -2301,11 +4008,20 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -2318,9 +4034,24 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

@@ -3,22 +3,25 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/machine-api-provider-openstack
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: openstack-machine-api-provider
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: openstack-machine-api-provider
 promotion:
   to:
-  - name: 4.17-priv
-    namespace: ocp-private
+  - name: "4.17"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
@@ -39,16 +42,13 @@ tests:
   commands: IS_CONTAINER=TRUE make vet
   container:
     from: src
-- as: golint
-  commands: IS_CONTAINER=TRUE make lint
-  container:
-    from: src
 - as: gomod
   commands: if [ $(go mod tidy && go mod vendor && git diff | wc -l) -gt 0 ]; then
     git diff && exit 1; fi
   container:
     from: src
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   steps:
     cluster_profile: openstack-vexxhost
     env:

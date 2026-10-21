@@ -3,6 +3,23 @@ set -o nounset
 # set -o errexit
 set -o pipefail
 
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        trap '
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep
+        ' EXIT
+    else
+        echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
+    fi
+fi
+
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
 SECRETS_DIR="/tmp/secrets"
 
@@ -16,6 +33,7 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+set +x  # Disable tracing to prevent credential leakage in CI logs
 # Set the dynamic vars based on provisioned hub cluster.
 CYPRESS_OC_CLUSTER_URL=$(oc whoami --show-server)
 export CYPRESS_OC_CLUSTER_URL
@@ -25,6 +43,29 @@ export CYPRESS_BASE_URL
 
 CYPRESS_OC_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OC_CLUSTER_PASS
+
+# Playwright equivalents (required by start.sh after Cypress→Playwright migration)
+# HUB_URL must be the API server URL (start.sh passes it to 'oc login --server').
+HUB_URL=$(oc whoami --show-server)
+export HUB_URL
+# Sanity-check: HUB_URL must point to the API server, not the web console.
+# start.sh passes HUB_URL to 'oc login --server'; a console URL would fail
+# with "HTML page instead of server URL".  Redact the full value to avoid
+# leaking cluster addresses in CI logs.
+if [[ "${HUB_URL}" == *"console"* ]]; then
+    echo "ERROR: HUB_URL appears to be a console URL, not an API server URL." >&2
+    echo "       Expected output of 'oc whoami --show-server', not '--show-console'." >&2
+    exit 1
+fi
+HUB_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+export HUB_PASSWORD
+OC_CLUSTER_URL=$(oc whoami --show-server)
+export OC_CLUSTER_URL
+OC_CLUSTER_PASS=$(cat "${SHARED_DIR}/kubeadmin-password")
+export OC_CLUSTER_PASS
+export CONSOLE_USERNAME="${CYPRESS_OC_CLUSTER_USER:-kubeadmin}"
+export TEST_MODE="${CYPRESS_TEST_MODE:-integration}"
+export GREP="${TEST_TAGS:-@ocpInterop}"
 
 # Set the dynamic vars needed to execute application based tests (GitOps, Ansible, ObjectStore, etc.)
 ANSIBLE_TOKEN=$(cat $SECRETS_DIR/alc/ansible-token)
@@ -45,11 +86,26 @@ export GITHUB_USER
 GITHUB_TOKEN=$(cat $SECRETS_DIR/alc/git-token)
 export GITHUB_TOKEN
 
-COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
-export COLLECTIVE_OCP_TOKEN
+# collective-ocp-token is optional; the key may not yet be provisioned in the
+# acm-qe/alc-credentials vault collection.  Export it when available so the
+# test runner can use it, but do not fail the step when it is absent.
+if [[ -f "$SECRETS_DIR/alc/collective-ocp-token" ]]; then
+    COLLECTIVE_OCP_TOKEN=$(cat "$SECRETS_DIR/alc/collective-ocp-token")
+    export COLLECTIVE_OCP_TOKEN
+else
+    echo "WARNING: collective-ocp-token not found in acm-qe/alc-credentials vault; tests requiring this credential may be skipped" >&2
+fi
 
 # run the test execution script
-bash +x ./../execute_alc_interop_commands.sh || :
+typeset -i _test_rc=0
+./start.sh alc || _test_rc=$?
+set -x  # Re-enable tracing
 
-# Copy the test cases results to an external directory
-cp -r ../tests/cypress/results $ARTIFACT_DIR/
+# Copy test results (Playwright or legacy Cypress)
+for dir in test-results playwright-report ../tests/cypress/results; do
+  if [[ -d "$dir" ]]; then
+    cp -r "$dir" "$ARTIFACT_DIR/" || true
+  fi
+done
+
+exit "${_test_rc}"

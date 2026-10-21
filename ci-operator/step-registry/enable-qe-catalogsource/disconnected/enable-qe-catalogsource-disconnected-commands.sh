@@ -6,6 +6,13 @@
 # The script exit 0 if fail to mirror images. this allows the other test can be executed continuously
 # The script exit 0 if fail to create catalogsource. this allows  the other test can be executed continuously
 set -u
+
+# Version comparison functions using sort -V
+function version_gt() {
+  # Returns 0 (true) if $1 > $2
+  [[ "$1" != "$2" ]] && [[ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" == "$2" ]]
+}
+
 # use it as a bool
 marketplace=0
 mirror=0
@@ -146,10 +153,8 @@ function disable_default_catalogsource () {
         echo "!!! fail to disable default Catalog Source"
         return 1
     fi
-    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
-    major_version=$(echo ${ocp_version} | cut -d '.' -f1)
-    minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
-    if [[ "X${major_version}" == "X4" && -n "${minor_version}" && "${minor_version}" -gt 17 ]]; then
+    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version | cut -d '.' -f1,2)
+    if version_gt "${ocp_version}" "4.17"; then
         echo "disable olmv1 default clustercatalog"
         run_command "oc patch clustercatalog openshift-certified-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
         run_command "oc patch clustercatalog openshift-redhat-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
@@ -420,7 +425,27 @@ function create_catalog_sources()
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
         echo "the index image as the initContainer cache image)"
-        cat <<EOF | oc create -f -
+        # oc-mirror rebuilds the catalog image with updated image references for C2S/SC2S,
+        # causing extractContent's cache integrity check to fail. Use the legacy catalog
+        # format for C2S/SC2S so opm serves the catalog without cache validation.
+        if [ $mirror -eq 1 ]; then
+            cat <<EOF | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: $CATALOGSOURCE_NAME
+  namespace: openshift-marketplace
+spec:
+  displayName: Production Operators
+  image: ${mirror_index_image}
+  publisher: OpenShift QE
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+        else
+            cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -440,6 +465,7 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+        fi
     else
         echo "the index image as the server image"
         cat <<EOF | oc create -f -
@@ -486,7 +512,7 @@ EOF
 
         run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
-        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
         return 1
     fi
@@ -623,6 +649,11 @@ if [ $mirror -eq 0 ]; then
 fi
 #Create ICSP for mirror registry. The ICSP are used for the following ci-opertor steps too. Abort the job if ICSP can not be created
 create_settled_icsp  || exit 1
+
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping QE catalogsource creation (mirror infrastructure is configured)"
+  exit 0
+fi
 
 #skip the mirror or catalogsource when OLM is not enabled.
 check_olm_capability || exit 0

@@ -7,9 +7,10 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
-  from: base
-  to: cluster-etcd-operator
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: cluster-etcd-operator
 releases:
   initial:
     integration:
@@ -27,10 +28,11 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
-- as: e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-recovery
   cron: 4 4 18 3 *
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery

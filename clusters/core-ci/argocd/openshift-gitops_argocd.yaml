@@ -7,33 +7,40 @@ spec:
   applicationSet:
     resources:
       limits:
+        cpu: "4"
+        memory: 2Gi
+      requests:
         cpu: "2"
         memory: 1Gi
-      requests:
-        cpu: 250m
-        memory: 512Mi
     webhookServer:
       ingress:
         enabled: false
       route:
         enabled: false
+  cmdParams:
+    controller.profile.enabled: "true"
   controller:
     env:
       - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
         value: round-robin
+      - name: GOMEMLIMIT
+        value: "48103633715B" # 80% of the controller memory limit (56Gi), rounded down.
     processors: {}
     resources:
       limits:
-        cpu: "3"
-        memory: 6Gi
+        cpu: "8"
+        memory: 56Gi
       requests:
-        cpu: "1"
-        memory: 1Gi
+        cpu: "4"
+        memory: 24Gi
     sharding:
       enabled: true
-      replicas: 15
+      replicas: 3
   extraConfig:
+    accounts.cluster-manifest-verifier: apiKey
+    controller.repo.server.timeout.seconds: "300"
     resource.sensitive.mask.annotations: openshift.io/token-secret.value, api-key, token
+    server.repo.server.timeout.seconds: "300"
   grafana:
     enabled: false
     ingress:
@@ -60,7 +67,7 @@ spec:
     enabled: false
   initialSSHKnownHosts: {}
   monitoring:
-    enabled: false
+    enabled: true
   notifications:
     enabled: false
   prometheus:
@@ -75,6 +82,11 @@ spec:
       g, system:cluster-admins, role:admin
       g, cluster-admins, role:admin
       g, test-platform-ci-admins, role:admin
+      p, cluster-manifest-verifier, applications, get, */*, allow
+      p, cluster-manifest-verifier, applications, sync, */*, allow
+      p, cluster-manifest-verifier, applications, create, */*, allow
+      p, cluster-manifest-verifier, applications, delete, */*, allow
+      p, cluster-manifest-verifier, applicationsets, create, */*, allow
     scopes: '[groups]'
   redis:
     autotls: openshift
@@ -91,11 +103,11 @@ spec:
         value: "true"
     resources:
       limits:
-        cpu: "4"
-        memory: 4Gi
+        cpu: "8"
+        memory: 16Gi
       requests:
-        cpu: 500m
-        memory: 1Gi
+        cpu: "2"
+        memory: 4Gi
   resourceExclusions: |
     - apiGroups:
       - ""
@@ -172,6 +184,18 @@ spec:
       kinds:
       - TaskRun
       - PipelineRun
+    - apiGroups:
+      - image.openshift.io
+      clusters:
+      - '*'
+      kinds:
+      - Image
+    - apiGroups:
+      - prow.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - ProwJob
   server:
     autoscale:
       enabled: false
@@ -183,10 +207,10 @@ spec:
     resources:
       limits:
         cpu: 500m
-        memory: 256Mi
+        memory: 2Gi
       requests:
         cpu: 125m
-        memory: 128Mi
+        memory: 256Mi
     route:
       enabled: true
     service:

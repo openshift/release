@@ -81,6 +81,20 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-two-node-arbiter-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-upgrade-os-rhel10
+  capabilities:
+  - intranet
+  cron: 0 8 * * 1,4
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT: rhel-10
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+    test:
+    - chain: baremetalds-ipi-test
+    - ref: mco-conf-day2-os-image-stream-default
+    workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-upgrade-workers
   capabilities:
   - intranet
@@ -101,6 +115,20 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-two-node-arbiter-upgrade-day-2-workers
   timeout: 5h0m0s
+- as: e2e-metal-ovn-two-node-fencing-upgrade-os-rhel10
+  capabilities:
+  - intranet
+  cron: 23 11 * * 1,4
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT: rhel-10
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+    test:
+    - chain: baremetalds-ipi-test
+    - ref: mco-conf-day2-os-image-stream-default
+    workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ipi-ovn-upgrade-runc
   capabilities:
   - intranet
@@ -108,6 +136,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      OSSTREAM: rhel-9
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
@@ -128,39 +157,50 @@ tests:
 - as: e2e-aws-upgrade-ovn-single-node
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     env:
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node
+- as: e2e-aws-upgrade-ovn-single-node-os-rhel10
+  interval: 24h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT: rhel-10
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants,legacy-test-framework-invariants-pathological
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_SUITE: none
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: single-node-e2e-test
+    - ref: mco-conf-day2-os-image-stream-default
+    workflow: openshift-upgrade-aws-single-node
 - as: e2e-metal-ovn-single-node-rt-upgrade
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_SKIPS: InPlace Resize
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
 - as: e2e-vsphere-upgrade
-  cron: 4 18 * * 2
+  cron: 49 2 * * 4
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-upgrade-vsphere
 - as: e2e-vsphere-zones-upgrade
-  cron: 21 2 * * 3
+  cron: 26 8 * * 3
   steps:
     cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
     workflow: openshift-upgrade-vsphere-zones
 - as: e2e-metal-ipi-ovn-upgrade-network-flow-matrix
   capabilities:
@@ -181,7 +221,7 @@ tests:
 - as: e2e-aws-upgrade-ovn-single-node-network-flow-matrix
   cron: 0 19 * * 0,2,4,6
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       SUITE: Nftables
       TEST_TYPE: upgrade-conformance
@@ -192,6 +232,58 @@ tests:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
     workflow: openshift-upgrade-aws-single-node
+- as: e2e-aws-ovn-upgrade-from-stable-haproxy28
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: openshift-upgrade-aws-patch-master-iam
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-aws
+- as: e2e-platform-external-aws-upgrade
+  cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-platform-external-ci'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
+- as: e2e-platform-external-aws-ccm-upgrade
+  cron: '@weekly'
+  reporter_config:
+    channel: '#forum-ocp-platform-external-ci'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-e2e-external-aws
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

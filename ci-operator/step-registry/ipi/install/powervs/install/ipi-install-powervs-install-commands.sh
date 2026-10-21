@@ -271,7 +271,7 @@ function install_required_tools() {
 
   echo "Installing PowerVS-DHCP-report"
   DHCP_TAR="PowerVS-DHCP-report-v1.3-linux-amd64.tar.gz"
-  curl --location --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR}
+  for _ in {1..3}; do curl --location --fail --output /tmp/${DHCP_TAR} https://github.com/hamzy/PowerVS-DHCP-report/releases/download/v1.3/${DHCP_TAR} && break || sleep 2; done
   (cd /tmp/; tar xzvf ${DHCP_TAR}; mv PowerVS-DHCP-report /tmp/bin/)
 
   hash jq || exit 1
@@ -280,6 +280,8 @@ function install_required_tools() {
 }
 
 function init_ibmcloud() {
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
   IC_API_KEY=${IBMCLOUD_API_KEY}
   export IC_API_KEY
 
@@ -299,6 +301,9 @@ function init_ibmcloud() {
     fi
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
+  fi
+  if [[ "${WAS_TRACING}" == true ]]; then
+    set -x
   fi
 
   echo "BASE_DOMAIN = ${BASE_DOMAIN}"
@@ -704,8 +709,11 @@ function dump_resources() {
   fi
 }
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
+# Separate traps for EXIT and TERM to handle cleanup properly
+# TERM: Kill children, run cleanup, then exit with proper signal status
+# EXIT: Just run cleanup (for normal termination)
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill -TERM ${CHILDREN} 2>/dev/null; fi; wait; trap - EXIT; prepare_next_steps; exit 143' TERM
+trap 'prepare_next_steps' EXIT
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -716,6 +724,8 @@ echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 install_required_tools
 
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
 IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
@@ -724,6 +734,9 @@ IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
+if [[ "${WAS_TRACING}" == true ]]; then
+  set -x
+fi
 POWERVS_SERVICE_INSTANCE_ID=$(yq-v4 eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_REGION=$(yq-v4 eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
 POWERVS_ZONE=$(yq-v4 eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
@@ -767,9 +780,14 @@ mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # Powervs requires config.json
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 cat > "/tmp/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
+if [[ "${WAS_TRACING}" == true ]]; then
+  set -x
+fi
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
 
@@ -904,6 +922,14 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${dir}/manifests"
 fi
 
+# Sets up the powervm-rmc manifests
+for POWERVM_RMC_YAML in powervm-rmc-namespace.yaml powervm-rmc-serviceaccount.yaml powervm-rmc-scc-rolebinding.yaml powervm-rmc-daemonset.yaml; do
+  if [ -f "${SHARED_DIR}/${POWERVM_RMC_YAML}" ]; then
+    echo "Saving ${SHARED_DIR}/${POWERVM_RMC_YAML} to the install directory..."
+    cp "${SHARED_DIR}/${POWERVM_RMC_YAML}" "${dir}/manifests"
+  fi
+done
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
@@ -935,8 +961,12 @@ export TF_LOG=debug
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-ret=${PIPESTATUS[0]}
+# Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+# Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
+openshift-install --dir="${dir}" create cluster > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
+INSTALL_PID=$!
+wait $INSTALL_PID
+ret=$?
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
   SKIP_WAIT_FOR=false
@@ -964,8 +994,12 @@ echo "SKIP_WAIT_FOR=${SKIP_WAIT_FOR}"
 if ! ${SKIP_WAIT_FOR}; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-  openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
-  ret=${PIPESTATUS[0]}
+  # Run openshift-install in background with process substitution to allow trap to execute on SIGTERM
+  # Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
+  openshift-install wait-for install-complete --dir="${dir}" > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
+  INSTALL_PID=$!
+  wait $INSTALL_PID
+  ret=$?
   echo "ret=${ret}"
   echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
 fi

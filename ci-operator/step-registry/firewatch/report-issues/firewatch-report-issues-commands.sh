@@ -4,13 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Create the Jira configuration file
-firewatch jira-config-gen --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" --server-url "${FIREWATCH_JIRA_SERVER}"
+jira_config_cmd="firewatch jira-config-gen --token-path ${FIREWATCH_JIRA_API_TOKEN_PATH} --server-url ${FIREWATCH_JIRA_SERVER}"
+
+if [ -f "${FIREWATCH_JIRA_EMAIL_PATH}" ]; then
+    jira_config_cmd+=" --email $(cat "${FIREWATCH_JIRA_EMAIL_PATH}")"
+fi
+
+eval "${jira_config_cmd}"
 
 report_command="firewatch report"
 
 if [ "${FIREWATCH_PRIVATE_DECK,,}" = "true" ]; then
     report_command+=" --gcs-bucket qe-private-deck --gcs-creds-file /tmp/secrets/private-deck/creds.json"
+else
+    report_command+=" --gcs-bucket test-platform-results-public"
 fi
 
 if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then

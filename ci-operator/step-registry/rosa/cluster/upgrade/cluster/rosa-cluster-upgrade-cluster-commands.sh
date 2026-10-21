@@ -13,8 +13,104 @@ log(){
 cluster_id=$(head -n 1 "${SHARED_DIR}/cluster-id")
 HOSTED_CP=${HOSTED_CP:-false}
 UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
+UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
+UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
+UPGRADE_START_EPOCH=""
+UPGRADE_START_ISO=""
+UPGRADE_FROM_VERSION=""
+
+# Capture sanitized ClusterOperator/node health before upgrade for gap-analysis Check #13.
+# Relies on Prow's ambient KUBECONFIG from SHARED_DIR/kubeconfig. Node hostnames and
+# network fields are omitted from published artifacts.
+write_pre_upgrade_snapshot() {
+  local kube="${SHARED_DIR}/kubeconfig"
+  if declare -F set_proxy >/dev/null; then
+    set_proxy
+  fi
+  if [[ ! -f "${kube}" ]]; then
+    log "No kubeconfig in SHARED_DIR; skipping pre-upgrade ClusterOperator snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! oc whoami --request-timeout=30s &>/dev/null; then
+    log "WARNING: kubeconfig is not usable; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! mkdir -p "${ARTIFACT_DIR}"; then
+    log "WARNING: cannot create ARTIFACT_DIR; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  oc get co -o wide --request-timeout=60s > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.txt" 2>/dev/null || true
+  oc get co -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      name: .metadata.name,
+      available: (([.status.conditions[]? | select(.type=="Available") | .status] | first) // ""),
+      degraded: (([.status.conditions[]? | select(.type=="Degraded") | .status] | first) // ""),
+      progressing: (([.status.conditions[]? | select(.type=="Progressing") | .status] | first) // ""),
+      version: ((.status.versions[]? | select(.name=="operator") | .version) // "")
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json"
+  oc get nodes -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      ready: (([.status.conditions[]? | select(.type=="Ready") | .status] | first) // ""),
+      schedulable: ((.spec.unschedulable // false) | not)
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json"
+  local cluster_version=""
+  cluster_version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' --request-timeout=30s 2>/dev/null || true)"
+  jq -n \
+    --arg cluster_version "${cluster_version}" \
+    --arg captured_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --arg phase "pre-upgrade" \
+    '{cluster_version: $cluster_version, captured_at: $captured_at, phase: $phase}' \
+    > "${ARTIFACT_DIR}/pre-upgrade-metadata.json" || true
+  log "Wrote pre-upgrade ClusterOperator snapshot for gap-analysis Check #13"
+  if declare -F unset_proxy >/dev/null; then
+    unset_proxy
+  fi
+}
+
+# Write upgrade-metrics.json with duration and the resolved target version. Best-effort;
+# does not fail the step. Prefer recommended_version from get_recommended_version_for_cluster.
+write_upgrade_metrics() {
+  if [[ -z "${UPGRADE_START_EPOCH}" ]]; then
+    return 0
+  fi
+  local end_epoch end_iso duration
+  end_epoch="$(date +%s)"
+  end_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  duration=$((end_epoch - UPGRADE_START_EPOCH))
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  jq -n \
+    --arg start "${UPGRADE_START_ISO}" \
+    --arg end "${end_iso}" \
+    --argjson start_epoch "${UPGRADE_START_EPOCH}" \
+    --argjson end_epoch "${end_epoch}" \
+    --argjson duration_seconds "${duration}" \
+    --arg from_version "${UPGRADE_FROM_VERSION:-}" \
+    --arg to_version "${recommended_version:-${UPGRADED_TO_VERSION:-}}" \
+    '{
+      start: $start,
+      end: $end,
+      start_epoch: $start_epoch,
+      end_epoch: $end_epoch,
+      duration_seconds: $duration_seconds,
+      from_version: $from_version,
+      to_version: $to_version
+    }' > "${ARTIFACT_DIR}/upgrade-metrics.json" || true
+  log "Wrote upgrade-metrics.json duration_seconds=${duration}"
+}
+trap 'write_upgrade_metrics || true' EXIT
 
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
@@ -77,32 +173,40 @@ function get_recommended_version_for_machinepool () {
   fi
 }
 
-# check_admin_gates function for ROSA
-function check_admin_gates() {
-    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
-    log -e "Admin ack required for these:\n$check_admin_gates"
-
-    ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
-    for item in ${ack_list}; do
-      # $ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.18-kube-1.32-api-removals-in-4.19":"true"}}' --type=merge
-      # https://access.redhat.com/articles/7112216
-      log "Patch Admin-acks configmap with ${item}: true"
-      oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
-    done
-}
-
 function upgrade_cluster_to () {
   major_version=$1
   recommended_version=""
   get_recommended_version_for_cluster $major_version
 
-  # Create upgrade scedule
   log "Upgrade the cluster $cluster_id to $recommended_version"
-  echo "rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH}"
+
+  # Before proceed the upgrade, we need to ack all the gates by --dry-run
+  # It may take 1-2 minutes for the acknowledgement to be propagated
+  # And we cannot patch the cm on the cluster
+  log "Acknowledging admin gates via dry-run upgrade"
+  rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} --dry-run || true
+
+  for attempt in 1 2; do
+    sleep 60
+    log "Checking gates for version $recommended_version (attempt $attempt/2)"
+    gate_count=$(rosa list gates -c $cluster_id --version $recommended_version -o json | jq 'length')
+    log "Active gates count: $gate_count"
+    if [[ "$gate_count" -eq 0 ]]; then
+      log "All admin gates cleared"
+      break
+    fi
+    if [[ "$attempt" -eq 2 ]]; then
+      log "error: Admin gates still present after dry-run acknowledgement"
+      rosa list gates -c $cluster_id --version $recommended_version
+      exit 1
+    fi
+  done
+
+  log "Scheduling cluster upgrade to $recommended_version"
   start_time=$(date +"%s")
   while true; do
     if (( $(date +"%s") - $start_time >= 7200 )); then
-      log "error: Timed out while waiting for the previous upgrade schedule to be removed."
+      log "error: Timed out while waiting to schedule upgrade."
       exit 1
     fi
 
@@ -119,17 +223,11 @@ function upgrade_cluster_to () {
         log "Waiting for the previous upgrade schedule to be removed."
         sleep 120
       fi
-    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then 
-      log "Admin Acknowledgements required."
-      set_proxy
-      check_admin_gates
-      unset_proxy
-      sleep 120
-      # ROSA Classic can take up to 2h to schedule, so attempts a re-try after clearing admin-gates.
-      # ROSA-HCP schedules instantly so breaking the loop after clearing admin-gates.
-      if [[ "$HOSTED_CP" == "true" ]]; then
-        break
-      fi
+    # The gate acknowledgement should be handled already, if we still hit the issue, exit directly
+    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then
+      log "error: Missing required acknowledgements to schedule upgrade"
+      log "$upgrade_info"
+      exit 1
     elif [[ "$upgrade_info" == *"Failed to schedule upgrade for cluster"* ]]; then
       log -e "$upgrade_info"
       log "Failed to schedule upgrade for cluster, so retry after a pause"
@@ -317,11 +415,25 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   HCP_SWITCH="--control-plane"
 fi
 
-if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
-  log "The UPGRADED_TO_VERSION is mandatory!"
-  exit 1
-fi
+write_pre_upgrade_snapshot
+UPGRADE_START_EPOCH="$(date +%s)"
+UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
 current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+UPGRADE_FROM_VERSION="${current_version}"
+
+# Auto-derive upgrade target from the cluster's current version when not explicitly set
+if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
+  current_x=$(echo "$current_version" | cut -d '.' -f1)
+  current_y=$(echo "$current_version" | cut -d '.' -f2)
+  UPGRADED_TO_VERSION="${current_x}.$((current_y + 1))"
+  log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION}"
+fi
+if [[ -z "${UPGRADE_CHANNEL}" ]]; then
+  UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
+  log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL}"
+fi
+
 if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
   log "The cluster has been in the version $UPGRADED_TO_VERSION"
   exit 1
@@ -353,6 +465,11 @@ if [[ "$end_version_x" == "$current_version_x" ]]; then
   fi
 
   for y in $(seq $start_version_y $end_version_y); do
+    if [[ -n "${UPGRADE_CHANNEL}" && $y -ne $current_version_y ]]; then
+      log "Changing cluster channel to ${UPGRADE_CHANNEL} for Y-stream upgrade"
+      rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
+      sleep 60
+    fi
     upgrade_cluster_to "$start_version_x.$y"
     if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
       upgrade_machinepool_to "$start_version_x.$y"
@@ -360,6 +477,11 @@ if [[ "$end_version_x" == "$current_version_x" ]]; then
   done
 else
   # For X-Stream upgrade, only support X+1
+  if [[ -n "${UPGRADE_CHANNEL}" ]]; then
+    log "Changing cluster channel to ${UPGRADE_CHANNEL} for X-stream upgrade"
+    rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
+    sleep 60
+  fi
   upgrade_cluster_to $UPGRADED_TO_VERSION
   if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
     upgrade_machinepool_to "$start_version_x.$y"

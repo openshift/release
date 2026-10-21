@@ -27,7 +27,10 @@ if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
         echo "Executing cluster-density-v2 in hypershift cluster"
         if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
                 echo "Set http proxy for hypershift cluster"
+                # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+                set +x
                 . $SHARED_DIR/proxy-conf.sh
+                set -x
         fi
         echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
         export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
@@ -49,7 +52,7 @@ if [[ ${CONTROL_PLANE_TOPOLOGY} == "External" && $cluster_infra == "AWS" ]]; the
 fi
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
-LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
+LATEST_TAG=$(git ls-remote --tags https://github.com/cloud-bulldozer/e2e-benchmarking.git | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
@@ -57,11 +60,13 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
 
 # Use CDV2_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 9
-iteration_multiplier=$((${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+# Use awk for fractional multiplier support; result is truncated to int
+iteration_multiplier=${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}
+ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
+export ITERATIONS
 
 export WORKLOAD=cluster-density-v2
-EXTRA_FLAGS="${CD_V2_EXTRA_FLAGS} --local-indexing --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${KB_FLAGS} ${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
@@ -73,23 +78,29 @@ fi
 export EXTRA_FLAGS UUID
 export ADDITIONAL_PARAMS
 
+set +o errexit
 ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
 
-
-if [[ ${JOB_TYPE} == "periodic" ]] && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
-  OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
-  OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
-  METRICS="collected-metrics-${UUID}/*QuantilesMeasurement*.json collected-metrics-${UUID}/jobSummary.json"
-  SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  # Prevent ssh or scp to cause error
-  if ! ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"; then
-    echo "Warning: failed to create remote directory in ${OCP_PERF_DASH_HOST}"
-  fi
-  if ! scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}; then
-    echo "Warning: failed to copy metrics to ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}"
-  fi
+METRICS_FOLDER="collected-metrics-${UUID}"
+if [[ -d ${METRICS_FOLDER} ]]; then
+  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
 fi
 
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
+fi
+
+exit ${RUN_EXIT_CODE}

@@ -17,6 +17,7 @@ fi
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
+DATA_STORAGE="/var/mnt/data-storage"
 
 if [[ "${CLUSTER_TYPE}" == *ocp-metal* ]]; then
   SSHOPTS=(-o 'ConnectTimeout=5'
@@ -146,7 +147,7 @@ case "$CLUSTER_TYPE" in
   oc extract -n openshift-machine-api secret/worker-user-data-managed --keys=userData --to=- > "${SHARED_DIR}"/worker.ign
   echo -e "\nCopying ignition files into bastion host..."
   chmod 644 "${SHARED_DIR}"/*.ign
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}"/*.ign "root@${AUX_HOST}:${DATA_STORAGE}/html/${CLUSTER_NAME}/"
 
   # For Bare metal UPI clusters, we consider the reservation of the nodes, and the configuration of the boot done
   # by the baremetal-lab-pre-* steps.
@@ -194,9 +195,11 @@ case "$CLUSTER_TYPE" in
   removal_list=( )
   echo "Removing the hosts having architectures: ${SCALE_IN_ARCHITECTURES}..."
   REGEX=$(echo "$SCALE_IN_ARCHITECTURES" | tr ',' '|')
+  # shellcheck disable=SC2154
   for bmhost in $(yq e -o=j -I=0 ".[] | select(.arch|test(\"${REGEX}\") and .name|test(\"worker\"))" "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    # shellcheck disable=SC2154
     removal_list+=( "${name}/${mac}" )
     oc adm cordon "${name}.${CLUSTER_NAME}.${BASE_DOMAIN}"
     oc adm drain --force --ignore-daemonsets --delete-local-data --grace-period=10 "${name}.${CLUSTER_NAME}.${BASE_DOMAIN}"

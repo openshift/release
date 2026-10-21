@@ -1,9 +1,9 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services check-validate-main-promotion dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
-export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
+export CONTAINER_ENGINE_OPTS ?= --platform linux
 export SKIP_PULL ?= false
 
 VOLUME_MOUNT_FLAGS = :z
@@ -22,7 +22,7 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation
+check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation check-validate-main-promotion
 	@echo "Service config check: PASS"
 
 check-boskos:
@@ -33,13 +33,18 @@ check-labels: python-help
 	python3 hack/validate-labels.py
 	@echo "Labels config check: PASS"
 
-check-cluster-profiles: python-help
-	python3 hack/validate-cluster-profiles-config.py ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+check-cluster-profiles:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_check-cluster-profiles-config_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_check-cluster-profiles-config_latest --normalize --config-path=/release/ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
 	@echo "Cluster profiles config check: PASS"
 
 check-yaml-indentation: python-help
 	hack/validate-yaml-indentation.sh .
 	@echo "YAML indentation check: PASS"
+
+check-validate-main-promotion: python-help
+	python3 hack/validate-main-promotion-guard.py
+	@echo "Main promotion validation: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -89,7 +94,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260217-999e46ca7 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20261007-6ed406f29 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -107,7 +112,7 @@ ci-operator-config:
 
 ci-operator-prowgen: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go --entrypoint=/usr/bin/ci-operator-prowgen quay.io/openshift/ci-public:ci_auto-config-brancher_latest --from-release-repo --to-release-repo --registry /go/src/github.com/openshift/release/ci-operator/step-registry --known-infra-file infra-build-farm-periodics.yaml --known-infra-file infra-periodics.yaml --known-infra-file infra-periodics-migrated.yaml --known-infra-file infra-image-mirroring.yaml --known-infra-file infra-periodics-origin-release-images.yaml $(WHAT)
 
 sanitize-prow-jobs: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest
@@ -144,8 +149,9 @@ revert-acknowledge-critical-fixes-only:
 	fi
 	# ocp-build-data is special
 	./hack/acknowledge_critical_fix_repos_single_repo.py openshift-eng/ocp-build-data openshift-$(RELEASE) --revert
+	$(eval REPOS ?= ./hack/acknowledge-critical-fix-repos.txt)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_tide-config-manager_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
 tide-config-manager-verified:
@@ -158,6 +164,10 @@ new-repo:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_repo-init_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_repo-init_latest --release-repo /release
 	$(MAKE) update
+
+.PHONY: test-tls-scanner
+test-tls-scanner:
+	python3 hack/test_tls_scanner.py
 
 validate-step-registry: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest
@@ -326,7 +336,7 @@ verify-app-ci:
 
 mixins:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_dashboards-validation_latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_dashboards-validation_latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_dashboards-validation_latest make -C /release/clusters/core-ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 
 # Runs e2e secrets generation and sync to clusters.
@@ -358,7 +368,7 @@ config_updater_vault_secret:  build_farm_credentials_folder
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_applyconfig_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
-		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(CURDIR)/clusters/build-clusters/build-shared:/manifests$(VOLUME_MOUNT_FLAGS)" \
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		quay.io/openshift/ci-public:ci_applyconfig_latest \
 		--config-dir=/manifests \
@@ -400,7 +410,7 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/build-clusters/build-shared/crd/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
 	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
@@ -416,7 +426,7 @@ sed_cmd := gsed
 timeout_cmd := gtimeout
 endif
 
-crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
+crds = 'clusters/build-clusters/build-shared/crd/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
 
 $(crds):
 	@#remove the empty lines at the beginning of the file. We do this to pass the yaml lint
@@ -505,22 +515,21 @@ generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment: 
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull ${CONTAINER_ENGINE_OPTS} quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG}
 	$(CONTAINER_ENGINE) run $(CONTAINER_USER) ${CONTAINER_ENGINE_OPTS} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
-		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
+		quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
+		--hypershift-image=quay-proxy.ci.openshift.org/openshift/ci:ci_hypershift-cli_${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hosted-mgmt/hypershift/SS_hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
 
 build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
 build-hypershift-deployment:
-	echo Building HyperShift operator with tag $(TAG)
-	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	echo "Tagging ci/hypershift-cli snapshot as $(TAG) (built by branch-ci-openshift-hypershift-main-images)."
 	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)

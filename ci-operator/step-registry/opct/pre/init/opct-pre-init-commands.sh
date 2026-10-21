@@ -42,6 +42,7 @@ export AWS_RETRY_MODE=adaptive
 function show_msg() {
   echo -e "$(date -u --rfc-3339=seconds)> \$@"
 }
+export -f show_msg
 
 # Extract OPCT from ImageStream
 function extract_opct() {
@@ -51,13 +52,13 @@ function extract_opct() {
   timeout 3m bash -c "until \
       oc image extract ${OPCT_CLI_IMAGE} ${IMAGE_EXTRACT_OPTS-} --registry-config=${CI_CREDENTIALS} --file=${OPCT_CLI_PATH_IMAGE} >/dev/null; \
       do
-        show_msg 'retrying in 15s...' && sleep 15;\
+        show_msg 'retrying in 15s...';\
+        sleep 15;\
       done"
 
   chmod u+x ${OPCT_CLI}
   show_msg "Running ${OPCT_CLI} version"
-  ${OPCT_CLI} version
-  #popd
+  ${OPCT_CLI} version || true
 }
 
 function dump_opct_namespace() {
@@ -84,9 +85,11 @@ fi
 
 # Extracting OPCT version
 show_msg "Extracting OPCT_VERSION..."
-${OPCT_CLI} version | tee "${ARTIFACT_DIR}/opct-version"
+{
+  ${OPCT_CLI} version | tee "${ARTIFACT_DIR}/opct-version"
+} || true
 
-OPCT_VERSION=$($OPCT_CLI version | grep ^"OPCT CLI" | awk -F': ' '{print$2}' | awk -F'+' '{print$1}' || true)
+OPCT_VERSION=$(grep ^"OPCT CLI" "${ARTIFACT_DIR}/opct-version" | awk -F': ' '{print$2}' | awk -F'+' '{print$1}' || true)
 OPCT_MODE="${OPCT_RUN_MODE:-default}"
 
 # Update env script

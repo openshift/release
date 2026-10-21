@@ -1,0 +1,18 @@
+workflow:
+  as: rosa-aws-cleanup
+  steps:
+    env:
+      RESOURCE_AGE_HOURS: "24"
+      CLEAN_IAM: "true"
+      DRY_RUN: "false"
+    test:
+    - ref: rosa-aws-cleanup-resources
+    post:
+    - ref: aws-deprovision-stacks
+  documentation: |-
+    Cleans ROSA CI-owned AWS resources older than 24 hours from the account
+    supplied by the cluster profile. Dry runs can scan multiple AWS regions
+    through REGIONS; live cleanup accepts one region per run because the shared
+    stack-deprovision step has a single-region contract. The workflow also
+    cleans global IAM roles and policies that use the ROSA CI naming convention,
+    plus ROSA-managed OIDC providers.

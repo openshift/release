@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 
 # Initial check
 case "${CLUSTER_TYPE}" in
-libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*)
+libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*|power-s2s*)
     ;;
 *)
     >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -49,7 +49,12 @@ function urlencode() {
 function prometheus_var_init() {
 	HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
 	# Do not exit with err if a token was not obtained. Collecting metrics is optional and should not fail the whole run
+	[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+	set +x
 	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s || true)
+	if [[ "${WAS_TRACING}" == true ]]; then
+		set -x
+	fi
 	export HOSTNAME
 	export TOKEN
 }
@@ -331,26 +336,19 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
 	powervs*)
 	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
 		;;
-	libvirt-ppc64le*)
+	powervc*)
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
+		;;
+	libvirt-ppc64le*|power-s2s*)
         TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
         ;;
 	esac
 
-    VERBOSITY="" # "--v 9"
-    set -x
-    openshift-tests run \
-        ${VERBOSITY} \
-        "${TEST_SUITE}" \
-        ${TEST_ARGS:-} \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
-}
+	if [[ "${DISABLE_LOAD_BALANCER_MONITOR:-false}" == "true" ]]; then
+		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+	fi
 
-function heavy_build() {
-    TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     VERBOSITY="" # "--v 9"
-
     set -x
     openshift-tests run \
         ${VERBOSITY} \
@@ -397,9 +395,6 @@ jenkins-e2e-rhel-only)
     ;;
 image-ecosystem)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/image-ecosystem suite
-    ;;
-heavy-build)
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel heavy_build
     ;;
 upgrade)
     upgrade

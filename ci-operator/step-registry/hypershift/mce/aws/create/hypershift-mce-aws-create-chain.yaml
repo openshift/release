@@ -10,6 +10,9 @@ chain:
         - name: HYPERSHIFT_BASE_DOMAIN
           default: "ci.hypershift.devcluster.openshift.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_AWS_REGION
+          default: ""
+          documentation: "The AWS region of the cluster."
       commands: |-
         set -exuo pipefail
 
@@ -23,7 +26,11 @@ chain:
             AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
           fi
 
+          if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+            HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+          fi
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
+          export AWS_REGION=${HYPERSHIFT_AWS_REGION}
           # hypershift CLI is needed to create iam cli-role, and it is already available in hypershift-operator image
           output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE})
           echo "$output"
@@ -40,8 +47,8 @@ chain:
       timeout: 15m0s
       credentials:
         - mount_path: /etc/hypershift-ci-jobs-awscreds
-          name: hypershift-ci-jobs-awscreds
-          namespace: test-credentials
+          group: ops/hypershift-ci-jobs-awscreds
+          collection: hypershift-team
     - as: create-hostedcluster
       cli: latest
       env:
@@ -214,14 +221,14 @@ chain:
       timeout: 60m0s
       credentials:
         - mount_path: /etc/ci-pull-credentials
-          name: ci-pull-credentials
+          bundle: ci-pull-credentials
           namespace: test-credentials
         - mount_path: /var/run/brew-pull-secret
-          name: cnv-ci-brew-pull-secret
-          namespace: test-credentials
+          group: cnv-ci-brew-pull-secret
+          collection: cnv-ci-secrets
         - mount_path: /etc/hypershift-ci-jobs-awscreds
-          name: hypershift-ci-jobs-awscreds
-          namespace: test-credentials
+          group: ops/hypershift-ci-jobs-awscreds
+          collection: hypershift-team
       dependencies:
         - name: "release:latest"
           env: HOSTEDCLUSTER_RELEASE_IMAGE_LATEST

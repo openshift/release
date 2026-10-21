@@ -4,14 +4,14 @@ ref:
   grace_period: 10m
   commands: upi-conf-vsphere-platform-external-commands.sh
   credentials:
-    - namespace: test-credentials
-      name: vsphere-vmc
+    - collection: vsphere-vmc
+      group: terraform
       mount_path: /var/run/vault/vsphere
-    - namespace: test-credentials
-      name: ci-ibmcloud
+    - collection: vsphere-vmc
+      group: ibmcloud
       mount_path: /var/run/vault/ibmcloud
-    - namespace: test-credentials
-      name: vsphere-ibmcloud-config
+    - collection: vsphere
+      group: ibmcloud/config
       mount_path: /var/run/vault/vsphere-ibmcloud-config
   resources:
     requests:
@@ -20,6 +20,12 @@ ref:
   env:
     - name: PATCH_INFRA_MANIFEST
       default: "false"
+    - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+      default: "true"
+      documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+    - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+      default: ""
+      documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
   dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM

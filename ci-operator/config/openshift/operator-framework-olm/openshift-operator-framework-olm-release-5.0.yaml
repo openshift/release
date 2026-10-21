@@ -1,15 +1,16 @@
 build_root:
   from_repository: true
 images:
-- dockerfile_path: operator-lifecycle-manager.Dockerfile
-  to: operator-lifecycle-manager
-- dockerfile_path: operator-registry.Dockerfile
-  to: operator-registry
-- dockerfile_path: operator-framework-tools.Dockerfile
-  to: operator-framework-tools
-- dockerfile_path: base.Dockerfile
-  from: src
-  to: ci-image
+  items:
+  - dockerfile_path: operator-lifecycle-manager.Dockerfile
+    to: operator-lifecycle-manager
+  - dockerfile_path: operator-registry.Dockerfile
+    to: operator-registry
+  - dockerfile_path: operator-framework-tools.Dockerfile
+    to: operator-framework-tools
+  - dockerfile_path: base.Dockerfile
+    from: src
+    to: ci-image
 promotion:
   to:
   - excluded_images:
@@ -36,10 +37,11 @@ tests:
   commands: make verify
   container:
     from: ci-image
-- as: e2e-gcp-ovn
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp
 - as: unit-olm
   commands: |
@@ -63,10 +65,11 @@ tests:
   commands: make unit/psm
   container:
     from: ci-image
-- as: e2e-gcp-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
+- always_run: false
+  as: e2e-gcp-olm
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -96,7 +99,7 @@ tests:
   as: e2e-gcp-olm-flaky
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -106,10 +109,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-console-olm
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
+- always_run: false
+  as: e2e-gcp-console-olm
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$|^(?:.*\/)?tests-extension\/
   steps:
-    cluster_profile: gcp
+    cluster_profile: openshift-org-gcp
     test:
     - as: test
       cli: latest
@@ -119,11 +123,23 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-upgrade
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+- always_run: false
+  as: e2e-upgrade
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-upgrade-ovn-single-node
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node
 - as: verify-deps
   steps:
     env:
@@ -140,6 +156,7 @@ tests:
         make verify
         make build
         make verify-metadata
+        make verify-images-json
       from: src
       resources:
         requests:
@@ -160,9 +177,10 @@ tests:
   container:
     from: src
   run_if_changed: ^tests-extension/(test/qe/testdata/|pkg/bindata/qe/)
-- as: e2e-aws-olmv0-ext
+- always_run: false
+  as: e2e-aws-olmv0-ext
   steps:
-    cluster_profile: aws-4
+    cluster_profile: openshift-org-aws
     env:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv0/all

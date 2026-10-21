@@ -3,22 +3,25 @@ build_root:
   from_repository: true
 canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
-- dockerfile_path: Dockerfile.rhel
-  to: openstack-cluster-api-controllers
+  items:
+  - dockerfile_path: Dockerfile.rhel
+    to: openstack-cluster-api-controllers
 promotion:
   to:
-  - name: 4.17-priv
-    namespace: ocp-private
+  - name: "4.17"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.17-priv
-      namespace: ocp-private
+      name: "4.17"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -39,7 +42,9 @@ tests:
     verify test
   container:
     from: src
-- as: e2e-techpreview
+- always_run: false
+  as: e2e-openstack-capi-techpreview
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:

@@ -276,9 +276,32 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 
-# Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
-elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
+# Skip tests specific to the PowerVC (IPI) ppc64le environment:
+#   - egressFirewall test is unsupported in the PowerVC network topology
+#   - Internet connectivity (IPv4) is not available from PowerVC nodes
+#   - Image registry blob-pull redirect returns 200 instead of 307 due to
+#     node resource pressure; skip until root cause is resolved
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 21)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ] && [ "${INSTALLER}" == "powervc" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network][Feature:EgressFirewall] egressFirewall should have no impact outside its namespace [Suite:openshift/conformance/parallel]"
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-imageregistry] Image registry [apigroup:route.openshift.io] should redirect on blob pull [apigroup:image.openshift.io] [Suite:openshift/conformance/parallel]"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVC with OnScaledown policy if another controller owns the PVC"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a WhenDeleted policy"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenDeleted)"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs with a OnScaledown policy"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenScaled)"
+"[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVCs when there is another controller"
+EOF
+# Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
+# Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
+elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
@@ -289,6 +312,8 @@ elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-node] [DRA] ResourceSlice Controller creates slices"
+"[sig-network][Feature:EgressFirewall] egressFirewall should have no impact outside its namespace [Suite:openshift/conformance/parallel]"
 EOF
     # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
     # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
@@ -300,6 +325,34 @@ EOF
 "[sig-etcd] etcd should not log excessive took too long messages"
 "[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
+       # Skip the PodObservedGenerationTracking tests for 4.21 only until https://redhat.atlassian.net/browse/OCPBUGS-83561 is fixed
+       # This test has timeout issues while pulling non-existent image on PowerVS for 4.21 (fixed in 4.22 with K8s 1.35)
+       if [ "${BRANCH}" == "4.21" ]; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod observedGeneration field set in pod conditions"
+"[sig-node] Pods Extended (pod generation) [Feature:PodObservedGenerationTracking] [FeatureGate:PodObservedGenerationTracking] [Beta] Pod Generation pod generation should start at 1 and increment per update"
+EOF
+       fi
+       # Skip the NetworkSegmentation test for 4.22 and higher versions on PowerVS until it pass
+       # NetworkSegmentation defaults to 9100 MTU, which exceeds PowerVS used 1500 MTU underlay limit and causes encapsulation packet drops.
+       if echo "${BRANCH}" | awk -F. '{ if ($1 > 4 || ($1 == 4 && $2 >= 22)) { exit 0 } else { exit 1 } }'; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation: services on a user defined primary network should be reachable through their cluster IP, node port and load balancer L2 primary UDN with custom network, cluster-networked pods, NodePort service [Suite:openshift/conformance/parallel]"
+EOF
+       fi
+       # Skip HAProxy router tests for versions below 4.22 until the fix is backported
+       # These tests fail due to missing VPC security group rule for port 80 in IBM Cloud PowerVS infrastructure
+       # The issue was fixed in 4.22 by https://github.com/openshift/installer/pull/10548
+       # Backporting to all lower versions requires significant resources and is not feasible at this time
+       # Bug reference: https://redhat.atlassian.net/browse/OCPBUGS-85232
+       if echo "${BRANCH}" | awk -F. '{ if ((($1 == 4) && ($2 < 22))) { exit 0 } else { exit 1 } }'; then
+          cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network-edge][Conformance][Area:Networking][Feature:Router] The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it [Skipped:Disconnected] [Suite:openshift/conformance/parallel/minimal]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should serve routes that were created from an ingress [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+"[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should respond with 503 to unrecognized hosts [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
+EOF
+       fi
     fi
 else
     echo "Executing all tests"
@@ -310,40 +363,6 @@ fi
 #
 # elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 17 && $2 <= 19))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
 #
-
-# Until the yellow-zone network bandwidth is upgraded, we will run the following tests in their own periodic and exclude
-# them from the conformance-parallel workflow in versions older than 4.21.
-if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 <= 20)) { exit 0 } else { exit 1 } }' &&  [[ "${TEST_TYPE}" == "conformance-parallel" || "${TEST_TYPE}" == "heavy-build" ]]; then
-    cat > "${SHARED_DIR}/temp_tests" << EOF
-"[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with multiple triggers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] Optimized image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] build without output image building from templates should create an image from a docker template without an output image reference defined [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] custom build with buildah being created from new-build should complete build with custom builder image [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] prune builds based on settings in the buildconfig should prune completed builds based on the successfulBuildsHistoryLimit setting [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] result image should have proper labels set Docker build from a template should create a image from \"test-docker-build.json\" template with proper Docker labels [apigroup:build.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] verify /run filesystem contents do not have unexpected content using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds][pullsecret] docker build using a pull secret Building from a template should create a docker build that pulls using a secret run it [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds][timing] capture build stages and durations should record build stages and durations for docker [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables should successfully resolve valueFrom in docker build environment variables [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-cli] oc debug deployment configs from a build [apigroup:image.openshift.io][apigroup:apps.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [apigroup:image.openshift.io][apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-imageregistry][Feature:Image] oc tag should change image reference for internal images [apigroup:build.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] build can reference a cluster service with a build being created from new-build should be able to run a build that references a cluster service [apigroup:build.openshift.io] [Skipped:Disconnected] [Skipped:Proxy] [Suite:openshift/conformance/parallel]"
-"[sig-builds][Feature:Builds] verify /run filesystem contents are writeable using a simple Docker Strategy Build [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
-EOF
-    if [ "${TEST_TYPE}" == "conformance-parallel" ]; then
-        echo "Adding heavy_build tests to the excluded test list..."
-        cat ${SHARED_DIR}/temp_tests >> ${SHARED_DIR}/excluded_tests
-    else
-        echo "Creating test list from the heavy_build test list..."
-        mv ${SHARED_DIR}/temp_tests ${SHARED_DIR}/tests
-    fi
-fi
 
 # Skip the following tests for clusters with multi-architecture compute nodes
 #

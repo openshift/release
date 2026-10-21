@@ -1,10 +1,5 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-#Set Kubeconfig:
+set -euxo pipefail; shopt -s inherit_errexit
 
 echo "Quay version is ${QUAY_VERSION}"
 QUAY_VERSION_THRESHOLD="3.16"
@@ -39,10 +34,28 @@ function copyArtifacts {
 }
 
 # Install Dependcies defined in packages.json
-yarn install || true
+npm install || true
 
-#Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
-trap copyArtifacts EXIT
+if [ "${MAP_TESTS}" = "true" ]; then
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget --timeout=30 -qO-) || _fURL=(curl --connect-timeout 10 --max-time 30 -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        trap '
+            copyArtifacts
+            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+                ExitTrap--PostProcessPrep junit--quay-interop-test.xml
+        ' EXIT
+    else
+        : "WARNING: ExitTrap--PostProcessPrep not available, falling back to copyArtifacts only"
+        trap copyArtifacts EXIT
+    fi
+else
+    trap copyArtifacts EXIT
+fi
 
 #Check Quay pod status
 set +x
@@ -68,10 +81,11 @@ if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V 
     export CYPRESS_QUAY_ENDPOINT=${registry}
     export CYPRESS_QUAY_PROJECT=${quay_ns}
     export CYPRESS_OLD_UI_DISABLED=true
+    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 else
     export CYPRESS_QUAY_ENDPOINT=${registry}
     export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
 fi
 
-NO_COLOR=1 yarn run smoke || true
+NO_COLOR=1 npm run smoke || true
 

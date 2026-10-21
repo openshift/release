@@ -201,6 +201,8 @@ function ci_get_clonerefs() {
 }
 
 function ci_clone_src() {
+    local force_clone="${1:-false}"
+
     fails=0
     for _ in $(seq 3) ; do
         if ci_get_clonerefs; then
@@ -215,7 +217,41 @@ function ci_clone_src() {
         fi
     done
 
-    if [ -z ${CLONEREFS_OPTIONS+x} ]; then
+    if [ "${force_clone}" == "true" ]; then
+        # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
+        # Priority: MICROSHIFT_PR > MICROSHIFT_GIT > MICROSHIFT_NIGHTLY > JOB_SPEC extraction
+        local branch pr_number=""
+        if [ -n "${MICROSHIFT_PR:-}" ]; then
+            branch="main"
+            pr_number="${MICROSHIFT_PR}"
+        elif [ -n "${MICROSHIFT_GIT:-}" ]; then
+            branch="${MICROSHIFT_GIT}"
+        elif [ -n "${MICROSHIFT_NIGHTLY:-}" ] || [ -n "${OCP_VERSION:-}" ]; then
+            branch="release-${OCP_VERSION}"
+        else
+            branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
+            # MicroShift repo uses main instead of master
+            [ "${branch}" == "master" ] && branch="main"
+        fi
+
+        CLONEREFS_OPTIONS=$(jq -n \
+            --arg branch "${branch}" \
+            --arg pr "${pr_number}" \
+            '{
+                "src_root": "/go",
+                "log":"/dev/null",
+                "git_user_name": "ci-robot",
+                "git_user_email": "ci-robot@openshift.io",
+                "fail": true,
+                "refs": [{
+                    "org": "openshift",
+                    "repo": "microshift",
+                    "base_ref": $branch,
+                    "workdir": true
+                } + if $pr != "" then {"pulls": [{"number": ($pr | tonumber), "sha": ""}]} else {} end]
+            }')
+        export CLONEREFS_OPTIONS
+    elif [ -z ${CLONEREFS_OPTIONS+x} ]; then
         # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
         CLONEREFS_OPTIONS=$(echo "${JOB_SPEC}" | jq '{"src_root": "/go", "log":"/dev/null", "git_user_name": "ci-robot", "git_user_email": "ci-robot@openshift.io", "fail": true, "refs": [(select(.refs) | .refs), try(.extra_refs[])]}')
         export CLONEREFS_OPTIONS
@@ -238,7 +274,7 @@ function ci_custom_link_report() {
     if [ "${JOB_TYPE}" == "presubmit" ]; then
         job_url_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
     fi
-    local -r url_prefix="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
+    local -r url_prefix="https://gcs.ci.openshift.org/gcs/test-platform-results-public/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/${ARTIFACT_DIR#/logs/}/scenario-info"
 
     # Disable tracing and glob expansion
     set +x
@@ -530,10 +566,10 @@ function ci_custom_link_report() {
       <a class="summary-link" target="_blank" href="${url_prefix}/">
         📁 Scenarios Directory
       </a>
-      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-metal-tests/build-log.txt">
+      <a class="summary-link" target="_blank" href="https://gcs.ci.openshift.org/gcs/test-platform-results-public/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-metal-tests/build-log.txt">
         📃 Scenarios Log
       </a>
-      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-infra-iso-build/build-log.txt">
+      <a class="summary-link" target="_blank" href="https://gcs.ci.openshift.org/gcs/test-platform-results-public/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-infra-iso-build/build-log.txt">
         📃 Build Log
       </a>
     </div>
@@ -709,6 +745,13 @@ function get_source_dir() {
     [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
     [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
     [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [bootc-releases-el9]="scenarios-bootc/el9/releases:scenarios-bootc"
+    [bootc-releases-el10]="scenarios-bootc/el10/releases:scenarios-bootc"
+    [bootc-presubmits-el9]="scenarios-bootc/el9/presubmits:scenarios-bootc"
+    [bootc-presubmits-el10]="scenarios-bootc/el10/presubmits:scenarios-bootc"
+    [bootc-periodics-el9]="scenarios-bootc/el9/periodics:scenarios-bootc"
+    [bootc-periodics-el10]="scenarios-bootc/el10/periodics:scenarios-bootc"
+    [bootc-c2cc]="scenarios-bootc/c2cc:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
     [periodics]="scenarios/periodics:scenarios-periodics"

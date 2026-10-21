@@ -2,20 +2,23 @@ build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager
 images:
-- dockerfile_path: Dockerfile.ci
-  to: cli-manager
+  items:
+  - dockerfile_path: Dockerfile.ci
+    to: cli-manager
 promotion:
   to:
-  - name: 4.16-priv
-    namespace: ocp-private
+  - name: "4.16"
+    namespace: ocp-priv
+prowgen:
+  private: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.16-priv
-  namespace: ocp-private
+  name: "4.16"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: make verify-gofmt
@@ -31,9 +34,10 @@ tests:
       SCAN_IMAGE: cli-manager
     test:
     - ref: fips-check-image-scan
-- as: e2e-aws-operator
+- always_run: false
+  as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: openshift-org-aws
     env:
       FIPS_ENABLED: "true"
     test:

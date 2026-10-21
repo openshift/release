@@ -17,14 +17,15 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.19-openshift-4.15
 images:
-- context_dir: .
-  dockerfile_path: docker-container-executor/Dockerfile
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: rhsso-runner
+  items:
+  - context_dir: .
+    dockerfile_path: docker-container-executor/Dockerfile
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: rhsso-runner
 releases:
   latest:
     candidate:
@@ -39,6 +40,16 @@ resources:
 tests:
 - as: rhsso-interop-aws
   cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#team-keycloak-continuous-testing'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     env:

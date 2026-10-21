@@ -8,24 +8,21 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: submariner-addon
-promotion:
-  to:
-  - name: "2.17"
-    namespace: stolostron
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: submariner-addon
 releases:
   initial:
     integration:
-      name: "4.6"
+      name: "4.20"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.6"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -56,6 +53,7 @@ tests:
   container:
     from: test-bin
 - as: sonarcloud
+  disable_rehearsal: true
   steps:
     test:
     - as: test
@@ -63,9 +61,25 @@ tests:
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:
-      - mount_path: /etc/sonarcloud/
-        name: acm-sonarcloud-token
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-sonarcloud-token
+        mount_path: /etc/sonarcloud/
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: sonarcloud-post-submit
+  postsubmit: true
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - collection: ocm-secrets
+        group: acm-sonarcloud-token
+        mount_path: /etc/sonarcloud/
       from: src
       resources:
         requests:
@@ -80,12 +94,6 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.17
-    workflow: ocm-ci-fastforward
 - as: golangci-lint
   commands: |
     export GOCACHE=/tmp/

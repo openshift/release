@@ -7,10 +7,11 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ./build/Dockerfile
-  from: base
-  optional: true
-  to: cert-policy-controller
+  items:
+  - dockerfile_path: ./build/Dockerfile
+    from: base
+    optional: true
+    to: cert-policy-controller
 promotion:
   to:
   - name: "2.12"
@@ -36,9 +37,9 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

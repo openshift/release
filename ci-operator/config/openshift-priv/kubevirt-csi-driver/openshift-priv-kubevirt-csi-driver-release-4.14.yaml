@@ -1,11 +1,11 @@
 base_images:
   base:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: base
   cli:
-    name: 4.14-priv
-    namespace: ocp-private
+    name: "4.14"
+    namespace: ocp-priv
     tag: cli
 binary_build_commands: make build
 build_root:
@@ -15,23 +15,26 @@ build_root:
     tag: rhel-8-release-golang-1.19-openshift-4.14
 canonical_go_repository: github.com/kubevirt/csi-driver
 images:
-- dockerfile_path: Dockerfile.openshift
-  from: base
-  to: kubevirt-csi-driver
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: base
+    to: kubevirt-csi-driver
 promotion:
   to:
-  - name: 4.14-priv
-    namespace: ocp-private
+  - name: "4.14"
+    namespace: ocp-priv
+prowgen:
+  private: true
 releases:
   initial:
     integration:
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
-      namespace: ocp-private
+      name: "4.14"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -42,7 +45,8 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-kubevirt-aws-csi
+- always_run: false
+  as: e2e-kubevirt-aws-csi
   steps:
     cluster_profile: aws-virtualization
     env:

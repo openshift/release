@@ -19,15 +19,25 @@ ref:
     - name: BUILD_COMPLETE_TIMEOUT
       default: "300"
       documentation: Timeout in seconds to wait for a build to be in Finished state.
+    - name: OPENSTACK_IMG_BASE_RELEASE
+      default: "quay.io/openstack-k8s-operators/openstack-operator-index:18.0-fr2-latest"
+      documentation: |-
+        Base release openstack-operator index used as the lower edge of the OLM
+        upgrade path baked into the openstack-operator meta index. The PR bundle
+        (built as the operator Makefile major.minor with a .99 patch, e.g.
+        19.0.99) gains a replaces edge back to this index's channel head, so
+        kuttl/chainsaw can drive a real OLM update. The base must be an older
+        version than that .99 PR bundle. Override per-branch here or via the
+        operator repo's .prow_ci.env.
   credentials:
   - mount_path: /secrets/rdoquay
-    name: rdoquay-oko-ci-robot
-    namespace: test-credentials
+    group: openstack-k8s-operator-ci-robot
+    collection: rdoquay-openstack-k8s-operators-ci-robot
   - mount_path: /secrets/docker
-    name: docker-io-oko-creds
-    namespace: test-credentials
+    group: openstack-k8s-operator-creds
+    collection: docker-openstack-k8s-operators-secrets
   - mount_path: /secrets/internal
-    name: internal-pull-creds
-    namespace: test-credentials
+    group: registry-redhat-io-secrets
+    collection: openstack-k8s-operators-internal
   documentation: |-
     This step builds operator images and push them to a remote registry.

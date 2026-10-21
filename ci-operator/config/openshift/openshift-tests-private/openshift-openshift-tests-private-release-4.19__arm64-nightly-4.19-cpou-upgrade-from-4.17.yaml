@@ -31,6 +31,9 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: upi-installer
+prowgen:
+  expose: true
+  private: true
 releases:
   arm64-intermediate:
     candidate:
@@ -66,10 +69,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: baremetalds-ipi-ovn-ipv4-f999
+- as: metal-ds-ipi-ovn-ipv4-f999
   capabilities:
   - intranet
-  cron: 8 8 29 2 *
+  cron: 0 0 31 2 *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -77,8 +80,6 @@ tests:
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
-      PACKET_METRO: dc
-      PACKET_PLAN: c3.large.arm64
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
@@ -94,9 +95,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-upgrade-qe-test-cpou
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-ipi-proxy-private-mini-perm-f999
-  cron: 8 8 29 2 *
+  cron: 0 0 31 2 *
   steps:
     cluster_profile: gcp-qe
     dependencies:

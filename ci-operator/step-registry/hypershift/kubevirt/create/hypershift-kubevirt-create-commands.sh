@@ -11,10 +11,14 @@ if [[ -n ${MCE} ]] ; then
 else
     CLUSTER_NAMESPACE_PREFIX=clusters
 fi
+CONTROL_PLANE_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 if [[ -n ${MCE} ]] ; then
@@ -107,9 +111,7 @@ then
   fi
   echo "mirror registry is ${mirror_registry}"
 
-  mirrored_index=${mirror_registry}/olm-index/redhat-operator-index
-  OLM_CATALOGS_R_OVERRIDES=registry.redhat.io/redhat/certified-operator-index=${mirrored_index},registry.redhat.io/redhat/community-operator-index=${mirrored_index},registry.redhat.io/redhat/redhat-marketplace-index=${mirrored_index},registry.redhat.io/redhat/redhat-operator-index=${mirrored_index}
-
+  OLM_CATALOGS_R_OVERRIDES=registry.redhat.io/redhat=${mirror_registry}/olm-index
   PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
   RELEASE_IMAGE="${PAYLOADIMAGE}"
 
@@ -136,14 +138,14 @@ then
 fi
 
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
-oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+oc create ns "${CONTROL_PLANE_NAMESPACE}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
   oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-bridge-whereabouts
-  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+  namespace: ${CONTROL_PLANE_NAMESPACE}
 spec:
   config: '{
       "cniVersion": "0.3.1",
@@ -168,7 +170,29 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
-EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE} "
+
+if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --auto-repair"
+fi
+
+case "${IP_STACK}" in
+ "v4")
+   EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
+   ;;
+ "v4v6")
+   # Use explicit CIDRs with IPv4 first (primary) since --default-dual doesn't work for KubeVirt
+   # Use non-conflicting IPv6 CIDRs (fd03::/48, fd04::/112) to avoid conflicts with management cluster
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+   ;;
+ "v6v4")
+   # Use explicit CIDRs with IPv6 first (primary) for v6v4 stack
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
+   ;;
+ "v6")
+   EXTRA_ARGS="${EXTRA_ARGS} --cluster-cidr fd03::/48 --service-cidr fd04::/112 "
+   ;;
+esac
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
@@ -193,8 +217,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --generate-ssh \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
-    --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14 ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+    ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
@@ -210,12 +233,8 @@ else
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
-    --infra-availability-policy ${INFRA_AVAILABILITY} \
-    --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
+    --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
-
-
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
@@ -223,3 +242,99 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+# Workaround for OCPBUGS-54574: Apply NetworkPolicies for virt-launcher
+if [[ "${CNI_PROVIDER}" == "cilium" ]]; then
+
+  if ! oc get crd ciliumnetworkpolicies.cilium.io &>/dev/null; then
+    echo "CiliumNetworkPolicy CRD not found, aborting"
+    exit 1
+  fi
+
+  oc apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: virt-launcher-egress
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s:kubevirt.io: virt-launcher
+  egress:
+    # In pure Kubernetes semantics, 0.0.0.0/0 excluding the Pod and Service CIDRs
+    # would include 192.168.111.4. However, Cilium classifies this peer as the
+    # host identity. CIDR/ipBlock rules do not match Cilium-managed host identities.
+    - toEntities:
+        - world
+        - host
+---
+# The four NetworkPolicies below are also added in https://github.com/openshift/hypershift/pull/9515
+# They can be removed once the PR is merged and backported to the respective release branches.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-konnectivity-from-nodes
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: kube-apiserver
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8091
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-ignition-server-proxy
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server-proxy
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-ignition-server
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: ignition-server
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 9090
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allows-ingress-to-oauth-openshift
+  namespace: ${CONTROL_PLANE_NAMESPACE}
+spec:
+  podSelector:
+    matchLabels:
+      app: oauth-openshift
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 6443
+  policyTypes:
+    - Ingress
+EOF
+
+  echo "NetworkPolicies applied to namespace ${CONTROL_PLANE_NAMESPACE}"
+fi

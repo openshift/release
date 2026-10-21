@@ -10,6 +10,11 @@ for NODE in `oc -o custom-columns=NAME:.metadata.name get nodes --no-headers`; d
     ROOT_DISK=$(oc debug --quiet --to-namespace default node/$NODE -- chroot /host /usr/bin/bash -c "findmnt -o SOURCE --noheadings --nofsroot --mountpoint /sysroot")
     if [ -z $ROOT_DISK ]; then echo "root disk not found"; exit 1; fi
     echo "ROOT_DISK $ROOT_DISK"
+
+    if [ ! -f $OUT ]; then
+	echo "Skip $NODE because it was absent on storage-disk-symlinks-save step"
+	continue
+    fi
     cat $OUT
 
     SUCCESS="yes"

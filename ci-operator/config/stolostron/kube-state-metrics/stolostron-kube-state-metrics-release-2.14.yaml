@@ -7,11 +7,12 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  from: base
-  to: kube-state-metrics
+  items:
+  - dockerfile_path: Dockerfile.prow
+    from: base
+    to: kube-state-metrics
 promotion:
   to:
   - name: "2.14"
@@ -59,9 +60,9 @@ tests:
         export OSCI_COMPONENT_NAME="kube-state-metrics"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
