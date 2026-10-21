@@ -61,6 +61,12 @@ tests:
         oc delete deployment feast-operator-controller-manager -n feast-operator-system
 
         make test-upgrade
+
+        # test-upgrade leaves the previous (upstream) operator running. Deploy the operator
+        # built from this branch again, so that tls-scanner-run checks it.
+        oc delete deployment feast-operator-controller-manager -n feast-operator-system --cascade=foreground --ignore-not-found
+        make install && make deploy IMG=${FEAST_OPERATOR_CONTROLLER_IMAGE} FS_IMG=${FEAST_FEATURE_SERVER_IMAGE}
+        oc wait --for condition=Available -n feast-operator-system deployment feast-operator-controller-manager --timeout=5m
       dependencies:
       - env: FEAST_OPERATOR_CONTROLLER_IMAGE
         name: feast-operator
