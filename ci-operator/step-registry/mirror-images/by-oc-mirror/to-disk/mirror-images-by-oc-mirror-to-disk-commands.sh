@@ -15,6 +15,12 @@ if [[ "${MIRROR_BIN}" != "oc-mirror" ]]; then
   exit 0
 fi
 
+# Preflight: verify required tools are available in this container image
+for tool in ssh scp tar; do
+  command -v "${tool}" >/dev/null ||
+    { echo "ERROR: required command missing: ${tool}"; exit 1; }
+done
+
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
@@ -202,12 +208,15 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_K
 echo "Bastion: ${BASTION_SSH_USER}@${BASTION_IP}"
 
 # Transfer the oc-mirror workspace (archive) to the bastion
-# The from-disk step will read the archive from this location on the bastion
+# The from-disk step will read the archive from this location on the bastion.
+# tar-over-SSH avoids the rsync dependency on both sides of the connection.
 echo "=== Transferring oc-mirror workspace to bastion ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "mkdir -p /tmp/oc-mirror-workspace"
-rsync -e "ssh ${SSH_OPTS}" -av --progress \
-    "${oc_mirror_workspace}/" \
-    "${BASTION_SSH_USER}@${BASTION_IP}:/tmp/oc-mirror-workspace/"
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
+  "mkdir -p /tmp/oc-mirror-workspace && command -v tar >/dev/null"
+
+tar -C "${oc_mirror_workspace}" -cf - . |
+  ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
+    "tar --no-same-owner -C /tmp/oc-mirror-workspace -xf -"
 echo "Workspace transfer complete."
 
 # Transfer the oc-mirror binary to the bastion
