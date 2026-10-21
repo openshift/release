@@ -1,0 +1,1 @@
+../hypershift-dump-extra-commands.sh

@@ -1,0 +1,1 @@
+../hypershift-setup-nested-management-cluster-commands.sh

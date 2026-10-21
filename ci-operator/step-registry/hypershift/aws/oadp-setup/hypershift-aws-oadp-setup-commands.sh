@@ -2,8 +2,24 @@
 
 set -euo pipefail
 
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+    echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+    exit 1
+  fi
+  export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+  if [[ ! -s "${KUBECONFIG}" ]]; then
+    echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+    exit 1
+  fi
+fi
+
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 REGION="${OADP_AWS_REGION:-us-east-1}"
+if [[ "${OADP_S3_BUCKET_NAME:-}" == *'${PROW_JOB_ID}'* ]]; then
+  : "${PROW_JOB_ID:?PROW_JOB_ID is required to resolve the OADP S3 bucket name}"
+  OADP_S3_BUCKET_NAME="${OADP_S3_BUCKET_NAME//\$\{PROW_JOB_ID\}/${PROW_JOB_ID}}"
+fi
 BUCKET_NAME="${OADP_S3_BUCKET_NAME:-hypershift-oadp-${CLUSTER_NAME}}"
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -11,10 +27,19 @@ export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials
 echo "Setting up OADP prerequisites for backup/restore tests"
 echo "Cluster: ${CLUSTER_NAME}, Region: ${REGION}, Bucket: ${BUCKET_NAME}"
 
-# Create S3 bucket for OADP backups
-echo "Creating S3 bucket ${BUCKET_NAME}..."
-aws s3api create-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" \
-  ${REGION:+$([ "${REGION}" != "us-east-1" ] && echo "--create-bucket-configuration LocationConstraint=${REGION}" || echo "")}
+# Create S3 bucket for OADP backups once. This step may run against multiple
+# management clusters that share the same BackupStorageLocation bucket.
+if HEAD_BUCKET_ERROR="$(aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" 2>&1)"; then
+  echo "S3 bucket ${BUCKET_NAME} already exists; reusing it"
+elif [[ "${HEAD_BUCKET_ERROR}" == *"(404)"* || "${HEAD_BUCKET_ERROR}" == *"Not Found"* ]]; then
+  echo "Creating S3 bucket ${BUCKET_NAME}..."
+  aws s3api create-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" \
+    ${REGION:+$([ "${REGION}" != "us-east-1" ] && echo "--create-bucket-configuration LocationConstraint=${REGION}" || echo "")}
+else
+  echo "Failed to check whether S3 bucket ${BUCKET_NAME} exists:" >&2
+  echo "${HEAD_BUCKET_ERROR}" >&2
+  exit 1
+fi
 
 # Save bucket name for cleanup
 echo "${BUCKET_NAME}" > "${SHARED_DIR}/oadp-bucket-name"
