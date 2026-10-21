@@ -177,12 +177,12 @@ ECHO_EXPECTATION_FILE="${WORK_DIR}/echo_expectation.json"
 # JSON-escaped so Authorino JsonResponse headers (e.g. "simple": "{\"data\":...}")
 # survive into response.json()["headers"] for extract_response().
 #
-# Do not add a higher-priority GET /get → plaintext "OK". Authorino response /
-# identity tests call client.get("/get") then response.json()["headers"].
-# A literal "OK" body caused JSONDecodeError on ~20 previously-passing tests
-# (rehearsal 2092567684859301888). Empty httpRequest {} matches /get and still
-# returns 200 for egress. The tools MockServer (deploy-tools) is the one that
-# needed an explicit /get path because its catch-all was the literal "/.*".
+# Static GET /get → 200 JSON (no JS/Velocity). s390x MockServer GraalJS cannot
+# run the upstream JavaScript template; dataplane tracing hits /get. Body must
+# be JSON, not plaintext "OK": Authorino tests call response.json()["headers"]
+# (plaintext caused JSONDecodeError on ~20 tests in 2092567684859301888).
+# Keep Velocity echo as a low-priority catch-all so other paths still mirror
+# request headers when the template engine is available.
 cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
 [
   {
@@ -192,6 +192,25 @@ cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
     },
     "httpResponse": {
       "statusCode": 404
+    }
+  },
+  {
+    "id": "get",
+    "priority": 100,
+    "httpRequest": {
+      "method": "GET",
+      "path": "/get"
+    },
+    "httpResponse": {
+      "statusCode": 200,
+      "headers": {
+        "content-type": ["application/json"]
+      },
+      "body": {
+        "headers": {},
+        "method": "GET",
+        "url": "/get"
+      }
     }
   },
   {
@@ -1847,7 +1866,7 @@ echo "  TESTSUITE_GIT_REF=${TESTSUITE_GIT_REF} overlay=${OVERLAY_TESTSUITE}"
 [[ "${RUN_KUADRANT}" == "true" ]] && append_make_target kuadrant "--reruns 0"
 # Makefile testsuite/% runs a path. When PYTEST_FLAGS includes -k, only that test.
 [[ "${RUN_DATAPLANE_TRACING_ONLY}" == "true" ]] && \
-  append_make_target "testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py" "--reruns 0"
+  append_make_target "testsuite/tests/singlecluster/tracing/data_plane_tracing" "--reruns 0"
 
 CONTAINER_SCRIPT+="make polish-junit || true
 # Debug summary before JUnit dump (survives even if follow logs drop mid-run).

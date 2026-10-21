@@ -77,12 +77,13 @@ tests:
       OSSM_STARTING_CSV: servicemeshoperator3.v3.4.1
       # Empty: install catalog channel head (1.4.2 is not in this index).
       RHCL_STARTING_CSV: ""
-      # Only still-red TRLP tests. Do NOT collect anything that already passed
-      # (396 + 14 wait-fix greens). This rehearsal forces GatewayClass istio
-      # (OCP's openshift-default is why tracing is unwired and TRLP never 429s).
-      # Tracing stays out until the dataplane tracing fix. Restore PYTEST_FLAGS:
-      # -n4 and RUN_SMOKE: "true" after this rehearsal.
-      PYTEST_FLAGS: "-n4 -k \"((test_invalid_api_key and route) or (test_invalid_api_key and gateway) or test_missing_api_key or test_trlp_limit_and_reset_free_user or test_trlp_limit_and_reset_paid_user or test_trlp_streaming_limit_and_reset or test_reservation_limit_and_reset or test_reservation_streaming or test_multiple_trlp or test_reservation_isolated_per_user or test_reservation_rejects_concurrent_overcommit or test_reservation_amount_is_clamped_to_max_fraction or test_authorized_hits_metric_exists_and_increments or test_metrics_reported_per_user_and_group)\""
+      # Dataplane tracing rehearsal only. Do not rerun the 410 projected greens
+      # or the 29 still-red TRLP tests. wasm-shim v0.15.0 BE-safe image (skip
+      # get_log_level) plus static MockServer GET /get. Restore PYTEST_FLAGS:
+      # -n4, RUN_SMOKE: "true", RUN_KUADRANT: "true", RUN_DATAPLANE_TRACING_ONLY:
+      # "false" after this rehearsal.
+      PYTEST_FLAGS: "-n4"
+      RELATED_IMAGE_WASMSHIM: quay.io/mtahoor/wasm-shim:s390x-be-fix
       # Always overlay Kuadrant/testsuite main onto the s390x image at Job start
       # (stablev1 bake is 5682b36 / Jul 2026). Each rehearsal resolves current
       # origin/main; the Job logs the fetched SHA.
@@ -92,7 +93,8 @@ tests:
       RUN_LIMITADOR: "false"
       RUN_DNSTLS: "false"
       RUN_OBSERVABILITY: "false"
-      RUN_KUADRANT: "true"
+      RUN_KUADRANT: "false"
+      RUN_DATAPLANE_TRACING_ONLY: "true"
       USE_EXTERNAL_DNS: "true"
     workflow: kuadrant-s390x
 zz_generated_metadata:
