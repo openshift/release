@@ -441,6 +441,9 @@ PATCH_EOF
 #     identical-hostnames: same wasm fail-open as deny_email.
 #     control-plane update: retry until a new reconcile span appears.
 #     dataplane tracing: send x-request-id (OCP Istio omits it on the response).
+#     GatewayClass: prefer istio over openshift-default (OCP 4.22 always has
+#       openshift-default; upstream picks it and leaves TRLP report + tracing
+#       on OpenShift's gateway controller instead of OSSM3).
 #     DNSRecord delegate=false: retry A lookup until CoreDNS has the record.
 # ---------------------------------------------------------------------------
 AUTHORINO_FIXES_PY="${WORK_DIR}/authorino-s390x-fixes.py"
@@ -1293,6 +1296,52 @@ def patch_no_caching() -> None:
     _write(path, text.replace(old, new, 1), "no-cache 500 warmup")
 
 
+def patch_prefer_istio_gateway_class() -> None:
+    """Prefer GatewayClass istio when Sail/OSSM3 installed it.
+
+    KuadrantGateway.get_gateway_class_name() returns openshift-default if that
+    CR exists, else istio. OCP 4.22 always ships openshift-default, so every
+    test Gateway lands on OpenShift's controller even though this job installs
+    OSSM3. Dataplane tracing is unwired on that class (no tracing EnvoyFilter).
+    TRLP Check/Report (response-body token count) also never 429'd there while
+    RateLimitPolicy request-count 429s — same cluster, same class. Invert the
+    preference so RHCL wasm runs on Istio, which is what QE/OSSM3 actually test.
+    """
+    path = Path("testsuite/gateway/gateway_api/gateway.py")
+    if not path.exists():
+        print("SKIP gateway.py missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: prefer-istio" in text:
+        print("SKIP GatewayClass preference already patched")
+        return
+    old = '''            gw_classes = [gw.name() for gw in oc.selector("gatewayclass.gateway.networking.k8s.io").objects()]
+            if "openshift-default" in gw_classes:
+                return "openshift-default"
+            if "istio" in gw_classes:
+                return "istio"
+            raise KeyError("Neither 'openshift-default' nor 'istio' GatewayClass found.")
+'''
+    new = '''            gw_classes = [gw.name() for gw in oc.selector("gatewayclass.gateway.networking.k8s.io").objects()]
+            # s390x-authorino-fix: prefer-istio
+            # OCP always has openshift-default; upstream prefers it over istio.
+            # This job installs OSSM3 — use Istio so TRLP report + tracing wasm
+            # attach the way RHCL QE expects. Fallback to openshift-default only
+            # if Istio GatewayClass is absent.
+            if "istio" in gw_classes:
+                print(f"KuadrantGateway: using GatewayClass istio (have {gw_classes})")
+                return "istio"
+            if "openshift-default" in gw_classes:
+                print(f"KuadrantGateway: fallback GatewayClass openshift-default (have {gw_classes})")
+                return "openshift-default"
+            raise KeyError("Neither 'openshift-default' nor 'istio' GatewayClass found.")
+'''
+    if old not in text:
+        print("WARN get_gateway_class_name preference block not found")
+        return
+    _write(path, text.replace(old, new, 1), "GatewayClass prefer istio over openshift-default")
+
+
 def patch_uma_wait() -> None:
     path = Path(
         "testsuite/tests/singlecluster/authorino/authorization/opa/test_authorization_services.py"
@@ -1325,6 +1374,7 @@ def patch_uma_wait() -> None:
 
 
 if __name__ == "__main__":
+    patch_prefer_istio_gateway_class()
     patch_dinosaur()
     patch_uma()
     patch_uma_eval()

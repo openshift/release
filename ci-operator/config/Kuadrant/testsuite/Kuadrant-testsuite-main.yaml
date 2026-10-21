@@ -77,13 +77,11 @@ tests:
       OSSM_STARTING_CSV: servicemeshoperator3.v3.4.1
       # Empty: install catalog channel head (1.4.2 is not in this index).
       RHCL_STARTING_CSV: ""
-      # Only still-red TRLP tests (buckets 3+4). Do NOT collect anything that
-      # already passed: the 396, or the 14 that went green on e721bf (OIDC,
-      # XFCC, gateway listener, no_caching, UMA), or the 6 extras the old -k
-      # overlapped (OIDC token, XFCC valid_cert, hostname lowercase, 3
-      # authorino test_invalid_api_key). Tracing + hostname_case upper/mixed
-      # are later. test_invalid_api_key is limited to [route]/[gateway].
-      # Restore PYTEST_FLAGS: -n4 and RUN_SMOKE: "true" after this rehearsal.
+      # Only still-red TRLP tests. Do NOT collect anything that already passed
+      # (396 + 14 wait-fix greens). This rehearsal forces GatewayClass istio
+      # (OCP's openshift-default is why tracing is unwired and TRLP never 429s).
+      # Tracing stays out until the dataplane tracing fix. Restore PYTEST_FLAGS:
+      # -n4 and RUN_SMOKE: "true" after this rehearsal.
       PYTEST_FLAGS: "-n4 -k \"((test_invalid_api_key and route) or (test_invalid_api_key and gateway) or test_missing_api_key or test_trlp_limit_and_reset_free_user or test_trlp_limit_and_reset_paid_user or test_trlp_streaming_limit_and_reset or test_reservation_limit_and_reset or test_reservation_streaming or test_multiple_trlp or test_reservation_isolated_per_user or test_reservation_rejects_concurrent_overcommit or test_reservation_amount_is_clamped_to_max_fraction or test_authorized_hits_metric_exists_and_increments or test_metrics_reported_per_user_and_group)\""
       # Always overlay Kuadrant/testsuite main onto the s390x image at Job start
       # (stablev1 bake is 5682b36 / Jul 2026). Each rehearsal resolves current
