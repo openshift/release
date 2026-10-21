@@ -207,33 +207,59 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_K
 
 echo "Bastion: ${BASTION_SSH_USER}@${BASTION_IP}"
 
-# Transfer the oc-mirror workspace (archive) to the bastion
-# The from-disk step will read the archive from this location on the bastion.
+# Stage location on the bastion: /var/tmp is backed by the EBS volume (~500 GB)
+# whereas /tmp is a tmpfs of only ~2 GB — far too small for the ~25 GB archive.
+BASTION_WORKSPACE_PATH="/var/tmp/oc-mirror-workspace"
+BASTION_BIN_PATH="/var/tmp/oc-mirror/oc-mirror"
+
+# Transfer the oc-mirror workspace (archive) to the bastion.
 # tar-over-SSH avoids the rsync dependency on both sides of the connection.
 echo "=== Transferring oc-mirror workspace to bastion ==="
+
+# Preflight: ensure /var/tmp has enough headroom before streaming 25+ GB.
+# Measure source size (KB) and available space on the bastion's /var/tmp (KB).
+local_kb=$(du -sk "${oc_mirror_workspace}" | awk '{print $1}')
+echo "Local workspace size: ${local_kb} KB ($(( local_kb / 1024 / 1024 )) GB)"
+
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-  "mkdir -p /tmp/oc-mirror-workspace && command -v tar >/dev/null"
+  "mkdir -p '${BASTION_WORKSPACE_PATH}' && mkdir -p '$(dirname "${BASTION_BIN_PATH}")' && command -v tar >/dev/null"
+
+bastion_avail_kb=$(ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
+  "df -k '${BASTION_WORKSPACE_PATH}' | awk 'NR==2{print \$4}'")
+echo "Bastion /var/tmp available: ${bastion_avail_kb} KB ($(( bastion_avail_kb / 1024 / 1024 )) GB)"
+df_output=$(ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
+  "df -h '${BASTION_WORKSPACE_PATH}'")
+echo "Bastion df output:"
+echo "${df_output}"
+
+if (( bastion_avail_kb < local_kb )); then
+  echo "ERROR: bastion has only ${bastion_avail_kb} KB available at ${BASTION_WORKSPACE_PATH} but workspace is ${local_kb} KB"
+  exit 1
+fi
+echo "Disk space check passed — proceeding with transfer."
 
 tar -C "${oc_mirror_workspace}" -cf - . |
   ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "tar --no-same-owner -C /tmp/oc-mirror-workspace -xf -"
+    "tar --no-same-owner -C '${BASTION_WORKSPACE_PATH}' -xf -"
 echo "Workspace transfer complete."
 
-# Transfer the oc-mirror binary to the bastion
+# Transfer the oc-mirror binary to the bastion.
 # The from-disk step runs oc-mirror on the bastion (without internet access),
 # so the binary must already be present there.
 echo "=== Transferring oc-mirror binary to bastion ==="
-scp ${SSH_OPTS} "${oc_mirror_bin}" "${BASTION_SSH_USER}@${BASTION_IP}:/tmp/oc-mirror"
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "chmod +x /tmp/oc-mirror && /tmp/oc-mirror version --output=yaml"
+scp ${SSH_OPTS} "${oc_mirror_bin}" "${BASTION_SSH_USER}@${BASTION_IP}:${BASTION_BIN_PATH}"
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "chmod +x '${BASTION_BIN_PATH}' && '${BASTION_BIN_PATH}' version --output=yaml"
 echo "Binary transfer complete."
 
-# Record the workspace path on the bastion for the from-disk step
-echo "/tmp/oc-mirror-workspace" > "${SHARED_DIR}/oc-mirror-workspace-path"
-echo "Wrote SHARED_DIR/oc-mirror-workspace-path"
+# Record paths on the bastion for the from-disk step
+echo "${BASTION_WORKSPACE_PATH}" > "${SHARED_DIR}/oc-mirror-workspace-path"
+echo "Wrote SHARED_DIR/oc-mirror-workspace-path: ${BASTION_WORKSPACE_PATH}"
+echo "${BASTION_BIN_PATH}" > "${SHARED_DIR}/oc-mirror-bin-path"
+echo "Wrote SHARED_DIR/oc-mirror-bin-path: ${BASTION_BIN_PATH}"
 
 # Clean up local secrets
 rm -f "${combined_pull_secret}"
 
 echo "=== mirror-to-disk (Phase 1) complete ==="
-echo "Archive staged on bastion at: /tmp/oc-mirror-workspace"
-echo "oc-mirror binary staged on bastion at: /tmp/oc-mirror"
+echo "Archive staged on bastion at: ${BASTION_WORKSPACE_PATH}"
+echo "oc-mirror binary staged on bastion at: ${BASTION_BIN_PATH}"

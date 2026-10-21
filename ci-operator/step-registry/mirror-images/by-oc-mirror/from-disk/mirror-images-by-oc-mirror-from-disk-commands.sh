@@ -58,18 +58,26 @@ if [[ -z "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ]]; then
 fi
 
 # Verify the workspace was staged by the to-disk step
-BASTION_WORKSPACE_PATH="/tmp/oc-mirror-workspace"
+BASTION_WORKSPACE_PATH="/var/tmp/oc-mirror-workspace"
 if [[ -f "${SHARED_DIR}/oc-mirror-workspace-path" ]]; then
     BASTION_WORKSPACE_PATH=$(cat "${SHARED_DIR}/oc-mirror-workspace-path")
 fi
 echo "Bastion workspace path: ${BASTION_WORKSPACE_PATH}"
 
+# Read the binary path written by the to-disk step; fall back to the
+# /var/tmp location so this step works even if re-run independently.
+BASTION_BIN_PATH="/var/tmp/oc-mirror/oc-mirror"
+if [[ -f "${SHARED_DIR}/oc-mirror-bin-path" ]]; then
+    BASTION_BIN_PATH=$(cat "${SHARED_DIR}/oc-mirror-bin-path")
+fi
+echo "Bastion oc-mirror binary path: ${BASTION_BIN_PATH}"
+
 # Verify the oc-mirror binary and workspace exist on the bastion
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "test -x /tmp/oc-mirror || { echo 'ERROR: /tmp/oc-mirror not found on bastion'; exit 1; }; \
+    "test -x '${BASTION_BIN_PATH}' || { echo 'ERROR: ${BASTION_BIN_PATH} not found on bastion'; exit 1; }; \
      test -d '${BASTION_WORKSPACE_PATH}/working-dir' || { echo 'ERROR: workspace missing at ${BASTION_WORKSPACE_PATH}'; exit 1; }; \
      echo 'oc-mirror binary and workspace verified.'; \
-     /tmp/oc-mirror version --output=yaml"
+     '${BASTION_BIN_PATH}' version --output=yaml"
 
 # ---------------------------------------------------------------------------
 # Registry credentials
@@ -171,6 +179,7 @@ MIRROR_REGISTRY_HOST="${MIRROR_REGISTRY_HOST}"
 BASTION_PRIVATE_IP="${BASTION_PRIVATE_IP}"
 ISC_PATH="${ISC_PATH}"
 BASTION_WORKSPACE_PATH="${BASTION_WORKSPACE_PATH}"
+BASTION_BIN_PATH="${BASTION_BIN_PATH}"
 VPC_IPV4_CIDR="${VPC_IPV4_CIDR}"
 VPC_IPV6_CIDR="${VPC_IPV6_CIDR}"
 IGNORE_RELEASE_SIGNATURE="${IGNORE_RELEASE_SIGNATURE}"
@@ -304,7 +313,7 @@ if [[ "${IGNORE_RELEASE_SIGNATURE}" == "true" ]]; then
     echo "Applying --ignore-release-signature (payload is unsigned)"
 fi
 
-/tmp/oc-mirror -c "${ISC_PATH}" \
+"${BASTION_BIN_PATH}" -c "${ISC_PATH}" \
     --from "file://${BASTION_WORKSPACE_PATH}" \
     "docker://${MIRROR_REGISTRY_HOST}" \
     --dest-tls-verify=false --v2 ${OC_MIRROR_EXTRA_FLAGS}
