@@ -138,6 +138,48 @@ esac
         self.assertEqual(metrics["to_version"], "4.20.1")
         self.assertIn("Wrote upgrade-metrics.json", result.stdout)
 
+    def test_prerelease_diagnostics_reject_sensitive_text_and_preserve_bounds(self):
+        boundary_version = "4.20.0-rc." + "1" * 22
+        rejected_versions = [
+            boundary_version + "1", "4.20.0-rc.", "4.20.0-ec.-3", "4.20.0-rc.2.private",
+            "4.20.0-ec.3/private", "4.20.0-rc.2+private", "4.20.0-fixture-private-value",
+            "prefix4.20.0-rc.2", "https://fixture-private-value/4.20.0-rc.2",
+        ]
+        self.stdout.write_text(
+            "4.20.0-rc.2  recommended fixture-private-value\n4.20.0-ec.3\n"
+            + boundary_version + "\n" + "\n".join(rejected_versions) + "\n"
+            + "\n".join(f"4.20.{index}" for index in range(25)) + "\n",
+            encoding="utf-8",
+        )
+        self.stderr.write_text("4.20.0-ec.99 recommended fixture-private-value\n", encoding="utf-8")
+        self.environment["TEST_LIST_STATUS"] = "42"
+        result = self.run_step()
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assert_query_count(1)
+        diagnostic = (self.artifacts / "upgrade-discovery.txt").read_text(encoding="utf-8")
+        rows = diagnostic.split("recommendation markers only):\n", 1)[1].splitlines()
+        self.assertEqual(len(rows), 20)
+        self.assertEqual(rows[0], "4.20.0-rc.2 recommended")
+        self.assertEqual(rows[1].split(), ["4.20.0-ec.3"])
+        self.assertEqual(rows[2].split(), [boundary_version])
+        self.assertEqual(rows[-1].split(), ["4.20.16"])
+        self.assertTrue(all(len(row.split()[0]) <= 32 for row in rows))
+        for rejected_version in rejected_versions:
+            self.assertNotIn(rejected_version, [row.split()[0] for row in rows])
+        self.assertNotIn("fixture-private-value", diagnostic)
+        self.assertNotIn("4.20.0-ec.99", diagnostic)
+        self.assertLess(len(diagnostic), 2048)
+
+    def test_prerelease_recommendation_selection_is_unchanged(self):
+        self.stdout.write_text("VERSION  NOTES\n4.20.0-rc.2  recommended\n", encoding="utf-8")
+        result = self.run_step()
+        self.assertEqual(result.returncode, 73, result.stderr)
+        calls = self.assert_query_count(1)
+        self.assertIn("list gates -c fixture-cluster --version 4.20.0-rc.2 -o json", calls)
+        metrics = json.loads((self.artifacts / "upgrade-metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual(metrics["to_version"], "4.20.0-rc.2")
+        self.assertFalse((self.artifacts / "upgrade-discovery.txt").exists())
+
     def test_metrics_writer_failure_is_best_effort_without_success_log(self):
         real_jq = shutil.which("jq")
         self.assertIsNotNone(real_jq)

@@ -181,8 +181,8 @@ function write_upgrade_discovery_diagnostics () {
         printf 'Observed message category: %s\n' "${category}"
       fi
     done
-    printf 'Available versions (up to 20 numeric versions; recommendation markers only):\n'
-    awk 'length($1) <= 32 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ && count < 20 {
+    printf 'Available versions (up to 20 release or rc/ec versions; recommendation markers only):\n'
+    awk 'length($1) <= 32 && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+(-(rc|ec)\.[0-9]+)?$/ && count < 20 {
       print $1, ($0 ~ /recommended/ ? "recommended" : ""); count++
     }' "${discovery_dir}/stdout"
   } > "${ARTIFACT_DIR}/upgrade-discovery.txt"; then
