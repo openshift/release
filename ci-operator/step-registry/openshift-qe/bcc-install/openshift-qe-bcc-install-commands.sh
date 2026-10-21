@@ -11,6 +11,7 @@ oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 # Extract bundle manifests from the bundle image using oc image extract
 BUNDLE_DIR="$(mktemp -d /tmp/bcc-bundle.XXXXXX)"
 echo "Extracting bundle manifests from ${BCC_BUNDLE_IMAGE} into ${BUNDLE_DIR}"
+mkdir -p "${BUNDLE_DIR}/manifests"
 oc image extract "${BCC_BUNDLE_IMAGE}" \
   --path="/manifests/:${BUNDLE_DIR}/manifests/" \
   --confirm
