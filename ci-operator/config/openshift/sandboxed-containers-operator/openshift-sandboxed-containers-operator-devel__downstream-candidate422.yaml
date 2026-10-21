@@ -167,6 +167,40 @@ tests:
       TESTS_KATA_UPSTREAM_PROFILE: k8s-configmap.bats
     workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
   timeout: 24h0m0s
+- as: azure-ipi-peerpods-disconnected
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CREDENTIALS_MODE: sts
+      ENABLE_MUST_GATHER: "false"
+      ENABLEPEERPODS: "true"
+      EXTRA_IMAGES_TO_MIRROR: ghcr.io/nginxinc/nginx-unprivileged:alpine,registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest,quay.io/prometheus/busybox:latest
+      INITDATA: ""
+      INSTALL_KATA_RPM: "false"
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
+      OSC_INSTALL: "true"
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 0h
+      TEST_RELEASE_TYPE: GA
+      TRUSTEE_URL: ""
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
+  timeout: 24h0m0s
 - as: aro-ipi-peerpods
   capabilities:
   - intranet
