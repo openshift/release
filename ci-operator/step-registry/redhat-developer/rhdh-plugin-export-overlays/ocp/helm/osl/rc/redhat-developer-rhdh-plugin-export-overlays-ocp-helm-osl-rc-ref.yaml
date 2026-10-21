@@ -34,25 +34,16 @@ ref:
     - A digest-pinned Logic IIB image in logic.iib.
     - Exact Logic subscription and CSV expectations: logic.package,
       logic.channel, logic.startingCSV, and logic.expectedVersion.
+      Logic uses manual InstallPlan approval; the initial plan is approved
+      only when it contains the expected Logic CSV and any other CSV is the
+      Serverless operator.
 
-    Serverless defaults to the latest serverless-operator in the stable channel
-    of redhat-operators in openshift-marketplace, installed in openshift-operators
-    as expected by the upstream Orchestrator test installer.
-    Omit the serverless object to use these defaults. The installed CSV and version
-    are logged once installation succeeds.
-
-    To pin an available operator version, set serverless.expectedVersion, for
-    example {"serverless": {"expectedVersion": "1.37.1"}}. An optional leading v
-    is accepted. The starting CSV defaults to serverless-operator.v1.37.1;
-    serverless.expectedCSV can override its name and requires expectedVersion.
-    A pin uses Manual approval for both Serverless and Logic because OLM can
-    combine their changes in one install plan. The job approves only initial
-    plans containing the requested CSVs and leaves subsequent upgrades unapproved.
-    The requested version must exist in the selected catalog and channel.
-    Container image tags are not supported as operator version overrides.
-
-    Optional serverless.package, serverless.channel, serverless.source, and
-    serverless.sourceNamespace override the standard catalog settings.
+    The Serverless subscription always uses serverless-operator from the stable
+    channel of redhat-operators in openshift-marketplace. It is installed in
+    openshift-operators with automatic approval and no starting CSV, so OLM
+    selects the latest version available in that channel. The installed CSV and
+    version are logged after installation. Serverless is not configured through
+    release.json.
 
     Candidate Logic images referenced from registry.redhat.io are mirrored to
     the matching Brew rh-osbs images named in the OSL release email.

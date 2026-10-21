@@ -12,6 +12,20 @@ LOGIC_CATALOG=osl-rc-logic
 
 trap 'rm -rf "${WORKDIR}"' EXIT
 
+set_serverless_defaults() {
+    SERVERLESS_PACKAGE=serverless-operator
+    SERVERLESS_CHANNEL=stable
+    SERVERLESS_SOURCE=redhat-operators
+    SERVERLESS_SOURCE_NAMESPACE=openshift-marketplace
+}
+
+reject_serverless_config() {
+    if jq -e '.serverless != null' "${MANIFEST}" >/dev/null; then
+        echo "ERROR: remove .serverless from release.json; this job selects the latest version from the stable redhat-operators channel" >&2
+        return 1
+    fi
+}
+
 require_manifest_string() {
     local field="$1"
     jq -er "${field} | strings | select(length > 0)" "${MANIFEST}" >/dev/null || {
@@ -94,36 +108,6 @@ spec:
 EOF
 }
 
-load_serverless_config() {
-    if ! jq -e '
-        .serverless == null or (.serverless | type == "object" and
-            all(.package, .channel, .source, .sourceNamespace, .expectedVersion, .expectedCSV;
-                . == null or (type == "string" and test("^[^\r\n]+$"))))
-    ' "${MANIFEST}" >/dev/null; then
-        echo "ERROR: serverless settings must be non-empty, single-line strings" >&2
-        return 1
-    fi
-    SERVERLESS_PACKAGE=$(jq -r '.serverless.package // "serverless-operator"' "${MANIFEST}")
-    SERVERLESS_CHANNEL=$(jq -r '.serverless.channel // "stable"' "${MANIFEST}")
-    SERVERLESS_SOURCE=$(jq -r '.serverless.source // "redhat-operators"' "${MANIFEST}")
-    SERVERLESS_SOURCE_NAMESPACE=$(jq -r '.serverless.sourceNamespace // "openshift-marketplace"' "${MANIFEST}")
-    SERVERLESS_VERSION=$(jq -r '.serverless.expectedVersion // ""' "${MANIFEST}")
-    SERVERLESS_EXPECTED_CSV=$(jq -r '.serverless.expectedCSV // ""' "${MANIFEST}")
-    SERVERLESS_APPROVAL=Automatic
-    if [[ -n "${SERVERLESS_VERSION}" ]]; then
-        SERVERLESS_VERSION="${SERVERLESS_VERSION#v}"
-        if [[ ! "${SERVERLESS_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
-            echo "ERROR: serverless.expectedVersion must be an exact operator version, for example 1.37.1" >&2
-            return 1
-        fi
-        SERVERLESS_EXPECTED_CSV="${SERVERLESS_EXPECTED_CSV:-${SERVERLESS_PACKAGE}.v${SERVERLESS_VERSION}}"
-        SERVERLESS_APPROVAL=Manual
-    elif [[ -n "${SERVERLESS_EXPECTED_CSV}" ]]; then
-        echo "ERROR: serverless.expectedCSV requires serverless.expectedVersion" >&2
-        return 1
-    fi
-}
-
 install_subscription() {
     local name="$1"
     local namespace="$2"
@@ -146,30 +130,6 @@ spec:
   sourceNamespace: ${source_namespace}
 $( [[ -z "${starting_csv}" ]] || printf '  startingCSV: %s\n' "${starting_csv}")
 EOF
-}
-
-approve_initial_install_plan() {
-    local name="$1"
-    local namespace="$2"
-    local expected_csv="$3"
-    local other_csv="${4:-}"
-    local plan
-    for _ in $(seq 1 90); do
-        plan=$(oc -n "${namespace}" get subscription "${name}" -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null || true)
-        if [[ -n "${plan}" ]]; then
-            if ! oc -n "${namespace}" get installplan "${plan}" -o json | jq -e --arg csv "${expected_csv}" --arg other "${other_csv}" \
-                '.spec.clusterServiceVersionNames | index($csv) != null and all(.[]; . == $csv or . == $other)' >/dev/null; then
-                echo "ERROR: refusing to approve InstallPlan ${namespace}/${plan}: expected ${expected_csv}, allowing only it and ${other_csv:-no other CSV}" >&2
-                return 1
-            fi
-            oc -n "${namespace}" patch installplan "${plan}" --type=merge -p '{"spec":{"approved":true}}'
-            return 0
-        fi
-        sleep 10
-    done
-    echo "ERROR: no InstallPlan for ${namespace}/${name} with requested CSV ${expected_csv}; check catalog availability" >&2
-    subscription_diagnostics "${name}" "${namespace}"
-    return 1
 }
 
 wait_for_subscription() {
@@ -211,6 +171,8 @@ verify_subscription() {
     local filter='.spec.channel == $channel and .spec.source == $source and .spec.sourceNamespace == $source_namespace and .spec.installPlanApproval == $approval'
     if [[ -n "${starting_csv}" ]]; then
         filter+=' and .spec.startingCSV == $starting_csv'
+    else
+        filter+=' and (.spec.startingCSV // "") == ""'
     fi
     if ! oc -n "${namespace}" get subscription "${name}" -o json | jq -e \
         --arg channel "${channel}" --arg source "${source}" --arg source_namespace "${source_namespace}" --arg starting_csv "${starting_csv}" --arg approval "${approval}" \
@@ -219,6 +181,35 @@ verify_subscription() {
         subscription_diagnostics "${name}" "${namespace}"
         return 1
     fi
+}
+
+approve_initial_install_plan() {
+    local name="$1"
+    local namespace="$2"
+    local expected_csv="$3"
+    local serverless_prefix="${SERVERLESS_PACKAGE}.v"
+    local plan
+    for _ in $(seq 1 90); do
+        plan=$(oc -n "${namespace}" get subscription "${name}" -o jsonpath='{.status.installPlanRef.name}' 2>/dev/null || true)
+        if [[ -n "${plan}" ]]; then
+            if ! oc -n "${namespace}" get installplan "${plan}" -o json | jq -e \
+                --arg csv "${expected_csv}" --arg serverless_prefix "${serverless_prefix}" '
+                    (.spec.clusterServiceVersionNames // []) as $csvs
+                    | ($csvs | index($csv) != null)
+                      and all($csvs[]; . == $csv or startswith($serverless_prefix))
+                ' >/dev/null; then
+                echo "ERROR: refusing to approve InstallPlan ${namespace}/${plan}: expected ${expected_csv} and only optional Serverless CSVs" >&2
+                oc -n "${namespace}" get installplan "${plan}" -o yaml >&2 || true
+                return 1
+            fi
+            oc -n "${namespace}" patch installplan "${plan}" --type=merge -p '{"spec":{"approved":true}}'
+            return 0
+        fi
+        sleep 10
+    done
+    echo "ERROR: no InstallPlan for ${namespace}/${name} with requested CSV ${expected_csv}; check catalog availability" >&2
+    subscription_diagnostics "${name}" "${namespace}"
+    return 1
 }
 
 wait_for_worker_mcp_rollout() {
@@ -302,7 +293,8 @@ require_manifest_string '.logic.package'
 require_manifest_string '.logic.channel'
 require_manifest_string '.logic.startingCSV'
 require_manifest_string '.logic.expectedVersion'
-load_serverless_config
+reject_serverless_config
+set_serverless_defaults
 
 OCP_VERSION=$(jq -r '.ocpVersion' "${MANIFEST}")
 LOGIC_IIB=$(jq -r '.logic.iib' "${MANIFEST}")
@@ -345,18 +337,12 @@ create_catalogsource "${LOGIC_CATALOG}" "${LOGIC_IIB}"
 wait_for_catalogsource "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}"
 
 wait_for_catalogsource "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
-install_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_PACKAGE}" "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}" "${SERVERLESS_EXPECTED_CSV}" "${SERVERLESS_APPROVAL}"
-verify_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}" "${SERVERLESS_EXPECTED_CSV}" "${SERVERLESS_APPROVAL}"
-if [[ "${SERVERLESS_APPROVAL}" == Manual ]]; then
-    approve_initial_install_plan "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_EXPECTED_CSV}"
-fi
-wait_for_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_VERSION}" "${SERVERLESS_EXPECTED_CSV}"
-# OLM can combine subscriptions in one InstallPlan. Keep both manual when pinned.
-install_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_PACKAGE}" "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" "${SERVERLESS_APPROVAL}"
-verify_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" "${SERVERLESS_APPROVAL}"
-if [[ "${SERVERLESS_APPROVAL}" == Manual ]]; then
-    approve_initial_install_plan "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_STARTING_CSV}" "${SERVERLESS_EXPECTED_CSV}"
-fi
+install_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_PACKAGE}" "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
+verify_subscription "${SERVERLESS_PACKAGE}" openshift-operators "${SERVERLESS_CHANNEL}" "${SERVERLESS_SOURCE}" "${SERVERLESS_SOURCE_NAMESPACE}"
+wait_for_subscription "${SERVERLESS_PACKAGE}" openshift-operators
+install_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_PACKAGE}" "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" Manual
+verify_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" Manual
+approve_initial_install_plan "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_STARTING_CSV}"
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
