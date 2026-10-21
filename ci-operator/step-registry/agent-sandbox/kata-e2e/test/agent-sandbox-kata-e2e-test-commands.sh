@@ -47,6 +47,7 @@ function exit_handler() {
 trap 'exit_handler' EXIT
 
 echo ">>> Installing gotestsum"
+export GOFLAGS="-mod=mod"
 go install gotest.tools/gotestsum@latest
 
 echo ">>> Running tests"
