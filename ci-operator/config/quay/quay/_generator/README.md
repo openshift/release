@@ -34,7 +34,7 @@ strips it again, so committed configs carry no header.
 ## How it works
 
 ```
-matrix.yaml.in ──> generate.py ──> one config file per cell ──> make update ──> Prow jobs
+matrix.yaml.in ──> generate.py ──> config files by filename ──> make update ──> Prow jobs
   releases           expands each job       ci-operator/config/quay/...        ci-operator/jobs/quay/...
   jobs               across clouds × ocp × arches,
                      merges template layers
@@ -230,6 +230,7 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
 
 ### Tests
 
-`make check` runs `pytest`, then `generate.py --check`. Golden-output tests use
+`make -C ci-operator/config/quay/quay/_generator check` runs `pytest`, then
+`generate.py --check`. Golden-output tests use
 `tests/fixtures/matrix-phase0.yaml.in`, not the real matrix, so adding coverage
 to `matrix.yaml.in` needs no test changes.
