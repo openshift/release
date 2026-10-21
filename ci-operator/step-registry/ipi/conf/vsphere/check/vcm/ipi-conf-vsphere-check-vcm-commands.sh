@@ -18,6 +18,9 @@ set -o pipefail
 # RESERVE_EXTRA_NETWORK - Requests an additional network that won't be attached
 #      to cluster nodes. Reserved networks are saved to reserved_networks.json
 #      for later use (e.g., remote worker installation).
+# MIN_VCENTERS - Requires the lease's pools to span at least this many distinct
+#      vCenters (min-vcenters lease support, SPLAT-2993).  Only valid with the
+#      POOL_COUNT single-lease path; must not exceed POOL_COUNT or MAX_VCENTERS.
 ################################################################################
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
@@ -38,11 +41,30 @@ fi
 log "POOLS: ${POOLS}"
 log "POOL_COUNT: ${POOL_COUNT}"
 log "MAX_VCENTERS: ${MAX_VCENTERS}"
+log "MIN_VCENTERS: ${MIN_VCENTERS}"
 
 # Make sure POOLS and POOL_COUNT are not both configured
 if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
   echo "Cannot set both POOL_COUNT and POOLS"
   exit 1
+fi
+
+# MIN_VCENTERS requires the single-lease (POOL_COUNT) path and must respect the
+# same bounds VCM enforces on spec.min-vcenters: it cannot exceed the number of
+# pools requested or the vCenters cap.
+if [[ "${MIN_VCENTERS}" != "0" ]]; then
+  if [[ "${POOLS}" != "" ]]; then
+    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
+    exit 1
+  fi
+  if (( MIN_VCENTERS > POOL_COUNT )); then
+    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed POOL_COUNT (${POOL_COUNT})"
+    exit 1
+  fi
+  if (( MIN_VCENTERS > MAX_VCENTERS )); then
+    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed MAX_VCENTERS (${MAX_VCENTERS})"
+    exit 1
+  fi
 fi
 
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
@@ -387,7 +409,7 @@ for POOL in "${pools[@]}"; do
   fi
 
   # shellcheck disable=SC1078
-  LEASES+=("$(echo "apiVersion: vspherecapacitymanager.splat.io/v1
+  lease_json=$(echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
 metadata:
   generateName: \"${LEASED_RESOURCE}-\"
@@ -405,10 +427,24 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
   pools: ${POOL_COUNT}
+  min-vcenters: ${MIN_VCENTERS}
   ${requiredPool}
   ${poolSelector}
   networks: $networks_number
-  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f -)
+
+  # An API server serving a VCM CRD that predates min-vcenters (SPLAT-2993)
+  # silently prunes the field instead of rejecting the lease.  Detect that here
+  # so a job requiring a multi-vCenter lease fails loudly instead of running on
+  # fewer vCenters than intended.
+  if [[ "${MIN_VCENTERS}" != "0" ]] && [[ "$(jq -r '.spec["min-vcenters"] // empty' <<<"${lease_json}")" == "" ]]; then
+    log "ERROR: lease was created without the requested min-vcenters (${MIN_VCENTERS})"
+    log "The VCM CRD in vsphere-infra-helpers does not support min-vcenters (SPLAT-2993)."
+    log "Deploy the updated vsphere-capacity-manager before running jobs that set MIN_VCENTERS."
+    exit 1
+  fi
+
+  LEASES+=("$(jq -r '.metadata.name' <<<"${lease_json}")")
 done
 
 log "waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled..."
