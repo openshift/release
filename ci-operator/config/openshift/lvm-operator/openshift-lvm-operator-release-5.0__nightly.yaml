@@ -66,23 +66,6 @@ tests:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
     test:
-    - as: lvms-tnf-label-nodes
-      cli: latest
-      commands: |
-        set -eu
-        if [ -f "${SHARED_DIR}/proxy-conf.sh" ]; then
-          source "${SHARED_DIR}/proxy-conf.sh"
-        fi
-        test "$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l | tr -d ' ')" = 2
-        # LVMS MNO disk tests select worker-labelled nodes. In TNF the two
-        # control-plane nodes also host workloads; there are no separate workers.
-        oc label nodes -l node-role.kubernetes.io/master node-role.kubernetes.io/worker= --overwrite
-        test "$(oc get nodes -l node-role.kubernetes.io/worker -o name | wc -l | tr -d ' ')" = 2
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: lvms-tnf-mno-integration-test
       cli: latest
       commands: |
