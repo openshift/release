@@ -1,6 +1,7 @@
 chain:
   as: sandboxed-containers-operator-test
   steps:
+    - ref: sandboxed-containers-operator-sanity
     - ref: sandboxed-containers-operator-testsuites-gate
   documentation: |-
     Shared `test`-phase chain for the sandboxed-containers-operator e2e
@@ -9,7 +10,10 @@ chain:
     All e2e workflows reference this chain in their `test` phase so that
     changes to the test-phase steps apply to every workflow at once.
 
-    A new minimal test step should be added to the chain to replace the
-    removed `openshift-extended-test` (OTP).  It should be added before the
-    `sandboxed-containers-operator-testsuites-gate step so that a failure in
-    pre or test phases skips post testsuite steps.
+    The `sandboxed-containers-operator-sanity` step runs first and checks that
+    a single workload runs on the cluster. It is enabled by default; a job
+    whose registry does not carry the workload image turns it off with
+    SANITY_ENABLE: "false".  It runs before the
+    `sandboxed-containers-operator-testsuites-gate` step so that a failure
+    there leaves the gate file uncreated, which skips the post testsuite
+    steps.
