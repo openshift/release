@@ -232,11 +232,16 @@ wait_cluster_settle() {
   sleep 90
 }
 
+# Keep per-phase reports OUT of ARTIFACT_DIR while phases run. test-runner.sh
+# does a recursive find for *_testrun.xml under ARTIFACT_DIR and fails with
+# "will not overwrite just-created" if prior-phase copies live there.
+NHC_PHASE_REPORTS_DIR="${NHC_PHASE_REPORTS_DIR:-/tmp/medik8s-nhc-phases}"
+
 # Snapshot per-phase junit/report XML so later phases cannot erase earlier
 # results (ginkgo overwrites nhc_suite_test_junit.xml each run).
 preserve_phase_reports() {
   local phase_slug="$1"
-  local dest="${ARTIFACT_DIR}/nhc-phases/${phase_slug}"
+  local dest="${NHC_PHASE_REPORTS_DIR}/${phase_slug}"
   mkdir -p "${dest}"
   # Copy whatever the suite just wrote; ignore missing files.
   find "${ARTIFACT_DIR}" -maxdepth 1 -type f \( \
@@ -249,7 +254,7 @@ preserve_phase_reports() {
 # failure > pass > skip so a earlier-phase pass is not shown as skipped
 # after a later phase that label-filtered it out.
 merge_phased_junit_reports() {
-  local phases_dir="${ARTIFACT_DIR}/nhc-phases"
+  local phases_dir="${NHC_PHASE_REPORTS_DIR}"
   if [[ ! -d "${phases_dir}" ]]; then
     return 0
   fi
@@ -373,6 +378,10 @@ if junit_paths:
 if testrun_paths:
     merge_files(testrun_paths, artifact_dir / "report_testrun.xml", "testsuite")
 PY
+  # Publish raw per-phase reports for debugging only after all make run-tests
+  # finished (so test-runner's recursive find cannot see them mid-job).
+  mkdir -p "${ARTIFACT_DIR}/nhc-phases"
+  cp -a "${phases_dir}/." "${ARTIFACT_DIR}/nhc-phases/" 2>/dev/null || true
 }
 
 run_tests_with_labels() {
