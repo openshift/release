@@ -1866,10 +1866,16 @@ periodics:
         for org in openshift-priv openshift; do
             echo "Filtering ${org} from org/config.yaml"
 
-            # Safety check: ensure the org exists exactly once
+            # The org may already be gone from the config (it is being removed
+            # from openshift/config as part of the Cyborg migration). Absence is
+            # fine - just skip it. Only a duplicate key is a real error.
             count=$(grep -cE "^  ${org}:" /tmp/stripped-config.yaml || true)
+            if [ "$count" -eq 0 ]; then
+                echo "${org} not present in config; nothing to filter"
+                continue
+            fi
             if [ "$count" -ne 1 ]; then
-                echo "ERROR: expected exactly one '${org}:' key, found $count" >&2
+                echo "ERROR: expected at most one '${org}:' key, found $count" >&2
                 exit 1
             fi
 
