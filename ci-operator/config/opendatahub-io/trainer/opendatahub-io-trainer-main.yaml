@@ -54,6 +54,45 @@ tests:
         set -euo pipefail
 
         oc apply --server-side -k manifests/overlays/manager
+
+        # The ODH controller image resolves the OpenShift cluster TLS profile
+        # at startup and watches it for changes.
+        oc apply --server-side -f - <<'EOF'
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-tls-profile
+        rules:
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          resourceNames:
+          - cluster
+          verbs:
+          - get
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          verbs:
+          - list
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-tls-profile
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-tls-profile
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+        EOF
+
         oc -n kubeflow-system set image \
           deployment/kubeflow-trainer-controller-manager \
           manager="${TRAINER_IMAGE}"
