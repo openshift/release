@@ -31,23 +31,13 @@ if [[ "${#SCAN_REGIONS[@]}" -eq 0 ]]; then
     echo "ERROR: REGIONS must contain at least one AWS region"
     exit 1
 fi
-if [[ "${DRY_RUN}" == "false" && "${#SCAN_REGIONS[@]}" -gt 1 ]]; then
-    echo "ERROR: Multi-region scanning is only supported in dry-run mode because aws-deprovision-stacks accepts one REGION per run"
-    exit 1
-fi
-
 NOW_EPOCH=$(date -u +%s)
 CUTOFF_EPOCH=$(date -u -d "${RESOURCE_AGE_HOURS} hours ago" +%s)
-STACK_LIST="${SHARED_DIR}/to_be_removed_cf_stack_list"
 CLEANUP_RC=0
 STACK_COUNT=0
 ROLE_COUNT=0
 POLICY_COUNT=0
 OIDC_PROVIDER_COUNT=0
-
-# The standalone cleanup workflow owns this file. The existing
-# aws-deprovision-stacks step consumes it during the workflow's post phase.
-: > "${STACK_LIST}"
 
 is_older_than_cutoff()
 {
@@ -78,13 +68,89 @@ run_cleanup()
     fi
 }
 
+delete_stack_vpc_load_balancers()
+{
+    # The ingress operator provisions a load balancer inside the stack's VPC at
+    # runtime. It is not a CloudFormation-managed resource, so delete-stack
+    # cannot remove it, and its network interfaces pin the VPC's subnets and
+    # block stack deletion. The stack is already past its expirationDate, so any
+    # load balancer still in its VPC is orphaned and safe to delete. This is best
+    # effort: failures are warnings and a future run retries.
+    local region=$1 stack_name=$2
+    local vpc_ids vpc_id lb_arns lb_arn deleted_arns clb_names clb
+
+    if ! vpc_ids=$(aws --region "${region}" cloudformation describe-stack-resources \
+        --stack-name "${stack_name}" \
+        --query "StackResources[?ResourceType=='AWS::EC2::VPC'].PhysicalResourceId" \
+        --output text 2>/dev/null); then
+        echo "WARNING: Could not read VPC resources of stack ${stack_name}; skipping load balancer cleanup" >&2
+        return
+    fi
+
+    for vpc_id in ${vpc_ids}; do
+        [[ -z "${vpc_id}" || "${vpc_id}" == "None" ]] && continue
+
+        lb_arns=$(aws --region "${region}" elbv2 describe-load-balancers \
+            --query "LoadBalancers[?VpcId=='${vpc_id}'].LoadBalancerArn" --output text 2>/dev/null) || lb_arns=""
+        deleted_arns=""
+        for lb_arn in ${lb_arns}; do
+            [[ -z "${lb_arn}" || "${lb_arn}" == "None" ]] && continue
+            if [[ "${DRY_RUN}" == "true" ]]; then
+                echo "  DRY-RUN: aws --region ${region} elbv2 delete-load-balancer --load-balancer-arn ${lb_arn}"
+                continue
+            fi
+            echo "  Deleting load balancer ${lb_arn} in VPC ${vpc_id} (orphaned, not managed by stack ${stack_name}) ..."
+            if aws --region "${region}" elbv2 delete-load-balancer --load-balancer-arn "${lb_arn}" 2>/dev/null; then
+                deleted_arns+=" ${lb_arn}"
+            else
+                echo "  WARNING: Failed to delete load balancer ${lb_arn}" >&2
+            fi
+        done
+        if [[ -n "${deleted_arns// }" ]]; then
+            # Wait (bounded) for the load balancers to release their network
+            # interfaces so the subsequent stack deletion can remove the subnets.
+            echo "  Waiting for load balancer deletion to release network interfaces ..."
+            aws --region "${region}" elbv2 wait load-balancers-deleted \
+                --load-balancer-arns ${deleted_arns} 2>/dev/null || true
+        fi
+
+        clb_names=$(aws --region "${region}" elb describe-load-balancers \
+            --query "LoadBalancerDescriptions[?VPCId=='${vpc_id}'].LoadBalancerName" --output text 2>/dev/null) || clb_names=""
+        for clb in ${clb_names}; do
+            [[ -z "${clb}" || "${clb}" == "None" ]] && continue
+            if [[ "${DRY_RUN}" == "true" ]]; then
+                echo "  DRY-RUN: aws --region ${region} elb delete-load-balancer --load-balancer-name ${clb}"
+                continue
+            fi
+            echo "  Deleting classic load balancer ${clb} in VPC ${vpc_id} ..."
+            aws --region "${region}" elb delete-load-balancer --load-balancer-name "${clb}" 2>/dev/null \
+                || echo "  WARNING: Failed to delete classic load balancer ${clb}" >&2
+        done
+    done
+}
+
+request_stack_deletion()
+{
+    local region=$1 stack_name=$2
+    delete_stack_vpc_load_balancers "${region}" "${stack_name}"
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        echo "  DRY-RUN: aws --region ${region} cloudformation delete-stack --stack-name ${stack_name}"
+        return
+    fi
+
+    echo "Requesting deletion of CloudFormation stack ${stack_name} in ${region} ..."
+    if ! aws --region "${region}" cloudformation delete-stack --stack-name "${stack_name}"; then
+        echo "WARNING: Failed to request deletion of stack ${stack_name}; a future cleanup run will retry it" >&2
+    fi
+}
+
 discover_expired_stacks()
 {
     local region=$1 stacks_json
     echo "Discovering expired CI VPC stacks in ${region} ..."
     if ! stacks_json=$(aws --region "${region}" cloudformation list-stacks --output json); then
-        echo "ERROR: Failed to list CloudFormation stacks in ${region}" >&2
-        CLEANUP_RC=1
+        echo "WARNING: Failed to list CloudFormation stacks in ${region}; a future cleanup run will retry" >&2
         return
     fi
 
@@ -98,7 +164,6 @@ discover_expired_stacks()
         if ! stack_json=$(aws --region "${region}" cloudformation describe-stacks \
             --stack-name "${stack_name}" --output json); then
             echo "WARNING: Could not inspect stack ${stack_name}" >&2
-            CLEANUP_RC=1
             continue
         fi
         expiration_date=$(jq -r '.Stacks[0].Tags[]? | select(.Key == "expirationDate") | .Value' <<< "${stack_json}")
@@ -108,7 +173,6 @@ discover_expired_stacks()
         fi
         if ! expiration_epoch=$(date -u -d "${expiration_date}" +%s 2>/dev/null); then
             echo "WARNING: Skipping ${stack_name}: invalid expirationDate '${expiration_date}'" >&2
-            CLEANUP_RC=1
             continue
         fi
         if [[ "${expiration_epoch}" -gt "${NOW_EPOCH}" ]]; then
@@ -118,9 +182,7 @@ discover_expired_stacks()
 
         echo "Found expired CI VPC stack ${stack_name} in ${region} (created ${created_at})"
         STACK_COUNT=$((STACK_COUNT + 1))
-        if [[ "${DRY_RUN}" == "false" ]]; then
-            echo "${stack_name}" >> "${STACK_LIST}"
-        fi
+        request_stack_deletion "${region}" "${stack_name}"
     done < <(jq -r '
         .StackSummaries[]
         | select(.StackStatus != "DELETE_COMPLETE")
