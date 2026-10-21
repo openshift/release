@@ -49,6 +49,8 @@ workflow:
           if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+            unset NVIDIANETWORK_OFED_DRIVER_VERSION NVIDIANETWORK_OFED_REPOSITORY \
+              NVIDIANETWORK_OFED_DRIVER_PULLSPEC
           fi
           export TEST_FEATURES=nvidianetwork
           export TEST_LABELS='deploy'
@@ -102,6 +104,8 @@ workflow:
           if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+            unset NVIDIANETWORK_OFED_DRIVER_VERSION NVIDIANETWORK_OFED_REPOSITORY \
+              NVIDIANETWORK_OFED_DRIVER_PULLSPEC
           fi
           export TEST_FEATURES=nvidianetwork
           export TEST_LABELS=rdma-shared-dev
@@ -135,6 +139,8 @@ workflow:
           if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+            unset NVIDIANETWORK_OFED_DRIVER_VERSION NVIDIANETWORK_OFED_REPOSITORY \
+              NVIDIANETWORK_OFED_DRIVER_PULLSPEC
           fi
           export TEST_FEATURES=nvidianetwork
           export TEST_LABELS='deploy || rdma-shared-dev'
@@ -179,11 +185,15 @@ workflow:
     NNO_SUBSCRIPTION_CHANNEL (for example v26.7) to pin the NVIDIA Network
     Operator release family; the value is applied after the cluster-profile
     environment is sourced so profile defaults cannot silently override the
-    lane. Set latest-ga to discover the newest quarterly GA channel available
+    lane. A lane also clears profile driver version, repository and pull-spec
+    pins so precompiled selection can discover a compatible pair.
+    Set latest-ga to discover the newest quarterly GA channel available
     in the cluster catalog; the job saves that channel for later stages.
     The precompiled stage sets NVIDIANETWORK_REUSE_NNO=true so it never
-    reinstalls or changes the operator. Precompiled driver selection uses the actual
-    installed CSV family and requires matching images for both RDMA workers.
-    No compatible pair skips that stage before changing the driver. These modes
+    reinstalls or changes the operator. Driver selection uses the requested
+    catalog channel's CSV version, then verifies the installed NNO release family
+    before changing the driver. Matching images must exist for both RDMA workers.
+    No compatible pair skips that stage before changing the driver. When a pair
+    is available, missing NNO fails the reuse stage. These modes
     require the companion nvidia-ci channel and pairing implementation. Leave
     the parameter unset to preserve cluster-profile channel defaults.
