@@ -115,12 +115,10 @@ tests:
         oc -n kubeflow-system rollout status \
           deployment/kubeflow-trainer-controller-manager --timeout=10m
 
-        # The manager overlay also installs JobSet. Wait for all control-plane
-        # workloads so the E2E suite does not race its controller or webhooks.
+        # The Trainer manager overlay applies the separate JobSet controller.
+        # Wait for both controller deployments before starting the E2E suite.
         oc -n kubeflow-system wait --for=condition=Available \
           deployment --all --timeout=10m
-        oc -n kubeflow-system wait --for=condition=Ready \
-          pod --all --timeout=10m
 
         oc apply --server-side -k manifests/overlays/runtimes
 
