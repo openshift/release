@@ -46,6 +46,10 @@ workflow:
           set -o allexport
           source "${e2e_env}"
           set +o allexport
+          if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
+            export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
+            export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+          fi
           export TEST_FEATURES=nvidianetwork
           export TEST_LABELS='deploy'
           export NVIDIANETWORK_CLEANUP=false
@@ -56,6 +60,7 @@ workflow:
           make run-tests
         env:
           - name: DUMP_FAILED_TESTS
+          - name: NNO_SUBSCRIPTION_CHANNEL
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -94,6 +99,10 @@ workflow:
           set -o allexport
           source "${e2e_env}"
           set +o allexport
+          if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
+            export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
+            export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+          fi
           export TEST_FEATURES=nvidianetwork
           export TEST_LABELS=rdma-shared-dev
           export NVIDIANETWORK_CLEANUP=false
@@ -104,6 +113,7 @@ workflow:
           make run-tests
         env:
           - name: DUMP_FAILED_TESTS
+          - name: NNO_SUBSCRIPTION_CHANNEL
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -122,8 +132,12 @@ workflow:
           set -o allexport
           source "${e2e_env}"
           set +o allexport
+          if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
+            export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
+            export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
+          fi
           export TEST_FEATURES=nvidianetwork
-          export TEST_LABELS='deploy'
+          export TEST_LABELS='deploy || rdma-shared-dev'
           export NVIDIANETWORK_CLEANUP=false
           export NVIDIANETWORK_USE_PRECOMPILED_OFED=true
           export NVIDIANETWORK_RDMA_LINK_TYPE=ethernet
@@ -133,6 +147,7 @@ workflow:
           make run-tests
         env:
           - name: DUMP_FAILED_TESTS
+          - name: NNO_SUBSCRIPTION_CHANNEL
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -147,6 +162,7 @@ workflow:
     env:
       DPF_DEPLOY_MAKE_TARGET: create-base-cluster
       DPF_OPENSHIFT_VERSION: "4.22"
+      NNO_SUBSCRIPTION_CHANNEL: ""
       DUMP_FAILED_TESTS: "true"
       TEST_TRACE: "true"
       TIMEOUT: 120m
@@ -155,5 +171,17 @@ workflow:
     Deploy a base OpenShift cluster on the selected lab profile with DPF, apply
     NVIDIA Network Operator day-2 manifests from the nvidia-ci image, then run
     the shared-device, GPU operator, GPUDirect, and precompiled OFED e2e suites.
+    The precompiled stage runs deployment followed by shared-device RDMA
+    against the selected driver, with GPUDirect disabled for that stage.
     The cluster profile stays on the consuming test so the nightly and the
-    manual presubmit share this workflow.
+    manual presubmit share this workflow. A consuming test can set
+    NNO_SUBSCRIPTION_CHANNEL (for example v26.7) to pin the NVIDIA Network
+    Operator release family; the value is applied after the cluster-profile
+    environment is sourced so profile defaults cannot silently override the
+    lane. Set latest-ga to discover the newest quarterly GA channel available
+    in the cluster catalog; an existing subscription keeps its selected channel
+    for the rest of the run. Precompiled driver selection uses the actual
+    installed CSV family and requires matching images for both RDMA workers.
+    No compatible pair skips that stage before changing the driver. These modes
+    require the companion nvidia-ci channel and pairing implementation. Leave
+    the parameter unset to preserve cluster-profile channel defaults.
