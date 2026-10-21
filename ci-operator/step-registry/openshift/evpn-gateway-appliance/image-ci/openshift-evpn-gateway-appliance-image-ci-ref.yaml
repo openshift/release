@@ -19,9 +19,14 @@ ref:
     default: "6"
     documentation: |-
       GitHub pull request number to fetch from openshift/evpn-gateway-appliance.
-      Temporary until the Containerfile is on main; remove the fetch when presubmits clone the PR head.
+      Defaults to PR 6 for the temporary appliance rehearsal source.
   documentation: >-
-    Fetches openshift/evpn-gateway-appliance pull request head and runs podman
-    build on image/rhel10/Containerfile. BOOTC_BASE stays on the public bootc
-    image. FRR and node-exporter come from the 4.22 CI imagestream, using the
-    mounted registry-pull-credentials file.
+    Temporarily fetches the appliance PR 6 rehearsal source by resolving its
+    pull request head to a commit SHA before downloading the archive. Builds
+    one image from image/rhel10/Containerfile with the public CentOS bootc base
+    and full FRR and node-exporter payload images from the 4.22 CI imagestream,
+    using the mounted registry-pull-credentials file. Runs
+    image/tools/smoke-nested.sh against that same image, then uses the public
+    CentOS bootc-image-builder to create qcow2 and raw disks. The compressed
+    disk.qcow2.gz and disk.raw.gz files are written to ARTIFACT_DIR. Nothing is
+    pushed to a registry.
