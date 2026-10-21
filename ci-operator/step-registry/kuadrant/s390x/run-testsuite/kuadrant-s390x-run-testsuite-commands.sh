@@ -1806,33 +1806,36 @@ if p.exists():
         print('egress-bk already present or no backend name')
 PY
 "
-if [[ "${OVERLAY_TESTSUITE}" != "true" ]]; then
-  CONTAINER_SCRIPT+="# RHCL 1.4.x publishes dataplane traces as Jaeger service wasm-shim.
-# Testsuite 80f962fc+ looks up kuadrant-filter. Match pre-80f962fc (17815b9).
-echo '=== Jaeger lookup kuadrant-filter -> wasm-shim (RHCL 1.4.x bake) ==='
+CONTAINER_SCRIPT+="# s390x BE-safe wasm-shim (v0.15.0 / quay.io/mtahoor/wasm-shim:s390x-be-fix)
+# and RHCL 1.4.x both publish dataplane traces as Jaeger service wasm-shim.
+# Testsuite 80f962fc+ looks up kuadrant-filter. Always rewrite, including when
+# overlaying main — this wasm image does not export as kuadrant-filter.
+echo '=== Jaeger lookup kuadrant-filter -> wasm-shim ==='
 python3 - <<'PY' || true
 from pathlib import Path
-files = [
-    Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py'),
-    Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing_rate_limit_only.py'),
-]
-old, new = 'service=\"kuadrant-filter\"', 'service=\"wasm-shim\"'
+root = Path('testsuite/tests/singlecluster/tracing/data_plane_tracing')
+files = sorted(root.glob('*.py')) if root.is_dir() else []
+if not files:
+    files = [
+        Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py'),
+        Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing_rate_limit_only.py'),
+    ]
+old, new = 'kuadrant-filter', 'wasm-shim'
+n = 0
 for p in files:
     if not p.exists():
         print('missing', p)
         continue
     t = p.read_text()
     if old not in t:
-        print(p, ': no kuadrant-filter service= (already wasm-shim?)')
+        print(p, ': no kuadrant-filter (already wasm-shim?)')
         continue
     p.write_text(t.replace(old, new))
     print('patched', p, '-> wasm-shim')
+    n += 1
+print('jaeger service rename files', n)
 PY
 "
-else
-  CONTAINER_SCRIPT+="echo '=== Skipping kuadrant-filter -> wasm-shim (overlaying ${TESTSUITE_GIT_REF}; keep checked-out Jaeger service name) ==='
-"
-fi
 CONTAINER_SCRIPT+="
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
 echo '=== Ensuring cfssl is on PATH ==='
