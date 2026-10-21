@@ -196,40 +196,60 @@ EOF
 }
 
 function create_idms() {
-    echo "Creating ImageDigestMirrorSet: ${IDMS_NAME}"
+    local cluster_minor rhel_suffix mirror_api mirror_kind mirror_spec_field mirror_resource
+    cluster_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f2)
 
-    if oc get imagedigestmirrorset "${IDMS_NAME}" &>/dev/null; then
-        echo "IDMS ${IDMS_NAME} already exists, skipping creation"
+    # LVMS product images track the cluster RHCOS base: rhel8 through 4.13, rhel9 from 4.14.
+    rhel_suffix="rhel9"
+    [[ "${cluster_minor}" -le 13 ]] && rhel_suffix="rhel8"
+
+    # ImageDigestMirrorSet (config.openshift.io/v1) exists from 4.13 on; 4.12 only has
+    # the older ImageContentSourcePolicy. Both express digest mirrors the same way.
+    mirror_api="config.openshift.io/v1"
+    mirror_kind="ImageDigestMirrorSet"
+    mirror_spec_field="imageDigestMirrors"
+    mirror_resource="imagedigestmirrorset"
+    if [[ "${cluster_minor}" -le 12 ]]; then
+        mirror_api="operator.openshift.io/v1alpha1"
+        mirror_kind="ImageContentSourcePolicy"
+        mirror_spec_field="repositoryDigestMirrors"
+        mirror_resource="imagecontentsourcepolicy"
+    fi
+
+    echo "Creating ${mirror_kind}: ${IDMS_NAME} (RHEL suffix: ${rhel_suffix})"
+
+    if oc get "${mirror_resource}" "${IDMS_NAME}" &>/dev/null; then
+        echo "${mirror_kind} ${IDMS_NAME} already exists, skipping creation"
         return 0
     fi
 
     cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${mirror_api}
+kind: ${mirror_kind}
 metadata:
   name: ${IDMS_NAME}
 spec:
-  imageDigestMirrors:
+  ${mirror_spec_field}:
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${rhel_suffix}-operator
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${rhel_suffix}
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${rhel_suffix}
 EOF
 
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to create IDMS"
+        echo "ERROR: Failed to create ${mirror_kind}"
         return 1
     fi
 
-    echo "IDMS ${IDMS_NAME} created successfully"
+    echo "${mirror_kind} ${IDMS_NAME} created successfully"
     return 0
 }
 
