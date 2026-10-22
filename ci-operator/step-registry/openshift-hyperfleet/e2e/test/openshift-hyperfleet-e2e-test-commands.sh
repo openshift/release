@@ -11,6 +11,8 @@ log(){
 }
 
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
+AUTH_MODE=$(cat "${SHARED_DIR}/auth_mode")
+export AUTH_MODE
 
 cp -r /e2e/ /tmp/
 

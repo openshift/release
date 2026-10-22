@@ -139,6 +139,7 @@ export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}
 # Configure authentication mode for HyperFleet.
 export AUTH_MODE="${AUTH_MODE:-EDGE+API}"
 export OIDC_ISSUER_MODE="${OIDC_ISSUER_MODE:-mock}"
+echo "${AUTH_MODE}" > "${SHARED_DIR}/auth_mode"
 
 # Install hyperfleet components via infra repo
 # Will inherit all exported values here
