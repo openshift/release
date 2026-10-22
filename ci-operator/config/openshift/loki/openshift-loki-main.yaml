@@ -135,29 +135,27 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
+      region: us-east-2
     owner: obs-logging
     product: ocp
     timeout: 1h30m0s
-    version: "4.21"
+    version: "4.22"
   steps:
-    dependencies:
-      OO_INDEX: ci-index-loki-operator-bundle
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: openshift-operators-redhat
-      OO_PACKAGE: loki-operator
-      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: install
       cli: latest
       commands: |
+        oc create ns openshift-operators-redhat
+        operator-sdk run bundle -n openshift-operators-redhat "$(OO_BUNDLE)"
         oc -n openshift-operators-redhat rollout status deployment loki-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: loki-operator-bundle
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-generic-claim
+    workflow: generic-claim
 - as: e2e-pre-merge
   cluster_claim:
     architecture: amd64
