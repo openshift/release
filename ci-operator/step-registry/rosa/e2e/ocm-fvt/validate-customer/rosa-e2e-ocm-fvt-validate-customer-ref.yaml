@@ -1,0 +1,77 @@
+ref:
+  as: rosa-e2e-ocm-fvt-validate-customer
+  from: nested-podman
+  commands: rosa-e2e-ocm-fvt-validate-customer-commands.sh
+  nested_podman: true
+  timeout: 2h0m0s
+  grace_period: 30s
+  credentials:
+  - collection: ocm-fvt-credentials
+    group: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_FVT_JOB_NAME
+    documentation: |-
+      Required ocmtest --job name (e.g. cs-rosa-hcp-ad-staging-main). Selects the
+      FVT profile and therefore the case set; the profile's provisioning
+      parameters are bypassed because the cluster comes from SHARED_DIR.
+  - name: OCM_FVT_SERVICE
+    default: "cms"
+    documentation: |-
+      ocmtest --service: cms (default) or osdfm.
+  - name: OCM_FVT_OCM_ENV
+    default: ""
+    documentation: OCM env override (e.g. integration). Empty uses ocmtest default (staging).
+  - name: FVT_GINKGO_FOCUS
+    default: ""
+    documentation: |-
+      Ginkgo focus filter selecting the FVT cases to run against the composed
+      cluster (e.g. a customer-facing subset). Empty runs the profile's default
+      case set. Passed to the container as GINKGO_FOCUS.
+  - name: FVT_GINKGO_SKIP
+    default: ""
+    documentation: |-
+      Ginkgo skip filter for the FVT cases. Empty uses the profile default.
+      Passed to the container as GINKGO_SKIP. Do not set
+      CleanClusterByProfile here (it fails --fail-on-empty); clean is skipped
+      via OCM_FVT_DEFER_CLEAN instead.
+  - name: OCM_FVT_EXTRA_ENVS
+    default: ""
+    documentation: |-
+      Newline-separated KEY=VALUE pairs injected into the podman container.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OCM_FVT_EXTRA_ENVS
+    default: ""
+    documentation: |-
+      Gangway API override for OCM_FVT_EXTRA_ENVS. When set via
+      pod_spec_options.envs (e.g. run-prow-job.sh --fvt-env), replaces
+      the job config value.
+  documentation: |-
+    Composes the customer-facing FVT (ocm-backend-tests) cases as a validation
+    tail against a cluster provisioned by any provisioner head via the
+    SHARED_DIR contract (ROSAENG-67580 / ROSAENG-67586). Compose, don't
+    migrate: the FVT suite and its harness (ocmtest) stay owned by CS/OCM QE;
+    this ref wires only the existing-cluster handoff and the case selection.
+
+    Reads ${SHARED_DIR}/cluster-id and ${SHARED_DIR}/kubeconfig (the elevated
+    customer-plane kubeconfig published by the head), seeds ocmtest's
+    recorded-cluster state with that cluster, and runs the test phase only
+    (--justTest, the symmetric counterpart of the --justClean mode that
+    rosa-e2e-ocm-fvt-clean already relies on). Clean is deferred
+    (OCM_FVT_DEFER_CLEAN=true): teardown stays with the workflow's post steps
+    (rosa-cluster-deprovision or the head's own teardown), never the FVT
+    harness.
+
+    DRAFT NOTE (harness contract to confirm with CS/OCM QE before merge):
+    the test phase honoring a pre-seeded cluster state under output/ —
+    cluster.ini (ID/State=ready) plus .datainfo/kube-configs/<cluster-id>
+    .kubeconfig — and the exact spelling of the test-only phase selector
+    (--justTest). If ocmtest grows a first-class existing-cluster mode
+    (e.g. --cluster-id), prefer it and drop the seeding.
+
+    Requires the cs-qe-credentials secret collection (ocm-tokens, slack
+    webhook, console client secret, quay auth, AWS credentials), same as
+    rosa-e2e-ocm-fvt.
