@@ -1,0 +1,90 @@
+# Track CNV's development stream using the existing cnv-dev-preview-konflux convention.
+# The OCP baseline follows the manually verified cluster; it does not select CNV.
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: storage-checkup-aws
+  # Prow evaluates cron schedules in UTC.
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      # Main coverage requires successful VM snapshot and restore results.
+      # Match complete status lines in the checkup's multiline result strings.
+      CHECKUP_EXPECTED_RESULTS: |-
+        {
+          "vmSnapshot": "(^|\\n)ReadyToUse=true(\\n|$)",
+          "vmRestore": "(^|\\n)Complete=true(\\n|$)"
+        }
+      CHECKUP_NUM_VMS: "10"
+      CHECKUP_STORAGE_CLASS: ""
+      # Resolve the current development catalog from cnv-ci/version-mapping.json
+      # on each run. An explicit image can override the mapping for a rehearsal.
+      CNV_CATALOG_IMAGE: ""
+      CNV_CATALOG_SOURCE: cnv-iib-catalog
+      CNV_OPERATOR_CHANNEL: dev-preview
+      CNV_VERSION: "4.99"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m8i.4xlarge
+    # A pre override replaces the workflow list, so retain every setup step.
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-aws-pre
+    - ref: cnv-enable-nested-virtualization-aws
+    - as: configure-cnv-pull-secret
+      cli: latest
+      commands: |
+        set +x
+        set -euo pipefail
+        umask 077
+        trap 'rm -f /tmp/authfile /tmp/authfile.new /tmp/cnv-update-pull-secret.sh' EXIT
+        curl --fail --silent --show-error --location \
+          https://raw.githubusercontent.com/openshift-cnv/cnv-ci/master/hack/update-pull-secret.sh \
+          --output /tmp/cnv-update-pull-secret.sh
+        bash /tmp/cnv-update-pull-secret.sh
+      credentials:
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: virtualization-secrets
+        group: konflux-pull-secret
+        mount_path: /var/run/cnv-ci-konflux-pull-secret
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: openshift-virtualization+konflux_ro_bot
+        name: KONFLUX_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-konflux-pull-secret/token
+        name: KONFLUX_REGISTRY_TOKEN_PATH
+      from_image:
+        name: ocp-qe-perfscale-ci
+        namespace: ci
+        tag: latest
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5m0s
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    workflow: cnv-storage-checkup-aws
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: cnv-storage-checkup
