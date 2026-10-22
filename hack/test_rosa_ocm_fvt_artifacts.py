@@ -15,6 +15,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -23,6 +24,28 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 STEP = REPOSITORY / "ci-operator/step-registry/rosa/e2e/ocm-fvt"
 SECRET = "FIXTURE_SECRET_DO_NOT_PRINT"
 DIGEST = "sha256:" + "a" * 64
+
+
+def mock_artifact_command(command, arguments, base, case):
+    output = base / "artifacts/ocm-fvt-results"
+    if command == "find":
+        if case == "find-failure" and arguments == [
+                str(output), "-type", "f", "-name", "report.xml", "-print0"]:
+            print(SECRET, file=sys.stderr)
+            return 94
+        os.execv("/usr/bin/find", ["find", *arguments])
+    if command == "cp":
+        if case == "copy-failure" and arguments[-1] == str(
+                base / "artifacts/junit-ocm-fvt-report.xml"):
+            print(SECRET, file=sys.stderr)
+            return 91
+        os.execv("/bin/cp", ["cp", *arguments])
+    if command == "python3":
+        if case == "collector-failure" and arguments == [
+                "-", str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
+            return 92
+        os.execv(sys.executable, [sys.executable, *arguments])
+    raise AssertionError("Unexpected artifact fixture command")
 
 
 def mock_command(command, arguments):
@@ -34,14 +57,8 @@ def mock_command(command, arguments):
                 or (command == "env" and arguments[0] == "-i")):
             return 0
         os.execv("/usr/bin/" + command, [command, *arguments])
-    if command == "cp":
-        if case == "copy-failure":
-            return 91
-        os.execv("/bin/cp", ["cp", *arguments])
-    if command == "python3":
-        if case == "collector-failure":
-            return 92
-        os.execv(sys.executable, [sys.executable, *arguments])
+    if command in ("find", "cp", "python3"):
+        return mock_artifact_command(command, arguments, base, case)
     if command != "podman":
         raise AssertionError("Unexpected fixture command")
     with (base / "calls.jsonl").open("a", encoding="utf-8") as calls:
@@ -69,6 +86,12 @@ def mock_command(command, arguments):
         (result / "report.xml").write_text("<testsuites/>\n", encoding="utf-8")
         (result / "pre-cluster-creation_123456.json").write_text(SECRET, encoding="utf-8")
         (result / "pre-cluster-creation_123456.json").chmod(0)
+        if case in ("copy-failure", "find-failure"):
+            (output / ".datainfo").mkdir()
+            (result / "cluster.ini").write_text(
+                "ID=fixture-cluster\nState=installing\n", encoding="utf-8")
+            (result / SECRET).mkdir()
+            (result / "report.xml").rename(result / SECRET / "report.xml")
         if case == "unreadable":
             result.chmod(0)
         elif case == "symlinks":
@@ -110,7 +133,7 @@ class ArtifactFixture(unittest.TestCase):
                         if line.startswith("  commands: "))
         self.script = self.base / commands
         shutil.copyfile(STEP / commands, self.script)
-        for command in ("podman", "cat", "env", "cp", "python3"):
+        for command in ("podman", "cat", "env", "cp", "find", "python3"):
             executable = self.bin / command
             executable.write_text(
                 f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
@@ -124,6 +147,7 @@ class ArtifactFixture(unittest.TestCase):
             "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
             "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
             "FIXTURE_CASE": case, "FIXTURE_EXIT": str(exit_code),
+            "OCM_FVT_DEFER_CLEAN": str(case in ("copy-failure", "find-failure")).lower(),
         }, capture_output=True, text=True, timeout=30, umask=0o077, check=False)
         self.assertEqual(result.returncode, exit_code, result.stderr)
         self.assertEqual((self.shared / "ocm-fvt-exit-code").read_text().strip(), str(exit_code))
@@ -242,22 +266,6 @@ class ArtifactSafetyTests(ArtifactFixture):
         self.assertTrue(directory["truncated"])
         self.assertEqual(len(directory["reports"]), 32)
 
-    def test_later_copy_failure_preserves_test_status(self):
-        self.run_step("copy-failure")
-        self.metadata()
-
-    def test_later_copy_failure_preserves_failed_test_status(self):
-        self.run_step("copy-failure", 42)
-        self.metadata()
-
-    def test_collector_failure_preserves_test_status(self):
-        result = self.run_step("collector-failure", 42)
-        self.assertIn("WARNING: failed to collect ocm-fvt artifact metadata", result.stdout)
-
-    def test_collector_failure_does_not_fail_successful_test(self):
-        result = self.run_step("collector-failure")
-        self.assertIn("WARNING: failed to collect ocm-fvt artifact metadata", result.stdout)
-
     def test_collector_does_not_follow_existing_artifact_symlink(self):
         artifact = self.artifacts / "ocm-fvt-artifact-metadata.json"
         artifact.symlink_to(self.base / "outside/secret")
@@ -301,6 +309,47 @@ class ArtifactSafetyTests(ArtifactFixture):
     def test_inspect_failure_is_best_effort(self):
         self.run_step("inspect-failure")
         self.metadata()
+
+
+class ArtifactPostprocessingTests(ArtifactFixture):
+    def check_report_failure(self, case, exit_code):
+        result = self.run_step(case, exit_code)
+        self.metadata()
+        operation = "copy ocm-fvt report" if case == "copy-failure" else "scan ocm-fvt reports"
+        self.assertIn("WARNING: failed to " + operation, result.stdout)
+        self.assertFalse((self.artifacts / "junit-ocm-fvt-report.xml").exists())
+        self.assertEqual((self.shared / "cluster-id").read_text(), "fixture-cluster")
+        for directory in (self.shared, self.artifacts):
+            self.assertEqual((directory / "ocm-fvt-gather-eligible").read_text(), "false")
+            self.assertEqual((directory / "ocm-fvt-job-name").read_text(), "fixture")
+            with tarfile.open(directory / "ocm-fvt-clean-state.tgz") as archive:
+                self.assertIn("test-result-fixture/cluster.ini", archive.getnames())
+                self.assertIn(".datainfo", archive.getnames())
+
+    def test_later_copy_failure_preserves_test_status(self):
+        self.check_report_failure("copy-failure", 0)
+
+    def test_later_copy_failure_preserves_failed_test_status(self):
+        self.check_report_failure("copy-failure", 42)
+
+    def test_later_find_failure_preserves_test_status(self):
+        self.check_report_failure("find-failure", 0)
+
+    def test_later_find_failure_preserves_failed_test_status(self):
+        self.check_report_failure("find-failure", 42)
+
+    def check_collector_failure(self, exit_code):
+        result = self.run_step("collector-failure", exit_code)
+        self.assertIn("WARNING: failed to collect ocm-fvt artifact metadata", result.stdout)
+        self.assertNotIn("WARNING: failed to persist ocmci image digest", result.stdout)
+        self.assertFalse((self.artifacts / "ocm-fvt-artifact-metadata.json").exists())
+        self.assertEqual((self.artifacts / "ocm-fvt-image-digest.txt").read_text(), DIGEST + "\n")
+
+    def test_collector_failure_preserves_test_status(self):
+        self.check_collector_failure(42)
+
+    def test_collector_failure_does_not_fail_successful_test(self):
+        self.check_collector_failure(0)
 
 
 if __name__ == "__main__":
