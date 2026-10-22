@@ -44,14 +44,23 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle /tmp
 
-BUCKET="gs://crc-bundle-${PULL_NUMBER}"
+# Bucket names are globally unique across all GCP projects, so derive the
+# name from the project ID to avoid collisions with buckets owned by other
+# projects. The project ID is a secret (it would be censored in logs and
+# artifacts), so use a hash of it rather than the ID itself.
+# A single shared bucket is used, with one prefix per PR, so the lifecycle
+# rule below cleans everything up without leaving empty buckets behind.
+PROJECT_HASH="$(echo -n "${GOOGLE_PROJECT_ID}" | sha256sum | cut -c1-16)"
+BUCKET_NAME="crc-bundle-${PROJECT_HASH}"
+BUCKET="gs://${BUCKET_NAME}"
+BUNDLE_PATH="${BUCKET_NAME}/${PULL_NUMBER}"
 echo "Check if ${BUCKET} bucket exists"
 if LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets describe "${BUCKET}" \
     --quiet \
     --project="${GOOGLE_PROJECT_ID}" >/dev/null 2>&1; then
   echo "Bucket '${BUCKET}' already exists. No action needed."
 else
-  echo "create crc-bundle-${PULL_NUMBER} bucket"
+  echo "create ${BUCKET_NAME} bucket"
   if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets create "${BUCKET}" \
       --quiet \
       --project="${GOOGLE_PROJECT_ID}"; then
@@ -67,12 +76,31 @@ else
   fi
 fi
 
+# Delete the bundles 10 days after upload.
+echo "Set lifecycle rule on ${BUCKET} to delete objects after 10 days"
+LIFECYCLE_FILE="$(mktemp)"
+cat > "${LIFECYCLE_FILE}" <<'EOF'
+{
+  "rule": [
+    {
+      "action": {"type": "Delete"},
+      "condition": {"age": 10}
+    }
+  ]
+}
+EOF
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud storage buckets update "${BUCKET}" \
+    --quiet \
+    --project="${GOOGLE_PROJECT_ID}" \
+    --lifecycle-file="${LIFECYCLE_FILE}"
+rm -f "${LIFECYCLE_FILE}"
+
 echo "Upload the bundle to gcp crc-bundle bucket"
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil cp /tmp/*.crcbundle gs://crc-bundle-"${PULL_NUMBER}"/
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil cp /tmp/*.crcbundle gs://"${BUNDLE_PATH}"/
 
 echo "Make Bundle publicly accessible from bucket"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil acl \
-   ch -r -u AllUsers:R gs://crc-bundle-"${PULL_NUMBER}"/
+   ch -r -u AllUsers:R gs://"${BUNDLE_PATH}"/
 
 echo "Create file in artifact directory, having links to storage links"
-find /tmp/ -maxdepth 1 -name "*.crcbundle" -printf "https://storage.googleapis.com/crc-bundle-${PULL_NUMBER}/%f\n" > ${ARTIFACT_DIR}/bundles.txt
+find /tmp/ -maxdepth 1 -name "*.crcbundle" -printf "https://storage.googleapis.com/${BUNDLE_PATH}/%f\n" > ${ARTIFACT_DIR}/bundles.txt
