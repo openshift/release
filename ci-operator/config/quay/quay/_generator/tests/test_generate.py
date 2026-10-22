@@ -794,6 +794,14 @@ def test_check_fails_on_unowned_config(tmp_path: Path) -> None:
     assert main(["--check", "--output", str(out)]) == 1
 
 
+def test_check_fails_on_sibling_repo_filename(tmp_path: Path) -> None:
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    sibling = next(p for p in (tmp_path).glob("*/*.yaml") if p.parent != out)
+    (out / sibling.name).write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
+
+
 def test_check_pins_hand_maintained_tests(tmp_path: Path) -> None:
     results = _phase0_results()
     for _group, filename, config in results:

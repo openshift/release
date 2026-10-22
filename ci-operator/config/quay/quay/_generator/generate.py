@@ -798,7 +798,10 @@ def _check_unowned(
 ) -> int:
     # A config the generator does not produce must be listed as hand-maintained,
     # with exactly its tests, so a new job cannot skip the matrix unnoticed.
-    known = {filename for _group, filename, _config in results} | set(retired)
+    known = {
+        filename for group, filename, _config in results
+        if _repo_dir(output_dir, group[0]) == output_dir
+    } | set(retired)
     failures = 0
     for path in sorted(output_dir.glob("*.yaml")):
         if path.name in known:
