@@ -61,7 +61,8 @@ else:
 
 
 class HtpasswdAuthRetryTests(unittest.TestCase):
-    def run_step(self, mode, results, attempts, delays, status=0):
+    def run_step(self, mode, results, retry_expectation, status=0):
+        attempts, delays = retry_expectation
         authenticated = attempts > 0 and results[attempts - 1][1] == 0
         post_status = status if authenticated else 0
         with tempfile.TemporaryDirectory() as directory:
@@ -127,16 +128,16 @@ class HtpasswdAuthRetryTests(unittest.TestCase):
         for mode in ("sso", "token"):
             for results, attempts, delays, status in cases:
                 with self.subTest(mode=mode, results=results):
-                    self.run_step(mode, results, attempts, delays, status)
+                    self.run_step(mode, results, (attempts, delays), status)
 
     def test_credential_selection_edges(self):
-        self.run_step("partial", [("success", 0)], 1, [])
-        self.run_step("none", [], 0, [], status=1)
+        self.run_step("partial", [("success", 0)], (1, []))
+        self.run_step("none", [], (0, []), status=1)
 
     def test_user_creation_failure_is_not_retried(self):
         for mode in ("sso", "token"):
             with self.subTest(mode=mode):
-                self.run_step(mode, [("success", 0)], 1, [], status=37)
+                self.run_step(mode, [("success", 0)], (1, []), status=37)
 
 
 if __name__ == "__main__":
