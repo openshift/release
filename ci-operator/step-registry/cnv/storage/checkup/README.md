@@ -84,6 +84,8 @@ Job deadline. The Job deadline is capped at 900 seconds to leave five minutes of
 the registry step for setup and reporting. Invalid timeouts and result expressions
 are rejected before creating checkup resources. Failed API reads retain the last
 complete result document so that a failing JUnit report can still be written.
+Job status reads retry transient API failures until the Job deadline and retain
+the last complete Job document in the artifacts.
 
 Artifacts include the installed CSV, cloud, selected class/provisioner, product
 versions, result ConfigMap, validation details, JUnit, workload state, checkup
@@ -110,6 +112,7 @@ StorageClass selection, and ten checkup VMs. Its schedule is daily at
 the CNV build is selected separately.
 
 The job adds the existing CNV CI Brew and Konflux credentials to the cluster pull
-secret before CNV installation. It does not install ODF or HPP. Generated Prow jobs
+secret before CNV installation using a helper pinned to a reviewed CNV CI commit.
+It does not install ODF or HPP. Generated Prow jobs
 live under `ci-operator/jobs/openshift/release/`. A CI rehearsal is still required
 to verify development-stream installation, AWS execution, diagnostics, and teardown.
