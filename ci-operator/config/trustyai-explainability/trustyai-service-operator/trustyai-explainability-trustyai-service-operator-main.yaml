@@ -89,13 +89,14 @@ tests:
         oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
         oc apply -f release/trustyai_odh_bundle.yaml
 
-        # odh overlay mounts metrics TLS from OpenShift service-ca; wait so the
-        # Deployment is not stuck on CreateContainerConfigError.
-        oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Ready \
-          secret/trustyai-service-operator-metrics-tls --timeout=5m || true
-
-        oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
-          deployment/trustyai-service-operator-controller-manager --timeout=10m
+        if ! oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
+          deployment/trustyai-service-operator-controller-manager --timeout=10m; then
+          echo "ERROR: operator Deployment not Available; collecting diagnostics"
+          oc -n "${OPERATOR_NAMESPACE}" get pods,deploy,events,secret || true
+          oc -n "${OPERATOR_NAMESPACE}" describe deploy/trustyai-service-operator-controller-manager || true
+          oc -n "${OPERATOR_NAMESPACE}" describe pods || true
+          exit 1
+        fi
 
         # Tenant/workload namespace: TrustyAIService exposes TLS endpoints
         # (e.g. 4443/8443) that must be PQC-ready for AI Safety.
