@@ -994,6 +994,40 @@ tests:
       TEST_SUITE: upgrade-conformance
       ZONES_EXCLUSION_PATTERN: (asia-southeast1-a|us-central1-c)
     workflow: openshift-upgrade-gcp-heterogeneous
+- as: e2e-agent-ibmz-sno
+  capabilities:
+  - intranet
+  cron: 0 17 * * 0
+  steps:
+    cluster_profile: libvirt-s390x-vpn
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.1"
+      COMPUTE_COUNT: "0"
+      CONTROL_COUNT: "1"
+      ETCD_DISK_SPEED: slow
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      TEST_SKIPS: The HAProxy router should be able to connect to a service that is
+        idled\| HTPasswd IDP should successfully configure htpasswd and be responsive\|
+        LDAP IDP should authenticate against an ldap server\| expected headers returned
+        from the authorize URL\| expected headers returned from the grant URL\| expected
+        headers returned from the login URL for the allow all IDP\| expected headers
+        returned from the login URL for the bootstrap IDP\| expected headers returned
+        from the login URL for when there is only one IDP\| expected headers returned
+        from the logout URL\| expected headers returned from the root URL\| expected
+        headers returned from the token URL\| expected headers returned from the token
+        request URL\| Using a OAuth client with a non-default token max age\| well-known
+        endpoint should be reachable
+      TEST_TYPE: suite
+      USE_EXTERNAL_DNS: "true"
+      VOLUME_CAPACITY: 120G
+    test:
+    - ref: single-node-e2e-test
+    workflow: openshift-e2e-libvirt-vpn
 zz_generated_metadata:
   branch: main
   org: openshift
