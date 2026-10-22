@@ -40,6 +40,7 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos
     env:
       BASE_DOMAIN: chaos.lp.devcluster.openshift.com
@@ -53,6 +54,8 @@ tests:
             {"name": "kubevirt-hyperconverged", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-cnv", "target_namespaces": "!install", "operator_group": "openshift-cnv-operator-group"}
         ]
       TELEMETRY_GROUP: ocp5.0-nightly--cnv-5.0-stable--aws
+    post:
+    - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     test:
@@ -62,7 +65,6 @@ tests:
     - chain: redhat-chaos-krkn-hub-cr-tests
     - ref: redhat-lp-chaos-lp-cnv-vm-check
     - ref: redhat-lp-chaos-lp-cnv-vm-clean
-    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
   timeout: 6h0m0s
 - as: cr--cnv--outage-node--aws
   cron: 0 23 31 2 *
@@ -76,6 +78,7 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-lp-chaos
     env:
       BASE_DOMAIN: chaos.lp.devcluster.openshift.com
@@ -89,6 +92,8 @@ tests:
         ]
       POWER_OUTAGE_TIMEOUT: "1200"
       TELEMETRY_GROUP: ocp5.0-nightly--cnv-5.0-stable--aws
+    post:
+    - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     test:
@@ -98,7 +103,6 @@ tests:
     - chain: redhat-chaos-krkn-hub-node-tests
     - ref: redhat-lp-chaos-lp-cnv-vm-check
     - ref: redhat-lp-chaos-lp-cnv-vm-clean
-    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
