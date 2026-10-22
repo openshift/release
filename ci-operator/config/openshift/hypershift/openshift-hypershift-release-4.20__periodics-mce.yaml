@@ -367,6 +367,36 @@ tests:
       CLUSTER_VERSION: "4.20"
       MCE_VERSION: "2.10"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
+- as: e2e-ibmz-s390x-mgmt-ovn-conformance-agent-oz
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: 30 0 * * 1
+  reporter_config:
+    channel: '#ibmz-prowci-notifier'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: libvirt-s390x-vpn-hcp
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:initial
+    env:
+      ARCH: s390x
+      BRANCH: 4.20-hcpci
+      ETCD_DISK_SPEED: slow
+      MCE_VERSION: "2.10"
+      MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT: "true"
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-phase2-oz
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
