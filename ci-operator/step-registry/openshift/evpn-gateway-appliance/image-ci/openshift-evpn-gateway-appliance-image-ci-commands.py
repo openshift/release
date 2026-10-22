@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit, urlunsplit
 
@@ -24,17 +26,30 @@ def timeout_for(command):
     return FETCH_TIMEOUT
 
 
+def utc_now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def run(command, **kwargs):
     timeout = kwargs.pop("timeout", timeout_for(command))
+    shown = shlex.join(command)
+    started = time.monotonic()
+    print(f"image-ci: {utc_now()} start {shown}", flush=True)
     try:
         result = subprocess.run(command, check=False, timeout=timeout, **kwargs)
     except subprocess.TimeoutExpired as expired:
-        shown = shlex.join(command)
+        elapsed = time.monotonic() - started
         print(
-            f"image-ci: {shown} timed out after {expired.timeout}s",
+            f"image-ci: {utc_now()} {shown} timed out after {expired.timeout}s elapsed {elapsed:.1f}s",
             file=sys.stderr,
+            flush=True,
         )
         raise SystemExit(1) from expired
+    elapsed = time.monotonic() - started
+    print(
+        f"image-ci: {utc_now()} finish {shown} elapsed {elapsed:.1f}s rc {result.returncode}",
+        flush=True,
+    )
     if result.returncode < 0:
         raise SystemExit(128 - result.returncode)
     if result.returncode:
@@ -178,10 +193,12 @@ def main():
         print("image-ci: no podman/docker found", file=sys.stderr)
         raise SystemExit(1)
     print(f"image-ci: building appliance image {image_tag}", flush=True)
+    debug = ["--log-level=debug"] if Path(engine).name == "podman" else []
     run(
         [
             engine,
             "build",
+            *debug,
             "-f",
             "image/rhel10/Containerfile",
             "-t",
@@ -202,6 +219,7 @@ def main():
         [
             engine,
             "build",
+            *debug,
             "--pull=never",
             "-f",
             "image/rhel10/Containerfile.nested-ci",
@@ -213,15 +231,15 @@ def main():
         ]
     )
 
-    # artifacts = os.environ.get("ARTIFACT_DIR") or "/tmp/artifacts"
-    # os.environ["ARTIFACT_DIR"] = artifacts
-    # Path(artifacts).mkdir(parents=True, exist_ok=True)
-    # smoke = Path(workroot) / "image/tools/smoke-payloads.py"
-    # if not smoke.is_file():
-    #     print(f"image-ci: {smoke} is not in this archive", file=sys.stderr)
-    #     raise SystemExit(1)
-    # print(f"image-ci: running payload smoke {image_tag}", flush=True)
-    # run(["python3", str(smoke), image_tag])
+    artifacts = os.environ.get("ARTIFACT_DIR") or "/tmp/artifacts"
+    os.environ["ARTIFACT_DIR"] = artifacts
+    Path(artifacts).mkdir(parents=True, exist_ok=True)
+    smoke = Path(workroot) / "image/tools/smoke-payloads.py"
+    if not smoke.is_file():
+        print(f"image-ci: {smoke} is not in this archive", file=sys.stderr)
+        raise SystemExit(1)
+    print(f"image-ci: running payload smoke {image_tag}", flush=True)
+    run(["python3", str(smoke), image_tag])
 
 
 if __name__ == "__main__":
