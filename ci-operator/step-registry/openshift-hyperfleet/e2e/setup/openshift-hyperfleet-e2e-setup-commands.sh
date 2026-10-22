@@ -175,9 +175,9 @@ if [[ -z "${GATEWAY_EXTERNAL_IP}" ]]; then
   exit 1
 fi
 
-log "Configuring Authorino to accept the gateway LoadBalancer host"
+log "Configuring gateway AuthConfig to accept the LoadBalancer host"
 AUTHORINO_HOSTS="${GATEWAY_EXTERNAL_IP}" \
-  NAMESPACE="${NAMESPACE_NAME}" HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfleet
+  NAMESPACE="${NAMESPACE_NAME}" HELMFILE_ENV="${HELMFILE_ENV}" make install-gateway
 
 export HYPERFLEET_API_URL=http://${GATEWAY_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
