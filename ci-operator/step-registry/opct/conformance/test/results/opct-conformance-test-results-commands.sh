@@ -133,8 +133,18 @@ function _exit_handler() {
   fi
   emit_summary || true
   # Namespace dump is best-effort; its failure must not change the
-  # original exit_class outcome.
-  dump_opct_namespace || true
+  # original exit_class outcome.  The shared dump_opct_namespace helper
+  # (from opct-pre-init) captures rc=$? and calls 'exit $rc'.  Two
+  # isolation issues arise if it runs directly in this handler:
+  #   1. emit_summary resets $? to 0, so the helper always sees rc=0
+  #      and skips the namespace inspection even on error paths.
+  #   2. The helper's 'exit $rc' terminates the process before this
+  #      handler reaches 'exit ${exit_class}', overriding the intended
+  #      exit code.
+  # Running in a subshell solves both: '(exit N)' seeds $? with
+  # exit_class so the helper sees the correct error state, and the
+  # helper's 'exit' terminates only the subshell.
+  ( (exit ${exit_class}); dump_opct_namespace ) || true
   exit ${exit_class}
 }
 trap '_exit_handler' EXIT
@@ -276,8 +286,8 @@ function extract_intended_plugins() {
     return 1
   fi
 
-  # Parse with jq.  The CI 'cli' image includes jq; other from:cli steps
-  # such as rosa-cluster-validate-rbac use jq for the same image base.
+  # Parse with jq.  This step uses the 'cli-jq' supplemental image
+  # (base cli + jq) because the base 'cli' image does not include jq.
   #
   # Validation rules:
   #   - Input must be exactly one valid JSON document (reject concatenated)
