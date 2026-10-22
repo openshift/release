@@ -129,9 +129,10 @@ SEED_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconf
 TARGET_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 
 # Resolve the Git branch once; preinstall will consume this same revision.
-GIT_REVISION=$(git ls-remote --exit-code "$ZTP_GIT_REPO" "refs/heads/$ZTP_GIT_BRANCH" | awk '{print $1}')
+# Bypass TLS certificate verification only for these IBI GitLab requests.
+GIT_REVISION=$(git -c http.sslVerify=false ls-remote --exit-code "$ZTP_GIT_REPO" "refs/heads/$ZTP_GIT_BRANCH" | awk '{print $1}')
 [[ "$GIT_REVISION" =~ ^[a-f0-9]{40}$ ]]
-curl --fail --silent --show-error --retry 2 --connect-timeout 30 --max-time 120 \
+curl --insecure --fail --silent --show-error --retry 2 --connect-timeout 30 --max-time 120 \
   "${ZTP_GIT_REPO%.git}/-/raw/${GIT_REVISION}/${VERSION}/${TARGET_SPOKE_NAME}/clusterinstance/preinstall-test/image-based-installation-config.yaml" \
   > "$TEMP_DIR/template.yaml"
 cp "${SHARED_DIR}/ibi-seed-catalogs.json" "$TEMP_DIR/catalogs.json"
