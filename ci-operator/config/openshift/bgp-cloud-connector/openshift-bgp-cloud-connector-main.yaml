@@ -1198,6 +1198,860 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- always_run: false
+  as: e2e-aro-hcp-operator
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    post:
+    - as: delete-cluster
+      commands: |+
+        # Remove everything this job made. All of it is in one of four places:
+        #
+        #   - the cluster's group, which holds everything create-cluster made
+        #     (vnet, NSG, subnets, Key Vault, the thirteen identities),
+        #     operator-identity's identity, and whatever the test's own
+        #     teardown missed (Route Server, its public IP, the client VM);
+        #   - the managed group, aro-<cluster>, which the service removes with
+        #     the cluster;
+        #   - soft-deleted vaults, where deleting the group moves the Key Vault
+        #     and its name stays taken until it is purged;
+        #   - role assignments naming one of the identities. Every grant this
+        #     job makes is scoped inside one of the two groups and goes with
+        #     it, but Azure keeps an assignment whose principal is deleted if
+        #     its scope survives, so the principals are recorded before
+        #     anything is deleted and looked for afterwards.
+        #
+        # Nothing sweeps this subscription for ARO HCP, so this step is the
+        # only cleanup. Every removal is attempted whatever happened to the
+        # one before it, then an audit looks rather than trusts, and the step
+        # fails if anything is left. The names are derived here rather than
+        # read from SHARED_DIR, because a step that is interrupted does not
+        # pass on what it wrote there.
+        set -o nounset
+        set -o pipefail
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        # Runs a command up to $1 times, $2 seconds apart, and fails only if
+        # every attempt did. Azure answers transient failures for all of the
+        # calls below, a group delete above all while the service is still
+        # removing its side, and one refusal is not a reason to leave the rest.
+        again() {
+          local attempts="$1" pause="$2" i
+          shift 2
+          for i in $(seq 1 "${attempts}"); do
+            "$@" && return 0
+            (( i < attempts )) || break
+            echo "  attempt ${i}/${attempts} failed; retrying in ${pause}s" >&2
+            sleep "${pause}"
+          done
+          return 1
+        }
+
+        # The container runs as a random uid whose home it may not own, so az
+        # keeps its token cache somewhere it can write.
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        subscription="$(jq -er .subscriptionId "${sp}")" || exit 1
+        login() {
+          az login --service-principal \
+            --username "$(jq -er .clientId "${sp}")" \
+            --password="$(jq -er .clientSecret "${sp}")" \
+            --tenant "$(jq -er .tenantId "${sp}")" --output none &&
+          az account set --subscription "${subscription}"
+        }
+        # Without a login nothing below can run, so this is the one failure
+        # that ends the step, after retrying.
+        again 5 30 login || { echo "could not log in; nothing was deleted" >&2; exit 1; }
+
+        api=2026-09-01-preview
+        cluster="${NAMESPACE}-${UNIQUE_HASH}"
+        rg="${cluster}"
+        managed_rg="aro-${cluster}"
+        key_vault="kv-${cluster}"
+        cluster_url="https://management.azure.com/subscriptions/${subscription}/resourceGroups/${rg}/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/${cluster}?api-version=${api}"
+        principals="$(mktemp)"
+        failed=0
+
+        # Prints true or false, or fails having said why it could not tell.
+        group_exists() {
+          local out
+          out="$(az group exists --name "$1")" || { echo "could not tell whether group $1 exists" >&2; return 1; }
+          echo "${out}"
+        }
+
+        # Prints present or absent, or fails having said why it could not tell.
+        cluster_state() {
+          local out
+          if out="$(az rest --method GET --url "${cluster_url}" --output none 2>&1)"; then
+            echo present
+          elif grep -qE '"code": ?"(ResourceNotFound|ResourceGroupNotFound)"' <<<"${out}"; then
+            echo absent
+          else
+            echo "could not tell whether the cluster exists:" >&2
+            redact <<<"${out}" >&2
+            return 1
+          fi
+        }
+
+        vault_soft_deleted() {
+          local out
+          out="$(az keyvault list-deleted --resource-type vault --query "[?name=='${key_vault}'].name" -o tsv)" || return 2
+          [[ -n "${out}" ]]
+        }
+
+        list_principals() { az identity list -g "${rg}" --query '[].principalId' -o tsv >"${principals}"; }
+        delete_group() { az group delete --name "$1" --yes --output none 2>&1 | redact; }
+        purge_vault() { az keyvault purge --name "${key_vault}" --location "${LOCATION}" 2>&1 | redact; }
+        delete_assignment() { az role assignment delete --ids "$1" --output none 2>&1 | redact; }
+
+        # Role assignments naming a recorded principal, anywhere in the
+        # subscription, as assignment ids.
+        leftover_assignments() {
+          [[ -s "${principals}" ]] || return 0
+          az role assignment list --all -o json \
+            | jq -r --rawfile p "${principals}" '($p | split("\n") | map(select(. != ""))) as $ids
+                | .[] | select(.principalId as $x | $ids | any(.[]; . == $x)) | .id'
+        }
+
+        # A group whose existence cannot be read is treated as present, so a
+        # failed query costs a delete attempt rather than skipping the cleanup.
+        rg_exists="$(group_exists "${rg}")" || rg_exists=true
+        if [[ "${rg_exists}" == true ]]; then
+          if ! again 3 20 list_principals; then
+            echo "could not record the identities' principals; role assignments will not be audited" >&2
+            failed=1
+          fi
+          echo "recorded $(grep -c . "${principals}") identities"
+
+          # The identities and network are in the group, and pulling them out
+          # from under a cluster the service is still deleting is how a delete
+          # gets stuck, so the group waits for the cluster to be confirmed gone.
+          # A GET that fails says nothing either way and the wait goes on; the
+          # DELETE is sent again every ten minutes in case one was lost or
+          # refused, which the service accepts for a cluster already deleting.
+          # A refused DELETE must not end the step under set -e, or nothing
+          # below runs.
+          echo "deleting cluster ${cluster}"
+          state=present
+          deadline=$((SECONDS + 3600))
+          next_delete=0
+          while (( SECONDS < deadline )); do
+            if (( SECONDS >= next_delete )); then
+              az rest --method DELETE --url "${cluster_url}" --output none 2>&1 | redact || true
+              next_delete=$((SECONDS + 600))
+            fi
+            state="$(cluster_state)" || state=unknown
+            [[ "${state}" == absent ]] && break
+            sleep 30
+          done
+          if [[ "${state}" != absent ]]; then
+            echo "the cluster is ${state}; not deleting ${rg} beneath it" >&2
+            failed=1
+          else
+            echo "deleted cluster ${cluster}"
+            echo "deleting group ${rg}"
+            if again 3 60 delete_group "${rg}"; then
+              echo "deleted group ${rg}"
+            else
+              echo "could not delete group ${rg}" >&2
+              failed=1
+            fi
+          fi
+        else
+          echo "no group ${rg}"
+        fi
+
+        # The service removes the managed group with the cluster; a cluster
+        # whose create failed early may leave one behind.
+        managed_exists="$(group_exists "${managed_rg}")" || managed_exists=true
+        if [[ "${managed_exists}" == true ]] && [[ "$(cluster_state)" == absent ]]; then
+          echo "deleting group ${managed_rg}"
+          again 3 60 delete_group "${managed_rg}" || failed=1
+        fi
+
+        if vault_soft_deleted; then
+          echo "purging ${key_vault}"
+          again 3 60 purge_vault || failed=1
+        fi
+
+        # An assignment left naming a deleted identity is removed by id; only
+        # ones naming this job's identities are touched.
+        while read -r id; do
+          [[ -n "${id}" ]] || continue
+          echo "deleting role assignment $(redact <<<"${id}")"
+          again 3 20 delete_assignment "${id}" || failed=1
+        done < <(leftover_assignments)
+
+        # Every check says what it found, on stdout, so a failing audit
+        # is never a silent one.
+        echo "--- remaining ---"
+        left=0
+        for g in "${rg}" "${managed_rg}"; do
+          if ! e="$(group_exists "${g}")"; then
+            echo "  group ${g}: could not tell"
+            left=1
+          elif [[ "${e}" != false ]]; then
+            echo "  group ${g}: exists (${e})"
+            left=1
+          fi
+        done
+        if ! state="$(cluster_state)"; then
+          echo "  cluster ${cluster}: could not tell"
+          left=1
+        elif [[ "${state}" != absent ]]; then
+          echo "  cluster ${cluster}: ${state}"
+          left=1
+        fi
+        # ci-operator runs every step under set -e, so a bare call that
+        # returns 1 for "not there" would end the step here.
+        rc=0
+        vault_soft_deleted || rc=$?
+        case ${rc} in
+          0) echo "  vault ${key_vault}: soft-deleted"; left=1 ;;
+          1) ;;
+          *) echo "  vault ${key_vault}: could not list soft-deleted vaults"; left=1 ;;
+        esac
+        if ! remaining="$(leftover_assignments)"; then
+          echo "  role assignments: could not list"
+          left=1
+        elif [[ -n "${remaining}" ]]; then
+          echo "  role assignments: $(grep -c . <<<"${remaining}") naming this job's identities"
+          left=1
+        fi
+        (( left == 0 )) && echo "  nothing"
+        echo "removal failures: ${failed}, left behind: ${left}"
+
+        (( failed == 0 && left == 0 ))
+
+      env:
+      - default: uksouth
+        documentation: Azure region the cluster was created in, for the Key Vault
+          purge.
+        name: LOCATION
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h30m0s
+    pre:
+    - as: create-cluster
+      cli: latest
+      commands: |
+        # An ARO HCP cluster built as a customer builds one: through the
+        # public resource provider, in the cluster profile's own
+        # subscription. The resource is
+        # Microsoft.RedHatOpenShift/hcpOpenShiftClusters, reachable only
+        # through the preview API, so everything here is az rest.
+        #
+        # The cluster brings almost nothing of its own. This step makes, in
+        # one resource group: a vnet with a node subnet behind an NSG and a
+        # subnet delegated to the service; a Key Vault holding the key etcd
+        # is encrypted with; and thirteen user-assigned managed identities,
+        # nine for control-plane operators, three for data-plane operators
+        # and one service managed identity. The service builds the nodes in
+        # a managed group, aro-<cluster>. delete-cluster removes all of it.
+        set -euo pipefail
+
+        # The log is public and az names resources by their full path, so
+        # every GUID in this step's output, the subscription's included,
+        # is masked on the way out.
+        exec > >(sed -uE 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g') 2>&1
+        redactor=$!
+        trap 'exec >&- 2>&-; wait "${redactor}"' EXIT
+
+        for cmd in curl oc openssl; do
+          command -v "${cmd}" >/dev/null || { echo "no ${cmd} in this image" >&2; exit 1; }
+        done
+
+        # The container runs as a random uid whose home it may not own, so az
+        # keeps its token cache somewhere it can write.
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        az account set --subscription "${subscription}"
+
+        api=2026-09-01-preview
+        keyvault_api=2025-05-01
+        region="${LOCATION}"
+        cluster="${NAMESPACE}-${UNIQUE_HASH}"
+        rg="${cluster}"
+        managed_rg="aro-${cluster}"
+        vnet="${cluster}-vnet"
+        nsg="${cluster}-nsg"
+        node_subnet=nodes
+        integration_subnet=vnet-integration
+        # Key Vault names are global and at most 24 characters; this is 23.
+        key_vault="kv-${cluster}"
+        etcd_key=etcd-data-kms-encryption-key
+        node_pool=np-1
+        rg_id="/subscriptions/${subscription}/resourceGroups/${rg}"
+        cluster_id="${rg_id}/providers/Microsoft.RedHatOpenShift/hcpOpenShiftClusters/${cluster}"
+        vnet_id="${rg_id}/providers/Microsoft.Network/virtualNetworks/${vnet}"
+        subnet_id="${vnet_id}/subnets/${node_subnet}"
+        nsg_id="${rg_id}/providers/Microsoft.Network/networkSecurityGroups/${nsg}"
+        vault_id="${rg_id}/providers/Microsoft.KeyVault/vaults/${key_vault}"
+
+        echo "${cluster}" >"${SHARED_DIR}/cluster-name"
+        echo "${rg}" >"${SHARED_DIR}/resourcegroup"
+        echo "${managed_rg}" >"${SHARED_DIR}/managed-resourcegroup"
+
+        # On everything taggable, so anything a failed teardown leaves behind
+        # can be found by the bgp-cloud-connector-ci- prefix and judged by
+        # bgp-cloud-connector-ci-delete-after, which is well past the longest
+        # this job can run. A
+        # soft-deleted vault keeps its tags. Role assignments take no tags;
+        # they carry the same marker in their description instead.
+        tags=("bgp-cloud-connector-ci-job=${JOB_NAME_SAFE}" "bgp-cloud-connector-ci-build-id=${BUILD_ID}"
+              "bgp-cloud-connector-ci-delete-after=$(date -u -d '+8 hours' +%Y-%m-%dT%H:%M:%SZ)")
+        printf '%s\n' "${tags[@]}" >"${SHARED_DIR}/azure-tags"
+        description="bgp-cloud-connector-ci ${JOB_NAME_SAFE} ${BUILD_ID}"
+
+        echo "region: ${region}"
+        echo "resource provider: $(az provider show --namespace Microsoft.RedHatOpenShift --query registrationState -o tsv)"
+
+        # Versions are per region, and a version can be listed but
+        # disabled. The cluster takes only X.Y and the service picks the
+        # z-stream; the node pool takes X.Y.Z, read later from the control
+        # plane so the two match.
+        enabled_versions() {
+          az rest --method GET \
+            --url "https://management.azure.com/subscriptions/${subscription}/providers/Microsoft.RedHatOpenShift/locations/${region}/hcpOpenShiftVersions?api-version=${api}" \
+            --query "value[?properties.enabled].name" -o tsv | sort -V
+        }
+        enabled="$(enabled_versions)"
+        minor="${ARO_HCP_VERSION}"
+        if [[ -z "${minor}" ]]; then
+          minor="$(tail -1 <<<"${enabled}" | cut -d. -f1,2)"
+        fi
+        if ! grep -q "^${minor}\." <<<"${enabled}"; then
+          echo "no enabled ${minor}.x in ${region}; enabled: $(tr '\n' ' ' <<<"${enabled}")" >&2
+          exit 1
+        fi
+        echo "cluster version: ${minor}"
+
+        az group create --name "${rg}" --location "${region}" --tags "${tags[@]}" --output none
+        echo "created group ${rg}"
+
+        az network nsg create -g "${rg}" -n "${nsg}" --output none
+        az network vnet create -g "${rg}" -n "${vnet}" --address-prefixes 10.0.0.0/16 --output none
+        az network vnet subnet create -g "${rg}" --vnet-name "${vnet}" -n "${node_subnet}" \
+          --address-prefixes 10.0.0.0/24 --nsg "${nsg}" \
+          --private-endpoint-network-policies Disabled --output none
+        az network vnet subnet create -g "${rg}" --vnet-name "${vnet}" -n "${integration_subnet}" \
+          --address-prefixes 10.0.1.0/24 \
+          --delegations Microsoft.RedHatOpenShift/hcpOpenShiftClusters --output none
+        echo "created the network"
+
+        # The key is created through ARM rather than the vault's data plane,
+        # so no data-plane role is needed to make it.
+        az keyvault create -g "${rg}" -n "${key_vault}" -l "${region}" \
+          --enable-rbac-authorization true --public-network-access Enabled \
+          --retention-days 7 --tags "${tags[@]}" --output none
+        key_uri="$(az rest --method PUT \
+          --url "https://management.azure.com${vault_id}/keys/${etcd_key}?api-version=${keyvault_api}" \
+          --body '{"properties":{"kty":"RSA","keySize":2048}}' \
+          --query properties.keyUriWithVersion -o tsv)"
+        etcd_key_version="${key_uri##*/}"
+        echo "created ${key_vault}/${etcd_key}"
+
+        cp_operators=(cluster-api-azure control-plane cloud-controller-manager ingress
+                      disk-csi-driver file-csi-driver image-registry cloud-network-config kms)
+        dp_operators=(disk-csi-driver file-csi-driver image-registry)
+        identity_name() {
+          case "$1" in
+            smi)  printf '%s-service-managed-identity' "${cluster}" ;;
+            cp:*) printf '%s-cp-%s' "${cluster}" "${1#cp:}" ;;
+            dp:*) printf '%s-dp-%s' "${cluster}" "${1#dp:}" ;;
+          esac
+        }
+        declare -A identity_id=() identity_principal=()
+        for key in smi $(printf 'cp:%s ' "${cp_operators[@]}") $(printf 'dp:%s ' "${dp_operators[@]}"); do
+          out="$(az identity create -g "${rg}" -n "$(identity_name "${key}")" -l "${region}" --tags "${tags[@]}" \
+            --query '[id, principalId]' -o tsv)"
+          identity_id[${key}]="$(sed -n 1p <<<"${out}")"
+          identity_principal[${key}]="$(sed -n 2p <<<"${out}")"
+        done
+        echo "created ${#identity_id[@]} identities"
+
+        scope_id() {
+          case "$1" in
+            vnet)      printf '%s' "${vnet_id}" ;;
+            subnet)    printf '%s' "${subnet_id}" ;;
+            nsg)       printf '%s' "${nsg_id}" ;;
+            keyvault)  printf '%s' "${vault_id}" ;;
+            cp:*|dp:*) printf '%s' "${identity_id[$1]}" ;;
+          esac
+        }
+
+        # A new identity takes a while to replicate, and a grant to it fails
+        # with PrincipalNotFound until it has.
+        grant() {
+          local attempt
+          for attempt in $(seq 1 6); do
+            if az role assignment create --assignee-object-id "${identity_principal[$1]}" \
+                 --assignee-principal-type ServicePrincipal --role "$2" \
+                 --scope "$(scope_id "$3")" --description "${description}" --output none; then
+              return 0
+            fi
+            (( attempt < 6 )) && sleep 20
+          done
+          echo "could not grant $2 to $1 on $3" >&2
+          return 1
+        }
+
+        # Scopes follow Azure/ARO-HCP's
+        # test/e2e-setup/bicep/modules/non-msi-scoped-assignments.bicep,
+        # which the service's permission validation checks against.
+        n=0
+        while read -r who role scope; do
+          [[ -n "${who}" ]] || continue
+          grant "${who}" "${role}" "${scope}"
+          n=$((n + 1))
+        done <<'EOF'
+        cp:cluster-api-azure        88366f10-ed47-4cc0-9fab-c8a06148393e subnet
+        cp:kms                      12338af0-0e69-4776-bea7-57ae8d297424 keyvault
+        cp:control-plane            fc0c873f-45e9-4d0d-a7d1-585aab30c6ed vnet
+        cp:control-plane            fc0c873f-45e9-4d0d-a7d1-585aab30c6ed nsg
+        cp:cloud-controller-manager a1f96423-95ce-4224-ab27-4e3dc72facd4 subnet
+        cp:cloud-controller-manager a1f96423-95ce-4224-ab27-4e3dc72facd4 nsg
+        cp:ingress                  0336e1d3-7a87-462b-b6db-342b63f7802c subnet
+        cp:file-csi-driver          0d7aedc0-15fd-4a67-a412-efad370c947e vnet
+        cp:file-csi-driver          0d7aedc0-15fd-4a67-a412-efad370c947e nsg
+        cp:image-registry           8b32b316-c2f5-4ddf-b05b-83dacd2d08b5 vnet
+        cp:cloud-network-config     be7a6435-15ae-4171-8f30-4a343eff9e8f subnet
+        cp:cloud-network-config     be7a6435-15ae-4171-8f30-4a343eff9e8f vnet
+        dp:file-csi-driver          0d7aedc0-15fd-4a67-a412-efad370c947e vnet
+        dp:file-csi-driver          0d7aedc0-15fd-4a67-a412-efad370c947e nsg
+        dp:image-registry           8b32b316-c2f5-4ddf-b05b-83dacd2d08b5 vnet
+        smi                         c0ff367d-66d8-445e-917c-583feb0ef0d4 vnet
+        smi                         c0ff367d-66d8-445e-917c-583feb0ef0d4 nsg
+        EOF
+        # Reader on each control-plane identity and Federated Identity
+        # Credential Operator on each data-plane identity, for the service
+        # managed identity.
+        for k in "${cp_operators[@]}"; do grant smi acdd72a7-3385-48ef-bd42-f606fba81ae7 "cp:${k}"; n=$((n + 1)); done
+        for k in "${dp_operators[@]}"; do grant smi ef318e2a-8334-4a05-9e4a-295a196c6a6e "dp:${k}"; n=$((n + 1)); done
+        echo "made ${n} role assignments"
+
+        to_map() { jq -Rn '[inputs] | [range(0; length; 2) as $i | {(.[$i]): .[$i+1]}] | add'; }
+        cp_map="$(for k in "${cp_operators[@]}"; do printf '%s\n%s\n' "${k}" "${identity_id[cp:${k}]}"; done | to_map)"
+        dp_map="$(for k in "${dp_operators[@]}"; do printf '%s\n%s\n' "${k}" "${identity_id[dp:${k}]}"; done | to_map)"
+        all_map="$(for k in smi $(printf 'cp:%s ' "${cp_operators[@]}"); do printf '%s\n' "${identity_id[${k}]}"; done \
+          | jq -Rn '[inputs] | map({(.): {}}) | add')"
+
+        # The PUT, repeated while the service says it is the one at fault;
+        # a node pool PUT has been seen to come back ServerTimeout with
+        # nothing created, and the same body accepted minutes later.
+        put() {
+          local out attempt
+          for attempt in $(seq 1 6); do
+            if out="$(az rest --method PUT --url "https://management.azure.com$1?api-version=${api}" \
+                        --body "$2" --output none 2>&1)"; then
+              return 0
+            fi
+            if ! grep -qE 'Service Unavailable|ServerTimeout|Bad Gateway|Gateway Timeout|InternalServerError' <<<"${out}"; then
+              echo "${out}" >&2
+              return 1
+            fi
+            echo "attempt ${attempt}/6: the service did not answer, retrying in 60s"
+            sleep 60
+          done
+          echo "${out}" >&2
+          return 1
+        }
+
+        # ARM keeps a failed resource but not why it failed; the reason is
+        # on the failed write's activity log entry, which can take a minute
+        # or two to appear.
+        failure_reason() {
+          local msg=""
+          for _ in $(seq 1 12); do
+            msg="$(az monitor activity-log list --resource-id "$1" --offset 6h --status Failed \
+              --query '[0].properties.statusMessage' -o tsv 2>/dev/null)" || msg=""
+            [[ -n "${msg}" ]] && break
+            sleep 10
+          done
+          echo "${msg:-the activity log has no failure recorded yet}" >&2
+        }
+
+        wait_provisioned() {
+          local state deadline=$((SECONDS + $2))
+          while (( SECONDS < deadline )); do
+            state="$(az rest --method GET --url "https://management.azure.com$1?api-version=${api}" \
+              --query properties.provisioningState -o tsv 2>/dev/null)" || state=""
+            case "${state}" in
+              Succeeded) echo "  ${state}"; return 0 ;;
+              Failed|Canceled) echo "  ${state}" >&2; failure_reason "$1"; return 1 ;;
+            esac
+            sleep 30
+          done
+          echo "timed out waiting for $1" >&2
+          return 1
+        }
+
+        cluster_body="$(jq -n \
+          --arg location "${region}" --arg version "${minor}" --arg managed "${managed_rg}" \
+          --arg subnet "${subnet_id}" --arg integration "${vnet_id}/subnets/${integration_subnet}" \
+          --arg nsg "${nsg_id}" --arg vault "${key_vault}" --arg key "${etcd_key}" \
+          --arg keyver "${etcd_key_version}" --arg smi "${identity_id[smi]}" \
+          --argjson cp "${cp_map}" --argjson dp "${dp_map}" --argjson all "${all_map}" '{
+          location: $location,
+          identity: {type: "UserAssigned", userAssignedIdentities: $all},
+          properties: {
+            version: {id: $version, channelGroup: "stable"},
+            dns: {}, console: {}, api: {visibility: "Public"},
+            clusterImageRegistry: {state: "Enabled"},
+            network: {networkType: "OVNKubernetes", podCidr: "10.128.0.0/14",
+                      serviceCidr: "172.30.0.0/16", machineCidr: "10.0.0.0/16", hostPrefix: 23},
+            etcd: {dataEncryption: {keyManagementMode: "CustomerManaged", customerManaged: {
+              encryptionType: "KMS",
+              kms: {vaultName: $vault, visibility: "Public", activeKey: {name: $key, version: $keyver}}}}},
+            platform: {
+              managedResourceGroup: $managed, subnetId: $subnet,
+              vnetIntegrationSubnetId: $integration, networkSecurityGroupId: $nsg,
+              outboundType: "LoadBalancer",
+              operatorsAuthentication: {userAssignedIdentities: {
+                controlPlaneOperators: $cp, dataPlaneOperators: $dp, serviceManagedIdentity: $smi}}}}}')"
+        echo "creating cluster ${cluster}"
+        put "${cluster_id}" "${cluster_body}"
+        wait_provisioned "${cluster_id}" 3600
+        # The managed group is the service's, but its deny assignment leaves
+        # tags writable.
+        az tag update --operation Merge --tags "${tags[@]}" --output none \
+          --resource-id "/subscriptions/${subscription}/resourceGroups/${managed_rg}"
+
+        # The service signs a certificate for a key that never leaves this
+        # step; the CSR's subject must be exactly this. The action answers
+        # 202 with a Location to poll, which az rest cannot show, hence
+        # curl.
+        auth="$(mktemp -d)"
+        openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-384 -nodes \
+          -keyout "${auth}/admin.key" -out "${auth}/admin.csr" \
+          -subj "/O=system:masters/CN=system:customer-break-glass:system-admin" 2>/dev/null
+        token="$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)"
+        code="$(jq -n --rawfile csr "${auth}/admin.csr" '{certificateSigningRequest: $csr}' \
+          | curl -sS -o "${auth}/body" -D "${auth}/headers" -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer ${token}" -H 'Content-Type: application/json' --data @- \
+              "https://management.azure.com${cluster_id}/requestAdminCredential?api-version=${api}")"
+        if [[ "${code}" != 202 ]]; then
+          echo "requestAdminCredential answered ${code}:" >&2
+          cat "${auth}/body" >&2
+          exit 1
+        fi
+        location="$(awk 'tolower($1) == "location:" { print $2 }' "${auth}/headers" | tr -d '\r')"
+        for _ in $(seq 1 60); do
+          code="$(curl -sS -o "${auth}/credential.json" -w '%{http_code}' -H "Authorization: Bearer ${token}" "${location}")"
+          [[ "${code}" == 200 ]] && break
+          sleep 5
+        done
+        [[ "${code}" == 200 ]] || { echo "the admin credential never arrived" >&2; exit 1; }
+        jq -er .kubeconfig "${auth}/credential.json" >"${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        if ! grep -q client-key-data "${KUBECONFIG}"; then
+          oc config set-credentials "$(oc config view -o jsonpath='{.users[0].name}')" \
+            --client-key="${auth}/admin.key" --embed-certs=true >/dev/null
+        fi
+        echo "admin credential expires $(jq -r .expirationTimestamp "${auth}/credential.json")"
+        rm -rf "${auth}"
+
+        node_version=""
+        for _ in $(seq 1 40); do
+          node_version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null)" || true
+          [[ -n "${node_version}" ]] && break
+          sleep 15
+        done
+        [[ -n "${node_version}" ]] || { echo "the control plane never reported its version" >&2; exit 1; }
+        grep -qxF "${node_version}" <<<"${enabled}" || { echo "${node_version} is not enabled in ${region}" >&2; exit 1; }
+        echo "control plane ${node_version}; the node pool matches it"
+
+        # Three workers: the suite's runner leaves one unlabelled for the
+        # data-plane spec, and E2E-AZURE-04 needs two router nodes besides.
+        node_pool_body="$(jq -n --arg location "${region}" --arg version "${node_version}" --arg subnet "${subnet_id}" '{
+          location: $location,
+          properties: {
+            version: {id: $version, channelGroup: "stable"},
+            replicas: 3,
+            platform: {subnetId: $subnet, vmSize: "Standard_D8s_v3",
+                       osDisk: {sizeGiB: 64, diskStorageAccountType: "StandardSSD_LRS"}}}}')"
+        echo "creating node pool ${node_pool}"
+        put "${cluster_id}/nodePools/${node_pool}" "${node_pool_body}"
+        wait_provisioned "${cluster_id}/nodePools/${node_pool}" 1800
+
+        # The console is left out: with no OIDC client named for it, it has
+        # no pods and its operator is never Available, and nothing here
+        # signs in to it.
+        deadline=$((SECONDS + 1800))
+        until unavailable="$(oc get co -o json | jq -r '[.items[] | select(.metadata.name != "console")
+                 | select(([(.status.conditions // [])[] | select(.type == "Available") | .status] | first) != "True")
+                 | .metadata.name] | join(" ")')" && [[ -z "${unavailable}" ]]; do
+          (( SECONDS < deadline )) || { echo "never Available: ${unavailable}" >&2; exit 1; }
+          sleep 30
+        done
+        oc get nodes
+        oc get clusterversion
+      env:
+      - default: uksouth
+        documentation: Azure region for the cluster; one the resource provider offers
+          hcpOpenShiftClusters in, with DSv3 quota in the cluster profile's subscription.
+        name: LOCATION
+      - default: ""
+        documentation: OpenShift minor version, such as "4.22"; the newest minor enabled
+          in LOCATION when empty.
+        name: ARO_HCP_VERSION
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    - ref: ipi-install-rbac
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Both controllers watch FRRConfiguration and RouteAdvertisements
+        # from SetupWithManager, and CNO creates those two CRDs only in
+        # response to this patch. Without them the caches never sync, the
+        # manager exits after two minutes, and the CSV never installs.
+        oc patch network.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"additionalRoutingCapabilities":{"providers":["FRR"]},"defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+
+        deadline=$((SECONDS + 900))
+
+        for crd in frrconfigurations.frrk8s.metallb.io routeadvertisements.k8s.ovn.org; do
+          echo "waiting for crd/${crd}..."
+          until oc wait --for=condition=Established "crd/${crd}" --timeout=10s >/dev/null 2>&1; do
+            if (( SECONDS >= deadline )); then
+              oc get network.operator.openshift.io cluster -o yaml >&2
+              echo "timed out waiting for crd/${crd}" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+        done
+
+        echo "waiting for the frr-k8s rollout..."
+        until oc -n openshift-frr-k8s rollout status daemonset/frr-k8s --timeout=2m >/dev/null 2>&1; do
+          if (( SECONDS >= deadline )); then
+            oc -n openshift-frr-k8s get pods >&2
+            echo "timed out waiting for the frr-k8s daemonset" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+
+        oc -n openshift-frr-k8s get daemonset frr-k8s
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        # The customer's half on ARO HCP: an identity for the operator,
+        # trusted for the operator's ServiceAccount on this cluster's
+        # issuer, and handed to the operator through its Subscription. A
+        # hosted cluster runs no cloud credential operator, so nothing
+        # writes a secret from the operator's CredentialsRequest.
+        #
+        # On the managed group, Azure Red Hat OpenShift Network Operator
+        # (be7a6435-15ae-4171-8f30-4a343eff9e8f) holds the actions the
+        # operator needs there, which are the ones the ARO HCP deny
+        # assignment lets through: networkInterfaces/read and /write, and
+        # loadBalancers/backendAddressPools/join/action. The interface write
+        # also checks virtualNetworks/subnets/join/action on the nodes'
+        # subnet, so Network Contributor goes on that subnet alone. The
+        # Route Server does not exist until the test step creates it; the
+        # test grants Network Contributor on it there
+        # (hack/azure/grant-route-server-role.sh in bgp-cloud-connector).
+        # The CI principal is refused roleDefinitions/write, so every role
+        # is built-in.
+        set -euo pipefail
+
+        # The log is public and az names resources by their full path, so
+        # every GUID in this step's output, the subscription's included,
+        # is masked on the way out.
+        exec > >(sed -uE 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g') 2>&1
+        redactor=$!
+        trap 'exec >&- 2>&-; wait "${redactor}"' EXIT
+
+        redact() {
+          sed -E 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g'
+        }
+
+        AZURE_CONFIG_DIR="$(mktemp -d)"
+        export AZURE_CONFIG_DIR
+        sp="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+        az login --service-principal \
+          --username "$(jq -er .clientId "${sp}")" \
+          --password="$(jq -er .clientSecret "${sp}")" \
+          --tenant "$(jq -er .tenantId "${sp}")" --output none
+        subscription="$(jq -er .subscriptionId "${sp}")"
+        tenant="$(jq -er .tenantId "${sp}")"
+        az account set --subscription "${subscription}"
+
+        cluster="$(<"${SHARED_DIR}/cluster-name")"
+        rg="$(<"${SHARED_DIR}/resourcegroup")"
+        managed_rg="$(<"${SHARED_DIR}/managed-resourcegroup")"
+        managed_scope="/subscriptions/${subscription}/resourceGroups/${managed_rg}"
+        ns=openshift-bgp-cloud-connector
+        sa=openshift-bgp-cloud-connector-controller-manager
+        issuer="$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')"
+        echo "service account issuer: ${issuer}"
+
+        # The deny assignments on the managed group, as evidence beside the
+        # result: a deny assignment overrides any role granted below, so an
+        # action the operator needs that one of these denies is refused
+        # whatever this step grants. The two actions checked are the ones
+        # the interface write needs on resources in the managed group: the
+        # interface itself and the load balancer's backend pool. The nodes'
+        # subnet is in the cluster's own group, outside these assignments'
+        # scope. Each action is matched against every assignment's actions
+        # less its notActions, wildcards included. Only principal counts
+        # are printed, never ids.
+        echo "deny assignments on ${managed_rg} that touch Microsoft.Network:"
+        az rest --method GET \
+          --url "https://management.azure.com${managed_scope}/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01" \
+          -o json >"${AZURE_CONFIG_DIR}/deny.json"
+        jq -r '.value[].properties
+          | select([.permissions[].actions[]] | any(test("^Microsoft.Network/"; "i")))
+          | "  actions:    \([.permissions[].actions[]] | join(" "))",
+            "  notActions: \([.permissions[].notActions[]] | join(" "))",
+            "  excludes \((.excludePrincipals // []) | length) principal(s)", ""' "${AZURE_CONFIG_DIR}/deny.json"
+        for action in Microsoft.Network/networkInterfaces/write \
+                      Microsoft.Network/loadBalancers/backendAddressPools/join/action; do
+          n="$(jq --arg a "${action}" '
+            def covers($p): ($p | gsub("\\*"; ".*")) as $re | $a | test("^" + $re + "$"; "i");
+            [.value[].properties | select(any(.permissions[];
+               any(.actions[]; covers(.)) and (any(.notActions[]; covers(.)) | not)))] | length' \
+            "${AZURE_CONFIG_DIR}/deny.json")"
+          if (( n > 0 )); then
+            echo "DENIED  ${action} by ${n} deny assignment(s) on ${managed_rg}"
+          else
+            echo "allowed ${action}: no deny assignment on ${managed_rg} covers it"
+          fi
+        done
+
+        identity="${cluster}-bgp-cloud-connector"
+        mapfile -t tags <"${SHARED_DIR}/azure-tags"
+        description="bgp-cloud-connector-ci ${JOB_NAME_SAFE} ${BUILD_ID}"
+        az identity create -g "${rg}" -n "${identity}" --tags "${tags[@]}" --output none
+        client_id="$(az identity show -g "${rg}" -n "${identity}" --query clientId -o tsv)"
+        principal_id="$(az identity show -g "${rg}" -n "${identity}" --query principalId -o tsv)"
+        az identity federated-credential create -g "${rg}" --identity-name "${identity}" \
+          --name bgp-cloud-connector --issuer "${issuer}" \
+          --subject "system:serviceaccount:${ns}:${sa}" --audiences openshift --output none
+        echo "created ${identity}, trusted for ${ns}/${sa}"
+
+        declare -A roles=(["${managed_scope}"]="Azure Red Hat OpenShift Network Operator")
+        while read -r subnet_id; do
+          [[ -n "${subnet_id}" ]] && roles["${subnet_id}"]="Network Contributor"
+        done < <(az network nic list -g "${managed_rg}" \
+                   --query '[].ipConfigurations[].subnet.id' -o tsv | sort -u)
+        (( ${#roles[@]} > 1 )) || { echo "found no subnet for the nodes' interfaces in ${managed_rg}" >&2; exit 1; }
+        echo "${principal_id}" >"${SHARED_DIR}/route-server-assignee"
+
+        # A new principal takes a while to replicate; an assignment made too
+        # soon fails with PrincipalNotFound.
+        for scope in "${!roles[@]}"; do
+          role="${roles[${scope}]}"
+          for attempt in $(seq 1 18); do
+            if az role assignment create --assignee-object-id "${principal_id}" \
+                 --assignee-principal-type ServicePrincipal --role "${role}" \
+                 --scope "${scope}" --description "${description}" --output none 2>"${AZURE_CONFIG_DIR}/err"; then
+              echo "assigned ${role} over ${scope##*/}"
+              break
+            fi
+            if (( attempt == 18 )); then
+              echo "could not assign ${role} over ${scope##*/}:" >&2
+              redact <"${AZURE_CONFIG_DIR}/err" | head -5 >&2
+              exit 1
+            fi
+            sleep 20
+          done
+        done
+
+        subscription_object="$(oc -n "${ns}" get subscription.operators.coreos.com -o name | head -1)"
+        oc -n "${ns}" patch "${subscription_object}" --type=merge -p "$(jq -nc \
+          --arg c "${client_id}" --arg t "${tenant}" --arg s "${subscription}" \
+          '{spec:{config:{env:[{name:"CLIENTID",value:$c},{name:"TENANTID",value:$t},{name:"SUBSCRIPTIONID",value:$s}]}}}')" >/dev/null
+        echo "handed the identity to the operator through ${subscription_object}"
+
+        # OLM rewrites the deployment from the Subscription; wait for the
+        # identity to reach it, then for the new pod.
+        deadline=$((SECONDS + 300))
+        until oc -n "${ns}" get deployment openshift-bgp-cloud-connector-controller-manager \
+                -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].env[?(@.name=="CLIENTID")].value}' \
+                | grep -q .; do
+          if (( SECONDS >= deadline )); then
+            echo "the Subscription's identity never reached the deployment" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        oc -n "${ns}" rollout status deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        # The log is public, and the suite's diagnostics print each node's
+        # providerID, which names the subscription, so every GUID is masked
+        # on the way out. exec, so that prow's SIGTERM reaches the script's
+        # teardown trap rather than a shell waiting on it.
+        ROUTE_SERVER_ASSIGNEE="$(<"${SHARED_DIR}/route-server-assignee")" \
+          exec hack/ci-e2e-azure.sh \
+          > >(sed -uE 's/[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/<guid>/g') 2>&1
+      from: e2e-runner
+      grace_period: 1h0m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
