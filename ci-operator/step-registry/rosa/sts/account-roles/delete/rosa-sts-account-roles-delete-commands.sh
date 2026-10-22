@@ -1,10 +1,15 @@
 #!/bin/bash
 
+set +x
 set -o nounset
 set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+AUTH_OPERATION=account-roles-delete
+AUTH_REPORT="${ARTIFACT_DIR}/${AUTH_OPERATION}-auth.jsonl"
+: > "${AUTH_REPORT}"
 
 retry_with_backoff() {
   local max_retries="${1}"
@@ -49,20 +54,60 @@ read_profile_file() {
   fi
 }
 
-# Log in
+auth_diagnostic() {
+  local environment="${OCM_LOGIN_ENV}" attempt="$1" exit_code="$2" failure_class="$3"
+  case "${environment}" in
+    production|prod|staging|stage|integration) ;;
+    *) environment=other ;;
+  esac
+  printf '{"time":"%s","operation":"%s","environment":"%s","attempt":%d,"max_attempts":3,"exit_code":%s,"class":"%s","http_status":"unknown","endpoint":"unknown"}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${AUTH_OPERATION}" "${environment}" "${attempt}" "${exit_code}" "${failure_class}" \
+    | tee -a "${AUTH_REPORT}" >&2
+}
+
+rosa_login() {
+  local attempt output exit_code failure_class
+  local -a credentials
+  if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+    credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    credentials=(--token "${ROSA_TOKEN}")
+  else
+    auth_diagnostic 0 1 missing_credentials
+    return 1
+  fi
+
+  for attempt in 1 2 3; do
+    auth_diagnostic "${attempt}" null started
+    if output=$(rosa login --env "${OCM_LOGIN_ENV}" "${credentials[@]}" 2>&1); then
+      auth_diagnostic "${attempt}" 0 success
+      return 0
+    else
+      exit_code=$?
+    fi
+    output="${output,,}"
+    case "${output}" in
+      *invalid_grant*|*invalid_client*|*unauthorized_client*|*access_denied*|*unauthorized*|*forbidden*|*invalid\ token*|*invalid\ refresh\ token*|*invalid\ credentials*|*authentication\ failed*)
+        failure_class=auth_rejected ;;
+      *"expected response content type 'application/json' but received 'text/html'"*)
+        failure_class=retryable_html ;;
+      *i/o\ timeout*|*tls\ handshake\ timeout*|*connection\ reset\ by\ peer*|*unexpected\ eof*|*temporary\ failure\ in\ name\ resolution*|*context\ deadline\ exceeded*)
+        failure_class=retryable_transport ;;
+      *) failure_class=unclassified ;;
+    esac
+    unset output
+    auth_diagnostic "${attempt}" "${exit_code}" "${failure_class}"
+    if [[ "${failure_class}" != retryable_* || "${attempt}" -eq 3 ]]; then
+      return "${exit_code}"
+    fi
+    sleep "$((attempt * 10))"
+  done
+}
+
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
-if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
-  exit 1
-fi
+rosa_login
 
 # If the account roles exist, do deletion.
 ACCOUNT_ROLES_PREFIX_FILE="${SHARED_DIR}/cluster-prefix"
