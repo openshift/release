@@ -125,8 +125,13 @@ EOF
             local pr_files
             pr_files=$(curl -sSL --connect-timeout 10 --max-time 30 \
                 "https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
+            # Only consider added ('+') diff lines so that respins (where the
+            # catalog file is modified) resolve the NEW snapshot. Matching the
+            # raw patch would pick the removed ('-') line first and resolve the
+            # stale, pre-existing snapshot.
             snapshot=$(echo "${pr_files}" | jq -r \
                 '[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+                | grep '^+' | grep -v '^+++' \
                 | grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
 
             if [[ -n "${snapshot}" ]]; then
@@ -196,40 +201,60 @@ EOF
 }
 
 function create_idms() {
-    echo "Creating ImageDigestMirrorSet: ${IDMS_NAME}"
+    local cluster_minor rhel_suffix mirror_api mirror_kind mirror_spec_field mirror_resource
+    cluster_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f2)
 
-    if oc get imagedigestmirrorset "${IDMS_NAME}" &>/dev/null; then
-        echo "IDMS ${IDMS_NAME} already exists, skipping creation"
+    # LVMS product images track the cluster RHCOS base: rhel8 through 4.13, rhel9 from 4.14.
+    rhel_suffix="rhel9"
+    [[ "${cluster_minor}" -le 13 ]] && rhel_suffix="rhel8"
+
+    # ImageDigestMirrorSet (config.openshift.io/v1) exists from 4.13 on; 4.12 only has
+    # the older ImageContentSourcePolicy. Both express digest mirrors the same way.
+    mirror_api="config.openshift.io/v1"
+    mirror_kind="ImageDigestMirrorSet"
+    mirror_spec_field="imageDigestMirrors"
+    mirror_resource="imagedigestmirrorset"
+    if [[ "${cluster_minor}" -le 12 ]]; then
+        mirror_api="operator.openshift.io/v1alpha1"
+        mirror_kind="ImageContentSourcePolicy"
+        mirror_spec_field="repositoryDigestMirrors"
+        mirror_resource="imagecontentsourcepolicy"
+    fi
+
+    echo "Creating ${mirror_kind}: ${IDMS_NAME} (RHEL suffix: ${rhel_suffix})"
+
+    if oc get "${mirror_resource}" "${IDMS_NAME}" &>/dev/null; then
+        echo "${mirror_kind} ${IDMS_NAME} already exists, skipping creation"
         return 0
     fi
 
     cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${mirror_api}
+kind: ${mirror_kind}
 metadata:
   name: ${IDMS_NAME}
 spec:
-  imageDigestMirrors:
+  ${mirror_spec_field}:
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${rhel_suffix}-operator
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${rhel_suffix}
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${rhel_suffix}
 EOF
 
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to create IDMS"
+        echo "ERROR: Failed to create ${mirror_kind}"
         return 1
     fi
 
-    echo "IDMS ${IDMS_NAME} created successfully"
+    echo "${mirror_kind} ${IDMS_NAME} created successfully"
     return 0
 }
 
@@ -255,18 +280,28 @@ function update_subscription() {
 }
 
 function wait_for_upgrade_complete() {
+    # The upgrade is only complete once the CSV for the TARGET version reaches
+    # Succeeded. Checking for any Succeeded CSV is wrong: the pre-upgrade CSV is
+    # already Succeeded, so we would return immediately without verifying the
+    # upgrade actually happened.
+    local target_version
+    target_version=$(get_target_version_from_channel "${TARGET_LVMS_CHANNEL}")
+    echo "Waiting for LVMS to upgrade to version ${target_version}.x ..."
+
     local -i counter=0
     while [ $counter -lt 1800 ]; do
         counter+=30
         sleep 30
 
-        local csv_info phase
+        local csv_info version phase
         csv_info=$(get_lvms_csv_info)
+        version=$(echo "${csv_info}" | cut -d',' -f2)
         phase=$(echo "${csv_info}" | cut -d',' -f3)
 
         echo "LVMS CSV: ${csv_info:-pending} (${counter}s)"
 
-        if [[ "${phase}" == "Succeeded" ]]; then
+        if [[ "${version}" == "${target_version}".* && "${phase}" == "Succeeded" ]]; then
+            echo "LVMS upgrade to ${version} succeeded"
             return 0
         fi
 
@@ -278,7 +313,7 @@ function wait_for_upgrade_complete() {
         fi
     done
 
-    echo "ERROR: LVMS upgrade timed out"
+    echo "ERROR: LVMS upgrade timed out (never reached ${target_version}.x in Succeeded phase)"
     oc get csv -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_csv.yaml" 2>&1 || true
     oc get pods -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_pods.yaml" 2>&1 || true
     return 1
@@ -302,6 +337,16 @@ function main() {
     local new_version
     new_version=$(get_lvms_version)
     echo "LVMS upgrade completed: ${new_version}"
+
+     # Prove an upgrade actually happened
+    if [[ "${new_version}" == "${current_version}" ]]; then
+        echo "ERROR: LVMS did not upgrade; still at ${current_version}"
+        return 1
+    fi
+    if [[ "$(printf '%s\n%s\n' "${current_version}" "${new_version}" | sort -V | tail -1)" != "${new_version}" ]]; then
+        echo "ERROR: ${new_version} is not newer than ${current_version}"
+        return 1
+    fi
 }
 
 main
