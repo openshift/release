@@ -35,6 +35,15 @@ EOF
     SOURCE_NAMESPACE=$OO_INSTALL_NAMESPACE
 fi
 
+CONFIG_SPEC=""
+if [[ "${QUAY_OPERATOR_STS}" == "true" ]]; then
+    ROLE_ARN=$(cat "${SHARED_DIR}/STS_ROLE_ARN")
+    CONFIG_SPEC="  config:
+    env:
+    - name: ROLEARN
+      value: $ROLE_ARN"
+fi
+
 SUB=$(
     cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -48,6 +57,7 @@ spec:
   source: $SOURCE
   sourceNamespace: $SOURCE_NAMESPACE
 $CHANNEL_SPEC
+$CONFIG_SPEC
 EOF
 )
 
