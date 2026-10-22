@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-mce-agent-nutanix-worker-dns
+  from_image:
+    namespace: ci
+    name: agent-qe-base
+    tag: latest
+  commands: hypershift-mce-agent-nutanix-worker-dns-commands.sh
+  credentials:
+  - collection: cluster-secrets-nutanix
+    group: nutanix-pc
+    mount_path: /var/run/vault/nutanix
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 45m0s
+  grace_period: 5m0s
+  env:
+  - name: NUTANIX_DNS_IMAGE_UUID
+    default: ""
+    documentation: Optional existing RHCOS Nutanix disk image UUID. An image supplied here is never deleted by this workflow.
+  - name: NUTANIX_DNS_RHCOS_URI
+    default: https://rhcos.mirror.openshift.com/art/storage/prod/streams/4.12/builds/412.86.202303211731-0/x86_64/rhcos-412.86.202303211731-0-nutanix.x86_64.qcow2
+    documentation: RHCOS Nutanix disk image URI to import when NUTANIX_DNS_IMAGE_UUID is empty.
+  - name: NUTANIX_DNS_UPSTREAM
+    default: ""
+    documentation: Optional IPv4 upstream DNS server; defaults to the leased subnet's existing first IPv4 DHCP DNS server.
+  documentation: >-
+    Creates a run-owned DNS VM on the leased Nutanix subnet, serves HostedCluster API and apps records,
+    and advertises the VM through DHCP option 6 before the InfraEnv ISO and workers are created.
