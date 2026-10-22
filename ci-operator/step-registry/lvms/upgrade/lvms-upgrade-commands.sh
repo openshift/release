@@ -330,6 +330,15 @@ function main() {
     current_version=$(get_lvms_version)
     echo "LVMS upgrade: ${current_version:-unknown} -> ${TARGET_LVMS_CHANNEL}"
 
+    # An upgrade test requires a known starting version. If the initial CSV read
+    # yielded nothing, bail out: an empty baseline would let the wait and the
+    # final checks accept the unchanged, pre-upgrade CSV as a successful upgrade.
+    if [[ -z "${current_version}" ]]; then
+        echo "ERROR: could not determine the installed LVMS version before upgrade"
+        oc get csv -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_csv.yaml" 2>&1 || true
+        return 1
+    fi
+
     create_idms
     setup_target_catalogsource
     update_subscription
