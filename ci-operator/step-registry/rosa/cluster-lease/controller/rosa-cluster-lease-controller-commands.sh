@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set +x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -7,6 +8,85 @@ set -o pipefail
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
+
+initialize_reports() {
+    REPORT="${ARTIFACT_DIR}/controller-report.txt"
+    AUTH_REPORT="${ARTIFACT_DIR}/controller-auth.jsonl"
+    echo "Lease Controller Report - $(date -u)" > "${REPORT}"
+    echo "======================================" >> "${REPORT}"
+    : > "${AUTH_REPORT}"
+}
+
+auth_diagnostic() {
+    local operation="$1" environment="$2" attempt="$3" exit_code="$4" failure_class="$5"
+    case "${environment}" in
+        production|prod|staging|stage|integration) ;;
+        *) environment=other ;;
+    esac
+    printf '{"time":"%s","operation":"%s","environment":"%s","attempt":%d,"max_attempts":3,"exit_code":%s,"class":"%s","http_status":"unknown","endpoint":"unknown"}\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${operation}" "${environment}" "${attempt}" "${exit_code}" "${failure_class}" \
+        | tee -a "${AUTH_REPORT}" "${REPORT}" >&2
+}
+
+ocm_login() {
+    local target_env="$1" operation="$2" attempt output exit_code failure_class
+    local -a credentials
+    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
+    elif [[ -n "${OCM_TOKEN}" ]]; then
+        credentials=(--token "${OCM_TOKEN}")
+    else
+        auth_diagnostic "${operation}" "${target_env}" 0 1 missing_credentials
+        return 1
+    fi
+
+    for attempt in 1 2 3; do
+        auth_diagnostic "${operation}" "${target_env}" "${attempt}" null started
+        if output=$(ocm login --url "${target_env}" "${credentials[@]}" 2>&1); then
+            CURRENT_OCM_ENV="${target_env}"
+            auth_diagnostic "${operation}" "${target_env}" "${attempt}" 0 success
+            return 0
+        else
+            exit_code=$?
+        fi
+        output="${output,,}"
+        case "${output}" in
+            *invalid_grant*|*invalid_client*|*unauthorized_client*|*access_denied*|*unauthorized*|*forbidden*|*invalid\ token*|*invalid\ refresh\ token*|*invalid\ credentials*|*authentication\ failed*)
+                failure_class=permanent_auth ;;
+            *"expected response content type 'application/json' but received 'text/html'"*)
+                failure_class=retryable_html ;;
+            *i/o\ timeout*|*tls\ handshake\ timeout*|*connection\ reset\ by\ peer*|*unexpected\ eof*|*temporary\ failure\ in\ name\ resolution*|*context\ deadline\ exceeded*)
+                failure_class=retryable_transport ;;
+            *) failure_class=unclassified ;;
+        esac
+        unset output
+        auth_diagnostic "${operation}" "${target_env}" "${attempt}" "${exit_code}" "${failure_class}"
+        if [[ "${failure_class}" != retryable_* || "${attempt}" -eq 3 ]]; then
+            return "${exit_code}"
+        fi
+        sleep "$((attempt * 10))"
+    done
+}
+
+ocm_authenticate() {
+    SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
+    SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
+    OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
+    CURRENT_OCM_ENV=""
+    ocm_login "${OCM_LOGIN_ENV}" initial-login
+}
+
+ocm_ensure_env() {
+    local target_env="$1"
+    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
+        return 0
+    fi
+    ocm_login "${target_env}" environment-switch
+}
+
+if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
+    return 0
+fi
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
@@ -17,6 +97,8 @@ MAX_CLUSTER_AGE_HOURS="${MAX_CLUSTER_AGE_HOURS:-0}"
 REFRESH_DAY="${REFRESH_DAY:-6}"
 MAX_REFRESH_PER_RUN="${MAX_REFRESH_PER_RUN:-2}"
 DRY_RUN="${DRY_RUN:-false}"
+
+initialize_reports
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
     log "ERROR: Lease host kubeconfig not found at ${LEASE_HOST_KUBECONFIG}"
@@ -51,7 +133,7 @@ ocm_get_cluster() {
 ocm_check_cluster() {
     local cluster_id="$1" ocm_env="${2:-staging}"
     OCM_CHECK_RESULT="" OCM_CHECK_STATUS="" OCM_CHECK_RESPONSE=""
-    ocm_ensure_env "${ocm_env}"
+    ocm_ensure_env "${ocm_env}" || return $?
     local response rc
     if response=$(ocm get /api/clusters_mgmt/v1/clusters/"${cluster_id}" 2>&1); then
         rc=0
@@ -361,43 +443,11 @@ schedule_upgrade() {
     fi
 }
 
-# Log in to OCM
-SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
-SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
-
-if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with SSO credentials"
-    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-elif [[ -n "${OCM_TOKEN}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with offline token"
-    ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
-else
-    log "ERROR: No OCM credentials found in cluster profile"
-    exit 1
-fi
-
-CURRENT_OCM_ENV="${OCM_LOGIN_ENV}"
-
-ocm_ensure_env() {
-    local target_env="$1"
-    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
-        return 0
-    fi
-    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-        ocm login --url "${target_env}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-    elif [[ -n "${OCM_TOKEN}" ]]; then
-        ocm login --url "${target_env}" --token "${OCM_TOKEN}"
-    fi
-    CURRENT_OCM_ENV="${target_env}"
-}
+ocm_authenticate || exit $?
 
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
-REPORT="${ARTIFACT_DIR}/controller-report.txt"
-echo "Lease Controller Report - $(date -u)" > "${REPORT}"
-echo "======================================" >> "${REPORT}"
 
 # ---------------------------------------------------------------
 # Phase 1: Read desired state
