@@ -1,0 +1,78 @@
+ref:
+  as: p2p-upgrade-odf-spokes
+  from: cli
+  commands: p2p-upgrade-odf-spokes-commands.sh
+  timeout: 8h0m0s
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Upgrade ODF on one or more ACM spoke clusters through one or more channels after an EUS
+    OCP upgrade.
+
+    Timeout is 8h (install steps use 3h) because each hop waits sequentially for CSV name
+    change (15m) + CSV Succeeded (15m) + StorageCluster operand completion (90m) + NooBaa
+    Ready (90m) = 3.5h per hop. Operand completion is images/version, not phase=Ready alone:
+    a leftover Ready from the prior hop can satisfy oc wait immediately after the new CSV
+    succeeds. Two EUS hops are 7h worst-case, plus must-gather/diagnostics. Spokes
+    upgrade in parallel so wall-clock time is one spoke, not N. 8h is the ceiling that
+    covers that budget.
+
+    Reads spoke cluster names and kubeconfigs from ${SHARED_DIR} (same files written by
+    acm-interop-p2p-cluster-install). For each spoke, iterates ODF_UPGRADE_CHANNEL_HOPS
+    (comma-separated, e.g. "stable-4.21,stable-4.22"). Each hop first rewrites the
+    odf-operator pkgs ConfigMap (deployment env PKGS_CONFIG_MAP_NAME) so records still on
+    the pre-hop channel point at the hop channel, then patches Subscriptions still on that
+    pre-hop channel (odf-operator and dependencies such as odf-csi-addons-operator).
+    ocs-client-operator is not patched until StorageCluster hop completion: webhook
+    subscription.ocs.openshift.io denies a client channel that does not match StorageClient
+    desired-subscription-channel. The running operator copies ConfigMap channels back onto
+    dependency Subscriptions; leaving the ConfigMap on the old channel makes that
+    write-back restore stable-4.20 and OLM reports ConstraintsNotSatisfiable once the
+    refreshed catalog no longer contains it. The step then waits for OLM to install the
+    new CSV (Succeeded), then for StorageCluster status.images actualImage to equal
+    desiredImage (and status.version to match the hop) and NooBaa to return to Ready,
+    then aligns ocs-client-operator before moving to the next hop.
+
+    ODF's OLM upgrade graph requires sequential hops. Jumping directly from stable-4.20 to
+    stable-4.22 leaves OLM without an install-plan edge and the installedCSV never changes.
+    For a 4.20→4.22 EUS upgrade set ODF_UPGRADE_CHANNEL_HOPS=stable-4.21,stable-4.22.
+
+    Multiple spokes are upgraded in parallel; hops within each spoke are sequential.
+    Intended for EUS scenarios. Run after all OCP upgrade steps (hub + spoke) have completed.
+    Does not re-label nodes or re-create the StorageCluster.
+
+    Writes per-spoke resource state and an upgrade summary (CSV, StorageCluster phase,
+    version, ceph desired/actual images, NooBaa phase) to
+    ${ARTIFACT_DIR}/odf-spoke-upgrade-<name>/ on success and failure.
+    On failure, also runs ocs-must-gather against the failing hop's ODF version.
+  env:
+  - name: ODF_UPGRADE_CHANNEL_HOPS
+    default: ""
+    documentation: |-
+      Comma-separated ordered list of ODF Subscription channels to upgrade through on each
+      spoke (e.g. "stable-4.21,stable-4.22"). Each hop retargets the pkgs ConfigMap and
+      every Subscription still on the pre-hop channel, waits for the new CSV to reach
+      Succeeded, then waits for StorageCluster operand images to
+      converge (actualImage == desiredImage, version matching the hop) and NooBaa Ready
+      before the next hop. Required — step fails if empty.
+  - name: ODF_INSTALL_NAMESPACE
+    default: "openshift-storage"
+    documentation: Namespace of the ODF operator and StorageCluster on the spokes.
+  - name: ODF_STORAGE_CLUSTER_NAME
+    default: "ocs-storagecluster"
+    documentation: StorageCluster metadata.name on each spoke.
+  - name: ODF_SUBSCRIPTION_NAME
+    default: "odf-operator"
+    documentation: ODF Subscription metadata.name.
+  - name: ODF_CSV_POLL_INTERVAL_SECONDS
+    default: "10"
+    documentation: Sleep between installedCSV change polls per spoke (seconds).
+  - name: ODF_CSV_POLL_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Max seconds to wait for the new CSV to appear and reach Succeeded per hop per spoke (15 min).
+  - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
+    default: "5400"
+    documentation: Max seconds to wait for StorageCluster operand image/version convergence and NooBaa Ready per hop per spoke (90 min).
