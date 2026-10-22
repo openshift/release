@@ -139,16 +139,22 @@ echo "VPC IPv6 CIDR: ${VPC_IPV6_CIDR:-none}"
 #
 # Phases executed by the remote script:
 #   1. Save iptables state (IPv4 + IPv6)
-#   2. Register EXIT trap that restores firewall, cleans /etc/hosts, removes auth
+#   2. Register EXIT trap that restores firewall, cleans /etc/hosts, removes auth,
+#      and collects the D2M log
 #   3. Add /etc/hosts entry to route registry hostname to private IP
 #   4. Apply IPv4 isolation via a dedicated OC_MIRROR_EGRESS chain (jumped from
-#      the start of OUTPUT so pre-existing ACCEPT rules can't bypass it)
-#   5. Apply IPv6 isolation via OC_MIRROR_EGRESS6 chain
+#      the start of OUTPUT so pre-existing ACCEPT rules can't bypass it).
+#      SSH_CONNECTION is used to derive the CI pod's IP and port so an explicit
+#      ACCEPT rule pins the SSH return flow before the terminal REJECT.
+#      Terminal rule uses REJECT (not DROP) so unexpected external connections
+#      fail immediately rather than hanging until TCP timeout.
+#   5. Apply IPv6 isolation via OC_MIRROR_EGRESS6 chain (same REJECT approach)
 #   6. Isolation acceptance test:
 #      a. Direct (--noproxy) connection to quay.io must fail
 #      b. Direct connection to the registry hostname:port must succeed
-#      c. DROP rule must be present in both chains
-#   7. Run oc-mirror disk-to-mirror
+#      c. REJECT rule must be present in both chains
+#   7. Run oc-mirror disk-to-mirror under timeout, tee-ing output to /var/tmp
+#      so it is recoverable even if the SSH session is disrupted
 #   EXIT trap fires: restores firewall, removes /etc/hosts entry, auth file
 # ---------------------------------------------------------------------------
 REMOTE_D2M_SCRIPT="/tmp/oc-mirror-d2m.sh"
@@ -229,15 +235,33 @@ echo "/etc/hosts updated."
 # -------------------------------------------------------------------
 # IPv4 isolation via a dedicated chain jumped from the start of OUTPUT.
 # Using a dedicated chain means pre-existing broad ACCEPT rules can't
-# bypass the DROP at the end.
+# bypass the terminal REJECT.
+#
+# SSH_CONNECTION on the bastion is set by sshd to:
+#   "<client-ip> <client-port> <server-ip> <server-port>"
+# We use it to pin an explicit ACCEPT for the return flow of the CI pod's
+# SSH control connection before applying the terminal REJECT.  Without this
+# explicit rule the DROP/REJECT catches the SSH server's reply packets and
+# the remote script's output is silently lost, causing an apparent 2-hour
+# timeout.
 # -------------------------------------------------------------------
 echo "=== Applying IPv4 isolation ==="
+read -r _ci_ip _ci_port _srv_ip _ssh_port <<<"${SSH_CONNECTION:-}"
 sudo iptables -N OC_MIRROR_EGRESS 2>/dev/null || sudo iptables -F OC_MIRROR_EGRESS
-sudo iptables -A OC_MIRROR_EGRESS -o lo                          -j ACCEPT
-sudo iptables -A OC_MIRROR_EGRESS -m state --state ESTABLISHED,RELATED -j ACCEPT
-sudo iptables -A OC_MIRROR_EGRESS -d "${VPC_IPV4_CIDR}"         -j ACCEPT
-sudo iptables -A OC_MIRROR_EGRESS -d 169.254.169.254/32          -j ACCEPT
-sudo iptables -A OC_MIRROR_EGRESS                                -j DROP
+sudo iptables -A OC_MIRROR_EGRESS -o lo                                            -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -m state --state ESTABLISHED,RELATED             -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -d "${VPC_IPV4_CIDR}"                            -j ACCEPT
+sudo iptables -A OC_MIRROR_EGRESS -d 169.254.169.254/32                            -j ACCEPT
+# Explicit SSH return-flow pinhole: allow TCP replies from sshd back to the CI pod.
+if [[ -n "${_ci_ip:-}" && -n "${_ci_port:-}" && -n "${_ssh_port:-}" ]]; then
+    echo "Pinning SSH return flow: src-port ${_ssh_port} -> ${_ci_ip}:${_ci_port}"
+    sudo iptables -A OC_MIRROR_EGRESS \
+        -p tcp -d "${_ci_ip}" --sport "${_ssh_port}" --dport "${_ci_port}" -j ACCEPT
+else
+    echo "WARNING: SSH_CONNECTION not set — SSH return-flow pinhole skipped"
+fi
+# REJECT (not DROP) so unexpected external deps fail immediately, not after TCP timeout.
+sudo iptables -A OC_MIRROR_EGRESS                                                  -j REJECT --reject-with icmp-admin-prohibited
 # Insert at the start of OUTPUT — takes precedence over existing rules.
 sudo iptables -I OUTPUT 1 -j OC_MIRROR_EGRESS
 
@@ -253,7 +277,7 @@ sudo ip6tables -A OC_MIRROR_EGRESS6 -d fe80::/10                   -j ACCEPT
 if [[ -n "${VPC_IPV6_CIDR}" ]]; then
     sudo ip6tables -A OC_MIRROR_EGRESS6 -d "${VPC_IPV6_CIDR}"      -j ACCEPT
 fi
-sudo ip6tables -A OC_MIRROR_EGRESS6                                 -j DROP
+sudo ip6tables -A OC_MIRROR_EGRESS6                                 -j REJECT --reject-with icmp6-adm-prohibited
 sudo ip6tables -I OUTPUT 1 -j OC_MIRROR_EGRESS6
 
 echo "Isolation rules applied."
@@ -284,16 +308,16 @@ else
     exit 1
 fi
 
-echo "--- Test 3: DROP rules present in isolation chains ---"
-if ! sudo iptables  -L OC_MIRROR_EGRESS  -n | grep -q DROP; then
-    echo "FAIL: DROP rule missing from IPv4 OC_MIRROR_EGRESS chain"
+echo "--- Test 3: REJECT rules present in isolation chains ---"
+if ! sudo iptables  -L OC_MIRROR_EGRESS  -n | grep -q REJECT; then
+    echo "FAIL: REJECT rule missing from IPv4 OC_MIRROR_EGRESS chain"
     exit 1
 fi
-if ! sudo ip6tables -L OC_MIRROR_EGRESS6 -n | grep -q DROP; then
-    echo "FAIL: DROP rule missing from IPv6 OC_MIRROR_EGRESS6 chain"
+if ! sudo ip6tables -L OC_MIRROR_EGRESS6 -n | grep -q REJECT; then
+    echo "FAIL: REJECT rule missing from IPv6 OC_MIRROR_EGRESS6 chain"
     exit 1
 fi
-echo "PASS: DROP rules present in both isolation chains"
+echo "PASS: REJECT rules present in both isolation chains"
 echo "Isolation acceptance test passed."
 
 # -------------------------------------------------------------------
@@ -313,10 +337,22 @@ if [[ "${IGNORE_RELEASE_SIGNATURE}" == "true" ]]; then
     echo "Applying --ignore-release-signature (payload is unsigned)"
 fi
 
-"${BASTION_BIN_PATH}" -c "${ISC_PATH}" \
+# Run D2M under a 100-minute timeout and tee output to /var/tmp so it is
+# preserved even if the SSH session is disrupted by firewall rules.
+# The step grace_period is 15 m and the step timeout is 2 h, so 100 m gives
+# ample room for the EXIT trap cleanup to complete before ci-operator kills us.
+D2M_LOG="/var/tmp/oc-mirror-d2m.log"
+timeout 6000 "${BASTION_BIN_PATH}" -c "${ISC_PATH}" \
     --from "file://${BASTION_WORKSPACE_PATH}" \
     "docker://${MIRROR_REGISTRY_HOST}" \
-    --dest-tls-verify=false --v2 ${OC_MIRROR_EXTRA_FLAGS}
+    --dest-tls-verify=false --v2 ${OC_MIRROR_EXTRA_FLAGS} \
+    2>&1 | tee "${D2M_LOG}"
+# Capture the exit status of oc-mirror (not tee).
+D2M_RC=${PIPESTATUS[0]}
+if [[ ${D2M_RC} -ne 0 ]]; then
+    echo "ERROR: oc-mirror disk-to-mirror exited with code ${D2M_RC}"
+    exit ${D2M_RC}
+fi
 
 echo "=== oc-mirror disk-to-mirror complete ==="
 # EXIT trap fires here: restores firewall, removes /etc/hosts entry and auth file.
@@ -330,6 +366,14 @@ rm -f "${local_script}"
 echo "=== Executing remote D2M script on bastion ==="
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "${REMOTE_D2M_SCRIPT}"
 echo "Remote D2M script complete."
+
+# Collect the D2M log from the bastion.  The log is written to /var/tmp on the
+# bastion so it survives even if the SSH session was disrupted during isolation.
+# Run this after firewall restoration so the scp is not blocked.
+D2M_LOG="/var/tmp/oc-mirror-d2m.log"
+scp ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}:${D2M_LOG}" \
+    "${ARTIFACT_DIR}/bastion-oc-mirror-d2m.log" 2>/dev/null || \
+    echo "Note: D2M log not found on bastion at ${D2M_LOG} (may not have been created)"
 
 # Save post-restore iptables state to artifacts for audit/debugging
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
