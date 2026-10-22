@@ -734,6 +734,32 @@ tests:
     workflow: openshift-qe-installer-aws
   timeout: 14h0m0s
 - always_run: false
+  as: udn-bgp-layer2-300-120nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      ITERATIONS: "300"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      UDN_BGP_LAYER2: "true"
+    post:
+    - ref: openshift-qe-installer-aws-deprovision-bastion
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-post-featureset
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-installer-aws-provision-bastion
+    test:
+    - ref: openshift-qe-bgp-setup-udn-bgp
+    - ref: openshift-qe-udn-bgp
+    workflow: openshift-qe-installer-aws
+  timeout: 14h0m0s
+- always_run: false
   as: cudn-density-single-ns-800-24nodes
   optional: true
   steps:
