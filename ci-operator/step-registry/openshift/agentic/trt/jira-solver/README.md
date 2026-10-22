@@ -1,20 +1,33 @@
-# Serial Jira solver
+# Serial Jira solver and review responder
 
-The solver merges `Agent` into `permissions.deny` in its runtime settings, retaining
-the existing hooks and other settings. Both the initial solve and timeout
-continuation use those settings, even when `ALLOWED_TOOLS` includes `Agent`.
-The shared `jira-solve` skill remains unchanged and runs in `--ci` mode.
+The `openshift-agentic-trt-runtime-policy` pre-step writes a shared helper to
+`SHARED_DIR/trt-runtime-policy.sh`. The solver and responder source it to generate
+per-session settings and hooks; the guard implementation lives only in that
+step's commands script, not in individual agent images. All four production/eval
+workflows include the step, and the solve-eval dispatcher copies the helper into
+each case's `SHARED_DIR`.
+
+Both modes merge `Agent` into `permissions.deny`, preserving hooks and other
+settings. The initial solve, timeout continuation, responder's direct Claude
+gate, review worker, and CI-fix worker all receive those settings, even when
+`ALLOWED_TOOLS` includes `Agent`. The responder retains its existing credential
+denials. The shared skills remain unchanged.
 
 The parent owns implementation, review, validation, and local commits. CI policy
 is appended after skill and repository guidance so instructions to delegate or
-publish do not override it. The agent must not push or use `gh`; only the pipeline
-publishes a committed feature branch to the configured fork and opens the PR.
-Publication fails for missing commits, commits with no net changes from the
+publish do not override it. Neither mode permits agent pushes. Solver mode also
+blocks `gh`; review mode allows it for reading reviews/CI and posting authorized
+replies. The gate remains read-only; the shared policy does not grant it write
+permission or change its required output format.
+
+Only the pipeline publishes a committed feature branch and opens the solver PR.
+Solver publication fails for missing commits, commits with no net changes from the
 starting tree, leftover tracked changes, or untracked files outside `artifacts/`.
 A timeout remains a failed solve even if continuation successfully preserves
 work in a local commit. Evaluation renames its local
 branch before publication; it does not delete remote branches or fall back to
-pushing upstream.
+pushing upstream. The responder retains its existing pipeline push/target checks
+and no-change behavior; it does not inherit the solver's empty-solution gate.
 
 Each solve has a separate temporary hook/settings directory, including concurrent
 evaluation cases; this does not enable delegation within a solve. The
@@ -46,10 +59,10 @@ checks use `bash -o pipefail -c '...'`. Do not pipe checks to `head`/`tail`, ign
 their exit codes, or describe a component pass as a passing full target. These
 records describe only the commands actually run, not full validation coverage.
 
-`artifacts/solver-settings.json` and `solver-versions.txt` record the solver-supplied
-settings and installed versions, not all merged Claude settings. Session logs
-and check logs remain artifacts. Do not include credentials in commands or
-captured output.
+`artifacts/solver-settings.json`/`solver-versions.txt` and
+`review-settings.json`/`review-versions.txt` record each mode's supplied settings
+and installed versions, not all merged Claude settings. Session logs and check
+logs remain artifacts. Do not include credentials in commands or captured output.
 
 ## Rehearsal verification
 
@@ -57,7 +70,8 @@ Verify this change using rehearsals of `openshift-agentic-trt-eval` and
 `openshift-agentic-trt-review-responder-eval` on the release PR. They build the
 shared agentic-dev image containing the PR's scripts. The solver rehearsal needs
 the actual deployed `agentic-ci` wrapper, Claude version, solver settings, and
-updated Sippy environment; the responder rehearsal checks image compatibility.
+updated Sippy environment. The responder rehearsal must verify policy enforcement
+on the gate and both worker paths, not just shared-image compatibility.
 
 1. Exercise the initial solve. Ask the parent to attempt the `Agent` tool, then
    edit a fixture, run a passing check, and commit locally. Confirm delegation is
@@ -84,6 +98,10 @@ updated Sippy environment; the responder rehearsal checks image compatibility.
    record retains the failure, full logs are available, and the final report does
    not call the full target passing. Confirm the actual MCP virtualenv Python,
    pip, and pytest work before implementation.
+6. In responder rehearsal, verify delegation and direct/wrapped pushes are denied
+   on the gate, review, and CI-fix paths, while required `gh` reads and authorized
+   replies still work. Preserve the gate's read-only behavior and output contract.
+   A legitimate no-change review round must not fail the solver's publication gate.
 
 Record the rehearsal URLs, image identity, installed versions, initial and
 continuation tool events, child-session inspection, remote refs, and check

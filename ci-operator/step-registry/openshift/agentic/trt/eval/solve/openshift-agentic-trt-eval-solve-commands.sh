@@ -80,6 +80,7 @@ for case_name in "${CASE_LIST[@]}"; do
         cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/trt-telemetry.sh" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/trt-runtime-policy.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-auth.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-token-outputs" "${CASE_SHARED}/"
 
