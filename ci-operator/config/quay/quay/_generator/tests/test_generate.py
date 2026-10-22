@@ -67,6 +67,13 @@ def test_expand_matrix_cells() -> None:
     assert cell.test_as == "aws-s3-nightly"
     assert "PLAYWRIGHT_GREP_INVERT" not in cell.env
 
+    rehearsal_cell = next(
+        c
+        for c in cells
+        if c.branch == "redhat-3.18" and c.ocp_version == "4.14" and c.test == "e2e-install"
+    )
+    assert rehearsal_cell.strict_playwright_ref is False
+
     arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
     assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
     assert arm_cell.test_as == "aws-s3-nightly"
@@ -136,11 +143,23 @@ def test_jinja_renders_ocp_version() -> None:
 def test_e2e_install_template_inverts_full_default_filter() -> None:
     env = jinja_env(GENERATOR_DIR / "templates")
     rendered = render_template(env, "tests/e2e-install.yaml.j2", _phase0_cell().context())
-    assert rendered["tests"][0]["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"] == (
+    rendered_env = rendered["tests"][0]["steps"]["env"]
+    assert rendered_env["PLAYWRIGHT_GREP_INVERT"] == (
         "@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|"
         "saves and loads architecture filter with mirror configuration|"
         "loads existing architecture filter from saved mirror configuration"
     )
+    assert rendered_env["PLAYWRIGHT_REF_MODE"] == "strict"
+
+
+def test_e2e_install_omits_strict_playwright_ref_when_disabled() -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(
+        env,
+        "tests/e2e-install.yaml.j2",
+        _phase0_cell(strict_playwright_ref=False).context(),
+    )
+    assert "PLAYWRIGHT_REF_MODE" not in rendered["tests"][0]["steps"]["env"]
 
 
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:

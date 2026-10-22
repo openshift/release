@@ -80,6 +80,9 @@ class Cell:
     sts: bool = False
     storage_override: str | None = None
     database: bool = False
+    # Nightly Playwright jobs normally fail closed when image-label commits cannot
+    # be fetched. Set false for a job that must use the step's derived default.
+    strict_playwright_ref: bool = True
     # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
     # channels, and branches are derived from quay_version + upgrade_from, so a row
     # needs only this one field.
@@ -227,6 +230,7 @@ class Cell:
             "test_as": self.test_as,
             "deploy_ref": self.deploy_ref,
             "database": self.database,
+            "strict_playwright_ref": self.strict_playwright_ref,
             "database_kind": self.database_kind,
             "database_provision_ref": self.database_provision_ref,
             "database_deprovision_ref": self.database_deprovision_ref,

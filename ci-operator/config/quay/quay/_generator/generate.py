@@ -81,6 +81,7 @@ JOB_KEYS = {
     "ocp_channel",
     "sts",
     "database",
+    "strict_playwright_ref",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -379,6 +380,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             if sts is not None and "aws" not in clouds:
                 raise ValueError(f"{where}.sts is only valid when clouds include aws")
             database = _job_bool_field(job, "database", where) or False
+            strict_playwright_ref = _job_bool_field(job, "strict_playwright_ref", where)
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -426,6 +428,12 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         f"{where} always_run: true cannot be combined with "
                         "run_if_changed or skip_if_only_changed"
                     )
+            if strict_playwright_ref is not None and (
+                kind != "periodic" or test != "e2e-install" or source != "nightly"
+            ):
+                raise ValueError(
+                    f"{where}.strict_playwright_ref is only valid for nightly e2e-install jobs"
+                )
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
@@ -487,6 +495,9 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         storage_override=storage,
                         upgrade_from=upgrade_from,
                         database=database,
+                        strict_playwright_ref=(
+                            strict_playwright_ref if strict_playwright_ref is not None else True
+                        ),
                         ocp_channel=ocp_channel or "stable",
                     )
                 )
