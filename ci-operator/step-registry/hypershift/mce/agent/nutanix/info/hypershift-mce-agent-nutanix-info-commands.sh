@@ -23,7 +23,7 @@ if [[ -s "$SHARED_DIR/nutanix_infraenv_name" && -s "$SHARED_DIR/nutanix_agent_na
   oc get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o json | jq '{metadata:{name:.metadata.name,namespace:.metadata.namespace,labels:.metadata.labels},spec:{cpuArchitecture:.spec.cpuArchitecture,pullSecretRef:.spec.pullSecretRef,proxy:.spec.proxy},status:{conditions:.status.conditions}}' > "$ARTIFACT_DIR/nutanix-infraenv.json" 2>&1 || true
 fi
 
-for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts; do
+for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts nutanix_dns_ip nutanix_dns_vm_name nutanix_dns_vm_uuid nutanix_dns_image_name nutanix_dns_image_uuid nutanix_dns_dhcp_state.json; do
   if [[ -s "$SHARED_DIR/$file" ]]; then
     cp "$SHARED_DIR/$file" "$ARTIFACT_DIR/$file"
   fi
@@ -31,6 +31,19 @@ done
 
 if [[ -s "$SHARED_DIR/nutanix_context.sh" ]]; then
   source "$SHARED_DIR/nutanix_context.sh"
+  if [[ -s "$SHARED_DIR/nutanix_dns_vm_uuid" ]]; then
+    dns_vm_uuid=$(cat "$SHARED_DIR/nutanix_dns_vm_uuid")
+    curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+      "$NUTANIX_PC_URL/api/nutanix/v3/vms/$dns_vm_uuid" |
+      jq '{uuid:.metadata.uuid,name:.spec.name,nics:[.spec.resources.nic_list[]? | {mac_address,ip_endpoint_list}],power_state:.status.resources.power_state}' \
+        > "$ARTIFACT_DIR/nutanix-worker-dns-vm.json" || true
+  fi
+  if [[ -s "$SHARED_DIR/nutanix_dns_dhcp_state.json" ]]; then
+    curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+      "$NUTANIX_PC_URL/api/nutanix/v3/subnets/$SUBNET_UUID" |
+      jq '{uuid:.metadata.uuid,name:.spec.name,dhcp_options:.spec.resources.ip_config.dhcp_options}' \
+        > "$ARTIFACT_DIR/nutanix-worker-dns-subnet.json" || true
+  fi
   if [[ -s "$SHARED_DIR/vm_uuids.txt" ]]; then
     : > "$ARTIFACT_DIR/nutanix-vms.jsonl"
     while IFS= read -r uuid; do
