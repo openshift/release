@@ -10,7 +10,11 @@
 # When SPOKE_CLUSTER_UPGRADE_EUS=true, performs a control-plane-only (CPOU)
 # multi-hop upgrade using ${SHARED_DIR}/upgrade-edge (written by
 # cucushift-upgrade-setedge-2hops): pause worker MCP, hop each image in order,
-# unpause worker MCP. Single-hop jobs leave the flag false.
+# unpause worker MCP.
+# When SPOKE_CLUSTER_UPGRADE_CPOU=true (and EUS is false), performs the same
+# pause / control-plane hop / unpause sequence for a single hop. Hop images
+# come from ${SHARED_DIR}/upgrade-edge when that file is non-empty, otherwise
+# from OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
@@ -35,7 +39,7 @@ typeset currentHopVersion=''
 WriteSpokeUpgradeFailureDiagnostics() {
     typeset artifactFile="${ARTIFACT_DIR}/spoke-${spokeName}-upgrade-failure.txt"
     {
-        printf '%s\n' "=== currentHopVersion=${currentHopVersion:-unknown} SPOKE_CLUSTER_UPGRADE_EUS=${SPOKE_CLUSTER_UPGRADE_EUS} ==="
+        printf '%s\n' "=== currentHopVersion=${currentHopVersion:-unknown} SPOKE_CLUSTER_UPGRADE_EUS=${SPOKE_CLUSTER_UPGRADE_EUS} SPOKE_CLUSTER_UPGRADE_CPOU=${SPOKE_CLUSTER_UPGRADE_CPOU} ==="
         printf '\n'
         printf '%s\n' "=== oc get clusterversion version ==="
         oc --kubeconfig="${spokeKubeconfig}" get clusterversion version -o wide 2>&1 || true
@@ -303,9 +307,10 @@ DisableSpokeClusterImagePolicy() {
         --ignore-not-found 1>/dev/null
 
     # Step 3: wait for MCO to re-render the master MCP with the updated policy.json.
-    # In EUS mode workers are still paused; they receive the re-rendered config (no Sigstore)
-    # when unpaused.  In n+1 mode this re-render completes before the upgrade begins, so
-    # masters can pull the unsigned target OS image without signature enforcement.
+    # In EUS and CPOU mode workers are still paused; they receive the re-rendered config
+    # (no Sigstore) when unpaused. When workers were never paused, this re-render
+    # completes before the upgrade begins, so masters can pull the unsigned target
+    # OS image without signature enforcement.
     # || true: if master MCO config didn't change (no other diff), skip gracefully.
     WaitMcpCondition "${spokeKubeconfig}" master Updating "${ACM_SPOKE_MCP_CHANGE_TIMEOUT_SECONDS}s" || true
     WaitMcpCondition "${spokeKubeconfig}" master Updated "${ACM_SPOKE_UPGRADE_TIMEOUT}"
@@ -391,15 +396,56 @@ if [[ "${SPOKE_CLUSTER_UPGRADE_EUS}" == 'true' ]]; then
     # Workers are now upgraded — CVO can finally mark the last hop Completed.
     WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${currentHopVersion}"
     DumpSpokeUpgradeStatus "unpaused"
+elif [[ "${SPOKE_CLUSTER_UPGRADE_CPOU}" == 'true' ]]; then
+    # n+1 CPOU (e.g. 4.21→4.22): same pause / control-plane hop / unpause sequence as EUS,
+    # with one hop instead of the EUS-to-EUS edge.
+    typeset hopPullspecs='' hopPullspec=''
+    typeset -a hopImagesArr=()
+    if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
+        hopPullspecs="$(< "${SHARED_DIR}/upgrade-edge")"
+    fi
+    if [[ -n "${hopPullspecs//[[:space:],]/}" ]]; then
+        IFS=',' read -r -a hopImagesArr <<< "${hopPullspecs}"
+    else
+        [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]] \
+            || { : "CPOU spoke upgrade needs upgrade-edge or OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"; exit 1; }
+        hopImagesArr=("${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}")
+    fi
+    (( ${#hopImagesArr[@]} >= 1 )) || { : "CPOU spoke upgrade requires at least 1 hop image; got ${#hopImagesArr[@]}"; exit 1; }
+    : "CPOU spoke upgrade via ${#hopImagesArr[@]} hop(s)"
+    SetWorkerMcpPaused "${spokeKubeconfig}" true
+    DumpSpokeUpgradeStatus "paused"
+    # 4.21 spokes already have the openshift CIP. Clear it before the first hop so
+    # masters can pull the unsigned target OS image while workers stay paused.
+    DisableSpokeClusterImagePolicy
+    for hopPullspec in "${hopImagesArr[@]}"; do
+        hopPullspec="${hopPullspec//[[:space:]]/}"
+        [[ -n "${hopPullspec}" ]] || { : "Empty/whitespace-only pullspec in spoke CPOU hop list"; exit 1; }
+        UpgradeSpokeToPullspec "${hopPullspec}" currentHopVersion
+        # CVO may recreate the openshift CIP during the hop (OCPBUGS-114622).
+        # Clear it before workers unpause so they do not require a Sigstore signature.
+        DisableSpokeClusterImagePolicy
+        if [[ -n "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" ]]; then
+            : "Re-applying channel ${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL} after hop to ${currentHopVersion}"
+            oc --kubeconfig="${spokeKubeconfig}" patch clusterversion version --type merge \
+                -p "$(jq -cn --arg ch "${SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL}" '{"spec":{"channel":$ch}}')"
+        fi
+    done
+    WaitMcpCondition "${spokeKubeconfig}" worker 'Updated=False' "${ACM_SPOKE_UPGRADE_TIMEOUT}"
+    SetWorkerMcpPaused "${spokeKubeconfig}" false
+    WaitMcpCondition "${spokeKubeconfig}" worker Updated "${ACM_SPOKE_UPGRADE_TIMEOUT}"
+    # Workers are now upgraded — CVO can finally mark the hop Completed.
+    WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${currentHopVersion}"
+    DumpSpokeUpgradeStatus "unpaused"
 else
-    # Defense-in-depth for n+1 (e.g. 4.21→4.22): the 'openshift' CIP exists on 4.21 spokes
-    # and cluster-install removes it, but re-assert here so a recreated or leftover CIP
-    # cannot block masters from pulling the unsigned target OS image during the upgrade.
-    # The function is idempotent: if the CVO override is already set and no CIP exists it
-    # returns immediately without any waits.
+    # Defense-in-depth for n+1 (e.g. 4.21→4.22) when CPOU is off: the 'openshift' CIP
+    # exists on 4.21 spokes and cluster-install removes it, but re-assert here so a
+    # recreated or leftover CIP cannot block masters from pulling the unsigned target
+    # OS image during the upgrade. The function is idempotent: if the CVO override is
+    # already set and no CIP exists it returns immediately without any waits.
     DisableSpokeClusterImagePolicy
     UpgradeSpokeToPullspec "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" currentHopVersion
-    # n+1: workers were never paused, so Completed can be checked immediately.
+    # Workers were never paused, so Completed can be checked immediately.
     WaitSpokeUpgradeCompleted "${spokeKubeconfig}" "${currentHopVersion}"
 fi
 
