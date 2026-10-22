@@ -1,5 +1,10 @@
 #!/bin/bash
 set -euo pipefail
+
+if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+  echo "Skipping work step: skip-work-steps marker is present."
+  exit 0
+fi
 udev_file="${CLUSTER_PROFILE_DIR}/doca1-udev-network-rules-base64"
 e2e_env="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
 if [[ -f "${udev_file}" ]]; then

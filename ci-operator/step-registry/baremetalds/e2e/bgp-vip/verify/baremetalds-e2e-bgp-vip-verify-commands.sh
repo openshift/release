@@ -66,51 +66,107 @@ if [[ "${keepalived}" -ne 0 ]]; then
 fi
 
 echo "[4/6] every ToR BGP session is Established with the negotiated timers and BFD up"
-# The peers are configured with holdTime=90s/keepaliveTime=30s (dev-scripts
-# BGP_VIP_* defaults) and BFD; the negotiated values prove the node-side FRR
-# actually accepted and applied the rendered timer/BFD config. A silently
-# rejected "timers" line would leave the FRR defaults (180/60) in place and
-# fail this check even though the session still establishes.
+# The expectations come from the bgp-vip FRRConfiguration the CNO rendered
+# from the install-config: every ToR neighbor it declares must have an
+# Established session from every master, with the negotiated hold/keepalive
+# matching the neighbor's holdTime/keepaliveTime (FRR defaults 180s/60s when
+# unset) and BFD Up when the neighbor references a bfdProfile. Comparing the
+# negotiated values proves the node-side FRR actually applied the rendered
+# config: a silently rejected "timers" line would leave the defaults in place
+# and still establish. Reading them from the CR rather than hardcoding the
+# dev-scripts defaults keeps this lane correct for whatever peer the
+# install-config declares (timers/BFD/IPv6 are all optional there).
 masters_total="$(oc get nodes -l node-role.kubernetes.io/master -o name | wc -l)"
+bgp_vip_cr="$(oc get frrconfiguration -n openshift-frr-k8s bgp-vip -o json)"
+tor_neighbors="$(printf '%s' "${bgp_vip_cr}" | jq -r '.spec.bgp.routers[0].neighbors[].address')"
+if [[ -z "${tor_neighbors}" ]]; then
+    printf '%s\n' "${bgp_vip_cr}" || true
+    fail "bgp-vip FRRConfiguration declares no ToR neighbor"
+fi
+echo "ToR neighbors declared by bgp-vip: $(echo "${tor_neighbors}" | tr '\n' ' ')"
 neighbors_json() {
     ${CLI} exec bgp-tor vtysh -c 'show bgp neighbors json' 2>/dev/null
 }
 check_sessions() {
+    # ToR-side view (stdin) checked against the CR-side expectations (argv)
     neighbors_json | python3 -c '
-import json, sys
-data = json.load(sys.stdin)
-expected_min = int(sys.argv[1])
+import json, re, sys
+tor = json.load(sys.stdin)
+cr = json.loads(sys.argv[1])
+masters = int(sys.argv[2])
+
+def seconds(d, default):
+    # metav1.Duration string such as "90s" or "1m30s"; FRR default when unset
+    if not d:
+        return default
+    total, n = 0, ""
+    for ch in d:
+        if ch.isdigit():
+            n += ch
+        else:
+            total += int(n) * {"h": 3600, "m": 60, "s": 1}[ch]
+            n = ""
+    return total
+
 failures = []
-established = 0
-for addr, n in data.items():
-    state = n.get("bgpState")
-    if state != "Established":
-        failures.append(f"{addr}: state {state}, expected Established")
-        continue
-    established += 1
-    hold = n.get("bgpTimerHoldTimeMsecs")
-    keep = n.get("bgpTimerKeepAliveIntervalMsecs")
-    if hold != 90000 or keep != 30000:
-        failures.append(f"{addr}: negotiated timers hold={hold}ms keepalive={keep}ms, expected 90000/30000 - the node-side FRR did not apply the configured timers")
-    bfd = n.get("peerBfdInfo", {}).get("status")
-    if bfd != "Up":
-        failures.append(f"{addr}: BFD status {bfd!r}, expected Up")
-if established < expected_min:
-    failures.append(f"only {established} Established session(s), expected at least {expected_min} (one per master)")
+for nb in cr["spec"]["bgp"]["routers"][0]["neighbors"]:
+    addr = nb["address"]
+    hold = seconds(nb.get("holdTime"), 180) * 1000
+    keep = seconds(nb.get("keepaliveTime"), 60) * 1000
+    want_bfd = bool(nb.get("bfdProfile"))
+    # the ToR has one session per master to this neighbor address; vtysh keys
+    # them by the node-side source address, so match on the remote view of
+    # the neighbor instead (hostname carries the node, localAs/remoteAs the
+    # peering) - every Established session to this family must match
+    family6 = ":" in addr
+    sessions = {a: n for a, n in tor.items() if (":" in a) == family6}
+    established = [a for a, n in sessions.items() if n.get("bgpState") == "Established"]
+    for a in sessions:
+        n = sessions[a]
+        state = n.get("bgpState")
+        if state != "Established":
+            failures.append(f"{a}: state {state}, expected Established")
+            continue
+        h, k = n.get("bgpTimerHoldTimeMsecs"), n.get("bgpTimerKeepAliveIntervalMsecs")
+        if h != hold or k != keep:
+            failures.append(f"{a}: negotiated timers hold={h}ms keepalive={k}ms, expected {hold}/{keep} from bgp-vip neighbor {addr} - the node-side FRR did not apply the rendered timers")
+        bfd = n.get("peerBfdInfo", {}).get("status")
+        profile = nb.get("bfdProfile")
+        if want_bfd and bfd != "Up":
+            failures.append(f"{a}: BFD status {bfd!r}, expected Up (bgp-vip neighbor {addr} references bfdProfile {profile!r})")
+        if not want_bfd and bfd == "Up":
+            failures.append(f"{a}: BFD is Up but bgp-vip neighbor {addr} declares no bfdProfile")
+    if len(established) < masters:
+        failures.append(f"neighbor {addr}: {len(established)} Established session(s) at the ToR, expected at least {masters} (one per master)")
 for f in failures:
     print(f)
 sys.exit(1 if failures else 0)
-' "${expected_min}"
+' "${bgp_vip_cr}" "${masters_total}"
 }
-expected_min="${masters_total}"
 if ! poll 300 check_sessions; then
     neighbors_json || true
-    fail "BGP sessions at the ToR not Established with negotiated timers 90/30 and BFD Up"
+    fail "BGP sessions at the ToR do not match the bgp-vip FRRConfiguration (Established, negotiated timers, BFD)"
 fi
 
 echo "[5/6] ToR sees every VIP of every address family with the expected path counts"
-api_vips="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.apiServerInternalIPs[*]}')"
-ingress_vips="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.ingressIPs[*]}')"
+# A VIP can only reach the ToR over a BGP session of its own address family,
+# so assert paths only for the families the bgp-vip FRRConfiguration peers on
+# (a dual-stack cluster whose install-config declares a v4 ToR peer only
+# advertises its v4 VIPs; the v6 VIPs are still served, just not via BGP).
+advertised_families() {
+    local vip
+    for vip in "$@"; do
+        if is_v6 "${vip}"; then
+            echo "${tor_neighbors}" | grep -q ':' && echo "${vip}" || echo "skipping ${vip}: bgp-vip declares no IPv6 ToR neighbor" >&2
+        else
+            echo "${tor_neighbors}" | grep -qv ':' && echo "${vip}" || echo "skipping ${vip}: bgp-vip declares no IPv4 ToR neighbor" >&2
+        fi
+    done
+}
+# shellcheck disable=SC2046
+api_vips="$(advertised_families $(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.apiServerInternalIPs[*]}'))"
+# shellcheck disable=SC2046
+ingress_vips="$(advertised_families $(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.ingressIPs[*]}'))"
 workers="$(oc get nodes -l node-role.kubernetes.io/worker -o name | { grep -cv master || true; })"
 # the ingress VIPs are advertised from every node hosting a Ready router pod
 router_nodes="$(oc get pods -n openshift-ingress -l ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default \

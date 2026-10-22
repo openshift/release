@@ -72,7 +72,11 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
           step: "5m"
           severity: "Degraded"
     junit_monitor:
-      job_name: "periodic-build-farm-canary-{cluster_name}"
+      job_names:
+        - "periodic-build-farm-canary-{cluster_name}"
+      artifact_path: "artifacts/junit_canary.xml"
+      alert_on_no_recent_run: true
+      missing_artifact_unhealthy: true
       max_age: "2h"
       severity: "Degraded"
       artifact_url_style: "gcs"
@@ -156,7 +160,7 @@ def dash_entry(cluster_name: str) -> str:
         description: "Build cluster {cluster_name}"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
 """
@@ -169,7 +173,7 @@ def mgmt_dash_entry(cluster_name: str) -> str:
         description: "Management cluster {cluster_name}"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
 """

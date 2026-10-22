@@ -15,6 +15,15 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-openshift-hyperfleet-hyperfleet-e2e-main-images-images
+    reporter_config:
+      slack:
+        channel: '#hyperfleet-e2e-status'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: |-
+          {{if eq .Spec.Type "postsubmit"}}:rotating_light: *{{.Spec.Job}}* ended with *{{.Status.State}}*. `ci/hyperfleet-e2e:latest` was not updated, so the nightlies keep testing the previous image. Rerun this job only if it is the newest main postsubmit. If a later merge already promoted, do nothing: rerunning an older run puts its older commit back on `latest`.{{else}}:x: *{{.Spec.Job}}* ended with *{{.Status.State}}*{{range .Spec.Refs.Pulls}} on PR #{{.Number}}{{end}}. The promoted image is not affected.{{end}}
+          Details: <{{.Status.URL}}|View logs>
     spec:
       containers:
       - args:

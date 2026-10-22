@@ -290,16 +290,13 @@ podman_args+=(--rm)
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 
 # Defer CleanClusterByProfile to Prow post (rosa-e2e-ocm-fvt-clean) so guest
-# must-gather can run against a live API. GINKGO_SKIP works with current images;
-# OCM_FVT_DEFER_CLEAN is also honored in tear_down once the image picks it up.
-# See ROSAENG-67965.
+# must-gather can run against a live API. Do NOT set GINKGO_SKIP=CleanClusterByProfile:
+# that filters the cleaner to 0 specs and fails --fail-on-empty, marking green
+# test runs as failed. Instead rely on OCM_FVT_DEFER_CLEAN so ocmtest skips the
+# post phase (and tear_down Skip() if post still runs). See ROSAENG-67965.
 if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
-  echo "OCM_FVT_DEFER_CLEAN=true: skipping in-workflow CleanClusterByProfile (Prow post will justClean)"
+  echo "OCM_FVT_DEFER_CLEAN=true: in-workflow post-clean deferred to Prow rosa-e2e-ocm-fvt-clean"
   echo "OCM_FVT_DEFER_CLEAN=true" >> "${podman_env_file}"
-  # Skip the cleaner It even if the image lacks the tear_down Skip() yet.
-  if ! grep -q '^GINKGO_SKIP=' "${podman_env_file}" 2>/dev/null; then
-    echo "GINKGO_SKIP=CleanClusterByProfile" >> "${podman_env_file}"
-  fi
 fi
 
 # ROSAENG-67791: osdfm metrics/alerts query RHOBS (in-cluster prometheus-app-sre PF removed).
@@ -438,6 +435,41 @@ if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
       break
     fi
   done < <(find "${ocm_fvt_output}" -type f \( -name 'kubeconfig' -o -name '*.kubeconfig' \) -print0 2>/dev/null)
+fi
+
+# Gate guest gather (must-gather / gather-extra) when deferred clean is enabled.
+# Write SHARED_DIR/ocm-fvt-gather-eligible=true only when the cluster reached ready
+# (and the guest API still answers if oc is available). When false, clear any
+# stale kubeconfig so post gather steps no-op instead of failing on dead DNS.
+# Jobs that do not provision a cluster omit this flag and do not use the
+# guest-artifacts chain; guest-kubeconfig treats a missing flag as "proceed".
+if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
+  gather_eligible=false
+  cluster_state=""
+  while IFS= read -r -d '' ini; do
+    cluster_state="$(awk -F'=[[:space:]]*' '/^State[[:space:]]*=/{print $2; exit}' "${ini}" | tr -d '[:space:]')"
+    [[ -n "${cluster_state}" ]] && break
+  done < <(find "${ocm_fvt_output}" -type f -name 'cluster.ini' -print0 2>/dev/null)
+
+  if [[ -s "${SHARED_DIR}/cluster-id" && "${cluster_state}" == "ready" ]]; then
+    gather_eligible=true
+    if [[ -s "${SHARED_DIR}/kubeconfig" ]] && command -v oc >/dev/null 2>&1; then
+      if ! oc --kubeconfig="${SHARED_DIR}/kubeconfig" --request-timeout=15s --insecure-skip-tls-verify \
+          get ns default >/dev/null 2>&1; then
+        echo "WARNING: cluster.ini State=ready but guest API unreachable; marking gather ineligible"
+        gather_eligible=false
+      fi
+    fi
+  fi
+
+  printf '%s' "${gather_eligible}" > "${SHARED_DIR}/ocm-fvt-gather-eligible"
+  cp -f "${SHARED_DIR}/ocm-fvt-gather-eligible" "${ARTIFACT_DIR}/ocm-fvt-gather-eligible" 2>/dev/null || true
+  echo "Wrote SHARED_DIR/ocm-fvt-gather-eligible=${gather_eligible} (cluster State=${cluster_state:-unknown})"
+
+  if [[ "${gather_eligible}" != "true" ]]; then
+    rm -f "${SHARED_DIR}/kubeconfig"
+    echo "Cleared SHARED_DIR/kubeconfig; rosa-gather-hcp-guest-artifacts will skip must-gather/extra"
+  fi
 fi
 
 # Persist profile recording (.datainfo + */cluster.ini) for rosa-e2e-ocm-fvt-clean.

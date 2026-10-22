@@ -17,10 +17,14 @@ spec:
         enabled: false
       route:
         enabled: false
+  cmdParams:
+    controller.profile.enabled: "true"
   controller:
     env:
       - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
         value: round-robin
+      - name: GOMEMLIMIT
+        value: "48103633715B" # 80% of the controller memory limit (56Gi), rounded down.
     processors: {}
     resources:
       limits:
@@ -186,6 +190,12 @@ spec:
       - '*'
       kinds:
       - Image
+    - apiGroups:
+      - prow.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - ProwJob
   server:
     autoscale:
       enabled: false

@@ -30,7 +30,7 @@ BM_WORKERS=${BM_WORKERS:-1}
 VIRT_WORKERS=${VIRT_WORKERS:-2}
 
 # Use latest stable version for mgmt cluster
-MGMT_VERSION=4.21
+MGMT_VERSION=4.22
 MGMT_RELEASE=stable
 
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"

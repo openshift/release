@@ -67,7 +67,11 @@ fi
 
 # Do not reuse the worktree the model was allowed to modify. Only apply its
 # generated docs patch to a clean clone with no agent-controlled git hooks.
-git clone "https://github.com/${repo}.git" "$workdir/repo"
+if [[ "$dry_run" == true ]]; then
+  git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+else
+  git clone "https://github.com/${repo}.git" "$workdir/repo"
+fi
 cd "$workdir/repo"
 git config user.name 'OpenShift CI Bot'
 git config user.email 'ci-bot@redhat.com'

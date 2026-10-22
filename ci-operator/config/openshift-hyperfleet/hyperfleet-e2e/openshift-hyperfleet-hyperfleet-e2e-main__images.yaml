@@ -16,6 +16,14 @@ images:
         as:
         - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
     to: hyperfleet-e2e
+  reporter_config:
+    channel: '#hyperfleet-e2e-status'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |-
+      {{if eq .Spec.Type "postsubmit"}}:rotating_light: *{{.Spec.Job}}* ended with *{{.Status.State}}*. `ci/hyperfleet-e2e:latest` was not updated, so the nightlies keep testing the previous image. Rerun this job only if it is the newest main postsubmit. If a later merge already promoted, do nothing: rerunning an older run puts its older commit back on `latest`.{{else}}:x: *{{.Spec.Job}}* ended with *{{.Status.State}}*{{range .Spec.Refs.Pulls}} on PR #{{.Number}}{{end}}. The promoted image is not affected.{{end}}
+      Details: <{{.Status.URL}}|View logs>
 promotion:
   to:
   - namespace: ci
@@ -26,6 +34,19 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: deployment-validation
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier0
+      MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX: e2e
+      MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG: latest
+      REGION: us-central1-a
+    workflow: openshift-hyperfleet-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet

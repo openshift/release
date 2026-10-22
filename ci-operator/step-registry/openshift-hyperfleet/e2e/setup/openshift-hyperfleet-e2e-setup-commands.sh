@@ -91,6 +91,51 @@ export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hy
 PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
 export PROJECT_ID=${PROJECT_ID}
 
+# Log the hyperfleet-e2e commit this run's image was built from. Nightlies
+# and rc-e2e import the promoted ci/hyperfleet-e2e:latest; PR jobs build it
+# in the job. ci-operator stores images as manifest lists, so the commit
+# label is on the amd64 child image, read through the namespaced
+# imagestreamimage API. Uses the step's service account (view on the
+# ci-operator namespace), so it runs before KUBECONFIG points at GKE.
+# Never fails the step.
+log_e2e_image_source() {
+  local err istag_json from_name digest image_json commit created
+  err="$(mktemp)"
+  if ! istag_json="$(env -u KUBECONFIG kubectl get imagestreamtag "pipeline:hyperfleet-e2e" \
+      -n "${NAMESPACE}" -o json 2>"${err}")"; then
+    log "WARNING: cannot read pipeline:hyperfleet-e2e, image commit unknown: $(cat "${err}")"
+    rm -f "${err}"
+    return 0
+  fi
+  from_name="$(jq -r '.tag.from.name // ""' <<< "${istag_json}" 2>/dev/null)" || from_name=""
+  digest="$(jq -r '[.image.dockerImageManifests[]? | select(.architecture == "amd64") | .digest][0] // ""' \
+      <<< "${istag_json}" 2>/dev/null)" || digest=""
+  image_json="${istag_json}"
+  if [[ -n "${digest}" ]]; then
+    if ! image_json="$(env -u KUBECONFIG kubectl get imagestreamimage "pipeline@${digest}" \
+        -n "${NAMESPACE}" -o json 2>"${err}")"; then
+      log "WARNING: cannot read pipeline@${digest}, image commit unknown: $(cat "${err}")"
+      image_json=""
+    fi
+  fi
+  rm -f "${err}"
+  commit="$(jq -r '.image.dockerImageMetadata.Config.Labels["io.openshift.build.commit.id"] // ""' \
+      <<< "${image_json}" 2>/dev/null)" || commit=""
+  created="$(jq -r '.image.dockerImageMetadata.Created // "unknown"' <<< "${image_json}" 2>/dev/null)" || created="unknown"
+  if [[ -n "${from_name}" ]]; then
+    if [[ -n "${commit}" ]]; then
+      log "hyperfleet-e2e image: imported ${from_name} (${digest:-no manifest list}), commit ${commit}, created ${created}"
+    else
+      log "WARNING: hyperfleet-e2e image imported from ${from_name} (${digest:-no manifest list}) has no io.openshift.build.commit.id label; source commit unknown"
+    fi
+  elif [[ -n "${commit}" ]]; then
+    log "hyperfleet-e2e image: built in this job from commit ${commit}"
+  else
+    log "hyperfleet-e2e image: built in this job from PR #${PULL_NUMBER:-unknown} at ${PULL_PULL_SHA:-unknown}"
+  fi
+}
+log_e2e_image_source
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Generates the kubeconfig and saves it to shared dir
 hyperfleet-credential-provider generate-kubeconfig \
@@ -139,10 +184,22 @@ export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}
 # Configure authentication placement for HyperFleet (API auth by default).
 export AUTH_MODE="${AUTH_MODE:-API}"
 
-# Install hyperfleet components via infra repo
-# Will inherit all exported values here
+# Install hyperfleet components via infra repo.
+# Retry transient clone failures, removing any partial checkout before retrying.
 log "Cloning hyperfleet-infra at ref: ${INFRA_REF}"
-git clone --depth 1 --branch "${INFRA_REF}" "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra
+for attempt in 1 2 3; do
+  if git clone --depth 1 --branch "${INFRA_REF}" "https://github.com/openshift-hyperfleet/hyperfleet-infra.git" /tmp/hyperfleet-infra; then
+    break
+  fi
+  rm -rf /tmp/hyperfleet-infra
+  if (( attempt == 3 )); then
+    log "ERROR: hyperfleet-infra clone failed after 3 attempts"
+    exit 1
+  fi
+  retry_delay=$(( attempt * 15 ))
+  log "WARNING: hyperfleet-infra clone attempt ${attempt}/3 failed, retrying in ${retry_delay}s..."
+  sleep "${retry_delay}"
+done
 cd /tmp/hyperfleet-infra
 
 HELMFILE_ENV="e2e-gcp"
@@ -209,3 +266,7 @@ wait_for_api() {
 if ! wait_for_api "${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/" "Hyperfleet API"; then
   exit 1
 fi
+
+# Last step: mark setup as finished. The cluster-resources cleanup uses this
+# marker to tell an early setup failure from a setup that succeeded.
+touch "${SHARED_DIR}/setup_succeeded"
