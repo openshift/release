@@ -154,9 +154,14 @@ echo "bastion ip address: ${bastion_ip}"
 echo "${bastion_ip}" >"${SHARED_DIR}/bastion_private_address"
 echo "core" >"${SHARED_DIR}/bastion_ssh_user"
 
+# Disable tracing due to proxy credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)
 proxy_private_url="http://${proxy_credential}@${bastion_ip}:3128"
 echo "${proxy_private_url}" >"${SHARED_DIR}/proxy_private_url"
+# Restore previous tracing state
+$WAS_TRACING && set -x
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_ip}" >"${SHARED_DIR}/proxyip"
