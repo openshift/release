@@ -8,25 +8,25 @@ images:
   - additional_architectures:
     - arm64
     dockerfile_path: Dockerfile
-    to: fleetshift-server
+    to: ocm-fleet-server
   - additional_architectures:
     - arm64
     dockerfile_path: Dockerfile.local
-    from: fleetshift-server
-    to: fleetshift-server-local
+    from: ocm-fleet-server
+    to: ocm-fleet-server-local
   - additional_architectures:
     - arm64
     dockerfile_path: Dockerfile.web
-    to: fleetshift-web
+    to: ocm-fleet-web
   - additional_architectures:
     - arm64
-    dockerfile_path: Dockerfile.fleetshift
-    from: fleetshift-server-local
+    dockerfile_path: Dockerfile.aio
+    from: ocm-fleet-server-local
     inputs:
-      fleetshift-web:
+      ocm-fleet-web:
         as:
         - ${WEB_IMAGE}
-    to: fleetshift
+    to: ocm-fleet
 resources:
   '*':
     requests:
@@ -38,89 +38,89 @@ tests:
   - arm64
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server
+      SOURCE_IMAGE_REF: ocm-fleet-server
     env:
-      IMAGE_REPO: fleetshift-server
+      IMAGE_REPO: ocm-fleet-server
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-image-mirror-local
   capabilities:
   - arm64
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server-local
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
     env:
-      IMAGE_REPO: fleetshift-server-local
+      IMAGE_REPO: ocm-fleet-server-local
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-image-mirror-web
   capabilities:
   - arm64
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-web
+      SOURCE_IMAGE_REF: ocm-fleet-web
     env:
-      IMAGE_REPO: fleetshift-web
+      IMAGE_REPO: ocm-fleet-web
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-image-mirror-aio
   capabilities:
   - arm64
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift
+      SOURCE_IMAGE_REF: ocm-fleet
     env:
-      IMAGE_REPO: fleetshift
+      IMAGE_REPO: ocm-fleet
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-merge-image-mirror-server
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server
+      SOURCE_IMAGE_REF: ocm-fleet-server
     env:
       ALSO_TAG_LATEST: "true"
-      IMAGE_REPO: fleetshift-server
+      IMAGE_REPO: ocm-fleet-server
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-merge-image-mirror-local
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server-local
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
     env:
       ALSO_TAG_LATEST: "true"
-      IMAGE_REPO: fleetshift-server-local
+      IMAGE_REPO: ocm-fleet-server-local
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-merge-image-mirror-web
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-web
+      SOURCE_IMAGE_REF: ocm-fleet-web
     env:
       ALSO_TAG_LATEST: "true"
-      IMAGE_REPO: fleetshift-web
+      IMAGE_REPO: ocm-fleet-web
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: pr-merge-image-mirror-aio
   capabilities:
   - arm64
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift
+      SOURCE_IMAGE_REF: ocm-fleet
     env:
       ALSO_TAG_LATEST: "true"
-      IMAGE_REPO: fleetshift
+      IMAGE_REPO: ocm-fleet
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: republish-server-latest
   capabilities:
   - arm64
@@ -130,12 +130,12 @@ tests:
     interval: 1h
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server
+      SOURCE_IMAGE_REF: ocm-fleet-server
     env:
-      IMAGE_REPO: fleetshift-server
+      IMAGE_REPO: ocm-fleet-server
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: republish-local-latest
   capabilities:
   - arm64
@@ -145,12 +145,12 @@ tests:
     interval: 1h
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-server-local
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
     env:
-      IMAGE_REPO: fleetshift-server-local
+      IMAGE_REPO: ocm-fleet-server-local
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: republish-web-latest
   capabilities:
   - arm64
@@ -160,12 +160,12 @@ tests:
     interval: 1h
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift-web
+      SOURCE_IMAGE_REF: ocm-fleet-web
     env:
-      IMAGE_REPO: fleetshift-web
+      IMAGE_REPO: ocm-fleet-web
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 - as: republish-aio-latest
   capabilities:
   - arm64
@@ -175,13 +175,13 @@ tests:
     interval: 1h
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: fleetshift
+      SOURCE_IMAGE_REF: ocm-fleet
     env:
-      IMAGE_REPO: fleetshift
+      IMAGE_REPO: ocm-fleet
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
-    workflow: fleetshift-ci-image-mirror
+    workflow: ocm-fleet-ci-image-mirror
 zz_generated_metadata:
   branch: main
-  org: fleetshift
-  repo: fleetshift-poc
+  org: stolostron
+  repo: ocm-fleet
