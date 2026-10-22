@@ -131,25 +131,51 @@ ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
 
 echo "Set bastion SSH configuration"
 PROJECT_DIR="/tmp"
+trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
 grep ansible_ssh_private_key -A 100 "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
 chmod 600 "${PROJECT_DIR}/temp_ssh_key"
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
 
-echo "Run eco-gotests via SSH tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
+echo "Check OADP prerequisites and run eco-gotests via SSH tunnel"
+printf -v REMOTE_COMMAND 'bash -s -- %q %q' \
+  "${TARGET_HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig" "${TARGET_SPOKE_KUBECONFIG}"
+TEST_EXIT_CODE=0
+if ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-  "cd /tmp/eco_gotests && ./eco-gotests-run.sh || true"
+  "${REMOTE_COMMAND}" <<'REMOTE_SCRIPT'
+set -euo pipefail
+# TALM copies the hub ConfigMap only if its namespace already exists on the spoke.
+echo "Verify hub OADP ConfigMap"
+oc --kubeconfig "$1" --request-timeout=30s -n ztp-group get configmap oadp-cm -o name
+echo "Verify target spoke OADP ConfigMap namespace"
+oc --kubeconfig "$2" --request-timeout=30s get namespace ztp-group -o name
+cd /tmp/eco_gotests
+exec ./eco-gotests-run.sh
+REMOTE_SCRIPT
+then
+  echo "IBU upgrade suite completed successfully"
+else
+  TEST_EXIT_CODE=$?
+  echo "IBU upgrade execution failed with exit code ${TEST_EXIT_CODE}; collecting reports" >&2
+fi
 
 echo "Gather artifacts from bastion"
+ARTIFACT_EXIT_CODE=0
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_upgrade"
-scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+if ! scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/" || echo "No XML artifacts in eco_gotests upgrade — skipping"
-rm -f "${PROJECT_DIR}/temp_ssh_key"
+  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"; then
+  echo "Failed to collect IBU upgrade XML reports" >&2
+  ARTIFACT_EXIT_CODE=1
+fi
+if ! compgen -G "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/*suite_test_junit.xml" > /dev/null; then
+  echo "Missing IBU upgrade suite JUnit report" >&2
+  ARTIFACT_EXIT_CODE=1
+fi
 
 # ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
 # and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
@@ -173,3 +199,9 @@ echo ""
 echo "=== IBU Upgrade Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
 echo "Seed image OCP version: ${SEED_IMAGE_VERSION}"
+
+# Preserve the test failure after saving reports for the post-phase reporter.
+if [[ "${TEST_EXIT_CODE}" -ne 0 ]]; then
+  exit "${TEST_EXIT_CODE}"
+fi
+exit "${ARTIFACT_EXIT_CODE}"
