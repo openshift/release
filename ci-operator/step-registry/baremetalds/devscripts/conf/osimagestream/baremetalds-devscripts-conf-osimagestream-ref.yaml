@@ -1,21 +1,29 @@
 ref:
   as: baremetalds-devscripts-conf-osimagestream
   from: baremetal-installer
+  cli: latest
   commands: baremetalds-devscripts-conf-osimagestream-commands.sh
   resources:
     requests:
       cpu: 1000m
       memory: 500Mi
+  dependencies:
+    - name: "release:initial"
+      env: OSSTREAM_INITIAL_RELEASE_IMAGE
   env:
-    - name: OS_IMAGE_STREAM
+    - name: OSSTREAM
       default: ""
       documentation: |-
-        RHCOS OS image stream written by dev-scripts to install-config.yaml as
-        `osImageStream`. Valid values: "rhel-9", "rhel-10". Empty (the default) leaves the
-        field unset so the installer picks its own default for the release under test
-        (rhel-9 on 4.22-4.24, rhel-10 from 5.0). Keep it empty for 4.22 and older: on 4.22
-        the field is protected by the OSStreams feature gate, and on 4.21 and older the
-        field does not exist.
+        The OS Image Stream to install the cluster from. This is the same variable the
+        rhcos-conf-osstream step uses for the MachineConfigPools, so a job sets the stream
+        once. Valid values are "rhel-9" and "rhel-10"; empty (the default) is a no-op and
+        lets the installer pick its own default for the release under test.
   documentation: |-
-    Configure dev-scripts OS_IMAGE_STREAM outside of DEVSCRIPTS_CONFIG, so that a job can
-    set it without replacing the whole DEVSCRIPTS_CONFIG block.
+    Translates OSSTREAM into the dev-scripts OS_IMAGE_STREAM variable, which dev-scripts writes
+    to install-config.yaml as osImageStream. The translation happens outside of DEVSCRIPTS_CONFIG
+    so that a job can select a stream without replacing the whole DEVSCRIPTS_CONFIG block.
+
+    install-config osImageStream is protected by the OSStreams feature gate, which is only
+    enabled by default from 4.23 onwards, so the field is written only when the release that is
+    actually installed - the initial one, not an upgrade target - is 4.23 or newer. On older
+    releases the step logs that it is skipping and writes nothing, leaving the installer default.
