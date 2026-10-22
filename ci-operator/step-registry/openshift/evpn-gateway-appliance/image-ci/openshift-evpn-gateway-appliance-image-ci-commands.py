@@ -6,7 +6,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -162,30 +161,11 @@ def main():
         print("image-ci: could not read a full pull request head sha", file=sys.stderr)
         raise SystemExit(1)
     print(f"image-ci: HEAD {sha}", flush=True)
-    print(f"image-ci: fetching immutable archive {sha}", flush=True)
-    descriptor, download_archive = tempfile.mkstemp()
-    os.close(descriptor)
-    run(
-        [
-            "curl",
-            "-fsSL",
-            "-o",
-            download_archive,
-            "-L",
-            f"{repo}/archive/{sha}.tar.gz",
-        ]
-    )
-    run(
-        [
-            "tar",
-            "-xzf",
-            download_archive,
-            "-C",
-            workroot,
-            "--strip-components=1",
-        ]
-    )
-    Path(download_archive).unlink()
+    print(f"image-ci: fetching commit {sha}", flush=True)
+    run(["git", "init", "-q", "-b", "main", workroot])
+    run(["git", "-C", workroot, "remote", "add", "origin", repo])
+    run(["git", "-C", workroot, "fetch", "--depth", "1", "origin", sha])
+    run(["git", "-C", workroot, "checkout", "--detach", sha])
 
     os.chdir(workroot)
     engine = shutil.which("podman") or shutil.which("docker")
@@ -236,7 +216,7 @@ def main():
     Path(artifacts).mkdir(parents=True, exist_ok=True)
     smoke = Path(workroot) / "image/tools/smoke-payloads.py"
     if not smoke.is_file():
-        print(f"image-ci: {smoke} is not in this archive", file=sys.stderr)
+        print(f"image-ci: {smoke} is not in this checkout", file=sys.stderr)
         raise SystemExit(1)
     print(f"image-ci: running payload smoke {image_tag}", flush=True)
     run(["python3", str(smoke), image_tag])
