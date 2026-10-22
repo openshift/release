@@ -325,7 +325,7 @@ echo "Isolation acceptance test passed."
 # -------------------------------------------------------------------
 echo "=== Running oc-mirror disk-to-mirror ==="
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-${HOME}/run}"
-export REGISTRY_AUTH_PREFERENCE=podman
+unset REGISTRY_AUTH_PREFERENCE
 
 # ref OCPBUGS-56009: apply --ignore-release-signature when the to-disk step
 # determined the payload is unsigned (e.g. nightly/CI builds).
