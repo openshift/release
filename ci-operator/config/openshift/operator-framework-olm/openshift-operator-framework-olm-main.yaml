@@ -1,3 +1,8 @@
+base_images:
+  e2e-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: tests
 build_root:
   from_repository: true
 images:
@@ -11,10 +16,25 @@ images:
   - dockerfile_path: base.Dockerfile
     from: src
     to: ci-image
+  - build_args:
+    - name: CLUSTER_DEBUG_TOOLS_VERSION
+      value: b81366aabacc7f76624e53c438dcb1ede70c5324
+    dockerfile_literal: |-
+      FROM pipeline:src AS cluster-debug-tools
+      ARG CLUSTER_DEBUG_TOOLS_VERSION
+      RUN mkdir -p /tmp/cluster-debug-tools && \
+          GOFLAGS="" GOBIN=/tmp/cluster-debug-tools go install \
+            "github.com/openshift/cluster-debug-tools/cmd/kubectl-dev_tool@${CLUSTER_DEBUG_TOOLS_VERSION}" && \
+          test -x /tmp/cluster-debug-tools/kubectl-dev_tool
+      FROM e2e-tests
+      COPY --from=cluster-debug-tools /tmp/cluster-debug-tools/kubectl-dev_tool /usr/local/bin/kubectl-dev_tool
+    from: e2e-tests
+    to: olm-psa-test-runner
 promotion:
   to:
   - excluded_images:
     - ci-image
+    - olm-psa-test-runner
     name: "5.1"
     namespace: ocp
 releases:
@@ -186,7 +206,7 @@ tests:
       TEST_SUITE: olmv0/all
     test:
     - ref: openshift-e2e-test-psa-check
-    - ref: openshift-e2e-test
+    - ref: openshift-e2e-test-psa-check-e2e
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main

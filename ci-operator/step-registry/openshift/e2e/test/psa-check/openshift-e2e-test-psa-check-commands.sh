@@ -2,15 +2,7 @@
 
 set -euo pipefail
 
-: "${CLUSTER_DEBUG_TOOLS_VERSION:?CLUSTER_DEBUG_TOOLS_VERSION must be set}"
-
-tool_dir="${SHARED_DIR}/cluster-debug-tools"
-tool_path="${tool_dir}/kubectl-dev_tool"
-mkdir -p "${tool_dir}"
-
-echo "Installing cluster-debug-tools at ${CLUSTER_DEBUG_TOOLS_VERSION}"
-GOBIN="${tool_dir}" GOFLAGS="" go install \
-  "github.com/openshift/cluster-debug-tools/cmd/kubectl-dev_tool@${CLUSTER_DEBUG_TOOLS_VERSION}"
+tool_path=/usr/local/bin/kubectl-dev_tool
 
 if [[ ! -x "${tool_path}" ]]; then
   echo "kubectl-dev_tool was not installed at ${tool_path}" >&2
@@ -25,4 +17,4 @@ fi
   fi
 } >"${SHARED_DIR}/cluster-debug-tools.env"
 
-echo "kubectl-dev_tool available at ${tool_path}"
+echo "kubectl-dev_tool available in the e2e test image at ${tool_path}"

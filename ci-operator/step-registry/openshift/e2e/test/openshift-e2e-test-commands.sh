@@ -19,6 +19,13 @@ if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
     source "${SHARED_DIR}/cluster-debug-tools.env"
 fi
 
+if [[ "${PSA_CHECK_REQUIRED:-false}" == "true" ]]; then
+    if [[ -z "${PSA_CHECK_BIN:-}" || ! -x "${PSA_CHECK_BIN:-}" ]]; then
+        echo >&2 "PSA checker is required but not executable at ${PSA_CHECK_BIN:-<unset>}"
+        exit 1
+    fi
+fi
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
