@@ -29,6 +29,14 @@ export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
 # Install npm modules
 cd /tmp/monitoring-plugin/web
+
+# Skip revisions without the logging test harness (lands with the logging-view
+# merge in monitoring-plugin) instead of failing the readiness check.
+if [[ ! -f cypress.logging.config.ts ]] || ! grep -q '"start:logging-tests"' package.json; then
+  echo "Skipping: logging test harness not present in this source revision."
+  exit 0
+fi
+
 npm install
 
 # Start the logging view test harness, a webpack dev server on localhost:9003.
