@@ -12,6 +12,7 @@ from generate import (
     GENERATED_HEADER,
     GENERATOR_DIR,
     _check_configs,
+    _hand_maintained,
     _print_list,
     apply_cell_settings,
     apply_kind_settings,
@@ -786,13 +787,52 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
     assert _check_configs(results, retired, output_dir) == 1
 
 
-def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
+def test_check_fails_on_unowned_config(tmp_path: Path) -> None:
     out = tmp_path / "quay"
     assert main(["--output", str(out)]) == 0
     (out / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
-    (out / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
-    (out / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
-    assert main(["--check", "--output", str(out)]) == 0
+    assert main(["--check", "--output", str(out)]) == 1
+
+
+def test_check_fails_on_sibling_repo_filename(tmp_path: Path) -> None:
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    sibling = next(p for p in (tmp_path).glob("*/*.yaml") if p.parent != out)
+    (out / sibling.name).write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
+
+
+def test_check_pins_hand_maintained_tests(tmp_path: Path) -> None:
+    results = _phase0_results()
+    for _group, filename, config in results:
+        (tmp_path / filename).write_text(dump_config(config))
+    hand = {"quay-quay-master__claim.yaml": ["claim-cluster"]}
+    claim = tmp_path / "quay-quay-master__claim.yaml"
+    claim.write_text("tests:\n- as: claim-cluster\n")
+    assert _check_configs(results, [], tmp_path, hand) == 0
+    claim.write_text("tests:\n- as: claim-cluster\n- as: e2e-extra\n")
+    assert _check_configs(results, [], tmp_path, hand) == 1
+
+
+def test_check_fails_on_job_not_from_prowgen(tmp_path: Path) -> None:
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    prowgen = {"name": "generated", "labels": {"ci.openshift.io/generator": "prowgen"}}
+    path = jobs / "quay-quay-master-presubmits.yaml"
+    path.write_text(yaml.dump({"presubmits": {"quay/quay": [prowgen]}}))
+    assert _check_configs([], [], tmp_path, {}, jobs) == 0
+    path.write_text(yaml.dump({"periodics": [prowgen, {"name": "by-hand"}]}))
+    assert _check_configs([], [], tmp_path, {}, jobs) == 1
+
+
+def test_hand_maintained_must_not_be_generated() -> None:
+    matrix = {"managed_files": {"active": [PHASE0_NAME], "hand_maintained": {PHASE0_NAME: []}}}
+    with pytest.raises(ValueError, match="hand_maintained and generated"):
+        _hand_maintained(matrix)
+
+
+def test_repo_check_is_clean() -> None:
+    assert main(["--check"]) == 0
 
 
 def test_managed_files_active_must_match_generated(tmp_path: Path) -> None:

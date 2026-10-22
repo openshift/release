@@ -46,7 +46,10 @@ matrix.yaml.in ──> generate.py ──> config files by filename ──> make
 - Cells that share a filename merge into one file; their tests are listed in matrix order.
 - `matrix.yaml.in` lists every file the generator owns under `managed_files.active`.
   Generation fails if that list and the expanded matrix disagree.
-  Files not listed (such as `quay-quay-master__claim.yaml`) are hand-written and ignored.
+- Hand-written configs here (such as `quay-quay-master__claim.yaml`) are listed under
+  `managed_files.hand_maintained` with their test names. `--check` fails on any other
+  config in this directory, on a test added to a hand-maintained file, and on a Prow job
+  in `ci-operator/jobs/quay/quay/` without the `ci.openshift.io/generator: prowgen` label.
 
 ## Common tasks
 
@@ -124,7 +127,7 @@ from `retired` once it is gone; `--check` fails while a retired file still exist
 ```bash
 /tmp/quay-ci-generator-venv/bin/python generate.py --list      # table of every cell: file, test name, cron
 /tmp/quay-ci-generator-venv/bin/python generate.py --dry-run   # print the YAML
-/tmp/quay-ci-generator-venv/bin/python generate.py --check     # exit 1 if any managed file is stale
+/tmp/quay-ci-generator-venv/bin/python generate.py --check     # exit 1 if any managed file is stale or a config is unowned
 ```
 
 `--output DIR` writes or checks another directory instead of the in-tree ones;
@@ -145,6 +148,7 @@ Top level:
 | `global_defaults.image_source` | Reserved (`build`); no template reads it yet. |
 | `managed_files.active` | Every file the matrix must generate, exactly. |
 | `managed_files.retired` | Files the generator no longer owns; `--check` fails while any still exists. |
+| `managed_files.hand_maintained` | Hand-written configs in this directory, each mapped to the `as` of its tests. Prefer a matrix row; add an entry only for a config the generator cannot produce. |
 
 Per release, `quay[]`:
 
