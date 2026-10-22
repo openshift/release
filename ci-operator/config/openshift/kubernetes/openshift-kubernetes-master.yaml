@@ -39,6 +39,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: oc-rpms
+  openshift-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: tests
   rhel-coreos-base:
     name: "5.1"
     namespace: ocp
@@ -315,6 +319,46 @@ tests:
         requests:
           cpu: "3"
           memory: 600Mi
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: k8s-e2e-aws-ovn-nvidia-dra
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g6.4xlarge
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: nvidia-nfd-operator-install
+    - ref: nvidia-gpu-operator-install
+    - ref: nvidia-dra-driver-install
+    - as: openshift-nvidia-dra-e2e
+      commands: openshift-e2e-test-commands.sh
+      env:
+      - default: ""
+        name: TEST_ARGS
+      - default: suite
+        name: TEST_TYPE
+      - default: openshift/nvidia-dra
+        name: TEST_SUITE
+      - default: ""
+        name: TEST_SKIPS
+      - default: ""
+        name: TEST_CSI_DRIVER_MANIFEST
+      - default: ""
+        name: TEST_OCP_CSI_DRIVER_MANIFEST
+      from: openshift-tests
+      grace_period: 10m0s
+      resources:
+        limits:
+          memory: 10Gi
+        requests:
+          cpu: "3"
+          memory: 600Mi
+      timeout: 4h0m0s
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws
