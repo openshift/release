@@ -1,0 +1,35 @@
+ref:
+  as: openshift-evpn-gateway-appliance-image-ci
+  from: nested-podman
+  commands: openshift-evpn-gateway-appliance-image-ci-commands.py
+  run_as_script: true
+  credentials:
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  nested_podman: true
+  resources:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  env:
+  - name: EVPN_APPLIANCE_PR
+    default: "6"
+    documentation: |-
+      GitHub pull request number to fetch from openshift/evpn-gateway-appliance.
+      Defaults to PR 6 for the temporary appliance rehearsal source.
+  documentation: >-
+    Runs this Python script directly in the nested-podman image.
+    Fetches the appliance pull request named by EVPN_APPLIANCE_PR, resolves
+    its head commit, and downloads that archive. Builds the parent image
+    with podman from image/rhel10/Containerfile, using the public CentOS
+    bootc base and the FRR and node-exporter images from the 4.22 CI
+    imagestream. Builds the nested image from
+    image/rhel10/Containerfile.nested-ci with that parent tag. Then runs
+    python3 image/tools/smoke-payloads.py on the parent image. A missing
+    script or a smoke failure fails the step. Nothing is pushed to a
+    registry. The step does not build a disk and does not run
+    image/tools/smoke-nested.py. That smoke starts systemd in a container,
+    and this job already runs in a container.
