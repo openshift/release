@@ -36,8 +36,8 @@ for var in TRIAGE_VIEWS TRIAGE_POLICY TRIAGE_WRITE_MODE TRIAGE_MODE TRIAGE_BASEL
     fi
 done
 
-# --- Post-GA policy knobs (defaults keep the historical duty behaviour) ---
-TRIAGE_POLICY="${TRIAGE_POLICY:-duty}"
+# --- Post-GA policy knobs (defaults keep the historical pre-GA behaviour) ---
+TRIAGE_POLICY="${TRIAGE_POLICY:-pre-ga}"
 TRIAGE_WRITE_MODE="${TRIAGE_WRITE_MODE:-auto}"
 TRIAGE_MODE="${TRIAGE_MODE:-weekly}"
 TRIAGE_BASELINE="${TRIAGE_BASELINE:-auto}"
@@ -184,7 +184,7 @@ copy_reports() {
         echo "Copying reports to artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.md" -exec cp {} "${ARTIFACT_DIR}/" \; || true
     fi
-    if [[ "${TRIAGE_POLICY:-duty}" == "post-ga" ]]; then
+    if [[ "${TRIAGE_POLICY:-pre-ga}" == "post-ga" ]]; then
         postga_finalize_on_exit
     fi
 
