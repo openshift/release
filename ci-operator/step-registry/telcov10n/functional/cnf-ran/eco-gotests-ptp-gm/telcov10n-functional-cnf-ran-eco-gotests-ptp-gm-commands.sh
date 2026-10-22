@@ -9,6 +9,14 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 ECO_CI_CD_DIR=/eco-ci-cd
+
+if [ -n "${ECO_CI_CD_GIT_REPO:-}" ] && [ -n "${ECO_CI_CD_GIT_BRANCH:-}" ]; then
+  echo "Cloning eco-ci-cd from ${ECO_CI_CD_GIT_REPO} branch ${ECO_CI_CD_GIT_BRANCH}"
+  git clone --depth 1 --branch "${ECO_CI_CD_GIT_BRANCH}" "${ECO_CI_CD_GIT_REPO}" /tmp/eco-ci-cd-override
+  cp -r /eco-ci-cd/collections /tmp/eco-ci-cd-override/
+  ECO_CI_CD_DIR=/tmp/eco-ci-cd-override
+fi
+
 INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/ocp-deployment"
 
 process_inventory() {
