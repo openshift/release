@@ -1,0 +1,33 @@
+workflow:
+  as: openshift-e2e-powervs-heterogeneous-upi-disconnected
+  steps:
+    pre:
+    - ref: upi-install-powervs-cluster
+    - ref: upi-install-powervs-mirror
+    - ref: upi-install-heterogeneous-vpc
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: upi-deprovision-heterogeneous-vpc
+    - ref: upi-deprovision-powervs-cluster
+  documentation: |-
+    The Openshift E2E HETEROGENEOUS PowerVS Disconnected workflow (OCPSTRAT-1808)
+    provisions a PowerVS-based heterogeneous cluster (ppc64le control-plane +
+    amd64 Intel compute workers) and applies sparse manifest mirroring post-install.
+    Only the ppc64le and amd64 manifests from the multi-arch release payload are
+    mirrored to a local registry on the PowerVS bastion, reducing mirror size and
+    avoiding unnecessary architecture pulls.
+    Steps:
+      pre:
+        1. upi-install-powervs-cluster  - Provisions the PowerVS OCP cluster
+           (bastion, bootstrap, masters, ppc64le workers) and writes
+           BASTION_PUBLIC_IP and bastion_known_hosts to SHARED_DIR.
+        2. upi-install-powervs-mirror   - Sets up a local registry on the bastion,
+           mirrors the release image (sparse: ppc64le + amd64 only), and applies
+           the resulting ImageDigestMirrorSet to the running cluster so future image
+           pulls use the local mirror.
+        3. upi-install-heterogeneous-vpc - Adds amd64 Intel workers on IBM Cloud VPC.
+      test:
+        openshift-e2e-test - Runs the standard OCP e2e conformance suite.
+      post:
+        Deprovisions VPC Intel workers then PowerVS cluster.
