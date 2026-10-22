@@ -104,7 +104,7 @@ BASTION_ENV=( \
   ES_SERVER="${ES_SERVER}" \
   FRR_PEER_IP="${FRR_PEER_IP}" \
   GC="${GC}" \
-  ITERATIONS="${ITERATIONS}" \
+  ITERATIONS="${UDN_BGP_ITERATIONS:-${ITERATIONS}}" \
   JOB_NAME="${JOB_NAME:-}" \
   JOB_TYPE="${JOB_TYPE:-}" \
   KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}" \
@@ -114,6 +114,7 @@ BASTION_ENV=( \
   REPO_NAME="${REPO_NAME:-}" \
   REPO_OWNER="${REPO_OWNER:-}" \
   REPO_URL="${REPO_URL}" \
+  UDN_BGP_LAYER2="${UDN_BGP_LAYER2:-false}" \
   UUID="${UUID}" \
 )
 
@@ -144,6 +145,9 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
 fi
 EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
+if [[ "${UDN_BGP_LAYER2}" == "true" ]]; then
+  EXTRA_FLAGS+=" --layer2"
+fi
 
 export WORKLOAD=udn-bgp
 export ES_SERVER ES_METADATA_INDEX EXTRA_FLAGS GC ITERATIONS KUBE_BURNER_VERSION UUID
