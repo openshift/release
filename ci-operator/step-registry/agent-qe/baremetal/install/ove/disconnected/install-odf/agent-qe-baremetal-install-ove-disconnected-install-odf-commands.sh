@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function gather_debug_info() {
     echo "============================================"
     echo "Gathering debug information to ARTIFACT_DIR"
@@ -53,6 +57,15 @@ function gather_debug_info() {
 }
 
 trap 'gather_debug_info' ERR
+
+if [[ "${ODF_SUBSCRIPTION_CHANNEL}" == "stable-"* ]]; then
+  OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2)
+  AUTO_CHANNEL="stable-${OCP_VERSION}"
+  if [[ "${ODF_SUBSCRIPTION_CHANNEL}" != "${AUTO_CHANNEL}" ]]; then
+    echo "Auto-adjusting ODF channel from ${ODF_SUBSCRIPTION_CHANNEL} to ${AUTO_CHANNEL} (OCP ${OCP_VERSION})"
+    ODF_SUBSCRIPTION_CHANNEL="${AUTO_CHANNEL}"
+  fi
+fi
 
 echo "Labeling all nodes with cluster.ocs.openshift.io/openshift-storage..."
 oc label nodes --all cluster.ocs.openshift.io/openshift-storage="" --overwrite
