@@ -1,0 +1,58 @@
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sno-z-stream-upgrade
+  run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.13
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-4.13
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+      ZSTREAM_VERSION: "4.13"
+    test:
+    - ref: storage-data-create
+    - ref: lvms-upgrade
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-mno-z-stream-upgrade
+  run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.13
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_PACKAGE: lvms-operator
+      LVM_OPERATOR_SUB_SOURCE: redhat-operators
+      LVMS_NAMESPACE: openshift-lvm-storage
+      STORAGE_WORKLOAD_COUNT: "3"
+      TARGET_LVMS_CHANNEL: stable-4.13
+      TARGET_LVMS_SOURCE: lvm-catalogsource
+      ZSTREAM_VERSION: "4.13"
+    test:
+    - ref: storage-data-create
+    - ref: lvms-upgrade
+    - ref: storage-data-check
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+zz_generated_metadata:
+  branch: release-management
+  org: openshift
+  repo: lvm-operator
+  variant: z-upgrade-4.13
