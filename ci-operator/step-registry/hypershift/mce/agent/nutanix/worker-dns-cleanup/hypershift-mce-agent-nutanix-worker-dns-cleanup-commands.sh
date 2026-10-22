@@ -35,6 +35,7 @@ if [[ ! -r "$auth_file" ]]; then
   exit 1
 fi
 declare prism_central_host prism_central_port prism_central_username prism_central_password
+# shellcheck source=/dev/null
 source "$auth_file"
 for variable in prism_central_host prism_central_port prism_central_username prism_central_password; do
   if [[ -z "${!variable:-}" ]]; then
@@ -100,7 +101,7 @@ if [[ "$current_servers" == "$target_servers" ]]; then
     prism PUT "subnets/$subnet_uuid")
   wait_for_task "$(jq -r '.status.execution_context.task_uuid // empty' <<<"$subnet_response")"
   restored=false
-  for attempt in $(seq 1 24); do
+  for ((attempt = 1; attempt <= 24; attempt++)); do
     updated_subnet=$(prism GET "subnets/$subnet_uuid")
     if [[ $(jq -cS '.spec.resources.ip_config.dhcp_options.domain_name_server_list // []' <<<"$updated_subnet") == "$original_servers" ]]; then
       restored=true

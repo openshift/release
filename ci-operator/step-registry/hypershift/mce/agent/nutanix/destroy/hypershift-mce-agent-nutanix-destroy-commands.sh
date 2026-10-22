@@ -20,6 +20,7 @@ if [[ ! -s "$context_file" ]]; then
   exit 0
 fi
 
+# shellcheck source=/dev/null
 source "$context_file"
 if [[ ! -s "$SHARED_DIR/cluster-name" ]]; then
   exit 0
@@ -177,7 +178,7 @@ function wait_for_uuid_absent() {
   local endpoint=$1
   local uuid=$2
   local code
-  for attempt in $(seq 1 20); do
+  for ((attempt = 1; attempt <= 20; attempt++)); do
     code=$(curl --silent --show-error --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
       -o /dev/null -w '%{http_code}' "$NUTANIX_PC_URL/api/nutanix/v3/$endpoint/$uuid") || return 1
     if [[ "$code" == "404" ]]; then

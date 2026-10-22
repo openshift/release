@@ -239,7 +239,7 @@ subnet_response=$(jq --argjson target "$target_options" \
   prism PUT "subnets/$SUBNET_UUID")
 wait_for_task "$(jq -r '.status.execution_context.task_uuid // empty' <<<"$subnet_response")"
 advertised=false
-for attempt in $(seq 1 24); do
+for ((attempt = 1; attempt <= 24; attempt++)); do
   updated_subnet=$(prism GET "subnets/$SUBNET_UUID")
   if jq -e --arg ip "$advertise_ip" \
     '.spec.resources.ip_config.dhcp_options.domain_name_server_list == [$ip]' \

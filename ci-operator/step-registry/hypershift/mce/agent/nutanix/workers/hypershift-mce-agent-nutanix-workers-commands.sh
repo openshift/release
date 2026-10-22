@@ -186,7 +186,7 @@ map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
 : > "$map_file"
 mapped_agent_names=""
 mapped_count=0
-while IFS=$'\t' read -r vm_name vm_uuid vm_mac; do
+while IFS=$'\t' read -r vm_name _ vm_mac; do
   vm_mac_normalized=$(tr -d ':' <<<"$vm_mac" | tr '[:upper:]' '[:lower:]')
   matched_agent=""
   for agent in $agents; do

@@ -24,6 +24,7 @@ set +x
 declare prism_central_host prism_central_port prism_central_username prism_central_password
 declare prism_element_host prism_element_port prism_element_username prism_element_password
 declare prism_element_storage_container one_net_mode_network_name awk_ip_program
+# shellcheck source=/dev/null
 source "${auth_file}"
 
 for variable in prism_central_host prism_central_port prism_central_username prism_central_password prism_element_host prism_element_port prism_element_username prism_element_password prism_element_storage_container; do
