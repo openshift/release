@@ -714,7 +714,43 @@ fi
 IFS=' ' read -ra NETWORK_RESOURCE <<< "$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)"
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE[0]}.json" "${SHARED_DIR}"/NETWORK_single.json
 
-jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
+# Seed govc.sh from the pool backing failureDomains[0].  status.envVars is VCM's
+# deprecated top-level field and holds the LAST pool's values, which can belong
+# to a different vCenter than failureDomains[0]; a consumer that keeps govc.sh's
+# credentials while targeting another failure domain's server would then fail
+# login.  Each pool's own values are in status.envVarsMap.
+primary_fd_server=$(echo "${platformSpec}" | jq -r '.failureDomains[0].server')
+primary_fd_cluster=$(echo "${platformSpec}" | jq -r '.failureDomains[0].topology.computeCluster')
+primary_pool_name=""
+for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
+  if [[ ${_leaseJSON} =~ "single" ]]; then
+    continue
+  fi
+  _pool_count=$(jq -r '.status.poolInfo | length' < "${_leaseJSON}")
+  if [[ "${_pool_count}" == "null" || "${_pool_count}" -eq 0 ]]; then
+    continue
+  fi
+  for ((_pi = 0; _pi < _pool_count; _pi++)); do
+    _pool_server=$(jq -r ".status.poolInfo[${_pi}].server" < "${_leaseJSON}")
+    _pool_cluster=$(jq -r ".status.poolInfo[${_pi}].topology.computeCluster" < "${_leaseJSON}")
+    if [[ "${_pool_server}" == "${primary_fd_server}" && "${_pool_cluster}" == "${primary_fd_cluster}" ]]; then
+      primary_pool_name=$(jq -r ".status.poolInfo[${_pi}].name" < "${_leaseJSON}")
+      break 2
+    fi
+  done
+done
+
+if [[ -n "${primary_pool_name}" ]]; then
+  log "Seeding govc.sh from pool ${primary_pool_name} (failureDomains[0])"
+  jq -r ".status.envVarsMap.\"${primary_pool_name}\"" < "${_leaseJSON}" > /tmp/envvars
+  # failureDomains[0] already carries this pool's computed resource pool
+  resource_pool=$(echo "${platformSpec}" | jq -r '.failureDomains[0].topology.resourcePool')
+else
+  # Legacy single-pool leases have no poolInfo; their top-level status.envVars
+  # is the pool's own value and safe to seed from.
+  log "No poolInfo entry matches failureDomains[0], seeding govc.sh from status.envVars"
+  jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
+fi
 
 # shellcheck source=/dev/null
 source /tmp/envvars
@@ -722,6 +758,13 @@ source /tmp/envvars
 
 if [[ -z "${GOVC_URL}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
+
+# An empty credential lookup would otherwise surface later as an opaque govc
+# login failure in whichever step consumes govc.sh.
+if [[ -z "${pool_usernames[${GOVC_URL}]:-}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - no credentials found for vCenter ${GOVC_URL}, exiting"
   exit 1
 fi
 
