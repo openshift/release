@@ -113,6 +113,10 @@ if jq -e --arg ip "$advertise_ip" '(.domain_name_server_list // []) | index($ip)
   echo "The leased subnet already advertises $advertise_ip; refusing to adopt existing DNS configuration."
   exit 1
 fi
+# Nutanix advertises domain_name_server_list to workers as DHCP option 6.
+# Start with the subnet’s existing DHCP options (or {} if none),
+# preserve the other options, and sets domain_name_server_list to an array
+# containing only $advertise_ip.
 target_options=$(jq -ncS --argjson original "$original_options" --arg ip "$advertise_ip" \
   '($original // {}) | .domain_name_server_list = [$ip]')
 
@@ -234,6 +238,7 @@ if [[ $(jq -cS '.spec.resources.ip_config.dhcp_options // null' <<<"$current_sub
   echo "The leased subnet's DHCP options changed during host DNS setup; refusing to overwrite them."
   exit 1
 fi
+# Persist the updated DNS list under spec.resources.ip_config.dhcp_options on the leased subnet.
 subnet_response=$(jq --argjson target "$target_options" \
   '{api_version,metadata,spec} | .spec.resources.ip_config.dhcp_options = $target' <<<"$current_subnet" |
   prism PUT "subnets/$SUBNET_UUID")
