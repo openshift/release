@@ -2,6 +2,11 @@
 set -e
 set -o pipefail
 
+if [[ "${RUN_ECO_GOTESTS_ONLY:-false}" == "true" || "${SKIP_HUB_SETUP:-false}" == "true" ]]; then
+  echo "Skipping hub-deploy (RUN_ECO_GOTESTS_ONLY=${RUN_ECO_GOTESTS_ONLY:-false} SKIP_HUB_SETUP=${SKIP_HUB_SETUP:-false})"
+  exit 0
+fi
+
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
   echo "Detected skip.txt — skipping"
   exit 0
@@ -64,8 +69,8 @@ if [ "${CLUSTER_NAME}" = "kni-qe-106" ] || [ "${CLUSTER_NAME}" = "kni-qe-110" ];
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
 fi
 
-# kni-qe-111 uses helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
-if [ "${CLUSTER_NAME}" = "kni-qe-111" ]; then
+# kni-qe-111 and kni-qe-129 use helix89 (same as kni-qe-108), ci-operator cannot mount the same secret twice.
+if [ "${CLUSTER_NAME}" = "kni-qe-111" ] || [ "${CLUSTER_NAME}" = "kni-qe-129" ]; then
   echo "Processing shared hypervisor inventory for ${CLUSTER_NAME} from kni-qe-108 mount"
   process_inventory "${MOUNTED_HOST_INVENTORY}/kni-qe-108/hypervisor" \
     /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
