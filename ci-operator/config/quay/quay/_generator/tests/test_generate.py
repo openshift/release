@@ -484,11 +484,18 @@ def test_upgrade_nightlies() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     expected = {
-        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": ("from-316", "stable", "4.22", "3.16", "3.17"),
-        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": ("from-317", "stable", "4.22", "3.17", "3.18"),
-        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": ("from-318", "candidate", "5.0", "3.18", "5.0"),
+        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": (
+            "from-316", "stable", "4.22", "3.16", "3.17", "quay-3.17__v4.22__quay-rhel9-operator"
+        ),
+        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": (
+            "from-317", "stable", "4.22", "3.17", "3.18",
+            "quay-operator-fbc-unified-4.22-20261022013012521155.ocp4.22",
+        ),
+        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": (
+            "from-318", "candidate", "5.0", "3.18", "5.0", "quay-5.0__v5.0__quay-rhel9-operator"
+        ),
     }
-    for filename, (as_name, channel, ocp, source, target) in expected.items():
+    for filename, (as_name, channel, ocp, source, target, index_tag) in expected.items():
         config = by_name[filename]
         assert config["releases"]["latest"] == {
             "release": {"architecture": "amd64", "channel": channel, "version": ocp}
@@ -499,7 +506,7 @@ def test_upgrade_nightlies() -> None:
         env = test["steps"]["env"]
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
-        assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+        assert env["QUAY_INDEX_IMAGE_TAG"] == index_tag
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
@@ -574,9 +581,33 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert config["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-4.22"
     assert config["releases"]["latest"]["candidate"]["version"] == "4.14"
     assert config["tests"][0]["cron"] == "@weekly"
-    assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
+    assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == (
+        "quay-operator-fbc-unified-4.14-20261022020845443720.ocp4.14"
+    )
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_redhat_318_unified_fbc_tags() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tags = {
+        "4.14": "quay-operator-fbc-unified-4.14-20261022020845443720.ocp4.14",
+        "4.15": "quay-operator-fbc-unified-4.15-20261022020825512806.ocp4.15",
+        "4.16": "quay-operator-fbc-unified-4.16-20261022020845269325.ocp4.16",
+        "4.17": "quay-operator-fbc-unified-4.17-20261022020205681254.ocp4.17",
+        "4.18": "quay-operator-fbc-unified-4.18-20261022020152394805.ocp4.18",
+        "4.19": "quay-operator-fbc-unified-4.19-20261022020147859689.ocp4.19",
+        "4.20": "quay-operator-fbc-unified-4.20-20261022020129256133.ocp4.20",
+        "4.21": "quay-operator-fbc-unified-4.21-20261022020113088239.ocp4.21",
+        "4.22": "quay-operator-fbc-unified-4.22-20261022013012521155.ocp4.22",
+    }
+    for ocp, tag in tags.items():
+        ocp_nodot = ocp.replace(".", "")
+        install = by_name[f"quay-quay-redhat-3.18__aws-ocp{ocp_nodot}-e2e-install.yaml"]
+        upgrade = by_name[f"quay-quay-redhat-3.18__aws-ocp{ocp_nodot}-s3-upgrade.yaml"]
+        assert install["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == tag
+        assert upgrade["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == tag
 
 
 def test_master_presubmit_expands_all_clouds() -> None:
