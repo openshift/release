@@ -1,0 +1,26 @@
+ref:
+  as: hypershift-mce-agent-nutanix-worker-dns
+  from: dev-scripts
+  cli: latest
+  commands: hypershift-mce-agent-nutanix-worker-dns-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 35m0s
+  grace_period: 5m0s
+  env:
+  - name: NUTANIX_DNS_BIND_IP
+    default: ""
+    documentation: Local baremetal IPv4 address for the dedicated dnsmasq listener; defaults to the packet-conf host IP.
+  - name: NUTANIX_DNS_ADVERTISE_IP
+    default: ""
+    documentation: Worker-reachable IPv4 address advertised through Nutanix DHCP option 6; defaults to the packet-conf host IP.
+  - name: NUTANIX_DNS_CLIENT_CIDR
+    default: ""
+    documentation: Source IPv4 CIDR allowed to query DNS; defaults to the leased Nutanix subnet.
+  - name: NUTANIX_DNS_UPSTREAM
+    default: "127.0.0.1"
+    documentation: Baremetal management-side DNS server used for non-HostedCluster queries.
+  documentation: >-
+    Starts a separate run-scoped dnsmasq on the baremetal host's worker-facing IP, restricts UDP and TCP 53 to the worker source CIDR, and advertises the resolver through DHCP option 6 on the leased Nutanix subnet. It does not configure OFCIR port forwarding.

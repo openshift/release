@@ -23,7 +23,7 @@ if [[ -s "$SHARED_DIR/nutanix_infraenv_name" && -s "$SHARED_DIR/nutanix_agent_na
   oc get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o json | jq '{metadata:{name:.metadata.name,namespace:.metadata.namespace,labels:.metadata.labels},spec:{cpuArchitecture:.spec.cpuArchitecture,pullSecretRef:.spec.pullSecretRef,proxy:.spec.proxy},status:{conditions:.status.conditions}}' > "$ARTIFACT_DIR/nutanix-infraenv.json" 2>&1 || true
 fi
 
-for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts; do
+for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts nutanix_worker_dns_state.json; do
   if [[ -s "$SHARED_DIR/$file" ]]; then
     cp "$SHARED_DIR/$file" "$ARTIFACT_DIR/$file"
   fi
@@ -45,6 +45,22 @@ fi
 if [[ -f "$SHARED_DIR/packet-conf.sh" ]]; then
   source "$SHARED_DIR/packet-conf.sh"
   ssh "${SSHOPTS[@]}" "root@$IP" 'sudo podman logs --tail=500 external-squid 2>&1' > "$ARTIFACT_DIR/nutanix-squid.log" 2>&1 || true
+  if [[ -s "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
+    dns_cluster=$(jq -r '.cluster' "$SHARED_DIR/nutanix_worker_dns_state.json")
+    if [[ "$dns_cluster" =~ ^[a-z0-9-]+$ ]]; then
+      ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- "$dns_cluster" <<'EOF' > "$ARTIFACT_DIR/nutanix-worker-dns.log" 2>&1 || true
+unit="hypershift-nutanix-worker-dns-$1.service"
+systemctl --no-pager status "$unit"
+journalctl --no-pager -u "$unit" -n 200
+ss -lntu '( sport = :53 )'
+marker="/etc/hypershift-nutanix-worker-dns/$1.state"
+if [[ -s "$marker" ]]; then
+  read -r marker_cluster marker_bind marker_clients zone < "$marker"
+  firewall-cmd --zone="$zone" --list-rich-rules
+fi
+EOF
+    fi
+  fi
 fi
 
 if [[ -s "$SHARED_DIR/nutanix_squid_allowed_hosts" ]]; then

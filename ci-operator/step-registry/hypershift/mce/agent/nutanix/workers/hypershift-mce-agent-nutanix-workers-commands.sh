@@ -165,7 +165,22 @@ if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX
   exit 1
 fi
 
-for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=Validated --timeout=20m; done
+for agent in $agents; do
+  oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=Validated --timeout=20m
+  agent_json=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json)
+  if ! jq -e '
+    [.status.validationsInfo.network[]? |
+      select(.id == "api-domain-name-resolved-correctly" or
+             .id == "api-int-domain-name-resolved-correctly" or
+             .id == "apps-domain-name-resolved-correctly" or
+             .id == "ignition-downloadable")] |
+    length == 4 and all(.[]; .status == "success")
+  ' <<<"$agent_json" >/dev/null; then
+    echo "Agent $agent has not passed API, API-int, apps DNS, and ignition-downloadable validations."
+    jq -r '.status.validationsInfo.network[]? | select(.id | test("domain-name-resolved-correctly|ignition-downloadable")) | "\(.id): \(.status): \(.message)"' <<<"$agent_json"
+    exit 1
+  fi
+done
 
 map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
 : > "$map_file"
