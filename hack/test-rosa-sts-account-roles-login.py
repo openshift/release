@@ -4,8 +4,10 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
+import venv
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,13 +18,13 @@ SENTINEL = "SYNTHETIC_RESPONSE_BODY_DO_NOT_LOG"
 CLIENT_ID = "synthetic-client-id"
 CLIENT_SECRET = "synthetic-client-secret"
 TOKEN = "synthetic-offline-token"
-MOCK_ROSA = r'''#!/usr/bin/python3
-import json
+MOCK_ROSA = r'''import json
 import os
 from pathlib import Path
 import sys
 
 root = Path(os.environ["MOCK_ROOT"])
+assert sys.executable == os.environ["MOCK_PYTHON"]
 arguments = sys.argv[1:]
 if arguments[0] != "login":
     with (root / "downstream").open("a") as stream:
@@ -43,7 +45,10 @@ sys.exit(status)
 
 
 class LoginTests(unittest.TestCase):
+    """Exercise the complete inline step with synthetic credentials and safe mocks."""
+
     def run_case(self, plan, credentials="both", environment="staging", traced=False):
+        """Check login behavior and output safety, returning captured mock evidence."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in ("bin", "profile", "shared", "artifacts"):
@@ -65,7 +70,7 @@ class LoginTests(unittest.TestCase):
                 (root / "profile" / name).write_text(value)
             (root / "plan").write_text(json.dumps(plan))
             mocks = {
-                "rosa": MOCK_ROSA,
+                "rosa": f"#!{sys.executable}\n{MOCK_ROSA}",
                 "sleep": '#!/bin/bash\nprintf "%s\\n" "$*" >> "$MOCK_ROOT/sleeps"\n',
                 "aws": '#!/bin/bash\necho forbidden > "$MOCK_ROOT/cloud"; exit 98\n',
             }
@@ -77,6 +82,7 @@ class LoginTests(unittest.TestCase):
                 "PATH": f"{root / 'bin'}:/usr/bin:/bin",
                 "HOME": str(root),
                 "MOCK_ROOT": str(root),
+                "MOCK_PYTHON": sys.executable,
                 "ARTIFACT_DIR": str(root / "artifacts"),
                 "CLUSTER_PROFILE_DIR": str(root / "profile"),
                 "SHARED_DIR": str(root / "shared"),
@@ -125,6 +131,19 @@ class LoginTests(unittest.TestCase):
                     if credentials in ("both", "client") else ["--token", TOKEN]
                 self.assertEqual(call, expected)
             return result.returncode, calls, sleeps, events
+
+    def test_mock_uses_runner_interpreter(self):
+        """Run login cases under a distinct virtualenv interpreter without pip/network."""
+        with tempfile.TemporaryDirectory() as directory:
+            venv.EnvBuilder(with_pip=False).create(directory)
+            interpreter = Path(directory) / "bin/python"
+            self.assertNotEqual(str(interpreter), sys.executable)
+            result = subprocess.run(
+                [str(interpreter), str(Path(__file__).resolve()),
+                 "LoginTests.test_credentials_and_success_output_safety"],
+                capture_output=True, text=True, check=False, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_credentials_and_success_output_safety(self):
         for credentials in ("client", "token", "both", "partial_token", "secret_token"):
