@@ -236,16 +236,26 @@ echo "Running CNV storage checkup in ${namespace} against ${storage_class}"
 failure_category=execution
 deadline=$((SECONDS + CHECKUP_JOB_TIMEOUT_SECONDS))
 while true; do
-  oc --request-timeout=30s -n "${namespace}" get job storage-checkup -o json > "${ARTIFACT_DIR}/job.json"
-  if jq -e 'any(.status.conditions[]?; .type == "Complete" and .status == "True")' "${ARTIFACT_DIR}/job.json" > /dev/null; then
-    job_complete=true
-    break
+  remaining_seconds=$((deadline - SECONDS))
+  (( remaining_seconds > 0 )) || fail "Timed out waiting for the storage checkup Job"
+  # Retry transient API failures and preserve the last complete Job document.
+  if oc --request-timeout="$((remaining_seconds < 30 ? remaining_seconds : 30))s" \
+    -n "${namespace}" get job storage-checkup -o json > "${ARTIFACT_DIR}/job.json.tmp" &&
+    jq -e 'type == "object"' "${ARTIFACT_DIR}/job.json.tmp" > /dev/null; then
+    mv "${ARTIFACT_DIR}/job.json.tmp" "${ARTIFACT_DIR}/job.json"
+    if jq -e 'any(.status.conditions[]?; .type == "Complete" and .status == "True")' "${ARTIFACT_DIR}/job.json" > /dev/null; then
+      job_complete=true
+      break
+    fi
+    if jq -e 'any(.status.conditions[]?; .type == "Failed" and .status == "True")' "${ARTIFACT_DIR}/job.json" > /dev/null; then
+      fail "Storage checkup Job failed; see its ConfigMap, pod logs, and events in the artifacts"
+    fi
+  else
+    echo "Could not read a complete Job status; retrying until its deadline" >&2
   fi
-  if jq -e 'any(.status.conditions[]?; .type == "Failed" and .status == "True")' "${ARTIFACT_DIR}/job.json" > /dev/null; then
-    fail "Storage checkup Job failed; see its ConfigMap, pod logs, and events in the artifacts"
-  fi
-  (( SECONDS < deadline )) || fail "Timed out waiting for the storage checkup Job"
-  sleep 10
+  remaining_seconds=$((deadline - SECONDS))
+  (( remaining_seconds > 0 )) || fail "Timed out waiting for the storage checkup Job"
+  sleep "$((remaining_seconds < 10 ? remaining_seconds : 10))"
 done
 
 failure_category=results
