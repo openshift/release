@@ -103,7 +103,6 @@ mirror:
   - name: quay.io/openshift/origin-oauth-proxy:4.14
   - name: registry.access.redhat.com/ubi9/ubi:9.4
   - name: registry.access.redhat.com/ubi9/ubi-minimal:latest
-  - name: quay.io/operator-framework/opm:latest
   - name: docker.io/library/busybox:1.36.0
   - name: quay.io/prometheus/busybox:latest
   - name: ${QUAY_MUST_GATHER_IMAGE}
@@ -117,6 +116,12 @@ EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
     run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
+
+    # Preserve the complete opm manifest list; oc-mirror's platform filtering
+    # edits it and fails when preserving the original digests.
+    oc image mirror --keep-manifest-list=true --filter-by-os='.*' --insecure=true \
+        --registry-config="${XDG_RUNTIME_DIR}/containers/auth.json" \
+        "quay.io/operator-framework/opm:latest=${MIRROR_REGISTRY_HOST}/operator-framework/opm:latest"
 
     echo "[$(timestamp)] Saving image mirror policies to SHARED_DIR (applied by run_sdk)..."
     cat > "${SHARED_DIR}/kueue-idms.yaml" <<EOF
