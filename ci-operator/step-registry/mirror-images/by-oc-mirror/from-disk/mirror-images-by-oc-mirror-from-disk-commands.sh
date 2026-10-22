@@ -199,28 +199,77 @@ cat >> "${local_script}" <<'PART2'
 # Runs unconditionally on exit, whether the D2M succeeds or fails.
 # -------------------------------------------------------------------
 function d2m_cleanup() {
-    echo "=== [cleanup] Restoring iptables/ip6tables rules ==="
-    if [[ -f /tmp/iptables-before-import.rules ]]; then
-        sudo iptables-restore  < /tmp/iptables-before-import.rules  && echo "[cleanup] IPv4 rules restored." || echo "[cleanup] WARNING: IPv4 restore failed."
+    # -------------------------------------------------------------------
+    # Firewall teardown — explicit -D/-F/-X, not iptables-restore.
+    #
+    # iptables-restore replaces the full ruleset atomically, but if the
+    # OC_MIRROR_EGRESS chain still has references (OUTPUT -> OC_MIRROR_EGRESS)
+    # the restore either silently leaves it in place or fails.  Explicit
+    # teardown in -D / -F / -X order is the only reliable approach.
+    # -------------------------------------------------------------------
+    echo "=== [cleanup] Removing OC_MIRROR_EGRESS firewall rules ==="
+
+    # IPv4
+    sudo iptables  -D OUTPUT -j OC_MIRROR_EGRESS  2>/dev/null \
+        && echo "[cleanup] IPv4 OUTPUT -> OC_MIRROR_EGRESS removed." \
+        || echo "[cleanup] IPv4 OUTPUT -> OC_MIRROR_EGRESS already gone (ok)."
+    sudo iptables  -F OC_MIRROR_EGRESS            2>/dev/null \
+        && echo "[cleanup] IPv4 OC_MIRROR_EGRESS flushed."  \
+        || echo "[cleanup] IPv4 OC_MIRROR_EGRESS flush skipped (ok)."
+    sudo iptables  -X OC_MIRROR_EGRESS            2>/dev/null \
+        && echo "[cleanup] IPv4 OC_MIRROR_EGRESS deleted."  \
+        || echo "[cleanup] IPv4 OC_MIRROR_EGRESS delete skipped (ok)."
+
+    # IPv6
+    sudo ip6tables -D OUTPUT -j OC_MIRROR_EGRESS6 2>/dev/null \
+        && echo "[cleanup] IPv6 OUTPUT -> OC_MIRROR_EGRESS6 removed." \
+        || echo "[cleanup] IPv6 OUTPUT -> OC_MIRROR_EGRESS6 already gone (ok)."
+    sudo ip6tables -F OC_MIRROR_EGRESS6           2>/dev/null \
+        && echo "[cleanup] IPv6 OC_MIRROR_EGRESS6 flushed."  \
+        || echo "[cleanup] IPv6 OC_MIRROR_EGRESS6 flush skipped (ok)."
+    sudo ip6tables -X OC_MIRROR_EGRESS6           2>/dev/null \
+        && echo "[cleanup] IPv6 OC_MIRROR_EGRESS6 deleted."  \
+        || echo "[cleanup] IPv6 OC_MIRROR_EGRESS6 delete skipped (ok)."
+
+    # Verification — fail loudly if either chain is still reachable from OUTPUT.
+    if sudo iptables  -C OUTPUT -j OC_MIRROR_EGRESS  2>/dev/null; then
+        echo "[cleanup] FATAL: OC_MIRROR_EGRESS  is still in IPv4 OUTPUT after teardown"
+        CLEANUP_FAILED=1
+    else
+        echo "[cleanup] PASS: OC_MIRROR_EGRESS  not in IPv4 OUTPUT."
     fi
-    if [[ -f /tmp/ip6tables-before-import.rules ]]; then
-        sudo ip6tables-restore < /tmp/ip6tables-before-import.rules && echo "[cleanup] IPv6 rules restored." || echo "[cleanup] WARNING: IPv6 restore failed."
+    if sudo ip6tables -C OUTPUT -j OC_MIRROR_EGRESS6 2>/dev/null; then
+        echo "[cleanup] FATAL: OC_MIRROR_EGRESS6 is still in IPv6 OUTPUT after teardown"
+        CLEANUP_FAILED=1
+    else
+        echo "[cleanup] PASS: OC_MIRROR_EGRESS6 not in IPv6 OUTPUT."
     fi
+
     echo "=== [cleanup] Removing /etc/hosts registry entry ==="
-    sudo sed -i "/${MIRROR_REGISTRY_HOSTNAME}/d" /etc/hosts && echo "[cleanup] /etc/hosts entry removed." || echo "[cleanup] WARNING: /etc/hosts sed failed."
+    sudo sed -i "/${MIRROR_REGISTRY_HOSTNAME}/d" /etc/hosts \
+        && echo "[cleanup] /etc/hosts entry removed." \
+        || echo "[cleanup] WARNING: /etc/hosts sed failed."
+
     echo "=== [cleanup] Removing remote auth file ==="
     xdg="${XDG_RUNTIME_DIR:-${HOME}/run}"
     rm -f /tmp/oc-mirror-pull-secret.json "${xdg}/containers/auth.json"
+
+    if [[ "${CLEANUP_FAILED:-0}" == "1" ]]; then
+        echo "[cleanup] FATAL: firewall teardown incomplete — isolation rules still active"
+        exit 1
+    fi
     echo "=== [cleanup] Done ==="
 }
 trap d2m_cleanup EXIT
 
 # -------------------------------------------------------------------
-# Save current firewall state before any modifications
+# Save current firewall state before any modifications.
+# Written to /var/tmp (EBS) so it persists and can be scp-d to ARTIFACT_DIR
+# after cleanup for a complete before/after audit trail.
 # -------------------------------------------------------------------
 echo "Saving current iptables/ip6tables rules..."
-sudo iptables-save  > /tmp/iptables-before-import.rules
-sudo ip6tables-save > /tmp/ip6tables-before-import.rules
+sudo iptables-save  > /var/tmp/iptables-before-import.rules
+sudo ip6tables-save > /var/tmp/ip6tables-before-import.rules
 
 # -------------------------------------------------------------------
 # Registry routing: map public DNS name to bastion private IP.
@@ -367,18 +416,73 @@ echo "=== Executing remote D2M script on bastion ==="
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "${REMOTE_D2M_SCRIPT}"
 echo "Remote D2M script complete."
 
-# Collect the D2M log from the bastion.  The log is written to /var/tmp on the
-# bastion so it survives even if the SSH session was disrupted during isolation.
-# Run this after firewall restoration so the scp is not blocked.
+# ---------------------------------------------------------------------------
+# Artifact collection (firewall is now restored, all scp/ssh unrestricted)
+# ---------------------------------------------------------------------------
+
+# D2M log tee-d to /var/tmp during the remote script run
 D2M_LOG="/var/tmp/oc-mirror-d2m.log"
 scp ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}:${D2M_LOG}" \
     "${ARTIFACT_DIR}/bastion-oc-mirror-d2m.log" 2>/dev/null || \
     echo "Note: D2M log not found on bastion at ${D2M_LOG} (may not have been created)"
 
-# Save post-restore iptables state to artifacts for audit/debugging
+# Pre-isolation iptables snapshot (for before/after comparison)
+scp ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}:/var/tmp/iptables-before-import.rules" \
+    "${ARTIFACT_DIR}/bastion-iptables-before-isolation.txt" 2>/dev/null || true
+scp ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}:/var/tmp/ip6tables-before-import.rules" \
+    "${ARTIFACT_DIR}/bastion-ip6tables-before-isolation.txt" 2>/dev/null || true
+
+# Post-cleanup iptables state
 ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
-    "sudo iptables -L -n -v && echo '---IPv6---' && sudo ip6tables -L -n -v" \
-    > "${ARTIFACT_DIR}/bastion-iptables-post-restore.txt" 2>&1 || true
+    "sudo iptables-save && echo '---IPv6---' && sudo ip6tables-save" \
+    > "${ARTIFACT_DIR}/bastion-iptables-post-cleanup.txt" 2>&1 || true
+
+# ---------------------------------------------------------------------------
+# Post-cleanup proxy-path check.
+# Verify the bastion can reach servicequotas.us-west-2.amazonaws.com through
+# whatever proxy the installer will use.  This is the endpoint that failed in
+# the prior run.  A failure here confirms the isolation rules outlived cleanup;
+# success proves the proxy path is clear for cluster installation.
+# ---------------------------------------------------------------------------
+echo "=== Post-cleanup proxy-path check ==="
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" bash <<'PROXY_CHECK'
+set -euo pipefail
+ENDPOINT="https://servicequotas.us-west-2.amazonaws.com"
+
+# Collect proxy environment (may be set system-wide or via /etc/environment)
+# Try both lower- and upper-case variants; prefer the lower-case form.
+proxy_url="${https_proxy:-${HTTPS_PROXY:-}}"
+
+if [[ -z "${proxy_url}" ]]; then
+    # Fall back to /etc/environment in case it is not exported
+    if [[ -f /etc/environment ]]; then
+        _p=$(grep -i '^https_proxy=' /etc/environment | head -n1 | cut -d= -f2- | tr -d '"' || true)
+        [[ -n "${_p}" ]] && proxy_url="${_p}"
+    fi
+fi
+
+echo "Proxy in use: ${proxy_url:-<none>}"
+echo "Endpoint:     ${ENDPOINT}"
+
+if [[ -n "${proxy_url}" ]]; then
+    curl_args=(--proxy "${proxy_url}")
+else
+    curl_args=()
+fi
+
+if curl "${curl_args[@]}" --noproxy '' \
+        -m 15 --silent --output /dev/null --write-out "HTTP %{http_code}\n" \
+        "${ENDPOINT}"; then
+    echo "PASS: ${ENDPOINT} reachable through proxy"
+else
+    echo "FAIL: ${ENDPOINT} not reachable — isolation rules may still be active"
+    echo "Current OUTPUT chain:"
+    sudo iptables  -L OUTPUT -n -v || true
+    sudo ip6tables -L OUTPUT -n -v || true
+    exit 1
+fi
+PROXY_CHECK
+echo "Post-cleanup proxy-path check passed."
 
 # ---------------------------------------------------------------------------
 # Copy IDMS/ITMS from bastion to SHARED_DIR
