@@ -64,3 +64,4 @@ oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
 # Add proxy config in this step and leave conformance test step untouched
 echo "Adding proxy-url in kubeconfig for e2e conformance tests"
 sed -i "/- cluster/ a\    proxy-url: ${proxy}" "${SHARED_DIR}"/kubeconfig
+sleep 30m
