@@ -1,0 +1,148 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: kmm-ci
+  - dockerfile_literal: |
+      FROM quay.io/ocp-edge-qe/eco-gotests:latest
+      USER 0
+      RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+      RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    to: eco-gotests
+  run_if_changed: x^
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: kmm-qe-smoke
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- as: kmm-qe-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 2 * * *
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: kmm-ci

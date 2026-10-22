@@ -100,7 +100,7 @@ echo "[3/4] every LoadBalancer service IP is advertised to the ToR from every fr
 lb_ips=""
 expected_lb_ips="$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}' | wc -w)"
 get_lb_ips() {
-    lb_ips="$(oc get svc lb-echo -n default -o jsonpath='{.status.loadBalancer.ingress[*].ip}' 2>/dev/null)"
+    lb_ips="$(oc get svc lb-echo -n bgp-vip-e2e -o jsonpath='{.status.loadBalancer.ingress[*].ip}' 2>/dev/null)"
     [[ "$(echo "${lb_ips}" | wc -w)" -eq "${expected_lb_ips}" ]]
 }
 advertisable_lb_ips() {
@@ -114,7 +114,7 @@ advertisable_lb_ips() {
     done
 }
 if ! poll 180 get_lb_ips; then
-    oc describe svc lb-echo -n default || true
+    oc describe svc lb-echo -n bgp-vip-e2e || true
     fail "lb-echo did not receive ${expected_lb_ips} LoadBalancer IP(s) from the pool (got: '${lb_ips:-none}')"
 else
     # ToR convergence takes ~15-20s after advertisement; the poll absorbs it.
