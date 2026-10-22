@@ -1,0 +1,42 @@
+ref:
+  as: cnv-storage-checkup-run
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  cli: latest
+  commands: cnv-storage-checkup-run-commands.sh
+  timeout: 20m0s
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  env:
+  - name: CHECKUP_TIMEOUT
+    default: 10m
+    documentation: Positive duration using h, m, or s, passed through spec.timeout; must be shorter than the Job deadline.
+  - name: CHECKUP_VMI_TIMEOUT
+    default: 3m
+    documentation: Positive duration using h, m, or s for VMI operations; must be shorter than CHECKUP_TIMEOUT.
+  - name: CHECKUP_NUM_VMS
+    default: "10"
+    documentation: Number of concurrent VMs; workers need capacity for their memory and virtualization overhead.
+  - name: CHECKUP_SKIP_TEARDOWN
+    default: onfailure
+    documentation: Product teardown mode (never, onfailure, or always); the post step always removes the run namespace.
+  - name: CHECKUP_JOB_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Job deadline in seconds (1-900), longer than CHECKUP_TIMEOUT; the step reserves five more minutes for setup and reporting.
+  - name: CHECKUP_EXPECTED_RESULTS
+    default: '{}'
+    documentation: |-
+      Optional JSON object mapping status.result field names to required regular
+      expressions, for example {"vmLiveMigration":"migration completed"}.
+      Configure backend-specific requirements here rather than branching the script.
+  documentation: |-
+    Execute the storage checkup shipped with installed CNV in a unique namespace.
+    Require successful completion and non-skipped provisioning, VM boot, clone,
+    hotplug, and concurrent boot results. Preserve capability-dependent results
+    and apply optional expectations, then publish the result ConfigMap, a JSON
+    summary with runtime image IDs, and per-check JUnit with explicit skip reasons.
