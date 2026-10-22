@@ -10,6 +10,23 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+  - build_args:
+    - name: BOOTC_BASE
+      value: quay.io/centos-bootc/centos-bootc:stream10
+    - name: FRR_IMAGE
+      value: registry.ci.openshift.org/ocp/4.22:metallb-frr
+    - name: NODE_EXPORTER_IMAGE
+      value: registry.ci.openshift.org/ocp/4.22:prometheus-node-exporter
+    context_dir: image/rhel10
+    dockerfile_path: Containerfile
+    to: evpn-appliance
+  - context_dir: image/rhel10
+    dockerfile_path: Containerfile.nested-ci
+    inputs:
+      evpn-appliance:
+        as:
+        - ${APPLIANCE_IMAGE}
+    to: evpn-appliance-nested-ci
 resources:
   '*':
     limits:
@@ -17,6 +34,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  evpn-appliance:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
 tests:
 - as: verify
   commands: make verify OFFLINE=1
