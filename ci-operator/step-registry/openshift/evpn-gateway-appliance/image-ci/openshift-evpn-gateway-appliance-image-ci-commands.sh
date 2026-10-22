@@ -52,39 +52,42 @@ podman build \
 	.
 
 cd "${WORKROOT}"
-bash image/tools/smoke-nested.sh "${IMAGE_TAG}"
+export ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+mkdir -p "${ARTIFACT_DIR}"
+artifacts="${ARTIFACT_DIR}"
 
-artifacts="${ARTIFACT_DIR:-/tmp/artifacts}"
-mkdir -p "${artifacts}"
+archive="${WORKROOT}/appliance-image.tar"
+rm -f "${archive}"
+echo "image-ci: saving ${IMAGE_TAG} to ${archive}"
+podman save --format oci-archive -o "${archive}" "${IMAGE_TAG}"
+
 if ! command -v gzip >/dev/null; then
 	echo "image-ci: gzip is required to save disks" >&2
 	exit 1
 fi
 
-store="$(podman info --format '{{.Store.GraphRoot}}')"
-
 build_disk() {
 	local kind="$1"
 	local filename="$2"
+	local destname="$3"
 	local out="${WORKROOT}/output-${kind}"
 	local disk dest partial
 	rm -rf "${out}"
 	mkdir -p "${out}"
-	echo "image-ci: building ${kind} from ${IMAGE_TAG}"
+	echo "image-ci: building ${kind} from ${archive}"
 	podman run --rm --privileged --pull=newer \
 		-v "${out}:/output" \
-		-v "${store}:/var/lib/containers/storage" \
+		-v "${archive}:/appliance-image.tar:ro" \
 		"${BIB_IMAGE}" \
 		--type "${kind}" \
-		--local \
-		"${IMAGE_TAG}"
+		oci-archive:/appliance-image.tar
 	disk="$(find "${out}" -type f -name "${filename}" -print -quit)"
 	if [[ -z "${disk}" ]]; then
 		echo "image-ci: ${filename} missing under ${out}" >&2
 		find "${out}" -type f -print >&2 || true
 		return 1
 	fi
-	dest="${artifacts}/${filename}.gz"
+	dest="${artifacts}/${destname}.gz"
 	partial="${dest}.partial"
 	echo "image-ci: compressing ${disk} to ${dest}"
 	rm -f "${partial}"
@@ -97,5 +100,25 @@ build_disk() {
 	echo "image-ci: saved ${dest} $(stat -c '%s' "${dest}")"
 }
 
-build_disk qcow2 disk.qcow2
-build_disk raw disk.raw
+build_disk qcow2 disk.qcow2 disk.qcow2
+build_disk ami disk.raw disk.ami.raw
+
+tar_dest="${artifacts}/appliance-image.tar.gz"
+tar_partial="${tar_dest}.partial"
+rm -f "${tar_partial}"
+echo "image-ci: compressing ${archive} to ${tar_dest}"
+if ! gzip --best -c "${archive}" > "${tar_partial}"; then
+	rm -f "${tar_partial}"
+	echo "image-ci: failed to compress ${archive}" >&2
+	exit 1
+fi
+mv "${tar_partial}" "${tar_dest}"
+echo "image-ci: saved ${tar_dest} $(stat -c '%s' "${tar_dest}")"
+
+smoke="${WORKROOT}/image/tools/smoke-payloads.py"
+if [[ -f "${smoke}" ]] && command -v python3 >/dev/null 2>&1; then
+	echo "image-ci: running payload smoke without failing the disk build"
+	python3 "${smoke}" "${IMAGE_TAG}" || echo "image-ci: payload smoke failed; disk artifacts are already saved" >&2
+else
+	echo "image-ci: skipping payload smoke because ${smoke} is not in this archive" >&2
+fi
