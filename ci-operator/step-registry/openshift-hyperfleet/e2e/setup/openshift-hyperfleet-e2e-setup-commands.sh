@@ -181,8 +181,10 @@ export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
 export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}"
 
-# Configure authentication placement for HyperFleet (API auth by default).
-export AUTH_MODE="${AUTH_MODE:-API}"
+# Configure authentication mode for HyperFleet.
+export AUTH_MODE="${AUTH_MODE:-EDGE+API}"
+export OIDC_ISSUER_MODE="${OIDC_ISSUER_MODE:-mock}"
+echo "${AUTH_MODE}" > "${SHARED_DIR}/auth_mode"
 
 # Install hyperfleet components via infra repo.
 # Retry transient clone failures, removing any partial checkout before retrying.
@@ -208,7 +210,7 @@ NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfle
 
 # Save installed charts for cleanup
 HELMFILE_JSON="${SHARED_DIR}/helm-release-${NAMESPACE_NAME}.json"
-NAMESPACE="${NAMESPACE_NAME}" OIDC_ISSUER_MODE="mock" \
+NAMESPACE="${NAMESPACE_NAME}" \
   helmfile -f helmfile/helmfile.yaml.gotmpl list -e "${HELMFILE_ENV}" --output json > "${HELMFILE_JSON}"
 
 # Verify deployed components
@@ -229,6 +231,10 @@ if [[ -z "${GATEWAY_EXTERNAL_IP}" ]]; then
   log "ERROR: Failed to resolve Hyperfleet Gateway external IP. Is the LoadBalancer ready?"
   exit 1
 fi
+
+log "Configuring gateway AuthConfig to accept the LoadBalancer host"
+AUTHORINO_HOSTS="${GATEWAY_EXTERNAL_IP}" \
+  NAMESPACE="${NAMESPACE_NAME}" HELMFILE_ENV="${HELMFILE_ENV}" make install-gateway
 
 export HYPERFLEET_API_URL=http://${GATEWAY_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
