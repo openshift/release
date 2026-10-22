@@ -136,6 +136,30 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: aws-upi-e2e-ote
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/byoh-pool
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - as: set-wmco-byoh-ote-environment
+      commands: |
+        printf '%s\n' 'export WMCO_BYOH_NODE_POOL_REQUIRED=true' >> "${SHARED_DIR}/cluster-debug-tools.env"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: openshift-e2e-test
+    workflow: windows-e2e-ote-byoh-pool-aws-upi
+- always_run: false
   as: aws-e2e-ote-techpreview
   optional: true
   pipeline_run_if_changed: ^ote/
