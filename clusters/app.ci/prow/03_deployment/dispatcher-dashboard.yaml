@@ -1,0 +1,291 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dispatcher-dashboard
+  namespace: ci
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.dispatcher-dashboard: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"dispatcher-dashboard"}}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dispatcher-dashboard-view
+  namespace: ci
+rules:
+# A virtual resource used only for the OAuth access check; no CRD is required.
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - dispatcherobservations
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dispatcher-dashboard-view
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dispatcher-dashboard-view
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: test-platform-ci-admins
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dispatcher-dashboard-logs
+  namespace: ci
+rules:
+# Kubernetes cannot restrict pod discovery or pod-log reads by label. The
+# dashboard selects only the dispatcher and scheduler main containers.
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dispatcher-dashboard-logs
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dispatcher-dashboard-logs
+subjects:
+- kind: ServiceAccount
+  name: dispatcher-dashboard
+  namespace: ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispatcher-dashboard
+  namespace: ci
+  labels:
+    app: prow
+    component: dispatcher-dashboard
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow
+      component: dispatcher-dashboard
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: dispatcher-dashboard
+    spec:
+      serviceAccountName: dispatcher-dashboard
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: dispatcher-dashboard
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_dispatcher-dashboard_latest
+        imagePullPolicy: Always
+        args:
+        # Only the authenticated proxy can reach the application listener.
+        - --listen=127.0.0.1:8080
+        - --dispatcher-url=https://prowjob-dispatcher.ci.svc:8443
+        - --dispatcher-token-file=/var/run/dispatcher-observation/token
+        - --dispatcher-ca-file=/etc/dispatcher-ca/service-ca.crt
+        - --enable-log-diagnostics
+        - --log-max-bytes=8388608
+        - --log-namespace=ci
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        # The loopback listener is probed through the proxy's exact health-only
+        # auth bypass. Readiness checks local credentials, not upstream health.
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+          failureThreshold: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+          periodSeconds: 30
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: dispatcher-observation
+          mountPath: /var/run/dispatcher-observation
+          readOnly: true
+        - name: dispatcher-ca
+          mountPath: /etc/dispatcher-ca
+          readOnly: true
+      - name: oauth-proxy
+        image: quay.io/openshift/origin-oauth-proxy:4.19
+        imagePullPolicy: IfNotPresent
+        args:
+        - -provider=openshift
+        - -openshift-service-account=dispatcher-dashboard
+        - -https-address=:8443
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://127.0.0.1:8080
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        # Browser OAuth checks the user's permission, without granting the proxy
+        # service account cluster-wide token review or authorization rights.
+        - '-openshift-sar={"namespace":"ci","resourceAPIGroup":"ci.openshift.io","resource":"dispatcherobservations","verb":"get"}'
+        - -skip-auth-regex=^/(healthz|readyz)$
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -cookie-samesite=lax
+        - -pass-basic-auth=false
+        - -pass-user-headers=false
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        ports:
+        - name: https
+          containerPort: 8443
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        startupProbe:
+          httpGet:
+            path: /oauth2/healthz
+            port: https
+            scheme: HTTPS
+          failureThreshold: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /oauth2/healthz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          timeoutSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /oauth2/healthz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 30
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: tls
+          mountPath: /etc/tls/private
+          readOnly: true
+        - name: session-secret
+          mountPath: /etc/proxy/secrets
+          readOnly: true
+      volumes:
+      - name: dispatcher-observation
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: prowjob-dispatcher-observation
+              expirationSeconds: 3600
+              path: token
+      - name: dispatcher-ca
+        configMap:
+          name: dispatcher-observation-ca
+      - name: tls
+        secret:
+          secretName: dispatcher-dashboard-tls
+      - name: session-secret
+        secret:
+          secretName: dispatcher-dashboard-oauth
+          items:
+          - key: session_secret
+            path: session_secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispatcher-dashboard
+  namespace: ci
+  labels:
+    app: prow
+    component: dispatcher-dashboard
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: dispatcher-dashboard-tls
+spec:
+  selector:
+    app: prow
+    component: dispatcher-dashboard
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dispatcher-dashboard
+  namespace: ci
+spec:
+  host: dispatcher-dashboard-ci.apps.ci.l2s4.p1.openshiftapps.com
+  port:
+    targetPort: https
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: reencrypt
+  to:
+    kind: Service
+    name: dispatcher-dashboard
+    weight: 100
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dispatcher-observation-ca
+  namespace: ci
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
