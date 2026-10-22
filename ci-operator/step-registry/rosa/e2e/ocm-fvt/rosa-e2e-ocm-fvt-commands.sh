@@ -489,15 +489,13 @@ PY
 $WAS_TRACING_RUN && set -x
 
 # Copy merged report.xml (skip per-phase duplicates).
-if ! {
-  find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
-    if ! cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"; then
-      echo "WARNING: failed to copy ocm-fvt report"
-    fi
-  done
-} 2>/dev/null; then
-  echo "WARNING: failed to scan ocm-fvt reports"
-fi
+# Process sub + 2>/dev/null: ignore unreadable IDP diagnostic dirs (pipefail + find would
+# otherwise fail a green ocmtest run). Same pattern as cluster.ini finds below.
+while IFS= read -r -d '' xml_file; do
+  if ! cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"; then
+    echo "WARNING: failed to copy ocm-fvt report"
+  fi
+done < <(find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 2>/dev/null)
 
 # Publish cluster id (+ best-effort guest kubeconfig) for post gather steps
 # (rosa-gather-hcp-guest-artifacts / gather-extra). OCM FVT keeps cluster state
