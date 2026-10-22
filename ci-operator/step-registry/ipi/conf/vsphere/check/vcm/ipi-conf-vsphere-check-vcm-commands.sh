@@ -49,6 +49,17 @@ if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
   exit 1
 fi
 
+# MIN_VCENTERS, POOL_COUNT and MAX_VCENTERS are compared arithmetically below
+# and written into the lease spec; reject anything but non-negative integers
+# here so a misconfigured value fails with a clear message instead of a cryptic
+# bash or API-server error.  0 keeps its "disabled" meaning for MIN_VCENTERS.
+for NUMERIC_VAR in MIN_VCENTERS POOL_COUNT MAX_VCENTERS; do
+  if ! [[ "${!NUMERIC_VAR}" =~ ^[0-9]+$ ]]; then
+    echo "${NUMERIC_VAR} must be a non-negative integer, got '${!NUMERIC_VAR}'"
+    exit 1
+  fi
+done
+
 # MIN_VCENTERS requires the single-lease (POOL_COUNT) path and must respect the
 # same bounds VCM enforces on spec.min-vcenters: it cannot exceed the number of
 # pools requested or the vCenters cap.
@@ -57,11 +68,11 @@ if [[ "${MIN_VCENTERS}" != "0" ]]; then
     echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
     exit 1
   fi
-  if (( MIN_VCENTERS > POOL_COUNT )); then
+  if (( 10#${MIN_VCENTERS} > 10#${POOL_COUNT} )); then
     echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed POOL_COUNT (${POOL_COUNT})"
     exit 1
   fi
-  if (( MIN_VCENTERS > MAX_VCENTERS )); then
+  if (( 10#${MIN_VCENTERS} > 10#${MAX_VCENTERS} )); then
     echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed MAX_VCENTERS (${MAX_VCENTERS})"
     exit 1
   fi
@@ -832,17 +843,39 @@ for LEASE in "${SHARED_DIR}"/LEASE*; do
     continue
   fi
 
-  jq -r .status.envVars "${LEASE}" > /tmp/envvars
+  # A lease can cover multiple pools (POOL_COUNT path) and each pool has its own
+  # portgroup, so DVS info must be gathered per pool from poolInfo/envVarsMap.
+  # Leases without poolInfo (legacy single-pool leases) fall back to the
+  # top-level status fields.
+  dvs_pool_count=$(jq -r '.status.poolInfo | length' "${LEASE}")
+  if [[ "${dvs_pool_count}" != "null" && "${dvs_pool_count}" -gt 0 ]]; then
+    for ((dvs_pool_idx = 0; dvs_pool_idx < dvs_pool_count; dvs_pool_idx++)); do
+      dvs_pool_name=$(jq -r ".status.poolInfo[${dvs_pool_idx}].name" "${LEASE}")
+      jq -r ".status.envVarsMap.\"${dvs_pool_name}\"" "${LEASE}" > /tmp/envvars
 
-  # shellcheck source=/dev/null
-  source /tmp/envvars
+      # shellcheck source=/dev/null
+      source /tmp/envvars
 
-  log "checking ${LEASE} and ${GOVC_NETWORK} for DVS UUID"
+      log "checking ${LEASE} pool ${dvs_pool_name} and ${GOVC_NETWORK} for DVS UUID"
 
-  export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
-  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+      export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+      export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
 
-  getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+      getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+    done
+  else
+    jq -r .status.envVars "${LEASE}" > /tmp/envvars
+
+    # shellcheck source=/dev/null
+    source /tmp/envvars
+
+    log "checking ${LEASE} and ${GOVC_NETWORK} for DVS UUID"
+
+    export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+    export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+
+    getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+  fi
 done
 
 log "writing the platform spec"
