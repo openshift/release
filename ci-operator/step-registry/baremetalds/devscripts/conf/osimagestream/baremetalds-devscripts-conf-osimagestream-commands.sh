@@ -40,11 +40,16 @@ fi
 
 # The release image lives in the build farm registry, whose credentials are not part of the
 # cluster profile pull secret, so merge them into a copy the same way the other steps that read
-# a release image do.
-pull_secret=/tmp/pull-secret
+# a release image do. The copy gets a unique name, and the trap that deletes it is installed
+# before any credential is written into it, so a step interrupted between the copy and the
+# explicit cleanup below cannot leave the merged secret behind. An untrapped SIGTERM would kill
+# the shell without running the EXIT trap, so the termination signals exit instead.
+pull_secret="$(mktemp "${TMPDIR:-/tmp}/osimagestream-pull-secret.XXXXXXXX")"
+trap 'rm -f "${pull_secret}"' EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${pull_secret}"
 if ! oc registry login --to "${pull_secret}"; then
-  rm -f "${pull_secret}"
   echo "ERROR: OSSTREAM=${OSSTREAM} was requested but logging in to the registry failed,"
   echo "ERROR: so the initial release version cannot be read. Refusing to guess."
   exit 1
