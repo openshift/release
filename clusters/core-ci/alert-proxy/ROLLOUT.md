@@ -5,6 +5,36 @@ This directory describes the intended final state. The accumulated alert-proxy c
 The ordering and gates below are part of the safety boundary: direct Slack delivery is removed only
 after the replacement path is proven, and Alertmanager mutations are enabled in a later change.
 
+## Core CI callback routing
+
+The proxy now runs in Core CI while Slack-bot runs in app.ci. Slack-bot cannot use
+`alert-proxy.ci.svc` to reach a Service in the other cluster. The two Routes in
+`routes.yaml` match the `/interactions` and `/mentions` path prefixes on
+`https://alert-proxy-ci.apps.master.ci.devcluster.openshift.com`. They use the
+Core CI router's wildcard TLS certificate and refuse plaintext HTTP. The application
+serves only the exact callback handlers under these prefixes. The existing
+forwarder HMAC is required on both endpoints; interactions also retain the original
+Slack signature. The Alertmanager webhook and metrics remain cluster-internal.
+
+Complete these steps in order before changing the Slack-bot forwarding URLs:
+
+1. Sync the two Core CI Routes. Confirm that both are admitted, HTTPS validates
+   with the ordinary system trust store, and an unsigned POST to either path
+   returns HTTP 401. Confirm that `/metrics` and `/webhook/alertmanager` have no
+   route to the proxy.
+2. Merge and deploy the ci-tools change that permits this exact HTTPS hostname in
+   Slack-bot's callback URL validator. Confirm the deployed image contains the
+   change; the current validator accepts only cluster-local proxy URLs.
+3. In a separate release change, set the interaction and mention flags to this
+   hostname with their corresponding paths. Confirm the Slack-bot rollout has
+   completed before exercising an acknowledgement and a forwarded mention.
+
+Keep the shared forwarder secret and original Slack signature checks enabled.
+Do not add a root Route, expose the webhook, disable TLS verification, or reset the
+runtime state during this migration. Roll back by unsetting both forwarding URL
+flags to disable proxy callbacks; leave the Alertmanager delivery path and durable
+state intact.
+
 ## Runtime state bootstrap
 
 `state-bootstrap.create-once` deliberately has no `.yaml`, `.yml`, or `.json` suffix. Normal
