@@ -1,0 +1,104 @@
+base_images:
+  aws-cli:
+    namespace: ocp
+    name: '4.20'
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    namespace: ocp
+    name: '4.20'
+    tag: upi-installer
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-sts-identity
+  always_run: false
+  optional: true
+  cluster: build07
+  steps:
+    cluster_profile: aws-sts-diagnostic
+    test:
+    - as: check-identity
+      from: aws-cli
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        fail() { echo "STS diagnostic failed: $*" >&2; exit 1; }
+        command -v aws >/dev/null || fail 'AWS CLI is missing'
+        command -v jq >/dev/null || fail 'jq is missing'
+        : "${CLUSTER_PROFILE_DIR:?ci-operator must mount the diagnostic cluster profile}"
+
+        # Refuse unexpected profile fields, including static credential files. Kubernetes
+        # Secret volumes also contain ..data/..timestamp symlinks, which are not fields.
+        for entry in "${CLUSTER_PROFILE_DIR}"/* "${CLUSTER_PROFILE_DIR}"/.[!.]*; do
+          [[ -e "$entry" ]] || continue
+          case "${entry##*/}" in
+            hub_role_arn|target_role_arn) ;;
+            *) fail "unexpected profile field: ${entry##*/}" ;;
+          esac
+        done
+        for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN; do
+          [[ -z "${!name:-}" ]] || fail "static credential environment variable is set: ${name}"
+        done
+
+        # Use a fresh home/cache and an absent credentials file. Disable alternate
+        # identity providers so a successful call must use the generated profile chain.
+        export HOME
+        HOME=$(mktemp -d)
+        export AWS_CONFIG_FILE=/var/run/secrets/aws/config/config
+        export AWS_SHARED_CREDENTIALS_FILE="${HOME}/no-credentials"
+        export AWS_PROFILE=default
+        export AWS_DEFAULT_PROFILE=default
+        export AWS_SDK_LOAD_CONFIG=1
+        export AWS_EC2_METADATA_DISABLED=true
+        export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1
+        export AWS_PAGER=''
+        unset AWS_ROLE_ARN AWS_WEB_IDENTITY_TOKEN_FILE AWS_ROLE_SESSION_NAME
+        unset AWS_CONTAINER_CREDENTIALS_RELATIVE_URI AWS_CONTAINER_CREDENTIALS_FULL_URI
+        unset AWS_CONTAINER_AUTHORIZATION_TOKEN AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
+        unset AWS_ENDPOINT_URL AWS_ENDPOINT_URL_STS
+        export AWS_IGNORE_CONFIGURED_ENDPOINT_URLS=true
+
+        [[ -s "$AWS_CONFIG_FILE" ]] || fail 'ci-operator did not mount a generated STS config'
+        [[ ! -e "$AWS_SHARED_CREDENTIALS_FILE" ]] || fail 'credentials file unexpectedly exists'
+        [[ -s "${CLUSTER_PROFILE_DIR}/hub_role_arn" ]] || fail 'hub_role_arn is missing'
+        [[ -s "${CLUSTER_PROFILE_DIR}/target_role_arn" ]] || fail 'target_role_arn is missing'
+        [[ $(aws configure get source_profile --profile default) == hub ]] || fail 'default profile must use hub'
+        [[ $(aws configure get source_profile --profile hub) == home ]] || fail 'hub profile must use home'
+        [[ $(aws configure get role_arn --profile hub) == "$(cat "${CLUSTER_PROFILE_DIR}/hub_role_arn")" ]] || fail 'hub role mapping differs'
+        target_role=$(cat "${CLUSTER_PROFILE_DIR}/target_role_arn")
+        [[ $(aws configure get role_arn --profile default) == "$target_role" ]] || fail 'target role mapping differs'
+        token_file=$(aws configure get web_identity_token_file --profile home)
+        [[ "$token_file" == /var/run/secrets/aws/sts-token/token && -s "$token_file" ]] || fail 'projected web identity token is missing'
+
+        [[ "$target_role" =~ ^arn:([^:]+):iam::([0-9]{12}):role/(.+)$ ]] || fail 'invalid target role ARN'
+        partition=${BASH_REMATCH[1]}
+        account=${BASH_REMATCH[2]}
+        role_name=${BASH_REMATCH[3]##*/}
+
+        aws --version
+        identity=$(aws sts get-caller-identity --output json)
+        actual_account=$(jq -er '.Account' <<< "$identity")
+        actual_arn=$(jq -er '.Arn' <<< "$identity")
+        [[ "$actual_account" == "$account" ]] || fail 'caller account differs from target role account'
+        [[ "$actual_arn" == "arn:${partition}:sts::${account}:assumed-role/${role_name}/"* ]] || fail 'caller role differs from target role'
+
+        # Caller identity is audit metadata. Never print the projected token or credentials.
+        jq -n --arg account "$actual_account" --arg arn "$actual_arn" --arg target "$target_role" \
+          '{result:"PASS",account:$account,caller_arn:$arn,expected_target_role:$target,authentication:"projected-token/home/hub/target"}'
+        echo 'PASS: expected target role reached without a static AWS credential source.'
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  org: openshift
+  repo: release
+  branch: main
+  variant: aws-sts-diagnostic
+prowgen:
+  enable_secrets_store_csi_driver: true
