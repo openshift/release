@@ -1,37 +1,55 @@
 #!/bin/bash
 set -euo pipefail
 
-echo "Installing BGP Cloud Connector operator from bundle: ${BCC_BUNDLE_IMAGE}"
+NAMESPACE="bgp-cloud-connector"
+PACKAGE_NAME="bgp-cloud-connector"
+CATALOG_SOURCE="redhat-operators"
+CATALOG_SOURCE_NAMESPACE="openshift-marketplace"
+SUBSCRIPTION_NAME="bgp-cloud-connector"
 
-NAMESPACE="openshift-bgp-cloud-connector"
+echo "Installing BGP Cloud Connector operator via OLM Subscription"
+echo "  Package:          ${PACKAGE_NAME}"
+echo "  CatalogSource:    ${CATALOG_SOURCE}"
+echo "  Namespace:        ${NAMESPACE}"
 
-# Create the operator namespace
+# --- helpers ----------------------------------------------------------------
+
+wait_for_csv() {
+  local ns="$1" sub="$2" csv phase
+  echo "Waiting for CSV of subscription ${sub} in ${ns} to reach Succeeded ..."
+  for i in $(seq 1 60); do
+    csv="$(oc get subscription "${sub}" -n "${ns}" \
+      -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+    if [[ -n "${csv}" ]]; then
+      phase="$(oc get csv "${csv}" -n "${ns}" \
+        -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+      echo "  CSV ${csv} phase: ${phase:-<none>} (${i}/60)"
+      if [[ "${phase}" == "Succeeded" ]]; then
+        echo "CSV ${csv} reached Succeeded phase"
+        return 0
+      fi
+    else
+      echo "  Waiting for installedCSV to appear ... (${i}/60)"
+    fi
+    sleep 10
+  done
+
+  echo "ERROR: CSV for subscription ${sub} did not reach Succeeded within 10 minutes" >&2
+  oc get subscription "${sub}" -n "${ns}" -o yaml >&2 || true
+  oc get csv -n "${ns}" -o wide >&2 || true
+  oc get installplan -n "${ns}" -o wide >&2 || true
+  oc get events -n "${ns}" --sort-by='.lastTimestamp' | tail -30 >&2 || true
+  return 1
+}
+
+# --- namespace --------------------------------------------------------------
+
+echo "=== Creating namespace ${NAMESPACE} ==="
 oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-# Extract bundle manifests from the bundle image using oc image extract
-BUNDLE_DIR="$(mktemp -d /tmp/bcc-bundle.XXXXXX)"
-echo "Extracting bundle manifests from ${BCC_BUNDLE_IMAGE} into ${BUNDLE_DIR}"
-mkdir -p "${BUNDLE_DIR}/manifests"
-oc image extract "${BCC_BUNDLE_IMAGE}" \
-  --path="/manifests/:${BUNDLE_DIR}/manifests/" \
-  --confirm
+# --- OperatorGroup ----------------------------------------------------------
 
-# Apply CRDs first
-echo "Applying CRDs..."
-CRD_COUNT=0
-for crd_file in "${BUNDLE_DIR}"/manifests/*crd*.yaml "${BUNDLE_DIR}"/manifests/*crd*.yml; do
-  if [[ -f "${crd_file}" ]]; then
-    echo "  Applying CRD: ${crd_file}"
-    oc apply -f "${crd_file}"
-    CRD_COUNT=$((CRD_COUNT + 1))
-  fi
-done
-if [[ "${CRD_COUNT}" -eq 0 ]]; then
-  echo "WARNING: No CRD files found in bundle manifests"
-fi
-
-# Create OperatorGroup for OwnNamespace install mode
-echo "Creating OperatorGroup..."
+echo "=== Creating OperatorGroup ==="
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -43,30 +61,60 @@ spec:
   - ${NAMESPACE}
 EOF
 
-# Find and apply the ClusterServiceVersion
-echo "Applying ClusterServiceVersion..."
-CSV_COUNT=0
-for csv_file in "${BUNDLE_DIR}"/manifests/*clusterserviceversion*.yaml "${BUNDLE_DIR}"/manifests/*clusterserviceversion*.yml; do
-  if [[ -f "${csv_file}" ]]; then
-    echo "  Applying CSV: ${csv_file}"
-    oc apply -n "${NAMESPACE}" -f "${csv_file}"
-    CSV_COUNT=$((CSV_COUNT + 1))
+# --- Subscription -----------------------------------------------------------
+
+echo "=== Creating Subscription ==="
+cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: ${SUBSCRIPTION_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: ${PACKAGE_NAME}
+  source: ${CATALOG_SOURCE}
+  sourceNamespace: ${CATALOG_SOURCE_NAMESPACE}
+EOF
+
+# --- wait for CSV -----------------------------------------------------------
+
+wait_for_csv "${NAMESPACE}" "${SUBSCRIPTION_NAME}"
+
+# --- wait for controller deployment ----------------------------------------
+
+echo "=== Waiting for BCC controller-manager deployment to become Available ==="
+# Give OLM a moment to create the deployment from the CSV
+sleep 10
+
+DEPLOY_NAME=""
+for i in $(seq 1 30); do
+  DEPLOY_NAME="$(oc get deployments -n "${NAMESPACE}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -n "${DEPLOY_NAME}" ]]; then
+    echo "Found deployment: ${DEPLOY_NAME}"
+    break
   fi
+  echo "  Waiting for deployment to be created ... (${i}/30)"
+  sleep 5
 done
-if [[ "${CSV_COUNT}" -eq 0 ]]; then
-  echo "ERROR: No ClusterServiceVersion files found in bundle manifests" >&2
-  ls -la "${BUNDLE_DIR}/manifests/" >&2
+
+if [[ -z "${DEPLOY_NAME}" ]]; then
+  echo "ERROR: No deployment found in namespace ${NAMESPACE}" >&2
+  oc get all -n "${NAMESPACE}" -o wide >&2 || true
   exit 1
 fi
 
-# Clean up extracted bundle
-rm -rf "${BUNDLE_DIR}"
-
-# Wait for the controller-manager to be available
-echo "Waiting for BCC controller-manager to become available..."
-oc -n "${NAMESPACE}" wait \
+if ! oc -n "${NAMESPACE}" wait \
   --for=condition=Available \
-  deployment/openshift-bgp-cloud-connector-controller-manager \
-  --timeout=5m
+  "deployment/${DEPLOY_NAME}" \
+  --timeout=5m; then
+  echo "ERROR: Deployment ${DEPLOY_NAME} did not become Available" >&2
+  oc get deployment "${DEPLOY_NAME}" -n "${NAMESPACE}" -o yaml >&2 || true
+  oc get pods -n "${NAMESPACE}" -o wide >&2 || true
+  oc get events -n "${NAMESPACE}" --sort-by='.lastTimestamp' | tail -30 >&2 || true
+  exit 1
+fi
 
-echo "BGP Cloud Connector operator installed successfully"
+echo "=== BGP Cloud Connector operator installed successfully ==="
+oc get deployment,pods -n "${NAMESPACE}" -o wide
