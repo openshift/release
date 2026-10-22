@@ -114,7 +114,7 @@ BASTION_ENV=( \
   REPO_NAME="${REPO_NAME:-}" \
   REPO_OWNER="${REPO_OWNER:-}" \
   REPO_URL="${REPO_URL}" \
-  UDN_BGP_LAYER2="${UDN_BGP_LAYER2:-false}" \
+  UDN_BGP_LAYER2="${UDN_BGP_LAYER2:-true}" \
   UUID="${UUID}" \
 )
 
