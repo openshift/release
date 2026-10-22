@@ -11,15 +11,15 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  rosa-e2e:
+    name: rosa-e2e
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
-images:
-  items:
-  - dockerfile_path: Containerfile
-    to: rosa-e2e
 releases:
   latest:
     candidate:
@@ -29,7 +29,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -91,6 +91,26 @@ tests:
     - ref: rosa-cluster-upgrade-cluster
     - ref: rosa-e2e-test
     workflow: rosa-e2e-classic
+- as: rosa-classic-sts-upgrade-staging-from-4-22-to-5-0
+  cron: 30 5 * * 3
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_TOPOLOGY: classic
+      HOSTED_CP: "false"
+      LABEL_FILTER: Platform:Classic
+      MULTI_AZ: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "2"
+      STS: "true"
+      UPGRADE_CHANNEL: candidate-5.0
+      UPGRADED_TO_VERSION: "5.0"
+    test:
+    - ref: rosa-cluster-upgrade-cluster
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-classic
 - as: rosa-hcp-upgrade-staging-y-minus-3
   cron: 30 2 * * 5
   steps:
@@ -101,13 +121,13 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "3"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool
@@ -123,13 +143,13 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "2"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool
@@ -145,13 +165,35 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
-      MULTI_AZ: "false"
+      MULTI_AZ: "true"
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
-      REPLICAS: "2"
+      REPLICAS: "3"
       UPGRADE_CHANNEL_PREFIX: candidate
       VERSION_OFFSET_FROM_LATEST: "1"
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
+    test:
+    - ref: rosa-cluster-upgrade-hcp
+    - ref: rosa-cluster-upgrade-machinepool
+    - ref: rosa-e2e-test
+    workflow: rosa-e2e-hcp
+- as: rosa-hcp-upgrade-staging-from-4-22-to-5-0
+  cron: 30 5 * * 2
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: candidate
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      MULTI_AZ: "true"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-west-2
+      REPLICAS: "3"
+      UPGRADE_CHANNEL: candidate-5.0
+      UPGRADED_TO_VERSION: "5.0"
     test:
     - ref: rosa-cluster-upgrade-hcp
     - ref: rosa-cluster-upgrade-machinepool

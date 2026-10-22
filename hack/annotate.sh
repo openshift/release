@@ -53,11 +53,11 @@ retry() {
 function annotate() {
 	local namespace="$1"
 	local name="$2"
-	local private="${4:-}" # empty string by default
+	local dir="${4:-}" # empty string by default
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
-	if [[ -n "${private}" ]]; then
-		conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+	if [[ -n "${dir}" ]]; then
+		conf="${base}/core-services/release-controller/_releases/${dir}/release-$3"
 	fi
 
 	if [[ -s "${conf}" ]]; then
@@ -67,7 +67,7 @@ function annotate() {
 		# If this is a configuration for a private release controller, enforce that all ProwJob
 		# names include "priv". This attempts to ensure that no on introduces a ProwJob without
 		# "hidden: true" to the verification steps of embargoed release payloads.
-		if [[ -n "${private}" ]]; then
+		if [[ "${dir}" == "priv" ]]; then
 			local nonpriv_hits=$(cat ${conf} | jq -r '.verify | keys[] as $k | (.[$k] | .prowJob.name)' | grep -v priv)
 			if [[ -n "${nonpriv_hits}" ]]; then
 				echo "${conf} contains prowJob name without 'priv' substring ; Please use naming convention to ensure embargoed releases are not tested publicly."
@@ -85,6 +85,11 @@ for release in ${releases[@]}; do
 	annotate "origin" "scos-${release}" "okd-scos-${release}-ci.json"
 	annotate "origin" "scos-${release}-art" "okd-scos-${release}-art.json"
 
+	annotate "origin-arm64" "${release}-arm64" "okd-${release}-arm64.json"
+	annotate "origin-arm64" "scos-${release}-arm64" "okd-scos-${release}-arm64.json"
+	annotate "origin-arm64" "scos-${release}-arm64" "okd-scos-${release}-ci-arm64.json"
+	annotate "origin-arm64" "scos-${release}-art-arm64" "okd-scos-${release}-art-arm64.json"
+
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp" "${release}-konflux-art-latest" "konflux-ocp-${release}.json"
@@ -94,11 +99,18 @@ for release in ${releases[@]}; do
 	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-multi" "${release}-art-latest-multi" "ocp-${release}-multi.json"
 
-	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
-	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
-	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
-	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "private"
-	annotate "ocp-multi-priv" "${release}-art-latest-multi-priv" "ocp-${release}-multi.json" "private"
+	# The art23398 assembly is defined in ocp-build-data's openshift-5.0 releases.yml.
+	# Match the imagestreams created by doozer release:gen-payload.
+	annotate "ocp" "${release}-art-assembly-art23398" "konflux-ocp-${release}-art23398.json"
+	annotate "ocp-s390x" "${release}-art-assembly-art23398-s390x" "konflux-ocp-${release}-art23398-s390x.json"
+	annotate "ocp-ppc64le" "${release}-art-assembly-art23398-ppc64le" "konflux-ocp-${release}-art23398-ppc64le.json"
+	annotate "ocp-arm64" "${release}-art-assembly-art23398-arm64" "konflux-ocp-${release}-art23398-arm64.json"
+
+	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "priv"
+	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "priv"
+	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "priv"
+	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "priv"
+	annotate "ocp-multi-priv" "${release}-art-latest-multi-priv" "ocp-${release}-multi.json" "priv"
 
 done
 
@@ -107,9 +119,18 @@ annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
 
+# OKD 4.y-stable release streams (arm64)
+annotate "origin-arm64" "release-arm64" "okd-4.y-stable-arm64.json"
+annotate "origin-arm64" "release-scos-arm64" "okd-scos-4.y-stable-arm64.json"
+annotate "origin-arm64" "release-scos-next-arm64" "okd-scos-4.y-next-arm64.json"
+
 # OKD 5.y-stable release streams
 annotate "origin" "release-5-scos" "okd-scos-5.y-stable.json"
 annotate "origin" "release-5-scos-next" "okd-scos-5.y-next.json"
+
+# OKD 5.y-stable release streams (arm64)
+annotate "origin-arm64" "release-5-scos-arm64" "okd-scos-5.y-stable-arm64.json"
+annotate "origin-arm64" "release-5-scos-next-arm64" "okd-scos-5.y-next-arm64.json"
 
 # 4.y-stable release streams
 annotate "ocp" "release" "ocp-4.y-stable.json"
@@ -139,5 +160,8 @@ annotate "ocp-s390x" "5-dev-preview-s390x" "ocp-5-dev-preview-s390x.json"
 annotate "ocp-ppc64le" "5-dev-preview-ppc64le" "ocp-5-dev-preview-ppc64le.json"
 annotate "ocp-arm64" "5-dev-preview-arm64" "ocp-5-dev-preview-arm64.json"
 annotate "ocp-multi" "5-dev-preview-multi" "ocp-5-dev-preview-multi.json"
+
+# HyperShift release streams
+annotate "hypershift" "hypershift-operator-main-nightly" "hcp-main.json" "hypershift"
 
 exit $global_failure

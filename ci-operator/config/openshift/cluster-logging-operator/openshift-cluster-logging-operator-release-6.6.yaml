@@ -27,10 +27,10 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.21
+    tag: rhel-9-golang-1.26-openshift-4.23
 images:
   items:
-  - from: ubi9-minimal
+  - dockerfile_path: Dockerfile
     to: cluster-logging-operator
   - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
     from: ubi9-minimal
@@ -73,7 +73,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -93,11 +93,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
+      region: us-east-2
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.21"
+    version: "4.22"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:
@@ -105,7 +105,7 @@ tests:
       cli: latest
       commands: export GOFLAGS=-mod=mod ; export PATH=/go/bin:$PATH ; FAKE_HOME_DIR=/tmp/home
         LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
+        LOKI_OPERATOR_CHANNEL=stable-6.6 make test-e2e IMAGE_TLS_SCANNER=quay-proxy.ci.openshift.org/openshift/ci:tls-scanner_tls-scanner_tls-scanner-tool
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -130,11 +130,11 @@ tests:
     architecture: amd64
     cloud: aws
     labels:
-      region: us-east-1
+      region: us-east-2
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.21"
+    version: "4.22"
   skip_if_only_changed: ^docs/|^config/docs|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)
   steps:
     test:

@@ -48,10 +48,16 @@ MOUNTED_SPOKE_INVENTORY="/var/host_variables/${TARGET_CLUSTER_NAME}/spoke-master
 
 echo "=== IBU Upgrade eco-gotests Configuration ==="
 echo "TARGET_CLUSTER_NAME=${TARGET_CLUSTER_NAME}"
-echo "TARGET_SPOKE_CLUSTER=${TARGET_SPOKE_CLUSTER}"
+echo "TARGET_SPOKE_SNO=${TARGET_SPOKE_SNO}"
 echo "ECO_GOTESTS_FEATURES=${ECO_GOTESTS_FEATURES}"
 echo "MIRROR_REGISTRY=${MIRROR_REGISTRY}"
 echo "VERSION=${VERSION}"
+if [[ ! -s "${SHARED_DIR}/cluster_version" ]]; then
+  echo "Error: seed hub cluster version file not found: '${SHARED_DIR}/cluster_version'" >&2
+  exit 1
+fi
+SEED_IMAGE_VERSION="$(cat "${SHARED_DIR}/cluster_version")"
+echo "Seed image version=${SEED_IMAGE_VERSION}"
 echo ""
 
 # Copy target hub inventory from SHARED_DIR (target-* prefixed files saved by ibu-target-hub-deploy)
@@ -82,9 +88,9 @@ process_inventory "${MOUNTED_SPOKE_INVENTORY}" "${OCP_DEPLOYMENT_INVENTORY_PATH}
 
 echo "Target hub inventory copied from SHARED_DIR and spoke inventory processed"
 
-# Target hub kubeconfig at the standard telcov10n path on the target bastion
-TARGET_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
-TARGET_VM_NAME="master-0.${TARGET_CLUSTER_NAME}"
+# Host directory mounted into the eco-gotests container at /clusterconfigs.
+TARGET_HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}"
+TARGET_HUB_KUBECONFIG="/clusterconfigs/auth/kubeconfig"
 
 echo ""
 echo "=== Step 1: Prepare IBU target SNO and retrieve kubeconfig ==="
@@ -93,27 +99,34 @@ cd /eco-ci-cd
 ansible-playbook playbooks/ran/ibu-prepare-spoke-sno.yml \
   -i "${OCP_DEPLOYMENT_INVENTORY_PATH}/build-inventory.py" \
   --extra-vars "hub_cluster=${TARGET_CLUSTER_NAME}" \
-  --extra-vars "spoke_cluster=${TARGET_SPOKE_CLUSTER}" \
-  --extra-vars "seed_vm_name=${TARGET_VM_NAME}"
+  --extra-vars "spoke_cluster=${TARGET_SPOKE_SNO}"
 
 echo ""
 echo "=== Step 2: Run eco-gotests IBU upgrade suite ==="
-TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_CLUSTER}-kubeconfig"
+TARGET_SPOKE_KUBECONFIG="/tmp/${TARGET_SPOKE_SNO}-kubeconfig"
 
 # Build eco-gotests environment variables
 ECO_GOTESTS_ENV_VARS="-e ECO_CNF_RAN_SKIP_TLS_VERIFY=true"
 ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE=${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
-ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=${TARGET_HUB_KUBECONFIG}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_SEED_IMAGE_VERSION=${SEED_IMAGE_VERSION}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_ODAP_CM_NAME=oadp-cm"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBGU_ODAP_CM_NAMESPACE=ztp-group"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KCAT_BROKER=vran-qe-kafka.kni-qe-11.telcoqe.eng.rdu2.dc.redhat.com:9092"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_HUB=${TARGET_HUB_KUBECONFIG}"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO=/kubeconfig/kubeconfig"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_TEST_TRACE=true"
+ECO_GOTESTS_ENV_VARS+=" -e ECO_VERBOSE_SCRIPT=true"
 
 ansible-playbook playbooks/deploy-run-eco-gotests.yaml \
   -i "${CNF_INVENTORY_PATH}/switch-config.yaml" \
   --extra-vars "kubeconfig=${TARGET_SPOKE_KUBECONFIG}" \
   --extra-vars "features=${ECO_GOTESTS_FEATURES}" \
-  --extra-vars 'labels=!no-container' \
+  --extra-vars '{"labels": "\"!no-container&&(!ValidateSeedReferences)\""}' \
   --extra-vars 'eco_worker_label=""' \
   --extra-vars 'eco_cnf_core_net_switch_user=""' \
   --extra-vars 'eco_cnf_core_net_switch_pass=""' \
   --extra-vars 'eco_gotests_tag=latest' \
+  --extra-vars "hub_clusterconfigs_path=${TARGET_HUB_CLUSTERCONFIGS_PATH}" \
   --extra-vars "additional_test_env_variables=\"${ECO_GOTESTS_ENV_VARS}\""
 
 echo "Set bastion SSH configuration"
@@ -135,14 +148,28 @@ mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_upgrade"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"
+  "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/" || echo "No XML artifacts in eco_gotests upgrade — skipping"
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
-# Save junit XMLs to SHARED_DIR with junit_ prefix for ibu-report step
+# ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
+# and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
+echo "Store Polarion and junit reports for reporter step"
+for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*suite_test_junit.xml; do
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying polarion report: ${filename} -> polarion_ibu_upgrade_${filename}"
+    cp "$f" "${SHARED_DIR}/polarion_ibu_upgrade_${filename}"
+  fi
+done
 for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*.xml; do
-  [[ -f "$f" ]] && cp "$f" "${SHARED_DIR}/junit_ibu_upgrade_$(basename "$f")"
+  if [[ -f "$f" ]]; then
+    filename=$(basename "$f")
+    echo "Copying junit report: ${filename} -> junit_ibu_upgrade_${filename}"
+    cp "$f" "${SHARED_DIR}/junit_ibu_upgrade_${filename}"
+  fi
 done
 
 echo ""
 echo "=== IBU Upgrade Eco-Gotests Complete ==="
 echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"
+echo "Seed image OCP version: ${SEED_IMAGE_VERSION}"

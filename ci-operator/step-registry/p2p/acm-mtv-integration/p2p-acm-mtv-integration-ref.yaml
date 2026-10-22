@@ -1,0 +1,54 @@
+ref:
+  as: p2p-acm-mtv-integration
+  from: cli
+  commands: p2p-acm-mtv-integration-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Hand the MTV lifecycle to ACM by enabling the MultiClusterHub cnv-mtv-integrations component.
+
+    ACM then:
+      - installs the MTV operator on the hub (mtv-operator add-on on local-cluster, OperatorPolicy
+        with the channel ACM ships) and applies a ForkliftController with
+        feature_ocp_live_migration=true (CCLM),
+      - runs the mtv-integrations controller, which registers every ManagedCluster labeled
+        acm/cnv-operator-install=true as an MTV Provider <cluster>-mtv (ManagedServiceAccount +
+        ClusterPermission, token rotation handled by ACM),
+      - deploys the kubevirt-hyperconverged add-on (CNV on labeled clusters and local-cluster),
+      - installs the MTV Plan admission webhook that authorizes Plans against ACM
+        fine-grained VM RBAC (kubevirtprojects).
+
+    This step waits until MultiClusterHub is Running, the mtv-operator add-on is Available on
+    local-cluster, the ACM ForkliftController is reconciled with CCLM enabled, and the Plan
+    webhook has ready endpoints. It replaces installing mtv-operator via install-operators and
+    p2p-mtv-additional-config.
+
+    Requires acm-mch.
+  env:
+  - name: MTV_MCH_COMPONENTS
+    default: "cnv-mtv-integrations"
+    documentation: |-
+      Space-separated MultiClusterHub spec.overrides.components entries to enable.
+      In ACM 2.9+ (MCE 2.4+) ManagedServiceAccount is GA and always on via multicluster-engine;
+      only cnv-mtv-integrations needs to be gated here.
+  - name: MTV_INSTALL_NAMESPACE
+    default: "openshift-mtv"
+    documentation: Namespace where ACM installs the MTV operator and ForkliftController.
+  - name: MTV_FORKLIFT_CONTROLLER_NAME
+    default: "forklift-controller"
+    documentation: ForkliftController (and controller Deployment) name applied by the ACM add-on.
+  - name: MTV_PLAN_WEBHOOK_CONFIG_NAME
+    default: "mtv-plan-webhook-validating-configuration"
+    documentation: ValidatingWebhookConfiguration installed by mtv-integrations for Plans.
+  - name: MTV_PLAN_WEBHOOK_SERVICE_NAME
+    default: "mtv-plan-webhook-service"
+    documentation: Service backing the Plan webhook; must have ready endpoints before Plans are created.
+  - name: P2P_ACM_MTV_WAIT_TIMEOUT
+    default: "30m"
+    documentation: >-
+      Timeout for each wait (MCH Running, add-on Available, ForkliftController, webhook).
+      Accepts h/m/s units, alone or combined (e.g. 30m, 1h30m, 1h0m0s).

@@ -7,6 +7,7 @@ deck:
   additional_allowed_buckets:
   - origin-federated-results
   - prow-artifact-archive
+  - test-platform-results
   branding:
     favicon: /static/extensions/favicon.ico
     header_color: black
@@ -29,6 +30,15 @@ deck:
     rerun_auth_configs:
       github_users:
       - raelga
+      - sclarkso
+  - repo: Azure/ARO-RP
+    rerun_auth_configs:
+      github_users:
+      - hlipsig
+      - tsatam
+      - wanghaoran1988
+      - stevekuznetsov
+      - rachelvweber
   - repo: openshift/multiarch-tuning-operator
     rerun_auth_configs:
       github_team_slugs:
@@ -130,6 +140,27 @@ deck:
       github_team_slugs:
       - org: redhat-chaos
         slug: redhat-chaos
+  - repo: redhat-developer/rhdh
+    rerun_auth_configs:
+      github_orgs:
+      - redhat-developer
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
+  - repo: redhat-developer/rhdh-plugin-export-overlays
+    rerun_auth_configs:
+      github_orgs:
+      - redhat-developer
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
+  - repo: redhat-developer/rhdh-test-instance
+    rerun_auth_configs:
+      github_orgs:
+      - redhat-developer
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
   - repo: openshift/operator-framework-operator-controller
     rerun_auth_configs:
       github_team_slugs:
@@ -184,7 +215,7 @@ deck:
     bucket_aliases:
       origin-ci-test: test-platform-results
     gcs_browser_prefixes:
-      '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      '*': https://gcs.ci.openshift.org/gcs/
       openshift-eng/agent-qe-infra: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/olm-team-ai-helpers: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/ship-help-bot: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -202,9 +233,10 @@ deck:
       openshift/openshift-tests-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/verification-tests: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     gcs_browser_prefixes_by_bucket:
-      '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      '*': https://gcs.ci.openshift.org/gcs/
       origin-ci-private: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       qe-private-deck: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      test-platform-results: https://gcsweb-test-platform-results-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     lenses:
     - lens:
         name: metadata
@@ -322,7 +354,7 @@ plank:
       censoring_options:
         minimum_secret_length: 6
       gcs_configuration:
-        bucket: test-platform-results
+        bucket: test-platform-results-public
         compress_file_types:
         - txt
         - log
@@ -364,10 +396,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260714-0633879af
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260714-0633879af
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260714-0633879af
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260714-0633879af
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20261007-6ed406f29
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20261007-6ed406f29
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20261007-6ed406f29
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20261007-6ed406f29
   - config:
       censoring_options:
         exclude_directories:
@@ -511,6 +543,9 @@ plank:
     repo: openshift/ols-load-generator
   - config:
       timeout: 23h55m0s
+    repo: openshift-psap/forge
+  - config:
+      timeout: 23h55m0s
     repo: openshift-psap/topsail
   - config:
       timeout: 24h0m0s
@@ -533,6 +568,7 @@ plank:
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-priv/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -540,12 +576,12 @@ plank:
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/verification-tests: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
-  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/test-platform-results/{{end}}
+  job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/test-platform-results-public/{{end}}
     {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 2150
+  max_concurrency: 2300
   max_goroutines: 20
   max_revivals: 3
   pod_pending_timeout: 30m0s
@@ -669,7 +705,7 @@ scheduler:
   external:
     cache:
       cleanup_interval: 1h0m0s
-      entry_timeout_interval: 10m0s
+      entry_timeout_interval: 3m0s
     url: http://prowjob-dispatcher.ci.svc.cluster.local:8080
 sinker:
   max_pod_age: 6h0m0s
@@ -686,6 +722,7 @@ tide:
   batch_size_limit:
     Azure/ARO-HCP: 5
     cri-o/cri-o: -1
+    openshift-online/rosa-clusters-service: 5
   blocker_label: tide/merge-blocker
   context_options:
     from-branch-protection: true
@@ -698,6 +735,8 @@ tide:
             branches:
               main:
                 from-branch-protection: true
+                required-contexts:
+                - ci/pipeline-gate
                 required-if-present-contexts:
                 - change-detection
                 - lint
@@ -737,29 +776,346 @@ tide:
           odh-dashboard:
             required-contexts:
             - Tests
+            required-if-present-contexts:
+            - AutoML BFF Tests
+            - AutoRAG BFF Tests
+            - AutoX Core Services Tests
+            - Core BFF Tests
+            - Dashboard Operator Tests
+            - EvalHub BFF Tests
+            - EvalHub Frontend Tests
+            - Gen AI BFF Tests
+            - Gen AI Frontend Tests
+            - MaaS BFF Tests
+            - MLflow BFF Tests
+            - Model Registry BFF Tests
+            - Model Registry Frontend Tests
             skip-unknown-contexts: true
           opendatahub-operator:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
       openshift:
         repos:
+          agent-installer-utils:
+            required-contexts:
+            - ci/pipeline-gate
+          ansible-operator-plugins:
+            required-contexts:
+            - ci/pipeline-gate
+          ansible-service-broker:
+            required-contexts:
+            - ci/pipeline-gate
+          api:
+            required-contexts:
+            - ci/pipeline-gate
+          apiserver-network-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          app-netutil:
+            required-contexts:
+            - ci/pipeline-gate
           assisted-installer:
+            required-contexts:
+            - ci/pipeline-gate
             skip-unknown-contexts: true
+          assisted-installer-agent:
+            required-contexts:
+            - ci/pipeline-gate
+          assisted-service:
+            required-contexts:
+            - ci/pipeline-gate
           assisted-test-infra:
+            required-contexts:
+            - ci/pipeline-gate
             skip-unknown-contexts: true
+          autoscale-tests:
+            required-contexts:
+            - ci/pipeline-gate
           aws-account-operator:
             skip-unknown-contexts: true
+          aws-ebs-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-ebs-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-efs-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-encryption-provider:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-karpenter-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-load-balancer-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-node-termination-handler:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-pod-identity-webhook:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-disk-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-disk-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-file-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-file-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-kubernetes-kms:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-service-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-storage-azcopy:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-workload-identity:
+            required-contexts:
+            - ci/pipeline-gate
+          baremetal-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          baremetal-runtimecfg:
+            required-contexts:
+            - ci/pipeline-gate
+          bgp-cloud-connector:
+            required-contexts:
+            - ci/pipeline-gate
+          bond-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          build-test-images:
+            required-contexts:
+            - ci/pipeline-gate
+          builder:
+            required-contexts:
+            - ci/pipeline-gate
+          cert-manager-operator:
+            branches:
+              master:
+                required-contexts:
+                - ci/pipeline-gate
           cert-manager-operator-release:
             skip-unknown-contexts: true
           certman-operator:
             skip-unknown-contexts: true
           ci-docs:
             skip-unknown-contexts: true
+          ci-tools:
+            required-contexts:
+            - ci/pipeline-gate
+          cincinnati:
+            required-contexts:
+            - ci/pipeline-gate
+          cincinnati-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cli-manager:
+            required-contexts:
+            - ci/pipeline-gate
+          cli-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-credential-operator:
+            required-contexts:
+            - ci/pipeline-gate
           cloud-ingress-operator:
             skip-unknown-contexts: true
+          cloud-network-config-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-ibm:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-kubevirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-nutanix:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-powervs:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-vsphere:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-actuator-pkg:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-alibaba:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-baremetal:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-ibmcloud:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-kubevirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-libvirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-metal3:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-ovirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-vsphere:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-authentication-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-baremetal-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-bootstrap:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-capi-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-cloud-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-control-plane-machine-set-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-csi-snapshot-controller-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-dns-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-etcd-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-image-registry-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-ingress-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-apiserver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-descheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-scheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-storage-version-migrator-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-machine-approver:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-monitoring-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-network-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-nfd-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-node-tuning-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-olm-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-openshift-apiserver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-openshift-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-policy-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-resource-override-admission:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-resource-override-admission-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-samples-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-storage-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-update-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-update-keys:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-version-operator:
+            required-contexts:
+            - ci/pipeline-gate
           coderabbit:
             required-contexts:
             - CodeRabbit
+          community.okd:
+            required-contexts:
+            - ci/pipeline-gate
+          configmap-reload:
+            required-contexts:
+            - ci/pipeline-gate
           configuration-anomaly-detection:
             branches:
               main:
@@ -778,29 +1134,504 @@ tide:
                 - ci/prow/lint
                 - ci/prow/test
                 - ci/prow/validate
+          console:
+            required-contexts:
+            - ci/pipeline-gate
+          console-crontab-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          console-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          console-plugin-template:
+            required-contexts:
+            - ci/pipeline-gate
+          containernetworking-plugins:
+            required-contexts:
+            - ci/pipeline-gate
+          coredns:
+            required-contexts:
+            - ci/pipeline-gate
+          cri-o:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-nfs:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-shared-resource:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-shared-resource-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-attacher:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-provisioner:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-resizer:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-snapshot-metadata:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-snapshotter:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-livenessprobe:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-node-driver-registrar:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          custom-metrics-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
           deadmanssnitch-operator:
             skip-unknown-contexts: true
+          driver-toolkit:
+            required-contexts:
+            - ci/pipeline-gate
+          egress-router-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          elasticsearch-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          elasticsearch-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          etcd:
+            required-contexts:
+            - ci/pipeline-gate
+          external-dns-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          external-secrets-operator:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+          faas-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          file-integrity-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          frr:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-filestore-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-pd-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-pd-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
           gcp-project-operator:
             skip-unknown-contexts: true
+          gcp-workload-identity-federation-webhook:
+            required-contexts:
+            - ci/pipeline-gate
+          grafana:
+            required-contexts:
+            - ci/pipeline-gate
+          hive:
+            required-contexts:
+            - ci/pipeline-gate
+          hypershift:
+            required-contexts:
+            - ci/pipeline-gate
+          ib-sriov-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-powervs-block-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-powervs-block-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-vpc-block-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-vpc-block-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          image-customization-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          image-registry:
+            required-contexts:
+            - ci/pipeline-gate
+          images:
+            required-contexts:
+            - ci/pipeline-gate
+          insights-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          insights-runtime-extractor:
+            required-contexts:
+            - ci/pipeline-gate
+          installer:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-agent-image:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-image:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-rhcos-downloader:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-static-ip-manager:
+            required-contexts:
+            - ci/pipeline-gate
           jenkins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-client-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-openshift-login-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-sync-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jobset-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          k8s-prometheus-adapter:
+            required-contexts:
+            - ci/pipeline-gate
+          karpenter-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          kedacore-keda:
+            required-contexts:
+            - ci/pipeline-gate
+          konflux-tasks:
+            required-contexts:
+            - ci/pipeline-gate
+          kube-rbac-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          kube-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          kubecsr:
+            required-contexts:
+            - ci/pipeline-gate
+          kubefed-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-autoscaler:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-kube-storage-version-migrator:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-metrics-server:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-nmstate:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-sigs-karpenter:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-sigs-resource-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          kubevirt-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          kueue-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          library-go:
+            required-contexts:
+            - ci/pipeline-gate
           lightspeed-service:
             skip-unknown-contexts: true
+          local-storage-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          lvm-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          lws-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-ibmcloud:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-nutanix:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-powervs:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-os-images:
+            required-contexts:
+            - ci/pipeline-gate
           managed-node-metadata-operator:
             skip-unknown-contexts: true
           managed-upgrade-operator:
             skip-unknown-contexts: true
           managed-velero-operator:
             skip-unknown-contexts: true
+          metallb-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          microshift:
+            required-contexts:
+            - ci/pipeline-gate
+          monitoring-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          multiarch:
+            required-contexts:
+            - ci/pipeline-gate
+          multiarch-tuning-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-admission-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-networkpolicy:
+            required-contexts:
+            - ci/pipeline-gate
+          must-gather:
+            required-contexts:
+            - ci/pipeline-gate
+          must-gather-operator:
+            branches:
+              master:
+                required-contexts:
+                - ci/pipeline-gate
+          network-metrics-daemon:
+            required-contexts:
+            - ci/pipeline-gate
+          network-tools:
+            required-contexts:
+            - ci/pipeline-gate
+          network.offline_migration_sdn_to_ovnk:
+            required-contexts:
+            - ci/pipeline-gate
+          networking-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          nmstate-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          node-observability-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          node_exporter:
+            required-contexts:
+            - ci/pipeline-gate
+          oadp-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-apiserver:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-server:
+            required-contexts:
+            - ci/pipeline-gate
+          oc:
+            required-contexts:
+            - ci/pipeline-gate
+          oc-compliance:
+            required-contexts:
+            - ci/pipeline-gate
+          oc-mirror:
+            required-contexts:
+            - ci/pipeline-gate
           ocm-agent:
             skip-unknown-contexts: true
           ocm-agent-operator:
             skip-unknown-contexts: true
+          ocp-release-operator-sdk:
+            required-contexts:
+            - ci/pipeline-gate
+          okd-machine-os:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-ansible:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-apiserver:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-controller-manager:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-mcp-server:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-restclient-python:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-tests-private:
+            required-contexts:
+            - ci/pipeline-gate
+          openstack-resource-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-catalogd:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-olm:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-operator-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-rukpak:
+            required-contexts:
+            - ci/pipeline-gate
+          origin:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.12:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.13:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.14:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.15:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.16:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.17:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.18:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.19:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.20:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.21:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.22:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.23:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.0:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.1:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.2:
+                required-contexts:
+                - ci/pipeline-gate
+          origin-aggregated-logging:
+            required-contexts:
+            - ci/pipeline-gate
+          origin-branding:
+            required-contexts:
+            - ci/pipeline-gate
+          os:
+            required-contexts:
+            - ci/pipeline-gate
           osd-cluster-ready:
             skip-unknown-contexts: true
+          osde2e:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+          ovirt-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ovirt-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ovn-kubernetes:
+            required-contexts:
+            - ci/pipeline-gate
           pagerduty-operator:
             skip-unknown-contexts: true
+          pf-status-relay-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          platform-operators:
+            required-contexts:
+            - ci/pipeline-gate
+          project-request-limit:
+            required-contexts:
+            - ci/pipeline-gate
+          prom-label-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus-alertmanager:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ptp-operator:
+            required-contexts:
+            - ci/pipeline-gate
           rbac-permissions-operator:
             branches:
               master:
@@ -821,11 +1652,114 @@ tide:
                 - ci/prow/commits
                 - ci/prow/lint
                 - ci/prow/test
+          route-controller-manager:
+            required-contexts:
+            - ci/pipeline-gate
           route-monitor-operator:
             branches:
               master:
                 required-if-present-contexts:
                 - ci/prow/e2e-binary-build-success
+          route-override-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          router:
+            required-contexts:
+            - ci/pipeline-gate
+          run-once-duration-override:
+            required-contexts:
+            - ci/pipeline-gate
+          run-once-duration-override-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          sandboxed-containers-operator:
+            branches:
+              devel:
+                required-if-present-contexts:
+                - Red Hat Konflux / build-test-images / osc-operator
+                - Red Hat Konflux / make-test / osc-operator
+            required-contexts:
+            - ci/pipeline-gate
+          sdn:
+            required-contexts:
+            - ci/pipeline-gate
+          secondary-scheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          secrets-store-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          secrets-store-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          security-profiles-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          service-ca-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          service-catalog:
+            required-contexts:
+            - ci/pipeline-gate
+          sippy:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-dp-admission-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-network-device-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-network-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          telemeter:
+            required-contexts:
+            - ci/pipeline-gate
+          template-service-broker:
+            required-contexts:
+            - ci/pipeline-gate
+          thanos:
+            required-contexts:
+            - ci/pipeline-gate
+          tls-scanner:
+            required-contexts:
+            - ci/pipeline-gate
+          topolvm:
+            required-contexts:
+            - ci/pipeline-gate
+          vertical-pod-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          vmware-vsphere-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          vmware-vsphere-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          volume-data-source-validator:
+            required-contexts:
+            - ci/pipeline-gate
+          vsphere-problem-detector:
+            required-contexts:
+            - ci/pipeline-gate
+          whereabouts-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          windows-machine-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          windows-machine-config-operator-fbc:
+            required-contexts:
+            - ci/pipeline-gate
+          zero-trust-workload-identity-manager:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
       openshift-eng:
         repos:
           coderabbit:
@@ -833,30 +1767,895 @@ tide:
             - CodeRabbit
       openshift-online:
         repos:
+          aws-nuke-cf:
+            skip-unknown-contexts: true
           coderabbit:
             required-contexts:
             - CodeRabbit
+          gcp-hcp-infra:
+            branches:
+              main:
+                required-if-present-contexts:
+                - ci/prow/terraform-plan
+          rosa-seaplane-api:
+            skip-unknown-contexts: true
+          rosa-seaplane-kube-applier:
+            skip-unknown-contexts: true
+          rosa-seaplane-zoa:
+            from-branch-protection: true
+            required-if-present-contexts:
+            - Konflux kflux-prd-rh02 / zoa-lambda-on-pull-request
+            - Konflux kflux-prd-rh02 / zoa-runner-on-pull-request
+            skip-unknown-contexts: true
       openshift-priv:
         repos:
+          agent-installer-utils:
+            required-contexts:
+            - ci/pipeline-gate
+          ansible-operator-plugins:
+            required-contexts:
+            - ci/pipeline-gate
+          ansible-service-broker:
+            required-contexts:
+            - ci/pipeline-gate
+          api:
+            required-contexts:
+            - ci/pipeline-gate
+          apiserver-network-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          app-netutil:
+            required-contexts:
+            - ci/pipeline-gate
           assisted-installer:
+            required-contexts:
+            - ci/pipeline-gate
             skip-unknown-contexts: true
+          assisted-installer-agent:
+            required-contexts:
+            - ci/pipeline-gate
+          assisted-installer-ui:
+            required-contexts:
+            - ci/pipeline-gate
+          assisted-service:
+            required-contexts:
+            - ci/pipeline-gate
+          autoscale-tests:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-ebs-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-ebs-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-efs-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-encryption-provider:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-karpenter-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-node-termination-handler:
+            required-contexts:
+            - ci/pipeline-gate
+          aws-pod-identity-webhook:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-disk-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-disk-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-file-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-file-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-kubernetes-kms:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-service-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-storage-azcopy:
+            required-contexts:
+            - ci/pipeline-gate
+          azure-workload-identity:
+            required-contexts:
+            - ci/pipeline-gate
+          baremetal-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          baremetal-runtimecfg:
+            required-contexts:
+            - ci/pipeline-gate
+          bond-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          build-test-images:
+            required-contexts:
+            - ci/pipeline-gate
+          builder:
+            required-contexts:
+            - ci/pipeline-gate
+          cert-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cli-manager:
+            required-contexts:
+            - ci/pipeline-gate
+          cli-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-credential-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-network-config-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-ibm:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-kubevirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-nutanix:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-powervs:
+            required-contexts:
+            - ci/pipeline-gate
+          cloud-provider-vsphere:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-actuator-pkg:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-alibaba:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-baremetal:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-ibmcloud:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-kubevirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-libvirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-metal3:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-ovirt:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-api-provider-vsphere:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-authentication-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-baremetal-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-bootstrap:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-capi-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-cloud-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-control-plane-machine-set-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-csi-snapshot-controller-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-dns-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-etcd-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-image-registry-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-ingress-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-apiserver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-descheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-scheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-kube-storage-version-migrator-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-machine-approver:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-monitoring-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-network-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-nfd-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-node-tuning-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-olm-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-openshift-apiserver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-openshift-controller-manager-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-policy-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-resource-override-admission:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-resource-override-admission-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-samples-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-storage-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-update-keys:
+            required-contexts:
+            - ci/pipeline-gate
+          cluster-version-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          configmap-reload:
+            required-contexts:
+            - ci/pipeline-gate
+          console:
+            required-contexts:
+            - ci/pipeline-gate
+          console-crontab-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          console-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          console-plugin-template:
+            required-contexts:
+            - ci/pipeline-gate
+          containernetworking-plugins:
+            required-contexts:
+            - ci/pipeline-gate
+          coredns:
+            required-contexts:
+            - ci/pipeline-gate
+          cri-o:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-nfs:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-shared-resource:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-driver-shared-resource-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-attacher:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-provisioner:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-resizer:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-snapshot-metadata:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-external-snapshotter:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-livenessprobe:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-node-driver-registrar:
+            required-contexts:
+            - ci/pipeline-gate
+          csi-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          custom-metrics-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          downstream-ptp-operator-monorepo:
+            required-contexts:
+            - ci/pipeline-gate
+          driver-toolkit:
+            required-contexts:
+            - ci/pipeline-gate
+          egress-router-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          etcd:
+            required-contexts:
+            - ci/pipeline-gate
+          external-dns-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          file-integrity-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          frr:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-filestore-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-pd-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-pd-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          gcp-workload-identity-federation-webhook:
+            required-contexts:
+            - ci/pipeline-gate
+          grafana:
+            required-contexts:
+            - ci/pipeline-gate
+          hive:
+            required-contexts:
+            - ci/pipeline-gate
+          hypershift:
+            required-contexts:
+            - ci/pipeline-gate
+          ib-sriov-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-powervs-block-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-powervs-block-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-vpc-block-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ibm-vpc-block-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          image-customization-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          image-registry:
+            required-contexts:
+            - ci/pipeline-gate
+          images:
+            required-contexts:
+            - ci/pipeline-gate
+          insights-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          insights-runtime-extractor:
+            required-contexts:
+            - ci/pipeline-gate
+          installer:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-agent-image:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-image:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-rhcos-downloader:
+            required-contexts:
+            - ci/pipeline-gate
+          ironic-static-ip-manager:
+            required-contexts:
+            - ci/pipeline-gate
           jenkins:
             optional-regex-contexts:
             - Red\ Hat\ Konflux.*
-          operator-lifecycle-manager:
-            branches:
-              master:
-                skip-unknown-contexts: true
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-client-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-openshift-login-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jenkins-sync-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          jobset-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          k8s-prometheus-adapter:
+            required-contexts:
+            - ci/pipeline-gate
+          karpenter-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          kedacore-keda:
+            required-contexts:
+            - ci/pipeline-gate
+          kube-rbac-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          kube-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          kubecsr:
+            required-contexts:
+            - ci/pipeline-gate
+          kubefed-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-autoscaler:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-kube-storage-version-migrator:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-metrics-server:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-nmstate:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-sigs-karpenter:
+            required-contexts:
+            - ci/pipeline-gate
+          kubernetes-sigs-resource-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          kubevirt-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          library-go:
+            required-contexts:
+            - ci/pipeline-gate
+          local-storage-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          lvm-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          lws-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-aws:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-azure:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-gcp:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-ibmcloud:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-nutanix:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-openstack:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-api-provider-powervs:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          machine-os-images:
+            required-contexts:
+            - ci/pipeline-gate
+          metallb-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          microshift:
+            required-contexts:
+            - ci/pipeline-gate
+          migtools-kubevirt-datamover-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          migtools-kubevirt-datamover-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          monitoring-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          multiarch-tuning-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-admission-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          multus-networkpolicy:
+            required-contexts:
+            - ci/pipeline-gate
+          must-gather:
+            required-contexts:
+            - ci/pipeline-gate
+          must-gather-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          network-metrics-daemon:
+            required-contexts:
+            - ci/pipeline-gate
+          network-tools:
+            required-contexts:
+            - ci/pipeline-gate
+          network.offline_migration_sdn_to_ovnk:
+            required-contexts:
+            - ci/pipeline-gate
+          networking-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          nmstate-console-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          node-observability-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          node_exporter:
+            required-contexts:
+            - ci/pipeline-gate
+          oadp-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-apiserver:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          oauth-server:
+            required-contexts:
+            - ci/pipeline-gate
+          oc:
+            required-contexts:
+            - ci/pipeline-gate
+          oc-mirror:
+            required-contexts:
+            - ci/pipeline-gate
+          ocp-release-operator-sdk:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-ansible:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-apiserver:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-controller-manager:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-mcp-server:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-state-metrics:
+            required-contexts:
+            - ci/pipeline-gate
+          openshift-tests-private:
+            required-contexts:
+            - ci/pipeline-gate
+          openstack-resource-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-catalogd:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-olm:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-operator-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          operator-framework-rukpak:
+            required-contexts:
+            - ci/pipeline-gate
           operator-marketplace:
             branches:
               master:
                 skip-unknown-contexts: true
-          operator-registry:
+            required-contexts:
+            - ci/pipeline-gate
+          origin:
             branches:
-              master:
-                skip-unknown-contexts: true
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.12:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.13:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.14:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.15:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.16:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.17:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.18:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.19:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.20:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.21:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.22:
+                required-contexts:
+                - ci/pipeline-gate
+              release-4.23:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.0:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.1:
+                required-contexts:
+                - ci/pipeline-gate
+              release-5.2:
+                required-contexts:
+                - ci/pipeline-gate
+          os:
+            required-contexts:
+            - ci/pipeline-gate
+          ovirt-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          ovirt-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ovn-kubernetes:
+            required-contexts:
+            - ci/pipeline-gate
+          pf-status-relay-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          platform-operators:
+            required-contexts:
+            - ci/pipeline-gate
+          project-request-limit:
+            required-contexts:
+            - ci/pipeline-gate
+          prom-label-proxy:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus-alertmanager:
+            required-contexts:
+            - ci/pipeline-gate
+          prometheus-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          ptp-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          quay-quay-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          route-controller-manager:
+            required-contexts:
+            - ci/pipeline-gate
+          route-override-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          router:
+            required-contexts:
+            - ci/pipeline-gate
+          run-once-duration-override:
+            required-contexts:
+            - ci/pipeline-gate
+          run-once-duration-override-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          sdn:
+            required-contexts:
+            - ci/pipeline-gate
+          secondary-scheduler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          secrets-store-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          secrets-store-csi-driver-operator:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+          service-ca-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          service-catalog:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-dp-admission-controller:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-network-device-plugin:
+            required-contexts:
+            - ci/pipeline-gate
+          sriov-network-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          telemeter:
+            required-contexts:
+            - ci/pipeline-gate
+          template-service-broker:
+            required-contexts:
+            - ci/pipeline-gate
+          thanos:
+            required-contexts:
+            - ci/pipeline-gate
+          tls-scanner:
+            required-contexts:
+            - ci/pipeline-gate
           vector:
             skip-unknown-contexts: true
+          vertical-pod-autoscaler-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          vmware-vsphere-csi-driver:
+            required-contexts:
+            - ci/pipeline-gate
+          vmware-vsphere-csi-driver-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          volume-data-source-validator:
+            required-contexts:
+            - ci/pipeline-gate
+          vsphere-problem-detector:
+            required-contexts:
+            - ci/pipeline-gate
+          whereabouts-cni:
+            required-contexts:
+            - ci/pipeline-gate
+          windows-machine-config-operator:
+            required-contexts:
+            - ci/pipeline-gate
+          zero-trust-workload-identity-manager:
+            required-contexts:
+            - ci/pipeline-gate
+      openshift-service-mesh:
+        repos:
+          istio:
+            branches:
+              master:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.24:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.26:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.27:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.28:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.30:
+                required-contexts:
+                - ci/pipeline-gate
+              release-1.31:
+                required-contexts:
+                - ci/pipeline-gate
+          sail-operator:
+            branches:
+              main:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.0:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.1:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.2:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.3:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.4:
+                required-contexts:
+                - ci/pipeline-gate
+              release-3.5:
+                required-contexts:
+                - ci/pipeline-gate
       operator-framework:
         repos:
           api:
@@ -871,6 +2670,8 @@ tide:
             branches:
               master:
                 skip-unknown-contexts: true
+            required-contexts:
+            - ci/pipeline-gate
           operator-registry:
             branches:
               master:
@@ -908,8 +2709,43 @@ tide:
                 - ci/prow/e2e-presubmits-rosa-hcp-private-critical-high-presubmit
                 - ci/prow/e2e-presubmits-rosa-sts-advanced-critical-high-presubmit
                 - ci/prow/e2e-presubmits-rosa-sts-private-critical-high-presubmit
+          terraform-rhcs-rosa-classic:
+            branches:
+              main:
+                required-if-present-contexts:
+                - ci/prow/rosa-classic-private-with-autoscaler-unmanaged-oidc-byo-vpc
+                - ci/prow/rosa-classic-public
+          terraform-rhcs-rosa-hcp:
+            branches:
+              main:
+                required-if-present-contexts:
+                - ci/prow/rosa-hcp-private
+                - ci/prow/rosa-hcp-public
   display_all_tide_queries_in_status: true
+  github_merge_blocks_policy:
+    migtools/filebrowser: block
+    migtools/kopia: block
+    migtools/kubevirt-datamover-controller: block
+    migtools/kubevirt-datamover-plugin: block
+    migtools/kubevirt-velero-plugin: block
+    migtools/oadp-cli: block
+    migtools/oadp-non-admin: block
+    migtools/oadp-vm-file-restore: block
+    migtools/oadp-vmdp: block
+    migtools/udistribution: block
+    openshift/hypershift-oadp-plugin: block
+    openshift/oadp-must-gather: block
+    openshift/oadp-operator: block
+    openshift/openshift-velero-plugin: block
+    openshift/restic: block
+    openshift/velero: block
+    openshift/velero-plugin-for-aws: block
+    openshift/velero-plugin-for-csi: block
+    openshift/velero-plugin-for-gcp: block
+    openshift/velero-plugin-for-legacy-aws: block
+    openshift/velero-plugin-for-microsoft-azure: block
   max_goroutines: 100
+  max_query_concurrency: 25
   merge_label: tide/merge-method-merge
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
@@ -922,6 +2758,7 @@ tide:
     openshift-hyperfleet/hyperfleet-sentinel: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-priv/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/distributed-tracing-qe: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
@@ -931,6 +2768,8 @@ tide:
   priority:
   - labels:
     - priority/ci-critical
+  - labels:
+    - ci/severity-critical
   - labels:
     - jira/severity-critical
   - labels:

@@ -58,6 +58,16 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
 - always_run: false
+  as: e2e-aws-ovn-multi-cidr
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_ARGS: --disable-monitor=legacy-test-framework-invariants-alerts,metrics-endpoints-down
+      TEST_SKIPS: alerts in firing state
+    workflow: openshift-e2e-aws-ovn-multi-cidr
+- always_run: false
   as: e2e-agent-compact-ipv4
   capabilities:
   - intranet
@@ -84,6 +94,7 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-aws-ovn-microshift
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -122,6 +133,72 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv4-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-ipv6-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
@@ -137,6 +214,24 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
+  as: e2e-aws-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-aws-core-networking-bastion
 - always_run: false
   as: e2e-aws-ovn-fdp-qe
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
@@ -194,6 +289,24 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
 - always_run: false
+  as: e2e-azure-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
+  as: e2e-azure-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-azure-core-networking-bastion
+- always_run: false
   as: e2e-aws-ovn-upgrade
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
@@ -249,6 +362,24 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: openshift-e2e-gcp-core-networking-bastion
+- always_run: false
+  as: e2e-gcp-core-networking-serial-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: openshift-e2e-gcp-core-networking-bastion
 - always_run: false
   as: e2e-vsphere-windows
   optional: true
@@ -347,6 +478,15 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-serial
+  capabilities:
+  - intranet
+  optional: true
+  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw-serial
+- always_run: false
   as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
   capabilities:
   - intranet
@@ -362,6 +502,23 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-hypershift-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-hypershift-kubevirt-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-kubevirt-conformance
 - as: unit
   commands: |
     cd go-controller
@@ -635,6 +792,31 @@ tests:
     test:
     - chain: openshift-qe-cluster-density-v2
     workflow: openshift-qe-installer-aws
+- always_run: false
+  as: cudn-density-single-ns-1000-24nodes
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "24"
+      BASE_DOMAIN: ibmcloud-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: bxf-16x64
+      CONTROL_PLANE_INSTANCE_TYPE: bx3d-96x480
+      DISK_NAME: vdb
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
+        --local-indexing
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bxf-64x256
+      OVERRIDE_ITERATIONS: "1000"
+      RESOURCE_GROUP: ocp-cpt
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cudn-density
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
 - always_run: false
   as: perfscale-aws-ovn-small-node-density-cni
   optional: true

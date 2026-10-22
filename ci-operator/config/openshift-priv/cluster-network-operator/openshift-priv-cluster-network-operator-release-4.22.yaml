@@ -29,20 +29,20 @@ images:
     to: cluster-network-operator
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -239,6 +239,7 @@ tests:
     workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-gcp-ovn-techpreview
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -496,6 +497,15 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- always_run: false
+  as: e2e-metal-ipi-ovn-secondary-encap
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^bindata\/network\/ovn-kubernetes\/common\/008-script-lib\.yaml$|^bindata\/network\/ovn-kubernetes\/(managed|self-hosted)\/ovnkube-node\.yaml$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: cluster-network-operator-ovn-secondary-encap
 - always_run: false
   as: e2e-aws-ovn-fdp-qe
   pipeline_skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$

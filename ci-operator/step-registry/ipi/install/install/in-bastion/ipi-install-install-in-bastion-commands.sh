@@ -220,7 +220,8 @@ esac
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" \
+  | tee "${ARTIFACT_DIR}/install-config.yaml"
 
 run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${SHARED_DIR}/install-config.yaml" "${REMOTE_INSTALL_DIR}"
 # move private key to ~/.ssh/ so that installer can use it to gather logs on

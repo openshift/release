@@ -10,6 +10,8 @@ echo "************ Fix container user ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+catalog_info_dir=$(mktemp -d)
+
 function update_openshift_config_pull_secret {
 
   echo "************ telcov10n Add preGA credentials to openshift config pull-secret ************"
@@ -68,436 +70,1670 @@ EOF
   jq '.data.".dockerconfigjson" = "'${new_dot_dockerconfig_data}'"' /tmp/dot-dockerconfig.json | oc replace -f -
 }
 
-function append_production_path_idms_entries {
-  # This function addresses the PreGA catalog mirror path mismatch issue.
-  # PreGA oc-mirror generates IDMS with development registry paths (e.g., acm-d, redhat-user-workloads),
-  # but operator CSVs reference production paths (e.g., rhacm2, multicluster-engine, openshift-gitops-1).
-  # Without these additional entries, ACM/MCE/GitOps operators will fail with ImagePullBackOff.
-  #
-  # This fix ensures only ONE node reboot is needed by appending entries to the IDMS
-  # before it's applied to the cluster.
-  #
-  # Reference: .cursor/docs/troubleshooting/prega-catalog-mirror-issue.md
-
-  local idms_file="${1}"
-
-  echo "************ telcov10n Append production path IDMS entries ************"
-  echo ""
-  echo "Checking if production path entries need to be added to IDMS..."
-  echo "This is required because PreGA oc-mirror generates IDMS with development paths (acm-d, redhat-user-workloads)"
-  echo "but operator CSVs reference production paths (rhacm2, multicluster-engine, openshift-gitops-1)"
-  echo ""
-
-  # Check if the production path entries are already in the IDMS file
-  local needs_rhacm2=false
-  local needs_mce=false
-  local needs_gitops=false
-
-  if ! grep -q "registry.redhat.io/rhacm2" "${idms_file}"; then
-    echo "- Missing: registry.redhat.io/rhacm2 (ACM production path)"
-    needs_rhacm2=true
-  else
-    echo "✓ Found: registry.redhat.io/rhacm2"
-  fi
-
-  if ! grep -q "registry.redhat.io/multicluster-engine" "${idms_file}"; then
-    echo "- Missing: registry.redhat.io/multicluster-engine (MCE production path)"
-    needs_mce=true
-  else
-    echo "✓ Found: registry.redhat.io/multicluster-engine"
-  fi
-
-  if ! grep -q "registry.redhat.io/openshift-gitops-1" "${idms_file}"; then
-    echo "- Missing: registry.redhat.io/openshift-gitops-1 (GitOps production path)"
-    needs_gitops=true
-  else
-    echo "✓ Found: registry.redhat.io/openshift-gitops-1"
-  fi
-
-  # If any entries are missing, append them to the IDMS file
-  if [ "${needs_rhacm2}" = true ] || [ "${needs_mce}" = true ] || [ "${needs_gitops}" = true ]; then
-    echo ""
-    echo "Appending missing production path entries to ${idms_file}..."
-
-    if [ "${needs_rhacm2}" = true ]; then
-      cat <<'EOF' >> "${idms_file}"
-  - mirrors:
-    - quay.io/prega/test/acm-d
-    source: registry.redhat.io/rhacm2
-EOF
-      echo "  ✓ Added registry.redhat.io/rhacm2 → quay.io/prega/test/acm-d"
-    fi
-
-    if [ "${needs_mce}" = true ]; then
-      cat <<'EOF' >> "${idms_file}"
-  - mirrors:
-    - quay.io/prega/test/acm-d
-    source: registry.redhat.io/multicluster-engine
-EOF
-      echo "  ✓ Added registry.redhat.io/multicluster-engine → quay.io/prega/test/acm-d"
-    fi
-
-    if [ "${needs_gitops}" = true ]; then
-      cat <<'EOF' >> "${idms_file}"
-  - mirrors:
-    - quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant
-    source: registry.redhat.io/openshift-gitops-1
-EOF
-      echo "  ✓ Added registry.redhat.io/openshift-gitops-1 → quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant"
-    fi
-
-    echo ""
-    echo "✓ Production path entries appended successfully"
-    echo "  This ensures ACM, MCE, and GitOps operators can pull images from PreGA mirror"
-    echo ""
-  else
-    echo ""
-    echo "✓ All required production path IDMS entries already exist in the file. No changes needed."
-    echo ""
-  fi
-}
-
 function apply_catalog_source_and_image_digest_mirror_set {
 
-  SSHOPTS=(-o 'ConnectTimeout=5'
-    -o 'StrictHostKeyChecking=no'
-    -o 'UserKnownHostsFile=/dev/null'
-    -o 'ServerAliveInterval=90'
-    -o LogLevel=ERROR
-    -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+  local prega_info_dir="${catalog_info_dir}"
 
-  catalog_info_dir=$(mktemp -d)
+  echo
+  echo "----------------------------------------------------------------------------------------------"
+  echo "--------------------- catalogSource.yaml -------------------------"
+  cat "${prega_info_dir}/catalogSource.yaml"
+  echo "------------- imageDigestMirrorSet.yaml -----------------"
+  cat "${prega_info_dir}/imageDigestMirrorSet.yaml"
+  echo "----------------------------------------------------------------------------------------------"
 
-  echo "Copy PreGA pull secret to temporary file to AUX_HOST"
-  scp "${SSHOPTS[@]}" "/var/run/telcov10n/ztp-left-shifting/prega-pull-secret" "root@${AUX_HOST}:/tmp/prega-pull-secret"
-
-  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${PREGA_CATSRC_AND_IDMS_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
-    "${catalog_info_dir}" "${IMAGE_INDEX_OCP_VERSION}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-## Reading pull secret before set -x to avoid logging the secret
-echo "Read Pull secret from temporary file"
-prega_pull_secret="$(cat /tmp/prega-pull-secret)"
-rm -rf /tmp/prega-pull-secret
-
-set -x
-catalog_soruces_url="${1}"
-prega_operator_index_tags_url="${2}"
-image_index_ocp_version="${4}"
-tag_version="v${4}.0"
-
-
-function findout_manifest_digest {
-  # Query Quay API for stable tag to get manifest digest
-  # This approach uses Quay's maintained stable tags (v4.21, v4.22)
-  # which always point to validated, production-ready catalog indices
-
-  local stable_tag="${tag_version%.0}"  # v4.21.0 -> v4.21
-
-  echo "==============================================================================" >&2
-  echo "Save PreGA pull secret to a temporary file" >&2
-  echo "==============================================================================" >&2
-
-  local prega_pull_secret_dir="$(mktemp -d)"
-  local prega_pull_secret_path="${prega_pull_secret_dir}/config.json"
-
-  cat > "${prega_pull_secret_path}" <<IEOF
-  {
-    "auths": {
-      "quay.io": {
-        "auth": "${prega_pull_secret}"
-      }
-    }
-  }
-IEOF
-
-  echo "==============================================================================" >&2
-  echo "Querying Quay for stable PreGA catalog tag: ${stable_tag}" >&2
-  echo "==============================================================================" >&2
-
-  local repo=$(echo "${prega_operator_index_tags_url}" | sed -E 's|https?://([^/]+)/api/v1/repository/([^/]+/[^/]+).*|\1/\2|')
-
-# Try stable tag first (v4.21) - most reliable
-  local image="${repo}:${stable_tag}"
-  echo "Attempting to inspect: ${image}" >&2
-
-  local res
-  res=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
-
-  if [ -n "${res}" ] && [ "${res}" != "null" ]; then
-    echo "✓ Found stable tag ${stable_tag} with manifest digest: ${res:0:20}..." >&2
-    rm -rf "${prega_pull_secret_dir}"
-    echo "${res}"
-    return 0
-  fi
-
-  echo "WARNING: Stable tag ${stable_tag} not found, trying fallback with ${tag_version}" >&2
-
-  # Fallback 1: Try with .0 suffix (v4.21.0)
-  image="${repo}:${tag_version}"
-  echo "Attempting to inspect: ${image}" >&2
-
-  res=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
-
-  # Clean up temporary directory
-  rm -rf "${prega_pull_secret_dir}"
-
-  if [ -n "${res}" ] && [ "${res}" != "null" ]; then
-    echo "✓ Found tag ${tag_version} with manifest digest: ${res:0:20}..." >&2
-    echo "${res}"
-    return 0
-  fi
-
-  echo "ERROR: Could not determine manifest digest using podman" >&2
-  echo "null"
-  return 1
-}
-
-function get_related_catalogs_and_idms_manifests {
-  # Find the timestamped version on mirror site that matches the manifest digest
-  # from the stable tag query using podman instead of Quay API
-
-  local query_tag="${tag_version%.*}-"  # v4.21.0 -> v4.21-
-
-  echo "" >&2
-  echo "==============================================================================" >&2
-  echo "Finding timestamped version matching manifest digest using podman" >&2
-  echo "==============================================================================" >&2
-  echo "Query pattern: ${query_tag}*" >&2
-  echo "Target digest: ${selected_manifest_digest:0:20}..." >&2
-
-  # Create temporary auth file for podman
-  local prega_pull_secret_dir="$(mktemp -d)"
-  local prega_pull_secret_path="${prega_pull_secret_dir}/config.json"
-
-  cat > "${prega_pull_secret_path}" <<IEOF
-  {
-    "auths": {
-      "quay.io": {
-        "auth": "${prega_pull_secret}"
-      }
-    }
-  }
-IEOF
-
-  # Get repository from URL
-  local repo=$(echo "${prega_operator_index_tags_url}" | sed -E 's|https?://([^/]+)/api/v1/repository/([^/]+/[^/]+).*|\1/\2|')
-
-  # Get list of available timestamped tags from mirror site
-  # This is more efficient than brute-force checking all possible timestamps
-  echo "Fetching available tags from mirror site..." >&2
-  local available_tags=$(curl -sSLk --retry 5 --retry-delay 30 --retry-all-errors "${catalog_soruces_url}" 2>/dev/null | grep -oP "${query_tag%-}-"'\d+T\d+' | sort -ru)
-
-  if [ -z "${available_tags}" ]; then
-    echo "WARNING: No timestamped tags found on mirror site for pattern ${query_tag}*" >&2
-    rm -rf "${prega_pull_secret_dir}"
-    echo "ERROR: Could not find timestamped tags on mirror site" >&2
-    echo "${selected_manifest_digest}-not-found"
-    return 1
-  fi
-
-  echo "Found $(echo "${available_tags}" | wc -l) candidate tags on mirror site" >&2
-
-  # Check each available tag with podman to find the one matching our digest
-  local found_tag=""
-  local checked_count=0
-
-  while IFS= read -r candidate_tag; do
-    # Remove trailing slash if present
-    candidate_tag="${candidate_tag%/}"
-
-    checked_count=$((checked_count + 1))
-    echo "Checking tag ${checked_count}: ${candidate_tag}..." >&2
-
-    local image="${repo}:${candidate_tag}"
-    local digest=$(podman manifest inspect --authfile "${prega_pull_secret_path}" "${image}" 2>/dev/null | jq -r '.manifests[0].digest // empty' 2>/dev/null)
-
-    if [ -n "${digest}" ] && [ "${digest}" == "${selected_manifest_digest}" ]; then
-      echo "✓ Found matching timestamped tag: ${candidate_tag}" >&2
-      found_tag="${candidate_tag}"
-      break
-    fi
-  done <<< "${available_tags}"
-
-  # Clean up temporary directory
-  rm -rf "${prega_pull_secret_dir}"
-
-  if [ -n "${found_tag}" ]; then
-    echo "${found_tag}"
-    return 0
-  fi
-
-  # If not found, return error indication
-  echo "ERROR: Could not find timestamped tag matching manifest digest using podman (checked ${checked_count} tags)" >&2
-  echo "${selected_manifest_digest}-not-found"
-}
-
-# Step 1: Get manifest digest from Quay stable tag
-selected_manifest_digest=$(findout_manifest_digest)
-
-if [ "${selected_manifest_digest}" == "null" ] || [ -z "${selected_manifest_digest}" ]; then
-  echo "ERROR: Failed to determine manifest digest"
-  exit 1
-fi
-
-# Step 2: Find timestamped version with matching digest
-version_tag=$(get_related_catalogs_and_idms_manifests)
-
-if [ -z "$version_tag" ] || [[ "$version_tag" == *"-not-found" ]]; then
-  echo "ERROR: Failed to find matching timestamped version on mirror"
-  echo "This likely indicates a race condition - stable tag updated before mirror published"
-  exit 1
-fi
-
-echo ""
-echo "=============================================================================="
-echo "Checking if selected catalog exists on mirror site"
-echo "=============================================================================="
-
-# Check if version exists on mirror
-status_code=$(curl -sSLk -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
-
-if [ "$status_code" -ne 200 ]; then
-  echo "ERROR: Selected version ${version_tag} not found on mirror (HTTP ${status_code})"
-  echo "Mirror may not be ready yet"
-  echo ""
-  echo "Available versions on mirror site:"
-  curl -sSLk "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
-  exit 1
-fi
-
-echo "✓ Version ${version_tag} is available on mirror site (HTTP ${status_code})"
-echo ""
-
-info_dir=${3}/${version_tag}
-mkdir -pv ${info_dir}
-pushd .
-cd ${info_dir}
-
-
-download_url="${catalog_soruces_url}/${version_tag}"
-
-echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
-yaml_files=$(curl -sSLk ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
-
-if [ -z "$yaml_files" ]; then
-  echo "ERROR: No YAML files found in ${version_tag}"
-  echo "This should not happen as version was pre-verified"
-
-  echo "Trying other version build"
-  _version=$( echo $version_tag | cut -d"-" -f1 )
-  all_version_folder=$(curl -sk $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
-
-  for folder in $all_version_folder
-  do
-    yaml_files=$(curl -sSLk ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "")
-    if [[ ! -z $yaml_files ]]
-    then
-      echo "Found files in build: $folder"
-      download_url=${catalog_soruces_url}/${folder}
-      break
-    fi
-  done
-fi
-
-if [[ -z $yaml_files ]]
-then
-  echo "Cloud not locate manifest in version ${_version}"
-  exit 1
-fi
-
-echo "Downloading files..."
-for f in $yaml_files; do
   set -x
-  curl -sSLkO ${download_url}/${f}
+  oc -n openshift-marketplace delete catsrc "${CATALOGSOURCE_NAME}" --ignore-not-found
+
+  echo "Remove default catalog source"
+  oc patch operatorhub cluster --type=json -p '[{"op": "add", "path": "/spec/sources", "value": [{"name": "redhat-operators", "disabled": true}]}]'
+  oc apply -f "${prega_info_dir}/catalogSource.yaml"
+  oc apply -f "${prega_info_dir}/imageDigestMirrorSet.yaml"
+  cat "${prega_info_dir}/imageDigestMirrorSet.yaml" >| "${SHARED_DIR}/imageDigestMirrorSet.yaml"
   set +x
-done
+}
 
-# Verify required files were downloaded
-if [ ! -f "catalogSource.yaml" ]; then
-  echo "ERROR: catalogSource.yaml not found in ${catalog_soruces_url}/${version_tag}"
-  echo "Available files in directory:"
-  ls -la
-  echo "Aborting - PreGA mirror may be incomplete or still building"
-  exit 1
-fi
+function create_pre_ga_static_catalog_source {
+  echo "************ telcov10n Create Pre GA static catalog source ************"
 
-if [ ! -f "imageDigestMirrorSet.yaml" ]; then
-  echo "ERROR: imageDigestMirrorSet.yaml not found in ${catalog_soruces_url}/${version_tag}"
-  echo "Available files in directory:"
-  ls -la
-  echo "Aborting - PreGA mirror may be incomplete or still building"
-  exit 1
-fi
-
-set -x
-popd
+  catalogSource=$(cat <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+  namespace: openshift-marketplace
+spec:
+  image: quay.io/prega/prega-operator-index:v${IMAGE_INDEX_OCP_VERSION}
+  displayName: Red Hat Custom Operators Catalog for ${IMAGE_INDEX_OCP_VERSION}
+  sourceType: grpc
 EOF
-
-  rsync -avP \
-      -e "ssh $(echo "${SSHOPTS[@]}")" \
-      "root@${AUX_HOST}":${catalog_info_dir}/ \
-      ${catalog_info_dir}
-
-  timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${catalog_info_dir}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-set -x
-rm -frv ${1}
+)
+  export catalogSource
+  imageDigestMirrorSet=$(cat <<EOF
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  labels:
+    operators.openshift.org/catalog: "true"
+  name: prega-operator-index-short
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-central-db-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-central-db-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-central-db-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-central-db-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-collector-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-collector-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-collector-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-collector-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-fact-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-fact-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-fact-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-fact-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-main-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-main-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-main-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-main-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-operator-bundle
+    source: registry.redhat.io/advanced-cluster-security/rhacs-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-rhel8-operator
+    source: registry.redhat.io/advanced-cluster-security/rhacs-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-rhel9-operator
+    source: registry.redhat.io/advanced-cluster-security/rhacs-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-roxctl-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-roxctl-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-roxctl-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-roxctl-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-db-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-db-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-db-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-db-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-db-slim-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-db-slim-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-db-slim-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-db-slim-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-slim-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-slim-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-slim-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-slim-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-v4-db-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-v4-db-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-v4-db-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-v4-db-rhel9
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-v4-rhel8
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-v4-rhel8
+  - mirrors:
+    - quay.io/prega/test/advanced-cluster-security/rhacs-scanner-v4-rhel9
+    source: registry.redhat.io/advanced-cluster-security/rhacs-scanner-v4-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-25/aap-cloud-billing-rhel8
+    source: registry.redhat.io/ansible-automation-platform-25/aap-cloud-billing-rhel8
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-25/aap-cloud-billing-rhel8-operator
+    source: registry.redhat.io/ansible-automation-platform-25/aap-cloud-billing-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-25/aap-cloud-metrics-collector-rhel8
+    source: registry.redhat.io/ansible-automation-platform-25/aap-cloud-metrics-collector-rhel8
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-25/aap-cloud-ui-rhel8
+    source: registry.redhat.io/ansible-automation-platform-25/aap-cloud-ui-rhel8
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-25/aap-cloud-ui-rhel8-operator
+    source: registry.redhat.io/ansible-automation-platform-25/aap-cloud-ui-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/controller-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/controller-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/controller-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/eda-controller-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/eda-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/eda-controller-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/eda-controller-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/eda-controller-ui-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/eda-controller-ui-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/ee-minimal-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/ee-minimal-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/ee-supported-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/gateway-proxy-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/gateway-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/gateway-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/gateway-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/gateway-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/gateway-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/hub-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/hub-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/hub-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/hub-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/hub-web-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/hub-web-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/lightspeed-chatbot-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/lightspeed-chatbot-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/lightspeed-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/lightspeed-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/lightspeed-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/lightspeed-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/mcp-tools-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/mcp-tools-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/platform-resource-rhel9-operator
+    source: registry.redhat.io/ansible-automation-platform-26/platform-resource-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform-26/platform-resource-runner-rhel9
+    source: registry.redhat.io/ansible-automation-platform-26/platform-resource-runner-rhel9
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform/cloud-addons-operator-bundle
+    source: registry.redhat.io/ansible-automation-platform/cloud-addons-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/ansible-automation-platform/platform-operator-bundle
+    source: registry.redhat.io/ansible-automation-platform/platform-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/cert-manager/cert-manager-istio-csr-rhel9
+    source: registry.redhat.io/cert-manager/cert-manager-istio-csr-rhel9
+  - mirrors:
+    - quay.io/prega/test/cert-manager/cert-manager-operator-bundle
+    source: registry.redhat.io/cert-manager/cert-manager-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/cert-manager/cert-manager-operator-rhel9
+    source: registry.redhat.io/cert-manager/cert-manager-operator-rhel9
+  - mirrors:
+    - quay.io/prega/test/cert-manager/cert-manager-trust-manager-rhel9
+    source: registry.redhat.io/cert-manager/cert-manager-trust-manager-rhel9
+  - mirrors:
+    - quay.io/prega/test/cert-manager/jetstack-cert-manager-acmesolver-rhel9
+    source: registry.redhat.io/cert-manager/jetstack-cert-manager-acmesolver-rhel9
+  - mirrors:
+    - quay.io/prega/test/cert-manager/jetstack-cert-manager-rhel9
+    source: registry.redhat.io/cert-manager/jetstack-cert-manager-rhel9
+  - mirrors:
+    - quay.io/prega/test/cli-manager/cli-manager-operator-bundle
+    source: registry.redhat.io/cli-manager/cli-manager-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/cli-manager/cli-manager-rhel9
+    source: registry.redhat.io/cli-manager/cli-manager-rhel9
+  - mirrors:
+    - quay.io/prega/test/cli-manager/cli-manager-rhel9-operator
+    source: registry.redhat.io/cli-manager/cli-manager-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/cluster-observability-operator-bundle
+    source: registry.redhat.io/cluster-observability-operator/cluster-observability-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/cluster-observability-rhel8-operator
+    source: registry.redhat.io/cluster-observability-operator/cluster-observability-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-admission-webhook-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-admission-webhook-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-console-dashboards-plugin-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-console-dashboards-plugin-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-console-distributed-tracing-plugin-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-console-distributed-tracing-plugin-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-console-logging-plugin-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-console-logging-plugin-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-console-troubleshooting-panel-plugin-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-console-troubleshooting-panel-plugin-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-korrel8r-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-korrel8r-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-prometheus-alertmanager-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-prometheus-alertmanager-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-prometheus-config-reloader-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-prometheus-config-reloader-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-prometheus-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-prometheus-rhel8
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-prometheus-rhel8-operator
+    source: registry.redhat.io/cluster-observability-operator/coo-prometheus-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/cluster-observability-operator/coo-thanos-rhel8
+    source: registry.redhat.io/cluster-observability-operator/coo-thanos-rhel8
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-compliance-content-rhel8
+    source: registry.redhat.io/compliance/openshift-compliance-content-rhel8
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-compliance-must-gather-rhel8
+    source: registry.redhat.io/compliance/openshift-compliance-must-gather-rhel8
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-compliance-openscap-rhel8
+    source: registry.redhat.io/compliance/openshift-compliance-openscap-rhel8
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-compliance-operator-bundle
+    source: registry.redhat.io/compliance/openshift-compliance-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-compliance-rhel8-operator
+    source: registry.redhat.io/compliance/openshift-compliance-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-file-integrity-operator-bundle
+    source: registry.redhat.io/compliance/openshift-file-integrity-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/compliance/openshift-file-integrity-rhel8-operator
+    source: registry.redhat.io/compliance/openshift-file-integrity-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/custom-metrics-autoscaler/custom-metrics-autoscaler-adapter-rhel8
+    source: registry.redhat.io/custom-metrics-autoscaler/custom-metrics-autoscaler-adapter-rhel8
+  - mirrors:
+    - quay.io/prega/test/custom-metrics-autoscaler/custom-metrics-autoscaler-admission-webhooks-rhel8
+    source: registry.redhat.io/custom-metrics-autoscaler/custom-metrics-autoscaler-admission-webhooks-rhel8
+  - mirrors:
+    - quay.io/prega/test/custom-metrics-autoscaler/custom-metrics-autoscaler-operator-bundle
+    source: registry.redhat.io/custom-metrics-autoscaler/custom-metrics-autoscaler-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/custom-metrics-autoscaler/custom-metrics-autoscaler-rhel8
+    source: registry.redhat.io/custom-metrics-autoscaler/custom-metrics-autoscaler-rhel8
+  - mirrors:
+    - quay.io/prega/test/custom-metrics-autoscaler/custom-metrics-autoscaler-rhel8-operator
+    source: registry.redhat.io/custom-metrics-autoscaler/custom-metrics-autoscaler-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-hub-operator-bundle
+    source: registry.redhat.io/kmm/kernel-module-management-hub-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-hub-rhel9-operator
+    source: registry.redhat.io/kmm/kernel-module-management-hub-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-must-gather-rhel9
+    source: registry.redhat.io/kmm/kernel-module-management-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-operator-bundle
+    source: registry.redhat.io/kmm/kernel-module-management-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-rhel9-operator
+    source: registry.redhat.io/kmm/kernel-module-management-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-signing-rhel9
+    source: registry.redhat.io/kmm/kernel-module-management-signing-rhel9
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-webhook-server-rhel9
+    source: registry.redhat.io/kmm/kernel-module-management-webhook-server-rhel9
+  - mirrors:
+    - quay.io/prega/test/kmm/kernel-module-management-worker-rhel9
+    source: registry.redhat.io/kmm/kernel-module-management-worker-rhel9
+  - mirrors:
+    - quay.io/prega/test/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/lvms4/lvms-operator-bundle
+    source: registry.redhat.io/lvms4/lvms-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-api-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-console-plugin-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-console-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-controller-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-must-gather-rhel8
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-must-gather-rhel8
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-openstack-populator-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-openstack-populator-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-operator-bundle
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-ova-provider-server-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-populator-controller-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-populator-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-rhel8-operator
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-rhel9-operator
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-rhv-populator-rhel8
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-rhv-populator-rhel8
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-validation-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-validation-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-virt-v2v-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-virt-v2v-rhel9
+  - mirrors:
+    - quay.io/prega/test/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9
+    source: registry.redhat.io/migration-toolkit-virtualization/mtv-vsphere-xcopy-volume-populator-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-analyzer-addon-rhel9
+    source: registry.redhat.io/mta/mta-analyzer-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-cli-rhel9
+    source: registry.redhat.io/mta/mta-cli-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-discovery-addon-rhel9
+    source: registry.redhat.io/mta/mta-discovery-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-dotnet-external-provider-rhel9
+    source: registry.redhat.io/mta/mta-dotnet-external-provider-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-generic-external-provider-rhel9
+    source: registry.redhat.io/mta/mta-generic-external-provider-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-hub-rhel9
+    source: registry.redhat.io/mta/mta-hub-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-java-external-provider-rhel9
+    source: registry.redhat.io/mta/mta-java-external-provider-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-operator-bundle
+    source: registry.redhat.io/mta/mta-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/mta/mta-platform-addon-rhel9
+    source: registry.redhat.io/mta/mta-platform-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-rhel9-operator
+    source: registry.redhat.io/mta/mta-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/mta/mta-solution-server-rhel9
+    source: registry.redhat.io/mta/mta-solution-server-rhel9
+  - mirrors:
+    - quay.io/prega/test/mta/mta-ui-rhel9
+    source: registry.redhat.io/mta/mta-ui-rhel9
+  - mirrors:
+    - quay.io/prega/test/mtr/mtr-operator-bundle
+    source: registry.redhat.io/mtr/mtr-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/mtr/mtr-rhel8-operator
+    source: registry.redhat.io/mtr/mtr-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/mtr/mtr-web-container-rhel8
+    source: registry.redhat.io/mtr/mtr-web-container-rhel8
+  - mirrors:
+    - quay.io/prega/test/mtr/mtr-web-executor-container-rhel8
+    source: registry.redhat.io/mtr/mtr-web-executor-container-rhel8
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/addon-manager-rhel9
+    source: registry.redhat.io/multicluster-engine/addon-manager-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/assisted-image-service-rhel9
+    source: registry.redhat.io/multicluster-engine/assisted-image-service-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/assisted-installer-agent-rhel9
+    source: registry.redhat.io/multicluster-engine/assisted-installer-agent-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/assisted-installer-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/assisted-installer-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/assisted-installer-rhel9
+    source: registry.redhat.io/multicluster-engine/assisted-installer-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/assisted-service-9-rhel9
+    source: registry.redhat.io/multicluster-engine/assisted-service-9-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/azure-service-operator-rhel9
+    source: registry.redhat.io/multicluster-engine/azure-service-operator-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/backplane-rhel9-operator
+    source: registry.redhat.io/multicluster-engine/backplane-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/capoa-bootstrap-rhel9
+    source: registry.redhat.io/multicluster-engine/capoa-bootstrap-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/capoa-control-plane-rhel9
+    source: registry.redhat.io/multicluster-engine/capoa-control-plane-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cloudevents-conductor-rhel9
+    source: registry.redhat.io/multicluster-engine/cloudevents-conductor-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-api-provider-agent-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-api-provider-agent-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-api-provider-aws-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-api-provider-aws-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-api-provider-azure-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-api-provider-azure-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-api-provider-kubevirt-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-api-provider-kubevirt-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-curator-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-curator-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-image-set-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-image-set-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-permission-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-permission-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/cluster-proxy-rhel9
+    source: registry.redhat.io/multicluster-engine/cluster-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/clusterclaims-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/clusterclaims-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/clusterlifecycle-state-metrics-rhel9
+    source: registry.redhat.io/multicluster-engine/clusterlifecycle-state-metrics-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/console-mce-rhel9
+    source: registry.redhat.io/multicluster-engine/console-mce-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/discovery-rhel9
+    source: registry.redhat.io/multicluster-engine/discovery-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/hive-rhel9
+    source: registry.redhat.io/multicluster-engine/hive-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/hypershift-addon-rhel9-operator
+    source: registry.redhat.io/multicluster-engine/hypershift-addon-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/hypershift-cli-rhel9
+    source: registry.redhat.io/multicluster-engine/hypershift-cli-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/hypershift-rhel9-operator
+    source: registry.redhat.io/multicluster-engine/hypershift-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/image-based-install-rhel9
+    source: registry.redhat.io/multicluster-engine/image-based-install-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/kube-rbac-proxy-mce-rhel9
+    source: registry.redhat.io/multicluster-engine/kube-rbac-proxy-mce-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/maestro-rhel9
+    source: registry.redhat.io/multicluster-engine/maestro-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/managed-serviceaccount-rhel9
+    source: registry.redhat.io/multicluster-engine/managed-serviceaccount-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/managedcluster-import-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/managedcluster-import-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/mce-capi-webhook-config-rhel9
+    source: registry.redhat.io/multicluster-engine/mce-capi-webhook-config-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/mce-operator-bundle
+    source: registry.redhat.io/multicluster-engine/mce-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/multicloud-manager-rhel9
+    source: registry.redhat.io/multicluster-engine/multicloud-manager-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/must-gather-rhel9
+    source: registry.redhat.io/multicluster-engine/must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/placement-rhel9
+    source: registry.redhat.io/multicluster-engine/placement-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/provider-credential-controller-rhel9
+    source: registry.redhat.io/multicluster-engine/provider-credential-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/registration-operator-rhel9
+    source: registry.redhat.io/multicluster-engine/registration-operator-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/registration-rhel9
+    source: registry.redhat.io/multicluster-engine/registration-rhel9
+  - mirrors:
+    - quay.io/prega/test/multicluster-engine/work-rhel9
+    source: registry.redhat.io/multicluster-engine/work-rhel9
+  - mirrors:
+    - quay.io/prega/test/noo/node-observability-agent-rhel8
+    source: registry.redhat.io/noo/node-observability-agent-rhel8
+  - mirrors:
+    - quay.io/prega/test/noo/node-observability-operator-bundle-rhel8
+    source: registry.redhat.io/noo/node-observability-operator-bundle-rhel8
+  - mirrors:
+    - quay.io/prega/test/noo/node-observability-rhel8-operator
+    source: registry.redhat.io/noo/node-observability-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-cli-binaries-rhel9
+    source: registry.redhat.io/oadp/oadp-cli-binaries-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-hypershift-velero-plugin-rhel9
+    source: registry.redhat.io/oadp/oadp-hypershift-velero-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-kubevirt-datamover-controller-rhel9
+    source: registry.redhat.io/oadp/oadp-kubevirt-datamover-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-kubevirt-datamover-plugin-rhel9
+    source: registry.redhat.io/oadp/oadp-kubevirt-datamover-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-kubevirt-velero-plugin-rhel9
+    source: registry.redhat.io/oadp/oadp-kubevirt-velero-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-mustgather-rhel9
+    source: registry.redhat.io/oadp/oadp-mustgather-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-non-admin-rhel9
+    source: registry.redhat.io/oadp/oadp-non-admin-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-operator-bundle
+    source: registry.redhat.io/oadp/oadp-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-rhel9-operator
+    source: registry.redhat.io/oadp/oadp-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-plugin-for-aws-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-plugin-for-aws-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-plugin-for-gcp-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-plugin-for-gcp-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-plugin-for-legacy-aws-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-plugin-for-legacy-aws-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-plugin-for-microsoft-azure-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-plugin-for-microsoft-azure-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-plugin-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-velero-rhel9
+    source: registry.redhat.io/oadp/oadp-velero-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-vm-file-restore-rhel9
+    source: registry.redhat.io/oadp/oadp-vm-file-restore-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-vmdp-binaries-rhel9
+    source: registry.redhat.io/oadp/oadp-vmdp-binaries-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-vmfr-access-filebrowser-rhel9
+    source: registry.redhat.io/oadp/oadp-vmfr-access-filebrowser-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-vmfr-access-rhel9
+    source: registry.redhat.io/oadp/oadp-vmfr-access-rhel9
+  - mirrors:
+    - quay.io/prega/test/oadp/oadp-vmfr-access-sshd-rhel9
+    source: registry.redhat.io/oadp/oadp-vmfr-access-sshd-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/cephcsi-operator-bundle
+    source: registry.redhat.io/odf4/cephcsi-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/cephcsi-rhel9
+    source: registry.redhat.io/odf4/cephcsi-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/cephcsi-rhel9-operator
+    source: registry.redhat.io/odf4/cephcsi-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/devicefinder-rhel9
+    source: registry.redhat.io/odf4/devicefinder-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/mcg-core-rhel9
+    source: registry.redhat.io/odf4/mcg-core-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/mcg-operator-bundle
+    source: registry.redhat.io/odf4/mcg-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/mcg-rhel9-operator
+    source: registry.redhat.io/odf4/mcg-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-client-console-rhel9
+    source: registry.redhat.io/odf4/ocs-client-console-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-client-operator-bundle
+    source: registry.redhat.io/odf4/ocs-client-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-client-rhel9-operator
+    source: registry.redhat.io/odf4/ocs-client-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-metrics-exporter-rhel9
+    source: registry.redhat.io/odf4/ocs-metrics-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-operator-bundle
+    source: registry.redhat.io/odf4/ocs-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-rhel9-operator
+    source: registry.redhat.io/odf4/ocs-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/ocs-tls-profiles-operator-bundle
+    source: registry.redhat.io/odf4/ocs-tls-profiles-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-blackbox-exporter-rhel9
+    source: registry.redhat.io/odf4/odf-blackbox-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-cloudnative-pg-rhel9-operator
+    source: registry.redhat.io/odf4/odf-cloudnative-pg-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-console-rhel9
+    source: registry.redhat.io/odf4/odf-console-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-cosi-sidecar-rhel9
+    source: registry.redhat.io/odf4/odf-cosi-sidecar-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-csi-addons-operator-bundle
+    source: registry.redhat.io/odf4/odf-csi-addons-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-csi-addons-rhel9-operator
+    source: registry.redhat.io/odf4/odf-csi-addons-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-csi-addons-sidecar-rhel9
+    source: registry.redhat.io/odf4/odf-csi-addons-sidecar-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-dependencies-operator-bundle
+    source: registry.redhat.io/odf4/odf-dependencies-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-drbd-rhel9
+    source: registry.redhat.io/odf4/odf-drbd-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-external-snapshotter-operator-bundle
+    source: registry.redhat.io/odf4/odf-external-snapshotter-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-external-snapshotter-rhel9-operator
+    source: registry.redhat.io/odf4/odf-external-snapshotter-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-external-snapshotter-sidecar-rhel9
+    source: registry.redhat.io/odf4/odf-external-snapshotter-sidecar-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-lightspeed-rag-content-rhel9
+    source: registry.redhat.io/odf4/odf-lightspeed-rag-content-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-multicluster-console-rhel9
+    source: registry.redhat.io/odf4/odf-multicluster-console-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-multicluster-operator-bundle
+    source: registry.redhat.io/odf4/odf-multicluster-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-multicluster-rhel9-operator
+    source: registry.redhat.io/odf4/odf-multicluster-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-must-gather-rhel9
+    source: registry.redhat.io/odf4/odf-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-operator-bundle
+    source: registry.redhat.io/odf4/odf-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-prometheus-operator-bundle
+    source: registry.redhat.io/odf4/odf-prometheus-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odf-rhel9-operator
+    source: registry.redhat.io/odf4/odf-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/odr-cluster-operator-bundle
+    source: registry.redhat.io/odf4/odr-cluster-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odr-hub-operator-bundle
+    source: registry.redhat.io/odf4/odr-hub-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odr-recipe-operator-bundle
+    source: registry.redhat.io/odf4/odr-recipe-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/odr-rhel9-operator
+    source: registry.redhat.io/odf4/odr-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/odf4/rook-ceph-operator-bundle
+    source: registry.redhat.io/odf4/rook-ceph-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/odf4/rook-ceph-rhel9-operator
+    source: registry.redhat.io/odf4/rook-ceph-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/applicationset-rhel8
+    source: registry.redhat.io/openshift-gitops-1/applicationset-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argo-rollouts-rhel8
+    source: registry.redhat.io/openshift-gitops-1/argo-rollouts-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argo-rollouts-rhel9
+    source: registry.redhat.io/openshift-gitops-1/argo-rollouts-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-agent-rhel8
+    source: registry.redhat.io/openshift-gitops-1/argocd-agent-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-agent-rhel9
+    source: registry.redhat.io/openshift-gitops-1/argocd-agent-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-extensions-rhel8
+    source: registry.redhat.io/openshift-gitops-1/argocd-extensions-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-extensions-rhel9
+    source: registry.redhat.io/openshift-gitops-1/argocd-extensions-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-image-updater-rhel8
+    source: registry.redhat.io/openshift-gitops-1/argocd-image-updater-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-image-updater-rhel9
+    source: registry.redhat.io/openshift-gitops-1/argocd-image-updater-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-rhel8
+    source: registry.redhat.io/openshift-gitops-1/argocd-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/argocd-rhel9
+    source: registry.redhat.io/openshift-gitops-1/argocd-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/console-plugin-rhel8
+    source: registry.redhat.io/openshift-gitops-1/console-plugin-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/console-plugin-rhel9
+    source: registry.redhat.io/openshift-gitops-1/console-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/dex-rhel8
+    source: registry.redhat.io/openshift-gitops-1/dex-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/dex-rhel9
+    source: registry.redhat.io/openshift-gitops-1/dex-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/gitops-operator-bundle
+    source: registry.redhat.io/openshift-gitops-1/gitops-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/gitops-rhel8
+    source: registry.redhat.io/openshift-gitops-1/gitops-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/gitops-rhel8-operator
+    source: registry.redhat.io/openshift-gitops-1/gitops-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/gitops-rhel9
+    source: registry.redhat.io/openshift-gitops-1/gitops-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/gitops-rhel9-operator
+    source: registry.redhat.io/openshift-gitops-1/gitops-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/kam-delivery-rhel8
+    source: registry.redhat.io/openshift-gitops-1/kam-delivery-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/must-gather-rhel8
+    source: registry.redhat.io/openshift-gitops-1/must-gather-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-gitops-1/must-gather-rhel9
+    source: registry.redhat.io/openshift-gitops-1/must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/cluster-logging-operator-bundle
+    source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/cluster-logging-rhel9-operator
+    source: registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/log-file-metric-exporter-rhel9
+    source: registry.redhat.io/openshift-logging/log-file-metric-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/logging-loki-rhel9
+    source: registry.redhat.io/openshift-logging/logging-loki-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/loki-operator-bundle
+    source: registry.redhat.io/openshift-logging/loki-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/loki-rhel9-operator
+    source: registry.redhat.io/openshift-logging/loki-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/lokistack-gateway-rhel9
+    source: registry.redhat.io/openshift-logging/lokistack-gateway-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/opa-openshift-rhel9
+    source: registry.redhat.io/openshift-logging/opa-openshift-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-logging/vector-rhel9
+    source: registry.redhat.io/openshift-logging/vector-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-cache-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-cache-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-chains-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-chains-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-cli-tkn-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-cli-tkn-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-console-plugin-pf5-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-pf5-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-console-plugin-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-console-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-entrypoint-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-entrypoint-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-events-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-events-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-git-init-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-hub-api-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-hub-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-hub-db-migration-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-hub-db-migration-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-hub-ui-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-hub-ui-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-manual-approval-gate-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-manual-approval-gate-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-multicluster-proxy-aae-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-multicluster-proxy-aae-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-nop-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-nop-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-opc-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-opc-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-operator-bundle
+    source: registry.redhat.io/openshift-pipelines/pipelines-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-operator-proxy-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-operator-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-operator-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-operator-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pipelines-as-code-cli-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-cli-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pipelines-as-code-watcher-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-watcher-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pipelines-as-code-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pipelines-as-code-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pruner-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pruner-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-pruner-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-pruner-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-resolvers-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-resolvers-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-results-api-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-results-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-results-retention-policy-agent-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-results-retention-policy-agent-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-results-watcher-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-results-watcher-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-rhel9-operator
+    source: registry.redhat.io/openshift-pipelines/pipelines-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-scheduler-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-scheduler-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-serve-tkn-cli-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-serve-tkn-cli-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-sidecarlogresults-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-sidecarlogresults-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-syncer-service-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-syncer-service-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-triggers-controller-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-triggers-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-triggers-core-interceptors-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-triggers-core-interceptors-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-triggers-eventlistenersink-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-triggers-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-triggers-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-webhook-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-pipelines/pipelines-workingdirinit-rhel9
+    source: registry.redhat.io/openshift-pipelines/pipelines-workingdirinit-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-serverless-1/kn-client-kn-rhel9
+    source: registry.redhat.io/openshift-serverless-1/kn-client-kn-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh-tech-preview/istio-ztunnel-rhel9
+    source: registry.redhat.io/openshift-service-mesh-tech-preview/istio-ztunnel-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/grafana-rhel8
+    source: registry.redhat.io/openshift-service-mesh/grafana-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-cni-rhel8
+    source: registry.redhat.io/openshift-service-mesh/istio-cni-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-cni-rhel9
+    source: registry.redhat.io/openshift-service-mesh/istio-cni-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-must-gather-rhel8
+    source: registry.redhat.io/openshift-service-mesh/istio-must-gather-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-must-gather-rhel9
+    source: registry.redhat.io/openshift-service-mesh/istio-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-operator-bundle
+    source: registry.redhat.io/openshift-service-mesh/istio-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-pilot-rhel9
+    source: registry.redhat.io/openshift-service-mesh/istio-pilot-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-proxyv2-rhel9
+    source: registry.redhat.io/openshift-service-mesh/istio-proxyv2-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-rhel8-operator
+    source: registry.redhat.io/openshift-service-mesh/istio-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-rhel8-operator-metadata
+    source: registry.redhat.io/openshift-service-mesh/istio-rhel8-operator-metadata
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-rhel9-operator
+    source: registry.redhat.io/openshift-service-mesh/istio-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-sail-operator-bundle
+    source: registry.redhat.io/openshift-service-mesh/istio-sail-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/istio-ztunnel-rhel9
+    source: registry.redhat.io/openshift-service-mesh/istio-ztunnel-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-operator-bundle
+    source: registry.redhat.io/openshift-service-mesh/kiali-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-ossmc-rhel8
+    source: registry.redhat.io/openshift-service-mesh/kiali-ossmc-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-ossmc-rhel9
+    source: registry.redhat.io/openshift-service-mesh/kiali-ossmc-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-rhel8
+    source: registry.redhat.io/openshift-service-mesh/kiali-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-rhel9
+    source: registry.redhat.io/openshift-service-mesh/kiali-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/kiali-rhel9-operator
+    source: registry.redhat.io/openshift-service-mesh/kiali-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/pilot-rhel8
+    source: registry.redhat.io/openshift-service-mesh/pilot-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/prometheus-rhel8
+    source: registry.redhat.io/openshift-service-mesh/prometheus-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/proxyv2-rhel8
+    source: registry.redhat.io/openshift-service-mesh/proxyv2-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/proxyv2-rhel9
+    source: registry.redhat.io/openshift-service-mesh/proxyv2-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift-service-mesh/ratelimit-rhel8
+    source: registry.redhat.io/openshift-service-mesh/ratelimit-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-update-service/cincinnati-operator-bundle
+    source: registry.redhat.io/openshift-update-service/cincinnati-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift-update-service/openshift-update-service-rhel8
+    source: registry.redhat.io/openshift-update-service/openshift-update-service-rhel8
+  - mirrors:
+    - quay.io/prega/test/openshift-update-service/openshift-update-service-rhel8-operator
+    source: registry.redhat.io/openshift-update-service/openshift-update-service-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/frr-rhel9
+    source: registry.redhat.io/openshift4/frr-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ingress-node-firewall-operator-bundle
+    source: registry.redhat.io/openshift4/ingress-node-firewall-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ingress-node-firewall-rhel9
+    source: registry.redhat.io/openshift4/ingress-node-firewall-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ingress-node-firewall-rhel9-operator
+    source: registry.redhat.io/openshift4/ingress-node-firewall-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/kubernetes-nmstate-operator-bundle
+    source: registry.redhat.io/openshift4/kubernetes-nmstate-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/kubernetes-nmstate-rhel9-operator
+    source: registry.redhat.io/openshift4/kubernetes-nmstate-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/lifecycle-agent-operator-bundle
+    source: registry.redhat.io/openshift4/lifecycle-agent-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/lifecycle-agent-rhel9-operator
+    source: registry.redhat.io/openshift4/lifecycle-agent-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/metallb-rhel9
+    source: registry.redhat.io/openshift4/metallb-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/metallb-rhel9-operator
+    source: registry.redhat.io/openshift4/metallb-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/nmstate-console-plugin-rhel9
+    source: registry.redhat.io/openshift4/nmstate-console-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/numaresources-operator-bundle
+    source: registry.redhat.io/openshift4/numaresources-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/numaresources-rhel9-operator
+    source: registry.redhat.io/openshift4/numaresources-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/o-cloud-manager-operator-bundle
+    source: registry.redhat.io/openshift4/o-cloud-manager-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/o-cloud-manager-rhel9-operator
+    source: registry.redhat.io/openshift4/o-cloud-manager-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-aws-efs-csi-driver-container-rhel9
+    source: registry.redhat.io/openshift4/ose-aws-efs-csi-driver-container-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-aws-efs-csi-driver-operator-bundle
+    source: registry.redhat.io/openshift4/ose-aws-efs-csi-driver-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-aws-efs-csi-driver-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-aws-efs-csi-driver-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-baremetal-cluster-api-controllers-rhel9
+    source: registry.redhat.io/openshift4/ose-baremetal-cluster-api-controllers-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-cloud-event-proxy-rhel9
+    source: registry.redhat.io/openshift4/ose-cloud-event-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-cluster-api-rhel9
+    source: registry.redhat.io/openshift4/ose-cluster-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-cluster-nfd-operator-bundle
+    source: registry.redhat.io/openshift4/ose-cluster-nfd-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-cluster-nfd-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-cluster-nfd-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-clusterresourceoverride-operator-bundle
+    source: registry.redhat.io/openshift4/ose-clusterresourceoverride-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-clusterresourceoverride-rhel9
+    source: registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-clusterresourceoverride-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-clusterresourceoverride-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-configmap-reloader-rhel9
+    source: registry.redhat.io/openshift4/ose-configmap-reloader-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-external-attacher-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-external-attacher-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-external-provisioner-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-external-provisioner-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-external-resizer-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-external-resizer-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-external-snapshot-metadata-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-external-snapshot-metadata-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-external-snapshotter-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-external-snapshotter-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-livenessprobe-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-livenessprobe-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-csi-node-driver-registrar-rhel9
+    source: registry.redhat.io/openshift4/ose-csi-node-driver-registrar-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-daemon-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-daemon-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-intel-ipu-p4sdk-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-intel-ipu-p4sdk-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-intel-ipu-vsp-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-intel-ipu-vsp-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-intel-netsec-vsp-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-intel-netsec-vsp-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-marvell-cp-agent-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-marvell-cp-agent-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-marvell-vsp-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-marvell-vsp-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-network-resources-injector-rhel9
+    source: registry.redhat.io/openshift4/ose-dpu-network-resources-injector-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-operator-bundle
+    source: registry.redhat.io/openshift4/ose-dpu-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-dpu-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-dpu-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-gcp-filestore-csi-driver-operator-bundle
+    source: registry.redhat.io/openshift4/ose-gcp-filestore-csi-driver-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-gcp-filestore-csi-driver-rhel9
+    source: registry.redhat.io/openshift4/ose-gcp-filestore-csi-driver-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-gcp-filestore-csi-driver-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-gcp-filestore-csi-driver-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-haproxy-router
+    source: registry.redhat.io/openshift4/ose-haproxy-router
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-haproxy-router-rhel9
+    source: registry.redhat.io/openshift4/ose-haproxy-router-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-kube-rbac-proxy
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-kube-rbac-proxy-rhel9
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-kubernetes-nmstate-handler-rhel9
+    source: registry.redhat.io/openshift4/ose-kubernetes-nmstate-handler-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-local-storage-diskmaker-rhel9
+    source: registry.redhat.io/openshift4/ose-local-storage-diskmaker-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-local-storage-mustgather-rhel9
+    source: registry.redhat.io/openshift4/ose-local-storage-mustgather-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-local-storage-operator-bundle
+    source: registry.redhat.io/openshift4/ose-local-storage-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-local-storage-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-local-storage-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-metallb-operator-bundle
+    source: registry.redhat.io/openshift4/ose-metallb-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-must-gather-rhel9
+    source: registry.redhat.io/openshift4/ose-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-node-feature-discovery-rhel9
+    source: registry.redhat.io/openshift4/ose-node-feature-discovery-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-oauth-proxy
+    source: registry.redhat.io/openshift4/ose-oauth-proxy
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-oauth-proxy-rhel9
+    source: registry.redhat.io/openshift4/ose-oauth-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus
+    source: registry.redhat.io/openshift4/ose-prometheus
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus-alertmanager-rhel9
+    source: registry.redhat.io/openshift4/ose-prometheus-alertmanager-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus-config-reloader
+    source: registry.redhat.io/openshift4/ose-prometheus-config-reloader
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus-config-reloader-rhel9
+    source: registry.redhat.io/openshift4/ose-prometheus-config-reloader-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus-rhel9
+    source: registry.redhat.io/openshift4/ose-prometheus-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-prometheus-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-prometheus-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-ptp-operator-bundle
+    source: registry.redhat.io/openshift4/ose-ptp-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-ptp-rhel9
+    source: registry.redhat.io/openshift4/ose-ptp-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-ptp-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-ptp-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-secrets-store-csi-driver-operator-bundle
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-secrets-store-csi-driver-rhel9
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-secrets-store-csi-driver-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-secrets-store-csi-driver-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-smb-csi-driver-operator-bundle
+    source: registry.redhat.io/openshift4/ose-smb-csi-driver-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-smb-csi-driver-rhel9
+    source: registry.redhat.io/openshift4/ose-smb-csi-driver-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-smb-csi-driver-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-smb-csi-driver-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-dp-admission-controller-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-dp-admission-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-infiniband-cni-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-infiniband-cni-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-config-daemon-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-network-config-daemon-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-device-plugin-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-network-device-plugin-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-metrics-exporter-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-network-metrics-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-operator-bundle
+    source: registry.redhat.io/openshift4/ose-sriov-network-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-sriov-network-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-network-webhook-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-network-webhook-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-sriov-rdma-cni-rhel9
+    source: registry.redhat.io/openshift4/ose-sriov-rdma-cni-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-support-log-gather-operator-bundle
+    source: registry.redhat.io/openshift4/ose-support-log-gather-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-support-log-gather-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-support-log-gather-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-tools-rhel9
+    source: registry.redhat.io/openshift4/ose-tools-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-vertical-pod-autoscaler-operator-bundle
+    source: registry.redhat.io/openshift4/ose-vertical-pod-autoscaler-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-vertical-pod-autoscaler-rhel9
+    source: registry.redhat.io/openshift4/ose-vertical-pod-autoscaler-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/ose-vertical-pod-autoscaler-rhel9-operator
+    source: registry.redhat.io/openshift4/ose-vertical-pod-autoscaler-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/pf-status-relay-operator-bundle
+    source: registry.redhat.io/openshift4/pf-status-relay-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/pf-status-relay-rhel9
+    source: registry.redhat.io/openshift4/pf-status-relay-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/pf-status-relay-rhel9-operator
+    source: registry.redhat.io/openshift4/pf-status-relay-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift4/ptp-must-gather-rhel9
+    source: registry.redhat.io/openshift4/ptp-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/recert-rhel9
+    source: registry.redhat.io/openshift4/recert-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/sriov-cni-rhel9
+    source: registry.redhat.io/openshift4/sriov-cni-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/topology-aware-lifecycle-manager-aztp-rhel9
+    source: registry.redhat.io/openshift4/topology-aware-lifecycle-manager-aztp-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/topology-aware-lifecycle-manager-operator-bundle
+    source: registry.redhat.io/openshift4/topology-aware-lifecycle-manager-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/openshift4/topology-aware-lifecycle-manager-precache-rhel9
+    source: registry.redhat.io/openshift4/topology-aware-lifecycle-manager-precache-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/topology-aware-lifecycle-manager-recovery-rhel9
+    source: registry.redhat.io/openshift4/topology-aware-lifecycle-manager-recovery-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift4/topology-aware-lifecycle-manager-rhel9-operator
+    source: registry.redhat.io/openshift4/topology-aware-lifecycle-manager-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/openshift5/ose-baremetal-cluster-api-controllers-rhel9
+    source: registry.redhat.io/openshift5/ose-baremetal-cluster-api-controllers-rhel9
+  - mirrors:
+    - quay.io/prega/test/openshift5/ose-cluster-api-rhel9
+    source: registry.redhat.io/openshift5/ose-cluster-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/quay/clair-rhel9
+    source: registry.redhat.io/quay/clair-rhel9
+  - mirrors:
+    - quay.io/prega/test/quay/quay-bridge-operator-bundle
+    source: registry.redhat.io/quay/quay-bridge-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/quay/quay-bridge-operator-rhel9
+    source: registry.redhat.io/quay/quay-bridge-operator-rhel9
+  - mirrors:
+    - quay.io/prega/test/quay/quay-builder-qemu-rhcos-rhel8
+    source: registry.redhat.io/quay/quay-builder-qemu-rhcos-rhel8
+  - mirrors:
+    - quay.io/prega/test/quay/quay-builder-rhel9
+    source: registry.redhat.io/quay/quay-builder-rhel9
+  - mirrors:
+    - quay.io/prega/test/quay/quay-container-security-operator-bundle
+    source: registry.redhat.io/quay/quay-container-security-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/quay/quay-container-security-operator-rhel8
+    source: registry.redhat.io/quay/quay-container-security-operator-rhel8
+  - mirrors:
+    - quay.io/prega/test/quay/quay-operator-bundle
+    source: registry.redhat.io/quay/quay-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/quay/quay-operator-rhel9
+    source: registry.redhat.io/quay/quay-operator-rhel9
+  - mirrors:
+    - quay.io/prega/test/quay/quay-rhel9
+    source: registry.redhat.io/quay/quay-rhel9
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso7-rhel8-init-container
+    source: registry.redhat.io/rh-sso-7/sso7-rhel8-init-container
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso7-rhel8-operator
+    source: registry.redhat.io/rh-sso-7/sso7-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso7-rhel8-operator-bundle
+    source: registry.redhat.io/rh-sso-7/sso7-rhel8-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso75-openj9-openshift-rhel8
+    source: registry.redhat.io/rh-sso-7/sso75-openj9-openshift-rhel8
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso75-openshift-rhel8
+    source: registry.redhat.io/rh-sso-7/sso75-openshift-rhel8
+  - mirrors:
+    - quay.io/prega/test/rh-sso-7/sso76-openshift-rhel8
+    source: registry.redhat.io/rh-sso-7/sso76-openshift-rhel8
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-cli-rhel9
+    source: registry.redhat.io/rhacm2/acm-cli-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-governance-policy-addon-controller-rhel9
+    source: registry.redhat.io/rhacm2/acm-governance-policy-addon-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-governance-policy-framework-addon-rhel9
+    source: registry.redhat.io/rhacm2/acm-governance-policy-framework-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-grafana-rhel9
+    source: registry.redhat.io/rhacm2/acm-grafana-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-multicluster-observability-addon-rhel9
+    source: registry.redhat.io/rhacm2/acm-multicluster-observability-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-must-gather-rhel9
+    source: registry.redhat.io/rhacm2/acm-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-operator-bundle
+    source: registry.redhat.io/rhacm2/acm-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-prometheus-config-reloader-rhel9
+    source: registry.redhat.io/rhacm2/acm-prometheus-config-reloader-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-prometheus-rhel9
+    source: registry.redhat.io/rhacm2/acm-prometheus-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-search-indexer-rhel9
+    source: registry.redhat.io/rhacm2/acm-search-indexer-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-search-v2-api-rhel9
+    source: registry.redhat.io/rhacm2/acm-search-v2-api-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-search-v2-rhel9
+    source: registry.redhat.io/rhacm2/acm-search-v2-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-siteconfig-rhel9
+    source: registry.redhat.io/rhacm2/acm-siteconfig-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/acm-volsync-addon-controller-rhel9
+    source: registry.redhat.io/rhacm2/acm-volsync-addon-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/cert-policy-controller-rhel9
+    source: registry.redhat.io/rhacm2/cert-policy-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/cluster-backup-rhel9-operator
+    source: registry.redhat.io/rhacm2/cluster-backup-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhacm2/config-policy-controller-rhel9
+    source: registry.redhat.io/rhacm2/config-policy-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/console-rhel9
+    source: registry.redhat.io/rhacm2/console-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/endpoint-monitoring-rhel9-operator
+    source: registry.redhat.io/rhacm2/endpoint-monitoring-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhacm2/governance-policy-propagator-rhel9
+    source: registry.redhat.io/rhacm2/governance-policy-propagator-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/grafana-dashboard-loader-rhel9
+    source: registry.redhat.io/rhacm2/grafana-dashboard-loader-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/insights-client-rhel9
+    source: registry.redhat.io/rhacm2/insights-client-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/insights-metrics-rhel9
+    source: registry.redhat.io/rhacm2/insights-metrics-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/klusterlet-addon-controller-rhel9
+    source: registry.redhat.io/rhacm2/klusterlet-addon-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/kube-rbac-proxy-rhel9
+    source: registry.redhat.io/rhacm2/kube-rbac-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/kube-state-metrics-rhel9
+    source: registry.redhat.io/rhacm2/kube-state-metrics-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/memcached-exporter-rhel9
+    source: registry.redhat.io/rhacm2/memcached-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/metrics-collector-rhel9
+    source: registry.redhat.io/rhacm2/metrics-collector-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/mtv-integrations-rhel9
+    source: registry.redhat.io/rhacm2/mtv-integrations-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicloud-integrations-rhel9
+    source: registry.redhat.io/rhacm2/multicloud-integrations-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicluster-observability-rhel9-operator
+    source: registry.redhat.io/rhacm2/multicluster-observability-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicluster-operators-application-rhel9
+    source: registry.redhat.io/rhacm2/multicluster-operators-application-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicluster-operators-channel-rhel9
+    source: registry.redhat.io/rhacm2/multicluster-operators-channel-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicluster-operators-subscription-rhel9
+    source: registry.redhat.io/rhacm2/multicluster-operators-subscription-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multicluster-role-assignment-rhel9
+    source: registry.redhat.io/rhacm2/multicluster-role-assignment-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/multiclusterhub-rhel9
+    source: registry.redhat.io/rhacm2/multiclusterhub-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/node-exporter-rhel9
+    source: registry.redhat.io/rhacm2/node-exporter-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/obo-prometheus-rhel9-operator
+    source: registry.redhat.io/rhacm2/obo-prometheus-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhacm2/observatorium-rhel9
+    source: registry.redhat.io/rhacm2/observatorium-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/observatorium-rhel9-operator
+    source: registry.redhat.io/rhacm2/observatorium-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhacm2/prometheus-alertmanager-rhel9
+    source: registry.redhat.io/rhacm2/prometheus-alertmanager-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/prometheus-rhel9
+    source: registry.redhat.io/rhacm2/prometheus-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/rbac-query-proxy-rhel9
+    source: registry.redhat.io/rhacm2/rbac-query-proxy-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/search-collector-rhel9
+    source: registry.redhat.io/rhacm2/search-collector-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/submariner-addon-rhel9
+    source: registry.redhat.io/rhacm2/submariner-addon-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/thanos-receive-controller-rhel9
+    source: registry.redhat.io/rhacm2/thanos-receive-controller-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/thanos-rhel9
+    source: registry.redhat.io/rhacm2/thanos-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhacm2/volsync-rhel9
+    source: registry.redhat.io/rhacm2/volsync-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhbk/keycloak-operator-bundle
+    source: registry.redhat.io/rhbk/keycloak-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/rhbk/keycloak-rhel9
+    source: registry.redhat.io/rhbk/keycloak-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhbk/keycloak-rhel9-operator
+    source: registry.redhat.io/rhbk/keycloak-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/rhceph/9-rhel9
+    source: registry.redhat.io/rhceph/9-rhel9
+  - mirrors:
+    - quay.io/prega/test/rhel8/postgresql-10
+    source: registry.redhat.io/rhel8/postgresql-10
+  - mirrors:
+    - quay.io/prega/test/rhel8/postgresql-13
+    source: registry.redhat.io/rhel8/postgresql-13
+  - mirrors:
+    - quay.io/prega/test/rhel8/postgresql-15
+    source: registry.redhat.io/rhel8/postgresql-15
+  - mirrors:
+    - quay.io/prega/test/rhel8/redis-5
+    source: registry.redhat.io/rhel8/redis-5
+  - mirrors:
+    - quay.io/prega/test/rhel8/redis-6
+    source: registry.redhat.io/rhel8/redis-6
+  - mirrors:
+    - quay.io/prega/test/rhel9/buildah
+    source: registry.redhat.io/rhel9/buildah
+  - mirrors:
+    - quay.io/prega/test/rhel9/memcached
+    source: registry.redhat.io/rhel9/memcached
+  - mirrors:
+    - quay.io/prega/test/rhel9/postgresql-13
+    source: registry.redhat.io/rhel9/postgresql-13
+  - mirrors:
+    - quay.io/prega/test/rhel9/postgresql-15
+    source: registry.redhat.io/rhel9/postgresql-15
+  - mirrors:
+    - quay.io/prega/test/rhel9/postgresql-16
+    source: registry.redhat.io/rhel9/postgresql-16
+  - mirrors:
+    - quay.io/prega/test/rhel9/postgresql-18
+    source: registry.redhat.io/rhel9/postgresql-18
+  - mirrors:
+    - quay.io/prega/test/rhel9/redis-6
+    source: registry.redhat.io/rhel9/redis-6
+  - mirrors:
+    - quay.io/prega/test/rhel9/redis-7
+    source: registry.redhat.io/rhel9/redis-7
+  - mirrors:
+    - quay.io/prega/test/rhel9/skopeo
+    source: registry.redhat.io/rhel9/skopeo
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-gateway-opa-rhel8
+    source: registry.redhat.io/rhosdt/tempo-gateway-opa-rhel8
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-gateway-rhel8
+    source: registry.redhat.io/rhosdt/tempo-gateway-rhel8
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-operator-bundle
+    source: registry.redhat.io/rhosdt/tempo-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-query-rhel8
+    source: registry.redhat.io/rhosdt/tempo-query-rhel8
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-rhel8
+    source: registry.redhat.io/rhosdt/tempo-rhel8
+  - mirrors:
+    - quay.io/prega/test/rhosdt/tempo-rhel8-operator
+    source: registry.redhat.io/rhosdt/tempo-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/source-to-image/source-to-image-rhel9
+    source: registry.redhat.io/source-to-image/source-to-image-rhel9
+  - mirrors:
+    - quay.io/prega/test/ubi9/openjdk-17
+    source: registry.redhat.io/ubi9/openjdk-17
+  - mirrors:
+    - quay.io/prega/test/ubi9/ubi-minimal
+    source: registry.redhat.io/ubi9/ubi-minimal
+  - mirrors:
+    - quay.io/prega/test/workload-availability/node-healthcheck-must-gather-rhel9
+    source: registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9
+  - mirrors:
+    - quay.io/prega/test/workload-availability/node-healthcheck-operator-bundle
+    source: registry.redhat.io/workload-availability/node-healthcheck-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/workload-availability/node-healthcheck-rhel9-operator
+    source: registry.redhat.io/workload-availability/node-healthcheck-rhel9-operator
+  - mirrors:
+    - quay.io/prega/test/workload-availability/node-remediation-console-rhel9
+    source: registry.redhat.io/workload-availability/node-remediation-console-rhel9
+  - mirrors:
+    - quay.io/prega/test/workload-availability/self-node-remediation-operator-bundle
+    source: registry.redhat.io/workload-availability/self-node-remediation-operator-bundle
+  - mirrors:
+    - quay.io/prega/test/workload-availability/self-node-remediation-rhel8-operator
+    source: registry.redhat.io/workload-availability/self-node-remediation-rhel8-operator
+  - mirrors:
+    - quay.io/prega/test/workload-availability/self-node-remediation-rhel9-operator
+    source: registry.redhat.io/workload-availability/self-node-remediation-rhel9-operator
 EOF
+)
+  export imageDigestMirrorSet
 
-  echo
-  echo "----------------------------------------------------------------------------------------------"
-  set -x
-  rm -frv "${ARTIFACT_DIR}/pre-ga-info"
-  mv -v ${catalog_info_dir} "${ARTIFACT_DIR}/pre-ga-info"
-  prega_info_dir="$(ls -1d ${ARTIFACT_DIR}/pre-ga-info/*)"
-  ls -lhrtR ${prega_info_dir}
-  set +x
-  echo
-  echo "----------------------------------------------------------------------------------------------"
-  echo
-  set -x
-  oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
-  sed -i "s/name: .*/name: ${CATALOGSOURCE_NAME}/" ${prega_info_dir}/catalogSource.yaml
-  # Add or update displayName field in catalogSource.yaml under spec section
-  if grep -q "displayName:" ${prega_info_dir}/catalogSource.yaml; then
-    # Update existing displayName
-    sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
-  else
-    # Add displayName field after image field in spec section
-    sed -i "/^  image: /a\  displayName: ${CATALOGSOURCE_DISPLAY_NAME}" ${prega_info_dir}/catalogSource.yaml
-  fi
-  set +x
-  echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
-  cat ${prega_info_dir}/catalogSource.yaml
-  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageDigestMirrorSet.yaml (BEFORE) -----------------"
-  cat ${prega_info_dir}/imageDigestMirrorSet.yaml
-  echo "----------------------------------------------------------------------------------------------"
+  echo "Creating Pre GA static catalog source..."
 
-  # Append production path entries to IDMS if needed (ACM/MCE/GitOps)
-  append_production_path_idms_entries "${prega_info_dir}/imageDigestMirrorSet.yaml"
-
-  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageDigestMirrorSet.yaml (AFTER) ------------------"
-  cat ${prega_info_dir}/imageDigestMirrorSet.yaml
-  echo "----------------------------------------------------------------------------------------------"
-
-  set -x
-  oc apply -f ${prega_info_dir}/catalogSource.yaml
-  oc apply -f ${prega_info_dir}/imageDigestMirrorSet.yaml
-  cat ${prega_info_dir}/imageDigestMirrorSet.yaml >| ${SHARED_DIR}/imageDigestMirrorSet.yaml
-  set +x
+  echo "${catalogSource}" > "${catalog_info_dir}/catalogSource.yaml"
+  echo "${imageDigestMirrorSet}" > "${catalog_info_dir}/imageDigestMirrorSet.yaml"
+  echo "Pre GA static catalog source has been created successfully!!!"
 }
+
 
 function create_pre_ga_calatog {
 
   echo "************ telcov10n Create Pre GA catalog ************"
+
+  create_pre_ga_static_catalog_source
 
   apply_catalog_source_and_image_digest_mirror_set
 

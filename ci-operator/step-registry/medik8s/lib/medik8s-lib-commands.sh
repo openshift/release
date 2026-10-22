@@ -6,7 +6,8 @@ cat <<'MEDIK8S_LIB_EOF' > "${SHARED_DIR}/medik8s-lib.sh"
 # Written by the medik8s-lib ref step; do not edit directly.
 #
 # Required caller variables per function:
-#   resolve_commit_sha: GIT_REF, FBC_COMMIT_SHA (in/out)
+#   resolve_commit_sha: OCP_VERSION, FBC_COMMIT_SHA (in/out), FBC_SHA_PINNED (in/out); takes optional [max_attempts]
+#   fetch_latest_fbc_sha: (none - takes image_name, [max_pages]); prints newest commit-SHA tag
 #   verify_fbc_image:   OCP_VERSION, FBC_COMMIT_SHA, FBC_SHA_PINNED
 #   wait_for_mcp_rollout: (none - takes argument)
 #   ensure_marketplace: (none)
@@ -61,73 +62,107 @@ set_proxy() {
 }
 
 resolve_commit_sha() {
+    local max_attempts="${1:-6}"
+
     if [[ -n "$FBC_COMMIT_SHA" ]]; then
+        FBC_SHA_PINNED="true"
         log "Using provided FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
         return 0
     fi
 
-    local encoded_ref
-    encoded_ref=$(jq -rn --arg ref "$GIT_REF" '$ref | @uri') || encoded_ref="$GIT_REF"
+    FBC_SHA_PINNED="false"
 
-    log "Resolving latest commit from ${GITLAB_PROJECT_NAME} ${GIT_REF} ref..."
-    local tmp_commit
-    tmp_commit=$(mktemp)
-    gitlab_fetch "${GITLAB_API}/projects/${GITLAB_PROJECT}/repository/commits/${encoded_ref}" "$tmp_commit" || {
-        rm -f "$tmp_commit"
-        exit 1
-    }
-    FBC_COMMIT_SHA=$(jq -r .id "$tmp_commit")
-    rm -f "$tmp_commit"
-
-    if [[ -z "$FBC_COMMIT_SHA" || "$FBC_COMMIT_SHA" == "null" ]]; then
-        log "ERROR: Failed to parse commit SHA from GitLab API response"
+    if [[ ! "${OCP_VERSION:-}" =~ ^[0-9]{2,4}$ ]]; then
+        log "ERROR: OCP_VERSION must be a 2-4 digit string (e.g., '422' for OCP 4.22), got: '${OCP_VERSION:-}'"
         exit 1
     fi
 
-    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA"
+    local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
+    log "Resolving latest active FBC image for ${image_name} from Quay..."
+
+    # The FBC image is a periodic Konflux build tagged by commit SHA, but every
+    # build also pushes many short-lived cosign/attestation (sha256-*.att/.sig/
+    # .sbom) and on-pull-request tags that sort ahead of it. A single page can
+    # therefore contain no commit-SHA tag even though the repo is healthy, so we
+    # page through the active tags until one is found. A genuinely fresh build
+    # can also be briefly absent while it publishes, so the whole scan is wrapped
+    # in exponential backoff (2+4+8+16+32 = 62s window) before failing hard.
+    local attempt delay
+    for attempt in $(seq 1 "$max_attempts"); do
+        if FBC_COMMIT_SHA=$(fetch_latest_fbc_sha "$image_name"); then
+            if [[ -n "$FBC_COMMIT_SHA" ]]; then
+                break
+            fi
+            log "WARNING: No active SHA tag for ${image_name} yet (attempt ${attempt}/${max_attempts})"
+        else
+            log "WARNING: Quay API request for ${image_name} failed (attempt ${attempt}/${max_attempts})"
+        fi
+        if [[ "$attempt" -lt "$max_attempts" ]]; then
+            delay=$(( 2 ** attempt ))
+            log "Retrying in ${delay}s..."
+            sleep "$delay"
+        fi
+    done
+
+    if [[ -z "$FBC_COMMIT_SHA" ]]; then
+        log "ERROR: No active SHA tag found for ${image_name} on Quay after ${max_attempts} attempts"
+        exit 1
+    fi
+
+    log "Resolved FBC_COMMIT_SHA: $FBC_COMMIT_SHA (from Quay active tags)"
+}
+
+# Print the newest active 40-hex commit-SHA tag for an FBC image, or nothing if
+# none exist. Quay returns tags newest-first by start_ts, so the first SHA tag
+# found while paging is the newest. Returns non-zero if any page request fails.
+# Usage: fetch_latest_fbc_sha <image_name> [max_pages]
+fetch_latest_fbc_sha() {
+    local image_name="$1" max_pages="${2:-5}"
+    local page sha has_additional quay_response
+    for page in $(seq 1 "$max_pages"); do
+        # Leave curl's stderr intact so a 401/403, DNS failure, or timeout is
+        # distinguishable in the logs; stdout stays reserved for the JSON body.
+        if ! quay_response=$(curl -sSf --connect-timeout 10 --max-time 30 \
+            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=100&page=${page}&onlyActiveTags=true"); then
+            return 1
+        fi
+        # This helper runs inside `if FBC_COMMIT_SHA=$(...)`, which suppresses
+        # errexit, so an HTTP-200 non-JSON body would make jq fail silently and
+        # look like an empty scan. Check each jq exit status explicitly (pipefail
+        # is set) so a parse failure is reported as a failed response, not an
+        # empty result, and the caller's retry loop can act on it.
+        sha=$(echo "$quay_response" \
+            | jq -r '[.tags[] | select(.name | test("^[0-9a-f]{40}$"))] | sort_by(.start_ts) | reverse | .[0].name // empty') || return 1
+        if [[ -n "$sha" ]]; then
+            echo "$sha"
+            return 0
+        fi
+        has_additional=$(echo "$quay_response" | jq -r '.has_additional') || return 1
+        if [[ "$has_additional" != "true" ]]; then
+            break
+        fi
+    done
+    return 0
 }
 
 verify_fbc_image() {
     local image_name="${FBC_IMAGE_PREFIX}-${OCP_VERSION}"
-    local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
-    log "Verifying FBC image exists: $fbc_image"
 
-    local manifest_status
-    manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
-        --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-        "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
-        -H "Accept: application/vnd.oci.image.index.v1+json" || true)
-
-    if [[ "$manifest_status" == "404" ]]; then
-        if [[ "$FBC_SHA_PINNED" == "true" ]]; then
-            log "ERROR: Pinned FBC image not found: ${fbc_image}"
-            log "The explicitly provided FBC_COMMIT_SHA does not have a corresponding image on Quay"
+    if [[ "${FBC_SHA_PINNED:-}" == "true" ]]; then
+        local fbc_image="${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+        log "Verifying pinned FBC image: $fbc_image"
+        local manifest_status
+        manifest_status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+            "https://quay.io/v2/${QUAY_REPO_PATH}/${image_name}/manifests/${FBC_COMMIT_SHA}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json" || true)
+        if [[ "$manifest_status" != "200" ]]; then
+            log "ERROR: Pinned FBC image not found (HTTP ${manifest_status})"
             exit 1
         fi
-
-        log "WARNING: FBC image not found for commit ${FBC_COMMIT_SHA} (HTTP 404)"
-        log "Falling back to listing available tags..."
-
-        local fallback_tag
-        fallback_tag=$(curl -sSf --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
-            "https://quay.io/api/v1/repository/${QUAY_REPO_PATH}/${image_name}/tag/?limit=50&onlyActiveTags=true" 2>/dev/null \
-            | jq -r '.tags[].name' \
-            | grep -E '^[0-9a-f]{40}$' \
-            | tail -1) || true
-
-        if [[ -n "$fallback_tag" ]]; then
-            log "Using fallback tag (arbitrary valid commit): $fallback_tag"
-            FBC_COMMIT_SHA="$fallback_tag"
-        else
-            log "ERROR: No valid FBC image tags found"
-            exit 1
-        fi
-    elif [[ "$manifest_status" != "200" ]]; then
-        log "ERROR: Failed to verify FBC image manifest (HTTP ${manifest_status})"
-        exit 1
     fi
 
-    log "FBC image verified: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
+    log "Using FBC image: ${FBC_IMAGE_REPO}/${image_name}:${FBC_COMMIT_SHA}"
 }
 
 wait_for_mcp_rollout() {
@@ -213,5 +248,15 @@ wait_for_catalogsource() {
     return 1
 }
 MEDIK8S_LIB_EOF
+
+# Single source of truth for the workload image used by all medik8s E2E
+# destructive tests (connected, disconnected, upgrade). Change HERE to
+# update the image for all environments in one place.
+echo "registry.access.redhat.com/ubi9/ubi-minimal:latest" > "${SHARED_DIR}/workload_image"
+
+# Injector image for SBR privileged iptables-injection pods. Must provide
+# nsenter and iptables; ubi-minimal lacks both. ubi (full) ships util-linux
+# (nsenter) and iptables. Change HERE to update all SBR injection tests.
+echo "registry.access.redhat.com/ubi9/ubi:latest" > "${SHARED_DIR}/injector_image"
 
 echo "medik8s-lib.sh written to ${SHARED_DIR}"

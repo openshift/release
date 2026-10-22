@@ -72,8 +72,14 @@ log "Management cluster access established"
 # Determine namespaces
 # HC namespace:  ocm-<env>-<cluster_id>
 # HCP namespace: ocm-<env>-<cluster_id>-<cluster_name>
-HC_NAMESPACE="ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}"
-HCP_NAMESPACE="ocm-${OCM_LOGIN_ENV}-${CLUSTER_ID}-${CLUSTER_NAME}"
+# The namespace env token is the OCM short name, which differs from OCM_LOGIN_ENV:
+# integration -> int (staging and production match their login env verbatim).
+case "${OCM_LOGIN_ENV}" in
+  integration) NS_ENV="int" ;;
+  *)           NS_ENV="${OCM_LOGIN_ENV}" ;;
+esac
+HC_NAMESPACE="ocm-${NS_ENV}-${CLUSTER_ID}"
+HCP_NAMESPACE="ocm-${NS_ENV}-${CLUSTER_ID}-${CLUSTER_NAME}"
 log "HC namespace:  ${HC_NAMESPACE}"
 log "HCP namespace: ${HCP_NAMESPACE}"
 

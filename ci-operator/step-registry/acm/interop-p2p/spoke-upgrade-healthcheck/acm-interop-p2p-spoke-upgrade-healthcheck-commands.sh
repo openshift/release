@@ -318,8 +318,11 @@ function check_pod() {
 # Setup proxy if it's present in the shared dir
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     # shellcheck disable=SC1091
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 OC="run_command_oc"

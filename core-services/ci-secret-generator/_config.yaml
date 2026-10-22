@@ -58,6 +58,9 @@
     - ci-operator
     - cluster-display
     - ci-images-mirror
+    - ci-operator-configresolver
+    - payload-testing-ui
+    - horologium
     - promotion-quay-tagger
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
@@ -73,6 +76,20 @@
     - core-ci
     service_account:
     - pj-rehearse
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: trt-aggregator
+  params:
+    cluster:
+    - core-ci
+    service_account:
+    - trt-aggregator-waiter
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -204,7 +221,10 @@
     - build09
     - build10
     - build11
+    - build12
+    - build13
     - core-ci
+    - hosted-mgmt
     service_account:
     - component-monitor
 - fields:
@@ -215,7 +235,25 @@
   item_name: ship-status-dash-mcp-server
   params:
     cluster:
-    - app.ci
+    - core-ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
+      --bound-object-name=token-bound-object-1
+    name: sa.$(service_account).$(cluster).token.txt
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - hosted-mgmt
+    - hosted-mgmt2
+    service_account:
+    - cluster-display
+    - github-ldap-user-group-creator
+    - hypershift-workload
+    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -229,12 +267,8 @@
     cluster:
     - hosted-mgmt
     service_account:
-    - cluster-display
     - clusterpool-manager
-    - github-ldap-user-group-creator
     - hive
-    - hypershift-workload
-    - prow-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token --namespace ci ci-monitoring --duration=2419200s --bound-object-kind=Secret
@@ -245,6 +279,7 @@
     cluster:
     - app.ci
     - hosted-mgmt
+    - hosted-mgmt2
     service_account:
     - ci-monitoring
 - fields:
@@ -320,6 +355,7 @@
     - build12
     - build13
     - core-ci
+    - app.ci
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n rosa-cluster-lease rosa-cluster-lease-manager --duration=2419200s

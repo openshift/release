@@ -10,29 +10,35 @@ MC=""
 APISRV=""
 INGRESS80=""
 INGRESS443=""
-SSH=""
-ACCESS=""
 IRI=""
-first_host=true
 echo "Filling the load balancer targets..."
 num_workers="$(yq e '[.[] | select(.name|test("worker-[0-9]"))]|length' "$SHARED_DIR/hosts.yaml")"
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  if [ ${#name} -eq 0 ] || [ ${#ip} -eq 0 ] || [ ${#ipv6} -eq 0 ]; then
+
+  # Validate parsed entries dynamically based on which protocol tracks are active
+  if [ ${#name} -eq 0 ] || \
+     { [ "${ipv4_enabled:-false}" = "true" ] && [ ${#ip} -eq 0 ]; } || \
+     { [ "${ipv6_enabled:-false}" = "true" ] && [ ${#ipv6} -eq 0 ]; }; then
     echo "Error when parsing the Bare Metal Host metadata"
     exit 1
   fi
 
   if [[ "$name" =~ bootstrap* ]] || [[ "$name" =~ master* ]]; then
-    MC="$MC
-      server $name $ip:22623 check inter 1s
+    if [ "${ipv4_enabled}" = "true" ]; then
+      MC="$MC
+      server $name $ip:22623 check inter 1s"
+      APISRV="$APISRV
+      server $name $ip:6443 check inter 1s"
+    fi
+    if [ "${ipv6_enabled}" = "true" ]; then
+      MC="$MC
       server $name-v6 [$ipv6]:22623 check inter 1s"
-    APISRV="$APISRV
-      server $name $ip:6443 check inter 1s
+      APISRV="$APISRV
       server $name-v6 [$ipv6]:6443 check inter 1s"
+    fi
   fi
   if [[ "$name" =~ worker-a-* ]] && [ -e "$SHARED_DIR/deploy_hypershift_hosted" ]; then
     echo "Skipping the worker-a-* as they are meant to belong to an hypershift hosted cluster"
@@ -40,34 +46,29 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   # if number of worker hosts less then 2, then master hosts might get the worker role
   if [ "$num_workers" -lt 2 ] || [[ "$name" =~ worker* ]]; then
-    INGRESS80="$INGRESS80
-      server $name $ip:80 check inter 1s
+    if [ "${ipv4_enabled}" = "true" ]; then
+      INGRESS80="$INGRESS80
+      server $name $ip:80 check inter 1s"
+      INGRESS443="$INGRESS443
+      server $name $ip:443 check inter 1s"
+    fi
+    if [ "${ipv6_enabled}" = "true" ]; then
+      INGRESS80="$INGRESS80
       server $name-v6 [$ipv6]:80 check inter 1s"
-    INGRESS443="$INGRESS443
-      server $name $ip:443 check inter 1s
+      INGRESS443="$INGRESS443
       server $name-v6 [$ipv6]:443 check inter 1s"
+    fi
   fi
-  if $first_host; then
-    first_host=false
-    ACCESS="$ACCESS
-listen access-auxiliary
-    bind :::$((14000 + "$host"))
-    mode tcp
-    balance source
-    timeout tunnel 2h
-      server access-auxiliary 192.168.80.2:22 check inter 1s"
+
+  # Add proxy mappings condition-based for IRI connections
+  if [ "${ipv4_enabled}" = "true" ]; then
+    IRI="$IRI
+      server $name $ip:22625 check inter 1s"
   fi
-  SSH="$SSH
-listen $name-ssh
-    bind :::$((13000 + "$host"))
-    mode tcp
-    balance source
-    timeout tunnel 5m
-      server $name $ip:22 check inter 1s
-      server $name-v6 [$ipv6]:22 check inter 1s"
-  IRI="$IRI
-      server $name $ip:22625 check inter 1s
+  if [ "${ipv6_enabled}" = "true" ]; then
+    IRI="$IRI
       server $name-v6 [$ipv6]:22625 check inter 1s"
+  fi
 done
 echo "Generating the template..."
 
@@ -122,8 +123,6 @@ listen ingress-router-443
     mode tcp
     balance source
 $INGRESS443
-$SSH
-$ACCESS
 listen iri-22625
     bind :::22625
     mode tcp

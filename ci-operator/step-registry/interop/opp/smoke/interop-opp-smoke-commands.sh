@@ -1,8 +1,50 @@
 #!/bin/bash
+set -euo pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=$?
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+trap '_opp_cleanup' EXIT
+
+echo ">>> PHASE: initialization"
+
+# ---------------------------------------------------------------------------
+# Ensure jq is available (the "cli" image may not include it)
+# ---------------------------------------------------------------------------
+if ! command -v jq &>/dev/null; then
+    echo "INFO: jq not found in PATH; installing static binary..."
+    case "$(uname -m)" in
+        x86_64)  _jq_arch="amd64"; _jq_sha256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5" ;;
+        aarch64) _jq_arch="arm64"; _jq_sha256="4dd2d8a0661df0b22f1bb9a1f9830f06b6f3b8f7d91211a1ef5d7c4f06a8b4a5" ;;
+        *)       echo "FATAL: unsupported architecture $(uname -m) for jq bootstrap" >&2; exit 1 ;;
+    esac
+    curl -fsSL -o /tmp/jq \
+        "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-${_jq_arch}"
+    echo "${_jq_sha256}  /tmp/jq" | sha256sum --check --strict --quiet
+    chmod +x /tmp/jq
+    export PATH="/tmp:${PATH}"
+    echo "INFO: jq installed → $(jq --version) [${_jq_arch}, checksum verified]"
+fi
 
 # ---------------------------------------------------------------------------
 # OPP post-upgrade smoke tests
@@ -12,86 +54,115 @@ set -o pipefail
 # TestGrid.
 # ---------------------------------------------------------------------------
 
+# NOTE: OPP_OPERATORS and SMOKE_SETTLE_SECONDS may be set via workflow env (naming deviates from OPP__ convention)
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
 
-JUNIT_FILE="${ARTIFACT_DIR}/junit_opp_smoke.xml"
+typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
 
 # Accumulators for JUnit generation
-declare -a TC_NAMES=()
-declare -a TC_RESULTS=()   # "pass" or "fail"
-declare -a TC_MESSAGES=()  # failure message (empty when pass)
+typeset -a tcNamesArr=()
+typeset -a tcResultsArr=()    # "pass" or "fail"
+typeset -a tcMessagesArr=()   # failure message (empty when pass)
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-add_result() {
-    local name="$1" result="$2" message="${3:-}"
-    TC_NAMES+=("$name")
-    TC_RESULTS+=("$result")
-    TC_MESSAGES+=("$message")
+AddResult() {
+    typeset name="${1:-}"; (($#)) && shift
+    typeset result="${1:-}"; (($#)) && shift
+    typeset message="${1:-}"; (($#)) && shift
+    tcNamesArr+=("${name}")
+    tcResultsArr+=("${result}")
+    tcMessagesArr+=("${message}")
+    true
 }
 
-xml_escape() {
-    local text="$1"
+# XmlEscape: Required for bash 5.x where patsub_replacement is enabled
+# by default, changing how ${var//pattern/replacement} handles & and \ in
+# the replacement string. Without escaping, JUnit XML output is malformed.
+XmlEscape() {
+    typeset text="${1:-}"; (($#)) && shift
+    if shopt -q patsub_replacement 2>/dev/null; then
+        shopt -u patsub_replacement
+        local _restore_patsub=true
+    fi
     text="${text//&/&amp;}"
     text="${text//</&lt;}"
     text="${text//>/&gt;}"
     text="${text//\"/&quot;}"
     text="${text//\'/&apos;}"
-    printf '%s' "$text"
+    [[ "${_restore_patsub:-}" == true ]] && shopt -s patsub_replacement
+    printf '%s' "${text}"
 }
 
-write_junit() {
-    local total=${#TC_NAMES[@]}
-    local failures=0
-    for r in "${TC_RESULTS[@]}"; do
-        if [[ "$r" == "fail" ]]; then
-            (( failures++ )) || true
+WriteJunit() {
+    typeset -i total=${#tcNamesArr[@]}
+    typeset -i failCount=0
+    typeset -i skipCount=0
+    for r in "${tcResultsArr[@]}"; do
+        if [[ "${r}" == "fail" ]]; then
+            (( failCount++ )) || true
+        elif [[ "${r}" == "skip" ]]; then
+            (( skipCount++ )) || true
         fi
     done
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"opp-smoke\" tests=\"${total}\" failures=\"${failures}\">"
-        for i in "${!TC_NAMES[@]}"; do
-            local name
-            name="$(xml_escape "${TC_NAMES[$i]}")"
-            echo "  <testcase classname=\"opp-smoke\" name=\"${name}\">"
-            if [[ "${TC_RESULTS[$i]}" == "fail" ]]; then
-                local msg
-                msg="$(xml_escape "${TC_MESSAGES[$i]}")"
+        echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        for i in "${!tcNamesArr[@]}"; do
+            typeset name=""
+            name="$(XmlEscape "${tcNamesArr[$i]}")"
+            echo "  <testcase classname=\"lp-interop--OPP--smoke\" name=\"${name}\">"
+            if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
+                typeset msg=""
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
                 echo "    <failure message=\"${msg}\"></failure>"
+            elif [[ "${tcResultsArr[$i]}" == "skip" ]]; then
+                typeset msg=""
+                msg="$(XmlEscape "${tcMessagesArr[$i]}")"
+                echo "    <skipped message=\"${msg}\"/>"
             fi
             echo "  </testcase>"
         done
         echo "</testsuite>"
-    } > "${JUNIT_FILE}"
-    echo "JUnit XML written to ${JUNIT_FILE}"
+    } > "${junitFile}"
+    : "JUnit XML written to ${junitFile}"
 }
 
 # shellcheck disable=SC2317  # invoked via trap
-collect_exit_artifacts() {
-    echo "Collecting exit diagnostics..."
-    oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/clusteroperators.yaml" 2>/dev/null || true
-    oc get csv --all-namespaces -o yaml > "${ARTIFACT_DIR}/csvs.yaml" 2>/dev/null || true
-    oc get nodes -o yaml > "${ARTIFACT_DIR}/nodes.yaml" 2>/dev/null || true
+CollectExitArtifacts() {
+    : "Collecting exit diagnostics..."
+    oc get clusteroperators -o yaml > "${ARTIFACT_DIR}/clusteroperators.yaml" || true
+    oc get csv --all-namespaces -o yaml > "${ARTIFACT_DIR}/csvs.yaml" || true
+    oc get nodes -o yaml > "${ARTIFACT_DIR}/nodes.yaml" || true
 }
 
-trap collect_exit_artifacts EXIT
+# shellcheck disable=SC2317
+_propagate_junit () {
+    local _step_prefix
+    # Use BASH_SOURCE[0] (the current script) rather than [1] (the caller)
+    _step_prefix="$(basename "${BASH_SOURCE[0]:-$0}" .sh)"
+    find "${ARTIFACT_DIR}" -name '*.xml' -print0 2>/dev/null | while IFS= read -r -d '' _xf; do
+        cp "${_xf}" "${SHARED_DIR}/${_step_prefix}--$(basename "${_xf}")" 2>/dev/null || true
+    done
+}
+
+trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
 # ---------------------------------------------------------------------------
 
-test_cluster_health() {
-    echo -e "\n=== Test: cluster-health ==="
-    local fail_msg=""
+TestClusterHealth() {
+    echo ">>> PHASE: Test — cluster-health"
+    typeset failMsg=""
 
     # ClusterOperators: Available=True, Degraded!=True
-    local co_problems
-    co_problems="$(oc get clusteroperators -o json | jq -r '
+    typeset coProblems=""
+    if ! coProblems="$(oc get clusteroperators -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="Available")) | first | .status) != "True"
@@ -99,59 +170,68 @@ test_cluster_health() {
             (.status.conditions // [] | map(select(.type=="Degraded")) | first | .status) == "True"
         )
         | .metadata.name
-    ')" || true
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query ClusterOperators"
+        return
+    fi
 
-    if [[ -n "$co_problems" ]]; then
-        fail_msg="Unhealthy ClusterOperators: ${co_problems//$'\n'/, }"
-        echo "FAIL: ${fail_msg}"
+    if [[ -n "${coProblems}" ]]; then
+        failMsg="Unhealthy ClusterOperators: ${coProblems//$'\n'/, }"
+        : "FAIL: ${failMsg}"
     else
-        echo "PASS: All ClusterOperators healthy"
+        : "PASS: All ClusterOperators healthy"
     fi
 
     # Nodes: all Ready
-    local node_problems
-    node_problems="$(oc get nodes -o json | jq -r '
+    typeset nodeProblems=""
+    if ! nodeProblems="$(oc get nodes -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="Ready")) | first | .status) != "True"
         )
         | .metadata.name
-    ')" || true
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query nodes"
+        return
+    fi
 
-    if [[ -n "$node_problems" ]]; then
-        local node_msg="Not-Ready nodes: ${node_problems//$'\n'/, }"
-        if [[ -n "$fail_msg" ]]; then
-            fail_msg="${fail_msg}; ${node_msg}"
+    if [[ -n "${nodeProblems}" ]]; then
+        typeset nodeMsg="Not-Ready nodes: ${nodeProblems//$'\n'/, }"
+        if [[ -n "${failMsg}" ]]; then
+            failMsg="${failMsg}; ${nodeMsg}"
         else
-            fail_msg="$node_msg"
+            failMsg="${nodeMsg}"
         fi
-        echo "FAIL: ${node_msg}"
+        : "FAIL: ${nodeMsg}"
     else
-        echo "PASS: All nodes Ready"
+        : "PASS: All nodes Ready"
     fi
 
     # ClusterVersion: Available=True
-    local cv_available
-    cv_available="$(oc get clusterversion version -o json | jq -r '
+    typeset cvAvailable=""
+    if ! cvAvailable="$(oc get clusterversion version -o json | jq -r '
         .status.conditions // [] | map(select(.type=="Available")) | first | .status
-    ')" || true
-
-    if [[ "$cv_available" != "True" ]]; then
-        local cv_msg="ClusterVersion Available=${cv_available:-unknown}"
-        if [[ -n "$fail_msg" ]]; then
-            fail_msg="${fail_msg}; ${cv_msg}"
-        else
-            fail_msg="$cv_msg"
-        fi
-        echo "FAIL: ${cv_msg}"
-    else
-        echo "PASS: ClusterVersion Available=True"
+    ')"; then
+        AddResult "cluster-health" "fail" "Failed to query ClusterVersion"
+        return
     fi
 
-    if [[ -z "$fail_msg" ]]; then
-        add_result "cluster-health" "pass"
+    if [[ "${cvAvailable}" != "True" ]]; then
+        typeset cvMsg="ClusterVersion Available=${cvAvailable:-unknown}"
+        if [[ -n "${failMsg}" ]]; then
+            failMsg="${failMsg}; ${cvMsg}"
+        else
+            failMsg="${cvMsg}"
+        fi
+        : "FAIL: ${cvMsg}"
     else
-        add_result "cluster-health" "fail" "$fail_msg"
+        : "PASS: ClusterVersion Available=True"
+    fi
+
+    if [[ -z "${failMsg}" ]]; then
+        AddResult "cluster-health" "pass"
+    else
+        AddResult "cluster-health" "fail" "${failMsg}"
     fi
 }
 
@@ -159,82 +239,99 @@ test_cluster_health() {
 # Test 2: opp-operators
 # ---------------------------------------------------------------------------
 
-test_opp_operators() {
-    echo -e "\n=== Test: opp-operators ==="
-    local fail_msg=""
+TestOppOperators() {
+    echo ">>> PHASE: Test — opp-operators"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: opp-operators check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp-operators" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "opp-operators" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
+    typeset failMsg=""
 
-    IFS=',' read -ra operators <<< "$OPP_OPERATORS"
-    for op in "${operators[@]}"; do
-        op="$(echo "$op" | xargs)"  # trim whitespace
-        echo "Checking operator: ${op}"
+    typeset -a operatorsArr=()
+    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
+    for op in "${operatorsArr[@]}"; do
+        op="$(echo "${op}" | xargs)"  # trim whitespace
+        : "Checking operator: ${op}"
 
         # Find CSV matching this operator prefix
-        local csv_info
-        csv_info="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "$op" '
+        typeset csvInfo=""
+        if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
             .items[]
             | select(.metadata.name | startswith($prefix))
             | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)"
-        ' | head -1)" || true
+        ' | head -1)"; then
+            typeset apiMsg="Failed to query CSVs for ${op}"
+            : "FAIL: ${apiMsg}"
+            if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${apiMsg}"; else failMsg="${apiMsg}"; fi
+            continue
+        fi
 
-        if [[ -z "$csv_info" ]]; then
-            local msg="CSV not found for ${op}"
-            echo "FAIL: ${msg}"
-            if [[ -n "$fail_msg" ]]; then
-                fail_msg="${fail_msg}; ${msg}"
+        if [[ -z "${csvInfo}" ]]; then
+            typeset notFoundMsg="CSV not found for ${op}"
+            : "FAIL: ${notFoundMsg}"
+            if [[ -n "${failMsg}" ]]; then
+                failMsg="${failMsg}; ${notFoundMsg}"
             else
-                fail_msg="$msg"
+                failMsg="${notFoundMsg}"
             fi
             continue
         fi
 
-        local csv_ns csv_name csv_phase
-        csv_ns="$(echo "$csv_info" | cut -d/ -f1)"
-        csv_name="$(echo "$csv_info" | cut -d/ -f2)"
-        csv_phase="$(echo "$csv_info" | cut -d/ -f3)"
+        typeset csvNs="" csvName="" csvPhase=""
+        csvNs="$(echo "${csvInfo}" | cut -d/ -f1)"
+        csvName="$(echo "${csvInfo}" | cut -d/ -f2)"
+        csvPhase="$(echo "${csvInfo}" | cut -d/ -f3)"
 
-        if [[ "$csv_phase" != "Succeeded" ]]; then
-            local msg="CSV ${csv_name} in phase ${csv_phase} (expected Succeeded)"
-            echo "FAIL: ${msg}"
-            if [[ -n "$fail_msg" ]]; then
-                fail_msg="${fail_msg}; ${msg}"
+        if [[ "${csvPhase}" != "Succeeded" ]]; then
+            typeset phaseMsg="CSV ${csvName} in phase ${csvPhase} (expected Succeeded)"
+            : "FAIL: ${phaseMsg}"
+            if [[ -n "${failMsg}" ]]; then
+                failMsg="${failMsg}; ${phaseMsg}"
             else
-                fail_msg="$msg"
+                failMsg="${phaseMsg}"
             fi
         else
-            echo "PASS: CSV ${csv_name} phase=Succeeded"
+            : "PASS: CSV ${csvName} phase=Succeeded"
         fi
 
         # Check pods are Ready in the operator namespace (with settling window)
-        echo "Waiting ${SMOKE_SETTLE_SECONDS}s settling window for pods in ${csv_ns}..."
+        : "Waiting ${SMOKE_SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
         sleep "${SMOKE_SETTLE_SECONDS}"
 
-        local not_ready_pods
-        not_ready_pods="$(oc get pods -n "$csv_ns" -o json | jq -r '
+        typeset notReadyPods=""
+        if ! notReadyPods="$(oc get pods -n "${csvNs}" -o json | jq -r '
             .items[]
             | select(.status.phase != "Succeeded")
             | select(
                 (.status.containerStatuses // [] | map(select(.ready != true)) | length) > 0
             )
             | .metadata.name
-        ')" || true
+        ')"; then
+            typeset podApiMsg="Failed to query pods in ${csvNs}"
+            : "FAIL: ${podApiMsg}"
+            if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${podApiMsg}"; else failMsg="${podApiMsg}"; fi
+            continue
+        fi
 
-        if [[ -n "$not_ready_pods" ]]; then
-            local msg="Not-ready pods in ${csv_ns}: ${not_ready_pods//$'\n'/, }"
-            echo "FAIL: ${msg}"
-            if [[ -n "$fail_msg" ]]; then
-                fail_msg="${fail_msg}; ${msg}"
+        if [[ -n "${notReadyPods}" ]]; then
+            typeset podMsg="Not-ready pods in ${csvNs}: ${notReadyPods//$'\n'/, }"
+            : "FAIL: ${podMsg}"
+            if [[ -n "${failMsg}" ]]; then
+                failMsg="${failMsg}; ${podMsg}"
             else
-                fail_msg="$msg"
+                failMsg="${podMsg}"
             fi
         else
-            echo "PASS: All pods ready in ${csv_ns}"
+            : "PASS: All pods ready in ${csvNs}"
         fi
     done
 
-    if [[ -z "$fail_msg" ]]; then
-        add_result "opp-operators" "pass"
+    if [[ -z "${failMsg}" ]]; then
+        AddResult "opp-operators" "pass"
     else
-        add_result "opp-operators" "fail" "$fail_msg"
+        AddResult "opp-operators" "fail" "${failMsg}"
     fi
 }
 
@@ -242,40 +339,52 @@ test_opp_operators() {
 # Test 3: acm-connectivity
 # ---------------------------------------------------------------------------
 
-test_acm_connectivity() {
-    echo -e "\n=== Test: acm-connectivity ==="
-    local fail_msg=""
+TestAcmConnectivity() {
+    echo ">>> PHASE: Test — acm-connectivity"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acm-connectivity check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acm-connectivity" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acm-connectivity" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
+    typeset failMsg=""
 
     # Check if ManagedCluster resources exist
-    local mc_count
-    mc_count="$(oc get managedclusters --no-headers 2>/dev/null | wc -l)" || true
-
-    if [[ "$mc_count" -eq 0 ]]; then
-        echo "SKIP: No ManagedCluster resources found"
-        add_result "acm-connectivity" "pass" ""
+    typeset -i mcCount=0
+    if ! mcCount=$(oc get managedclusters -o json | jq '.items | length'); then
+        AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
         return
     fi
 
-    local mc_problems
-    mc_problems="$(oc get managedclusters -o json | jq -r '
+    if [[ "${mcCount}" -eq 0 ]]; then
+        : "SKIP: No ManagedCluster resources found"
+        AddResult "acm-connectivity" "skip" "No ManagedCluster resources found"
+        return
+    fi
+
+    typeset mcProblems=""
+    if ! mcProblems="$(oc get managedclusters -o json | jq -r '
         .items[]
         | select(
             (.status.conditions // [] | map(select(.type=="ManagedClusterConditionAvailable")) | first | .status) != "True"
         )
         | .metadata.name
-    ')" || true
-
-    if [[ -n "$mc_problems" ]]; then
-        fail_msg="ManagedClusters not available: ${mc_problems//$'\n'/, }"
-        echo "FAIL: ${fail_msg}"
-    else
-        echo "PASS: All ManagedClusters available"
+    ')"; then
+        AddResult "acm-connectivity" "fail" "Failed to query ManagedCluster conditions"
+        return
     fi
 
-    if [[ -z "$fail_msg" ]]; then
-        add_result "acm-connectivity" "pass"
+    if [[ -n "${mcProblems}" ]]; then
+        failMsg="ManagedClusters not available: ${mcProblems//$'\n'/, }"
+        : "FAIL: ${failMsg}"
     else
-        add_result "acm-connectivity" "fail" "$fail_msg"
+        : "PASS: All ManagedClusters available"
+    fi
+
+    if [[ -z "${failMsg}" ]]; then
+        AddResult "acm-connectivity" "pass"
+    else
+        AddResult "acm-connectivity" "fail" "${failMsg}"
     fi
 }
 
@@ -283,66 +392,75 @@ test_acm_connectivity() {
 # Test 4: acs-sensors
 # ---------------------------------------------------------------------------
 
-test_acs_sensors() {
-    echo -e "\n=== Test: acs-sensors ==="
-    local fail_msg=""
+TestAcsSensors() {
+    echo ">>> PHASE: Test — acs-sensors"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: acs-sensors check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "acs-sensors" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "acs-sensors" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
+    typeset failMsg=""
 
     # Check SecuredCluster CR status first
-    local sc_status
-    sc_status="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null | jq -r '
+    typeset scStatus=""
+    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
         .items[]
         | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))"
-    ' | head -1)" || true
+    ' | head -1)"; then
+        AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
+        return
+    fi
 
-    if [[ -n "$sc_status" ]]; then
-        local sc_ns sc_name sc_conds
-        sc_ns="$(echo "$sc_status" | cut -d/ -f1)"
-        sc_name="$(echo "$sc_status" | cut -d/ -f2)"
-        sc_conds="$(echo "$sc_status" | cut -d/ -f3)"
-        echo "SecuredCluster ${sc_name} in ${sc_ns}: conditions=${sc_conds}"
+    if [[ -n "${scStatus}" ]]; then
+        typeset scNs="" scName="" scConds=""
+        scNs="$(echo "${scStatus}" | cut -d/ -f1)"
+        scName="$(echo "${scStatus}" | cut -d/ -f2)"
+        scConds="$(echo "${scStatus}" | cut -d/ -f3)"
+        : "SecuredCluster ${scName} in ${scNs}: conditions=${scConds}"
 
         # Verify sensor pods are Running in the SecuredCluster namespace
-        local sensor_status
-        sensor_status="$(oc get pods -n "$sc_ns" -l app=sensor -o json 2>/dev/null | jq -r '
+        typeset sensorStatus=""
+        sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json | jq -r '
             .items[] | "\(.metadata.name):\(.status.phase)"
         ')" || true
 
-        if [[ -z "$sensor_status" ]]; then
-            fail_msg="No sensor pods found in ${sc_ns}"
-            echo "FAIL: ${fail_msg}"
+        if [[ -z "${sensorStatus}" ]]; then
+            failMsg="No sensor pods found in ${scNs}"
+            : "FAIL: ${failMsg}"
         else
-            local bad_sensors
-            bad_sensors="$(echo "$sensor_status" | grep -v ':Running$' || true)"
-            if [[ -n "$bad_sensors" ]]; then
-                fail_msg="Sensor pods not running: ${bad_sensors//$'\n'/, }"
-                echo "FAIL: ${fail_msg}"
+            typeset badSensors=""
+            badSensors="$(echo "${sensorStatus}" | grep -v ':Running$' || true)"
+            if [[ -n "${badSensors}" ]]; then
+                failMsg="Sensor pods not running: ${badSensors//$'\n'/, }"
+                : "FAIL: ${failMsg}"
             else
-                echo "PASS: Sensor pods running in ${sc_ns}"
+                : "PASS: Sensor pods running in ${scNs}"
             fi
         fi
     else
         # No SecuredCluster CR; check if ACS operator is even installed
-        local acs_csv
-        acs_csv="$(oc get csv --all-namespaces -o json 2>/dev/null | jq -r '
+        typeset acsCsv=""
+        acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
             .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name
         ' | head -1)" || true
 
-        if [[ -z "$acs_csv" ]]; then
-            echo "SKIP: ACS operator not installed"
-            add_result "acs-sensors" "pass" ""
+        if [[ -z "${acsCsv}" ]]; then
+            : "SKIP: ACS operator not installed"
+            AddResult "acs-sensors" "skip" "ACS operator not installed"
             return
         fi
 
         # ACS operator installed but no SecuredCluster CR
-        echo "SKIP: ACS operator installed but no SecuredCluster CR found"
-        add_result "acs-sensors" "pass" ""
+        : "SKIP: ACS operator installed but no SecuredCluster CR found"
+        AddResult "acs-sensors" "skip" "ACS operator installed but no SecuredCluster CR found"
         return
     fi
 
-    if [[ -z "$fail_msg" ]]; then
-        add_result "acs-sensors" "pass"
+    if [[ -z "${failMsg}" ]]; then
+        AddResult "acs-sensors" "pass"
     else
-        add_result "acs-sensors" "fail" "$fail_msg"
+        AddResult "acs-sensors" "fail" "${failMsg}"
     fi
 }
 
@@ -350,63 +468,84 @@ test_acs_sensors() {
 # Test 5: quay-pull
 # ---------------------------------------------------------------------------
 
-test_quay_pull() {
-    echo -e "\n=== Test: quay-pull ==="
-    local fail_msg=""
+TestQuayPull() {
+    echo ">>> PHASE: Test — quay-pull"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: quay-pull check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "quay-pull" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AddResult "quay-pull" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
+    typeset failMsg=""
 
     # Find the Quay registry route
-    local quay_route
-    quay_route="$(oc get routes --all-namespaces -o json 2>/dev/null | jq -r '
+    typeset quayRoute=""
+    set +x  # suppress xtrace — route hostnames are sensitive
+    if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
         .items[]
         | select(.metadata.name | test("quay"; "i"))
         | select(.spec.host | test("quay"; "i"))
         | .spec.host
-    ' | head -1)" || true
+    ' | head -1)"; then
+        : "Route query failed, trying QuayRegistry CR..."
+    fi
+    set -x
 
-    if [[ -z "$quay_route" ]]; then
+    if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
-        quay_route="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>/dev/null | jq -r '
+        set +x  # suppress xtrace — registry endpoint URLs are sensitive
+        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
             .items[0].status.registryEndpoint // empty
-        ' | sed 's|^https://||')" || true
+        ' | sed 's|^https://||')"; then
+            : "QuayRegistry CR query failed"
+        fi
+        set -x
     fi
 
-    if [[ -z "$quay_route" ]]; then
+    if [[ -z "${quayRoute}" ]]; then
         # Check if Quay operator is even installed
-        local quay_csv
-        quay_csv="$(oc get csv --all-namespaces -o json 2>/dev/null | jq -r '
+        typeset quayCsv=""
+        if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
             .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name
-        ' | head -1)" || true
-
-        if [[ -z "$quay_csv" ]]; then
-            echo "SKIP: Quay operator not installed"
-            add_result "quay-pull" "pass" ""
+        ' | head -1)"; then
+            AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
             return
         fi
 
-        fail_msg="Quay operator installed but no registry route found"
-        echo "FAIL: ${fail_msg}"
-        add_result "quay-pull" "fail" "$fail_msg"
+        if [[ -z "${quayCsv}" ]]; then
+            : "SKIP: Quay operator not installed"
+            AddResult "quay-pull" "skip" "Quay operator not installed"
+            return
+        fi
+
+        failMsg="Quay operator installed but no registry route found"
+        : "FAIL: ${failMsg}"
+        AddResult "quay-pull" "fail" "${failMsg}"
         return
     fi
 
-    echo "Found Quay route: ${quay_route}"
+    : "Found Quay route: ${quayRoute}"
 
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
-    local http_code
-    http_code="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quay_route}/api/v1/discovery" --max-time 30)" || true
+    typeset httpCode=""
+    set +x  # suppress xtrace — URL contains route hostname
+    if ! httpCode="$(curl -sk -o /dev/null -w '%{http_code}' "https://${quayRoute}/api/v1/discovery" --max-time 30)"; then
+        httpCode=""
+    fi
+    set -x
 
-    if [[ "$http_code" =~ ^(200|401|403)$ ]]; then
-        echo "PASS: Quay registry responding (HTTP ${http_code}) at ${quay_route}"
+    if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
+        : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
     else
-        fail_msg="Quay registry unreachable at ${quay_route} (HTTP ${http_code:-timeout})"
-        echo "FAIL: ${fail_msg}"
+        failMsg="Quay registry unreachable at ${quayRoute} (HTTP ${httpCode:-timeout})"
+        : "FAIL: ${failMsg}"
     fi
 
-    if [[ -z "$fail_msg" ]]; then
-        add_result "quay-pull" "pass"
+    if [[ -z "${failMsg}" ]]; then
+        AddResult "quay-pull" "pass"
     else
-        add_result "quay-pull" "fail" "$fail_msg"
+        AddResult "quay-pull" "fail" "${failMsg}"
     fi
 }
 
@@ -414,40 +553,40 @@ test_quay_pull() {
 # Main
 # ---------------------------------------------------------------------------
 
-main() {
+Main() {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    echo "OPP Smoke Tests starting"
-    echo "Operators: ${OPP_OPERATORS}"
-    echo "Settle window: ${SMOKE_SETTLE_SECONDS}s"
-    echo "Artifacts dir: ${ARTIFACT_DIR}"
+    echo ">>> PHASE: OPP Smoke Tests starting"
+    : "Operators: ${OPP_OPERATORS}"
+    : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
+    : "Artifacts dir: ${ARTIFACT_DIR}"
 
-    test_cluster_health      || true
-    test_opp_operators       || true
-    test_acm_connectivity    || true
-    test_acs_sensors         || true
-    test_quay_pull           || true
+    TestClusterHealth      || true
+    TestOppOperators       || true
+    TestAcmConnectivity    || true
+    TestAcsSensors         || true
+    TestQuayPull           || true
 
-    write_junit
+    WriteJunit
 
     # Determine overall result
-    local any_fail=0
-    for r in "${TC_RESULTS[@]}"; do
-        if [[ "$r" == "fail" ]]; then
-            any_fail=1
+    typeset -i hasAnyFail=0
+    for r in "${tcResultsArr[@]}"; do
+        if [[ "${r}" == "fail" ]]; then
+            hasAnyFail=1
             break
         fi
     done
 
-    if (( any_fail )); then
-        echo -e "\nOPP Smoke Tests: SOME TESTS FAILED"
+    if (( hasAnyFail )); then
+        : "OPP Smoke Tests: SOME TESTS FAILED"
         exit 1
     fi
 
-    echo -e "\nOPP Smoke Tests: ALL PASSED"
+    : "OPP Smoke Tests: ALL PASSED"
     exit 0
 }
 
-main "$@"
+Main "$@"

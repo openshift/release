@@ -19,7 +19,7 @@ fi
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
 # --- Validate GitHub tokens from github-app-auth step ---
-for f in gh-fork-token gh-upstream-token; do
+for f in gh-fork-token gh-upstream-token github-app-auth.sh github-app-token-outputs; do
     [[ -f "${SHARED_DIR}/${f}" ]] || { echo "ERROR: ${f} not found in SHARED_DIR. Run trt-github-app-auth step first."; exit 1; }
 done
 echo "GitHub tokens validated."
@@ -36,4 +36,93 @@ curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
 }
 
 echo "Summary: $(jq -r '.fields.summary // "No summary"' "${SHARED_DIR}/jira-issue.json")"
+
+# --- Telemetry helper for downstream test steps ---
+cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
+#!/bin/bash
+# TRT agentic telemetry helpers. Source from jira-solver / review-responder:
+#   source "${SHARED_DIR}/trt-telemetry.sh"
+
+EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
+
+if [[ -f "${SHARED_DIR}/github-app-auth.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/github-app-auth.sh"
+fi
+
+agentic_ci() {
+    # Installation tokens last 1h; mint a fresh one before each long child.
+    if declare -F refresh_github_tokens >/dev/null 2>&1; then
+        refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
+    fi
+    local timeout_seconds=""
+    local extra_args=()
+    while [[ "${1:-}" == --* ]]; do
+        case "$1" in
+            --timeout) timeout_seconds="$2"; shift 2 ;;
+            *) extra_args+=("$1"); shift ;;
+        esac
+    done
+    local prompt="$1"; shift
+    local cmd=(
+        agentic-ci run
+        --backend local
+        --harness claude-code
+        --model "${CLAUDE_MODEL}"
+        --workdir "${WORKDIR}"
+        "${extra_args[@]+"${extra_args[@]}"}"
+        "${prompt}"
+        --
+        --permission-mode default
+        --allowedTools "${ALLOWED_TOOLS}"
+        --verbose
+        "$@"
+    )
+    local run_tmp
+    run_tmp=$(mktemp -d /tmp/agentic-ci-wrapper.XXXXXX)
+    local rc=0
+    if [[ -n "${timeout_seconds}" ]]; then
+        TMPDIR="${run_tmp}" timeout "${timeout_seconds}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    else
+        TMPDIR="${run_tmp}" "${cmd[@]}" 2>&1 | tee -a "${WORKDIR}/artifacts/claude-output.log" || rc=${PIPESTATUS[0]}
+    fi
+    find "${run_tmp}" -name 'claude-otel.jsonl' -type f -exec cat {} + >> "${OTEL_LOG}" 2>/dev/null || true
+    rm -rf "${run_tmp}"
+    return $rc
+}
+
+finalize_session_metrics() {
+    # phase is "solve" or "review". Each step writes its own artifact so a
+    # later phase cannot overwrite the earlier phase's cost row.
+    local phase="${1:-}"
+    rm -f "${SHARED_DIR}/claude-otel.jsonl" "${SHARED_DIR}/claude-session-metrics-autodl.json"
+    if [[ "${phase}" != "solve" && "${phase}" != "review" ]]; then
+        echo "Warning: finalize_session_metrics requires phase solve or review, skipping session metrics"
+        return 0
+    fi
+    if [[ ! -f "${EXTRACT_METRICS}" ]]; then
+        echo "Warning: extract_metrics.py not found, skipping session metrics"
+        return 0
+    fi
+    if [[ ! -s "${OTEL_LOG}" ]]; then
+        echo "Warning: No OTEL data collected, skipping session metrics"
+        return 0
+    fi
+    local metrics_tmp dest
+    metrics_tmp=$(mktemp)
+    dest="${ARTIFACT_DIR}/claude-session-metrics-${phase}-autodl.json"
+    if ! python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" 2>&1; then
+        echo "Warning: Failed to extract session metrics"
+        rm -f "${metrics_tmp}"
+        return 0
+    fi
+    cp "${metrics_tmp}" "${dest}"
+    rm -f "${metrics_tmp}"
+    echo "Session metrics autodl written to ${dest}"
+}
+HEREDOC_EOF
+chmod +x "${SHARED_DIR}/trt-telemetry.sh"
+echo "Telemetry helper written to ${SHARED_DIR}/trt-telemetry.sh"
+
 echo "=== TRT Init Complete ==="

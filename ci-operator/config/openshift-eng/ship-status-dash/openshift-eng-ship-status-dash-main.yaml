@@ -9,19 +9,38 @@ images:
     to: dashboard
   - dockerfile_path: images/mcp/Dockerfile
     to: mcp
+  - dockerfile_path: images/mcp/Dockerfile.auth
+    to: mcp-auth
   - dockerfile_path: images/mock-monitored-component/Dockerfile
     to: mock-monitored-component
   - dockerfile_path: images/mock-oauth-proxy/Dockerfile
     to: mock-oauth-proxy
   - dockerfile_path: images/migrate/Dockerfile
     to: migrate
+  - dockerfile_path: images/seed-slo/Dockerfile
+    to: seed-slo
+  - dockerfile_path: .devcontainer/Dockerfile
+    to: ship-status-dash-devcontainer
 promotion:
   to:
   - excluded_images:
     - mock-monitored-component
     - mock-oauth-proxy
+    - seed-slo
+    - ship-status-dash-devcontainer
     namespace: ship-status-dash
     tag: latest
+  - excluded_images:
+    - component-monitor
+    - dashboard
+    - mcp
+    - mcp-auth
+    - migrate
+    - mock-monitored-component
+    - mock-oauth-proxy
+    - seed-slo
+    name: ship-status-dash
+    namespace: ci
 resources:
   '*':
     limits:
@@ -31,7 +50,9 @@ resources:
       memory: 200Mi
 tests:
 - as: lint
-  commands: HOME=/tmp make lint
+  commands: |
+    HOME=/tmp make lint
+    HOME=/tmp make verify-apm
   container:
     from: src
 - as: unit

@@ -68,16 +68,16 @@ save_status_data_router_failed() {
 
 # Constructs the artifacts URL based on CI job context
 get_artifacts_url() {
-  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_base_url="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
   local artifacts_complete_url
 
   if [ -n "${PULL_NUMBER:-}" ]; then
     local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-plugin-export-overlays-"${RELEASE_BRANCH_NAME}"-}"
-    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-e2e"
     artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts"
   else
     local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-plugin-export-overlays-"${RELEASE_BRANCH_NAME}"-}"
-    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
+    local part_2="redhat-developer-rhdh-plugin-export-overlays-ocp-e2e"
     artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts"
   fi
 
@@ -134,7 +134,7 @@ process_junit_file() {
 }
 
 get_job_url() {
-  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results-public"
   local job_complete_url
   if [ -n "${PULL_NUMBER:-}" ]; then
     job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"

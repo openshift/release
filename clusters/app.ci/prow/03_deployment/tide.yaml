@@ -47,12 +47,16 @@ spec:
       serviceAccountName: tide
       initContainers:
       - name: git-sync-init
+        resources:
+          requests:
+            memory: "256Mi"
         command:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
         - --ref=main
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
         - --one-time=true
         - --depth=1
         - --link=release
@@ -60,16 +64,21 @@ spec:
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
       containers:
       - name: tide
-        image: quay.io/petr-muller/tide:sharded-queries
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tide:v20261007-6ed406f29
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --dry-run=false
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
-        - --job-config-path=/var/repo/release/ci-operator/jobs
+        # Keep git-sync's published link (release) in the path. Never point the
+        # recursive job loader at the git-sync root containing .git/.worktrees.
+        - --job-config-path=/etc/jobs/git/release/ci-operator/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -99,8 +108,14 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
+        - name: combined-jobs
+          mountPath: /etc/jobs
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         - name: release
-          mountPath: /var/repo
+          mountPath: /etc/jobs/git
+          readOnly: true
         - name: tmp
           mountPath: /tmp
         - name: service-account
@@ -108,7 +123,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "20Gi"
+            memory: "36Gi"
             cpu: "1500m"
       - name: git-sync
         command:
@@ -118,16 +133,20 @@ spec:
         - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
+        - --sparse-checkout-file=/etc/git-sync-jobs/sparse-checkout
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
+        - name: jobs-sparse-checkout
+          mountPath: /etc/git-sync-jobs
+          readOnly: true
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "0.5"
+            memory: "512Mi"
+            cpu: "100m"
       volumes:
       - name: service-account-token
         projected:
@@ -142,6 +161,14 @@ spec:
           name: config
       - name: release
         emptyDir: {}
+      - name: combined-jobs
+        emptyDir: {}
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: jobs-sparse-checkout
+        configMap:
+          name: prow-jobs-sparse-checkout
       - name: tmp
         emptyDir: {}
       - name: service-account

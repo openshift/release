@@ -1,0 +1,145 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: cmd/trainer-controller-manager/Dockerfile.odh
+    to: trainer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: kubeflow-system
+    post:
+    - chain: gather
+    test:
+    - as: deploy-e2e-and-prepare-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc apply --server-side -k manifests/overlays/manager
+
+        # The ODH controller image resolves the OpenShift cluster TLS profile
+        # at startup and watches it for changes.
+        oc apply --server-side -f - <<'EOF'
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-tls-profile
+        rules:
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          resourceNames:
+          - cluster
+          verbs:
+          - get
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          verbs:
+          - list
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-tls-profile
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-tls-profile
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+        EOF
+
+        oc -n kubeflow-system set image \
+          deployment/kubeflow-trainer-controller-manager \
+          manager="${TRAINER_IMAGE}"
+
+        # The RHAI E2E suite exercises TrainJob progression tracking, which is
+        # guarded by an alpha feature gate and disabled by default.
+        oc -n kubeflow-system patch \
+          deployment/kubeflow-trainer-controller-manager \
+          --type=json \
+          -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--feature-gates=TrainJobStatus=true"}]'
+
+        actual_image="$(oc -n kubeflow-system get \
+          deployment/kubeflow-trainer-controller-manager \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].image}')"
+        if [[ "${actual_image}" != "${TRAINER_IMAGE}" ]]; then
+          echo "expected manager image ${TRAINER_IMAGE}, got ${actual_image}" >&2
+          exit 1
+        fi
+
+        oc -n kubeflow-system rollout status \
+          deployment/kubeflow-trainer-controller-manager --timeout=10m
+
+        # The manager overlay also installs JobSet. Wait for all control-plane
+        # workloads so the E2E suite does not race its controller or webhooks.
+        oc -n kubeflow-system wait --for=condition=Available \
+          deployment --all --timeout=10m
+        oc -n kubeflow-system wait --for=condition=Ready \
+          pod --all --timeout=10m
+
+        oc apply --server-side -k manifests/overlays/runtimes
+
+        # The builder image defaults to -mod=vendor, but Trainer does not
+        # vendor its dependencies.
+        export GOFLAGS=''
+        make test-e2e
+      dependencies:
+      - env: TRAINER_IMAGE
+        name: trainer
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h15m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: trainer

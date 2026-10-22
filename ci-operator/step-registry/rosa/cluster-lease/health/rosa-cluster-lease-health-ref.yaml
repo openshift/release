@@ -10,7 +10,7 @@ ref:
   timeout: 30m0s
   credentials:
   - namespace: test-credentials
-    name: rosa-cluster-lease-manager
+    bundle: rosa-cluster-lease-manager
     mount_path: /etc/rosa-cluster-lease-manager
   env:
   - name: LEASE_NAMESPACE
@@ -25,10 +25,18 @@ ref:
   documentation: |-
     Periodic health check for the ROSA cluster lease inventory.
 
-    For each lease cluster, checks OCM cluster status, API server
-    reachability via OCM kubeconfig, and node health. Detects stale leases
-    (clusters stuck in-use beyond STALE_LEASE_HOURS) and force-releases
-    them. Marks unhealthy clusters as status=error.
+    For each lease cluster, checks OCM cluster status and in-cluster
+    ClusterPackage health. Detects stale leases (clusters stuck in-use
+    beyond STALE_LEASE_HOURS) and force-releases them. Marks unhealthy
+    clusters as status=error.
+
+    After confirming OCM reports the cluster as ready, fetches a
+    cluster-admin kubeconfig via the OCM credentials API and inspects
+    hive.openshift.io/managed=true ClusterPackages for missing or
+    degraded entries. The expected set is configurable via the
+    rosa-cluster-lease-config ConfigMap (keys: expected-clusterpackages
+    or expected-clusterpackages-<cluster-type>), defaulting to the 10
+    standard managed operators.
 
     Run as a periodic Prow job (e.g. every 30 minutes) to keep the
     lease inventory healthy and recover from job crashes.

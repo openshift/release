@@ -5,6 +5,12 @@ import json
 import yaml
 
 CONFIG = {
+    'ibmcloud-perfscale-jp-quota-slice': {
+        'jp-osa': 10,
+    },
+    'ibmcloud-perfscale-quota-slice': {
+        'us-south': 15,
+    },
     'aws-us-east-1-quota-slice': {
         'us-east-1': 15,
     },
@@ -103,6 +109,15 @@ CONFIG = {
     'rosa-e2e-03-quota-slice': {
         'us-west-2': 5,
         'us-east-2': 5
+    },
+    'metal-nno-doca2-quota-slice': {
+        'metal-nno-doca2-rdu2': 1,
+    },
+    'metal-dpf-doca4-quota-slice': {
+        'metal-dpf-doca4-rdu2': 1,
+    },
+    'metal-dpf-doca5-quota-slice': {
+        'metal-dpf-doca5-rdu2': 1,
     },
     'metal-dpf-doca8-quota-slice': {
         'metal-dpf-doca8-rdu2': 1,
@@ -317,12 +332,6 @@ CONFIG = {
     'aro-hcp-dev-quota-slice': {
         'default': 14,
     },
-    'aro-hcp-dev-global-pipeline-quota-slice': {
-        'default': 1,
-    },
-    'aro-hcp-dev-cspr-pipeline-quota-slice': {
-        'default': 1,
-    },
     'aro-hcp-dev-image-push-quota-slice': {
         'default': 1,
     },
@@ -337,11 +346,16 @@ CONFIG = {
     'aro-hcp-dev-shard3-slot': {},
     'aro-hcp-dev-hypershift-westus3-slot': {},
     'aro-hcp-int-shard0-slot': {},
+    'aro-hcp-int-westus3-shard0-slot': {},
     'aro-hcp-prod-shard0-slot': {},
     'aro-hcp-prod-shard1-slot': {},
+    'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
+    'aro-hcp-stg-westus3-shard0-slot': {},
+    'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
+    'aro-hcp-arm-helper-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -367,7 +381,7 @@ CONFIG = {
         'ap-northeast-1': 3,
     },
     'gcd-quota-slice': {
-        'u-germany-northeast1': 2,
+        'u-germany-northeast1': 7,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 45,
@@ -387,18 +401,6 @@ CONFIG = {
     'gcp-sustaining-autorelease-412-quota-slice': {
         'us-east1': 60,
     },
-    'gcp-quota-slice': {
-        'us-central1': 70,
-    },
-    'gcp-3-quota-slice': {
-        'us-central1': 70,
-    },
-    'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
-    },
-    'gcp-arm64-quota-slice': {
-        'us-central1': 30,
-    },
     'gcp-opendatahub-quota-slice': {
         'us-central1': 30,
     },
@@ -413,8 +415,27 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
+    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + amd64 workers (xkvmocp08);
+    # capacity carved from lnxocp11 oz-0-1 + oz-0-3; explicit lease names (YZ owns amd64-0-0).
+    'libvirt-s390x-vpn-amd64-quota-slice': {
+        'libvirt-s390x-vpn-amd64-0-0': 1,
+        'libvirt-s390x-vpn-amd64-0-1': 1
+    },
+    # Orange zone (OZ) VPN heterogeneous: s390x CP/compute + ARM64 workers (akvmocp03);
+    # capacity carved from lnxocp11 oz-0-2 below; keep explicit arm64 lease name.
+    'libvirt-s390x-vpn-arm64-quota-slice': {
+        'libvirt-s390x-arm64-0-0': 1
+    },
+    # Orange zone (OZ) VPN IPv6: additional 5th concurrent lease on lnxocp12 (LPAR12).
+    # vpn-oz keeps oz-1-0..oz-1-3; this profile adds vpn-ipv6-0-0 as new capacity.
+    'libvirt-s390x-vpn-ipv6-quota-slice': {
+        'libvirt-s390x-vpn-ipv6-0-0': 1
+    },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
+    'libvirt-s390x-vpn-hcp-quota-slice': {},
+    'libvirt-s390x-vpn-virt-quota-slice': {},
+    'libvirt-s390x-vpn-virt-sno-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -436,15 +457,6 @@ CONFIG = {
     },
     'openstack-hwoffload-quota-slice': {
         'default': 3,
-    },
-    'openstack-nerc-dev-quota-slice': {
-        'default': 1,
-    },
-    'openstack-rhoso-quota-slice': {
-        'serval71.lab.eng.tlv2.redhat.com': 1,
-    },
-    'openstack-rhos-ci-quota-slice': {
-        'default': 1,
     },
     'openstack-nfv-quota-slice': {
         'default': 4,
@@ -468,6 +480,7 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
+    'power-s2s-quota-slice': {},
     'vsphere-dis-2-quota-slice':{},
     'vsphere-connected-2-quota-slice':{},
     'vsphere-elastic-quota-slice':{},
@@ -489,13 +502,16 @@ CONFIG = {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
-        'default': 20,
+        'default': 30,
     },
     'hypershift-azure-quota-slice': {
         'default': 20,
     },
     'hypershift-gcp-quota-slice': {
         'default': 10,
+    },
+    'platform-gcp-quota-slice': {
+        'default': 3,
     },
     'powervc-1-quota-slice': {
         'default': 4,
@@ -517,6 +533,7 @@ CONFIG = {
     'powervs-7-quota-slice': {},
     'powervs-8-quota-slice': {},
     'powervs-9-quota-slice': {},
+    'powervs-10-quota-slice': {},
     'powervs-sno-quota-slice': {
         'dal14': 2,
     },
@@ -541,6 +558,9 @@ CONFIG = {
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
     },
+    'ibmcloud-quay-quota-slice': {
+        'us-east': 4,
+    },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
@@ -552,6 +572,9 @@ CONFIG = {
     },
     'hypershift-hive-quota-slice': {
         'default': 20,
+    },
+    'hypershift-hive-hosted-mgmt2-quota-slice': {
+        'default': 100,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -613,7 +636,7 @@ CONFIG = {
         'us-west-2': 15,
     },
     'gitops-aws-quota-slice': {
-        'us-west-2': 10
+        'us-west-2': 20
     },
     'che-aws-quota-slice': {
         # us-east-2 is reserved for the air-gapped clusters
@@ -651,6 +674,12 @@ CONFIG = {
         'us-east-2': 5,
         'us-west-1': 5,
         'us-west-2': 5,
+    },
+    'aws-edge-hw-accel-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+        'us-west-1': 15,
+        'us-west-2': 15,
     },
     'rh-openshift-ecosystem-quota-slice': {
         'us-east-1': 10,
@@ -708,7 +737,7 @@ CONFIG = {
         'default': 1,
     },
     'amd-gpu-quota-slice': {
-        '10.8.231.19': 1,
+        '10.6.135.55': 1,
     },
     'aws-osp-qe-quota-slice': {
         'us-east-1': 10,
@@ -729,12 +758,45 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(4):
     for j in range(4):
         CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-{}-{}'.format(i, j)] = 1
+# Move lnxocp14 slots 0-3 from vpn-oz to the HCP VPN profile (same lease names / host)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-0']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-1']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-2']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-3-3']
+# Reserve lnxocp11 slots from vpn-oz for heterogeneous VPN profiles
+# (ARM → arm64-0-0 ← oz-0-2; x86 → vpn-amd64-0-0/0-1 ← oz-0-3/oz-0-1)
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-1']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-2']
+del CONFIG['libvirt-s390x-vpn-oz-quota-slice']['libvirt-s390x-oz-0-3']
+
+# HCP on OZ lnxocp14 (dedicated): reuse former vpn-oz leases oz-3-0 through oz-3-3
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-0'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-1'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-2'] = 1
+CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
+
+# Heterogeneous on OZ lnxocp11: oz-0-2 → ARM; oz-0-3 + oz-0-1 → x86 VPN hetero (2 leases).
+# Z control-plane + compute on lnxocp11; day-2 workers on akvmocp03 / xkvmocp08.
+# GSM: arm64-0-0 ← oz-0-2; vpn-amd64-0-0 ← oz-0-3; vpn-amd64-0-1 ← oz-0-1.
+# vpn-oz retains oz-0-0 on lnxocp11.
+
+# IPv6 on OZ lnxocp12 (LPAR12): new 5th concurrent lease (vpn-oz keeps oz-1-0..oz-1-3).
+# GSM: libvirt-s390x-vpn-ipv6-0-0 hostname/IPs on lnxocp12.
+
+# Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
+for i in range(2):
+    CONFIG['libvirt-s390x-vpn-virt-quota-slice']['libvirt-s390x-virt-{}-0'.format(i)] = 1
+    CONFIG['libvirt-s390x-vpn-virt-sno-quota-slice']['libvirt-s390x-virt-sno-{}-0'.format(i)] = 1
 
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
+
+for i in range(1):        
+    for j in range(4):    
+        CONFIG['power-s2s-quota-slice']['power-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -795,6 +857,9 @@ for i in range(4):
 for i in range(2):
     CONFIG['powervs-9-quota-slice']['sao04-powervs-9-quota-slice-{}'.format(i)] = 1
 
+for i in range(4):
+    CONFIG['powervs-10-quota-slice']['dal14-powervs-10-quota-slice-{}'.format(i)] = 1
+
 for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
 for i in range(150):
@@ -803,27 +868,37 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
 # BEGIN ARO-HCP E2E SLOT RESOURCES
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard0-slot']['aro-hcp-dev-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard1-slot']['aro-hcp-dev-shard1-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(6):
+for i in range(5):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-int-westus3-shard0-slot']['aro-hcp-int-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(4):
+    CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(21):
+    CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
+for i in range(40):
+    CONFIG['aro-hcp-arm-helper-sp-dev']['aro-hcp-arm-helper-sp-dev-{}'.format(i)] = 1
 
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
@@ -857,19 +932,50 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-gcp': {
         'gcp': {
             'install': 50,
-            'quota': CONFIG['gcp-quota-slice'],
-        },
-        'gcp-arm64': {
-            'install': 20,
-            'quota': CONFIG['gcp-arm64-quota-slice'],
+            'quota': {
+                'us-central1': 30,
+                'us-east1': 35,
+                'us-east4': 5,
+                'us-west1': 5,
+            },
         },
         'gcp-openshift-gce-devel-ci-2': {
             'install': 50,
-            'quota': CONFIG['gcp-openshift-gce-devel-ci-2-quota-slice'],
+            'quota': {
+                'us-central1': 35,
+                'us-east1': 35,
+                'us-east4': 35,
+                'us-west1': 35,
+            },
         },
         'gcp-3': {
             'install': 50,
-            'quota': CONFIG['gcp-3-quota-slice'],
+            'quota': {
+                'us-central1': 35,
+                'us-east1': 35,
+                'us-east4': 35,
+                'us-west1': 35,
+            },
+        },
+    },
+    'openshift-org-gcp-arm64': {
+        'gcp': {
+            'install': 50,
+            'quota': {
+                'us-central1': 35,
+            },
+        },
+        'gcp-openshift-gce-devel-ci-2': {
+            'install': 50,
+            'quota': {
+                'us-central1': 20,
+            },
+        },
+        'gcp-3': {
+            'install': 50,
+            'quota': {
+                'us-central1': 20,
+            },
         },
     },
 }
@@ -889,7 +995,7 @@ def cluster_profile_set_resources(clusterProfileSets):
             if not 'quota' in profileData:
                 continue
             for region, regionCount in sorted(profileData['quota'].items()):
-                cps_resource['names'].extend([f'{profile}--{region}--quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
+                cps_resource['names'].extend([f'{profile}--{region}--{profileSet}-quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
                 counter += regionCount
 
         yield cps_resource

@@ -53,7 +53,7 @@ end = datetime.now(timezone.utc) + timedelta(hours=$SILENCE_DURATION_HOURS)
 print(end.strftime('%Y-%m-%dT%H:%M:%S.000Z'))
 ")
 
-JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/"
+JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   JOB_URL="${JOB_URL}pr-logs/pull/${REPO_OWNER:-}_${REPO_NAME:-}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
 else

@@ -4,6 +4,11 @@ set -e
 set -u
 set -o pipefail
 
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "====> SKIP_QE_APP_REGISTRY=true, skipping deploy qe catalogsource"
+  exit 0
+fi
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
@@ -94,10 +99,10 @@ function update_global_auth () {
       check_mcp_status
       echo "update the cluster global auth successfully."
   else
-      echo "!!! fail to add QE optional registry auth, retry and enable log..."
+      echo "!!! fail to add QE optional registry auth, retry without verbose logging..."
       sleep 1
       ret=0
-      run_command "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
+      run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
       if [[ $ret -eq 0 ]]; then
         echo "update the cluster global auth successfully after retry."
       else
@@ -219,7 +224,7 @@ EOF
         
         run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
-        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
         return 1
     fi

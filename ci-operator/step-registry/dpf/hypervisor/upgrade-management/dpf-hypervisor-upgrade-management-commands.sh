@@ -1,15 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-# SSH + cluster-locate boilerplate copied from dpf-hypervisor-sanity-existing-commands.sh.
-# Duplicated because each step ref runs as an independent pod with no shared setup.
+# SSH + cluster-locate boilerplate duplicated because each step ref runs as
+# an independent pod with no shared setup.
 # Also duplicated in network-tests and deploy-cluster. TODO: extract into a shared script.
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
-REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
+CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
-cat /var/run/dpf-ci/private-key | base64 -d >/tmp/id_rsa
+cat ${CLUSTER_PROFILE_DIR}/private-key | base64 -d >/tmp/id_rsa
 echo "" >>/tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
@@ -43,5 +44,5 @@ echo "=== Running management cluster upgrade ==="
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
     source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
     cd \${LAST_OPENSHIFT_DPF}; \
-    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.${CLUSTER_NAME}; \
     make upgrade-management"

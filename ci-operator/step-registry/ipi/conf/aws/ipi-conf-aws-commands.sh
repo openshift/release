@@ -125,8 +125,14 @@ else
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
   # region.
+  # Let the AWS CLI filter and count instead of piping its output into
+  # 'grep -q': grep exits on the first match, the CLI dies with a broken
+  # pipe (exit 120), and with pipefail the check always reported "no".
   IS_M6A_REGION="no"
-  if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
+  m6a_offerings=$(aws ec2 describe-instance-type-offerings --region "${REGION}" \
+    --filters "Name=instance-type,Values=m6a.*" \
+    --query 'length(InstanceTypeOfferings)' --output json || echo 0)
+  if [[ "${m6a_offerings}" -gt 0 ]]; then
     IS_M6A_REGION="yes"
   fi
 
@@ -346,9 +352,18 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]] && [[ -z "${CONTROL_PLANE_AMI}" ]] && 
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   else
     # 4.22 and above: rhcos.json was split into coreos-rhel-9.json and coreos-rhel-10.json
-    coreos_file="coreos-rhel-9.json"
+    if version_le "5.0" "${ocp_version}"; then
+      # Default to rhel-10 for 5.0 and above
+      coreos_file="coreos-rhel-10.json"
+    else
+      # rhel-9 for 4.22-4.x
+      coreos_file="coreos-rhel-9.json"
+    fi
+    # OS_IMAGE_STREAM explicitly overrides the version-based default.
     if [[ "${OS_IMAGE_STREAM:-}" == "rhel-10" ]]; then
       coreos_file="coreos-rhel-10.json"
+    elif [[ "${OS_IMAGE_STREAM:-}" == "rhel-9" ]]; then
+      coreos_file="coreos-rhel-9.json"
     fi
     curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/${coreos_file} -o /tmp/ami.json
     CONTROL_PLANE_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
@@ -366,6 +381,11 @@ fi
 if [[ -n "${COMPUTE_AMI}" ]]; then
   echo "Setting compute AMI: ${COMPUTE_AMI}"
   yq-v4 eval -i '.compute[0].platform.aws.amiID = env(COMPUTE_AMI)' "${CONFIG}"
+fi
+
+if [[ -n "${COMPUTE_MACHINE_MANAGEMENT}" ]]; then
+  echo "Setting compute machine management: ${COMPUTE_MACHINE_MANAGEMENT}"
+  yq-v4 eval -i '.compute[0].management = env(COMPUTE_MACHINE_MANAGEMENT)' "${CONFIG}"
 fi
 
 

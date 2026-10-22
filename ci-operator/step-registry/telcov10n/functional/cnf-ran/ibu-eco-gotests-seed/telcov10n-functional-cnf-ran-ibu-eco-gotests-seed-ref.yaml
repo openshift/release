@@ -7,18 +7,24 @@ ref:
   commands: telcov10n-functional-cnf-ran-ibu-eco-gotests-seed-commands.sh
   documentation: |-
     Prepare IBU seed SNO, run eco-gotests seedgeneration suite, then poweroff
-    seed spoke VM.
+    seed spoke.
+
+    The seed spoke is a baremetal SNO (helix58); its /var/lib/containers
+    partition is created at install by the clusterinstance extra-manifests.
 
     Flow:
     1. Run ibu-prepare-spoke-sno.yml to retrieve seed spoke kubeconfig from hub cluster ACM
-    2. Attach container storage disk to seed SNO VM
-    3. Configure shared container storage mount on seed SNO
-    4. Run eco-gotests IBU seedgeneration test suite
-    5. Power off seed spoke VM to prepare for upgrade
+    2. Generate eco-gotests run script (deploy-run-eco-gotests.yaml)
+    3. Run seedgeneration via ibu-run-seedgeneration.yml (pull-secret
+       backup/restore, MCP wait, verify SeedGenerator SeedGenCompleted)
+    4. Collect junit for ibu-report; power off seed spoke
 
     This step reuses inventory and credentials from earlier workflow steps
     (available in SHARED_DIR from hub-deploy step).
-  timeout: 90m
+
+    Requires eco-ci-cd image that includes playbooks/ran/ibu-run-seedgeneration.yml.
+  # Includes seedgeneration runtime plus post-suite pull-secret restore / MCP wait
+  timeout: 150m
   resources:
     requests:
       cpu: 100m

@@ -40,11 +40,23 @@ set -x
 
 /usr/bin/id
 ls -alh ./memory-hog/
-./memory-hog/prow_run.sh
-rc=$?
 
-if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
-    cp /tmp/events.json ${ARTIFACT_DIR}/events.json
-fi
-echo "Finished running memory hog scenario"
-echo "Return code: $rc"
+collect_artifacts() {
+  local rc=$?
+  set +o errexit
+  # Finished running memory hog scenario
+  if [[ "${TELEMETRY_EVENTS_BACKUP:-}" == "True" && -f /tmp/events.json ]]; then
+    cp /tmp/events.json "${ARTIFACT_DIR}/events.json"
+  fi
+  if [[ -f /tmp/report.out.pdf ]]; then
+    cp /tmp/report.out.pdf "${ARTIFACT_DIR}/kraken.report.pdf"
+  fi
+  exit "$rc"
+}
+
+trap collect_artifacts EXIT
+
+set -euxo pipefail; shopt -s inherit_errexit
+
+./memory-hog/prow_run.sh
+

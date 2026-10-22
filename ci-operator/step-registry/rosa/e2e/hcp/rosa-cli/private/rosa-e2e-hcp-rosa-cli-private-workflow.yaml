@@ -1,0 +1,56 @@
+workflow:
+  as: rosa-e2e-hcp-rosa-cli-private
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      REPLICAS: "3"
+    pre:
+      - chain: rosa-e2e-hcp-rosa-cli-private-provision
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      - ref: rosa-cluster-wait-ready-nodes
+      # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
+      # backplane (ROSAENG-67580).
+      - ref: rosa-backplane-login
+    test:
+      - ref: rosa-e2e-validate-customer
+      - ref: rosa-e2e-validate-platform
+    post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
+  documentation: |-
+    ROSAENG-67585 pilot for the provision x validate matrix on PrivateLink: a
+    rosa-CLI provisioner head feeding the shared, provisioner-agnostic validation
+    tail, end to end.
+
+    This workflow provisions a ROSA HCP private cluster (private API, private
+    default ingress, BYO VPC) via the rosa-e2e-hcp-rosa-cli-private-provision
+    chain — the PrivateLink variant of the rosa-CLI head, which publishes the
+    SHARED_DIR provisioner-to-validator contract (cluster-id, kubeconfig,
+    cluster-metadata.json). See that chain for the one step it differs from the
+    public rosa-e2e-hcp-rosa-cli-provision chain.
+
+    rosa-backplane-login then adds bp-kubeconfig (customer plane) and
+    mc-kubeconfig / sc-kubeconfig (platform plane), and the validation tail runs
+    the provisioner-agnostic refs: rosa-e2e-validate-customer (guest cluster via
+    the backplane kubeconfig) followed by rosa-e2e-validate-platform (management
+    and service clusters). Either head (OCM SDK, terraform-provider-rhcs) can be
+    swapped in front of the same tail.
+
+    The platform plane requires corp-network reachability: run this workflow only
+    where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).

@@ -37,4 +37,25 @@ if [ -n "${SRIOV_NET_DEVICEPOOL}" ]; then
   EXTRA_FLAGS="${EXTRA_FLAGS} --net-devicepool ${SRIOV_NET_DEVICEPOOL}"
 fi
 
+set +o errexit
 WORKLOAD=rds-core EXTRA_FLAGS+=" --alerting=true --profile-type=${PROFILE_TYPE}" ./run.sh
+RUN_EXIT_CODE=$?
+set -o errexit
+
+METRICS_FOLDER=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
+if [[ -d ${METRICS_FOLDER} ]]; then
+  cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
+fi
+
+if [[ "${RUN_EXIT_CODE}" -eq 2 ]]; then
+  echo "kube-burner returned exit code 2, which means the workload reached a timeout"
+  echo "Checking cluster health before exiting"
+  if /tmp/kube-burner-ocp cluster-health; then
+    echo "Cluster is still healthy. Ignoring workload timeout to run remaining workloads"
+    echo "Deleting any left-over test resources"
+    oc delete ns -l kube-burner.io/uuid
+    exit 0
+  fi
+fi
+
+exit ${RUN_EXIT_CODE}

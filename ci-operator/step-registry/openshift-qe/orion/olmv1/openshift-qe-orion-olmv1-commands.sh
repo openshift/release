@@ -101,20 +101,29 @@ pip install -r requirements.txt
 
 case "$ES_TYPE" in
   qe)
+    # Disable xtrace: reading QE ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/qe/password")
     ES_USERNAME=$(<"/secret/qe/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    set -x
     ;;
   quay-qe)
+    # Disable xtrace: reading quay-qe ElasticSearch credentials
+    set +x
     ES_PASSWORD=$(<"/secret/quay-qe/password")
     ES_USERNAME=$(<"/secret/quay-qe/username")
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    set -x
     ;;
   *)
+    # Disable xtrace: reading credentials and constructing authenticated URL
+    set +x
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
     ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    set -x
     ;;
 esac
 

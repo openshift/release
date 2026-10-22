@@ -3,77 +3,58 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.24-linux:
+  stolostron_builder_go1.26-linux:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 images:
   items:
-  - dockerfile_path: operators/multiclusterobservability/Dockerfile
+  - dockerfile_path: operators/multiclusterobservability/Containerfile.operator
     from: base
     inputs:
-      stolostron_builder_go1.24-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: multicluster-observability-operator
-  - dockerfile_path: proxy/Dockerfile
+  - dockerfile_path: proxy/Containerfile.operator
     from: base
     inputs:
-      stolostron_builder_go1.24-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: rbac-query-proxy
-  - dockerfile_path: operators/endpointmetrics/Dockerfile
+  - dockerfile_path: operators/endpointmetrics/Containerfile.operator
     from: base
     inputs:
-      stolostron_builder_go1.24-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: endpoint-monitoring-operator
   - dockerfile_path: tests/Dockerfile
     from: base
     inputs:
-      stolostron_builder_go1.25-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: observability-e2e-test
-  - dockerfile_path: collectors/metrics/Dockerfile
+  - dockerfile_path: collectors/metrics/Containerfile.operator
     from: base
     inputs:
-      stolostron_builder_go1.24-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: metrics-collector
-  - dockerfile_path: loaders/dashboards/Dockerfile
+  - dockerfile_path: loaders/dashboards/Containerfile.operator
     from: base
     inputs:
-      stolostron_builder_go1.24-linux:
+      stolostron_builder_go1.26-linux:
         as:
-        - registry.ci.openshift.org/stolostron/builder:go1.24-linux
-      stolostron_builder_go1.25-linux:
-        as:
-        - registry.ci.openshift.org/stolostron/builder:go1.25-linux
+        - registry.ci.openshift.org/stolostron/builder:go1.26-linux
     to: grafana-dashboard-loader
 promotion:
   to:
@@ -218,9 +199,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -243,9 +224,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -269,9 +250,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -295,9 +276,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -321,9 +302,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:
@@ -347,9 +328,9 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make osci/publish
       credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
       from: src
       resources:
         requests:

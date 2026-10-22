@@ -1,6 +1,8 @@
 ref:
   as: upi-install-libvirt
   from: libvirt-installer
+  # Inject oc for images that omit it (e.g. ocp/4.15:libvirt-installer).
+  cli: latest
   grace_period: 30m
   commands: upi-install-libvirt-commands.sh
   env:
@@ -35,6 +37,14 @@ ref:
     default: 'standard'
   - name: USE_EXTERNAL_DNS
     default: 'false'
+  - name: ENSURE_LIBVIRT_NETWORK
+    default: 'false'
+    documentation: |-
+      When true, re-verify/recreate the lease libvirt network immediately before
+      guest creation (bridge reclaim races on shared Z hypervisors). Enabled only
+      for heterogeneous VPN installs via upi-install-libvirt-heterogeneous chain.
+      Also enables stale ignition/clone volume delete-before-recreate and mock-nss
+      wrapping of virt-install for that path.
   - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
     default: "true"
     documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
@@ -46,4 +56,8 @@ ref:
     - name: "release:latest"
       env: OPENSHIFT_INSTALL_TARGET
   documentation: >-
-    The UPI libvirt install step runs the openshift-install in order to bring up an OpenShift cluster via a remote libvirt configuration with a fixed load balancer.
+    Runs openshift-install and creates guests on a remote libvirt hypervisor.
+    4.16+ and non-s390x keep the historical virt-install/qemu-img path.
+    s390x-only fallbacks when those tools are missing: virsh define/start and
+    virsh vol-resize. On s390x, ETCD_DISK_SPEED=slow is skipped when BRANCH is
+    known < 4.16.

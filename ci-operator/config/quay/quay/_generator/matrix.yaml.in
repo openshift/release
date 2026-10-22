@@ -1,0 +1,193 @@
+version: 2
+
+global_defaults:
+  image_source: build
+  arch: amd64
+  repo: quay/quay
+
+managed_files:
+  active:
+    - quay-quay-master.yaml
+    - quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
+    - quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__gcp-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.17__azure-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml
+    - quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml
+    - quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml
+    - quay-quay-redhat-5.0__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-5.0__aws-arm64-ocp50-e2e-install.yaml
+    - quay-quay-redhat-5.0__gcp-ocp50-e2e-install.yaml
+    - quay-quay-redhat-5.0__azure-ocp50-e2e-install.yaml
+    - quay-quay-operator-redhat-5.0__aws-ocp50-e2e-chainsaw.yaml
+    - quay-quay-redhat-3.16__aws-ocp421-e2e-install.yaml
+  retired: []
+
+quay:
+  - branch: redhat-3.18
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws,gcp,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+      # Sibling of the daily row: same files, distinct as (e.g. aws-s3-rds-nightly).
+      # Uses quay-database-intg-{aws-rds,azure-postgres} before deploy.
+      - cron: weekly
+        source: nightly
+        clouds: [aws,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+        database: true
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-install
+      # oldest OCP Quay 3.18 supports with an ART nightly FBC (v4.12/v4.13 have none)
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.14"]
+        test: e2e-install
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        arches: [arm64]
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        fips: true
+      - cron: 0 8 * * 2
+        source: nightly
+        clouds: [libvirt]
+        ocp: ["4.22"]
+        test: e2e-install
+        arches: [s390x]
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: odf
+      # Operator-channel upgrade lane: install n-1 (stable-3.17), seed it, OLM-upgrade
+      # to n (stable-3.18), then verify/functional Playwright phases. Runs on a
+      # stable OCP cluster (see templates/base.yaml.j2). source: nightly selects
+      # the ART FBC env layer that resolves the operator catalog digest.
+      # Only the n-1 version is specified; the target channel/branch (from
+      # quay_version), the source channel/branch (from upgrade_from), the job name
+      # (from-317), and the static env all come from the generator + upgrade
+      # template.
+      - cron: nightly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: upgrade
+        upgrade_from: "3.17"
+  - branch: redhat-3.17
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws,gcp,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: odf
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        fips: true
+      - cron: nightly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: upgrade
+        upgrade_from: "3.16"
+  - branch: redhat-5.0
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws,gcp,azure]
+        ocp: ["5.0"]
+        test: e2e-install
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-install
+        fips: true
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-install
+        arches: [arm64]
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-install
+        storage: odf
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-chainsaw
+      # Quay 5.0's ART FBC exists only for OCP v5.0, and OCP 5.0 has no stable
+      # channel yet: install from candidate until it goes GA.
+      - cron: nightly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: upgrade
+        upgrade_from: "3.18"
+        ocp_channel: candidate
+  # newest OCP with a quay-3.16 ART nightly FBC (there is no v4.22 one)
+  - branch: redhat-3.16
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.21"]
+        test: e2e-install
+  - branch: master
+    layout: base
+    env:
+      QUAY_OPERATOR_CHANNEL: stable-3.18
+      # Presubmit jobs render no source layer, so the ART FBC env that periodics
+      # get from templates/sources/nightly.yaml.j2 must be set here instead.
+      # master has no quay_version to derive the FBC tag from, so pin it to the
+      # onboarded quay-3.18 FBC group (OCP v4.22 matches the job's ocp below).
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    jobs:
+      - kind: presubmit
+        clouds: [aws, gcp, azure]
+        ocp: ["4.22"]
+        test: e2e-install
+        always_run: false
+        optional: true
+      - kind: presubmit
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: odf
+        always_run: false
+        optional: true

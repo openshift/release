@@ -141,7 +141,7 @@ Get approvals:
 Reports are stored in GCS:
 
 ```
-gs://test-platform-results/logs/
+gs://test-platform-results-public/logs/
   periodic-ci-openshift-online-rosa-gap-analysis-main-rosa-gap-analysis-nightly/<build-id>/artifacts/
 ```
 
@@ -151,7 +151,7 @@ Download artifacts:
 BUILD_ID=<latest-build-id-from-prow>
 
 # Download gap analysis reports
-gsutil -m cp -r gs://test-platform-results/logs/periodic-ci-openshift-online-rosa-gap-analysis-main-rosa-gap-analysis-nightly/${BUILD_ID}/artifacts/ .
+gsutil -m cp -r gs://test-platform-results-public/logs/periodic-ci-openshift-online-rosa-gap-analysis-main-rosa-gap-analysis-nightly/${BUILD_ID}/artifacts/ .
 ```
 
 ## Troubleshooting

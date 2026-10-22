@@ -24,7 +24,7 @@ images:
     to: discovery-testserver
 promotion:
   to:
-  - name: "5.0"
+  - name: "5.1"
     namespace: stolostron
 resources:
   '*':
@@ -60,8 +60,9 @@ tests:
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: sonar-post-submit
   commands: |
     export ocm_dir=$(mktemp -d -t ocm-XXXXX)
@@ -75,14 +76,9 @@ tests:
     from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: backplane-fast-forward-5-0
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-5.0
-    workflow: ocm-ci-fastforward
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: latest-image-mirror
   postsubmit: true
   steps:

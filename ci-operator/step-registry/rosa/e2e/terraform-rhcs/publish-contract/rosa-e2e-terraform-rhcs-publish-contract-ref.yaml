@@ -1,0 +1,57 @@
+ref:
+  as: rosa-e2e-terraform-rhcs-publish-contract
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-terraform-rhcs-publish-contract-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment the cluster lives in. Supported values are [production, staging, integration]. Must match the RHCS_URL given to rhcs-e2e-setup.
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Fallback for the cluster topology when OCM does not report hypershift.enabled. An explicit OCM value (true or false) always takes precedence over this env var. Recorded as topology=hcp when true, classic otherwise.
+  - name: REGION
+    default: ""
+    documentation: AWS region fallback for cluster-metadata.json when OCM does not report one.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: OpenShift version fallback for cluster-metadata.json when OCM does not report one.
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: Release channel group fallback for cluster-metadata.json when OCM does not report one.
+  - name: ZERO_EGRESS
+    default: "false"
+    documentation: Whether the Terraform profile built a zero-egress cluster. Unlike the other feature flags this is not derived from OCM, which has no stable field for it; it is OR-ed with the cluster property when the service sets one. Recorded as feature_flags.zero_egress.
+  documentation: |-
+    Publishes the frozen provisioner-to-validator SHARED_DIR contract (ROSAENG-67580) for a cluster
+    provisioned by the terraform-provider-rhcs day1 flow, making it the Terraform head of the
+    provision x validate matrix (ROSAENG-308 / ROSAENG-67583) alongside rosa-e2e-ocm-provision and
+    rosa-e2e-rosa-cli-publish-contract.
+
+    rhcs-e2e-setup runs the provider's ginkgo "day1-prepare" suite with RHCS_OUTPUT=${SHARED_DIR},
+    which leaves ${SHARED_DIR}/cluster-name behind but records no cluster id (day2 re-derives it from
+    terraform state). This step resolves the id from OCM by name and writes the two missing contract
+    artifacts, ${SHARED_DIR}/cluster-id and ${SHARED_DIR}/cluster-metadata.json, using the same
+    schema and schema_version as the other heads so the provisioner-agnostic validation refs
+    (rosa-e2e-validate-customer / rosa-e2e-validate-platform) cannot tell them apart.
+
+    Feature flags are derived from the OCM representation of the cluster rather than from env vars:
+    the Terraform flow is driven by a profile name (CLUSTER_PROFILE) and does not expose the
+    per-feature env vars the OCM and rosa-CLI heads use. ZERO_EGRESS is the one exception.
+
+    No customer-plane kubeconfig is published: every HCP profile in the provider's
+    tests/ci/profiles sets admin_enabled: false, so the day1 flow has no cluster-admin credentials to
+    build one from. rosa-backplane-login must run before the validation tail so
+    rosa-e2e-validate-customer can fall back to bp-kubeconfig. If a profile ever does produce the
+    provider's ${RHCS_OUTPUT}/kubeconfig directory of per-user kubeconfigs, this step moves it to
+    ${SHARED_DIR}/rhcs-kubeconfigs so a directory is never left at the contract's file path.
+
+    The step fails rather than publish an incomplete contract when cluster-name is missing, when the
+    name does not resolve to exactly one OCM cluster, or when the name/region cannot be resolved.
+
+    Run this immediately after rhcs-e2e-setup. Requires ocm and jq (provided by the rosa-aws-cli
+    image) and OCM credentials in the cluster profile.

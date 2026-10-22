@@ -107,8 +107,69 @@ data:
 EOF
 
 # Creating AgentServiceConfig
-CLUSTER_VERSION=$(oc get clusterversion -o jsonpath={..desired.version} | cut -d '.' -f 1,2)
-OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
+if [ -z "${OCP_IMAGE_MULTI:-}" ]; then
+  echo "OCP_IMAGE_MULTI is required" >&2
+  exit 1
+fi
+if ! RELEASE_INFO=$(oc adm release info "${OCP_IMAGE_MULTI}" --output=json); then
+  echo "Failed to inspect release image ${OCP_IMAGE_MULTI}" >&2
+  exit 1
+fi
+if ! RELEASE_VERSION=$(echo "${RELEASE_INFO}" | jq -er '.metadata.version // empty'); then
+  echo "Release image ${OCP_IMAGE_MULTI} has no metadata.version" >&2
+  exit 1
+fi
+if [ -z "${RELEASE_VERSION}" ]; then
+  echo "Release image ${OCP_IMAGE_MULTI} has no metadata.version" >&2
+  exit 1
+fi
+CLUSTER_VERSION=$(echo "${RELEASE_VERSION}" | cut -d '.' -f 1,2)
+
+if ! MACHINE_OS_IMAGE=$(oc adm release info \
+  --image-for=machine-os-images \
+  --filter-by-os=linux/amd64 \
+  "${OCP_IMAGE_MULTI}"); then
+  echo "Failed to resolve machine-os-images from ${OCP_IMAGE_MULTI}" >&2
+  exit 1
+fi
+if [ -z "${MACHINE_OS_IMAGE}" ]; then
+  echo "Release image ${OCP_IMAGE_MULTI} does not contain machine-os-images" >&2
+  exit 1
+fi
+
+if ! COREOS_STREAM_DIR=$(mktemp -d "${TMPDIR:-/tmp}/coreos-stream.XXXXXX"); then
+  echo "Failed to create a temporary directory for coreos-stream.json" >&2
+  exit 1
+fi
+COREOS_STREAM_JSON="${COREOS_STREAM_DIR}/coreos-stream.json"
+if ! oc image extract "${MACHINE_OS_IMAGE}" \
+  --path="/coreos/coreos-stream.json:${COREOS_STREAM_DIR}" \
+  --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+  --filter-by-os=linux/amd64 \
+  --confirm; then
+  echo "Failed to extract /coreos/coreos-stream.json from ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ ! -s "${COREOS_STREAM_JSON}" ]; then
+  echo "${MACHINE_OS_IMAGE} does not contain /coreos/coreos-stream.json" >&2
+  exit 1
+fi
+if ! OS_IMAGE_VERSION=$(jq -er '.architectures.s390x.artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
+  echo "No RHCOS metal release found for s390x in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ -z "${OS_IMAGE_VERSION}" ]; then
+  echo "No RHCOS metal release found for s390x in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if ! OS_IMAGE_URL=$(jq -er '.architectures.s390x.artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
+  echo "No RHCOS metal ISO URL found for s390x in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ -z "${OS_IMAGE_URL}" ]; then
+  echo "No RHCOS metal ISO URL found for s390x in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
 echo "$(date) Creating AgentServiceConfig"
 cat <<EOF | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
@@ -132,8 +193,8 @@ spec:
         storage: 10Gi
   osImages:
     - openshiftVersion: "${CLUSTER_VERSION}"
-      version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").version')
-      url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "s390x").url')
+      version: "${OS_IMAGE_VERSION}"
+      url: "${OS_IMAGE_URL}"
       cpuArchitecture: s390x
 EOF
 

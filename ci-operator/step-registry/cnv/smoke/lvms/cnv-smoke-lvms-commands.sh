@@ -30,7 +30,10 @@ unset KUBERNETES_PORT
 unset KUBERNETES_PORT_443_TCP_PORT
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
   NO_PROXY="${NO_PROXY},bitwarden.com,bitwarden.eu"
   no_proxy="${no_proxy},bitwarden.com,bitwarden.eu"
   export NO_PROXY no_proxy

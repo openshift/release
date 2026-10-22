@@ -11,8 +11,11 @@ cat /etc/os-release
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 python --version
@@ -76,16 +79,6 @@ set -o errexit
 METRICS_FOLDER="collected-metrics-${UUID}"
 if [[ -f ${METRICS_FOLDER}/jobSummary.json ]]; then
   cp -r ${METRICS_FOLDER} "${ARTIFACT_DIR}/"
-  if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]]; then
-    set +e
-    OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
-    OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
-    METRICS="${METRICS_FOLDER}/*QuantilesMeasurement*.json ${METRICS_FOLDER}/jobSummary.json"
-    SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"
-    scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}
-    set -e
-  fi
 fi
 
 if [[ ${PPROF} == "true" ]]; then

@@ -10,9 +10,8 @@ oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\"
 
 oc wait co network --for='condition=PROGRESSING=True' --timeout=120s
 # Wait until the ovn-kubernetes pods are restarted
-sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
-sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
-if [ "${sample_node}" = "${sample_node_zone}" ]; then
+# Interconnect mode deploys ovnkube-control-plane; legacy mode uses ovnkube-master
+if oc get deployment/ovnkube-control-plane -n openshift-ovn-kubernetes >/dev/null 2>&1; then
   echo "INFO: INTERCONNECT MODE"
   # FIXME: Increasing timeout to 15minutes for OVNK IC deployments (original value was 360seconds)
   # See https://issues.redhat.com/browse/OCPBUGS-16629 for details

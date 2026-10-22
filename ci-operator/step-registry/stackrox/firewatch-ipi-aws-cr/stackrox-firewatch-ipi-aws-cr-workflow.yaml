@@ -1,0 +1,19 @@
+workflow:
+  as: stackrox-firewatch-ipi-aws-cr
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-aws-pre
+    post:
+    - chain: ipi-aws-post
+    - ref: mpiit-data-router-reporter
+      best_effort: true
+      timeout: 15m
+    - ref: firewatch-report-issues
+  documentation: |-
+    StackRox-owned variant of firewatch-ipi-aws-cr. Identical to that workflow
+    except the mpiit-data-router-reporter post step is marked best_effort, so a
+    recurring outage of the Data Router / Report Portal reporting service
+    (intermittent 503s from datarouter.ccitredhat.com, tracked as LPINTEROP-6864)
+    no longer fails an otherwise-green job. firewatch-report-issues still runs and
+    files Jira issues for real failures.

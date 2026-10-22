@@ -1,0 +1,34 @@
+workflow:
+  as: nno-signed-e2e
+  steps:
+    pre:
+    - ref: nno-read-signed-target
+    test:
+    - chain: nno-cluster-setup
+    - ref: nvidia-gpu-operator-merge-stage-credentials
+      env:
+      - name: MERGE_STAGE_REGISTRY_CREDENTIALS
+        default: "true"
+    - ref: nno-install-signed-driver
+    - ref: nno-install-gpu-operator-rdma
+    - ref: nno-test-gpudirect
+    post:
+    - ref: gather-extra
+    - ref: gather-must-gather
+    allow_skip_on_success: true
+    env:
+      DPF_DEPLOY_MAKE_TARGET: create-base-cluster
+      DPF_REQUIRE_SHARED_OPENSHIFT_VERSION: "true"
+      DPF_OPENSHIFT_VERSION: "4.22"
+      DUMP_FAILED_TESTS: "true"
+      TEST_TRACE: "true"
+      TIMEOUT: 120m
+      VERBOSE_LEVEL: "100"
+  documentation: |-
+    Validate the planned OCP and staging DOCA image request before lab actions,
+    deploy that exact OCP version on the selected lab profile, apply NNO day-2
+    setup, install the requested precompiled driver directly, verify it is
+    running, install the GPU Operator with RDMA enabled, and run GPUDirect RDMA
+    with the selected driver still active. The nvidia-ci request validator
+    publishes dpf-openshift-version, ofed-pullspec, and a normalized request
+    artifact. Missing or invalid requests fail without defaults or discovery.

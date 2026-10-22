@@ -1,6 +1,65 @@
 presubmits:
   openshift/ci-tools:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
+    context: ci/prow/agentic-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+    labels:
+      ci-operator.openshift.io/variant: agentic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-main-agentic-images
+    rerun_command: /test agentic-images
+    run_if_changed: ^(\.devcontainer/|hack/agentic_setup\.sh|\.agentic/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=agentic
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )agentic-images,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -11,6 +70,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -40,6 +100,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -52,7 +113,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -158,6 +218,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -187,6 +248,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -199,7 +261,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -275,6 +336,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -304,6 +366,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -316,7 +379,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -384,7 +446,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_run_if_changed: ^(cmd/(ci-operator|ci-operator-configresolver|pod-scaler|gsm-secret-sync|ci-secret-generator|ci-secret-bootstrap)/|pkg/|test/e2e/|Makefile|go\.(mod|sum)$)
+      pipeline_run_if_changed: ^(cmd/(ci-operator|ci-operator-configresolver|pod-scaler|gsm-secret-sync|gsm-proxy|ci-secret-generator|ci-secret-bootstrap)/|pkg/|test/e2e/|Makefile|go\.(mod|sum)$)
     branches:
     - ^main$
     - ^main-
@@ -394,6 +456,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -423,6 +486,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -435,7 +499,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -541,6 +604,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -570,6 +634,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -582,7 +647,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -687,6 +751,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -716,6 +781,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -728,7 +794,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -804,6 +869,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -833,6 +899,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -845,7 +912,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -921,6 +987,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -950,6 +1017,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -962,7 +1030,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -1038,6 +1105,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -1067,6 +1135,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -1079,7 +1148,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -1155,6 +1223,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -1184,6 +1253,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -1196,7 +1266,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -1282,7 +1351,7 @@ presubmits:
         env:
         - name: BOOTSTRAP_BINARY
           value: /tmp/ci-secret-bootstrap
-        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.26-openshift-4.23
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1320,7 +1389,7 @@ presubmits:
         - -mod=mod
         - -race
         - ./cmd/ci-secret-generator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.26-openshift-4.23
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1338,6 +1407,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -1367,6 +1437,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -1379,7 +1450,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -1484,6 +1554,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -1513,6 +1584,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -1525,7 +1597,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile
@@ -1616,7 +1687,7 @@ presubmits:
       containers:
       - command:
         - hack/check-prow-version.sh
-        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.23
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.26-openshift-4.23
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1634,6 +1705,7 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - .devcontainer/Dockerfile
       - images/applyconfig/Dockerfile
       - images/auto-config-brancher/Dockerfile
       - images/auto-peribolos-sync/Dockerfile
@@ -1663,6 +1735,7 @@ presubmits:
       - images/dptp-controller-manager/Dockerfile
       - images/entrypoint-wrapper/Dockerfile
       - images/generate-registry-metadata/Dockerfile
+      - images/gsm-proxy/Dockerfile
       - images/gsm-secret-sync/Dockerfile
       - images/job-run-aggregator/Dockerfile
       - images/multi-arch-builder-controller/Dockerfile
@@ -1675,7 +1748,6 @@ presubmits:
       - images/private-org-sync/Dockerfile
       - images/private-prow-configs-mirror/Dockerfile
       - images/prow-job-dispatcher/Dockerfile
-      - images/registry-replacer/Dockerfile
       - images/repo-brancher-controller/Dockerfile
       - images/repo-brancher/Dockerfile
       - images/repo-init/Dockerfile

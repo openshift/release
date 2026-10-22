@@ -6,15 +6,16 @@ set -o pipefail
 
 echo "=== TRT PR Followup ==="
 
-# --- Read tokens from SHARED_DIR ---
-set +x
-GH_FORK_TOKEN=$(cat "${SHARED_DIR}/gh-fork-token")
-export GH_FORK_TOKEN
-GITHUB_TOKEN=$(cat "${SHARED_DIR}/gh-upstream-token")
-export GITHUB_TOKEN
-JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
+[[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
+    echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
+    exit 1
+}
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/github-app-auth.sh"
+load_github_tokens
+configure_github_git_credentials
 
-git config --global credential.helper '!f() { echo username=x-access-token; echo "password=${GH_FORK_TOKEN}"; }; f'
+JIRA_ISSUE_KEY=$(cat "${SHARED_DIR}/jira-issue-key")
 
 # --- Find PR ---
 echo "Searching for PR associated with ${JIRA_ISSUE_KEY}..."

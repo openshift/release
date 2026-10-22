@@ -14,8 +14,12 @@ hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
 hcp_domain="$job_id-$HYPERSHIFT_BASEDOMAIN"
 export hcp_domain
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 IC_API_KEY=$(cat "${IC_API_KEY_FILE}")
 export IC_API_KEY
+set -x
 
 MGMT_CLUSTER_NAME=$(cat "$SHARED_DIR/mgmt_cluster_name")
 export MGMT_CLUSTER_NAME
@@ -23,8 +27,12 @@ export MGMT_CLUSTER_NAME
 VPC_NAME="$MGMT_CLUSTER_NAME-vpc"
 
 # Getting ssh info
+# Tracing is disabled while the private key is read, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
+set -x
 tmp_ssh_key="/tmp/httpd-vsi-key"
 envsubst <<"EOF" >${tmp_ssh_key}
 -----BEGIN OPENSSH PRIVATE KEY-----
@@ -61,7 +69,11 @@ fi
 set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
+# Tracing is disabled while the API key is handled, otherwise xtrace expands
+# it into the publicly readable build log.
+set +x
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
+set -x
 set +e
 echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
@@ -542,7 +554,10 @@ EOF
 
 # Sourcing the proxy settings for the next steps
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 

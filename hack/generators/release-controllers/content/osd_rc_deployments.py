@@ -266,7 +266,7 @@ def get_oc_prepare_container():
             DURATION=$SECONDS
             echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
                         """],
-            "image": "release-controller:latest",
+            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest",
             "volumeMounts": get_oc_volume_mounts(),
             "env": get_oc_env_vars(),
         }
@@ -359,7 +359,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "11Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
@@ -450,7 +450,7 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "2Gi"
+                                    "memory": "4Gi"
                                 },
                             },
                             'command': ['/usr/bin/release-controller-api',

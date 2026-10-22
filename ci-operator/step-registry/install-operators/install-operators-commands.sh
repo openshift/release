@@ -78,14 +78,25 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
             -l catalog=${operator_source} \
             -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.defaultChannel}' 2>/dev/null || echo)
         if [[ -z "${operator_channel}" ]]; then
-            echo "ERROR: Default channel not found in '${operator_name}' packagemanifest."
+            echo "WARNING: Default channel not found in '${operator_name}' packagemanifest. Falling back to the first available channel."
+            operator_channel=$(oc get packagemanifest \
+                -l catalog=${operator_source} \
+                -ojsonpath='{.items[?(.metadata.name=="'${operator_name}'")].status.channels[0].name}' 2>/dev/null || echo)
+        fi
+        if [[ -z "${operator_channel}" ]]; then
+            echo "ERROR: No channel found in '${operator_name}' packagemanifest."
             echo "Checking if the ${operator_name} packagemanifest is available in other catalogs for debugging purpose:"
             set -x
             oc get packagemanifest "${operator_name}" || \
               echo "There is not any available packagemanifest for '${operator_name}' operator"
+            if [[ "${operator_skip_checking}" == "true" ]]; then
+                set +x
+                echo "skip_checking is set, skipping '${operator_name}' operator installation."
+                continue
+            fi
             exit 1
         else
-            echo "INFO: Default channel is ${operator_channel}"
+            echo "INFO: Using channel '${operator_channel}'"
         fi
     fi
 
@@ -181,6 +192,12 @@ EOF
 
         if [[ -z "${CSV}" ]]; then
             echo "Try ${i}/${RETRIES}: can't get the ${operator_name} yet. Checking again in 30 seconds"
+            if (( i % 5 == 0 )); then
+                echo "--- Subscription status for ${operator_name} ---"
+                oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
+                    -o jsonpath='{range .status.conditions[*]}  Condition: type={.type} status={.status}{"\n"}{end}' 2>/dev/null || true
+                echo "---"
+            fi
             sleep 30
         fi
 
@@ -193,17 +210,38 @@ EOF
         fi
     done
 
-    if [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-        echo "Error: Failed to deploy ${operator_name}"
-        echo
-        echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
-        echo
-        oc get packagemanifest | grep ${operator_name} || echo
-        echo "CSV ${CSV} YAML"
-        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
-        echo
-        echo "CSV ${CSV} Describe"
-        oc describe csv "${CSV}" -n "${operator_install_namespace}"
+    if [[ -z "${CSV}" ]] || [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null) != "Succeeded" ]]; then
+        if [[ -z "${CSV}" ]]; then
+            echo "Error: Failed to deploy ${operator_name} - no CSV was ever created"
+            echo "This typically means OLM could not resolve the subscription (wrong channel, missing bundle, or catalog issue)."
+            echo
+            echo "=== Subscription status ==="
+            oc get subscription -n "${operator_install_namespace}" "${operator_name}" \
+                -o jsonpath='Subscription: name={.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV} installPlan={.status.installPlanRef.name}{"\n"}{range .status.conditions[*]}  Condition: type={.type} status={.status}{"\n"}{end}' 2>/dev/null || echo "Subscription not found"
+            echo
+            echo "=== Available channels for ${operator_name} ==="
+            oc get packagemanifest "${operator_name}" -o jsonpath='{range .status.channels[*]}  Channel: name={.name}{"\n"}{end}' 2>/dev/null || echo "packagemanifest not found"
+            echo
+            echo "=== OLM Resolution events ==="
+            oc get events -A --field-selector reason=ResolutionFailed --sort-by='.lastTimestamp' \
+                -o jsonpath='{range .items[*]}  Event: timestamp={.lastTimestamp} namespace={.metadata.namespace} objectKind={.involvedObject.kind} objectName={.involvedObject.name} reason={.reason}{"\n"}{end}' 2>/dev/null | tail -10 || true
+            echo
+            echo "=== InstallPlans ==="
+            oc get installplan -n "${operator_install_namespace}" \
+                -o jsonpath='{range .items[*]}  InstallPlan: name={.metadata.name} phase={.status.phase}{"\n"}{end}' 2>/dev/null || echo "No InstallPlans found"
+        else
+            # CSV exists but not Succeeded — keep existing diagnostics
+            echo "Error: Failed to deploy ${operator_name}"
+            echo
+            echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
+            echo
+            oc get packagemanifest | grep ${operator_name} || echo
+            echo "CSV ${CSV} YAML"
+            oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
+            echo
+            echo "CSV ${CSV} Describe"
+            oc describe csv "${CSV}" -n "${operator_install_namespace}"
+        fi
         if [[ "${operator_skip_checking}" == "true" ]]; then
             echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
         else

@@ -11,10 +11,37 @@ set -euo pipefail
 echo "Starting GCP hosted cluster infrastructure setup..."
 
 # Install Google Cloud CLI (hypershift-operator image doesn't have gcloud)
+# Download to a temp file first (not piped) so we can verify before extracting.
+# Use --fail so HTTP errors (4xx/5xx) produce a non-zero exit code,
+# --retry/--retry-all-errors for transient network failures, and
+# --show-error for diagnostics on failure.
 echo "Installing Google Cloud CLI..."
 GCLOUD_SDK_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
 GCLOUD_INSTALL_DIR="${HOME}/google-cloud-sdk"
-curl -sL "${GCLOUD_SDK_URL}" | tar -xzf - -C "${HOME}"
+
+GCLOUD_TMP="$(mktemp /tmp/gcloud-sdk.XXXXXX.tar.gz)"
+trap 'rm -f -- "${GCLOUD_TMP}"' EXIT
+echo "Downloading gcloud CLI from ${GCLOUD_SDK_URL}..."
+curl -fSL --retry 3 --retry-delay 5 --retry-all-errors \
+  -o "${GCLOUD_TMP}" "${GCLOUD_SDK_URL}"
+echo "Download complete ($(stat -c%s "${GCLOUD_TMP}") bytes)"
+
+# Verify the download is non-empty and a valid gzip archive before extracting
+if [[ ! -s "${GCLOUD_TMP}" ]]; then
+  echo "ERROR: Downloaded file is empty"
+  rm -f "${GCLOUD_TMP}"
+  exit 1
+fi
+if ! gzip -t "${GCLOUD_TMP}" 2>/dev/null; then
+  echo "ERROR: Downloaded file is not a valid gzip archive"
+  rm -f "${GCLOUD_TMP}"
+  exit 1
+fi
+
+echo "Extracting gcloud CLI..."
+tar -xzf "${GCLOUD_TMP}" -C "${HOME}"
+echo "Google Cloud CLI installed successfully"
+
 export PATH="${GCLOUD_INSTALL_DIR}/bin:${PATH}"
 
 # Authenticate gcloud and set ADC for the hypershift CLI via WIF credential written

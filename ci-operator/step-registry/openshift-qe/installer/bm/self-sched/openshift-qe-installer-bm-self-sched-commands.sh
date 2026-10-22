@@ -23,6 +23,8 @@ else
   echo "Get available hosts for self scheduling from a certain hardware model ..."
   HOSTS=$(curl -fsSk $QUADS_INSTANCE/api/v3/available\?can_self_schedule\=true\&model=$MODEL | jq .[0:$NUM_SERVERS] | jq -r .[])
   echo $HOSTS
+  bastion=$(echo "$HOSTS" | head -n1)
+  echo "$bastion" > "${SHARED_DIR}/bastion"
 fi
 
 # [Optional] Get a free VLAN

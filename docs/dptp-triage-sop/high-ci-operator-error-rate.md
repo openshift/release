@@ -98,7 +98,7 @@ oc --context "$CTX" get events -n "$TEST_NS" --sort-by=.lastTimestamp | tail -40
 ### `building_project_image`
 
 1. Fix **Dockerfile / inputs** or **base image** per log—often repo-owned.
-2. For **registry flakes**, verify **`registry.ci.openshift.org`** / mirror health; compare with other jobs pulling same image.
+2. For **registry flakes**, verify **`quay-proxy.ci.openshift.org`** / **`registry.ci.openshift.org`** / mirror health; compare with other jobs pulling same image.
 3. Re-run **after** fix: prefer **`/retest`** or Prow **rerun** from Deck rather than ad-hoc cluster tweaks.
 
 ### `interrupted`

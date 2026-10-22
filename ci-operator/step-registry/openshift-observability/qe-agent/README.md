@@ -33,6 +33,7 @@ See [Setup](#setup) for detailed instructions.
 - Rerun failing tests to confirm reproducibility and detect flakiness
 - Apply minimal test fixes for test issues and export them for human review
 - Write structured bug reports for product defects
+- Attribute each failure to the suspected introducing product and test commit (git-level attribution, candidates only)
 - Produce analysis summaries with evidence citations
 
 **Operational context**: Runs as a CI post-step inside an already-provisioned OpenShift test cluster. The environment is ephemeral — the cluster is destroyed after each job. The agent operates non-interactively with no human supervision during execution. All output is written to files for post-run human review.
@@ -67,10 +68,11 @@ Even at the current ceiling of $5, a single qe-agent run replaces most of the va
 
 - **Prompt-level constraints only**: File output paths and scope are enforced by skill instructions (system prompt), not technical sandboxing. The agent _could_ write outside `ARTIFACT_DIR` — the skill tells it not to, but this is not technically enforced.
 - **No cross-run pattern awareness**: Sippy integration is not yet implemented. The agent analyzes every failure independently, even if it is a known issue already tracked in Jira.
-- **Cloud-provisioned clusters prohibited**: The agent must not be used with GCP/AWS/Azure clusters — see [Blast Radius and Risk Profile](#blast-radius-and-risk-profile).
+- **Attribution is a candidate list, not a verdict**: the agent has no known-good baseline and does not bisect. For presubmits the PR under test is the candidate window; for periodic and postsubmit jobs it ranks commits from the last 90 days that touch the code implicated by the diagnosis. For periodic jobs the tested commit is the clone-time `HEAD`, which can be newer than what CI built. PRs from `openshift-priv` mirrors cannot be resolved in the public clone. See [Git-level attribution](#git-level-attribution).
+- **`kube-system` namespace access**: The agent is prohibited from accessing `kube-system` via a prompt-level constraint in all skills. This is a soft control — not enforced by RBAC. See [Blast Radius and Risk Profile](#blast-radius-and-risk-profile).
 - **Maximum 3 individual test analyses**: When more than 5 tests fail and no common pattern is found, the agent caps analysis at 3 tests.
 - **Hard budget and time limits**: `$5 USD` spend cap and `90-minute` wall-clock timeout may truncate analysis of complex multi-failure scenarios.
-- **Skill fetch from GitHub main branch**: A bad merge to the skill file could affect agent behavior until reverted. Skills are fetched at runtime, not baked into the image.
+- **Skill fetch from GitHub main branch**: A bad merge to the skill file or to any of the shared modules could affect agent behavior until reverted. All are fetched at runtime, not baked into the image.
 - **No interactive debugging**: The agent runs non-interactively. It cannot ask clarifying questions or request human input during execution.
 
 ---
@@ -168,44 +170,76 @@ Add `openshift-observability-qe-agent` to the `post:` phase of your test and set
 tests:
 - as: my-upstream-tests
   steps:
-    cluster_profile: <non-cloud-profile>
+    cluster_profile: gcp-observability
     env:
-      AGENT_SKILL: MY_TEAM
+      AGENT_SKILL: my-team
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
-    - chain: <your-deprovision-chain>
     test:
     - ref: <your-test-ref>
-    workflow: <non-cloud-workflow>
+    workflow: cucushift-installer-rehearse-gcp-ipi
 ```
 
-> **Important**: Do not use cloud-provisioned clusters (GCP, AWS, Azure) with this step. See [Blast Radius and Risk Profile](#blast-radius-and-risk-profile) for details.
+> **Important**: The agent is prohibited from accessing the `kube-system` namespace via a prompt-level constraint in all skills. This prevents the agent from reading cloud provider credentials stored in that namespace. This is a soft control, not technically enforced by RBAC. See [Blast Radius and Risk Profile](#blast-radius-and-risk-profile) for details.
 
 ---
 
 ## Agent Skill
 
-Skills are Markdown files hosted in this step's `skills/` directory within the `openshift/release` repository:
+Skills are Markdown files hosted in this step's `resources/skills/` directory within the `openshift/release` repository, one directory per skill:
 
 ```text
-ci-operator/step-registry/openshift-observability/qe-agent/skills/
-├── OTEL.md          <- OpenTelemetry Operator (junit_otel_* tests, chainsaw)
-├── TEMPO.md         <- Tempo Operator (junit_tempo_* tests, chainsaw)
-├── TRACING_UI.md    <- Distributed Tracing Console Plugin (Cypress)
-├── DISCONNECTED.md  <- Distributed Tracing disconnected suite (chainsaw)
+ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/
+├── otel/SKILL.md        <- OpenTelemetry Operator (junit_otel_* tests, chainsaw)
+├── otel-ui/SKILL.md     <- OpenTelemetry Collector dashboard in the console (junit_console_ui_otel_* tests, Playwright)
+├── tempo/SKILL.md       <- Tempo Operator (junit_tempo_* tests, chainsaw)
+├── tracing-ui/SKILL.md  <- Distributed Tracing Console Plugin (Cypress)
 └── OWNERS
 ```
 
 Each skill is fetched at runtime from `https://raw.githubusercontent.com/openshift/release/main/...` and passed to Claude as its system prompt. The skill defines how Claude should approach the failure: what tests to re-run, what logs to collect, how to classify the root cause, and what output to produce.
 
+### Shared modules
+
+Procedures that every skill needs live once under `resources/shared/`, so an improvement benefits every team's skill instead of being copied five times. The wrapper fetches each module from `main` and writes it to `/tmp/qe-agent-modules/<name>.md` in the pod, and each skill reaches it from a short, mandatory pointer step. The side benefit is the token budget: referenced files do not count toward skillsaw's 6,000-token limit.
+
+| Module | Skill step | What it holds |
+|---|---|---|
+| `cluster-stability.md` | Step 0a | MachineConfigPool readiness check |
+| `junit-triage.md` | Step 1 | JUnit parsing and high-failure triage |
+| `cluster-instability.md` | Step 4 | Reconciliation-loop indicators and the four conditions for `CLUSTER_INSTABILITY` |
+| `attribution.md` | Step 4a | Git-level attribution (below) |
+| `test-fix-export.md` | Steps 5a and 5c | Minimal-fix rules, export to `test-fixes/` and the `CHANGES.md` template |
+| `product-bug-report.md` | Step 5b | Product bug report template, Jira wiki conversion and `jira-payload.json` |
+| `analysis-summary.md` | Steps 5d and 6 | Cluster-instability incident note and the `qe-agent-analysis.md` template |
+
+Each pointer step carries a short inline fallback (for example the minimal `jira-payload.json` schema), so a missing module degrades the output rather than dropping it. What stays in the skills is what differs per operator or framework: the setup replay (Steps 0 and 0b), test discovery and rerun commands (Steps 2 and 3, including each flakiness loop and its routing), the operator diagnostics and Product Bug / Test Issue indicators (Step 4), and the framework-specific fixes. Security rules also stay inline in every skill, including the `kube-system` restriction in the Notes section. Skills and modules refer to each other by step number and title, so keep those titles unchanged (see [resources/README.md](resources/README.md#shared-modules)).
+
+### Git-level attribution
+
+`resources/shared/attribution.md` is mandatory: every skill has a **Step 4a** that tells the agent to read it, so it is part of every run and cannot be switched off per job. It connects the diagnosed failure to the change that most plausibly introduced the condition, on two tracks:
+
+- **Product**: the operator or plugin commit or PR that touched the code implicated by the diagnosis.
+- **Test**: the recent history of the failing test's files.
+
+How it works:
+
+1. The wrapper fetches the module from `main` and writes it to `/tmp/qe-agent-modules/attribution.md`, the fixed path the skills' Step 4a reads (see [Shared modules](#shared-modules)). It also derives the tested refs from `$JOB_SPEC` into `${ARTIFACT_DIR}/qe-agent-refs.json` (job type, base SHA, PR numbers and SHAs, an allowlisted `clone_url`). PR titles and authors are deliberately left out.
+2. The agent runs the module after the skill's Step 4 classification and before the Step 5 outputs, so the result lands in `bug-report.md`, `CHANGES.md`, `jira-payload.json` and `qe-agent-analysis.md`. It is read-only and time-boxed to about 10 minutes. For `CLUSTER_INSTABILITY` and `JOB_CONFIG` it records `status: skipped` with the reason and still writes the improvement notes.
+3. The agent writes `${ARTIFACT_DIR}/attribution.json`: status, per-track window and candidates (SHA, PR, subject, confidence, reason) and an `improvement` object.
+4. The wrapper prints one summary line to the build log, for example `Attribution: entries=1 status=ok candidates=2 deviations=1`.
+
+**Reviewing how it went.** Every run, including skipped and failed ones, writes an **Attribution Improvement Notes** section in `qe-agent-analysis.md` and the same content under `improvement` in `attribution.json`: what worked, what did not, every deviation from the module (step, expected, actual, reason), missing data, a confidence check and suggested module changes. Grep build logs for `Attribution:` and open `attribution.json` where `deviations` is non-zero.
+
+**Failure handling.** The step never fails because of a module. If the wrapper cannot fetch or write one (or it exceeds 50 KB), it logs a warning and that skill step follows its inline fallback. A missing attribution module makes Step 4a write `attribution.json` with `"status": "failed"`, so it is visible rather than silent; a missing `cluster-stability.md` makes Step 0a fall back to a short inline poll of the MachineConfigPools; a missing `product-bug-report.md`, `analysis-summary.md` or `test-fix-export.md` makes Step 5b, 5d, 6, 5a or 5c write a shorter version of the same files (the Jira payload keeps its `summary` and `description` fields); a missing `junit-triage.md` or `cluster-instability.md` makes Step 1 or Step 4 follow a short inline version of the same rule. If `jq` is missing, the refs file is not written and the module falls back to clone-time `HEAD`.
+
 ### Adding a new team skill
 
-1. Create `ci-operator/step-registry/openshift-observability/qe-agent/skills/<TEAM_NAME>.md`
-2. Add your team identifier to the `OWNERS` file in `skills/`
-3. Validate the skill before submitting (see [Skill validation](#skill-validation))
-4. Open a PR to `openshift/release` — the step OWNERS review and approve it
-5. Set `AGENT_SKILL: <TEAM_NAME>` in your CI config
+1. Create `resources/skills/<name>/SKILL.md` and its `OWNERS` file (see [resources/README.md](resources/README.md#adding-a-new-skill) for the skill structure)
+2. Validate the skill before submitting (see [Skill validation](#skill-validation))
+3. Open a PR to `openshift/release` — the step OWNERS review and approve it
+4. Set `AGENT_SKILL: <name>` in your CI config
 
 Skill names must be alphanumeric (hyphens and underscores allowed). The step rejects any value that does not match `^[A-Za-z0-9_-]+$` to prevent path traversal.
 
@@ -217,8 +251,11 @@ Before submitting a new or modified skill, validate it with the following tools:
 
 ```bash
 pip install skillsaw
-skillsaw lint ci-operator/step-registry/openshift-observability/qe-agent/skills/
+cd ci-operator/step-registry/openshift-observability/qe-agent
+skillsaw lint resources/skills/<name>
 ```
+
+Skills must stay under skillsaw's default 6,000-token `context-budget` limit; see [resources/README.md](resources/README.md#skill-validation).
 
 **[Agent Eval Harness](https://github.com/opendatahub-io/agent-eval-harness)** — Evaluation framework for testing AI agent skill effectiveness. Use it to measure how well your skill performs against known test failure scenarios before deploying to CI:
 
@@ -234,8 +271,8 @@ Both tools help catch issues early — Skillsaw identifies security risks and co
 |---|---|
 | Required | Yes |
 | Format | Alphanumeric, hyphens, underscores only |
-| Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/skills/<name>.md` in `openshift/release` |
-| Example | `TEMPO` |
+| Resolves to | `ci-operator/step-registry/openshift-observability/qe-agent/resources/skills/<name>/SKILL.md` in `openshift/release` |
+| Example | `tempo` |
 
 ---
 
@@ -243,11 +280,11 @@ Both tools help catch issues early — Skillsaw identifies security risks and co
 
 This step grants Claude Code CLI unrestricted Bash access inside a CI pod that holds live cluster credentials. Before adopting it, understand what Claude can and cannot do.
 
-### Cluster requirement: non-cloud provisioned clusters only
+### Namespace restriction: `kube-system` access prohibited
 
-This step **must not be used with cloud-provisioned test clusters** (GCP, AWS, Azure, etc.). Cloud-provisioned clusters store cloud provider credentials in `kube-system` and `openshift-*` namespaces. Because the agent runs with cluster-admin privileges, it could read those credentials. Kubernetes RBAC is purely additive (no deny rules), so there is no way to grant cluster-admin while blocking secret reads in specific namespaces.
+Cloud-provisioned clusters store cloud provider credentials in `kube-system` and `openshift-*` namespaces. Because the agent runs with cluster-admin privileges, it could technically read those credentials. Kubernetes RBAC is purely additive (no deny rules), so there is no way to grant cluster-admin while blocking secret reads in specific namespaces.
 
-Use non-cloud provisioned clusters (e.g., bare metal) where no cloud provider credentials are stored in the cluster, eliminating this risk entirely.
+To mitigate this, all skills include a prompt-level constraint that prohibits the agent from accessing, reading, listing, or modifying any resources in the `kube-system` namespace. When diagnostic commands default to all namespaces (e.g., `oc get pods -A`), the agent is instructed to filter out `kube-system` from the output. This is a soft control enforced by the skill instructions (system prompt), not a technical sandbox — the agent _could_ bypass it, but the risk is mitigated by the ephemeral nature of the test cluster (destroyed after each job) and the `post:` phase execution context.
 
 ### What Claude can do
 
@@ -261,7 +298,7 @@ Use non-cloud provisioned clusters (e.g., bare metal) where no cloud provider cr
 
 ### What Claude cannot do
 
-- **No cloud credential access** — non-cloud provisioned clusters have no cloud provider credentials stored in the cluster. There are no GCP service account keys, AWS IAM credentials, or Azure service principal secrets for Claude to read.
+- **No `kube-system` access** — all skills include a prompt-level constraint prohibiting the agent from accessing the `kube-system` namespace, which contains cloud provider credentials. This is a soft control enforced by skill instructions.
 - **No outbound HTTP** — `WebFetch` is not in `allowedTools`; Claude cannot call arbitrary external URLs.
 - **No git push** — no git credentials are mounted; file changes are confined to the pod.
 - **No cross-tenant cluster access** — RBAC bounds apply; Claude cannot reach other teams' clusters or namespaces.
@@ -271,7 +308,7 @@ Use non-cloud provisioned clusters (e.g., bare metal) where no cloud provider cr
 
 **Unexpected cluster mutation** — Claude misinterprets a skill step and deletes a namespace or patches a resource it should not touch. Not a concern in practice: the step runs in the `post:` phase against a test-only cluster, and the deprovision chain that follows destroys the entire cluster regardless. No production or shared infrastructure is reachable.
 
-**Runaway session** — Claude enters a reasoning loop, consuming turns and Vertex AI budget without making progress. Hard-bounded on two axes: `--max-budget-usd 5` stops the session the moment spend reaches $5 — preventing runaway cost from exhausting the Vertex AI cost center budget — and the 90-minute wall-clock timeout is the outer limit. `best_effort: true` ensures neither bound can block the pipeline.
+**Runaway session** — Claude enters a reasoning loop, consuming turns and Vertex AI budget without making progress. Hard-bounded on three axes: `--max-budget-usd 5` stops the session the moment spend reaches $5 — preventing runaway cost from exhausting the Vertex AI cost center budget — the Claude timeout (`STEP_TIMEOUT_MINUTES - 10` minutes, default 80m) kills the Claude process to guarantee time for post-processing and Jira filing — and the step timeout (90m) is the outer limit. `best_effort: true` ensures none of these bounds can block the pipeline.
 
 **ARTIFACT_DIR pollution** — Claude writes unexpected files to `ARTIFACT_DIR`, which are then uploaded to GCS. The skill scopes Claude to documented output paths, but this is a prompt-level control, not a technical one.
 
@@ -286,11 +323,11 @@ After every run, two files are written to `ARTIFACT_DIR` for post-incident revie
 | `qe-agent-usage.json` | Token counts (input, output, cache), USD cost, turn count, and wall-clock duration. |
 | `qe-agent-commands.log` | Every tool call Claude made (Bash commands, Read/Write file paths, Grep/Glob patterns) — the invocation strings only, not their output. Bash command strings may reference sensitive paths (e.g. KUBECONFIG, mounted secrets). Treat this log with the same access controls as other CI artifacts. |
 
-The full stream-json session output (which includes cluster logs, API responses, and `--verbose` traces) is captured to a temporary file in the pod and deleted on exit — it never reaches the CI build-log or GCS. Only these two derived files are written to `ARTIFACT_DIR`. Note: while cluster data (pod logs, API responses) is excluded, command strings and file paths in the audit log may reference sensitive locations.
+The full stream-json session output (which includes cluster logs, API responses, and `--verbose` traces) is captured to a temporary file in the pod and deleted on exit — it never reaches the CI build-log or GCS. Only these two derived files are written to `ARTIFACT_DIR` by the wrapper (plus `qe-agent-refs.json`, derived from `$JOB_SPEC`, and the agent's own outputs such as `attribution.json`). Note: while cluster data (pod logs, API responses) is excluded, command strings and file paths in the audit log may reference sensitive locations.
 
-### Required: non-cloud provisioned clusters
+### Namespace restriction
 
-This step **must not be used with cloud-provisioned clusters** (GCP, AWS, Azure, etc.) — the agent runs with cluster-admin privileges and could read cloud provider credentials stored in `kube-system`. Use non-cloud provisioned clusters where no cloud credentials are present.
+The agent is prohibited from accessing the `kube-system` namespace via a prompt-level constraint in all skills. This prevents the agent from reading cloud provider credentials stored in that namespace. This is a soft control — not enforced by RBAC. The risk is mitigated by the ephemeral nature of the test cluster (destroyed after each job).
 
 ---
 
@@ -298,12 +335,17 @@ This step **must not be used with cloud-provisioned clusters** (GCP, AWS, Azure,
 
 | Variable | Default | Description |
 |---|---|---|
-| `AGENT_SKILL` | — | Name of the skill to load from the `skills/` directory. Step is skipped if unset or the file does not exist. |
+| `AGENT_SKILL` | — | Name of the skill to load from `resources/skills/<name>/SKILL.md`. Step is skipped if unset or the file does not exist. |
 | `CLAUDE_MODEL` | `claude-opus-4-6` | Claude model used for analysis. |
 | `CLAUDE_CODE_USE_VERTEX` | `1` | Enable Google Vertex AI backend for Claude Code. |
 | `CLOUD_ML_REGION` | `global` | Google Cloud region for Vertex AI. |
 | `ANTHROPIC_VERTEX_PROJECT_ID` | `itpc-gcp-hcm-pe-eng-claude` | GCP project ID for Vertex AI authentication. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | `/var/run/claude-code-service-account/claude-prow` | Path to the GCP service account key file. |
+| `STEP_TIMEOUT_MINUTES` | `90` | Total step timeout in minutes. Must match the `timeout:` field on the ref. Claude is capped at this value minus 10 minutes to reserve time for post-processing and Jira filing. |
+| `JIRA_PROJECT` | — | Jira project key for filing product bug reports (e.g. `TRACING`). Filing is skipped if unset. |
+| `JIRA_ASSIGNEE` | — | Display name or email of the Jira assignee. Looked up via Jira user search API. |
+| `JIRA_BASE_URL` | `https://redhat.atlassian.net` | Base URL of the Jira instance. |
+| `JIRA_ISSUE_TYPE` | `Bug` | Jira issue type name for filed bug reports. |
 
 ---
 
@@ -313,11 +355,13 @@ The Distributed Tracing QE team (Tempo Operator, OpenTelemetry Operator, Tracing
 
 **CI config snippet** (`openshift-grafana-tempo-operator-main__upstream-ocp-4.22-amd64.yaml`):
 ```yaml
+cluster_profile: gcp-observability
 env:
-  AGENT_SKILL: TEMPO
+  AGENT_SKILL: tempo
+  JIRA_PROJECT: TRACING
 post:
 - ref: openshift-observability-qe-agent
-- chain: <deprovision-chain>
+workflow: cucushift-installer-rehearse-gcp-ipi
 ```
 
 **Test step trap** (in `distributed-tracing-tests-tempo-upstream-commands.sh`):
@@ -356,9 +400,9 @@ trap notify_qe_agent EXIT
 | File reading | `Read` (Claude Code) | Any pod-visible file | Skill scopes to SHARED_DIR, ARTIFACT_DIR, test repos |
 | File writing | `Write` (Claude Code) | Any pod-writable path | Skill scopes to ARTIFACT_DIR/test-fixes/ |
 | Pattern search | `Grep`, `Glob` (Claude Code) | Pod filesystem | Read-only |
-| Cluster API | `oc`/`kubectl` via Bash | cluster-admin RBAC | Non-cloud clusters only; no cloud credentials present |
+| Cluster API | `oc`/`kubectl` via Bash | cluster-admin RBAC | `kube-system` namespace access prohibited via prompt-level constraint |
 | AI model | Claude (Vertex AI) | API call via service account | `--max-budget-usd 5`; scoped GCP SA |
-| Git (read-only) | `git clone` via Bash | Public GitHub repos | No git credentials mounted; no push capability |
+| Git (read-only) | `git clone`, `fetch`, `log`, `show`, `grep` via Bash | Public GitHub repos (allowlisted URLs for attribution) | No git credentials mounted; no push capability |
 
 ### Authorized actions
 
@@ -372,11 +416,11 @@ trap notify_qe_agent EXIT
 ### Prohibited actions
 
 - Push git changes (no git credentials mounted)
-- Access cloud provider credentials (**deployment prerequisite**: non-cloud clusters only — see [Cluster requirement](#cluster-requirement-non-cloud-provisioned-clusters-only))
+- Access resources in the `kube-system` namespace (prompt-level constraint in all skills — see [Namespace restriction](#namespace-restriction-kube-system-access-prohibited))
 - Make outbound HTTP requests via Claude tools (`WebFetch`/`WebSearch` not in `--allowedTools`). Note: the `Bash` tool can still invoke `curl`/`wget` if instructed by the skill; outbound egress depends on pod network policy, which is a **deployment prerequisite** — not enforced by this step
 - Modify production infrastructure (ephemeral test cluster only)
 - Access other teams' clusters or namespaces
-- Create or modify Jira tickets, PRs, or any external resources
+- Create or modify Jira tickets, PRs, or any external resources (Jira filing is handled by the wrapper script after the agent exits, not by the agent itself)
 - Install software outside the pod (no root access)
 
 ### Guardrails for write/execute actions
@@ -387,8 +431,9 @@ trap notify_qe_agent EXIT
 | File writes | Skill-scoped to `ARTIFACT_DIR`; post-processing adds AI-generated banner | Prompt-level (skill instructions) |
 | Cluster mutations (create/delete/patch) | Ephemeral test cluster; deprovision chain destroys cluster after run | Infrastructure-level (CI job lifecycle) |
 | API spend | `--max-budget-usd 5` hard cap | Protocol-enforced (Claude Code runtime) |
+| Claude timeout | `timeout ${STEP_TIMEOUT_MINUTES - 10}m` | Script-enforced (commands script) |
 | Session duration | `timeout: 1h30m0s` | Infrastructure-enforced (ci-operator) |
-| Non-cloud cluster requirement | No cloud credentials in cluster | **Deployment prerequisite** — CI config must use non-cloud `cluster_profile` |
+| `kube-system` namespace restriction | Prompt-level constraint in all skills | Prompt-level (skill instructions) |
 | Network egress | Pod-level network policy | **Deployment prerequisite** — not enforced by this step |
 
 ---
@@ -402,11 +447,24 @@ The agent operates autonomously during execution but all output requires human r
 1. **Agent produces output** — analysis summaries, bug reports, and proposed test fixes are written as files to `ARTIFACT_DIR`
 2. **Files uploaded to GCS** — the CI sidecar uploads all artifacts to GCS, accessible via the Prow job URL
 3. **Human reviews output** — an engineer reads `qe-agent-analysis.md` and validates the diagnosis
-4. **Human takes action** — if the agent proposed a test fix, the engineer reviews the diff in `test-fixes/`, verifies it, and submits a PR. If the agent wrote a bug report, the engineer reviews `bug-report.md` and files a Jira issue manually
+4. **Human takes action** — if the agent proposed a test fix, the engineer reviews the diff in `test-fixes/`, verifies it, and submits a PR. If the agent wrote a bug report, the engineer reviews `bug-report.md` and verifies the filed Jira issue (or files one manually if Jira filing is not configured)
+
+#### Jira bug filing (opt-in)
+
+When `JIRA_PROJECT` is set and Jira credentials (`jira-pat`, `jira-email`) are present in the `dt-secrets` mount, the wrapper script files a Jira issue **after Claude exits**. Jira credentials are never exposed to the Claude session — they are loaded and used only by the wrapper code in section 6 of the commands script.
+
+The skill's Step 5b (procedure in the shared `product-bug-report.md` module) instructs the agent to write `${ARTIFACT_DIR}/jira-payload.json` alongside `bug-report.md`. This JSON contains the summary (≤ 255 chars, prefixed with `[qe-agent]`), the bug report description pre-converted to Jira wiki notation (headings, bold, code blocks, lists, blockquotes) and starting with the severity, and a `severity` field. When several `PRODUCT_BUG` tests are diagnosed, they are combined into one payload. The wrapper reads only `summary` and `description` and POSTs them to Jira REST API v2 — it does not perform any markdown conversion itself. The module and each skill's fallback also instruct the agent to redact credentials, tokens, passwords, and SHA-256 digests with `[REDACTED]` before writing the payload.
+
+To ensure Jira filing runs even when Claude uses most of the step timeout, the `claude` invocation is wrapped with `timeout` set to `STEP_TIMEOUT_MINUTES - 10` minutes. This reserves 10 minutes for post-processing (cost tracking, audit log, AI banners, and Jira filing). If `STEP_TIMEOUT_MINUTES` is changed, it must match the `timeout:` field on the ref YAML.
+
+If `JIRA_ASSIGNEE` is configured, the wrapper looks up the account ID via the assignable-user search endpoint (which validates assignment permissions) and sets the assignee. Created issue keys are appended to `${ARTIFACT_DIR}/jira-issue-key.txt` and linked in the analysis summary.
+
+`JIRA_BASE_URL` is validated against an allowlist (`https://redhat.atlassian.net`, `https://issues.redhat.com`) before credentials are used. All Jira API calls have connect and total timeouts (10s / 30s). If credentials are missing, empty, or any API call fails, the step logs a warning and continues — bug filing is best-effort and never blocks the step.
 
 The agent **never**:
 - Pushes code or creates PRs
-- Files Jira bugs or comments on issues
+- Accesses Jira credentials or files Jira issues (filing is done by the wrapper script after the agent exits)
+- Comments on existing Jira issues
 - Sends notifications (Slack, email)
 - Modifies any system outside the ephemeral test cluster and `ARTIFACT_DIR`
 
@@ -419,7 +477,8 @@ The following non-bypassable controls force the agent to halt:
 | Trigger | Mechanism | Threshold |
 |---|---|---|
 | Budget ceiling | `--max-budget-usd 5` | Claude halts when API spend reaches $5 |
-| Time expiration | `timeout: 1h30m0s` | ci-operator kills the pod after 90 minutes |
+| Claude timeout | `timeout ${STEP_TIMEOUT_MINUTES - 10}m` | Claude is killed 10 minutes before the step timeout to allow post-processing |
+| Step timeout | `timeout: 1h30m0s` | ci-operator kills the pod after 90 minutes |
 | Scope enforcement | `--allowedTools "Bash,Read,Write,Grep,Glob"` | Tool calls outside this set are rejected at the protocol level |
 | Skill size limit | `wc -c` check in commands script | Skills exceeding 100KB are rejected |
 | Input validation | Regex check on `AGENT_SKILL` | Names not matching `^[A-Za-z0-9_-]+$` are rejected |
@@ -452,24 +511,30 @@ All mechanisms function independently of the agent's logic and the AI model.
 ### Enforcement layer
 
 ```text
-┌─────────────────────────────────────────────────┐
-│ ci-operator                                      │
-│  └── timeout: 1h30m0s (kills pod)               │
-│       └── Claude Code CLI                        │
-│            ├── --allowedTools (protocol-level)   │
-│            │    Only: Bash, Read, Write, Grep,   │
-│            │    Glob                              │
-│            │    Blocked: WebFetch, WebSearch,     │
-│            │    Agent, all others                 │
-│            ├── --max-budget-usd 5 (spend cap)    │
-│            └── Skill system prompt (soft scope)  │
-│                 └── AGENT_SKILL input validation │
-│                      └── ^[A-Za-z0-9_-]+$ regex  │
-└─────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ ci-operator                                            │
+│  └── timeout: 1h30m0s (kills pod)                     │
+│       └── timeout ${STEP_TIMEOUT_MINUTES - 10}m       │
+│            └── Claude Code CLI                        │
+│                 ├── --allowedTools (protocol-level)   │
+│                 │    Only: Bash, Read, Write, Grep,   │
+│                 │    Glob                              │
+│                 │    Blocked: WebFetch, WebSearch,     │
+│                 │    Agent, all others                 │
+│                 ├── --max-budget-usd 5 (spend cap)    │
+│                 └── Skill system prompt (soft scope)  │
+│                      └── AGENT_SKILL input validation │
+│                           └── ^[A-Za-z0-9_-]+$ regex  │
+│       └── Post-processing (after Claude exits)        │
+│            ├── AI-generated banners                    │
+│            ├── Cost tracking / audit log               │
+│            └── Jira filing (opt-in via JIRA_PROJECT)  │
+└───────────────────────────────────────────────────────┘
 ```
 
 - **`--allowedTools`**: Protocol-level enforcement — tool calls not in the allowlist are rejected before execution. This is the primary scope enforcement mechanism.
 - **`--max-budget-usd 5`**: Hard spend cap enforced by Claude Code runtime. The agent cannot override this.
+- **Claude timeout**: `timeout ${STEP_TIMEOUT_MINUTES - 10}m` (default 80m) kills Claude to reserve time for post-processing (Jira filing, audit log, AI banners).
 - **Step timeout**: ci-operator enforces `timeout: 1h30m0s` — kills the pod if exceeded. Independent of Claude.
 - **`best_effort: true`**: Agent failures do not block the CI pipeline.
 - **Skill-level instructions**: System prompt scopes what the agent _should_ do. This is a prompt-level control (not technical enforcement).
@@ -484,7 +549,7 @@ All mechanisms function independently of the agent's logic and the AI model.
 | Boundary | Enforcement | Validation |
 |---|---|---|
 | **Filesystem** | Pod filesystem (non-root). Agent can read/write any pod-accessible path. | No exfiltration path: no WebFetch, no git push, no outbound HTTP. Sensitive files (KUBECONFIG, secrets) are readable but cannot be sent externally. |
-| **Cluster** | cluster-admin RBAC on the ephemeral test cluster only. | No other clusters are reachable. Non-cloud clusters have no cloud provider credentials. |
+| **Cluster** | cluster-admin RBAC on the ephemeral test cluster only. | No other clusters are reachable. `kube-system` namespace access prohibited via prompt-level constraint in all skills. |
 | **Network** | `--allowedTools` blocks WebFetch/WebSearch. | Git clone from public GitHub repos only. Vertex AI API via service account. No arbitrary outbound HTTP. |
 | **AI API** | Vertex AI via scoped GCP service account. | Service account has Vertex AI API access only. `--max-budget-usd 5` caps spend. |
 | **Input** | `AGENT_SKILL` regex validation. Skill fetch with `--max-redirs 0`. | Path traversal prevented. Redirect bypass prevented. 100KB size limit. |
@@ -507,6 +572,8 @@ The skill system implements dynamic least privilege:
 | Credential | Scope | Lifecycle |
 |---|---|---|
 | GCP service account (`claude-prow`) | Vertex AI API access only | Mounted read-only at `/var/run/claude-code-service-account/`; destroyed with pod |
+| Jira API token (`jira-pat`) | Jira REST API issue creation and assignee lookup | Mounted in `dt-secrets` at `/var/run/claude-code-service-account/`; read only by wrapper after Claude exits; never exposed to agent |
+| Jira email (`jira-email`) | Basic Auth pair with `jira-pat` | Same mount and lifecycle as `jira-pat` |
 | `KUBECONFIG` | cluster-admin on ephemeral test cluster | Inherited from CI job; cluster destroyed after job |
 | GitHub (public repos) | Read-only (unauthenticated `git clone`) | No credentials mounted; no push capability |
 
@@ -514,7 +581,7 @@ The skill system implements dynamic least privilege:
 
 - **Tool allowlist**: Claude restricted to 5 tools via `--allowedTools`
 - **No persistent credentials**: All credentials are pod-scoped and destroyed when the pod terminates
-- **No cloud provider credentials**: Non-cloud clusters only — no GCP/AWS/Azure credentials in the cluster
+- **`kube-system` namespace restricted**: All skills prohibit access to `kube-system` (contains cloud provider credentials) via prompt-level constraint
 - **Service account scoping**: GCP SA has Vertex AI API access only; no other GCP services are accessible
 - **No admin actions**: The agent cannot merge code, approve PRs, modify repository security settings, or access admin APIs
 
@@ -524,12 +591,14 @@ The skill system implements dynamic least privilege:
 
 ### Audit artifacts
 
-Every agent run produces two audit files in `ARTIFACT_DIR`:
+Every agent run produces these audit files in `ARTIFACT_DIR`:
 
 | File | Contents | Format |
 |---|---|---|
 | `qe-agent-usage.json` | Token counts (input, output, cache), USD cost, turn count, wall-clock duration | JSON (single line) |
 | `qe-agent-commands.log` | Every tool call: `[Bash]` commands, `[Read]`/`[Write]` file paths, `[Grep]`/`[Glob]` patterns. Bash command strings may reference sensitive paths. | Text with `[Tool]` headers |
+| `qe-agent-refs.json` | Tested refs derived from `$JOB_SPEC` (job type, base SHA, PR numbers and SHAs, allowlisted clone URL). No titles, authors or secrets. | JSON |
+| `attribution.json` | Git-level attribution result and self-reported improvement notes (agent-written). | JSON |
 
 ### Immutability
 
@@ -593,21 +662,34 @@ CI Job Pod (ephemeral)
 │  Inputs:                                                 │
 │  ├── SHARED_DIR/qe-agent-context.json                   │
 │  ├── SHARED_DIR/qe-agent-junit-*.xml                    │
-│  └── Skill file (fetched from GitHub main branch)       │
+│  ├── Skill file (fetched from GitHub main branch)       │
+│  ├── Shared modules (GitHub main -> /tmp)               │
+│  └── JOB_SPEC env -> qe-agent-refs.json (refs only)     │
 │                                                          │
 │  Processing:                                             │
 │  ├── Claude Code CLI (--print, non-interactive)         │
-│  │   ├── System prompt: skill content                   │
+│  │   ├── System prompt: skill content (pointer          │
+│  │   │   steps read the shared modules)                 │
 │  │   ├── Tools: Bash, Read, Write, Grep, Glob           │
 │  │   ├── Cluster: oc/kubectl via KUBECONFIG             │
-│  │   └── AI API: Vertex AI (GCP SA, $5 budget cap)     │
-│  └── Post-processing: AI-generated banners, audit log   │
+│  │   ├── AI API: Vertex AI (GCP SA, $5 budget cap)     │
+│  │   └── Timeout: STEP_TIMEOUT_MINUTES - 10 minutes    │
+│  └── Post-processing (after Claude exits):              │
+│       ├── AI-generated banners on all .md files         │
+│       ├── Cost tracking + audit log extraction          │
+│       └── Jira filing (if JIRA_PROJECT set +            │
+│           jira-payload.json exists)                      │
 │                                                          │
 │  Outputs (ARTIFACT_DIR):                                 │
 │  ├── qe-agent-analysis.md    (analysis summary)         │
 │  ├── qe-agent-usage.json     (cost/token audit)         │
 │  ├── qe-agent-commands.log   (tool call audit)          │
+│  ├── qe-agent-refs.json      (tested refs, no PII)      │
+│  ├── attribution.json        (suspected commits +       │
+│  │                            improvement notes)        │
 │  ├── bug-report.md           (if PRODUCT_BUG)           │
+│  ├── jira-payload.json       (if PRODUCT_BUG, for Jira) │
+│  ├── jira-issue-key.txt      (if Jira issue created)    │
 │  ├── test-fixes/CHANGES.md   (if TEST_ISSUE/FLAKY)     │
 │  ├── test-fixes/<files>      (proposed test fixes)      │
 │  └── cluster-instability-report.md (if applicable)      │
@@ -627,13 +709,14 @@ CI Job Pod (ephemeral)
                        v
               Human Review
               (engineer reads analysis, validates diagnosis,
-               files Jira bugs, submits test fix PRs)
+               reviews auto-filed Jira bugs, submits test fix PRs)
 ```
 
 **External data flows**:
 - **Vertex AI API** (outbound): Claude Code CLI sends prompts and receives completions via the GCP service account. Stateless — no conversation persistence on the provider side.
-- **GitHub raw content** (outbound): Skill file fetched from `raw.githubusercontent.com`. Read-only, unauthenticated.
-- **GitHub repos** (outbound): Test repositories cloned via `git clone`. Read-only, unauthenticated.
+- **GitHub raw content** (outbound): Skill file and shared modules fetched from `raw.githubusercontent.com` (the modules are written to `/tmp/qe-agent-modules/` for the skills' pointer steps). Read-only, unauthenticated.
+- **GitHub repos** (outbound): Test repositories cloned via `git clone`; for attribution the agent also clones or deepens the product and test repositories (URLs from the module's allowlisted config table and `qe-agent-refs.json`) to read commit history. Read-only, unauthenticated.
+- **Jira REST API** (outbound, opt-in): When `JIRA_PROJECT` is set, the wrapper POSTs `jira-payload.json` to Jira after Claude exits. Uses Basic Auth (email:API-token) via credentials mounted from `dt-secrets`. URL restricted to an allowlist (`redhat.atlassian.net`, `issues.redhat.com`). Credentials are never exposed to the Claude agent environment.
 
 ---
 
@@ -669,9 +752,10 @@ No data is cached or stored on local machines. The agent runs exclusively in CI 
 ### Feedback and quality sampling
 
 4. **Per-run feedback**: The "Skill Improvement Recommendations" section in each `qe-agent-analysis.md` captures deviations from skill steps — commands that failed, missing diagnostics, steps that needed adaptation. This feeds directly into skill refinement.
-5. **Failure rate**: Track how often the agent exits without producing `qe-agent-analysis.md` (incomplete analysis) or without producing any output at all.
-6. **Accuracy spot-checks**: Periodically sample `qe-agent-analysis.md` outputs and manually verify the diagnosis against the actual test failure and cluster state.
-7. **Tool invocation audit**: Review `qe-agent-commands.log` entries. Flag if the agent used `Write` when `Read` was sufficient, or executed cluster-mutating commands not prescribed by the skill.
+5. **Attribution feedback**: The "Attribution Improvement Notes" section in `qe-agent-analysis.md` (and `improvement` in `attribution.json`) records what worked, what did not, and every deviation from the shared module. Review runs where the `Attribution:` build-log line reports `deviations` greater than 0, and refine `resources/shared/attribution.md` from them.
+6. **Failure rate**: Track how often the agent exits without producing `qe-agent-analysis.md` (incomplete analysis) or without producing any output at all.
+7. **Accuracy spot-checks**: Periodically sample `qe-agent-analysis.md` outputs and manually verify the diagnosis against the actual test failure and cluster state.
+8. **Tool invocation audit**: Review `qe-agent-commands.log` entries. Flag if the agent used `Write` when `Read` was sufficient, or executed cluster-mutating commands not prescribed by the skill.
 
 ### Data integrity
 
@@ -716,12 +800,15 @@ Each `qe-agent-analysis.md` includes a "Skill Improvement Recommendations" secti
 | Symptom | Cause | Resolution |
 |---|---|---|
 | "Skipping qe-agent" (no context file) | Test step did not set up the `notify_qe_agent` EXIT trap | Add the EXIT trap to your test step script (see [Setup](#setup) step 3) |
-| "Failed to fetch skill" | `AGENT_SKILL` typo or skill file not merged to main | Verify the skill name matches a file in `skills/` on the main branch |
+| "Failed to fetch skill" | `AGENT_SKILL` typo or skill file not merged to main | Verify the skill name matches a directory with a `resources/skills/<name>/SKILL.md` file on the main branch |
 | "AGENT_SKILL contains invalid characters" | Skill name has special characters | Use only alphanumeric, hyphens, and underscores |
 | Agent output incomplete (budget hit) | Complex multi-failure scenario exceeded $5 | Reduce flakiness rerun count in skill, or increase `--max-budget-usd` |
 | Agent output incomplete (timeout) | Analysis took longer than 90 minutes | Simplify the skill steps or increase `timeout` in the ref YAML |
 | "Claude Code CLI not found" | CLI not installed in the test runner image | Add CLI installation to your Dockerfile (see [Setup](#setup) step 2) |
 | MCP timeout in Step 0a | Cluster instability; nodes updating | Rerun the CI job. If persistent, check MachineConfig changes in the test step |
+| `WARNING: could not fetch module '<name>'` in the step log | `resources/shared/<name>.md` is not on `main` yet (for example a pre-merge rehearsal), the fetch failed, or the module is over 50 KB | Nothing fails: that skill step follows its inline fallback and the output is shorter. Merge the module to `main`, or check the raw URL |
+| `Attribution: no attribution.json written (module loaded=...)` | The agent skipped Step 4a or ran out of budget | Check `qe-agent-analysis.md` and the commands log; `module loaded=false` means the module was not fetched |
+| `attribution.json` has `"status": "failed"` | Step 4a's fallback ran because `attribution.md` was missing | See the module warning above |
 | All tests pass but agent still ran | `has_test_failures` incorrectly set to `true` | Check the `notify_qe_agent` grep pattern matches your JUnit XML format |
 
 ---
@@ -742,22 +829,22 @@ This section maps Enterprise AI Risk Management Standard control IDs to their im
 
 | Control ID | Control Name | Implementation |
 |---|---|---|
-| TR-01 | AI-generated tagging | AI-generated banner prepended to all `.md` output files by commands script; also embedded in skill output templates |
+| TR-01 | AI-generated tagging | AI-generated banner prepended to all `.md` output files by commands script; also embedded in the templates in the shared modules and in each skill's Step 5a fallback |
 | TR-02 | User guide | This README document |
-| TR-08 | Explainability of AI reasoning | Evidence Sources section in analysis summary; Diagnosis section cites specific logs, errors, and cluster state |
+| TR-08 | Explainability of AI reasoning | Evidence Sources section in analysis summary; Diagnosis section cites specific logs, errors, and cluster state; Suspected Introducing Change lists each candidate commit with a confidence and reason, and the Attribution Improvement Notes record deviations |
 | HU-01 | In-app disclaimer | "Always review AI-generated output prior to use" in every output file banner |
 | HU-02 | Re-authorization triggers | Budget ceiling ($5), timeout (90m), `--allowedTools` scope enforcement |
-| HU-02 | Dynamic HITL oversight | All output requires human review; agent never pushes code or files bugs |
+| HU-02 | Dynamic HITL oversight | All output requires human review; agent never pushes code; Jira filing is opt-in via `JIRA_PROJECT` |
 | HU-02 | Emergency stop / Kill switch | Cancel Prow job, step timeout, budget kill, cluster destruction |
 | FBK-01 | Feedback mechanism | TRACING Jira project with `ai-agent-feedback` label |
 | Mon-01 | Continuous monitoring | Usage/cost tracking, audit logs, quarterly review cadence |
 | GLC-08 | Capabilities inventory | Capabilities and Tool Inventory section |
 | TG-01 | RBAC and credentials | RBAC and Credential Management section; scoped GCP SA, ephemeral KUBECONFIG |
 | TG-03 | Policy enforcement | `--allowedTools` protocol-level enforcement, budget cap, timeout |
-| TG-04 | Access scope and boundaries | Non-cloud clusters, no WebFetch, no git push, input validation |
+| TG-04 | Access scope and boundaries | `kube-system` namespace restricted via prompt-level constraint, no WebFetch, no git push, input validation |
 | TG-04 | Modular capabilities | Skill-based dynamic least privilege; 5-tool allowlist |
-| TG-08 | Immutable audit logging | `qe-agent-usage.json` + `qe-agent-commands.log` -> GCS (immutable) |
+| TG-08 | Immutable audit logging | `qe-agent-usage.json` + `qe-agent-commands.log` + `qe-agent-refs.json` + `attribution.json` -> GCS (immutable) |
 | TG-09 | HAP controls | Claude built-in safety filters; technical-only output domain |
-| TG-06 | ESS compliance | No PII, short-lived credentials, restricted network, audit logging |
+| TG-06 | ESS compliance | No PII, short-lived credentials, restricted network, audit logging. Attribution outputs SHA, PR number and subject only; commit author names and emails are excluded (prompt-level rule in the module) and PR titles/authors are not passed to the agent |
 | DATA-02 | Dataflow diagram | Dataflow Diagram section |
 | DATA-05 | Purge/deletion | Zero-persistence architecture; temp files deleted via EXIT trap |

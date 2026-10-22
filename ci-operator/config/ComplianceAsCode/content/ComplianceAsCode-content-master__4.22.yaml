@@ -1,3 +1,20 @@
+base_images:
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -273,8 +290,7 @@ tests:
       BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
+    - chain: ipi-aws-pre-fips
     test:
     - as: test
       cli: latest
@@ -454,8 +470,7 @@ tests:
       BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
+    - chain: ipi-aws-pre-fips
     test:
     - as: test
       cli: latest
@@ -483,8 +498,7 @@ tests:
       BASE_DOMAIN: quay.devcluster.openshift.com
       FIPS_ENABLED: "true"
     pre:
-    - chain: ipi-aws-pre
-    - ref: fips-check
+    - chain: ipi-aws-pre-fips
     test:
     - as: test
       cli: latest
@@ -543,6 +557,568 @@ tests:
       commands: |
         export PROFILE=high-node
         export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-high-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=high-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-high-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=high
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-pci-dss-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=pci-dss-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-stig-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=stig-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-stig-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=stig
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-cis-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=cis-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-moderate-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-moderate-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=moderate
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-bsi-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=bsi-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-bsi-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export PROFILE=bsi
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-e8-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export PROFILE=e8
+        export PRODUCT=rhcos4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ocp4-nerc-cip-node-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=nerc-cip-node
+        export PRODUCT=ocp4
+        export CONTENT_DIRECTORY=$PWD
+        export component=ocp4-content-ds
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e; make install-jq
+        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestProfileRemediations$ -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -content-directory="$CONTENT_DIRECTORY"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-rhcos4-nerc-cip-rhcos10
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly-latest
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OSSTREAM: rhel-10
+    pre:
+    - chain: ipi-aws-pre-fips
+    test:
+    - as: wait-for-rhcos10-rollout
+      cli: latest
+      commands: |
+        set -e
+        echo "Waiting for master and worker MCPs to complete rhel-10 rollout..."
+        oc wait machineconfigpool/master machineconfigpool/worker --for=condition=Updated=True --timeout=60m
+        echo "Master and worker MCP rollout complete."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+        export PROFILE=nerc-cip
+        export PRODUCT=rhcos4
         export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
         git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e

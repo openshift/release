@@ -19,32 +19,37 @@ images:
     to: installer-etcd-artifacts
 promotion:
   to:
-  - name: 4.22-priv
-    namespace: ocp-private
+  - name: "4.22"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.22-priv
-      namespace: ocp-private
+      name: "4.22"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
       cpu: "4"
       memory: 3Gi
+  upstream-integration:
+    limits:
+      cpu: "6"
+    requests:
+      cpu: "6"
 tests:
 - as: upstream-unit
   commands: CGO_ENABLED=1 make test-unit --warn-undefined-variables
   container:
     from: bin
 - as: upstream-integration
-  commands: CGO_ENABLED=1 make test-integration --warn-undefined-variables
+  commands: CGO_ENABLED=1 CPU=4 make test-integration --warn-undefined-variables
   container:
     from: bin
   optional: true

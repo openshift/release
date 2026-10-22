@@ -16,8 +16,8 @@ resources:
       cpu: 100m
       memory: 600Mi
 tests:
-- as: e2e-azure
-  cron: 0 20 * * 0
+- as: smoke-azure
+  cron: 0 2 * * 1
   steps:
     cluster_profile: azure-virtualization
     env:
@@ -39,12 +39,12 @@ tests:
         make update_pull_secret set_imagedigestmirrorset deploy_cnv
         oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{"op": "add", "path": "/spec/defaultCPUModel", "value": "Broadwell"}]'
       credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      - mount_path: /var/run/cnv-ci-konflux-pull-secret
-        name: konflux-pull-secret
-        namespace: test-credentials
+      - collection: cnv-ci-secrets
+        group: cnv-ci-brew-pull-secret
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+      - collection: virtualization-secrets
+        group: konflux-pull-secret
+        mount_path: /var/run/cnv-ci-konflux-pull-secret
       env:
       - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
         name: BREW_IMAGE_REGISTRY_USERNAME
@@ -71,7 +71,7 @@ tests:
           memory: 600Mi
       timeout: 1h0m0s
     - ref: hypershift-kubevirt-install-odf
-    - as: run-validation-checkup
+    - as: run-validation-checkup-smoke
       cli: latest
       commands: |
         export CSV_NAME=$(oc get csv -n openshift-cnv -o json | jq -r '.items[] | select(.metadata.name | startswith("kubevirt-hyperconverged")).metadata.name')
@@ -80,11 +80,13 @@ tests:
       env:
       - default: "false"
         name: DRY_RUN
-      - default: 420m
+      - default: 180m
         name: OCP_VIRT_VALIDATION_TIMEOUT
       - default: ocs-storagecluster-ceph-rbd-virtualization
         name: STORAGE_CLASS
-      - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
+      - default: test_id:3242|test_id:1780|test_id:4609|test_id:4907|test_common_instancetype_vendor_labels
+        name: TEST_FOCUS
+      - default: outside
         name: TEST_SKIPS
       - default: openshift-cnv
         name: TARGET_NAMESPACE
@@ -95,8 +97,8 @@ tests:
         requests:
           cpu: 100m
           memory: 600Mi
-      timeout: 7h30m0s
-    - as: run-validation-checkup-disconnected
+      timeout: 3h30m0s
+    - as: run-validation-checkup-smoke-disconnected
       cli: latest
       commands: |
         export REGISTRY_AUTH_FILE=/tmp/auth.json
@@ -110,13 +112,15 @@ tests:
         name: CNV_VERSION
       - default: "false"
         name: DRY_RUN
-      - default: 540m
+      - default: 180m
         name: OCP_VIRT_VALIDATION_TIMEOUT
       - default: ocs-storagecluster-ceph-rbd-virtualization
         name: STORAGE_CLASS
       - default: compute,network,storage,ssp,tier2
         name: TEST_SUITES
-      - default: test_id:1780|test_id:1783|test_id:1513|test_id:1514
+      - default: test_id:1650|test_id:1780|test_id:4609|test_id:4777|test_machine_config_pool_health
+        name: TEST_FOCUS
+      - default: outside
         name: TEST_SKIPS
       - default: openshift-cnv
         name: TARGET_NAMESPACE
@@ -127,9 +131,9 @@ tests:
         requests:
           cpu: 100m
           memory: 600Mi
-      timeout: 10h0m0s
+      timeout: 4h0m0s
     workflow: ipi-azure
-  timeout: 19h0m0s
+  timeout: 9h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-cnv

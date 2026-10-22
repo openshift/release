@@ -92,7 +92,7 @@ spec:
      containers:
        - name: minio
          # Pulls the default Minio image from Docker Hub. !! when you change tag, do not forget to update mirror scripts in kiali-qe-utils repo !!
-         image: quay.io/minio/minio:RELEASE.2024-10-02T17-50-41Z
+         image: quay.io/openshifttest/minio:latest@sha256:fc6bedc99355fbdf1982a734475b56d01f4bbc59a9ec6f9a7bc4e222f74f5326
          args:
            - server
            - /storage
@@ -349,8 +349,27 @@ oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPA
 oc annotate route kiali haproxy.router.openshift.io/timeout=60s -n ${ISTIO_NAMESPACE}
 
 echo "=== Enabling user-monitoring workflow"
-wget -N https://raw.githubusercontent.com/kiali/kiali/master/hack/use-openshift-prometheus.sh
+wget -N https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/use-openshift-prometheus.sh
 chmod +x use-openshift-prometheus.sh
+# ensure-openshift-istio-proxies-podmonitor.sh exists only in Kiali >= 2.33
+helper_path="istio/ensure-openshift-istio-proxies-podmonitor.sh"
+helper_url="https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/istio/ensure-openshift-istio-proxies-podmonitor.sh"
+mkdir -p istio
+http_code=$(curl -sS -L -o "${helper_path}" -w "%{http_code}" "${helper_url}") || {
+  echo "ERROR: failed to download ${helper_path}"
+  rm -f "${helper_path}"
+  exit 1
+}
+if [[ "${http_code}" == "200" ]]; then
+  chmod +x "${helper_path}"
+elif [[ "${http_code}" == "404" ]]; then
+  echo "=== ensure-openshift-istio-proxies-podmonitor.sh not available (Kiali < 2.33); skipping"
+  rm -f "${helper_path}"
+else
+  echo "ERROR: failed to download ${helper_path} (HTTP ${http_code})"
+  rm -f "${helper_path}"
+  exit 1
+fi
 ./use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -np true -ml ossm-3 -kcns ${ISTIO_NAMESPACE}
 oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} kiali/kiali; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
 

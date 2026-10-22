@@ -270,7 +270,7 @@ extract_cluster_info() {
 # ============================================================================
 
 construct_prow_job_url() {
-    local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+    local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results-public"
 
     if [[ -n "${PULL_NUMBER:-}" ]]; then
         export PROW_JOB_URL="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"

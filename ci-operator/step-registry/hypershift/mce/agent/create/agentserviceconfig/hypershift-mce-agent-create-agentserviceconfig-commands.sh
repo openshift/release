@@ -12,7 +12,44 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   scp "${SSHOPTS[@]}" "root@${IP}:/root/.ssh/id_rsa.pub" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
+if [ -z "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST:-}" ]; then
+  echo "HOSTEDCLUSTER_RELEASE_IMAGE_LATEST is required" >&2
+  exit 1
+fi
+if [ -z "${AGENTSERVICECONFIG_CPU_ARCHITECTURE:-}" ]; then
+  echo "AGENTSERVICECONFIG_CPU_ARCHITECTURE is required" >&2
+  exit 1
+fi
+
+if ! RELEASE_INFO=$(oc adm release info "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" --output=json); then
+  echo "Failed to inspect release image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" >&2
+  exit 1
+fi
+if ! RELEASE_VERSION=$(echo "${RELEASE_INFO}" | jq -er '.metadata.version // empty'); then
+  echo "Release image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} has no metadata.version" >&2
+  exit 1
+fi
+if [ -z "${RELEASE_VERSION}" ]; then
+  echo "Release image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} has no metadata.version" >&2
+  exit 1
+fi
+CLUSTER_VERSION=$(echo "${RELEASE_VERSION}" | cut -d '.' -f 1,2)
+
+case "${AGENTSERVICECONFIG_CPU_ARCHITECTURE}" in
+  x86_64)
+    COREOS_STREAM_ARCHITECTURE=x86_64
+    ;;
+  arm64)
+    COREOS_STREAM_ARCHITECTURE=aarch64
+    ;;
+  ppc64le|s390x)
+    COREOS_STREAM_ARCHITECTURE="${AGENTSERVICECONFIG_CPU_ARCHITECTURE}"
+    ;;
+  *)
+    echo "Unsupported AgentServiceConfig architecture: ${AGENTSERVICECONFIG_CPU_ARCHITECTURE}" >&2
+    exit 1
+    ;;
+esac
 
 function registry_config() {
   src_image=${1}
@@ -64,8 +101,8 @@ spec:
   name: 'mirror-config'
  osImages:
  - openshiftVersion: "${CLUSTER_VERSION}"
-   version: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "'"${AGENTSERVICECONFIG_CPU_ARCHITECTURE}"'").version')
-   url: $(echo "$OS_IMAGES" | jq -r '.[] | select(.cpu_architecture == "'"${AGENTSERVICECONFIG_CPU_ARCHITECTURE}"'").url')
+   version: "${OS_IMAGE_VERSION}"
+   url: "${OS_IMAGE_URL}"
    cpuArchitecture: "${AGENTSERVICECONFIG_CPU_ARCHITECTURE}"
 $( [ "${DISCONNECTED}" = "true" ] && echo \
 " unauthenticatedRegistries:
@@ -159,14 +196,60 @@ $( [ "${DISCONNECTED}" = "true" ] && cat /tmp/ca-bundle-crt)
 END
 }
 
-OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' "${SHARED_DIR}/default_os_images.json")
+if ! MACHINE_OS_IMAGE=$(oc adm release info \
+  --image-for=machine-os-images \
+  --filter-by-os=linux/amd64 \
+  "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"); then
+  echo "Failed to resolve machine-os-images from ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}" >&2
+  exit 1
+fi
+if [ -z "${MACHINE_OS_IMAGE}" ]; then
+  echo "Release image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} does not contain machine-os-images" >&2
+  exit 1
+fi
+
+COREOS_STREAM_DIR=$(mktemp -d "${TMPDIR:-/tmp}/coreos-stream.XXXXXX")
+COREOS_STREAM_JSON="${COREOS_STREAM_DIR}/coreos-stream.json"
+if ! oc image extract "${MACHINE_OS_IMAGE}" \
+  --path="/coreos/coreos-stream.json:${COREOS_STREAM_DIR}" \
+  --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+  --filter-by-os=linux/amd64 \
+  --confirm; then
+  echo "Failed to extract /coreos/coreos-stream.json from ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ ! -s "${COREOS_STREAM_JSON}" ]; then
+  echo "${MACHINE_OS_IMAGE} does not contain /coreos/coreos-stream.json" >&2
+  exit 1
+fi
+
+if ! OS_IMAGE_VERSION=$(jq -er --arg arch "${COREOS_STREAM_ARCHITECTURE}" \
+  '.architectures[$arch].artifacts.metal.release // empty' "${COREOS_STREAM_JSON}"); then
+  echo "No RHCOS metal release found for ${AGENTSERVICECONFIG_CPU_ARCHITECTURE} in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ -z "${OS_IMAGE_VERSION}" ]; then
+  echo "No RHCOS metal release found for ${AGENTSERVICECONFIG_CPU_ARCHITECTURE} in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+
+if ! OS_IMAGE_URL=$(jq -er --arg arch "${COREOS_STREAM_ARCHITECTURE}" \
+  '.architectures[$arch].artifacts.metal.formats.iso.disk.location // empty' "${COREOS_STREAM_JSON}"); then
+  echo "No RHCOS metal ISO URL found for ${AGENTSERVICECONFIG_CPU_ARCHITECTURE} in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+if [ -z "${OS_IMAGE_URL}" ]; then
+  echo "No RHCOS metal ISO URL found for ${AGENTSERVICECONFIG_CPU_ARCHITECTURE} in ${MACHINE_OS_IMAGE}" >&2
+  exit 1
+fi
+
 ASSISTED_NAMESPACE="multicluster-engine"
 STORAGE_CLASS_NAME=$(oc get storageclass -o=jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
 
 if [ "${DISCONNECTED}" = "true" ]; then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/default_os_images.json" "root@${IP}:/root/default_os_images.json"
-  result=$(ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_VERSION" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+  result=$(ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_VERSION" "$OS_IMAGE_URL" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 CLUSTER_VERSION="${1}"
+OS_IMAGE_URL="${2}"
 
 # Workaround for https://issues.redhat.com/browse/OCPBUGS-74263
 function mirror_capi_specific_release() {
@@ -231,21 +314,21 @@ source network.sh
 
 mirror_capi_specific_release
 
-OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' /root/default_os_images.json)
 MIRROR_BASE_URL="http://$(wrap_if_ipv6 ${PROVISIONING_HOST_IP})/images"
-for i in $(seq 0 $(($(echo ${OS_IMAGES} | jq length) - 1))); do
-  rhcos_image=$(echo ${OS_IMAGES} | jq -r ".[$i].url")
-  mirror_rhcos_image=$(mirror_file "${rhcos_image}" "${IRONIC_IMAGES_DIR}" "${MIRROR_BASE_URL}")
-done
+mirror_rhcos_image=$(mirror_file "${OS_IMAGE_URL}" "${IRONIC_IMAGES_DIR}" "${MIRROR_BASE_URL}")
 set +x
-echo "MIRROR_BASE_URL###${MIRROR_BASE_URL}###"
+echo "MIRRORED_IMAGE_URL###${mirror_rhcos_image}###"
 EOF
 )
-  MIRROR_BASE_URL=$(echo "$result" | grep "MIRROR_BASE_URL###" | cut -d'#' -f4)
-  for i in $(seq 0 $(($(echo ${OS_IMAGES} | jq length) - 1))); do
-    mirror_rhcos_image="${MIRROR_BASE_URL}/$(echo ${OS_IMAGES} | jq -r ".[$i].url" | cut -d / -f 4-)"
-    OS_IMAGES=$(echo ${OS_IMAGES} | jq ".[$i].url=\"${mirror_rhcos_image}\"")
-  done
+  if ! mirror_rhcos_image=$(echo "$result" | grep "MIRRORED_IMAGE_URL###" | cut -d'#' -f4); then
+    echo "Failed to determine the mirrored RHCOS ISO URL" >&2
+    exit 1
+  fi
+  if [ -z "${mirror_rhcos_image}" ]; then
+    echo "Failed to determine the mirrored RHCOS ISO URL" >&2
+    exit 1
+  fi
+  OS_IMAGE_URL="${mirror_rhcos_image}"
 fi
 
 if [ "${DISCONNECTED}" = "true" ]; then

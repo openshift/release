@@ -6,8 +6,33 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# Configure aws
+retry_with_backoff() {
+  local max_retries="${1}"
+  shift
+  local cmd=("$@")
+  local attempt=1
+  local rc=0
+  local backoff=30
+
+  while [[ ${attempt} -le ${max_retries} ]]; do
+    echo "Attempt ${attempt}/${max_retries}: ${cmd[*]}"
+    rc=0
+    "${cmd[@]}" && return 0 || rc=$?
+    if [[ ${attempt} -lt ${max_retries} ]]; then
+      echo "Attempt ${attempt} failed (exit code ${rc}), retrying in ${backoff}s..."
+      sleep ${backoff}
+      backoff=$((backoff * 2))
+    else
+      echo "Attempt ${attempt} failed (exit code ${rc}), no more retries."
+    fi
+    attempt=$((attempt + 1))
+  done
+  return ${rc}
+}
+
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+
+# Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -45,7 +70,14 @@ if [[ -e "${OPERATOR_ROLES_PREFIX_FILE}" ]]; then
   OPERATOR_ROLES_PREFIX=$(cat "${OPERATOR_ROLES_PREFIX_FILE}")
 
   echo "Start deleting the byo operator roles with the prefix ${OPERATOR_ROLES_PREFIX}..."
-  rosa delete operator-roles -y --mode auto --prefix ${OPERATOR_ROLES_PREFIX}
+  set +e
+  retry_with_backoff 3 rosa delete operator-roles -y --mode auto --prefix "${OPERATOR_ROLES_PREFIX}"
+  ret=$?
+  set -e
+  if [[ ${ret} -ne 0 ]]; then
+    echo "ERROR: Failed to delete operator roles after all retries (exit code ${ret})"
+    exit ${ret}
+  fi
 else
   echo "No byo operator roles created in the pre step"
 fi

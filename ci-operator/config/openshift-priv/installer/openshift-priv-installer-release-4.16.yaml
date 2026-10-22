@@ -32,36 +32,50 @@ base_images:
     namespace: ci
     tag: v1.54.2
   ocp_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
+    name: "4.16"
+    namespace: ocp-priv
     tag: base-rhel9
   ocp_cli:
-    name: 4.16-priv
-    namespace: ocp-private
+    name: "4.16"
+    namespace: ocp-priv
     tag: cli
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
 images:
   items:
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     to: installer
-  - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer-artifacts/Dockerfile.rhel
     to: installer-artifacts
-  - dockerfile_path: images/libvirt/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/libvirt/Dockerfile.ci
     to: libvirt-installer
-  - dockerfile_path: images/installer/Dockerfile.upi.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.upi.ci
     to: upi-installer
-  - dockerfile_path: images/openstack/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/openstack/Dockerfile.ci
     from: openstack-base
     inputs:
       openstack-base:
         as:
         - registry.ci.openshift.org/ocp/4.16:base-rhel9
     to: openstack-installer
-  - dockerfile_path: images/baremetal/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/baremetal/Dockerfile.ci
     to: baremetal-installer
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -80,26 +94,26 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: 4.16-priv
-    namespace: ocp-private
+    name: "4.16"
+    namespace: ocp-priv
 prowgen:
   private: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-openstack-4-16.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-4-16.repo
+      curl http://base-openstack-4-16.ocp.svc/ > /etc/yum.repos.d/base-openstack-4-16.repo
     from: ocp_base-rhel9
     to: openstack-base
 releases:
   initial:
     integration:
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.16-priv
-      namespace: ocp-private
+      name: "4.16"
+      namespace: ocp-priv
 resources:
   '*':
     requests:
@@ -488,7 +502,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/pr-logs/directory/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
@@ -507,7 +521,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/pr-logs/directory/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi

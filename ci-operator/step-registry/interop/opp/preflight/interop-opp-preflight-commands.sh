@@ -1,8 +1,35 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euo pipefail
+shopt -s inherit_errexit
+
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
+# shellcheck disable=SC2154
+_opp_cleanup() {
+  _exit_code=${1:-$?}
+  set +x 2>/dev/null
+  # Scrub credentials before copying
+  sed -i -E \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+    -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+    -e 's/password=[^ &]+/password=[REDACTED]/g' \
+    -e 's/token=[^ &]+/token=[REDACTED]/g' \
+    -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+    "${_xtrace_log}" 2>/dev/null || true
+  if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+  fi
+}
+_jrc=0
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}' EXIT
+
+echo ">>> PHASE: initialization"
 
 OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
 
@@ -11,36 +38,43 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-# Ensure jq is available (not shipped in the cli base image)
-if ! command -v jq &>/dev/null; then
-    echo "jq not found; installing..."
-    dnf install -y -q jq 2>/dev/null || yum install -y -q jq 2>/dev/null || {
-        echo >&2 "ERROR: failed to install jq"
-        exit 1
-    }
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    set +x
+    source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 REPORT_DIR="${ARTIFACT_DIR}/preflight"
 REPORT_FILE="${REPORT_DIR}/preflight-report.json"
 mkdir -p "${REPORT_DIR}"
 
-CHECKS_FAILED=0
+typeset -i CHECKS_FAILED=0
+typeset -i EXIT_CODE=0
 
-debug_on_exit() {
+# shellcheck disable=SC2317
+function DebugOnExit () {
     if (( EXIT_CODE != 0 )); then
-        echo -e "\n### DEBUG: Pre-flight failure diagnostics ###\n"
-        echo -e "\n# ClusterVersion\n$(oc get clusterversion 2>/dev/null || echo 'unavailable')"
-        echo -e "\n# ClusterOperators\n$(oc get co 2>/dev/null || echo 'unavailable')"
-        echo -e "\n# MachineConfigPools\n$(oc get machineconfigpools 2>/dev/null || echo 'unavailable')"
-        echo -e "\n# Nodes\n$(oc get nodes 2>/dev/null || echo 'unavailable')"
-        echo -e "\n# OPP Operator CSVs\n$(oc get csv -A 2>/dev/null || echo 'unavailable')"
+        : "### DEBUG: Pre-flight failure diagnostics ###"
+        : "# ClusterVersion"
+        oc get clusterversion 2>/dev/null || : "unavailable"
+        : "# ClusterOperators"
+        oc get co 2>/dev/null || : "unavailable"
+        : "# MachineConfigPools"
+        oc get machineconfigpools 2>/dev/null || : "unavailable"
+        : "# Nodes"
+        oc get nodes 2>/dev/null || : "unavailable"
+        : "# OPP Operator CSVs"
+        oc get csv -A 2>/dev/null || : "unavailable"
         if [[ -f "${REPORT_FILE}" ]]; then
-            echo -e "\n# Pre-flight report:\n$(cat "${REPORT_FILE}")"
+            : "# Pre-flight report:"
+            cat "${REPORT_FILE}"
         fi
     fi
+    true
 }
 
-trap 'EXIT_CODE=$?; debug_on_exit' EXIT TERM
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit' EXIT
+trap 'exit 143' TERM
 
 # ──────────────────────────────────────────────────────────────────────
 #  Known removed / deprecated APIs per OCP minor version.
@@ -48,14 +82,10 @@ trap 'EXIT_CODE=$?; debug_on_exit' EXIT TERM
 #  was removed IN that minor version (i.e. no longer available).
 #  Source: Kubernetes deprecation guide + OCP release notes.
 # ──────────────────────────────────────────────────────────────────────
-declare -A REMOVED_APIS
-# APIs removed in 4.12 (Kubernetes 1.25)
+typeset -A REMOVED_APIS
 REMOVED_APIS["12"]="batch/v1beta1/CronJob policy/v1beta1/PodDisruptionBudget policy/v1beta1/PodSecurityPolicy discovery.k8s.io/v1beta1/EndpointSlice events.k8s.io/v1beta1/Event autoscaling/v2beta1/HorizontalPodAutoscaler"
-# APIs removed in 4.14 (Kubernetes 1.27)
 REMOVED_APIS["14"]="storage.k8s.io/v1beta1/CSIStorageCapacity"
-# APIs removed in 4.17 (Kubernetes 1.30)
 REMOVED_APIS["17"]="flowcontrol.apiserver.k8s.io/v1beta2/FlowSchema flowcontrol.apiserver.k8s.io/v1beta2/PriorityLevelConfiguration"
-# APIs removed in 4.18 (Kubernetes 1.31)
 REMOVED_APIS["18"]="flowcontrol.apiserver.k8s.io/v1beta3/FlowSchema flowcontrol.apiserver.k8s.io/v1beta3/PriorityLevelConfiguration"
 
 # ──────────────────────────────────────────────────────────────────────
@@ -63,357 +93,424 @@ REMOVED_APIS["18"]="flowcontrol.apiserver.k8s.io/v1beta3/FlowSchema flowcontrol.
 #  Maps OCP minor version to minimum required operator major.minor.
 #  Format: "operator_csv_prefix:min_major.min_minor"
 # ──────────────────────────────────────────────────────────────────────
-declare -A OPP_COMPAT
-OPP_COMPAT["14"]="advanced-cluster-management:2.9 rhacs-operator:4.3 odf-operator:4.14 quay-operator:3.10"
-OPP_COMPAT["15"]="advanced-cluster-management:2.10 rhacs-operator:4.4 odf-operator:4.15 quay-operator:3.11"
-OPP_COMPAT["16"]="advanced-cluster-management:2.11 rhacs-operator:4.5 odf-operator:4.16 quay-operator:3.12"
-OPP_COMPAT["17"]="advanced-cluster-management:2.12 rhacs-operator:4.6 odf-operator:4.17 quay-operator:3.13"
-OPP_COMPAT["18"]="advanced-cluster-management:2.13 rhacs-operator:4.7 odf-operator:4.18 quay-operator:3.14"
-OPP_COMPAT["19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operator:4.19 quay-operator:3.14"
-OPP_COMPAT["20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
-OPP_COMPAT["21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
-OPP_COMPAT["22"]="advanced-cluster-management:2.16 rhacs-operator:4.11 odf-operator:4.22 quay-operator:3.16"
+typeset -A OPP_COMPAT
+OPP_COMPAT["4.14"]="advanced-cluster-management:2.9 rhacs-operator:4.3 odf-operator:4.14 quay-operator:3.10"
+OPP_COMPAT["4.15"]="advanced-cluster-management:2.10 rhacs-operator:4.4 odf-operator:4.15 quay-operator:3.11"
+OPP_COMPAT["4.16"]="advanced-cluster-management:2.11 rhacs-operator:4.5 odf-operator:4.16 quay-operator:3.12"
+OPP_COMPAT["4.17"]="advanced-cluster-management:2.12 rhacs-operator:4.6 odf-operator:4.17 quay-operator:3.13"
+OPP_COMPAT["4.18"]="advanced-cluster-management:2.13 rhacs-operator:4.7 odf-operator:4.18 quay-operator:3.14"
+OPP_COMPAT["4.19"]="advanced-cluster-management:2.13 rhacs-operator:4.8 odf-operator:4.19 quay-operator:3.14"
+OPP_COMPAT["4.20"]="advanced-cluster-management:2.14 rhacs-operator:4.9 odf-operator:4.20 quay-operator:3.15"
+OPP_COMPAT["4.21"]="advanced-cluster-management:2.15 rhacs-operator:4.10 odf-operator:4.21 quay-operator:3.15"
+OPP_COMPAT["4.22"]="advanced-cluster-management:2.17 rhacs-operator:4.11 odf-operator:4.21 quay-operator:3.16"
+OPP_COMPAT["5.0"]="advanced-cluster-management:2.17 quay-operator:3.17 odf-operator:4.22 rhacs-operator:4.11"
+OPP_COMPAT["5.1"]="advanced-cluster-management:2.17 quay-operator:3.17"
 
-# ──────────────────────────────────────────────────────────────────────
-#  Utility: append a check result to the JSON report
-# ──────────────────────────────────────────────────────────────────────
-init_report() {
+function InitReport () {
     cat > "${REPORT_FILE}" <<'EOFJSON'
 {
   "preflight_checks": []
 }
 EOFJSON
+    true
 }
 
-append_check() {
-    local name="${1}" status="${2}" details="${3}"
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg n "${name}" --arg s "${status}" --arg d "${details}" \
-        '.preflight_checks += [{"check": $n, "status": $s, "details": $d}]' \
-        "${REPORT_FILE}" > "${tmp}" && mv "${tmp}" "${REPORT_FILE}"
+function AppendCheck () {
+    typeset checkName="${1}" checkStatus="${2}" checkDetails="${3}"
+    python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+data['preflight_checks'].append({'check': sys.argv[2], 'status': sys.argv[3], 'details': sys.argv[4]})
+with open(sys.argv[1], 'w') as f:
+    json.dump(data, f, indent=2)
+" "${REPORT_FILE}" "${checkName}" "${checkStatus}" "${checkDetails}"
+    true
 }
 
-# ──────────────────────────────────────────────────────────────────────
-#  Check 1: API deprecation scan
-# ──────────────────────────────────────────────────────────────────────
-check_api_deprecations() {
-    echo "=== Check 1: API deprecation scan ==="
+function CheckApiDeprecations () {
+    echo ">>> PHASE: Check 1 — API deprecation scan"
 
-    local target_minor="${1}"
-    local flagged="" found_count=0
+    typeset targetMinor="${1}"
+    typeset ocpDisplay="${2:-4.${targetMinor}}"
+    typeset targetMajor="${ocpDisplay%%.*}"
+    typeset flagged="" foundCount=0
 
-    # Collect available API resources on the cluster
-    local cluster_apis
-    cluster_apis="$(oc api-resources --no-headers 2>/dev/null)" || {
-        echo "WARNING: Failed to list API resources"
-        append_check "api_deprecation_scan" "warn" "Could not list cluster API resources"
+    typeset clusterApis
+    clusterApis="$(oc api-resources --no-headers)" || {
+        : "WARNING: Failed to list API resources"
+        AppendCheck "api_deprecation_scan" "warn" "Could not list cluster API resources"
         return 0
     }
 
-    # Check all versions up to and including the target
     for minor in "${!REMOVED_APIS[@]}"; do
-        if (( minor <= target_minor )); then
-            for api_entry in ${REMOVED_APIS[${minor}]}; do
-                local api_version api_kind
-                api_kind="${api_entry##*/}"
-                api_version="${api_entry%/*}"
+        if (( targetMajor > 4 || minor <= targetMinor )); then
+            for apiEntry in ${REMOVED_APIS[${minor}]}; do
+                typeset apiVersion apiKind
+                apiKind="${apiEntry##*/}"
+                apiVersion="${apiEntry%/*}"
 
-                # Check if this deprecated API version+kind is still served
-                if echo "${cluster_apis}" | grep -qw "${api_kind}" && \
-                   oc api-resources --api-group="${api_version%%/*}" 2>/dev/null | grep -q "${api_version#*/}"; then
-                    # Check if any OPP workloads reference this API
-                    local opp_usage
-                    opp_usage="$(oc get "${api_kind}" -A --no-headers 2>/dev/null | head -5)" || true
-                    if [[ -n "${opp_usage}" ]]; then
-                        flagged="${flagged}  - ${api_version}/${api_kind} (removed in 4.${minor})\n"
-                        (( found_count += 1 ))
+                if echo "${clusterApis}" | grep -qw "${apiKind}" && \
+                   oc api-resources --api-group="${apiVersion%%/*}" 2>/dev/null | grep -q "${apiVersion#*/}"; then
+                    typeset oppUsage
+                    oppUsage="$(oc get "${apiKind}" -A --no-headers 2>/dev/null | head -5)" || true
+                    if [[ -n "${oppUsage}" ]]; then
+                        flagged="${flagged}  - ${apiVersion}/${apiKind} (removed in ${targetMajor}.${minor})\n"
+                        (( foundCount += 1 ))
                     fi
                 fi
             done
         fi
     done
 
-    if (( found_count > 0 )); then
-        echo -e "WARNING: Found ${found_count} deprecated API(s) still in use:\n${flagged}"
-        append_check "api_deprecation_scan" "warn" "Found ${found_count} deprecated API(s) in use: ${flagged}"
+    if (( foundCount > 0 )); then
+        : "WARNING: Found ${foundCount} deprecated API(s) still in use"
+        echo -e "${flagged}"
+        AppendCheck "api_deprecation_scan" "warn" "Found ${foundCount} deprecated API(s) in use: ${flagged}"
     else
-        echo "No deprecated APIs detected for target version 4.${target_minor}"
-        append_check "api_deprecation_scan" "pass" "No deprecated APIs detected"
+        : "No deprecated APIs detected for target version ${ocpDisplay}"
+        AppendCheck "api_deprecation_scan" "pass" "No deprecated APIs detected for ${ocpDisplay}"
     fi
+    true
 }
 
-# ──────────────────────────────────────────────────────────────────────
-#  Check 2: OPP compatibility matrix
-# ──────────────────────────────────────────────────────────────────────
-check_opp_compatibility() {
-    echo -e "\n=== Check 2: OPP operator compatibility matrix ==="
+function CheckOppCompatibility () {
+    echo ">>> PHASE: Check 2 — OPP operator compatibility matrix"
+    if [[ "${IGNORE_SECONDARY_POLICIES:-false}" == "true" ]]; then
+        echo "SKIP: OPP compatibility matrix check (IGNORE_SECONDARY_POLICIES=true)"
+        echo "opp_compatibility_matrix" >> "${ARTIFACT_DIR}/skipped-policies.json" 2>/dev/null || true
+        AppendCheck "opp_compatibility_matrix" "skip" "Skipped (IGNORE_SECONDARY_POLICIES=true)"
+        return 0
+    fi
 
-    local target_minor="${1}"
-    local compat_spec="${OPP_COMPAT[${target_minor}]:-}"
-    local all_csvs failed=0
+    typeset ocpKey="${1}"
+    typeset compatSpec="${OPP_COMPAT[${ocpKey}]:-}"
+    typeset allCsvs
+    typeset failed=0
 
-    all_csvs="$(oc get csv -A --no-headers 2>/dev/null)" || {
-        echo >&2 "Failed to retrieve CSVs"
-        append_check "opp_compatibility_matrix" "fail" "Could not list CSVs"
+    allCsvs="$(oc get csv -A --no-headers)" || {
+        : "Failed to retrieve CSVs"
+        AppendCheck "opp_compatibility_matrix" "fail" "Could not list CSVs"
         (( CHECKS_FAILED += 1 ))
         return 0
     }
 
-    if [[ -z "${compat_spec}" ]]; then
-        echo "No compatibility matrix entry for target minor ${target_minor}; skipping version check"
-        append_check "opp_compatibility_matrix" "skip" "No matrix entry for OCP 4.${target_minor}"
+    if [[ -z "${compatSpec}" ]]; then
+        : "No compatibility matrix entry for OCP ${ocpKey}; skipping version check"
+        AppendCheck "opp_compatibility_matrix" "skip" "No matrix entry for OCP ${ocpKey}"
         return 0
     fi
 
-    local details=""
-    for entry in ${compat_spec}; do
-        local op_prefix="${entry%%:*}"
-        local min_version="${entry##*:}"
-        local min_major min_minor
-        min_major="${min_version%%.*}"
-        min_minor="${min_version##*.}"
+    typeset details=""
+    for entry in ${compatSpec}; do
+        typeset opPrefix="${entry%%:*}"
+        typeset minVersion="${entry##*:}"
 
-        # Find installed CSV for this operator
-        local csv_line csv_name installed_version
-        csv_line="$(echo "${all_csvs}" | grep "${op_prefix}" | head -1)" || true
-        if [[ -z "${csv_line}" ]]; then
-            echo >&2 "Operator not found: ${op_prefix}"
-            details="${details}${op_prefix}: NOT INSTALLED; "
+        # If OPP_OPERATORS is set, only check operators listed in it
+        if [[ -n "${OPP_OPERATORS:-}" ]]; then
+            if ! echo ",${OPP_OPERATORS}," | grep -q ",${opPrefix},"; then
+                : "INFO: ${opPrefix}: Skipping (not in OPP_OPERATORS)"
+                details="${details}${opPrefix}: skipped (not in OPP_OPERATORS); "
+                continue
+            fi
+        fi
+
+        typeset minMajor minMinor
+        minMajor="${minVersion%%.*}"
+        minMinor="${minVersion##*.}"
+
+        typeset csvLine csvName installedVersion
+        csvLine="$(echo "${allCsvs}" | grep "${opPrefix}" | head -1)" || true
+        if [[ -z "${csvLine}" ]]; then
+            : "Operator not found: ${opPrefix}"
+            details="${details}${opPrefix}: NOT INSTALLED; "
             (( failed += 1 ))
             continue
         fi
 
-        csv_name="$(echo "${csv_line}" | awk '{print $2}')"
-        # Extract version: strip operator name prefix, keep digits
-        installed_version="$(echo "${csv_name}" | grep -oE '[0-9]+\.[0-9]+' | head -1)" || true
-        if [[ -z "${installed_version}" ]]; then
-            echo "WARNING: Could not parse version from CSV ${csv_name}"
-            details="${details}${op_prefix}: version unparseable from ${csv_name}; "
+        csvName="$(echo "${csvLine}" | awk '{print $2}')"
+        installedVersion="$(echo "${csvName}" | grep -oE '[0-9]+\.[0-9]+' | head -1)" || true
+        if [[ -z "${installedVersion}" ]]; then
+            : "Operator ${opPrefix}: could not parse version from CSV ${csvName}"
+            details="${details}${opPrefix}: version unparseable from ${csvName}; "
+            (( failed += 1 ))
             continue
         fi
 
-        local inst_major inst_minor
-        inst_major="${installed_version%%.*}"
-        inst_minor="${installed_version##*.}"
+        typeset instMajor instMinor
+        instMajor="${installedVersion%%.*}"
+        instMinor="${installedVersion##*.}"
 
-        if (( inst_major < min_major || (inst_major == min_major && inst_minor < min_minor) )); then
-            echo >&2 "Operator ${op_prefix} version ${installed_version} is below minimum ${min_version} for OCP 4.${target_minor}"
-            details="${details}${op_prefix}: ${installed_version} < ${min_version} (INCOMPATIBLE); "
+        if (( instMajor < minMajor || (instMajor == minMajor && instMinor < minMinor) )); then
+            : "Operator ${opPrefix} version ${installedVersion} is below minimum ${minVersion} for OCP ${ocpKey}"
+            details="${details}${opPrefix}: ${installedVersion} < ${minVersion} (INCOMPATIBLE); "
             (( failed += 1 ))
         else
-            echo "Operator ${op_prefix}: version ${installed_version} >= ${min_version} (OK)"
-            details="${details}${op_prefix}: ${installed_version} >= ${min_version} (OK); "
+            : "Operator ${opPrefix}: version ${installedVersion} >= ${minVersion} (OK)"
+            details="${details}${opPrefix}: ${installedVersion} >= ${minVersion} (OK); "
         fi
     done
 
     if (( failed > 0 )); then
-        echo >&2 "${failed} operator(s) failed compatibility check"
-        append_check "opp_compatibility_matrix" "fail" "${details}"
+        : "${failed} operator(s) failed compatibility check"
+        AppendCheck "opp_compatibility_matrix" "fail" "${details}"
         (( CHECKS_FAILED += 1 ))
     else
-        echo "All OPP operators are compatible with OCP 4.${target_minor}"
-        append_check "opp_compatibility_matrix" "pass" "${details}"
+        : "All OPP operators are compatible with OCP ${ocpKey}"
+        AppendCheck "opp_compatibility_matrix" "pass" "${details}"
     fi
+    true
 }
 
-# ──────────────────────────────────────────────────────────────────────
-#  Check 3: Cluster health baseline
-# ──────────────────────────────────────────────────────────────────────
-check_cluster_health() {
-    echo -e "\n=== Check 3: Cluster health baseline ==="
+function CheckClusterHealth () {
+    echo ">>> PHASE: Check 3 — Cluster health baseline"
 
-    local failed=0 details=""
+    typeset failed=0 details=""
 
-    # 3a. Node health
-    echo "Checking node health..."
-    local unready_nodes
-    unready_nodes="$(oc get node --no-headers 2>/dev/null | awk '$2 != "Ready" {print $1}')" || true
-    if [[ -n "${unready_nodes}" ]]; then
-        echo >&2 "Not-Ready nodes: ${unready_nodes}"
-        details="${details}unready_nodes: ${unready_nodes}; "
+    : "Checking node health..."
+    typeset unreadyNodes
+    if ! unreadyNodes="$(oc get node --no-headers | awk '$2 != "Ready" {print $1}')"; then
+        : "Failed to query nodes"
+        details="${details}nodes: query failed; "
+        (( failed += 1 ))
+    elif [[ -n "${unreadyNodes}" ]]; then
+        : "Not-Ready nodes: ${unreadyNodes}"
+        details="${details}unready_nodes: ${unreadyNodes}; "
         (( failed += 1 ))
     else
-        local node_count
-        node_count="$(oc get node --no-headers 2>/dev/null | wc -l)"
-        echo "All ${node_count} nodes Ready"
-        details="${details}nodes: all ${node_count} ready; "
+        typeset nodeCount
+        nodeCount="$(oc get node --no-headers | wc -l)"
+        : "All ${nodeCount} nodes Ready"
+        details="${details}nodes: all ${nodeCount} ready; "
     fi
 
-    # 3b. ClusterOperator health
-    echo "Checking ClusterOperator health..."
-    local unhealthy_co
-    unhealthy_co="$(oc get co --no-headers 2>/dev/null | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')" || true
-    if [[ -n "${unhealthy_co}" ]]; then
-        echo >&2 "Unhealthy ClusterOperators: ${unhealthy_co}"
-        details="${details}unhealthy_co: ${unhealthy_co}; "
+    : "Checking ClusterOperator health..."
+    typeset unhealthyCo
+    if ! unhealthyCo="$(oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')"; then
+        : "Failed to query ClusterOperators"
+        details="${details}cluster_operators: query failed; "
+        (( failed += 1 ))
+    elif [[ -n "${unhealthyCo}" ]]; then
+        : "Unhealthy ClusterOperators: ${unhealthyCo}"
+        details="${details}unhealthy_co: ${unhealthyCo}; "
         (( failed += 1 ))
     else
-        echo "All ClusterOperators healthy"
+        : "All ClusterOperators healthy"
         details="${details}cluster_operators: all healthy; "
     fi
 
-    # 3c. CVO conditions
-    echo "Checking ClusterVersion conditions..."
-    local avail progressing degraded
-    avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)" || true
-    progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null)" || true
-    degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}' 2>/dev/null)" || true
-    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
-        echo >&2 "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
+    : "Checking ClusterVersion conditions..."
+    typeset avail progressing degraded
+    avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" || true
+    progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')" || true
+    degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')" || true
+    if [[ "${avail}" != "True" || ( -n "${progressing}" && "${progressing}" != "False" ) || ( -n "${degraded}" && "${degraded}" != "False" ) ]]; then
+        : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
         details="${details}cvo: Available=${avail} Progressing=${progressing} Degraded=${degraded}; "
         (( failed += 1 ))
     else
-        echo "CVO: Available=True, Progressing=False, Degraded=False"
+        : "CVO: Available=True, Progressing=False, Degraded=False"
         details="${details}cvo: healthy; "
     fi
 
-    # 3d. Firing alerts (excluding Watchdog and AlertmanagerReceiversNotConfigured)
-    echo "Checking for firing alerts..."
-    local firing_alerts=""
-    firing_alerts="$(oc -n openshift-monitoring exec -c prometheus prometheus-k8s-0 -- \
-        curl -s 'http://localhost:9090/api/v1/alerts' 2>/dev/null | \
-        jq -r '.data.alerts[]? | select(.state=="firing") | select(.labels.alertname != "Watchdog") | select(.labels.alertname != "AlertmanagerReceiversNotConfigured") | .labels.alertname' 2>/dev/null | \
-        sort -u)" || true
-
-    if [[ -n "${firing_alerts}" ]]; then
-        local alert_count
-        alert_count="$(echo "${firing_alerts}" | wc -l)"
-        echo "WARNING: ${alert_count} alert(s) firing: ${firing_alerts}"
-        details="${details}firing_alerts: ${alert_count} (${firing_alerts}); "
-        # Alerts are a warning, not a hard failure
+    : "Checking for firing alerts..."
+    typeset firingAlerts=""
+    if ! firingAlerts="$(oc -n openshift-monitoring exec -c prometheus prometheus-k8s-0 -- \
+        curl -s 'http://localhost:9090/api/v1/alerts' | \
+        python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if data.get('status') != 'success':
+    print('query returned non-success status', file=sys.stderr)
+    sys.exit(1)
+alerts = data.get('data', {}).get('alerts', [])
+names = sorted(set(
+    a['labels']['alertname'] for a in alerts
+    if a.get('state') == 'firing'
+    and a.get('labels', {}).get('alertname') not in ('Watchdog', 'AlertmanagerReceiversNotConfigured')
+))
+print('\n'.join(names))
+")"; then
+        : "Alert query failed or unavailable"
+        details="${details}alerts: query failed; "
+    elif [[ -n "${firingAlerts}" ]]; then
+        typeset alertCount
+        alertCount="$(echo "${firingAlerts}" | wc -l)"
+        : "WARNING: ${alertCount} alert(s) firing: ${firingAlerts}"
+        details="${details}firing_alerts: ${alertCount} (${firingAlerts}); "
     else
-        echo "No critical alerts firing"
+        : "No critical alerts firing"
         details="${details}alerts: none firing; "
     fi
 
-    # Save node and CO snapshot for baseline
     oc get nodes -o json > "${REPORT_DIR}/nodes-baseline.json" 2>/dev/null || true
     oc get co -o json > "${REPORT_DIR}/co-baseline.json" 2>/dev/null || true
 
     if (( failed > 0 )); then
-        echo >&2 "Cluster health baseline: ${failed} issue(s) found"
-        append_check "cluster_health_baseline" "fail" "${details}"
+        : "Cluster health baseline: ${failed} issue(s) found"
+        AppendCheck "cluster_health_baseline" "fail" "${details}"
         (( CHECKS_FAILED += 1 ))
     else
-        echo "Cluster health baseline: all checks passed"
-        append_check "cluster_health_baseline" "pass" "${details}"
+        : "Cluster health baseline: all checks passed"
+        AppendCheck "cluster_health_baseline" "pass" "${details}"
     fi
+    true
 }
 
-# ──────────────────────────────────────────────────────────────────────
-#  Check 4: MachineConfigPool readiness
-# ──────────────────────────────────────────────────────────────────────
-check_mcp_readiness() {
-    echo -e "\n=== Check 4: MachineConfigPool readiness ==="
+function CheckMcpReadiness () {
+    echo ">>> PHASE: Check 4 — MachineConfigPool readiness"
 
-    local failed=0 details=""
+    typeset failed=0 details=""
 
-    # Check MCP conditions: Updated=True, Updating=False, Degraded=False
-    local mcp_issues
-    mcp_issues="$(oc get machineconfigpools --no-headers 2>/dev/null | \
-        awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')" || true
-
-    if [[ -n "${mcp_issues}" ]]; then
-        echo >&2 "Unhealthy MachineConfigPools: ${mcp_issues}"
-        details="unhealthy_mcps: ${mcp_issues}; "
+    typeset mcpRaw=""
+    if ! mcpRaw="$(oc get machineconfigpools --no-headers 2>&1)"; then
+        : "Failed to query MachineConfigPools"
+        details="machineconfigpools: query failed; "
         (( failed += 1 ))
-
-        # Dump details for each unhealthy MCP
-        for mcp in ${mcp_issues}; do
-            echo -e "\n### MCP ${mcp} ###"
-            oc describe machineconfigpool "${mcp}" 2>/dev/null || true
-        done
     else
-        local mcp_count
-        mcp_count="$(oc get machineconfigpools --no-headers 2>/dev/null | wc -l)"
-        echo "All ${mcp_count} MachineConfigPools are updated and not degraded"
-        details="all ${mcp_count} MCPs healthy (Updated=True, Updating=False, Degraded=False); "
+        typeset mcpIssues=""
+        mcpIssues="$(echo "${mcpRaw}" | \
+            awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}')" || true
+
+        if [[ -n "${mcpIssues}" ]]; then
+            : "Unhealthy MachineConfigPools: ${mcpIssues}"
+            details="unhealthy_mcps: ${mcpIssues}; "
+            (( failed += 1 ))
+
+            for mcp in ${mcpIssues}; do
+                : "### MCP ${mcp} ###"
+                oc describe machineconfigpool "${mcp}" || true
+            done
+        else
+            typeset mcpCount
+            mcpCount="$(echo "${mcpRaw}" | wc -l)"
+            : "All ${mcpCount} MachineConfigPools are updated and not degraded"
+            details="all ${mcpCount} MCPs healthy (Updated=True, Updating=False, Degraded=False); "
+        fi
     fi
 
-    # Check that machine counts match (ready == desired)
-    local mismatch=""
-    while IFS= read -r line; do
-        local mcp_name ready desired
-        mcp_name="$(echo "${line}" | awk '{print $1}')"
-        desired="$(echo "${line}" | awk '{print $6}')"
-        ready="$(echo "${line}" | awk '{print $7}')"
-        if [[ -n "${ready}" && -n "${desired}" && "${ready}" != "${desired}" ]]; then
-            mismatch="${mismatch}${mcp_name} (ready=${ready}, desired=${desired}); "
-        fi
-    done < <(oc get machineconfigpools --no-headers 2>/dev/null || true)
+    typeset mismatch=""
+    if [[ -n "${mcpRaw:-}" ]]; then
+        while IFS= read -r line; do
+            typeset mcpName ready desired
+            mcpName="$(echo "${line}" | awk '{print $1}')"
+            ready="$(echo "${line}" | awk '{print $7}')"
+            desired="$(echo "${line}" | awk '{print $6}')"
+            if [[ -n "${ready}" && -n "${desired}" && "${ready}" != "${desired}" ]]; then
+                mismatch="${mismatch}${mcpName} (ready=${ready}, desired=${desired}); "
+            fi
+        done <<< "${mcpRaw}"
+    fi
 
     if [[ -n "${mismatch}" ]]; then
-        echo >&2 "MCP machine count mismatch: ${mismatch}"
+        : "MCP machine count mismatch: ${mismatch}"
         details="${details}machine_count_mismatch: ${mismatch}"
         (( failed += 1 ))
     fi
 
-    # Save MCP snapshot
     oc get machineconfigpools -o json > "${REPORT_DIR}/mcp-baseline.json" 2>/dev/null || true
 
     if (( failed > 0 )); then
-        echo >&2 "MachineConfigPool readiness: ${failed} issue(s) found"
-        append_check "mcp_readiness" "fail" "${details}"
+        : "MachineConfigPool readiness: ${failed} issue(s) found"
+        AppendCheck "mcp_readiness" "fail" "${details}"
         (( CHECKS_FAILED += 1 ))
     else
-        echo "MachineConfigPool readiness: all checks passed"
-        append_check "mcp_readiness" "pass" "${details}"
+        : "MachineConfigPool readiness: all checks passed"
+        AppendCheck "mcp_readiness" "pass" "${details}"
     fi
+    true
 }
 
-# ──────────────────────────────────────────────────────────────────────
-#  Main
-# ──────────────────────────────────────────────────────────────────────
-main() {
+function Main () {
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
 
-    local target="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    typeset target="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
     if [[ -z "${target}" ]]; then
-        echo >&2 "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is not set; cannot determine upgrade target"
+        : "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is not set; cannot determine upgrade target"
         exit 3
     fi
-    echo "Target release image: ${target}"
+    : "Target release image: ${target}"
 
+    set +x
     KUBECONFIG="" oc registry login
+    set -x
 
-    local target_version target_minor
-    target_version="$(oc adm release info "${target}" --output=json | jq -r '.metadata.version')"
-    target_minor="$(echo "${target_version}" | cut -f2 -d.)"
-    echo "Target OCP version: ${target_version} (minor: ${target_minor})"
+    typeset targetVersion targetMajor targetMinor ocpXy
+    targetVersion="$(oc adm release info "${target}" -o jsonpath='{.metadata.version}')"
+    targetMajor="$(echo "${targetVersion}" | cut -f1 -d.)"
+    targetMinor="$(echo "${targetVersion}" | cut -f2 -d.)"
+    ocpXy="${targetMajor}.${targetMinor}"
+    : "Target OCP version: ${targetVersion} (${ocpXy})"
 
-    local source_version
-    source_version="$(oc get clusterversion --no-headers | awk '{print $2}')"
-    echo "Source OCP version: ${source_version}"
+    typeset sourceVersion
+    sourceVersion="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    : "Source OCP version: ${sourceVersion}"
 
-    echo -e "\n=== Starting OPP pre-flight validation ===\n"
+    echo ">>> PHASE: Starting OPP pre-flight validation"
 
-    init_report
+    InitReport
 
-    # Add metadata to report
-    local tmp
-    tmp="$(mktemp)"
-    jq --arg tv "${target_version}" --arg sv "${source_version}" --arg ti "${target}" \
-        '. + {"target_version": $tv, "source_version": $sv, "target_image": $ti, "timestamp": now | tostring}' \
-        "${REPORT_FILE}" > "${tmp}" && mv "${tmp}" "${REPORT_FILE}"
+    python3 -c "
+import json, sys, time
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+data['target_version'] = sys.argv[2]
+data['source_version'] = sys.argv[3]
+data['target_image'] = sys.argv[4]
+data['timestamp'] = str(time.time())
+with open(sys.argv[1], 'w') as f:
+    json.dump(data, f, indent=2)
+" "${REPORT_FILE}" "${targetVersion}" "${sourceVersion}" "${target}"
 
-    check_api_deprecations "${target_minor}"
-    check_opp_compatibility "${target_minor}"
-    check_cluster_health
-    check_mcp_readiness
+    CheckApiDeprecations "${targetMinor}" "${ocpXy}"
+    CheckOppCompatibility "${ocpXy}"
+    CheckClusterHealth
+    CheckMcpReadiness
 
-    echo -e "\n=== Pre-flight summary ==="
-    jq '.' "${REPORT_FILE}"
+    : "=== Pre-flight summary ==="
+    python3 -m json.tool "${REPORT_FILE}"
 
     if (( CHECKS_FAILED > 0 )); then
-        echo >&2 "Pre-flight validation FAILED: ${CHECKS_FAILED} check(s) did not pass"
-        echo >&2 "Review ${REPORT_FILE} for details"
+        : "Pre-flight validation FAILED: ${CHECKS_FAILED} check(s) did not pass"
+        : "Review ${REPORT_FILE} for details"
         exit 3
     fi
 
-    echo "Pre-flight validation PASSED: all checks succeeded"
+    : "Pre-flight validation PASSED: all checks succeeded"
+    true
 }
 
-main "$@"
+SUITE_NAME="${SUITE_NAME:-preflight}"
+# --- JUnit wrapper ---
+# shellcheck disable=SC2317  # invoked via trap
+WriteJunit() {
+  local rc=${1:-0}
+  TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
+  if [[ $rc -eq 0 ]]; then
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="0" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <system-out>Step completed successfully at ${TIMESTAMP}</system-out>
+  </testcase>
+</testsuite>
+JEOF
+  else
+    cat > "${JUNIT_FILE}" <<JEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${SUITE_NAME}" tests="1" failures="1" time="0">
+  <testcase name="${SUITE_NAME}" classname="interop.opp">
+    <failure message="${SUITE_NAME} failed with exit code ${rc}">
+Step failed at ${TIMESTAMP} with exit code ${rc}
+    </failure>
+  </testcase>
+</testsuite>
+JEOF
+  fi
+}
+
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
+Main "$@"

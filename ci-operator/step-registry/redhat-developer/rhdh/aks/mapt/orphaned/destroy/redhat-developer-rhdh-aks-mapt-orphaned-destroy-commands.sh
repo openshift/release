@@ -58,7 +58,8 @@ for BLOB_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
       --project-name "aks" \
-      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}" 2>&1)
+      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}" \
+      --force-destroy 2>&1)
   exit_code=$?
   
   # Check for both exit code and error patterns in output

@@ -121,7 +121,8 @@ mirror:
 EOF
 
     run_command "cd /tmp"
-    run_command "curl -L -o oc-mirror.tar.gz https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/amd64/clients/ocp/latest/oc-mirror.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
+    CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
+    run_command "curl -L -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz && tar -xvzf oc-mirror.tar.gz && chmod +x oc-mirror"
 
     # Setup TLS certificate for mirror registry by extracting from cluster
     echo "Extracting mirror registry CA certificate from cluster..."
@@ -203,7 +204,7 @@ EOF
 
       run "oc get mcp,node"
       run "oc get mcp worker -o yaml"
-      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+      run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
       return 1
     }

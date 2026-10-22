@@ -1,0 +1,63 @@
+chain:
+  as: quay-aws-ipi-disconnected-omr-v2-upgrade-v3-provision
+  steps:
+  - ref: aws-provision-vpc-disconnected
+  - chain: aws-provision-bastionhost
+  - ref: quay-omr-v2-host-provision
+  - ref: quay-omr-v2-install
+  - ref: ipi-install-rbac
+  - ref: quay-omr-v3-mirror
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-aws
+  - ref: quay-omr-v3-ipi-conf-mirror
+  - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: aws-provision-cco-manual-users-static
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - ref: ipi-install-install-aws
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - as: disable-default-sources
+    from: cli
+    commands: |-
+      set -euo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json \
+        -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+    grace_period: 5m0s
+  - ref: aws-provision-tags-for-byo-vpc
+  env:
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: Use two availability zones so the workflow also supports regions such as us-west-1.
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: Instance type for control plane nodes.
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: Instance type for compute nodes.
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: Create the private cluster ingress DNS record during installation.
+  - name: PUBLISH
+    default: "Internal"
+    documentation: Cluster publish strategy for the disconnected install.
+  - name: EXTRACT_MANIFEST_INCLUDED
+    default: "true"
+    documentation: Extract only CredentialsRequests included by the install config so disabled capabilities do not inject secrets into absent namespaces.
+  documentation: |-
+    Provision the standard disconnected AWS VPC and FCOS proxy bastion plus a
+    dedicated large RHEL host, install released OMR v2 on the RHEL host, mirror
+    the selected OpenShift release through it, and install the cluster with
+    manual CCO credentials.

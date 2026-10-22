@@ -1,0 +1,41 @@
+base_images:
+  cli:
+    name: "{{ ocp_version }}"
+    namespace: ocp
+    tag: cli
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "{{ ocp_version }}"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: "{{ test_as }}"
+  steps:
+    env:
+      QUAY_OPERATOR_CHANNEL: "{{ operator_channel }}"
+zz_generated_metadata:
+  branch: "{{ branch }}"
+  org: "{{ org }}"
+  repo: "{{ repo }}"
+  variant: "{{ variant }}"

@@ -8,48 +8,80 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 if [[ -n "${SHARED_DIR}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    # Disable xtrace: proxy-conf.sh may set HTTP_PROXY with embedded credentials.
+    typeset _wasTracing=''
+    [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+    set +x
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
+    [[ "${_wasTracing}" == "true" ]] && set -x
 fi
 
-
+typeset sourceProvider="${MTV_SOURCE_PROVIDER}"
+typeset destinationProvider="${MTV_DESTINATION_PROVIDER}"
 
 # ValidateConfig — fail fast if storage map env vars are missing.
-ValidateConfig() {
+function ValidateConfig () {
     [[ -n "${MTV_SOURCE_STORAGE_NAME}" ]]    || { : "MTV_SOURCE_STORAGE_NAME is required";    false; }
     [[ -n "${MTV_DESTINATION_STORAGE_CLASS}" ]] || { : "MTV_DESTINATION_STORAGE_CLASS is required"; false; }
+    true
+}
+
+# ResolveProviderName — read a provider name resolved by p2p-mtv-wait-acm-providers from
+# SHARED_DIR/mtv-acm-provider-name-<spokeIndex> when the caller did not pin an explicit name.
+function ResolveProviderName () {
+    typeset -n _out="${1:?}"; (($#)) && shift
+    typeset spokeIndex="${1:?}"; (($#)) && shift
+    typeset sharedFile="${SHARED_DIR}/mtv-acm-provider-name-${spokeIndex}"
+
+    [[ -n "${_out}" ]] && return 0
+    [[ -s "${sharedFile}" ]] || {
+        printf 'ERROR: no provider name for spoke index %s (set MTV_SOURCE_PROVIDER/' "${spokeIndex}" >&2
+        printf 'MTV_DESTINATION_PROVIDER, or run p2p-mtv-wait-acm-providers first)\n' >&2
+        return 1
+    }
+    _out="$(tr -d '[:space:]' < "${sharedFile}")"
+}
+
+# ResolveProviderNames — fill in sourceProvider/destinationProvider from ACM discovery
+# (p2p-mtv-wait-acm-providers) unless MTV_SOURCE_PROVIDER/MTV_DESTINATION_PROVIDER pinned them.
+function ResolveProviderNames () {
+    ResolveProviderName sourceProvider "${MTV_SOURCE_SPOKE_INDEX}"
+    ResolveProviderName destinationProvider "${MTV_DEST_SPOKE_INDEX}"
 }
 
 # RefreshProviderInventory — trigger MTV to re-scan spoke storage/network before map validation.
-RefreshProviderInventory() {
-    typeset providerName="${1:?}"
+function RefreshProviderInventory () {
+    typeset providerName="${1:?}"; (($#)) && shift
     typeset ts
 
     ts="$(date -u +%s)"
-    oc annotate "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    oc annotate "provider/${providerName}" -n "${MTV_PROVIDER_NAMESPACE}" \
         "forklift.konveyor.io/inventory-refresh=${ts}" --overwrite
+    true
 }
 
 # WaitProviderReady — ensure both providers finished inventory before creating maps.
-WaitProviderReady() {
-    typeset providerName="${1:?}"
+function WaitProviderReady () {
+    typeset providerName="${1:?}"; (($#)) && shift
 
-    oc wait "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    oc wait "provider/${providerName}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PROVIDER_READY_TIMEOUT}"
+    true
 }
 
 # ApplyNetworkMap — create pod→pod NetworkMap for CCLM cross-cluster pod networking.
 # Uses jq --arg to safely marshal values; avoids raw heredoc expansion of YAML-special chars.
-ApplyNetworkMap() {
+function ApplyNetworkMap () {
     jq -n \
         --arg name    "${MTV_NETWORK_MAP_NAME}" \
-        --arg ns      "${MTV_NAMESPACE}" \
-        --arg srcProv "${MTV_SOURCE_PROVIDER}" \
-        --arg dstProv "${MTV_DESTINATION_PROVIDER}" \
+        --arg ns      "${MTV_PROVIDER_NAMESPACE}" \
+        --arg srcProv "${sourceProvider}" \
+        --arg dstProv "${destinationProvider}" \
         '{
             apiVersion: "forklift.konveyor.io/v1beta1",
             kind: "NetworkMap",
@@ -62,18 +94,19 @@ ApplyNetworkMap() {
                 }
             }
         }' | oc apply -f -
+    true
 }
 
 # ApplyStorageMap — map source ODF virt StorageClass to destination (RWX required for live migration).
 # Uses jq --arg to safely marshal values; avoids raw heredoc expansion of YAML-special chars.
-ApplyStorageMap() {
+function ApplyStorageMap () {
     jq -n \
         --arg name     "${MTV_STORAGE_MAP_NAME}" \
-        --arg ns       "${MTV_NAMESPACE}" \
+        --arg ns       "${MTV_PROVIDER_NAMESPACE}" \
         --arg srcName  "${MTV_SOURCE_STORAGE_NAME}" \
         --arg dstClass "${MTV_DESTINATION_STORAGE_CLASS}" \
-        --arg srcProv  "${MTV_SOURCE_PROVIDER}" \
-        --arg dstProv  "${MTV_DESTINATION_PROVIDER}" \
+        --arg srcProv  "${sourceProvider}" \
+        --arg dstProv  "${destinationProvider}" \
         '{
             apiVersion: "forklift.konveyor.io/v1beta1",
             kind: "StorageMap",
@@ -89,15 +122,17 @@ ApplyStorageMap() {
                 }
             }
         }' | oc apply -f -
+    true
 }
 
 # WaitMapReady — wait until MTV validates network/storage mapping against provider inventory.
-WaitMapReady() {
-    typeset kind="${1:?}"
-    typeset name="${2:?}"
+function WaitMapReady () {
+    typeset kind="${1:?}"; (($#)) && shift
+    typeset name="${1:?}"; (($#)) && shift
 
-    oc wait "${kind}/${name}" -n "${MTV_NAMESPACE}" \
+    oc wait "${kind}/${name}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_MAP_READY_TIMEOUT}"
+    true
 }
 
 # --- Main ---
@@ -106,14 +141,16 @@ WaitMapReady() {
 
 ValidateConfig
 
-oc get ns "${MTV_NAMESPACE}" 1>/dev/null
+oc get ns "${MTV_PROVIDER_NAMESPACE}"
 
-WaitProviderReady "${MTV_SOURCE_PROVIDER}"
-WaitProviderReady "${MTV_DESTINATION_PROVIDER}"
+ResolveProviderNames
+
+WaitProviderReady "${sourceProvider}"
+WaitProviderReady "${destinationProvider}"
 
 if [[ "${MTV_SKIP_INVENTORY_REFRESH}" != "true" ]]; then
-    RefreshProviderInventory "${MTV_SOURCE_PROVIDER}"
-    RefreshProviderInventory "${MTV_DESTINATION_PROVIDER}"
+    RefreshProviderInventory "${sourceProvider}"
+    RefreshProviderInventory "${destinationProvider}"
 fi
 
 ApplyNetworkMap
@@ -122,6 +159,6 @@ ApplyStorageMap
 WaitMapReady networkmap "${MTV_NETWORK_MAP_NAME}"
 WaitMapReady storagemap "${MTV_STORAGE_MAP_NAME}"
 
-oc get networkmap,storagemap -n "${MTV_NAMESPACE}" \
-    > "${ARTIFACT_DIR}/mtv-migration-maps-status.txt"
+oc get networkmap,storagemap -n "${MTV_PROVIDER_NAMESPACE}" \
+    >> "${ARTIFACT_DIR}/mtv-migration-maps-status.txt"
 true

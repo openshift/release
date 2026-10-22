@@ -1,3 +1,16 @@
+base_images:
+  base-rhel9:
+    name: "5.0"
+    namespace: ocp-priv
+    tag: base-rhel9
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+  cli-manager:
+    name: "5.0"
+    namespace: ocp-priv
+    tag: cli-manager
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cli-manager-operator
@@ -7,9 +20,8 @@ images:
     to: cli-manager-operator
 promotion:
   to:
-  - disabled: true
-    name: 5.0-priv
-    namespace: ocp-private
+  - name: "5.0"
+    namespace: ocp-priv
 prowgen:
   private: true
 resources:
@@ -18,8 +30,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 5.0-priv
-  namespace: ocp-private
+  name: "5.0"
+  namespace: ocp-priv
 tests:
 - as: verify
   commands: make verify-gofmt
@@ -36,8 +48,9 @@ tests:
       SCAN_IMAGE: cli-manager-operator
     test:
     - ref: fips-check-image-scan
-- as: e2e-aws-operator
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+- always_run: false
+  as: e2e-aws-operator
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -47,6 +60,11 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cli-manager-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:cli-manager
       from: src
       resources:
         requests:
@@ -55,7 +73,7 @@ tests:
 - always_run: false
   as: e2e-aws-operator-serial-ote
   optional: true
-  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -70,7 +88,19 @@ tests:
     - ref: fips-check
     test:
     - ref: openshift-tests-extension-setup-out-of-payload
-    - ref: cli-manager-install-krew
+    - as: resolve-images
+      commands: |
+        echo "$OPERATOR_IMAGE" > "${SHARED_DIR}/operator-image"
+        echo "$OPERAND_IMAGE" > "${SHARED_DIR}/operand-image"
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: cli-manager-operator
+      - env: OPERAND_IMAGE
+        name: pipeline:cli-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: security

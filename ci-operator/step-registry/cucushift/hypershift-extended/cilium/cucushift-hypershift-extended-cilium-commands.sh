@@ -4,6 +4,7 @@ set -euo pipefail
 
 CILIUM_VERSION=${CILIUM_VERSION:-"1.19.4"}
 CILIUM_CLI_VERSION=${CILIUM_CLI_VERSION:-"0.19.2"}
+CILIUM_REPOSITORY=${CILIUM_REPOSITORY:-"oci://quay.io/cilium/charts/cilium"}
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
@@ -32,7 +33,10 @@ fi
 
 mkdir -p /tmp/bin
 export PATH=/tmp/bin:$PATH
-curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" | tar -xzC /tmp/bin/
+curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz" -o /tmp/cilium-linux-amd64.tar.gz
+curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/download/v${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz.sha256sum" -o /tmp/cilium-linux-amd64.tar.gz.sha256sum
+(cd /tmp && sha256sum --check cilium-linux-amd64.tar.gz.sha256sum)
+tar -xzC /tmp/bin/ -f /tmp/cilium-linux-amd64.tar.gz
 chmod +x /tmp/bin/cilium
 
 PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
@@ -76,7 +80,7 @@ EOF
 # where <version> is a tag from https://quay.io/repository/cilium-charts-dev/cilium
 cilium install \
     --namespace cilium \
-    --repository oci://quay.io/cilium/charts/cilium \
+    --repository "${CILIUM_REPOSITORY}" \
     --version "${CILIUM_VERSION}" \
     --set debug.enabled=true \
     --set k8s.requireIPv4PodCIDR=true \

@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.25-linux
+    tag: go1.26-linux
 canonical_go_repository: github.com/stolostron/cluster-backup-operator
 images:
   items:
@@ -29,12 +29,14 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     export HOME="/tmp"
+    go clean -cache -modcache
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+  - collection: ocm-secrets
+    group: acm-sonarcloud-token-ci
+    mount_path: /etc/sonarcloud/
 - as: pr-image-mirror
   steps:
     dependencies:

@@ -1,0 +1,48 @@
+ref:
+  as: aro-hcp-deprovision-expired-certificates
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-deprovision-expired-certificates-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 2Gi
+  credentials:
+  - collection: hcm-aro
+    group: aro-hcp-dev
+    mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: CERTIFICATE_CLEANUP_DRY_RUN
+    default: "true"
+    documentation: Report eligible certificates without deleting them. Setting false permits deletion only when JOB_TYPE is periodic; all other invocations force dry-run.
+  - name: CERTIFICATE_CLEANUP_MIN_AGE
+    default: "168h"
+    documentation: Minimum age since the latest certificate creation or update; renewal postpones cleanup.
+  - name: CERTIFICATE_CLEANUP_MAX_DELETIONS
+    default: "1000"
+    documentation: Maximum number of active certificate mutations selected per run.
+  - name: CERTIFICATE_CLEANUP_MAX_PURGES
+    default: "1000"
+    documentation: Maximum total purge mutations selected per run across immediate purges and existing tombstones.
+  - name: CERTIFICATE_CLEANUP_WORKERS
+    default: "2"
+    documentation: Maximum concurrent certificate delete and purge chains.
+  - name: CERTIFICATE_CLEANUP_TIMEOUT
+    default: "60m"
+    documentation: Overall timeout for inventory discovery and mutations.
+  documentation: |-
+    Clean up orphaned DEV CI certificates with cleanup-sweeper ci-certificates.
+    The command fixes the scope to aro-hcp-dev-svc-kv and the two DEV infrastructure
+    subscriptions; it does not fan out across subscriptions or use Microsoft Graph.
+    Owner inventory must succeed in both subscriptions before any deletion; an
+    inventory failure fails closed. The default seven-day (168h) age is measured
+    from the latest creation or update timestamp, not the earliest, so a recent
+    renewal postpones cleanup. The deletion and purge limits are mutation budgets:
+    ineligible metadata does not consume them, so discovery can inspect the complete
+    inventory. Successful deletes are immediately purged, and pre-existing
+    tombstones share the same purge budget. Purging is irreversible.
+    The step defaults to dry-run; the dedicated hourly
+    delete-expired-dev-ci-certificates job explicitly sets dry-run to false.
+    The script forces dry-run unless JOB_TYPE is exactly periodic, regardless of
+    CERTIFICATE_CLEANUP_DRY_RUN. Prow rehearsals run as presubmits and cannot delete;
+    unset, empty, and other non-periodic job types also force dry-run.
+    Merging a periodic that sets dry-run to false enables real deletion immediately.

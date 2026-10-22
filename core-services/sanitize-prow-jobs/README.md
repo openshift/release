@@ -22,7 +22,6 @@ aws:
     capabilities:
     - arm64
     - gpu
-    - build-tmpfs
     - highperf
     - rce
     - sshd-bastion

@@ -15,7 +15,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
+    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs jq
 
 typeset -i odfCsvPollInt="${ODF_CSV_POLL_INTERVAL_SECONDS}"
@@ -277,6 +277,19 @@ oc --kubeconfig="${KUBECONFIG}" patch console.operator.openshift.io cluster \
 oc --kubeconfig="${KUBECONFIG}" label nodes cluster.ocs.openshift.io/openshift-storage='' \
     --selector='node-role.kubernetes.io/worker' \
     --overwrite
+
+# Verify every worker node received the ODF storage label.
+# ODF schedules OSDs only onto labeled nodes; a mismatch means at least one worker
+# was silently skipped and the StorageCluster will fail to reach Ready.
+typeset -i _workerCount _labeledCount
+_workerCount="$(oc --kubeconfig="${KUBECONFIG}" get nodes \
+    --selector='node-role.kubernetes.io/worker' \
+    -o json | jq '.items | length')"
+_labeledCount="$(oc --kubeconfig="${KUBECONFIG}" get nodes \
+    --selector='cluster.ocs.openshift.io/openshift-storage' \
+    -o json | jq '.items | length')"
+: "ODF storage label check: ${_labeledCount}/${_workerCount} worker nodes labeled on hub"
+(( _workerCount > 0 && _labeledCount == _workerCount ))
 
 oc --kubeconfig="${KUBECONFIG}" wait --for=create crd/storageclusters.ocs.openshift.io \
     --timeout=5m

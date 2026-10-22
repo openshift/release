@@ -20,12 +20,12 @@ spec:
             worker_connections 1024; \n\
         } \n\
         http { \n\
-            limit_req_zone $binary_remote_addr zone=mylimit:10m rate=9r/m; \n\
+            limit_req_zone $binary_remote_addr zone=mylimit:10m rate=20r/m; \n\
             server { \n\
                 listen 31999; \n\
                 server_name localhost; \n\
                 location / { \n\
-                    limit_req zone=mylimit burst=5 nodelay; \n\
+                    limit_req zone=mylimit burst=10 nodelay; \n\
                     limit_req_status 429; \n\
                     proxy_pass http://127.0.0.1:32001; \n\
                     proxy_set_header Host $host; \n\
@@ -36,7 +36,10 @@ spec:
                     proxy_set_header Upgrade $http_upgrade; \n\
                     proxy_set_header Connection "upgrade"; \n\
                 } \n\
-                  location = /429 { \n\
+                error_page 429 /429; \n\
+                location = /429 { \n\
+                    internal; \n\
+                    add_header Retry-After 7 always; \n\
                     return 429 "Rate limit exceeded. Please wait before retrying."; \n\
                 } \n\
             } \n\

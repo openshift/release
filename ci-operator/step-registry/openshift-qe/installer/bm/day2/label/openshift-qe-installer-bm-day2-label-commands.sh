@@ -11,8 +11,11 @@ cat /etc/os-release
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
 fi
 
 oc config view
@@ -122,4 +125,13 @@ if [ ${TELCO} == "true" ]; then
     echo "=== Labeling Summary ==="
     oc get nodes -l node-role.kubernetes.io/worker --show-labels
   fi
+fi
+
+if [ "${NODE_DENSITY_CNI_WORKLOAD}" == "true" ]; then
+  # Label the nodes with node-density-cni-workload
+  for node in `oc get nodes -l node-role.kubernetes.io/worker= --no-headers | head -${LABEL_NUM_NODES} | awk '{print $1}'`; do
+      oc label node $node node-role.kubernetes.io/node-density-cni-workload=""
+  done
+  echo "=== Labeling Summary ==="
+  oc get nodes -l node-role.kubernetes.io/worker --show-labels
 fi

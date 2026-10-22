@@ -2,14 +2,17 @@ ref:
   as: p2p-create-migration-test-vm
   from: cli
   commands: p2p-create-migration-test-vm-commands.sh
-  timeout: 1h0m0s
+  timeout: 4h0m0s
   grace_period: 10m0s
   resources:
     requests:
       cpu: 200m
       memory: 400Mi
   documentation: |-
-    Create a CNV test VirtualMachine on the source spoke for MTV cross-cluster live migration.
+    Create one or more CNV test VirtualMachines on the source spoke for MTV cross-cluster
+    live migration.  When CNV_TEST_VM_COUNT=1 the single VM is named CNV_TEST_VM_NAME;
+    when greater than 1, VMs are named test-vm-1 through test-vm-N and CNV_TEST_VM_NAME
+    is ignored.
 
     Supports cirros (HTTP import) or rhel (CNV DataSource clone). RHEL on ODF virt StorageClass
     requires cloneStrategy=copy and usePopulator=false — both are applied automatically.
@@ -19,10 +22,22 @@ ref:
 
     Writes ${ARTIFACT_DIR}/migration-test-vm-status.txt; diagnostics on failure under
     ${ARTIFACT_DIR}/migration-test-vm-diagnostics/.
+
+    Env vars consumed:
+      CNV_TEST_VM_COUNT   - number of VMs to create (default: 1)
+      CNV_TEST_VM_NAME    - name when count=1; ignored when count>1
+      CNV_TEST_VM_*       - shared image/storage/sizing settings for all VMs
   env:
+  - name: CNV_TEST_VM_COUNT
+    default: "1"
+    documentation: |-
+      Number of test VMs to create on the source spoke.
+      When 1, the single VM is named CNV_TEST_VM_NAME.
+      When greater than 1, VMs are named test-vm-1 through test-vm-N.
+      Must match MTV_TEST_VM_COUNT in p2p-mtv-execute-live-migration.
   - name: CNV_TEST_VM_NAME
     default: "test-vm-1"
-    documentation: VirtualMachine metadata.name on the source spoke.
+    documentation: VirtualMachine metadata.name when CNV_TEST_VM_COUNT=1. Ignored when count>1.
   - name: CNV_TEST_VM_NAMESPACE
     default: "vm-migration-test"
     documentation: Namespace for the test VM and DataVolume.

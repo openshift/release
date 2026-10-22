@@ -20,9 +20,16 @@ ref:
     Requires ocs-storagecluster-ceph-rbd-virtualization on spokes before p2p-mtv-create-migration-maps.
     Hub kubeconfig is not used; each spoke is targeted via --kubeconfig.
   env:
+  - name: ODF_SPOKE_OPERATOR_CHANNEL
+    default: ""
+    documentation: |-
+      ODF operator Subscription channel on each spoke (e.g. stable-4.21, stable-4.22).
+      Separate from ODF_OPERATOR_CHANNEL so hub and spoke can use different ODF versions
+      when the spoke starts on a lower OCP version (e.g. hub=4.22 spoke=4.21).
+      Defaults to empty; when unset, falls back to ODF_OPERATOR_CHANNEL for backward compatibility.
   - name: ODF_OPERATOR_CHANNEL
     default: "stable-4.21"
-    documentation: ODF operator Subscription channel on each spoke (e.g. stable-4.21).
+    documentation: ODF operator Subscription channel on each spoke (e.g. stable-4.21). Deprecated in favour of ODF_SPOKE_OPERATOR_CHANNEL; kept for backward compatibility.
   - name: ODF_BACKEND_STORAGE_CLASS
     default: "gp3-csi"
     documentation: AWS EBS StorageClass for OSD PVCs on spoke workers.
@@ -57,20 +64,11 @@ ref:
     default: "900"
     documentation: Max seconds to wait for ODF CSV Succeeded (15 min).
   - name: ODF_OCS_OPERATOR_BUFFER_SECONDS
-    default: "90"
-    documentation: Sleep after CSV Succeeded before waiting for ocs-operator deployment.
-  - name: ODF_CEPH_INITIAL_DELAY_SECONDS
-    default: "60"
-    documentation: Sleep after StorageCluster create before CephCluster Ready polling.
-  - name: ODF_CEPH_POLL_INTERVAL_SECONDS
-    default: "30"
-    documentation: Sleep between CephCluster Ready polls.
-  - name: ODF_CEPH_POLL_TIMEOUT_SECONDS
-    default: "1800"
-    documentation: Max seconds to wait for CephCluster Ready (30 min).
-  - name: ODF_STORAGECLUSTER_POLL_INTERVAL_SECONDS
-    default: "30"
-    documentation: Sleep between StorageCluster/NooBaa Ready polls.
+    default: "300"
+    documentation: |-
+      Max seconds to wait for ocs-operator Deployment to be created after CSV Succeeded
+      (used as --timeout for oc wait --for=create). 90s is a safe margin for image pulls and
+      pod scheduling on a fresh spoke after OLM resolves the Subscription.
   - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
     default: "5400"
     documentation: Max seconds to wait for StorageCluster and NooBaa Ready (90 min).

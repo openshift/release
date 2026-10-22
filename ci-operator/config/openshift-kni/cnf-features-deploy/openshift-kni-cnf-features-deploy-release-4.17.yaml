@@ -41,11 +41,13 @@ releases:
     integration:
       name: "4.17"
       namespace: ocp
+      reference_policy: Local
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.17"
+    integration:
+      include_built_images: true
+      name: "4.17"
+      namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     requests:
@@ -62,13 +64,15 @@ tests:
   container:
     from: src
   run_if_changed: ^ztp
-- as: e2e-aws-ci-tests
-  skip_if_only_changed: ^ztp|\.tekton/.*|cnf-tests/.konflux/.*|ztp/resource-generator/.konflux/.*|^cnf-tests/submodules/|^ztp/resource-generator/telco-reference$|^telco5g-konflux$
+- always_run: false
+  as: e2e-aws-ci-tests
+  optional: true
   steps:
     cluster_profile: aws-telco
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       SPOT_INSTANCES: "true"
+      SPOT_INSTANCES_FALLBACK: "true"
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch release-4.17
@@ -93,6 +97,7 @@ tests:
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       SPOT_INSTANCES: "true"
+      SPOT_INSTANCES_FALLBACK: "true"
       USER_TAGS: |
         ci-job-source prowci
         ci-job-branch release-4.17
@@ -100,6 +105,7 @@ tests:
         ci-job-type e2e-aws-ran-profile
         ci-repo-name cnf-features-deploy
         ci-org-name openshift-kni
+      ZONES_COUNT: "3"
     test:
     - as: e2e-aws-ran-profile
       commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32

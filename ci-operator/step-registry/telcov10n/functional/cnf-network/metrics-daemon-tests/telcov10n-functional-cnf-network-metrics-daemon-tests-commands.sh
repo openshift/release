@@ -47,7 +47,7 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run metric tests via ssh tunnel"
-ssh -o StrictHostKeyChecking=no "${BASTION_USER}"@"${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/network-metrics-daemon;./network-metrics-daemon-run.sh || true"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${BASTION_USER}"@"${BASTION_IP}" -i /tmp/temp_ssh_key "cd /tmp/network-metrics-daemon;./network-metrics-daemon-run.sh || true"
 
 echo "Gather artifacts from bastion"
 # shellcheck disable=SC2154

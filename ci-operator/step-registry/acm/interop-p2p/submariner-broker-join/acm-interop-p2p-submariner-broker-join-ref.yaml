@@ -1,6 +1,6 @@
 ref:
   as: acm-interop-p2p-submariner-broker-join
-  from: cli
+  from: cli-with-git
   commands: acm-interop-p2p-submariner-broker-join-commands.sh
   resources:
     requests:
@@ -13,6 +13,16 @@ ref:
       default: "2"
       documentation: |-
         Number of ACM spoke clusters to join to the Submariner broker.
+    - name: SUBMARINER_SUBCTL_VERSION
+      default: "release-0.24"
+      documentation: |-
+        subctl release tag to download from GitHub releases.
+        Format: release-<major>.<minor> (e.g. release-0.24).
+        Use "release-0.24" to pick up rolling builds from the release-0.24 branch
+        (includes LRP nexthop fix from PR #4126 merged 2026-08-11).
+        Must match the Submariner operator version deployed by broker-join.
+        Note: immutable vX.Y.Z tags require a trusted SHA-256 digest entry in
+        InstallSubctl._subctlDigests; rolling release-X.Y tags skip digest check.
     - name: SUBMARINER_REMEDIATE_GLOBALNET
       default: "true"
       documentation: |-
@@ -34,12 +44,25 @@ ref:
       documentation: |-
         When "true", broker-join failures are logged but do not fail the job.
         Used for iterative debugging of broker deployment and cluster join.
+    - name: SUBMARINER_VERIFY_HUB_SPOKE
+      default: "false"
+      documentation: |-
+        When "true", also join the hub cluster (KUBECONFIG) to the Submariner broker
+        after joining all spokes.  Required for hub-spoke CCLM: without hub joining,
+        there are no IPsec tunnels between hub pods and spoke pods, so
+        virt-synchronization-controller on port 8443 is unreachable across clusters.
+        The hub must have a gateway-labeled node (provided by cloud-prepare when
+        SUBMARINER_VERIFY_HUB_SPOKE=true) before this step runs.
+        Set to "false" for spoke-to-spoke topologies where the hub is management-only.
   documentation: |-
     Step 2 of 3 in the Submariner installation chain.
 
-    Installs subctl locally (not SHARED_DIR), deploys the Submariner broker on
+    Installs subctl ,deploys the Submariner broker on
     the hub cluster (no --globalnet), then joins each spoke with
     'subctl join --globalnet=false --label-gateway=false'.
+    When SUBMARINER_VERIFY_HUB_SPOKE=true, also joins the hub cluster (KUBECONFIG)
+    to the broker and runs the same readiness + DNS forwarding + Globalnet checks
+    on the hub, establishing IPsec tunnels between hub and all spokes.
     If a previous Globalnet deployment is detected, uninstalls Submariner from
     all clusters and redeploys without Globalnet before joining.
     After all spokes have joined, waits on each spoke for:
@@ -55,6 +78,8 @@ ref:
     Submariner broker is deployed WITHOUT Globalnet. Spokes must use
     non-overlapping pod CIDRs (acm-interop-p2p-cluster-install ResolveSpokeCidr)
     so cross-cluster pod IP routing works for KubeVirt CCLM sync traffic.
+
+
 
     Sensitive data handling:
       broker-info.subm is written to /tmp (never to SHARED_DIR) and removed

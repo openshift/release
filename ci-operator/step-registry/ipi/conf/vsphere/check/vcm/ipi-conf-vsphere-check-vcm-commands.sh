@@ -438,8 +438,33 @@ if [ "$n" -ge 5 ]; then
   exit 1
 fi
 
-# shellcheck disable=SC2046
-oc wait leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" --timeout=120m --for=jsonpath='{.status.phase}'=Fulfilled -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}")
+LEASE_WAIT_TIMEOUT_SECONDS=$((120 * 60))
+LEASE_WAIT_POLL_INTERVAL=15
+elapsed=0
+while true; do
+  # shellcheck disable=SC2046
+  lease_phases=$(oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}") -o json | jq -r 'if has("items") then .items[].status.phase else .status.phase end')
+
+  if grep -q "^Failed$" <<< "${lease_phases}"; then
+    log "ERROR: lease entered Failed phase, the requested configuration is invalid or cannot be fulfilled"
+    # shellcheck disable=SC2046
+    oc get leases.vspherecapacitymanager.splat.io --kubeconfig "${SA_KUBECONFIG}" -n vsphere-infra-helpers $(printf '%s ' "${LEASES[@]}") -o yaml
+    exit 1
+  fi
+
+  if [[ -z "$(grep -v '^Fulfilled$' <<< "${lease_phases}")" ]]; then
+    log "all leases fulfilled"
+    break
+  fi
+
+  if [[ ${elapsed} -ge ${LEASE_WAIT_TIMEOUT_SECONDS} ]]; then
+    log "ERROR: timed out waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled"
+    exit 1
+  fi
+
+  sleep ${LEASE_WAIT_POLL_INTERVAL}
+  elapsed=$((elapsed + LEASE_WAIT_POLL_INTERVAL))
+done
 
 declare -A vcenter_portgroups
 declare -A vcenter_reserved_portgroups

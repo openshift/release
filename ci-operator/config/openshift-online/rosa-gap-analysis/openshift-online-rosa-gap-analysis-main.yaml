@@ -1,11 +1,12 @@
 build_root:
   project_image:
     dockerfile_path: ci/Containerfile
-  use_build_cache: true
 images:
   items:
   - dockerfile_path: ci/Containerfile
     to: rosa-gap-analysis
+prowgen:
+  disable_sparse_checkout: true
 resources:
   '*':
     limits:
@@ -13,6 +14,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 zz_generated_metadata:
   branch: main
   org: openshift-online

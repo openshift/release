@@ -54,8 +54,9 @@ mirror:
     kubeVirtContainer: true
 EOF2
 
-wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/x86_64/clients/ocp/candidate/oc-mirror.rhel9.tar.gz
-tar xvzf oc-mirror.rhel9.tar.gz
+CGWURL="https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw"
+wget -O oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-amd64.tar.gz
+tar xvzf oc-mirror.tar.gz
 chmod +x oc-mirror
 jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret > /home/oc_mirror_auth
 ./oc-mirror version
@@ -95,14 +96,6 @@ echo "${HO_OPERATOR_IMAGE}" > /home/ho_operator_image
 
 
 jq -s '.[0] * .[1]' /home/pull-secret /tmp/.dockerconfigjson > /home/pull-secret-mirror
-
-if [[ -z ${MCE} ]] ; then
-  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
-  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
-  CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
-  oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
-  echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
-fi
 
 # Only the redhat-operator-index is mirrored to the internal registry by openshift-metal3/dev-scripts
 # based on MIRROR_OLM_REMOTE_INDEX environment variable. For this specific testing in DISCONNECTED mode,

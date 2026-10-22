@@ -25,10 +25,11 @@ def _add_trt_admin_role_bindings(gendoc, namespace):
 
 def generate_trt_rbac(config):
     with genlib.GenDoc(config.paths.path_trt_resources.joinpath('admin_generated_rbac.yaml')) as gendoc:
-        for private in (False, True):
-            for arch in config.arches:
-                context = Context(config, arch, private)
-                _add_trt_admin_role_bindings(gendoc, context.is_namespace)
+        for product in config.products:
+            for private in product.privacy_modes:
+                for arch in product.arches:
+                    context = Context(config, arch, private, product)
+                    _add_trt_admin_role_bindings(gendoc, context.is_namespace)
 
         gendoc.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',

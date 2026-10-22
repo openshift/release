@@ -19,7 +19,7 @@ NO_OF_RETRY=${NO_OF_RETRY:-"5"}
 export POWERVS_ZONE="${LEASED_RESOURCE}"
 POWERVS_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12") echo "dal" ;;
+            ("dal10" | "dal12" | "dal14") echo "dal" ;;
             ("us-south") echo "us-south" ;;
             ("wdc06" | "wdc07") echo "wdc" ;;
             ("us-east") echo "us-east" ;;
@@ -37,7 +37,7 @@ POWERVS_REGION=$(
 export POWERVS_REGION
 VPC_REGION=$(
         case "$POWERVS_ZONE" in
-            ("dal10" | "dal12" | "us-south") echo "us-south" ;;
+            ("dal10" | "dal12" | "dal14" | "us-south") echo "us-south" ;;
             ("wdc06" | "wdc07" | "us-east") echo "us-east" ;;
             ("sao01" | "sao04") echo "br-sao" ;;
             ("tor01") echo "ca-tor" ;;
@@ -240,6 +240,8 @@ function cleanup_prior() {
 # creates the var file
 # Note: kdump_enable is false so that is simplifies the setup of one MCP
 function configure_terraform() {
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IBMCLOUD_API_KEY
 
@@ -260,6 +262,9 @@ function configure_terraform() {
 
     PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
     echo "${PULL_SECRET}" > "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/pull-secret.txt
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
 
     echo "${WORKSPACE_NAME}" > "${SHARED_DIR}"/WORKSPACE_NAME
     VPC_NAME="${WORKSPACE_NAME}"
@@ -307,6 +312,7 @@ worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
 release_image_override    = "${TARGET_VERSION}"
+qe_only_disable_image_policy = true
 
 use_zone_info_for_names    = true
 use_ibm_cloud_services     = true
@@ -317,6 +323,7 @@ ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
 ibm_cloud_cis_crn          = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
+connection_timeout         = 90
 
 dns_forwarders = "161.26.0.10; 161.26.0.11"
 
@@ -452,9 +459,14 @@ function build_upi_cluster() {
     POWERVS_USER_ID=$(ibmcloud account show --output json | jq -r '.account_id')
     echo "IBM Cloud User ID: ${POWERVS_USER_ID}"
 
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     cat > "${SHARED_DIR}/powervs-config.json" << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${RESOURCE_GROUP}"}
 EOF
+    if [[ "${WAS_TRACING}" == true ]]; then
+        set -x
+    fi
     echo "powervs-config.json created successfully"
 }
 

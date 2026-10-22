@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: backplane-5.0
+    name: backplane-5.1
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -20,7 +20,7 @@ base_images:
     namespace: ci
     tag: latest
   tools:
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
     tag: tools
 binary_build_commands: make build
@@ -39,7 +39,7 @@ promotion:
   to:
   - excluded_images:
     - origin-devcontainer
-    name: "5.0"
+    name: "5.1"
     namespace: ocp
   - excluded_images:
     - tests
@@ -62,19 +62,19 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "5.1"
       namespace: ocp
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "5.0"
+      version: "5.1"
 resources:
   '*':
     requests:
@@ -118,6 +118,7 @@ tests:
     - ref: go-verify-deps
 - always_run: false
   as: e2e-gcp-ovn
+  pipeline_run_if_changed: ^.*$
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -267,6 +268,7 @@ tests:
     workflow: openshift-e2e-aws-image-registry
 - always_run: false
   as: e2e-gcp-ovn-upgrade
+  pipeline_run_if_changed: ^(vendor/|.*(upgrade|monitor).*)
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -284,6 +286,7 @@ tests:
     workflow: openshift-upgrade-gcp-ovn-rt
 - always_run: false
   as: e2e-gcp-csi
+  pipeline_run_if_changed: ^(vendor/|.*(storage|csi|volume).*)
   steps:
     cluster_profile: openshift-org-gcp
     observers:
@@ -330,6 +333,7 @@ tests:
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-serial
+  pipeline_run_if_changed: ^.*$
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -381,6 +385,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - always_run: false
   as: e2e-aws-csi
+  pipeline_run_if_changed: ^(vendor/|.*(storage|csi|volume).*)
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -392,6 +397,7 @@ tests:
     workflow: openshift-e2e-aws-csi
 - always_run: false
   as: e2e-vsphere-ovn-upi
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -402,6 +408,7 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - always_run: false
   as: e2e-vsphere-ovn
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -412,9 +419,12 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-aws-ovn-fips
+  pipeline_run_if_changed: ^.*$
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
       TEST_SUITE: openshift/conformance/parallel
@@ -446,16 +456,6 @@ tests:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
 - always_run: false
-  as: e2e-metal-ovn-two-node-fencing-recovery
-  capabilities:
-  - intranet
-  - nested-podman
-  optional: true
-  pipeline_run_if_changed: (baremetal|metal3|ironic)|^(test/extended/edge_topologies)
-  steps:
-    cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-fencing-recovery
-- always_run: false
   as: e2e-metal-ipi-ovn
   capabilities:
   - intranet
@@ -484,6 +484,7 @@ tests:
   as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
+  pipeline_run_if_changed: ^.*$
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -579,9 +580,7 @@ tests:
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -702,6 +701,8 @@ tests:
       --allow-missing-architectures=e2e-quay-io-crio-artifact-subpath-8cuvQpZ0AoyNahYr \
       --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
       --allow-missing-architectures=e2e-ghcr-io-nicolaka-netshoot \
+      --allow-missing-architectures=registry-k8s-io-e2e-test-images-node-perf-npb \
+      --allow-missing-architectures=registry-k8s-io-e2e-test-images-node-perf-pytorch-wide-deep \
       --log-level=debug
   container:
     from: tests
@@ -851,6 +852,7 @@ tests:
     workflow: upi-vsphere-platform-external-ccm
 - always_run: false
   as: e2e-aws-ovn-microshift
+  pipeline_run_if_changed: ^.*$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -860,6 +862,7 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
 - always_run: false
   as: e2e-aws-ovn-microshift-serial
+  pipeline_run_if_changed: ^.*$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -889,31 +892,34 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - always_run: false
-  as: e2e-aws-tls-observed-config
+  as: e2e-aws-tls-observed-config-techpreview
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/tls-observed-config
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - always_run: false
-  as: e2e-aws-tls-observed-config-hypershift
+  as: e2e-aws-tls-observed-config-hypershift-techpreview
   optional: true
   steps:
     cluster_profile: hypershift-aws
     env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/tls-observed-config
     workflow: hypershift-aws-conformance
 - always_run: false
-  as: e2e-aws-tls-observed-config-fips
+  as: e2e-aws-tls-observed-config-fips-techpreview
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/tls-observed-config
     pre:

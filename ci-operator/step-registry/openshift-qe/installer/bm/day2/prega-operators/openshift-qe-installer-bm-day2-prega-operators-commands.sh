@@ -5,25 +5,64 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
+fi
+
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
+# Disable xtrace: reading Quay access token
+set +x
 QUAY_ACCESS_TOKEN=$(cat ${CLUSTER_PROFILE_DIR}/prega_quay_auth_token)
+set -x
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
 get_idms_manifest() {
   echo "Getting the ImageDigestMirrorSet manifest from the PREGA build server"
   QUAY_URL="https://quay.io/api/v1/repository/prega/prega-operator-index/tag/?limit=100&page=1"
-  OCP_VERSION=$(oc get clusterversion --no-headers | grep -o '[4].[0-9][0-9]' | head -1 | awk '{print "v"$0}')
+  OCP_VERSION=$(oc get clusterversion --no-headers | grep -oE '[0-9]+\.[0-9]+' | head -1 | awk '{print "v"$0}')
+  # Disable xtrace: curl requests use QUAY_ACCESS_TOKEN in Authorization header
+  set +x
   DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
   OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  set -x
+  if [[ -z "${OPERATOR_PREGA_VERSION}" ]]; then
+    echo "OPERATOR_PREGA_VERSION could not be resolved from Quay; falling back to OCP_VERSION: ${OCP_VERSION}"
+    OPERATOR_PREGA_VERSION="${OCP_VERSION}"
+  fi
   echo "PREGA Operator Version: ${OPERATOR_PREGA_VERSION} for OCP Version: ${OCP_VERSION}"
   ssh ${SSH_ARGS} root@${bastion} "
     set -e
     set -o pipefail
-    curl -k -o /tmp/idms.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
+    curl -k -o /tmp/idms_${OCP_VERSION}.yaml https://${PREGA_BUILD_SERVER_IP}/${OPERATOR_PREGA_VERSION}/imageDigestMirrorSet.yaml
   "
-  scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms.yaml /tmp/idms.yaml
-  echo "ImageDigestMirrorSet manifest saved to /tmp/idms.yaml"
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/idms_${OCP_VERSION}.yaml /tmp/idms_${OCP_VERSION}.yaml
+
+  validate_yaml() {
+    local f="$1"
+    [[ -s "$f" ]] || return 1
+    if command -v yq &>/dev/null; then
+      yq eval '.apiVersion == "config.openshift.io/v1" and .kind == "ImageDigestMirrorSet"' "$f" 2>/dev/null | grep -q '^true$'
+    else
+      grep -qx 'apiVersion: config.openshift.io/v1' "$f" &&
+        grep -qx 'kind: ImageDigestMirrorSet' "$f"
+    fi
+  }
+
+  if ! validate_yaml /tmp/idms_${OCP_VERSION}.yaml; then
+    echo "Downloaded /tmp/idms_${OCP_VERSION}.yaml is not valid YAML; falling back to bastion artifact for ${OCP_VERSION}"
+    scp -q ${SSH_ARGS} root@${bastion}:/root/prega_artifacts/idms_${OCP_VERSION}.yaml /tmp/idms_${OCP_VERSION}.yaml
+    validate_yaml /tmp/idms_${OCP_VERSION}.yaml \
+      || { echo "Fallback IDMS /root/prega_artifacts/idms_${OCP_VERSION}.yaml is also invalid or missing"; exit 1; }
+  fi
+
+  echo "ImageDigestMirrorSet manifest saved to /tmp/idms_${OCP_VERSION}.yaml"
 }
 
 oc config view
@@ -39,15 +78,13 @@ if [ ${OCP_BUILD} == "dev" ]; then
   jq -s '.[0] * .[1]' /tmp/existing_pull_secret.json /tmp/prega_pull_secret.json > /tmp/merged_pull_secret.json
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/merged_pull_secret.json
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
-  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
   echo "Applying the ImageDigestMirrorSet manifest"
   get_idms_manifest
-  oc apply -f /tmp/idms.yaml
+  oc apply -f /tmp/idms_${OCP_VERSION}.yaml
   sleep 300
-  kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=60m mcp worker
-  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
+  oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=40m
 
   echo "Creating CatalogSource for PREGA Operator Index"
   cat << EOF| oc apply -f -
@@ -60,11 +97,20 @@ if [ ${OCP_BUILD} == "dev" ]; then
     image: quay.io/prega/prega-operator-index:${OPERATOR_PREGA_VERSION}
     sourceType: grpc
     displayName: Openshift Pre-GA Operators
+    grpcPodConfig:
+      securityContextConfig: restricted
 EOF
 
   echo "Waiting for CatalogSource to be ready"
   sleep 300
-  kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s
+  if ! kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s; then
+    echo "CatalogSource prega-operator-index did not become READY"
+    oc get catalogsource prega-operator-index -n openshift-marketplace -o yaml || true
+    oc get pods -n openshift-marketplace -o wide || true
+    oc describe pods -n openshift-marketplace -l olm.catalogSource=prega-operator-index || true
+    oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -80 || true
+    exit 1
+  fi
   echo "CatalogSource is ready"
   oc get catalogsources.operators.coreos.com -n openshift-marketplace
   oc get packagemanifests.packages.operators.coreos.com

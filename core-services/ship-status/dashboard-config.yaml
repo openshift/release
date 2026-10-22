@@ -1,3 +1,6 @@
+trusted_delegators:
+  - "system:serviceaccount:ship-status:mcp-server"
+
 components:
   - name: "Prow"
     description: "The backbone of the CI system"
@@ -11,7 +14,7 @@ components:
           - "ci-frontend"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Deck-Internal"
@@ -22,7 +25,7 @@ components:
           - "ci-frontend"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "QE-Private-Deck"
@@ -33,7 +36,7 @@ components:
           - "ci-frontend"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Crier"
@@ -44,7 +47,7 @@ components:
           - "ci-automation"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
         critical: true
@@ -56,7 +59,18 @@ components:
           - "ci-infrastructure"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+      - name: "Horologium"
+        description: "Triggers scheduled Prow jobs"
+        long_description: "Horologium evaluates configured periodic job schedules and creates ProwJobs when their next run is due. It supports interval-based and cron-based schedules for regularly triggered CI jobs."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/horologium/"
+        tags:
+          - "ci-automation"
+        monitoring:
+          frequency: 5m
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Prow-Controller-Manager"
@@ -67,7 +81,7 @@ components:
           - "ci-infrastructure"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
         critical: true
@@ -79,7 +93,7 @@ components:
           - "ci-automation"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: true
         critical: true
@@ -91,7 +105,7 @@ components:
           - "ci-api"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "GCSWeb"
@@ -101,7 +115,7 @@ components:
           - "ci-api"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "GHProxy"
@@ -112,7 +126,7 @@ components:
           - "ci-infrastructure"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
         critical: true
@@ -124,14 +138,14 @@ components:
           - "ci-automation"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
         critical: true
     owners:
       - rover_group: "test-platform-ci-admins"
       - service_account: "system:serviceaccount:ship-status:component-monitor"
-      - service_account: "system:serviceaccount:ship-status:chai-bot"
+      - user: "chai-bot"
   - name: "Boskos"
     description: "Dynamic resource manager for cloud-account quotas"
     ship_team: "DPTP"
@@ -144,124 +158,94 @@ components:
           - "resource-management"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
         critical: true
       - name: "AWS"
-        description: "AWS cloud account"
+        description: "AWS Cluster Profile Set for OpenShift"
         long_description: "Provides access to Amazon Web Services cloud resources for provisioning and testing OpenShift clusters."
         documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
         tags:
           - "aws"
         monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
+          outage_per_reason: true
         requires_confirmation: false
-      - name: "AWS-2"
-        description: "AWS-2 cloud account"
-        long_description: "Provides additional AWS quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "aws"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "AWS-3"
-        description: "AWS-3 cloud account"
-        long_description: "Provides additional AWS quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "aws"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "AWS-4"
-        description: "AWS-4 cloud account"
-        long_description: "Provides additional AWS quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "aws"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "AWS-5"
-        description: "AWS-5 cloud account"
-        long_description: "Provides additional AWS quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "aws"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "GCP"
-        description: "GCP cloud account"
-        long_description: "Provides access to Google Cloud Platform resources for provisioning and testing OpenShift clusters."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "gcp"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "GCP-2"
-        description: "GCP-2 cloud account"
-        long_description: "Provides additional GCP quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "gcp"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "GCP-3"
-        description: "GCP-3 cloud account"
-        long_description: "Provides additional GCP quota capacity to support increased testing load."
-        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
-        tags:
-          - "gcp"
-        monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
-      - name: "Azure-2"
-        description: "Azure-2 cloud account"
+      - name: "Azure"
+        description: "Azure Cluster Profile Set for OpenShift"
         long_description: "Provides access to Microsoft Azure cloud resources for provisioning and testing OpenShift clusters."
         documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
         tags:
           - "azure"
         monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
+          outage_per_reason: true
         requires_confirmation: false
-      - name: "Azure4"
-        description: "Azure4 cloud account"
-        long_description: "Provides additional Azure quota capacity to support increased testing load."
+      - name: "GCP"
+        description: "GCP Cluster Profile Set for OpenShift"
+        long_description: "Provides access to Google Cloud Platform resources for provisioning and testing OpenShift clusters."
         documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
         tags:
-          - "azure"
+          - "gcp"
         monitoring:
-          frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
+          outage_per_reason: true
+        requires_confirmation: false
+      - name: "GCP-ARM64"
+        description: "GCP ARM64 Cluster Profile Set for OpenShift"
+        long_description: "Provides access to Google Cloud Platform ARM64 resources for provisioning and testing OpenShift clusters."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "gcp"
+        monitoring:
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+          outage_per_reason: true
         requires_confirmation: false
     owners:
       - rover_group: "test-platform-ci-admins"
       - service_account: "system:serviceaccount:ship-status:component-monitor"
-      - service_account: "system:serviceaccount:ship-status:chai-bot"
+      - user: "chai-bot"
+  - name: "Boskos-Hypershift"
+    description: "Hypershift cloud accounts leased through Boskos. TRT owns this component for payload attribution."
+    ship_team: "TRT"
+    sub_components:
+      - name: "AWS"
+        description: "Hypershift AWS account (cluster profile hypershift-aws)"
+        long_description: "Hypershift-owned AWS account for the hypershift-aws cluster profile."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
+        monitoring:
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+          outage_per_reason: true
+        requires_confirmation: false
+      - name: "AKS"
+        description: "Managed AKS management-cluster account (cluster profile hypershift-aks)"
+        long_description: "Hypershift-owned managed AKS management-cluster account on Azure for the hypershift-aks cluster profile."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "azure"
+        monitoring:
+          frequency: 15m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+          outage_per_reason: true
+        requires_confirmation: false
+    owners:
+      - rover_group: "openshift-technical-release-team"
+      - service_account: "system:serviceaccount:ship-status:component-monitor"
+      - user: "chai-bot"
   - name: "Downstream CI"
     description: "Downstream CI tools maintained by Test Platform"
     ship_team: "DPTP"
@@ -274,7 +258,7 @@ components:
           - "ci-automation"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Retester"
@@ -285,13 +269,23 @@ components:
           - "ci-automation"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
+      - name: "CI-Config"
+        description: "OpenShift CI configuration in openshift/release"
+        long_description: "CI-Config covers the openshift/release repository as CI configuration: step-registry refs, ci-operator job configs, and credential definitions. It is not a live service, so there is no health probe. Outages are recorded by the payload-agent or humans when a merged config change breaks jobs across clusters (broken step refs, credential-form migrations, workflow misconfiguration). Do not file cluster-local capacity or node problems here; those belong on Build Farm."
+        documentation_url: "https://docs.ci.openshift.org/how-tos/contributing-openshift-release/"
+        tags:
+          - "ci-infrastructure"
+        requires_confirmation: false
+        slack_reporting:
+          - channel: "#ops-testplatform"
+            severity: "Degraded"
     owners:
       - rover_group: "test-platform-ci-admins"
       - service_account: "system:serviceaccount:ship-status:component-monitor"
-      - service_account: "system:serviceaccount:ship-status:chai-bot"
+      - user: "chai-bot"
   - name: "Sippy"
     description: "CI Private Investigator"
     ship_team: "TRT"
@@ -323,26 +317,34 @@ components:
           auto_resolve: true
         requires_confirmation: false
         critical: true
-      - name: "Sippy Chat"
-        description: "AI Chatbot within Sippy"
-        long_description: "Sippy Chat is an integrated AI chatbot that helps developers investigate and understand CI failures. It can analyze test results, cluster metrics, and job artifacts to provide intelligent insights about what went wrong and potential root causes."
-        documentation_url: "https://source.redhat.com/departments/products_and_global_engineering/openshift_development/openshift_wiki/sippy_chat_user_guide"
-        tags:
-          - "ci-analytics"
-        monitoring:
-          frequency: 5m
-          component_monitor: "dpcr-component-monitor"
-          auto_resolve: true
-        requires_confirmation: false
     owners:
       - rover_group: "openshift-technical-release-team"
       - service_account: "system:serviceaccount:ship-status:dpcr-component-monitor"
-      - service_account: "system:serviceaccount:ship-status:chai-bot"
+      - user: "chai-bot"
+  - name: "TRT Incidents"
+    description: "TRT Jira incidents labeled trt-incident"
+    ship_team: "TRT"
+    slo_component: true
+    sub_components:
+      - name: "Incidents"
+        description: "Currently open TRT incidents"
+        critical: true
+        requires_confirmation: false
+        exclude_from_main_outage_well: true
+        monitoring:
+          frequency: 30m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+          outage_per_reason: true
+    owners:
+      - rover_group: "openshift-technical-release-team"
+      - service_account: "system:serviceaccount:ship-status:component-monitor"
+      - user: "chai-bot"
   - name: "Build Farm"
     description: "OpenShift CI build clusters that run all CI jobs"
     ship_team: "DPTP"
     slack_reporting:
-      - channel: "#alerts-testplatform-build-farms"
+      - channel: "#ops-testplatform"
         severity: "Degraded"
     sub_components:
     # BEGIN: auto-generated build-farm sub_components (hack/generate-build-farm-monitor-config.py)
@@ -350,85 +352,105 @@ components:
         description: "Build cluster build01"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
-#       - name: "Build02"
-#         description: "Build cluster build02"
-#         monitoring:
-#           frequency: 5m
-#           component_monitor: "app-ci-component-monitor"
-#           auto_resolve: true
-#         requires_confirmation: false
-#
+      - name: "Build02"
+        description: "Build cluster build02"
+        monitoring:
+          frequency: 5m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
       - name: "Build03"
         description: "Build cluster build03"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build04"
         description: "Build cluster build04"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build05"
         description: "Build cluster build05"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build06"
         description: "Build cluster build06"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build07"
         description: "Build cluster build07"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build08"
         description: "Build cluster build08"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build09"
         description: "Build cluster build09"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build10"
         description: "Build cluster build10"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
       - name: "Build11"
         description: "Build cluster build11"
         monitoring:
           frequency: 5m
-          component_monitor: "app-ci-component-monitor"
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+      - name: "Build12"
+        description: "Build cluster build12"
+        monitoring:
+          frequency: 5m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+      - name: "Build13"
+        description: "Build cluster build13"
+        monitoring:
+          frequency: 5m
+          component_monitor: "core-ci-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+      - name: "Hosted-Mgmt"
+        description: "Management cluster hosted-mgmt"
+        monitoring:
+          frequency: 5m
+          component_monitor: "core-ci-component-monitor"
           auto_resolve: true
         requires_confirmation: false
     # END: auto-generated build-farm sub_components
     owners:
       - rover_group: "test-platform-ci-admins"
       - service_account: "system:serviceaccount:ship-status:component-monitor"
-      - service_account: "system:serviceaccount:ship-status:chai-bot"
+      - user: "chai-bot"
 
 tags:
 - name: "ci-frontend"
@@ -458,3 +480,38 @@ tags:
 - name: "ci-analytics"
   description: "CI data analysis and visualization platforms"
   color: "#6600CC"
+
+team_slos:
+  - team: "TRT"
+    owners:
+      - rover_group: "openshift-technical-release-team"
+      - user: "chai-bot"
+    slo_components:
+      - "trt-incidents"
+    slos:
+      - name: "accepted-payload-per-day"
+        display_name: "1 accepted payload every 48h"
+        source: "payload_acceptance"
+        workspace:
+          kind: "payload_streams"
+          schema_version: 1
+          window: "48h"
+          min_accepted: 1
+          recent_payloads: 2
+          streams:
+            - release_controller: "amd64"
+              release_controller_url: "https://amd64.ocp.releases.ci.openshift.org/"
+              name: "5.1.0-0.nightly"
+            - release_controller: "amd64"
+              release_controller_url: "https://amd64.ocp.releases.ci.openshift.org/"
+              name: "5.1.0-0.ci"
+            - release_controller: "amd64"
+              release_controller_url: "https://amd64.ocp.releases.ci.openshift.org/"
+              name: "5.0.0-0.nightly"
+            - release_controller: "amd64"
+              release_controller_url: "https://amd64.ocp.releases.ci.openshift.org/"
+              name: "5.0.0-0.ci"
+            - release_controller: "multi"
+              release_controller_url: "https://multi.ocp.releases.ci.openshift.org/"
+              name: "5.1.0-0.nightly-multi"
+              window: "168h"

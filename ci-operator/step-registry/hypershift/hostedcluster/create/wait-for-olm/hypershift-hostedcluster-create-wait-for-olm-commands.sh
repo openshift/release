@@ -6,6 +6,13 @@ if [[ "${WAIT_FOR_OLM:-false}" == "false" ]]; then
   exit 0
 fi
 
+echo "Set KUBECONFIG to management cluster"
+if [[ $HOSTED_MANAGEMENT_CLUSTER == "hosted-mgmt2" ]]; then
+	export KUBECONFIG=/var/run/hypershift-workload-credentials-hosted-mgmt2/kubeconfig
+else
+	export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+fi
+
 echo "$(date) Start to wait for OLM to be ready..."
 echo My username is: "$(oc whoami)"
 

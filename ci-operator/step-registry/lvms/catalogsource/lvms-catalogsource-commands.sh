@@ -21,6 +21,27 @@ CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.ve
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
+# LVMS product images (operator, must-gather, topolvm) carry a RHEL suffix that
+# tracks the cluster's RHCOS base: rhel8 through 4.13, rhel9 from 4.14 on.
+# The operator bundle image is unsuffixed.
+LVMS_RHEL_SUFFIX="rhel9"
+if [[ "$(echo "${CLUSTER_VERSION}" | cut -d. -f2)" -le 13 ]]; then
+	LVMS_RHEL_SUFFIX="rhel8"
+fi
+echo "Using LVMS product image RHEL suffix: ${LVMS_RHEL_SUFFIX}"
+
+# ImageDigestMirrorSet (config.openshift.io/v1) exists from 4.13 on; 4.12 only has
+# the older ImageContentSourcePolicy. Both express digest mirrors the same way.
+MIRROR_API_VERSION="config.openshift.io/v1"
+MIRROR_KIND="ImageDigestMirrorSet"
+MIRROR_SPEC_FIELD="imageDigestMirrors"
+if [[ "$(echo "${CLUSTER_VERSION}" | cut -d. -f2)" -le 12 ]]; then
+	MIRROR_API_VERSION="operator.openshift.io/v1alpha1"
+	MIRROR_KIND="ImageContentSourcePolicy"
+	MIRROR_SPEC_FIELD="repositoryDigestMirrors"
+fi
+echo "Using mirror resource kind: ${MIRROR_KIND}"
+
 if [[ "${LVM_CATALOG_SOURCE}" == "redhat-operators" ]]; then
   if [[ -n "${REDHAT_OPERATORS_INDEX_TAG:-}" ]]; then
     # Create a new CatalogSource with a different name to avoid conflicts with the marketplace-managed one
@@ -167,6 +188,7 @@ if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		"https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
 	snapshot=$(echo "${pr_files}" | jq -r \
 		'[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+		| grep '^+' | grep -v '^+++' \
 		| grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
 
 	if [[ -z "${snapshot}" ]]; then
@@ -238,24 +260,24 @@ function disable_default_catalogsource {
 function create_idms_connected {
 
 	cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${MIRROR_API_VERSION}
+kind: ${MIRROR_KIND}
 metadata:
   name: $IDMS_NAME
 spec:
-  imageDigestMirrors:
+  ${MIRROR_SPEC_FIELD}:
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${LVMS_RHEL_SUFFIX}-operator
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${LVMS_RHEL_SUFFIX}
 EOF
 
 	if [ $? -ne 0 ]; then
@@ -272,37 +294,43 @@ function create_idms_disconnected {
 	echo "Creating ImageDigestMirrorSet for LVMS images in disconnected environment"
 
 	cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${MIRROR_API_VERSION}
+kind: ${MIRROR_KIND}
 metadata:
   name: $IDMS_NAME
 spec:
-  imageDigestMirrors:
+  ${MIRROR_SPEC_FIELD}:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${LVMS_RHEL_SUFFIX}-operator
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
     source: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
+  - mirrors:
+    - ${MIRROR_REGISTRY_HOST}/openshift4/ose-kube-rbac-proxy
+    source: registry.redhat.io/openshift4/ose-kube-rbac-proxy
 EOF
 
 	if [ $? -ne 0 ]; then
-		echo "!!! failed to create ImageDigestMirrorSet for disconnected environment"
+		echo "!!! failed to create ${MIRROR_KIND} for disconnected environment"
 		return 1
 	fi
 
-	echo "ImageDigestMirrorSet $IDMS_NAME created successfully for disconnected environment"
+	echo "${MIRROR_KIND} $IDMS_NAME created successfully for disconnected environment"
 
-	cat <<EOF | oc apply -f -
+	# ImageTagMirrorSet is config.openshift.io/v1 (4.13+) and has no ICSP equivalent
+	# (ICSP mirrors by digest only). Skip tag mirroring on 4.12.
+	if [[ "${MIRROR_KIND}" != "ImageContentSourcePolicy" ]]; then
+		cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
@@ -314,12 +342,15 @@ spec:
     source: registry.redhat.io/rhel8/support-tools
 EOF
 
-	if [ $? -ne 0 ]; then
-		echo "!!! failed to create the ITMS for disconnected environment"
-		return 1
-	fi
+		if [ $? -ne 0 ]; then
+			echo "!!! failed to create the ITMS for disconnected environment"
+			return 1
+		fi
 
-	echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+		echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+	else
+		echo "Skipping ImageTagMirrorSet on 4.12 (unsupported; no ICSP tag-mirror equivalent)"
+	fi
 	return 0
 }
 
@@ -327,11 +358,8 @@ function mirror_test_images {
 	echo "Pre-mirroring test dependency images to mirror registry (port 5000)"
 
 	local new_pull_secret="/tmp/mirror-pull-secret.json"
-	local registry_cred
-	registry_cred=$(head -n 1 "$MIRROR_REGISTRY_CREDS" | base64 -w 0)
-
-	jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" \
-		'.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+	jq -s '.[0] * {auths: (.[0].auths * .[1].auths)}' \
+		"${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/new-dockerconfigjson > "${new_pull_secret}"
 
 	local image="registry.redhat.io/rhel8/support-tools:latest=${MIRROR_REGISTRY_HOST}/rhel8/support-tools:latest"
 	local retries=0
@@ -349,6 +377,19 @@ function mirror_test_images {
 	done
 
 	echo "Successfully mirrored support-tools image to ${MIRROR_REGISTRY_HOST}"
+
+	local index_image="${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
+	local manifests_dir="/tmp/lvms-catalog-manifests"
+	mkdir -p "${manifests_dir}"
+	echo "Mirroring LVMS catalog images from ${index_image} to ${MIRROR_REGISTRY_HOST}"
+	oc adm catalog mirror "${index_image}" "${MIRROR_REGISTRY_HOST}" \
+		--insecure=true -a "${new_pull_secret}" \
+		--index-filter-by-os="linux/${OCP_ARCH:-amd64}" \
+		--manifests-only=false \
+		--to-manifests="${manifests_dir}" || {
+		echo "WARNING: Failed to mirror LVMS catalog images, operator dependencies may fail to pull"
+	}
+
 	rm -f "${new_pull_secret}"
 	return 0
 }
@@ -396,7 +437,7 @@ EOF
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
-		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
+		run "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\") | {path, mode, overwrite}'"
 
 		return 1
 	}
@@ -574,8 +615,63 @@ function main {
 		return 1
 	}
 
-	# Support hypershift config guest cluster's idms
-	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
+	# Support hypershift config guest cluster's idms (non-fatal if yq-go is unavailable)
+	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml || true
+
+	# Extract source commit from catalog image for z-stream integration test builds.
+	# Only needed when ZSTREAM_VERSION is set — non-z-stream tests use pre-built images.
+	if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+		local commit node_name attempt
+
+		# Read the vcs-ref label from the catalog image via the cluster node.
+		# Reading it from the step container with "oc image info" fails on some
+		# environments (e.g. baremetal dual-stack) with a 403 Forbidden when it
+		# fetches the image config blob from quay.io's S3 backend. The node already
+		# pulled this image (the CatalogSource is Ready), so inspect it there using
+		# the node's working egress and pull credentials.
+		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" \
+			-o=jsonpath='{.items[0].spec.nodeName}')
+		oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
+			pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged \
+			pod-security.kubernetes.io/warn=privileged --overwrite || true
+
+		commit=""
+		for attempt in 1 2 3; do
+			echo "Reading vcs-ref from catalog image on node ${node_name} (attempt ${attempt}/3)"
+
+			# Pull and inspect run in separate oc debug sessions on purpose. oc debug
+			# merges the pod's stdout and stderr onto one stream, so a single session
+			# that both pulls and inspects would leak "podman pull"'s image-ID line
+			# into the captured label and produce a bogus ref. Pulling on its own lets
+			# its output (including any failure) flow to the step log for debugging,
+			# while the inspect session captures only the label.
+			if ! oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman pull -q --authfile /var/lib/kubelet/config.json "${LVM_INDEX_IMAGE}"; then
+				echo "podman pull of catalog image failed (see output above), retrying in 15s..."
+				[[ ${attempt} -lt 3 ]] && sleep 15
+				continue
+			fi
+
+			# "|| commit=''" stops set -e from exiting on a failed oc debug so the
+			# retry/error path still runs.
+			commit=$(oc -n debug-qe debug "node/${node_name}" -- chroot /host \
+				podman image inspect "${LVM_INDEX_IMAGE}" --format '{{ index .Labels "vcs-ref" }}' \
+				| tr -d '[:space:]') || commit=""
+			[[ -n "${commit}" && "${commit}" != "<novalue>" ]] && break
+			if [[ ${attempt} -lt 3 ]]; then
+				echo "vcs-ref lookup failed, retrying in 15s..."
+				sleep 15
+			fi
+		done
+
+		if [[ -z "${commit}" || "${commit}" == "<novalue>" ]]; then
+			echo "ERROR: vcs-ref label not found in catalog image ${LVM_INDEX_IMAGE} (node-side read via ${node_name})"
+			return 1
+		fi
+		echo "Resolved vcs-ref: ${commit}"
+		echo -n "${commit}" > "${SHARED_DIR}/lvm_source_commit"
+	fi
+
 	return 0
 }
 

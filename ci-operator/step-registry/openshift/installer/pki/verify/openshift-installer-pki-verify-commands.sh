@@ -18,7 +18,7 @@ declare -a SIGNERS=(
   "kube-control-plane-signer|kube-control-plane-signer|openshift-kube-apiserver-operator|tls.crt"
   "aggregator-signer|aggregator-client-signer|openshift-kube-apiserver-operator|tls.crt"
   "etcd-signer|etcd-signer|openshift-etcd|tls.crt"
-  "etcd-metrics-signer|etcd-metrics-signer|openshift-etcd|tls.crt"
+  "etcd-metrics-signer|etcd-metric-signer|openshift-etcd|tls.crt"
 )
 
 # Map expected algorithm to openssl output strings
@@ -50,6 +50,7 @@ for signer in "${SIGNERS[@]}"; do
   IFS='|' read -r description secret_name namespace cert_key <<< "${signer}"
   total=$((total + 1))
   status="PASS"
+  fail_details=""
 
   echo "--- Checking: ${description} (${namespace}/${secret_name}) ---" | tee -a "${ARTIFACT_LOG}"
 
@@ -85,6 +86,7 @@ for signer in "${SIGNERS[@]}"; do
     actual_algo=$(echo "${cert_text}" | grep -F "Public Key Algorithm:" | head -1 | xargs) || true
     echo "  FAIL: Expected algorithm '${expected_algo_str}', got '${actual_algo}'" | tee -a "${ARTIFACT_LOG}"
     status="FAIL"
+    fail_details="algo: expected ${expected_algo_str}, got ${actual_algo:-unknown}"
   fi
 
   # Check key parameter
@@ -102,12 +104,17 @@ for signer in "${SIGNERS[@]}"; do
     fi
     echo "  FAIL: Expected '${expected_param_str}', got '${actual_param:-not found}'" | tee -a "${ARTIFACT_LOG}"
     status="FAIL"
+    fail_details="${fail_details:+${fail_details}; }key: expected ${expected_param_str}, got ${actual_param:-unknown}"
   fi
 
   if [[ "${status}" == "FAIL" ]]; then
     failures=$((failures + 1))
   fi
-  results+=("${status}|${description}|${namespace}/${secret_name}")
+  if [[ "${status}" == "PASS" ]]; then
+    results+=("${status}|${description}|${namespace}/${secret_name}")
+  else
+    results+=("${status}|${description}|${fail_details}")
+  fi
 done
 
 # Verify PKI CR
@@ -138,7 +145,11 @@ else
   if [[ "${pki_status}" == "FAIL" ]]; then
     failures=$((failures + 1))
   fi
-  results+=("${pki_status}|PKI CR|mode=${mode:-unknown}")
+  if [[ "${pki_status}" == "PASS" ]]; then
+    results+=("${pki_status}|PKI CR|mode=${mode}")
+  else
+    results+=("${pki_status}|PKI CR|expected mode ${EXPECTED_PKI_MODE}, got ${mode:-not set}")
+  fi
 fi
 
 # Print summary table

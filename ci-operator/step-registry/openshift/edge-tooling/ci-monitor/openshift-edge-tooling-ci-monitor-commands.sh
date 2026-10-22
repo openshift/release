@@ -54,6 +54,10 @@ if ! echo "${GCLOUD_SHA}  ${GCLOUD_TGZ}" | sha256sum -c -; then
 fi
 tar -xzf "${GCLOUD_TGZ}" -C /tmp
 rm -f "${GCLOUD_TGZ}"
+# Redirect gcloud config to a writable directory — /home/claude/.config/gcloud/
+# is not writable in CI pods, causing install.sh to fail with PermissionError.
+export CLOUDSDK_CONFIG="/tmp/gcloud-config"
+mkdir -p "${CLOUDSDK_CONFIG}"
 /tmp/google-cloud-sdk/install.sh --quiet --path-update true
 export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 

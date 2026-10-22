@@ -21,27 +21,27 @@ promotion:
   to:
   - excluded_images:
     - monitoring-plugin-test
-    name: 4.20-priv
-    namespace: ocp-private
+    name: "4.20"
+    namespace: ocp-priv
 prowgen:
   private: true
 releases:
   initial:
     integration:
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
-      namespace: ocp-private
+      name: "4.20"
+      namespace: ocp-priv
 resources:
   '*':
     limits:
-      memory: 8Gi
+      memory: 16Gi
     requests:
       cpu: 1000m
-      memory: 8Gi
+      memory: 16Gi
 tests:
 - as: lint
   commands: |
@@ -51,6 +51,11 @@ tests:
 - as: translations
   commands: |
     make test-translations
+  container:
+    from: monitoring-plugin-test
+- as: test-frontend-unit
+  commands: |
+    make test-frontend-unit
   container:
     from: monitoring-plugin-test
 - always_run: false
@@ -96,9 +101,11 @@ tests:
     - failure
     - error
     report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-monitoring-ui
@@ -122,9 +129,11 @@ tests:
     - failure
     - error
     report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-coo-ui
@@ -148,9 +157,11 @@ tests:
     - failure
     - error
     report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-incidents-ui
@@ -254,9 +265,11 @@ tests:
     - failure
     - error
     report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     test:
     - ref: monitoring-plugin-tests-virtualization-ui
@@ -271,9 +284,11 @@ tests:
     - failure
     - error
     report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-      :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :volcano: {{end}}'
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
     test:

@@ -9,64 +9,67 @@ if ! oc get ns open-cluster-management-observability >/dev/null 2>&1; then
   oc create ns open-cluster-management-observability
 fi
 
-# Step 2: Deploy MinIO and create the MultiClusterObservability CR
-echo "[INFO] Deploying MinIO and creating MultiClusterObservability resource..."
+# Step 2: Deploy SeaweedFS and create the MultiClusterObservability CR
+echo "[INFO] Deploying SeaweedFS and creating MultiClusterObservability resource..."
 cat <<EOF | oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: minio
+  name: seaweedfs
   namespace: open-cluster-management-observability
   labels:
-    app.kubernetes.io/name: minio
+    app.kubernetes.io/name: seaweedfs
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: minio
+      app.kubernetes.io/name: seaweedfs
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: minio
+        app.kubernetes.io/name: seaweedfs
     spec:
       containers:
-      - command:
-        - /bin/sh
-        - -c
-        - mkdir -p /storage/thanos && /usr/bin/minio server /storage
+      - args:
+        - mini
+        - -dir=/data
+        - -webdav=false
+        - -s3.port.iceberg=0
         env:
-        - name: MINIO_ACCESS_KEY
-          value: minio
-        - name: MINIO_SECRET_KEY
-          value: minio123
-        image:  quay.io/minio/minio:RELEASE.2021-08-25T00-41-18Z
-        name: minio
+        - name: AWS_ACCESS_KEY_ID
+          value: thanos
+        - name: AWS_SECRET_ACCESS_KEY
+          value: supersecret
+        - name: S3_BUCKET
+          value: thanos
+        image: chrislusf/seaweedfs:4.29
+        name: seaweedfs
         ports:
-        - containerPort: 9000
+        - containerPort: 8333
           protocol: TCP
         volumeMounts:
-        - mountPath: /storage
+        - mountPath: /data
           name: storage
       volumes:
       - name: storage
         persistentVolumeClaim:
-          claimName: minio
+          claimName: seaweedfs
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   labels:
-    app.kubernetes.io/name: minio
-  name: minio
+    app.kubernetes.io/name: seaweedfs
+  name: seaweedfs
   namespace: open-cluster-management-observability
 spec:
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
-      storage: "1Gi"
+      storage: "2Gi"
 ---
 apiVersion: v1
 stringData:
@@ -74,10 +77,10 @@ stringData:
     type: s3
     config:
       bucket: "thanos"
-      endpoint: "minio:9000"
+      endpoint: "seaweedfs:8333"
       insecure: true
-      access_key: "minio"
-      secret_key: "minio123"
+      access_key: "thanos"
+      secret_key: "supersecret"
 kind: Secret
 metadata:
   name: thanos-object-storage
@@ -87,20 +90,20 @@ type: Opaque
 apiVersion: v1
 kind: Service
 metadata:
-  name: minio
+  name: seaweedfs
   namespace: open-cluster-management-observability
 spec:
   ports:
-  - port: 9000
+  - port: 8333
     protocol: TCP
-    targetPort: 9000
+    targetPort: 8333
   selector:
-    app.kubernetes.io/name: minio
+    app.kubernetes.io/name: seaweedfs
   type: ClusterIP
 EOF
 
-echo "[INFO] Waiting for MinIO become ready..."
-oc wait --for=condition=Available --timeout=20m Deployment/minio -n open-cluster-management-observability
+echo "[INFO] Waiting for SeaweedFS become ready..."
+oc wait --for=condition=Available --timeout=20m Deployment/seaweedfs -n open-cluster-management-observability
 
 oc apply -f - <<EOF
 apiVersion: observability.open-cluster-management.io/v1beta2

@@ -52,32 +52,41 @@ if [[ "$HOSTED_CP" == "true" ]]; then
    CLUSTER_SWITCH="--hosted-cp"
 fi
 
-# Support to create the account-roles with the higher version
+# Resolve the OpenShift version for account roles
 VERSION_SWITCH=""
-if [[ "$CHANNEL_GROUP" != "stable" ]]; then
-  # Get the X.Y from the release payload pullspec if we're using the one from CI
-  if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
-    if [[ -n "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
-      OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
-    fi
-  fi
 
-  if [[ -z "$OPENSHIFT_VERSION" ]]; then
-    versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
-    if [[ "$HOSTED_CP" == "true" ]]; then
-      versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
+# Get the X.Y from the release payload pullspec if we're using the one from CI
+if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
+  if [[ -n "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
+    OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
+  fi
+fi
+
+if [[ -z "$OPENSHIFT_VERSION" ]]; then
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    versionList=$(rosa list versions --channel-group "${CHANNEL_GROUP}" --hosted-cp -o json | jq -r '.[].raw_id')
+  else
+    versionList=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json | jq -r '.[].raw_id')
+  fi
+  # Resolve version from offset when VERSION_OFFSET_FROM_LATEST is set
+  if [[ -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
+    readarray -t y_streams < <(echo "$versionList" | cut -d'.' -f1,2 | sort -Vu)
+    total=${#y_streams[@]}
+    offset=${VERSION_OFFSET_FROM_LATEST}
+    source_index=$((total - offset - 1))
+    if (( source_index < 0 )); then
+      echo "ERROR: Not enough Y-streams for offset ${offset}. Have ${total}: ${y_streams[*]}"
+      exit 1
     fi
+    OPENSHIFT_VERSION=${y_streams[$source_index]}
+    echo "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+  else
     OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
+fi
 
+if [[ -n "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
-
-  # Determine cluster type switch early so the version fallback can use it
-  CLUSTER_SWITCH="--classic"
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    CLUSTER_SWITCH="--hosted-cp"
-  fi
-
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
 
@@ -135,7 +144,7 @@ elif [[ "${create_ret}" -ne 0 ]]; then
 fi
 
 # Share the resolved version (includes fallback if one was used)
-if [[ "${CHANNEL_GROUP}" != "stable" && -n "${OPENSHIFT_VERSION:-}" ]]; then
+if [[ -n "${OPENSHIFT_VERSION:-}" ]]; then
   echo -n "${OPENSHIFT_VERSION}" > "${SHARED_DIR}/openshift_version"
   echo "Stored resolved version ${OPENSHIFT_VERSION} to SHARED_DIR"
 fi

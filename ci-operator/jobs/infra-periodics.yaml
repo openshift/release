@@ -50,6 +50,55 @@ periodics:
         secretName: hypershift-operator-oidc-provider-s3-credentials
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 5 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-hosted-mgmt2-hypershift-deployment
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the hypershift
+        deployment on `hosted-mgmt2` has not been completed. Please check if anything
+        blocks the process.
+  spec:
+    containers:
+    - args:
+      - install
+      - --enable-uwm-telemetry-remote-write=false
+      - --hypershift-image=quay-proxy.ci.openshift.org/openshift/ci:hypershift_hypershift-operator_latest
+      - --oidc-storage-provider-s3-bucket-name=dptp-hypershift-oidc-provider-2
+      - --oidc-storage-provider-s3-credentials=/mgmt-aws/credentials
+      - --oidc-storage-provider-s3-region=us-east-1
+      command:
+      - /usr/bin/hypershift
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.hosted-mgmt2.config
+      image: quay-proxy.ci.openshift.org/openshift/ci:hypershift_hypershift-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+      - mountPath: /mgmt-aws
+        name: mgmt-aws-s3-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: config-updater
+    - name: mgmt-aws-s3-credentials
+      secret:
+        secretName: hypershift-operator-oidc-provider-s3-credentials-2
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 8 * * 1-5
   decorate: true
   labels:
@@ -263,7 +312,6 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
-        repo:Azure/ARO-HCP
         -label:lifecycle/frozen
         -label:tide/merge-blocker
         label:lifecycle/rotten
@@ -378,7 +426,6 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
-        repo:Azure/ARO-HCP
         -label:tide/merge-blocker
         -label:lifecycle/frozen
         label:lifecycle/stale
@@ -502,7 +549,6 @@ periodics:
         comments:<2500
         repo:operator-framework/operator-sdk
         repo:openshift-eng/ai-helpers
-        repo:Azure/ARO-HCP
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
@@ -609,6 +655,124 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Stale PRs rot after 30d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten PRs close after an additional 30d of inactivity.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Rotten PRs close after 30d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 1,9 * * *
   decorate: true
   labels:
@@ -618,7 +782,7 @@ periodics:
     containers:
     - args:
       - |-
-        --query=repo:openshift/hypershift
+        --query=org:openshift
         repo:openshift-eng/ai-helpers
         repo:openshift-kni/cnf-features-deploy
         repo:ComplianceAsCode/compliance-operator
@@ -636,7 +800,9 @@ periodics:
       - --github-endpoint=http://ghproxy
       - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
-        --comment=Stale PRs are closed after 21d of inactivity.
+        --comment=PRs go stale after 30d of inactivity.
+
+        Stale PRs eventually rot and close according to the repository's lifecycle policy.
 
         If this PR is still relevant, comment to refresh it or remove the stale label.
         Mark the PR as fresh by commenting `/remove-lifecycle stale`.
@@ -911,6 +1077,254 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
+  cron: 15 3,11 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-clusters-service-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-clusters-service
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=336h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
+      - |-
+        --comment=Inactive PRs go stale after 14d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Stale PRs close after an additional 7d of inactivity.
+        Exclude this PR from closing by commenting `/lifecycle frozen`.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 45 3,11 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-clusters-service-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-clusters-service
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+        label:lifecycle/stale
+      - --updated=168h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
+      - |-
+        --comment=Stale PRs close after 7d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Exclude this PR from closing again by commenting `/lifecycle frozen`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 15 3,11 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-seaplane-pr-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-seaplane
+        repo:openshift-online/rosa-seaplane-api
+        repo:openshift-online/rosa-seaplane-cli
+        repo:openshift-online/rosa-seaplane-internal
+        repo:openshift-online/rosa-seaplane-kube-applier
+        repo:openshift-online/rosa-seaplane-zoa
+        repo:openshift-online/aws-nuke-cf
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+      - --updated=336h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
+      - |-
+        --comment=Inactive PRs go stale after 14d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Stale PRs close after an additional 7d of inactivity.
+        Exclude this PR from closing by commenting `/lifecycle frozen`.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 45 3,11 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rosa-seaplane-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift-online/rosa-seaplane
+        repo:openshift-online/rosa-seaplane-api
+        repo:openshift-online/rosa-seaplane-cli
+        repo:openshift-online/rosa-seaplane-internal
+        repo:openshift-online/rosa-seaplane-kube-applier
+        repo:openshift-online/rosa-seaplane-zoa
+        repo:openshift-online/aws-nuke-cf
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        -label:do-not-merge/hold
+        label:lifecycle/stale
+      - --updated=168h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-org=openshift-online
+      - |-
+        --comment=Stale PRs close after 7d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle stale`.
+        Exclude this PR from closing again by commenting `/lifecycle frozen`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
   cron: 0 0 * * 3
   decorate: true
   decoration_config:
@@ -934,8 +1348,9 @@ periodics:
       - --github-throttle-org=openshift-metal3:600:200
       - --github-throttle-org=shipwright-io:600:200
       - --github-throttle-org=openshift-assisted:600:200
-      - --github-throttle-org=konveyor:600:200
       - --github-throttle-org=openshift-eng:600:200
+      - --github-throttle-org=openshift-kni:600:200
+      - --github-throttle-org=openshift-online:600:200
       - --github-app-id=$(GITHUB_APP_ID)
       - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
@@ -971,7 +1386,7 @@ periodics:
       name: config
 - agent: kubernetes
   cluster: app.ci
-  cron: 0 22 * * 3
+  cron: 0 22 1 1 *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -986,7 +1401,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261007-6ed406f29
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1021,7 +1436,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20261007-6ed406f29
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1043,7 +1458,7 @@ periodics:
   - base_ref: main
     org: openshift
     repo: release
-  - base_ref: openshift-5.0
+  - base_ref: openshift-5.1
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1062,9 +1477,8 @@ periodics:
       - --git-email=148852131+openshift-merge-bot[bot]@users.noreply.github.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=5.0
-      - --future-release=4.23
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --self-approve=true
       - --assign=openshift/test-platform
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -1133,6 +1547,8 @@ periodics:
       - --log-level=debug
       - --self-approve=true
       - --dry-run=false
+      - --jira=OCPBUGS
+      - --jira=OPRUN
       command:
       - /usr/bin/bumper
       env:
@@ -1239,28 +1655,35 @@ periodics:
       - --self-approve=true
       - --assign=openshift/test-platform
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
-      - --ignore-repo=openshift/jenkins
-      - --ignore-repo=redhat-developer/helm
-      - --ignore-repo=redhat-developer/odo
-      - --ignore-repo=redhat-developer/service-binding-operator
-      - --ignore-repo=redhat-developer/gitops-operator
-      - --ignore-repo=stolostron/acmqe-autotest
-      - --ignore-repo=openshift/kubernetes-metrics-server
-      - --ignore-repo=openshift/origin-metrics
-      - --ignore-repo=openshift/origin-web-console
-      - --ignore-repo=origin-web-console-server
+      - --ignore-repo=ci-operator/config/openshift/velero
+      - --ignore-repo=opendatahub-io/manifests
+      - --ignore-repo=openshift/cloud-network-config-controller
+      - --ignore-repo=openshift/cluster-api-provider-kubevirt
+      - --ignore-repo=openshift/cluster-network-operator
       - --ignore-repo=openshift/csi-driver-registrar
       - --ignore-repo=openshift/csi-external-resizer
       - --ignore-repo=openshift/csi-external-snapshotter
       - --ignore-repo=openshift/csi-livenessprobe
-      - --ignore-repo=openshift/sig-storage-local-static-provisioner
+      - --ignore-repo=openshift/egress-router-cni
       - --ignore-repo=openshift/etcd
-      - --ignore-repo=opendatahub-io/manifests
-      - --ignore-repo=openshift/cluster-api-provider-kubevirt
-      - --ignore-repo=serverless-operator
-      - --ignore-repo=ci-operator/config/openshift/velero
+      - --ignore-repo=openshift/ingress-node-firewall
+      - --ignore-repo=openshift/jenkins
+      - --ignore-repo=openshift/network-tools
+      - --ignore-repo=openshift/network.offline_migration_sdn_to_ovnk
+      - --ignore-repo=openshift/origin-metrics
+      - --ignore-repo=openshift/origin-web-console
+      - --ignore-repo=openshift/ovn-kubernetes
+      - --ignore-repo=openshift/sdn
+      - --ignore-repo=openshift/sig-storage-local-static-provisioner
       - --ignore-repo=openshift/velero
+      - --ignore-repo=origin-web-console-server
       - --ignore-repo=redhat-appstudio/rhtap-cli
+      - --ignore-repo=redhat-developer/gitops-operator
+      - --ignore-repo=redhat-developer/helm
+      - --ignore-repo=redhat-developer/odo
+      - --ignore-repo=redhat-developer/service-binding-operator
+      - --ignore-repo=serverless-operator
+      - --ignore-repo=stolostron/acmqe-autotest
       - --ignore-org=openshift-priv
       - --ignore-org=kubernetes-sigs
       - --ignore-org=CSPI-QE
@@ -1331,7 +1754,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1389,7 +1812,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1436,32 +1859,45 @@ periodics:
       - |
         set -euo pipefail
 
-        echo "Filtering openshift-priv from org/config.yaml"
+        cp org/config.yaml /tmp/stripped-config.yaml
 
-        # Safety check: ensure openshift-priv exists exactly once
-        count=$(grep -cE '^  openshift-priv:' org/config.yaml || true)
-        if [ "$count" -ne 1 ]; then
-            echo "ERROR: expected exactly one 'openshift-priv:' key, found $count" >&2
-            exit 1
-        fi
+        # Strip these orgs from the config before running peribolos; their
+        # membership is reconciled elsewhere and must not be managed here.
+        for org in openshift-priv openshift; do
+            echo "Filtering ${org} from org/config.yaml"
 
-        # Remove the openshift-priv org block using range deletion
-        # This deletes from "  openshift-priv:" line up to (but not including) the next org
-        sed -E '/^  openshift-priv:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-priv:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
-            org/config.yaml > /tmp/stripped-config.yaml
+            # The org may already be gone from the config (it is being removed
+            # from openshift/config as part of the Cyborg migration). Absence is
+            # fine - just skip it. Only a duplicate key is a real error.
+            count=$(grep -cE "^  ${org}:" /tmp/stripped-config.yaml || true)
+            if [ "$count" -eq 0 ]; then
+                echo "${org} not present in config; nothing to filter"
+                continue
+            fi
+            if [ "$count" -ne 1 ]; then
+                echo "ERROR: expected at most one '${org}:' key, found $count" >&2
+                exit 1
+            fi
+
+            # Remove the org block using range deletion
+            # This deletes from "  <org>:" line up to (but not including) the next org
+            sed -E "/^  ${org}:/,/^  [a-zA-Z0-9_-]+:/{/^  ${org}:/d; /^  [a-zA-Z0-9_-]+:/!d;}" \
+                /tmp/stripped-config.yaml > /tmp/stripped-config.next.yaml
+            mv /tmp/stripped-config.next.yaml /tmp/stripped-config.yaml
+
+            if grep -qE "^  ${org}:" /tmp/stripped-config.yaml; then
+                echo "ERROR: ${org} still present in output" >&2
+                exit 1
+            fi
+
+            echo "Successfully removed ${org} from configuration"
+        done
 
         # Verify the result is valid
         if ! grep -qE '^orgs:' /tmp/stripped-config.yaml; then
             echo "ERROR: Output YAML appears malformed (no 'orgs:' found)" >&2
             exit 1
         fi
-
-        if grep -qE '^  openshift-priv:' /tmp/stripped-config.yaml; then
-            echo "ERROR: openshift-priv still present in output" >&2
-            exit 1
-        fi
-
-        echo "Successfully removed openshift-priv from configuration"
 
         # Run peribolos with the filtered config
         exec /ko-app/peribolos \
@@ -1481,7 +1917,7 @@ periodics:
           --github-allowed-burst=600 \
           --allow-repo-archival \
           --ignore-enterprise-teams
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1513,7 +1949,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1543,8 +1979,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=5.0
-      - --future-release=5.1
+      - --current-release=5.1
+      - --future-release=5.2
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1594,6 +2030,59 @@ periodics:
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 6 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-mcp-server-fast-forward
+  reporter_config:
+    slack:
+      channel: '#pixaa-rebasebot-alerts'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        dnf install -y git
+        export HOME=/tmp
+        cd /tmp
+        # Avoid putting credentials in argv/env/logs
+        git_cmd() {
+          git -c credential.helper= -c credential.helper='!f() { echo username=openshift-merge-robot; printf password=; cat /etc/github/oauth; echo; }; f' "$@"
+        }
+        src=main
+        dst=release-1.1
+        repo_url=https://github.com/openshift/openshift-mcp-server.git
+        echo "Fast-forwarding ${src} -> ${dst} for openshift/openshift-mcp-server"
+        git_cmd clone -b "${dst}" "${repo_url}" repo
+        cd repo
+        git_cmd pull --ff-only origin "${src}"
+        git_cmd push
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 100m
       volumeMounts:
       - mountPath: /etc/github
         name: token
@@ -1668,9 +2157,9 @@ periodics:
       - --dry-run=false
       - --config-dir=./ci-operator/config/
       - --current-release=4.22
-      - --current-release=5.0
+      - --current-release=5.1
       - --future-release=4.23
-      - --future-release=5.1
+      - --future-release=5.2
       command:
       - blocking-issue-creator
       env:
@@ -1725,65 +2214,6 @@ periodics:
         requests:
           cpu: 500m
     serviceAccountName: imagestream-importer
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  decoration_config:
-    oauth_token_secret:
-      key: oauth
-      name: github-credentials-openshift-ci-robot-private-git-cloner
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: config
-    workdir: true
-  - base_ref: main
-    org: openshift
-    repo: release
-  hidden: true
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra-internal
-  name: periodic-auto-private-org-peribolos-sync
-  spec:
-    containers:
-    - args:
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --dry-run=false
-      - --self-approve=true
-      - --github-login=openshift-ci[bot]
-      - --git-name=openshift-ci[bot]
-      - --git-email=75433959+openshift-ci[bot]@users.noreply.github.com
-      - --peribolos-config=./org/config.yaml
-      - --release-repo-path=/home/prow/go/src/github.com/openshift/release
-      - --whitelist-file=/home/prow/go/src/github.com/openshift/release/core-services/openshift-priv/_whitelist.yaml
-      - --only-org=openshift
-      command:
-      - /usr/bin/auto-peribolos-sync
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-peribolos-sync_latest
-      imagePullPolicy: Always
-      name: auto-peribolos-sync
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: github-app-credentials
-        readOnly: true
-    volumes:
-    - name: github-app-credentials
-      secret:
-        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1925,7 +2355,7 @@ periodics:
       - --vault-role=secret-bootstrap
       - --vault-prefix=kv
       - --config=/etc/ci-secret-bootstrap/_config.yaml
-      - --log-level=debug
+      - --log-level=info
       - --dry-run=false
       - --force=true
       - --validate-bitwarden-items-usage
@@ -1936,6 +2366,8 @@ periodics:
       - --bw-allow-unused=dptp/build_farm
       - --bw-allow-unused=dptp/build_farm_osd_aws
       - --bw-allow-unused=dptp/build_farm_osd_gcp
+      - --bw-allow-unused=dptp/cert-issuer
+      - --bw-allow-unused=dptp/cert-manager
       - --bw-allow-unused=dptp/gcs-publisher
       - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
       - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
@@ -1959,15 +2391,30 @@ periodics:
       - --bw-allow-unused=dptp/openshift-bot
       - --bw-allow-unused=dptp/openshift-bugzilla-robot
       - --bw-allow-unused=dptp/openshift-bugzilla-robot@redhat.com
-      - --bw-allow-unused=dptp/openshift-build-robot
       - --bw-allow-unused=dptp/openshift-cherrypick-robot
       - --bw-allow-unused=dptp/openshift-ci-robot
       - --bw-allow-unused=dptp/openshift-github-robots@redhat.com
       - --bw-allow-unused=dptp/openshift-merge-robot
-      - --bw-allow-unused=dptp/openshift-publish-robot
       - --bw-allow-unused=dptp/quay.io
       - --bw-allow-unused=dptp/quay.io/multi-arch
       - --bw-allow-unused=dptp/registry.stage.redhat.io
+      - --bw-allow-unused=dptp/cluster-bot-osd-ephemeral
+      - --bw-allow-unused=dptp/gcp-openshift-gce-devel-ci
+      - --bw-allow-unused=dptp/gcp-openshift-gce-devel-ci-2
+      - --bw-allow-unused=dptp/gcp-openshift-gce-devel-ci-3
+      - --bw-allow-unused=dptp/mirror.openshift.com
+      - --bw-allow-unused=dptp/openshift-ci-2-aws-credentials
+      - --bw-allow-unused=dptp/openshift-ci-3-aws-credentials
+      - --bw-allow-unused=dptp/openshift-ci-4-aws-credentials
+      - --bw-allow-unused=dptp/openshift-ci-5-aws-credentials
+      - --bw-allow-unused=dptp/openshift-ci-aws-credentials
+      - --bw-allow-unused=dptp/openshift-ci-build-farm-cert-issuer
+      - --bw-allow-unused=dptp/openstack
+      - --bw-allow-unused=dptp/openstack-ppc64le
+      - --bw-allow-unused=dptp/os4-installer.openshift-ci.azure
+      - --bw-allow-unused=dptp/os4-installer.openshift-ci2.azure
+      - --bw-allow-unused=dptp/telemeter
+      - --bw-allow-unused=dptp/vsphere-credentials
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       - --enable-gsm=true
@@ -2082,7 +2529,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2114,7 +2561,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2146,7 +2593,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260714-0633879af
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20261007-6ed406f29
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2296,7 +2743,7 @@ periodics:
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
-      that all repos with CI configured are accessible by test-platform's bots
+      that stolostron repos with CI configured are accessible by test-platform's bots
     ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
   cluster: app.ci
   cron: 0 3 * * 1
@@ -2310,7 +2757,7 @@ periodics:
     workdir: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-check-gh-automation
+  name: periodic-check-gh-automation-stolostron
   spec:
     containers:
     - args:
@@ -2330,9 +2777,163 @@ periodics:
       - --bot=openshift-merge-robot
       - --bot=openshift-ci-robot
       - --check-branch-protection=false
-      - --ignore=Azure/ARO-HCP
+      - --only-org=stolostron
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that openshift-* org repos with CI configured are accessible by test-platform's
+      bots
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 1
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-openshift-orgs
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+      - --supplemental-plugin-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-ci
+      - --app-check-mode=standard
+      - --bot=openshift-merge-robot
+      - --bot=openshift-ci-robot
+      - --check-branch-protection=false
+      - --only-org=openshift-assisted
+      - --only-org=openshift-cnv
+      - --only-org=openshift-eng
+      - --only-org=openshift-hyperfleet
+      - --only-org=openshift-knative
+      - --only-org=openshift-kni
+      - --only-org=openshift-metal3
+      - --only-org=openshift-online
+      - --only-org=openshift-pipelines
+      - --only-org=openshift-power-monitoring
+      - --only-org=openshift-psap
+      - --only-org=openshift-qe
+      - --only-org=openshift-s2i
+      - --only-org=openshift-service-mesh
+      - --only-org=openshift-splat-team
+      - --only-org=openshift-virtualization
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that community org repos with CI configured are accessible by test-platform's
+      bots
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 1
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-community
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+      - --supplemental-plugin-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-ci
+      - --app-check-mode=standard
+      - --bot=openshift-merge-robot
+      - --bot=openshift-ci-robot
+      - --check-branch-protection=false
+      - --warn-only
       - --ignore=openshift
       - --ignore=openshift-priv
+      - --ignore=stolostron
+      - --ignore=openshift-assisted
+      - --ignore=openshift-cnv
+      - --ignore=openshift-eng
+      - --ignore=openshift-hyperfleet
+      - --ignore=openshift-knative
+      - --ignore=openshift-kni
+      - --ignore=openshift-metal3
+      - --ignore=openshift-online
+      - --ignore=openshift-pipelines
+      - --ignore=openshift-power-monitoring
+      - --ignore=openshift-psap
+      - --ignore=openshift-qe
+      - --ignore=openshift-s2i
+      - --ignore=openshift-service-mesh
+      - --ignore=openshift-splat-team
+      - --ignore=openshift-virtualization
       - --ignore=kata-containers/kata-containers
       - --ignore=containers/gvisor-tap-vsock
       - --ignore=containers/podman-py
@@ -2346,7 +2947,6 @@ periodics:
       - --ignore=ran-telco5g/kpi-results
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=openshift-logging/extended-logging-tests-interop
-      - --ignore=Azure/ARO-HCP
       - --ignore=rhbk/sso-test
       command:
       - ./hack/check-gh-automation.sh
@@ -2373,7 +2973,7 @@ periodics:
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
-      that all repos with tide configured allow access to openshift-merge-bot
+      that stolostron repos with tide configured allow access to openshift-merge-bot
     ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
   cluster: app.ci
   cron: 0 3 * * 2
@@ -2385,7 +2985,7 @@ periodics:
     workdir: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-check-gh-automation-tide
+  name: periodic-check-gh-automation-tide-stolostron
   spec:
     containers:
     - args:
@@ -2401,8 +3001,149 @@ periodics:
       - --app=openshift-merge-bot
       - --app-check-mode=tide
       - --check-branch-protection=false
+      - --only-org=stolostron
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-merge-bot
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that openshift-* org repos with tide configured allow access to openshift-merge-bot
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 2
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-tide-openshift-orgs
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-merge-bot
+      - --app-check-mode=tide
+      - --check-branch-protection=false
+      - --only-org=openshift-assisted
+      - --only-org=openshift-cnv
+      - --only-org=openshift-eng
+      - --only-org=openshift-hyperfleet
+      - --only-org=openshift-knative
+      - --only-org=openshift-kni
+      - --only-org=openshift-metal3
+      - --only-org=openshift-online
+      - --only-org=openshift-pipelines
+      - --only-org=openshift-power-monitoring
+      - --only-org=openshift-psap
+      - --only-org=openshift-qe
+      - --only-org=openshift-s2i
+      - --only-org=openshift-service-mesh
+      - --only-org=openshift-splat-team
+      - --only-org=openshift-virtualization
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-merge-bot
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+      imagePullPolicy: Always
+      name: check-gh-automation
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-merge-bot
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that community org repos with tide configured allow access to openshift-merge-bot
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 2
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-check-gh-automation-tide-community
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --app=openshift-merge-bot
+      - --app-check-mode=tide
+      - --check-branch-protection=false
+      - --warn-only
       - --ignore=openshift
       - --ignore=openshift-priv
+      - --ignore=stolostron
+      - --ignore=openshift-assisted
+      - --ignore=openshift-cnv
+      - --ignore=openshift-eng
+      - --ignore=openshift-hyperfleet
+      - --ignore=openshift-knative
+      - --ignore=openshift-kni
+      - --ignore=openshift-metal3
+      - --ignore=openshift-online
+      - --ignore=openshift-pipelines
+      - --ignore=openshift-power-monitoring
+      - --ignore=openshift-psap
+      - --ignore=openshift-qe
+      - --ignore=openshift-s2i
+      - --ignore=openshift-service-mesh
+      - --ignore=openshift-splat-team
+      - --ignore=openshift-virtualization
       - --ignore=kata-containers/kata-containers
       - --ignore=containers/gvisor-tap-vsock
       - --ignore=containers/podman-py
@@ -2627,7 +3368,7 @@ periodics:
       channel: '#trt-alert'
       job_states_to_report:
       - failure
-      report_template: Job {{.Spec.Job}} failed. See https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-prow-auto-sippy-config-generator/{{.Status.BuildID}}
+      report_template: Job {{.Spec.Job}} failed. See https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-prow-auto-sippy-config-generator/{{.Status.BuildID}}
         for details.
   spec:
     containers:
@@ -2707,7 +3448,7 @@ periodics:
       channel: '#trt-alert'
       job_states_to_report:
       - failure
-      report_template: Job {{.Spec.Job}} failed. See https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-update-origin-disruption-alert-data/{{.Status.BuildID}}
+      report_template: Job {{.Spec.Job}} failed. See https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-update-origin-disruption-alert-data/{{.Status.BuildID}}
         for details. This job runs weekly to sync latest observed percentiles into
         origin to use in testing. All failures of this job should be investigated.
   spec:
@@ -3021,7 +3762,8 @@ periodics:
       channel: '#pixaa-rebasebot-alerts'
       job_states_to_report:
       - failure
-      report_template: Job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+      report_template: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs>
   spec:
     containers:
     - args:

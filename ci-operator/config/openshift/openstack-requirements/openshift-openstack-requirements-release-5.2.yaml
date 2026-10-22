@@ -1,0 +1,176 @@
+base_images:
+  base_rhel10:
+    name: "5.2"
+    namespace: ocp
+    tag: base-rhel10
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: openstack-reqs-tester.Dockerfile
+    from: src
+    optional: true
+    to: reqs-tester
+  - dockerfile_path: openstack-reqs-tester-rhel10-py314.Dockerfile
+    from: base_rhel10
+    optional: true
+    to: reqs-tester-rhel10-py314
+promotion:
+  to:
+  - name: "5.2"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.2"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-rhel9-py312
+  commands: HOME=`dirname .` tox -vv -e py3
+  container:
+    from: reqs-tester
+- as: pep8-rhel9-py312
+  commands: HOME=/tmp tox -vv -e pep8
+  container:
+    from: reqs-tester
+- as: unit-rhel10-py314
+  commands: HOME=`dirname .` tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+- as: pep8-rhel10-py314
+  commands: HOME=/tmp tox -vv -e pep8
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+- always_run: false
+  as: sushy-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-sushy.git sushy
+    cd sushy
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: sushy-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-sushy.git sushy
+    cd sushy
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic.git ironic
+    cd ironic
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic.git ironic
+    cd ironic
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-python-agent-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic-python-agent.git ironic-python-agent
+    cd ironic-python-agent
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-python-agent-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic-python-agent.git ironic-python-agent
+    cd ironic-python-agent
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-prometheus-exporter-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic-prometheus-exporter.git ironic-prometheus-exporter
+    cd ironic-prometheus-exporter
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: ironic-prometheus-exporter-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-ironic-prometheus-exporter.git ironic-prometheus-exporter
+    cd ironic-prometheus-exporter
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: networking-generic-switch-unit
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-networking-generic-switch.git networking-generic-switch
+    cd networking-generic-switch
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    from: reqs-tester
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+- always_run: false
+  as: networking-generic-switch-unit-rhel10-py314
+  commands: |
+    set -e
+    constraints="$(pwd)/upper-constraints.txt"
+    git clone --depth=1 https://github.com/openshift/openstack-networking-generic-switch.git networking-generic-switch
+    cd networking-generic-switch
+    TOX_CONSTRAINTS_FILE="${constraints}" tox -vv -e py3
+  container:
+    clone: true
+    from: reqs-tester-rhel10-py314
+  pipeline_run_if_changed: (^upper-constraints\.txt$)|(^global-requirements\.txt$)|(^openstack-reqs-tester\.Dockerfile$)|(^openstack-reqs-tester-rhel10-py314\.Dockerfile$)
+zz_generated_metadata:
+  branch: release-5.2
+  org: openshift
+  repo: openstack-requirements

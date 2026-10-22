@@ -6,7 +6,16 @@ set -x
 cat /etc/os-release
 
 SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
-SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
+RHCOS_VERSION=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].status.nodeInfo.osImage}' | sed -E 's/.*CoreOS ([0-9]+)\..*/RHCOS\1/')
+echo "Detected RHCOS version: ${RHCOS_VERSION}"
+if [[ "${RHCOS_VERSION}" == "RHCOS10" ]]; then
+  SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name_rhcos10)
+elif [[ "${RHCOS_VERSION}" == "RHCOS9" ]]; then
+  SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name_rhcos9)
+else
+  echo "ERROR: Unrecognised RHCOS version '${RHCOS_VERSION}'; cannot determine SRIOV_PF_NAME" >&2
+  exit 1
+fi
 KERNEL_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_kernel_vfs_range)
 DPDK_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_dpdk_vfs_range)
 
@@ -131,5 +140,27 @@ else
       ${SRIOV_NODE_SELECTOR}: ""
     numVfs: ${SRIOV_NUM_VFS}
     resourceName: ${SRIOV_RESOURCE_NAME}
+EOF
+fi
+
+if [ "${NODE_DENSITY_CNI_WORKLOAD}" == "true" ]; then
+  # Create the SRIOV network policy for Node Density CNI Workload
+  cat << EOF| oc apply -f -
+  apiVersion: sriovnetwork.openshift.io/v1
+  kind: SriovNetwork
+  metadata:
+    name: sriov-net-node-density
+    namespace: openshift-sriov-network-operator
+  spec:
+    ipam: |
+      {
+        "type": "whereabouts",
+        "range": "172.20.0.0/16"
+      }
+    logLevel: info
+    networkNamespace: node-density-cni-0
+    resourceName: ${SRIOV_RESOURCE_NAME}
+    spoofChk: "off"
+    trust: "on"
 EOF
 fi

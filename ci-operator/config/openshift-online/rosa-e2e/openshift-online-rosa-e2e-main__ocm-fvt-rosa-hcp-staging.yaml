@@ -3,6 +3,10 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: builder
@@ -22,6 +26,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocm-fvt-periodic-ocp5-resource-cleaner
+  cron: 0 2 * * *
+  steps:
+    test:
+    - ref: rosa-e2e-ocm-resource-cleaner
+  timeout: 30m0s
 - as: ocm-fvt-periodic-cs-rosa-hcp-ad-staging-main
   capabilities:
   - nested-podman
@@ -30,9 +40,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-ad-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 7 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-ad-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -46,9 +79,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-amd64-upg-ocp5-ltrc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 8 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-upgrade-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -62,9 +118,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-z-egr-upg-ocp5-ltrc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 7 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-upgrade-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -78,9 +157,34 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-shared-vpc-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-shvpc-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 8 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: |-
+        AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+        SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-shared-vpc-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -94,9 +198,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-pl-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-pl-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 8 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-pl-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -110,9 +237,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-adobe-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-adobe-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 7 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-adobe-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -126,9 +276,80 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-y-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-y-upg-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-y-upgrade-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upgrade-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: |-
+        CLUSTER_PROFILE=rosa-hcp-y-upg
+        UPGRADE_DISTANCE=4
+        UPGRADE_TARGET_CHANNEL=candidate
+        UPGRADE_TARGET_VERSION=4.22.18
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt-longrunning
+  timeout: 12h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-nx-y-upg-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 10 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: |-
+        AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+        UPGRADE_DISTANCE=3
+        UPGRADE_TARGET_CHANNEL=candidate
+        UPGRADE_TARGET_VERSION=5.0.0-rc.7
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-nx-y-upgrade-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -142,9 +363,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-arm-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-arm-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 9 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-arm-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -158,9 +402,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-amd64-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-amd64-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -174,9 +441,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-autonode-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-autonode-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 9 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-autonode-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -190,9 +480,33 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_BACKPLANE_CREDS: "true"
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-hcp-e2e-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-hcp-e2e-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 10 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-hcp-e2e-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -206,9 +520,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-zero-egr-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 40 9 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-zero-egress-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -222,9 +559,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-upgrade-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-upg-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 6 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-upgrade-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -233,14 +593,37 @@ tests:
 - as: ocm-fvt-periodic-cs-sanity-staging-main
   capabilities:
   - nested-podman
-  cron: 0 0 31 2 *
+  cron: 0 3 * * *
   nested_podman: true
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-sanity-staging
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-ocp5-latest-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 7 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-sanity-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -254,9 +637,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-sanity-jira-staging
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-sanity-jira-ocp5-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 0 31 2 *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-sanity-jira-ocp5-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:
@@ -270,9 +676,32 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      OCM_FVT_DEFER_CLEAN: "true"
       OCM_FVT_JOB_NAME: cs-rosa-hcp-access-request-staging-main
     post:
     - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-rosa-hcp-acc-req-ocp5-lt-rc-staging-main
+  capabilities:
+  - nested-podman
+  cron: 20 10 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_DEFER_CLEAN: "true"
+      OCM_FVT_EXTRA_ENVS: AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred-ocp5
+      OCM_FVT_JOB_NAME: cs-rosa-hcp-access-request-ocp5-latest-rc-staging-main
+    post:
+    - ref: rosa-e2e-collect-cs-telemetry
+    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-gather-hcp-guest-artifacts
     pre:
     - ref: rosa-e2e-record-start-time
     test:

@@ -75,14 +75,24 @@ def add_imagestream_namespace_rbac(gendoc):
     hostname_prefix = arch_in_hostname[context.arch]
 
     puller_subjects = []
+    viewer_subjects = []
     if not context.private:
-        puller_subjects.append({
+        authenticated = {
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'system:authenticated'
-        })
+        }
+        puller_subjects.append(authenticated)
+        viewer_subjects.append(authenticated)
+        if context.product.name == 'okd':
+            puller_subjects.append({
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Group',
+                'name': 'system:unauthenticated'
+            })
     else:
         puller_subjects.extend(get_private_release_pullers())
+        viewer_subjects.extend(get_private_release_pullers())
 
     resources.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
@@ -111,7 +121,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'kind': 'ClusterRole',
             'name': 'view'
         },
-        'subjects': puller_subjects,
+        'subjects': viewer_subjects,
     })
 
     resources.append({
@@ -157,8 +167,8 @@ def add_imagestream_namespace_rbac(gendoc):
             }]
     })
 
-    if not context.suffix:
-        # Special permissions for x86_64 public rc
+    if not context.suffix and context.product.name == 'ocp':
+        # Special permissions for OCP x86_64 public rc
         resources.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'Role',
@@ -208,7 +218,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
-            'name': 'release-controller-import-ocp',
+            'name': f'release-controller-import-{context.product.deployment_prefix}',
             'namespace': context.is_namespace
         },
         'rules': [{
@@ -246,7 +256,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': 'release-controller-binding-ocp',
+            'name': f'release-controller-binding-{context.product.deployment_prefix}',
             'namespace': context.is_namespace,
         },
         'roleRef': {
@@ -261,8 +271,8 @@ def add_imagestream_namespace_rbac(gendoc):
         }]
     })
 
-    if not context.suffix:
-        # Special permissions just for x86_64 public release controller
+    if not context.suffix and context.product.name == 'ocp':
+        # Special permissions just for OCP x86_64 public release controller
         resources.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'RoleBinding',
@@ -351,7 +361,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': 'release-controller-binding-ocp',
+            'name': f'release-controller-binding-{context.product.deployment_prefix}',
             'namespace': context.jobs_namespace,
         },
         'roleRef': {
@@ -395,7 +405,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
-            'name': 'release-controller-import-ocp',
+            'name': f'release-controller-import-{context.product.deployment_prefix}',
         },
         'subjects': [{
             'kind': 'ServiceAccount',
@@ -431,7 +441,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRoleBinding',
             'metadata': {
-                'name': f'release-controller-ocp{context.suffix}-oauth'
+                'name': f'release-controller-{context.product.deployment_prefix}{context.suffix}-oauth'
             },
             'roleRef': {
                 'apiGroup': 'rbac.authorization.k8s.io',
@@ -450,7 +460,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRoleBinding',
             'metadata': {
-                'name': f'release-controller-ocp{context.suffix}',
+                'name': f'release-controller-{context.product.deployment_prefix}{context.suffix}',
             },
             'roleRef': {
                 'apiGroup': 'rbac.authorization.k8s.io',

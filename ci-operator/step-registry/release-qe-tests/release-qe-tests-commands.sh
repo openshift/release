@@ -7,8 +7,10 @@ set -o pipefail
 prow_api_token=$(cat "/var/run/vault/release-tests-token/prow_api_token")
 export APITOKEN=$prow_api_token
 
-github_token=$(cat "/var/run/vault/release-tests-token/github_token")
-export GITHUB_TOKEN=$github_token
+github_app_writer_id=$(cat "/var/run/vault/release-tests-token/github_app_writer_id")
+export GITHUB_APP_WRITER_ID=$github_app_writer_id
+github_app_writer_private_key="/var/run/vault/release-tests-token/github_app_writer_private_key"
+export GITHUB_APP_WRITER_PRIVATE_KEY=$github_app_writer_private_key
 
 release_payload_modifier_token=$(cat /var/run/vault/release-payload-modifier-token/token)
 export RELEASE_PAYLOAD_MODIFIER_TOKEN=$release_payload_modifier_token

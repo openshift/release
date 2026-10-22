@@ -13,8 +13,10 @@ chain:
     1. Installs two HashiCorp Vault Enterprise instances via Helm (vault-install step)
        - Mirrors Vault Enterprise and vault-kube-kms plugin images to dev-scripts local registry on baremetalds jobs
        - Applies ImageContentSourcePolicy/vault-mirror so kube-apiserver nodes can pull both images from the local mirror
-       - Deploys Vault in dev mode to vault-kms and vault-kms-secondary namespaces
+       - Deploys standalone Vault with service-CA TLS and file storage in vault-kms and vault-kms-secondary
        - Creates vault-license secret from mounted credentials
+       - Initializes and unseals Vault; stores root token and unseal key in Secrets
+       - Deploys an auto-unseal sidecar so transit keys survive pod restarts
        - Waits for Vault pods to be ready
        - Creates CA ConfigMaps (vault-ca-bundle and vault-ca-bundle-secondary) in openshift-config
 
@@ -48,6 +50,7 @@ chain:
     - VAULT_NAMESPACE: Primary Vault namespace (default: vault-kms)
     - VAULT_SECONDARY_NAMESPACE: Secondary Vault namespace (default: vault-kms-secondary)
     - VAULT_KMS_PLUGIN_IMAGE: vault-kube-kms plugin image for encryption-kms tests and baremetal mirroring
+    - VAULT_KMS_PLUGIN_IMAGE_UPDATE: optional second plugin image for plugin-update/rotation tests; mirrored to its own localimages repo + ICSP when distinct
 
     Environment variables (inherited from vault-configure step):
     - VAULT_KMS_KEY_NAME: Transit encryption key name (default: kms-key)

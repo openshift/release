@@ -39,6 +39,10 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base
+  console-plugin-demo:
+    name: "5.0"
+    namespace: ocp
+    tag: console-plugin-demo
   console-tests:
     name: "5.0"
     namespace: ocp
@@ -126,7 +130,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-ovn-single-node-csi
-  interval: 168h
+  cron: 44 20 * * 0
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -134,7 +138,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-csi
 - as: e2e-aws-ovn-single-node-workers-serial
-  interval: 168h
+  cron: 31 7 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -144,7 +148,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-workers
 - as: e2e-aws-ovn-single-node-workers
-  interval: 168h
+  cron: 39 5 * * 0
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -152,7 +156,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-workers
 - as: e2e-aws-ovn-single-node
-  interval: 168h
+  cron: 25 16 * * 1
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -160,7 +164,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-rhcos9
-  interval: 168h
+  cron: 49 22 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -170,17 +174,22 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-techpreview
-  interval: 168h
+  cron: 55 17 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-single-node-serial
-  interval: 168h
+  cron: 9 21 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -191,7 +200,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
   timeout: 5h0m0s
 - as: e2e-aws-ccm-techpreview
-  interval: 168h
+  cron: 22 3 * * 0
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-ccm-techpreview
@@ -201,24 +210,30 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
+      TEST_SKIPS: InPlace Resize
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
 - as: e2e-aws-ovn-single-node-techpreview-serial
-  interval: 168h
+  cron: 15 16 * * 4
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
   timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-rhcos10-techpreview-serial
-  interval: 168h
+  cron: 9 5 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -226,9 +241,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
       TEST_SUITE: openshift/conformance/serial
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
   timeout: 5h0m0s
 - as: e2e-metal-ovn-single-node-live-iso
@@ -240,9 +260,7 @@ tests:
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      TEST_FUNC: test_bip_add_worker
-    workflow: baremetalds-sno
+    workflow: baremetalds-sno-with-worker
 - as: e2e-metal-ipi-ovn-ipv4
   capabilities:
   - intranet
@@ -266,7 +284,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6-runc
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-serial-ipv4
   capabilities:
   - intranet
@@ -294,7 +311,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
   capabilities:
   - intranet
@@ -326,7 +342,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-upgrade
   capabilities:
   - intranet
@@ -450,7 +465,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6-runc-techpreview
   capabilities:
   - intranet
@@ -513,7 +527,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
@@ -610,7 +623,7 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-ovn-single-node-4vcpu-32gb-compute-upgrade
-  cron: '@daily'
+  cron: 42 5 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -622,7 +635,7 @@ tests:
     workflow: openshift-upgrade-aws-single-node
   timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-4vcpu-32gb-compute-serial
-  cron: '@daily'
+  cron: 49 17 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -796,7 +809,14 @@ tests:
   cron: 5 13 * * *
   steps:
     cluster_profile: equinix-edge-enablement
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- as: e2e-agent-ovn-two-node-fencing-mac
+  capabilities:
+  - intranet
+  cron: 5 14 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
@@ -895,7 +915,7 @@ tests:
 - as: e2e-metal-ovn-two-node-fencing-recovery
   capabilities:
   - intranet
-  cron: 19 10,20 * * *
+  cron: 19 10 * * *
   shard_count: 3
   steps:
     cluster_profile: equinix-edge-enablement
@@ -905,6 +925,7 @@ tests:
   - intranet
   - nested-podman
   cron: '@yearly'
+  shard_count: 2
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -915,7 +936,8 @@ tests:
 - as: e2e-metal-ovn-two-node-fencing-ipv6-recovery
   capabilities:
   - intranet
-  cron: 19 10,20 * * *
+  cron: 19 10 * * *
+  shard_count: 2
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -931,7 +953,8 @@ tests:
 - as: e2e-metal-ovn-two-node-fencing-dualstack-recovery
   capabilities:
   - intranet
-  cron: 19 7,17 * * *
+  cron: 19 7 * * *
+  shard_count: 2
   steps:
     cluster_profile: equinix-edge-enablement
     env:
@@ -973,20 +996,26 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-extended
+- as: e2e-metal-ovn-two-node-fencing-mac
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-mac
 - as: e2e-aws-ovn-proxy
-  cron: 0 0 */2 * *
+  cron: 39 3 * * 5
   steps:
     cluster_profile: openshift-org-aws
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
-- as: e2e-aws-ovn-installer-dualstack-ipv4-primary-techpreview
-  interval: 24h
+- as: e2e-aws-ovn-installer-dualstack-ipv4-primary
+  cron: 37 16 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv4Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
@@ -995,12 +1024,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-installer-dualstack-ipv6-primary-techpreview
-  interval: 24h
+- as: e2e-aws-ovn-installer-dualstack-ipv6-primary
+  cron: 28 7 * * 3
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       IP_FAMILY: DualStackIPv6Primary
       TEST_SKIPS: '\[sig-network\] \[Feature:IPv6DualStack\] Granular Checks: Services
         Secondary IP Family \[LinuxOnly\] should function for service endpoints using
@@ -1017,13 +1045,18 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-zones-techpreview
   cron: 15 0 * * *
@@ -1033,11 +1066,16 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-zones-techpreview-serial
   cron: 15 15 * * *
@@ -1047,12 +1085,18 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-rhcos9-techpreview
   cron: 17 6 * * *
@@ -1063,9 +1107,14 @@ tests:
       OS_IMAGE_STREAM: rhel-9
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-rhcos10-techpreview
   cron: 1 18 * * 0
@@ -1076,6 +1125,11 @@ tests:
       OS_IMAGE_STREAM: rhel-10
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-ovn-multi-network
   cron: 11 7 * * 2
@@ -1085,12 +1139,10 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiNetworks=true"]'
-      FEATURE_SET: CustomNoUpgrade
       MULTI_NIC_IPI: "true"
     workflow: openshift-e2e-vsphere
 - as: e2e-external-vsphere-ccm
@@ -1101,12 +1153,12 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: upi-vsphere-platform-external-ccm
 - as: e2e-aws-ovn-local-gateway
-  interval: 168h
+  cron: 35 21 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1123,7 +1175,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1139,12 +1191,17 @@ tests:
       OS_IMAGE_STREAM: rhel-9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-ovn-vcf9
-  cron: 23,53 12,19 * * *
+  cron: 23 12 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1160,7 +1217,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
@@ -1170,6 +1227,12 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: ipi-conf-vsphere-staticip-verify
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-staticip
 - as: e2e-vsphere-externallb-ovn
   cron: 44 14 * * 3
@@ -1179,7 +1242,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
@@ -1191,7 +1254,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1208,24 +1271,35 @@ tests:
       OS_IMAGE_STREAM: rhel-9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
-  cron: 40,55 2,9,10 * * *
+  cron: 40 2 * * *
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-rhcos9-techpreview-serial
@@ -1235,9 +1309,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-rhcos10-techpreview-serial
@@ -1247,6 +1326,11 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-serial
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
@@ -1257,7 +1341,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1281,7 +1365,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1311,7 +1395,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1331,7 +1415,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1358,9 +1442,11 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-ovn-upi-zones
   cron: 39 3 * * 4
@@ -1370,9 +1456,11 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-vsphere-host-groups-ovn-techpreview
   cron: 29 6 * * *
@@ -1380,6 +1468,11 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-host-groups
 - as: e2e-vsphere-ovn-multi-vcenter
   cron: 32 12 * * *
@@ -1389,12 +1482,10 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["VSphereMultiVCenters=true"]'
-      FEATURE_SET: CustomNoUpgrade
       POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
@@ -1407,7 +1498,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1415,27 +1506,30 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
-- as: e2e-vsphere-ovn-hybrid-env-techpreview
+- as: e2e-vsphere-ovn-hybrid-env
   cron: 45 1 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       CSI_MANAGEMENT_REMOVED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
       NETWORK_TYPE: multi-tenant
       PERSISTENT_MONITORING: "false"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
       TEST_SKIPS: \[sig-storage\] In-tree Volumes\|\[sig-arch\]\[Early\] Operators
         low level operators
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-hybrid-env
-- as: e2e-vsphere-ovn-hybrid-env-serial-techpreview
+- as: e2e-vsphere-ovn-hybrid-env-serial
   cron: 50 1 * * *
   shard_count: 2
   steps:
     cluster_profile: vsphere-elastic
     env:
       CSI_MANAGEMENT_REMOVED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
       NETWORK_TYPE: multi-tenant
       PERSISTENT_MONITORING: "false"
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
@@ -1443,19 +1537,28 @@ tests:
       TEST_SKIPS: \[sig-cli\]\|\[FeatureGate:VSphereDriverConfiguration\]\|\[sig-arch\]\[Early\]
         Operators low level operators
       TEST_SUITE: openshift/conformance/serial
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-upi-hybrid-env-techpreview
+- as: e2e-vsphere-ovn-upi-hybrid-env
   cron: 50 1 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       CSI_MANAGEMENT_REMOVED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
       NETWORK_TYPE: single-tenant
       STORAGE_CO_DEGRADE_CHECK: "true"
       TEST_SKIPS: \[sig-storage\] In-tree Volumes\|\[sig-arch\]\[Early\] Operators
         low level operators
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-upi-hybrid-env
 - as: e2e-vsphere-ovn-disk-setup-techpreview
   cron: 48 4 * * 3
@@ -1465,15 +1568,23 @@ tests:
       ADDITIONAL_DISK: "true"
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-dedicated-serial-techpreview
-  cron: '@daily'
+  cron: 27 21 * * 4
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_MACHINE_MANAGEMENT: MachineAPI
       DEDICATED_HOST: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     leases:
     - env: LEASED_RESOURCE
       resource_type: aws-edge-zones-quota-slice
@@ -1485,12 +1596,17 @@ tests:
     - chain: gather-core-dump
     - chain: ipi-deprovision
     - ref: ipi-deprovision-aws-dedicated-hosts
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-aws-ovn-fips
-  interval: 168h
+  cron: 36 17 * * 4
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       DEBUG_ENABLE_TCPDUMP: "true"
       FIPS_ENABLED: "true"
       TEST_REQUIRES_BUILDFARM_NET_ADMIN: "true"
@@ -1502,10 +1618,12 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-upgrade-fips
-  interval: 168h
+  cron: 58 9 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1517,33 +1635,44 @@ tests:
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-fips-rhcos9-techpreview
-  interval: 12h
+  cron: 40 2 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-9
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
     pre:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-fips-rhcos9-10-techpreview
-  interval: 12h
+  cron: 46 16 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
@@ -1552,13 +1681,18 @@ tests:
     - ref: rhcos-conf-osstream
     - chain: ipi-install-stableinitial
     - ref: fips-check
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-fips-no-nat-instance
-  interval: 168h
+  cron: 10 19 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
       CI_NAT_REPLACE: "false"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
       TEST_TYPE: upgrade-conformance
@@ -1603,10 +1737,12 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-csi
 - as: e2e-aws-ovn-fips-serial
-  interval: 168h
+  cron: 3 3 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -1628,6 +1764,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: ./test-prow-e2e.sh release
+      dependencies:
+      - env: PLUGIN_PULL_SPEC
+        name: console-plugin-demo
       from: console-tests
       resources:
         limits:
@@ -1653,7 +1792,7 @@ tests:
     cluster_profile: openshift-org-gcp
     workflow: openshift-e2e-gcp-xpn
 - as: e2e-aws-ovn-serial
-  interval: 168h
+  cron: 12 18 * * 5
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -1663,20 +1802,25 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-serial-rhcos9-techpreview
-  interval: 12h
+  cron: 8 17 * * 4
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-serial-rhcos9-10-techpreview
-  interval: 12h
+  cron: 43 18 * * 0
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -1684,13 +1828,18 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-tls-13
-  interval: 168h
+  cron: 2 17 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1700,7 +1849,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-tls-13
 - as: e2e-aws-csi
-  interval: 168h
+  cron: 8 8 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1731,7 +1880,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azurestack-upi-csi
 - as: e2e-aws-ovn-cgroupsv2
-  interval: 168h
+  cron: 54 3 * * 2
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -1739,7 +1888,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-cgroupsv2
 - as: e2e-aws-driver-toolkit
-  interval: 168h
+  cron: 2 7 * * 0
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -1758,7 +1907,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-driver-toolkit-10
-  interval: 168h
+  cron: 25 6 * * 5
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -1801,7 +1950,7 @@ tests:
 - as: e2e-telco5g-cnftests
   capabilities:
   - intranet
-  cron: 00 16 */1 * 1-5
+  cron: 00 09 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1814,26 +1963,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
-- as: e2e-telco5g-sno-cnftests
-  capabilities:
-  - intranet
-  cron: 00 18 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "5.0"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 0 0 * * 1,3,5
+  cron: 0 0 * * 6
   restrict_network_access: false
   steps:
     env:
@@ -1844,25 +1977,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
-- as: e2e-telco5g-ptp-upstream
-  capabilities:
-  - intranet
-  cron: 0 6 * * 1,3,5
-  restrict_network_access: false
-  steps:
-    env:
-      SKIP_OCP_INSTALL: "true"
-      T5CI_DEPLOY_UPSTREAM: "true"
-      T5CI_JOB_TYPE: ptp
-      T5CI_VERSION: "5.0"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-ptp
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
-  cron: 00 22 */1 * 1-5
+  cron: 00 22 */1 * 5,6,0
   restrict_network_access: false
   steps:
     env:
@@ -1894,7 +2012,7 @@ tests:
 - as: e2e-telco5g-mno-ztp-cnftests
   capabilities:
   - intranet
-  cron: 10 14 */1 * 1-5
+  cron: 10 14 */1 * 5,6,0
   restrict_network_access: false
   steps:
     env:
@@ -1917,7 +2035,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   restrict_network_access: false
   steps:
     env:
@@ -1937,7 +2055,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   restrict_network_access: false
   steps:
     env:
@@ -1948,14 +2066,14 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 13 * * *
+  cron: 11 2 * * 3
   reporter_config:
     channel: '#commatrix-nightlies-alerts'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -1963,14 +2081,14 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 13 * * *
+  cron: 59 16 * * 0
   reporter_config:
     channel: '#commatrix-nightlies-alerts'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     test:
@@ -1987,7 +2105,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: Network flow matrix periodic job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -2016,6 +2134,8 @@ tests:
   interval: 168h
   steps:
     cluster_profile: ibmcloud
+    env:
+      SIZE_VARIANT: medium
     observers:
       enable:
       - observers-resource-watch
@@ -2029,7 +2149,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-ibmcloud-csi
 - as: e2e-aws-ovn-upi
-  interval: 168h
+  cron: 19 7 * * 6
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -2074,13 +2194,15 @@ tests:
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
+    env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-serial
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-aws-ovn-etcd-scaling
-  interval: 168h
+  cron: 19 0 * * 3
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -2100,8 +2222,8 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_TYPE: e2-custom-8-32768
-      CONTROL_PLANE_NODE_TYPE: e2-custom-8-32768
+      COMPUTE_NODE_TYPE: e2-standard-8
+      CONTROL_PLANE_NODE_TYPE: e2-standard-8
       TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
         to support the 1.17 Sample API Server using the current Aggregator \| Ensure
         HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
@@ -2115,7 +2237,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-aws-custom-dns-techpreview
-  interval: 12h
+  cron: 30 0 * * 0
   steps:
     cluster_profile: aws-qe
     env:
@@ -2130,10 +2252,15 @@ tests:
         The HAProxy router should pass the gRPC interoperability tests \| Services
         should fail health check node port if there are only terminating endpoints
         \| egressfirewall
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
       USER_PROVISIONED_DNS: "yes"
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-custom-dns
 - as: e2e-azure-custom-dns-techpreview
   interval: 168h
@@ -2151,10 +2278,15 @@ tests:
         The HAProxy router should pass the gRPC interoperability tests \| Services
         should fail health check node port if there are only terminating endpoints
         \| egressfirewall
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
       USER_PROVISIONED_DNS: "yes"
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
@@ -2170,7 +2302,7 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - as: e2e-aws-ovn-cpu-partitioning
-  interval: 168h
+  cron: 43 17 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -2178,24 +2310,21 @@ tests:
         a node
     workflow: openshift-e2e-aws-cpu-partitioning
 - as: e2e-aws-ovn-single-node-one-core-serial
-  interval: 168h
+  cron: 19 17 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-gcp-graceful-shutdown
-  interval: 168h
+- as: e2e-aws-ovn-shared-vpc-phz
+  cron: 37 8 * * 6
   steps:
-    cluster_profile: openshift-org-gcp
-    workflow: openshift-e2e-gcp-graceful-shutdown
-- as: e2e-aws-ovn-shared-vpc-phz-techpreview
-  interval: 168h
-  steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      FEATURE_SET: TechPreviewNoUpgrade
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-qe-quota-slice
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
   capabilities:
@@ -2210,7 +2339,7 @@ tests:
         MASTER_VCPU=8
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
-- as: e2e-agent-compact-iso-no-registry-techpreview
+- as: e2e-agent-compact-iso-no-registry
   capabilities:
   - intranet
   cron: 0 */8 * * *
@@ -2221,9 +2350,8 @@ tests:
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
-- as: e2e-agent-ha-dualstack-iso-no-registry-techpreview
+- as: e2e-agent-ha-dualstack-iso-no-registry
   capabilities:
   - intranet
   cron: 30 */8 * * *
@@ -2234,10 +2362,8 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
-  timeout: 4h0m0s
-- as: e2e-agent-ha5-dualstack-iso-no-registry-techpreview
+- as: e2e-agent-ha5-dualstack-iso-no-registry
   capabilities:
   - intranet
   cron: 0 1/8 * * *
@@ -2248,10 +2374,9 @@ tests:
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4V6
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-        FEATURE_SET=TechPreviewNoUpgrade
+      DEVSCRIPTS_SETUP_TIMEOUT: 150m
     workflow: agent-e2e-generic-conformance-iso-no-registry
-  timeout: 4h0m0s
-- as: e2e-agent-sno-ipv4-iso-no-registry-techpreview
+- as: e2e-agent-sno-ipv4-iso-no-registry
   capabilities:
   - intranet
   cron: 30 1/8 * * *
@@ -2264,7 +2389,6 @@ tests:
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         AGENT_PLATFORM_TYPE=none
-        FEATURE_SET=TechPreviewNoUpgrade
     workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
@@ -2637,71 +2761,71 @@ tests:
       SKEW: 30d
     workflow: openshift-e2e-aws-cert-rotation
 - as: e2e-aws-ovn-edge-zones
-  cron: '@weekly'
+  cron: 12 4 * * 6
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-shared-vpc-edge-zones
-  cron: '@weekly'
+  cron: 18 20 * * 6
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
 - as: e2e-aws-ovn-edge-zones-manifest-validation
-  cron: '@daily'
+  cron: 54 1 * * 1
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-installer-manifests-aws-edge-zones
 - as: e2e-aws-overlay-mtu-ovn-5000
-  cron: '@weekly'
+  cron: 7 21 * * 3
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
       CLUSTER_NETWORK_MTU: "5000"
     workflow: openshift-e2e-aws-network-mtu
 - as: e2e-aws-overlay-mtu-ovn-edge-1100
-  cron: '@weekly'
+  cron: 44 17 * * 6
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws::edge: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
 - as: e2e-aws-public-ipv4-pool
-  cron: '@weekly'
+  cron: 36 23 * * 3
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: aws-us-east-1
     env:
@@ -2738,64 +2862,33 @@ tests:
     - ref: tls-scanner-run
     workflow: ipi-aws
 - as: e2e-external-aws
-  cron: '@weekly'
+  cron: 15 8 * * 1
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-external-aws
 - as: e2e-external-aws-ccm
-  cron: '@weekly'
+  cron: 14 21 * * 6
   reporter_config:
     channel: '#forum-ocp-splat-alerts-aws'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: openshift-org-aws
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-- as: opct-platform-external-aws-ccm
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
-      PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
-- as: opct-platform-external-aws
-  cron: '@monthly'
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :external-link::aws: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      OPCT_CLI_IMAGE: quay.io/opct/opct:latest
-    workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
-  interval: 168h
+  cron: 46 3 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -2862,7 +2955,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-runc
 - as: e2e-aws-ovn-runc
-  cron: '@daily'
+  cron: 4 19 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -2895,6 +2988,7 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       OS_IMAGE_STREAM: rhel-9
     observers:
       enable:
@@ -2902,7 +2996,7 @@ tests:
     workflow: openshift-e2e-gcp-serial-runc
   timeout: 5h0m0s
 - as: e2e-aws-serial-runc
-  cron: '@daily'
+  cron: 23 5 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -2918,6 +3012,11 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-runc
 - as: e2e-azure-ovn-runc-techpreview
   cron: '@daily'
@@ -2926,20 +3025,35 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-runc
 - as: e2e-azure-ovn-multidisk-techpreview
   cron: '@daily'
   steps:
     cluster_profile: openshift-org-azure
     env:
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_MULTIDISK_COMPUTE_DISKS: |
+        user-defined:containers:32:0:Premium_LRS:/var/lib/containers
+        user-defined:kubelet:16:1:StandardSSD_LRS:/var/lib/kubelet
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-multidisk
 - as: e2e-gcp-ovn-runc-techpreview
   cron: '@daily'
@@ -2948,20 +3062,30 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-runc
 - as: e2e-aws-ovn-runc-techpreview
-  cron: '@daily'
+  cron: 30 20 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-runc
 - as: e2e-metal-ipi-ovn-upgrade-runc
   capabilities:
@@ -2978,52 +3102,34 @@ tests:
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
 - as: e2e-rosa-hcp-ovn
   cron: '@daily'
+  reporter_config:
+    channel: '#rosa-prow-info'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{- if eq .Status.State "success"}} :green_jenkins_circle: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{- else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs> <@U0AKNPBBVT7> {{- end}}'
   steps:
-    cluster_profile: rosa-e2e-02
+    cluster_profile: rosa-e2e-01
     env:
+      CLUSTER_SECTOR: rosa-e2e
       ENABLE_BILLING_ACCOUNT: "yes"
-      TEST_SKIPS: etcd leader changes are not excessive\| Managed cluster should ensure
-        platform components have system-\* priority class associated\| Managed cluster
-        should set requests but not limits\| ocp payload should be based on existing
-        source OLM version should contain the source commit id\| OLM should have imagePullPolicy:IfNotPresent
-        on thier deployments\| users can manipulate groups\| well-known endpoint should
-        be reachable\| builds installing subscription content\| The HAProxy router
-        should expose prometheus metrics for a route\| oc adm must-gather runs successfully
-        for audit logs\| OAuth server has the correct token and certificate fallback
-        semantics\| OAuthClientWithRedirectURIs must validate request URIs according
-        to oauth-client definition\| should be present on all masters and work\| when
-        installed on the cluster should have a AlertmanagerReceiversNotConfigured
-        alert in firing state\| API LBs follow \/readyz of kube-apiserver and stop
-        sending requests before server shutdowns for external clients\| Node Lifecycle
-        should run through the lifecycle of a node\| check registry.redhat.io is available
-        and samples operator can import sample imagestreams\| NetworkPolicy between
-        server and client should allow ingress access from updated pod\| In-tree Volumes.*local.*blockfs.*subPath
-        should support file as subpath\| DRA.*kubelet.*DynamicResourceAllocation\|
-        InPlacePodVerticalScaling.*decrease memory limit below usage\| CSI Mock volume
-        expansion Expansion with recovery recovery should not be possible\| CSI Mock
-        volume expansion Expansion with recovery should allow recovery if controller
-        expansion fails with final error\| cloud-provider-aws-e2e.*loadbalancer NLB
-        internal should be reachable with hairpinning traffic\| cloud-provider-aws-e2e.*loadbalancer
-        NLB should be reachable with target-node-labels\| Monitor:apiserver-incluster-availability.*monitor
-        test apiserver-incluster-availability\| MutableCSINodeAllocatableCount.*Attach
-        Limit Exceeded should transition pod to failed state\| PersistentVolumes-local.*block\|
-        CSI.*csi-hostpath.*provisioning\| blocks manual creation of EndpointSlices
-        pointing to the cluster or service network\| blocks manual creation of Endpoints
-        pointing to the cluster or service network\|\[cloud-provider-aws-e2e-openshift\]
-        loadbalancer NLB \[OCPFeatureGate:AWSServiceLBNetworkSecurityGroup\]\|\[sig-node\]
-        Security should support seccomp runtime/default.*\[Feature:SELinuxMount\]
+      REGION: us-west-2
     observers:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-hcp-conformance
 - as: e2e-osd-ccs-gcp
   cluster: build10
-  cron: '@daily'
+  cron: 0 0 1 1 *
   steps:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
 - as: e2e-aws-ovn-upgrade-ipsec
-  cron: '@daily'
+  cron: 22 4 * * 3
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -3033,7 +3139,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - as: e2e-aws-ovn-serial-ipsec
-  cron: '@daily'
+  cron: 29 19 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -3057,36 +3163,52 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OSSTREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
 - as: e2e-aws-ovn-single-node-rhcos10-techpreview
-  interval: 168h
+  cron: 6 19 * * 0
   steps:
     cluster_profile: openshift-org-aws
     env:
       AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
 - as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
   interval: 168h
   steps:
     cluster_profile: openshift-org-gcp
     env:
+      CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
     pre:
     - chain: ipi-gcp-pre
     - ref: fips-check
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-serial
 - as: e2e-metal-ipi-ovn-ipv4-rhcos10-techpreview
   capabilities:
@@ -3108,16 +3230,21 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
       RT_ENABLED: "true"
+      TEST_SKIPS: regional PD should store data and sync across zones
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn-rt
 - as: e2e-aws-disruptive-longrunning
-  cron: 0 12 * * *
+  cron: 1 22 * * 6
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -3128,19 +3255,57 @@ tests:
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: openshift-e2e-test-8h
     workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-disruptive-longrunning-techpreview
+  cron: 42 23 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
+      TEST_SUITE: openshift/disruptive-longrunning
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated
+  cron: 36 19 * * 0
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/nodes/isolated
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-nodes-isolated-techpreview
   interval: 168h
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
-      TEST_SUITE: openshift/disruptive-longrunning
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
+      TEST_SUITE: openshift/nodes/isolated
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-disruption
 - as: e2e-azure-disruptive-longrunning-techpreview
   interval: 168h
@@ -3149,11 +3314,16 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
 - as: e2e-gcp-disruptive-longrunning-techpreview
   interval: 168h
@@ -3162,20 +3332,38 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
+- as: e2e-vsphere-disruptive-longrunning
+  cron: 30 13 * * 6
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_ARGS: --disable-monitor=audit-log-analyzer,known-image-checker --run OCPFeatureGate|vsphere
+      TEST_SUITE: openshift/disruptive-longrunning
+    workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-disruptive-longrunning-techpreview
-  interval: 168h
+  cron: 30 17 * * 1
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer,known-image-checker --run OCPFeatureGate|vsphere
       TEST_SUITE: openshift/disruptive-longrunning
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-metal-ipi-ovn-ipv4-disruptive-longrunning-techpreview
   capabilities:
@@ -3188,7 +3376,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         FEATURE_SET=TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -3205,7 +3393,7 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         FEATURE_SET=TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
@@ -3222,25 +3410,89 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
     observers:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-single-node-disruptive-longrunning-techpreview
-  interval: 168h
+  cron: 57 18 * * 0
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_ARGS: --disable-monitor=audit-log-analyzer --run OCPFeatureGate|Feature
       TEST_SUITE: openshift/disruptive-longrunning
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ovn-haproxy28
+  cron: 31 21 * * 6
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-serial-haproxy28
+  cron: 9 3 * * 0
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-upgrade-haproxy28
+  cron: 39 2 * * 6
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-fips-haproxy28
+  cron: 58 21 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      HAPROXY_VERSION: "2.8"
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: fips-check
+    - ref: ingress-conf-haproxy-version
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift

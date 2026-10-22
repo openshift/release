@@ -35,7 +35,7 @@ Key distinction: self-managed sets `AZURE_SELF_MANAGED=true`, which skips the `-
 
 - Root cluster kubeconfig: `/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig`
 - Cluster name: derived from `PROW_JOB_ID` hash (same pattern as AWS)
-- Instance type: `Standard_D16s_v3` (default)
+- Instance type: `Standard_D16s_v5` (default)
 - Etcd storage class: `managed-csi-premium-v2` (Premium SSD v2, created during setup)
 - Base domain: `hcp-sm-azure.azure.devcluster.openshift.com`
 - Location: `centralus`

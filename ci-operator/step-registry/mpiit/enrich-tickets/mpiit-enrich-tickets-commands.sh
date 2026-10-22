@@ -318,7 +318,7 @@ def main():
         job_name = os.environ.get("JOB_NAME", "")
         build_id = os.environ.get("BUILD_ID", "")
 
-    gcs_bucket = "test-platform-results"
+    gcs_bucket = "test-platform-results-public"
     search_window = os.environ.get("FIREWATCH_ENRICH_SEARCH_WINDOW", "10")
     chai_api_url = os.environ.get("MPIIT__CHAI_API_URL", "")
     chai_api_token = os.environ.get("MPIIT__CHAI_API_TOKEN", "")

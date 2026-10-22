@@ -63,7 +63,8 @@ snyk_deps() {
         PARAMS+=(--all-projects)
     fi
     if [ "$SNYK_DEPS_ADDITIONAL_ARGS" ]; then
-        read -a PARAMS <<<"$SNYK_DEPS_ADDITIONAL_ARGS"
+        read -r -a extra <<<"$SNYK_DEPS_ADDITIONAL_ARGS"
+        PARAMS+=("${extra[@]}")
     fi
     ${SNYK_DIR}/snyk test "${PARAMS[@]}"
 }
@@ -76,7 +77,8 @@ snyk_code() {
     echo Starting snyk code scan
     PARAMS=(--project-name="$PROJECT_NAME" --org="$ORG_NAME"  --sarif-file-output="${ARTIFACT_DIR}/snyk.sarif.json" --report)
     if [ "$SNYK_CODE_ADDITIONAL_ARGS" ]; then
-        read -a PARAMS <<<"$SNYK_CODE_ADDITIONAL_ARGS"
+        read -r -a extra <<<"$SNYK_CODE_ADDITIONAL_ARGS"
+        PARAMS+=("${extra[@]}")
     fi
 
     if [ -z "${TARGET_REFERENCE}" ]; then

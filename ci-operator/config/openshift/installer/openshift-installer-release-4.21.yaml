@@ -61,25 +61,36 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
-  - dockerfile_path: images/installer/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.ci
     to: installer
-  - dockerfile_path: images/libvirt/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/libvirt/Dockerfile.ci
     to: libvirt-installer
-  - dockerfile_path: images/installer/Dockerfile.upi.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/installer/Dockerfile.upi.ci
     to: upi-installer
-  - dockerfile_path: images/openstack/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/openstack/Dockerfile.ci
     from: openstack-base
     inputs:
       openstack-base:
         as:
         - registry.ci.openshift.org/ocp/4.17:base-rhel9
     to: openstack-installer
-  - dockerfile_path: images/baremetal/Dockerfile.ci
+  - capabilities:
+    - intranet
+    dockerfile_path: images/baremetal/Dockerfile.ci
     to: baremetal-installer
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -93,7 +104,9 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
-  - dockerfile_literal: |
+  - capabilities:
+    - intranet
+    dockerfile_literal: |
       FROM src
       COPY oc /usr/bin/oc
       RUN ln -s /usr/bin/oc /usr/bin/kubectl
@@ -658,15 +671,6 @@ tests:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
 - always_run: false
-  as: e2e-metal-ovn-two-node-fencing
-  capabilities:
-  - intranet
-  optional: true
-  pipeline_run_if_changed: (baremetal|metal3|ironic)
-  steps:
-    cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-fencing
-- always_run: false
   as: e2e-metal-ipi-ovn
   capabilities:
   - intranet
@@ -811,7 +815,7 @@ tests:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/pr-logs/directory/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
@@ -865,7 +869,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -875,21 +878,20 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-upi
-  pipeline_run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
+  optional: true
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
     job_states_to_report:
     - failure
     - error
     report_template: |
-      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/{{.Spec.Job}}|View history>)
+      :red_jenkins_circle: :vsphere: Presubmit job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/pr-logs/directory/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
 - always_run: false
   as: e2e-vsphere-ovn-upi-zones
   optional: true
-  pipeline_run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
@@ -911,7 +913,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-multi-vcenter-ovn
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -922,7 +923,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-hybrid-env
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1059,8 +1059,8 @@ tests:
         export AUTH_FILE=/var/secrets/registry-pull-secret/.dockerconfigjson
         hack/go-integration-test.sh
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
-        name: registry-pull-credentials
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
@@ -1384,6 +1384,7 @@ tests:
     - ref: go-verify-deps
 - always_run: false
   as: e2e-azure-nat-gateway-single-zone
+  pipeline_run_if_changed: ^$
   steps:
     cluster_profile: openshift-org-azure
     env:

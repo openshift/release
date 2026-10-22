@@ -3,12 +3,15 @@ ref:
   from: agentic-dev
   commands: openshift-agentic-trt-review-responder-commands.sh
   credentials:
-  - namespace: test-credentials
-    name: hypershift-team-claude-prow
+  - collection: ci-claude-code
+    group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
-  - namespace: test-credentials
-    name: trt-agent-gh-app
+  - collection: technical-release-team
+    group: openshift-trt-agent-gh-app
     mount_path: /var/run/github-token
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
   env:
   - name: UPSTREAM_REPO
   - name: FORK_REPO
@@ -21,11 +24,16 @@ ref:
   - name: CLOUD_ML_REGION
     default: "global"
   - name: ANTHROPIC_VERTEX_PROJECT_ID
-    default: "itpc-gcp-hybrid-pe-eng-claude"
+    default: "openshift-ci-prow-agents"
   - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: "/var/run/claude-code-service-account/claude-prow"
+    default: "/var/run/claude-code-service-account/google-token"
   - name: CLAUDE_MODEL
     default: "claude-opus-4-6"
+  - name: GATE_MODEL
+    default: "claude-haiku-4-5"
+  - name: REGISTRY_AUTH_FILE
+    default: /var/run/registry-pull-credentials/.dockerconfigjson
+    documentation: Pull secret for nested-podman QCI/registry.ci image pulls.
   nested_podman: true
   resources:
     requests:
@@ -34,10 +42,19 @@ ref:
   timeout: 3h0m0s
   grace_period: 1m0s
   documentation: |-
-    Polls for review comments and CI check failures on a PR, invoking
-    Claude to address them. Checks every 5 minutes until at least 6
-    iterations have passed AND 3 consecutive idle iterations occur.
-    Fetches inline review comments, PR reviews, and PR conversation
-    comments. Checks presubmit CI status and attempts to fix failures.
-    Filters to trusted users only (openshift org members + coderabbit).
+    Polls every 5 minutes until at least 6 iterations have passed AND
+    3 consecutive idle iterations occur. A small-model gate runs the
+    has-review-work skill. COMMENT_WORK=yes invokes address-review-pr;
+    failing required CI invokes address-ci-failures once per PR HEAD. Review
+    comments are evaluated independently.
+    A short CI/security block matching jira-solver is prepended;
+    repo-specific REVIEW.md is appended last on the
+    review worker. Credential-dumping shell tools are disallowed. Bash
+    verifies the PR head repository, branch, SHA, and effective fork URLs,
+    then fetches and checks out the exact commit before workers run; pushes
+    remain limited to that fork ref.
+    Rewritten history uses a force-with-lease pinned to the captured SHA after
+    the PR head is revalidated; upstream and unrestricted force pushes are
+    never used. Mints a fresh GitHub App token (1h TTL) immediately before
+    comment workers and git push.
     Reads PR number from SHARED_DIR (written by jira-solver or pr-followup).

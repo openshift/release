@@ -30,20 +30,20 @@ usual changes to those files are::
           # Add sleep here if you need to do manual testing
           # connect to cluster and delete the cucushift-installer-wait pod when done
           SLEEP_DURATION: "0"
-          # Select the testsuit based on filters+scenarios
-          TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-          TEST_SCENARIOS: C00102
-          TEST_TIMEOUT: "75"
     zz_generated_metadata:
       # Set a sensible variant name like "downstream-1.9-release-4.18" or so
       variant: downstream-release
 
 The downstream jobs use custom steps, chains and workflows hosted at [here](../../../step-registry/sandboxed-containers-operator/). Please refer to [their documentation](../../../step-registry/sandboxed-containers-operator/README.md) for further information.
 
-### Development
+## Tests
 
-On workflow change or periodic update please use the
-[create-prowjob](../../../step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh)
-command to refresh the default templates using the pre-defined defaults
-by running: ``sandboxed-containers-operator-create-prowjob-commands.sh update_templates``.
-Avoid modifying the templates directly, always use the ``update_template``!
+The test phase runs the `sandboxed-containers-operator-testsuites-gate` step, which
+creates `${SHARED_DIR}/testsuites_gate` so the POST-phase test suites know pre/test
+setup completed successfully.
+
+For the actual tests, refer to the POST-phase test-suite chain documented in
+[the testsuites README](../../../step-registry/sandboxed-containers-operator/testsuites/README.md).
+It explains the non-blocking `sandboxed-containers-operator-testsuites` chain, the
+`TEST_<STEP_NAME>_ENABLE` convention, and the `skeleton`/`skeleton2` demo suites
+(disabled by default).

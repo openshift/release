@@ -79,7 +79,21 @@ ref:
     documentation: Restrict master API endpoint and application routes to direct, private connectivity.
   - name: PRIVATE_LINK
     default: "false"
-    documentation: Provides private connectivity between VPCs, AWS services, and your on-premises networks, without exposing your traffic to the public internet.
+    documentation: >-
+      Provides private connectivity between VPCs, AWS services, and your on-premises
+      networks, without exposing your traffic to the public internet. Classic clusters
+      only: per `rosa create cluster --hosted-cp --help`, --private-link is only to be
+      used with Classic clusters after ROSA CLI v1.2.55. For HCP clusters, set PRIVATE
+      plus PRIVATE_DEFAULT_INGRESS instead; PRIVATE_LINK=true on HCP is honored for
+      backward compatibility and maps to --default-ingress-private.
+  - name: PRIVATE_DEFAULT_INGRESS
+    default: "false"
+    documentation: >-
+      HCP only. Make the default apps ingress (router) listen internally, via
+      --default-ingress-private. Per the rosa CLI this is the HCP equivalent of classic
+      PrivateLink ingress privacy: "For Hosted Control Plane clusters, use the '--private'
+      and '--default-ingress-private' flags instead." Implies ENABLE_BYOVPC and
+      private-subnets-only. Ignored for Classic clusters.
   - name: ENABLE_PROXY
     default: "false"
     documentation: Use proxy to create HTTP/HTTPs connections outside the cluster.
@@ -110,6 +124,9 @@ ref:
   - name: CLUSTER_SECTOR
     default: ""
     documentation: Sector groups a set of service clusters for HCP. The supported values are [canary, main].
+  - name: ADDITIONAL_PROPERTIES
+    default: ""
+    documentation: Additional properties to pass to rosa create cluster via --properties flag. Comma-separated key:value pairs.
   - name: ENABLE_SHARED_VPC
     default: "no"
     documentation: Create a Shared VPC cluster.
@@ -137,5 +154,8 @@ ref:
   - name: ENABLE_BILLING_ACCOUNT
     default: "no"
     documentation: Enable the use of the billing account for billing subscriptions purchased via the AWS marketplace.
+  - name: EXTERNAL_AUTH_PROVIDERS_ENABLED
+    default: "false"
+    documentation: Set to 'true' to create the cluster with external authentication (external OIDC) enabled. Only supported for HOSTED_CP (HCP) clusters. When enabled an external auth provider must be configured after provisioning (see rosa-conf-external-oidc-create).
   documentation: |-
     Using rosa cli to create a rosa cluster with the provided cluster profile. The cluster profile should include the offline token ocm-token to login and .awscred to init the rosa environment.

@@ -7,6 +7,10 @@ base_images:
     name: "4.19"
     namespace: origin
     tag: operator-sdk
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -16,7 +20,6 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-5.0
-  use_build_cache: true
 images:
   items:
   - context_dir: .
@@ -64,7 +67,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.20"
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
+  skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -97,7 +100,7 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=opendatahub-operator
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 120m" -e OPERATOR_NAMESPACE=opendatahub-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
@@ -113,7 +116,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.20"
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
+  skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -121,9 +124,12 @@ tests:
       SOURCE_IMAGE_REF: opendatahub-operator-rhoai
     env:
       IMAGE_REPO: opendatahub-operator
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: redhat-ods-operator,redhat-ods-applications,redhat-ods-monitoring,rhoai-model-registries
     pre:
     - ref: ipi-install-rbac
     - ref: opendatahub-operator-e2e-cluster-preflight-health-check
+    - ref: opendatahub-io-ci-rhoai-quay-pull-secret
     test:
     - as: install
       cli: latest
@@ -145,17 +151,18 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 80m" -e OPERATOR_NAMESPACE=redhat-ods-operator
+        E2E_TEST_DSC_MONITORING_NAMESPACE=redhat-ods-monitoring make e2e-test -e ODH_PLATFORM_TYPE=rhoai -e E2E_TEST_FLAGS="-timeout 120m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e E2E_AUTO_RESOLVE=true
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
       timeout: 3h0m0s
+    - ref: tls-scanner-run
     workflow: generic-claim
 - as: opendatahub-operator-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator
@@ -174,7 +181,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-rhoai-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: opendatahub-operator-rhoai

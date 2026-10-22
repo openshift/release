@@ -222,7 +222,10 @@ EOF
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     echo "Setting proxy"
+    # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+    set +x
     source "${SHARED_DIR}/proxy-conf.sh"
+    set -x
 fi
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml

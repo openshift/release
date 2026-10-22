@@ -3,6 +3,31 @@ import glob
 import os
 
 
+def _get_base_repos_configmap_name(major_minor):
+    """Return the sharded ConfigMap name for a given OCP version.
+
+    The base-repos ConfigMap is split into shards to stay under the
+    Kubernetes 1 MB size limit.  The shard boundaries must match the
+    glob patterns configured in config_updater (_plugins.yaml):
+      - base-repos-4-early: 3.x, 4.1-4.15
+      - base-repos-4-mid:   4.16-4.19
+      - base-repos-4-late:  4.20-4.29
+      - base-repos-5:       5.x+
+    """
+    parts = major_minor.split('.')
+    major = int(parts[0])
+    minor = int(parts[1])
+
+    if major >= 5:
+        return 'base-repos-5'
+    # 4.x and 3.x series
+    if major <= 3 or minor <= 15:
+        return 'base-repos-4-early'
+    if minor <= 19:
+        return 'base-repos-4-mid'
+    return 'base-repos-4-late'
+
+
 def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
     hyphened_version = f'{major_minor.replace(".", "-")}'
     for repo_file in sorted(glob.glob(f'{clone_dir}/core-services/release-controller/_repos/ocp-{major_minor}-*.repo')):
@@ -143,7 +168,7 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                         'key': f'{bn}.repo',
                                         'path': f'{bn}.repo'
                                     }],
-                                    'name': 'base-repos'
+                                    'name': _get_base_repos_configmap_name(major_minor)
                                 },
                                 'name': 'repos'
                             },

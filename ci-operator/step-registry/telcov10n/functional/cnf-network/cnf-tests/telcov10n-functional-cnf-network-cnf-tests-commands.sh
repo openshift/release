@@ -63,7 +63,7 @@ BASTION_IP=$(cat /eco-ci-cd/inventories/cnf/host_vars/bastion | grep -oP '(?<=an
 BASTION_USER=$(cat /eco-ci-cd/inventories/cnf/group_vars/all | grep -oP '(?<=ansible_user: ).*'| sed "s/'//g")
 
 echo "Run cnf-tests via ssh tunnel"
-ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-features-deploy;./cnf-tests-run.sh || true"
+ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null $BASTION_USER@$BASTION_IP -i /tmp/temp_ssh_key "cd /tmp/cnf-features-deploy;./cnf-tests-run.sh || true"
 
 echo "Gather artifacts from bastion"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key $BASTION_USER@$BASTION_IP:/tmp/junit/cnftests-junit.xml ${ARTIFACT_DIR}/junit_test-result.xml || true

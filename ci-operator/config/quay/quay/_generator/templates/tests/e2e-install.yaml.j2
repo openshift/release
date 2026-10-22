@@ -1,0 +1,39 @@
+{% import "tests/_e2e-install.defaults.j2" as d %}
+tests:
+- steps:
+    env:
+      ENABLE_BUILD_SUPPORT: "true"
+{%- if fips %}
+      FIPS_ENABLED: "true"
+      # FEATURE_FIPS requires MAIL_USE_TLS, which Mailpit does not serve, so
+      # Mailpit stays off and the @feature:MAILING specs self-skip.
+      QUAY_DEPLOY_MAILPIT: "false"
+{%- endif %}
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+{%- if source == "nightly" %}
+      PLAYWRIGHT_REF_MODE: strict
+{%- endif %}
+{%- if storage == "odf" %}
+      SETUP_NOOBAA: "true"
+      QUAY_STORAGE_PROVIDER: odf
+{%- endif %}
+      QUAY_EXTRA_CONFIG: |
+{{ d.quay_extra_config(fips=fips, quay_version=quay_version | default("")) | indent(8, true) }}
+    test:
+{%- if fips %}
+    - ref: fips-check-fips-or-die
+{%- endif %}
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+{%- if storage == "odf" %}
+    - ref: quay-install-odf-operator
+{%- endif %}
+{%- if database_provision_ref %}
+    - ref: "{{ database_provision_ref }}"
+{%- endif %}
+    - ref: "{{ deploy_ref }}"
+    - ref: quay-test-e2e

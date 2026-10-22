@@ -1,0 +1,789 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: "5.0"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  previous-wmco:
+    name: "5.0"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  tls-scanner-tool:
+    name: "5.2"
+    namespace: ocp
+    tag: tls-scanner-tool
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: build/Dockerfile.ci
+    to: windows-machine-config-operator-test
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+operator:
+  bundles:
+  - as: wmco-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+    skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: pipeline:windows-machine-config-operator-test
+promotion:
+  to:
+  - additional_images:
+      windows-machine-config-operator-bundle: wmco-bundle
+    name: "5.2"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "5.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.2"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+  src:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+  windows-machine-config-operator-test:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+- as: unit
+  commands: make unit
+  container:
+    from: src
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+- as: security
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    env:
+      PROJECT_NAME: windows-machine-config-operator
+    workflow: openshift-ci-security
+- always_run: false
+  as: aws-e2e-operator
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: aws-e2e-ote
+  optional: true
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: aws-e2e-ote-techpreview
+  optional: true
+  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: enable-tls-adherence
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        kas_resource=kubeapiserver.operator.openshift.io/cluster
+        kas_namespace=openshift-kube-apiserver
+        poll_seconds=15
+        observe_attempts=60
+        rollout_timeout_seconds=1800
+        stable_seconds=300
+        latest_revision=""
+
+        revision_has_tls_adherence() {
+          local revision=$1 config
+          if ! config=$(oc --request-timeout=10s -n "${kas_namespace}" \
+               get configmap "config-${revision}" -o jsonpath='{.data.config\.yaml}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fq '"TLSAdherence=true"' <<< "${config}" \
+            && ! grep -Fq '"TLSAdherence=false"' <<< "${config}"
+        }
+
+        operator_observed_tls_adherence() {
+          local observed_feature_gates
+          if ! observed_feature_gates=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{range .spec.observedConfig.apiServerArguments.feature-gates[*]}{@}{"\n"}{end}' \
+               2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'TLSAdherence=true' <<< "${observed_feature_gates}" \
+            && ! grep -Fxq 'TLSAdherence=false' <<< "${observed_feature_gates}"
+        }
+
+        pod_revisions_are_current() {
+          local pod_revisions revision current_revision target_revision index
+          local pod_count=0
+          local -a revision_lines
+
+          if ! pod_revisions=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{.status.latestAvailableRevision}{"\n"}{range .status.nodeStatuses[*]}{.currentRevision}{"|"}{.targetRevision}{"\n"}{end}' \
+               2>/dev/null); then
+            return 1
+          fi
+          mapfile -t revision_lines <<< "${pod_revisions}"
+          revision=${revision_lines[0]:-}
+          [[ "${revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+
+          for ((index = 1; index < ${#revision_lines[@]}; index++)); do
+            IFS='|' read -r current_revision target_revision <<< "${revision_lines[$index]}"
+            [[ "${current_revision}" == "${revision}" ]] || return 1
+            [[ "${target_revision}" == 0 ]] || return 1
+            ((pod_count += 1))
+          done
+          (( pod_count > 0 ))
+        }
+
+        kube_apiserver_operator_condition_status() {
+          local condition_type=$1 conditions
+          if ! conditions=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' \
+               2>/dev/null); then
+            echo Unknown
+          elif grep -Fxq "${condition_type}=True" <<< "${conditions}"; then
+            echo True
+          elif grep -Fxq "${condition_type}=False" <<< "${conditions}"; then
+            echo False
+          else
+            echo Unknown
+          fi
+        }
+
+        clusteroperator_condition_status() {
+          local condition_type=$1 conditions
+          if ! conditions=$(oc --request-timeout=10s get clusteroperator kube-apiserver \
+               -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' \
+               2>/dev/null); then
+            echo Unknown
+          elif grep -Fxq "${condition_type}=True" <<< "${conditions}"; then
+            echo True
+          elif grep -Fxq "${condition_type}=False" <<< "${conditions}"; then
+            echo False
+          else
+            echo Unknown
+          fi
+        }
+
+        dump_diagnostics() {
+          local raw_value feature_set=Unknown adherence=Unknown diagnostic_revision=Unknown
+          local tls_adherence_enabled=false observed_gate=false revision_gate=false
+          local pod_revisions_current=false api_ready=false
+
+          if raw_value=$(oc --request-timeout=10s get featuregate cluster \
+               -o jsonpath='{.spec.featureSet}' 2>/dev/null); then
+            case "${raw_value}" in
+              ""|Default) feature_set=Default ;;
+              CustomNoUpgrade|TechPreviewNoUpgrade|DevPreviewNoUpgrade) feature_set=${raw_value} ;;
+            esac
+          fi
+          if raw_value=$(oc --request-timeout=10s get featuregate cluster \
+               -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' \
+               2>/dev/null) \
+            && grep -Fxq TLSAdherence <<< "${raw_value}"; then
+            tls_adherence_enabled=true
+          fi
+          if raw_value=$(oc --request-timeout=10s get apiserver cluster \
+               -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
+            case "${raw_value}" in
+              "") adherence=Unset ;;
+              StrictAllComponents|LegacyAdheringComponentsOnly) adherence=${raw_value} ;;
+            esac
+          fi
+          if raw_value=$(oc --request-timeout=10s get "${kas_resource}" \
+               -o jsonpath='{.status.latestAvailableRevision}' 2>/dev/null) \
+            && [[ "${raw_value}" =~ ^[1-9][0-9]*$ ]]; then
+            diagnostic_revision=${raw_value}
+          fi
+          if operator_observed_tls_adherence; then
+            observed_gate=true
+          fi
+          if [[ "${diagnostic_revision}" =~ ^[1-9][0-9]*$ ]] \
+            && revision_has_tls_adherence "${diagnostic_revision}"; then
+            revision_gate=true
+          fi
+          if pod_revisions_are_current; then
+            pod_revisions_current=true
+          fi
+          if oc --request-timeout=10s get --raw=/readyz >/dev/null 2>&1; then
+            api_ready=true
+          fi
+
+          echo "--- TLS adherence rollout diagnostics (allowlisted fields only) ---"
+          echo "feature_set=${feature_set}"
+          echo "tls_adherence_enabled=${tls_adherence_enabled}"
+          echo "tls_adherence=${adherence}"
+          echo "latest_revision=${diagnostic_revision}"
+          echo "observed_gate=${observed_gate}"
+          echo "revision_gate=${revision_gate}"
+          echo "pod_revisions_current=${pod_revisions_current}"
+          echo "kube_apiserver_operator.StaticPodsAvailable=$(kube_apiserver_operator_condition_status StaticPodsAvailable)"
+          echo "kube_apiserver_operator.NodeInstallerProgressing=$(kube_apiserver_operator_condition_status NodeInstallerProgressing)"
+          echo "kube_apiserver_operator.NodeControllerDegraded=$(kube_apiserver_operator_condition_status NodeControllerDegraded)"
+          echo "clusteroperator_kube_apiserver.Available=$(clusteroperator_condition_status Available)"
+          echo "clusteroperator_kube_apiserver.Progressing=$(clusteroperator_condition_status Progressing)"
+          echo "clusteroperator_kube_apiserver.Degraded=$(clusteroperator_condition_status Degraded)"
+          echo "api_ready=${api_ready}"
+        }
+
+        rollout_and_health_are_stable() {
+          local operator_state kas_conditions co_conditions node_count=0
+          local node_name current_revision target_revision index
+          local -a state_lines
+
+          if ! operator_state=$(oc --request-timeout=10s get "${kas_resource}" -o jsonpath='{.status.latestAvailableRevision}{"\n"}{range .status.nodeStatuses[*]}{.nodeName}{"|"}{.currentRevision}{"|"}{.targetRevision}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          mapfile -t state_lines <<< "${operator_state}"
+          latest_revision=${state_lines[0]:-}
+          [[ "${latest_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+
+          if [[ "${baseline_is_noop}" != true ]] && (( latest_revision <= baseline_revision )); then
+            return 1
+          fi
+          revision_has_tls_adherence "${latest_revision}" || return 1
+
+          for ((index = 1; index < ${#state_lines[@]}; index++)); do
+            IFS='|' read -r node_name current_revision target_revision <<< "${state_lines[$index]}"
+            [[ -n "${node_name}" && "${current_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
+            [[ "${current_revision}" == "${latest_revision}" ]] || return 1
+            [[ "${target_revision}" == 0 ]] || return 1
+            ((node_count += 1))
+          done
+          (( node_count > 0 )) || return 1
+
+          if ! kas_conditions=$(oc --request-timeout=10s get "${kas_resource}" -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'StaticPodsAvailable=True' <<< "${kas_conditions}" || return 1
+          grep -Fxq 'NodeInstallerProgressing=False' <<< "${kas_conditions}" || return 1
+          grep -Fxq 'NodeControllerDegraded=False' <<< "${kas_conditions}" || return 1
+
+          if ! co_conditions=$(oc --request-timeout=10s get clusteroperator kube-apiserver -o jsonpath='{range .status.conditions[*]}{.type}{"="}{.status}{"\n"}{end}' 2>/dev/null); then
+            return 1
+          fi
+          grep -Fxq 'Available=True' <<< "${co_conditions}" || return 1
+          grep -Fxq 'Progressing=False' <<< "${co_conditions}" || return 1
+          grep -Fxq 'Degraded=False' <<< "${co_conditions}" || return 1
+
+          oc --request-timeout=10s get --raw=/readyz >/dev/null 2>&1
+        }
+
+        if ! baseline_revision=$(oc --request-timeout=10s get "${kas_resource}" \
+             -o jsonpath='{.status.latestAvailableRevision}' 2>/dev/null); then
+          echo "ERROR: cannot read the baseline kube-apiserver revision"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ ! "${baseline_revision}" =~ ^[1-9][0-9]*$ ]]; then
+          echo "ERROR: invalid baseline kube-apiserver revision"
+          dump_diagnostics
+          exit 1
+        fi
+
+        if ! baseline_config=$(oc --request-timeout=10s -n "${kas_namespace}" \
+             get configmap "config-${baseline_revision}" -o jsonpath='{.data.config\.yaml}' \
+             2>/dev/null); then
+          echo "ERROR: cannot read baseline kube-apiserver config revision ${baseline_revision}"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ -z "${baseline_config}" ]]; then
+          echo "ERROR: baseline kube-apiserver config revision ${baseline_revision} has no config.yaml payload"
+          dump_diagnostics
+          exit 1
+        fi
+        if ! baseline_feature_set=$(oc --request-timeout=10s get featuregate cluster \
+             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
+          || ! baseline_enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! baseline_disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! baseline_adherence=$(oc --request-timeout=10s get apiserver cluster \
+            -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null) \
+          || ! baseline_observed_feature_gates=$(oc --request-timeout=10s get "${kas_resource}" \
+            -o jsonpath='{range .spec.observedConfig.apiServerArguments.feature-gates[*]}{@}{"\n"}{end}' \
+            2>/dev/null); then
+          echo "ERROR: cannot read the pre-patch TLS adherence state"
+          dump_diagnostics
+          exit 1
+        fi
+
+        baseline_is_noop=false
+        if [[ "${baseline_feature_set}" == CustomNoUpgrade ]] \
+          && [[ "${baseline_enabled_gates}" == TLSAdherence ]] \
+          && ! grep -Fxq TLSAdherence <<< "${baseline_disabled_gates}" \
+          && [[ "${baseline_adherence}" == StrictAllComponents ]] \
+          && grep -Fxq 'TLSAdherence=true' <<< "${baseline_observed_feature_gates}" \
+          && ! grep -Fxq 'TLSAdherence=false' <<< "${baseline_observed_feature_gates}" \
+          && grep -Fq '"TLSAdherence=true"' <<< "${baseline_config}" \
+          && ! grep -Fq '"TLSAdherence=false"' <<< "${baseline_config}"; then
+          baseline_is_noop=true
+        fi
+        echo "Baseline kube-apiserver revision: ${baseline_revision}; exact desired state already active: ${baseline_is_noop}"
+
+        echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
+        if ! oc --request-timeout=10s patch featuregate cluster --type=merge \
+             -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}' \
+             >/dev/null 2>&1; then
+          echo "ERROR: failed to enable TLSAdherence via CustomNoUpgrade"
+          dump_diagnostics
+          exit 1
+        fi
+
+        echo "Setting tlsAdherence=StrictAllComponents (retry until the API accepts the field)..."
+        ok=false
+        for i in $(seq 1 60); do
+          if oc --request-timeout=10s patch apiserver cluster --type=merge \
+               -p '{"spec":{"tlsAdherence":"StrictAllComponents"}}' >/dev/null 2>&1 \
+             && [ "$(oc --request-timeout=10s get apiserver cluster -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null)" = "StrictAllComponents" ]; then
+            ok=true; echo "tlsAdherence=StrictAllComponents accepted (iteration $i)"; break
+          fi
+          echo "  waiting for apiserver schema/gate (i=$i)..."; sleep "${poll_seconds}"
+        done
+        if [[ "${ok}" != true ]]; then
+          echo "ERROR: tlsAdherence never accepted StrictAllComponents"
+          dump_diagnostics
+          exit 1
+        fi
+
+        echo "Waiting for the kube-apiserver operator to observe TLSAdherence=true..."
+        observed=false
+        for i in $(seq 1 "${observe_attempts}"); do
+          if operator_observed_tls_adherence; then
+            observed=true
+            echo "kube-apiserver operator observed TLSAdherence=true (iteration $i)"
+            break
+          fi
+          echo "  waiting for kube-apiserver observed configuration (i=$i/${observe_attempts})..."
+          sleep "${poll_seconds}"
+        done
+        if [[ "${observed}" != true ]]; then
+          echo "ERROR: kube-apiserver operator did not observe TLSAdherence=true"
+          dump_diagnostics
+          exit 1
+        fi
+
+        echo "Waiting for the TLS-enabled revision to finish and remain healthy for ${stable_seconds}s..."
+        deadline=$(( $(date +%s) + rollout_timeout_seconds ))
+        stable_since=0
+        stable_revision=""
+        stable_complete=false
+        while (( $(date +%s) < deadline )); do
+          if rollout_and_health_are_stable; then
+            now=$(date +%s)
+            if (( stable_since == 0 )) || [[ "${stable_revision}" != "${latest_revision}" ]]; then
+              stable_since=${now}
+              stable_revision=${latest_revision}
+              echo "  rollout is complete at revision ${latest_revision}; starting sustained health window"
+            fi
+            stable_for=$(( now - stable_since ))
+            echo "  revision ${latest_revision} and API healthy for ${stable_for}/${stable_seconds}s"
+            if (( stable_for >= stable_seconds )); then
+              stable_complete=true
+              break
+            fi
+          else
+            if (( stable_since != 0 )); then
+              echo "  rollout/API health changed; resetting sustained health window"
+            fi
+            stable_since=0
+            stable_revision=""
+          fi
+          sleep "${poll_seconds}"
+        done
+        if [[ "${stable_complete}" != true ]]; then
+          echo "ERROR: kube-apiserver rollout did not reach sustained health before timeout"
+          dump_diagnostics
+          exit 1
+        fi
+
+        if ! feature_set=$(oc --request-timeout=10s get featuregate cluster \
+             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
+          || ! enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
+            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
+          || ! adherence=$(oc --request-timeout=10s get apiserver cluster \
+            -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
+          echo "ERROR: failed to read final TLS adherence settings"
+          dump_diagnostics
+          exit 1
+        fi
+        if [[ "${feature_set}" != CustomNoUpgrade ]] \
+          || [[ "${enabled_gates}" != TLSAdherence ]] \
+          || grep -Fxq TLSAdherence <<< "${disabled_gates}" \
+          || [[ "${adherence}" != StrictAllComponents ]]; then
+          echo "ERROR: final TLS adherence settings do not match the requested configuration"
+          dump_diagnostics
+          exit 1
+        fi
+        echo "Waiting for the cluster to stabilize..."
+        if ! oc adm wait-for-stable-cluster --timeout=30m >/dev/null 2>&1; then
+          echo "ERROR: cluster did not stabilize after TLS adherence configuration"
+          dump_diagnostics
+          exit 1
+        fi
+        echo "TLSAdherence enabled; kube-apiserver revision ${latest_revision} is rolled out and sustainably healthy."
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
+  as: vsphere-disconnected-e2e-operator
+  optional: true
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      ENABLE_IDMS: "yes"
+      MIRROR_BIN: oc-mirror
+      PAUSE_IMAGE_ORG: test-org
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
+- always_run: false
+  as: azure-e2e-operator
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: gcp-e2e-operator
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
+  as: vsphere-e2e-operator
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: azure-e2e-upgrade
+  pipeline_skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: openshift-org-azure
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        # Deploy the bundle which will fail to come up due to it pointing to the operator image via a tag that is only
+        # available to the presubmit job it is created within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been promoted.
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$PREVIOUS_BUNDLE" \
+        || oc get csv -n $WMCO_NS |awk {'print $1'} | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
+        sleep 10
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+      - env: PREVIOUS_OPERATOR
+        name: previous-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: platform-none-vsphere-e2e-operator
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test-byoh
+    workflow: windows-e2e-operator-test-platform-none-vsphere
+- always_run: false
+  as: vsphere-proxy-e2e-operator
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+- always_run: false
+  as: vsphere-proxy-e2e-ote
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
+- always_run: false
+  as: wicd-unit-vsphere
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: vsphere-elastic
+    post:
+    - chain: upi-vsphere-windows-post
+    pre:
+    - ref: ipi-install-rbac
+    - ref: ipi-conf
+    - ref: ipi-conf-vsphere-check
+    - ref: ipi-conf-vsphere-check-vcm
+    - ref: upi-conf-vsphere-vcm
+    - ref: upi-conf-vsphere-dns
+    - chain: upi-vsphere-windows-pre
+    test:
+    - ref: windows-unit-wicd
+- as: community-fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: community-5.1
+      SOURCE_BRANCH: release-5.1
+    workflow: windows-ci-fastforward
+- always_run: false
+  as: nutanix-e2e-operator
+  cluster: build01
+  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: nutanix
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: nutanix-e2e-ote
+  cluster: build01
+  optional: true
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  steps:
+    cluster_profile: nutanix
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: tls-scanner
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_REPLICAS: "1"
+      SCAN_NAMESPACE: openshift-windows-machine-config-operator
+    test:
+    - ref: openshift-windows-install-wmco
+    - ref: tls-scanner-run
+    workflow: ipi-aws-ovn-hybrid
+zz_generated_metadata:
+  branch: release-5.2
+  org: openshift
+  repo: windows-machine-config-operator
