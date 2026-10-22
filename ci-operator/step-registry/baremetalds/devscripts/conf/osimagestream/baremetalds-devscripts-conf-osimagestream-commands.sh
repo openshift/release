@@ -59,13 +59,23 @@ if [[ -z "${initial_version}" ]]; then
   exit 1
 fi
 
-if [[ ! "${initial_version}" =~ ^([0-9]+)\.([0-9]+)([.-].*)?$ ]]; then
+# Accept only a complete release version, so that an unexpected or truncated metadata value can
+# never be read as a supported release. The grammar is major.minor.patch with the optional
+# prerelease and build identifiers OpenShift actually publishes, for example 4.23.0,
+# 4.23.0-ec.2, 4.23.0-rc.1, 4.23.0-0.nightly-2026-10-20-000000 and 4.23.0-0.ci-2026-10-20-000000.
+# Each identifier must be non-empty, so trailing separators and empty suffixes are rejected, and
+# no character class admits whitespace, so an embedded space or newline is rejected too.
+identifier='[0-9A-Za-z-]+'
+version_re="^([0-9]+)\.([0-9]+)\.([0-9]+)(-${identifier}(\.${identifier})*)?(\+${identifier}(\.${identifier})*)?$"
+
+if [[ "${initial_version}" =~ [[:space:]] || ! "${initial_version}" =~ ${version_re} ]]; then
   echo "ERROR: OSSTREAM=${OSSTREAM} was requested but the initial release version"
-  echo "ERROR: '${initial_version}' could not be parsed. Refusing to guess."
+  echo "ERROR: '${initial_version}' is not a complete release version. Refusing to guess."
   exit 1
 fi
-major="${BASH_REMATCH[1]}"
-minor="${BASH_REMATCH[2]}"
+# Base 10 is explicit so that a zero-padded component is never read as octal.
+major=$(( 10#${BASH_REMATCH[1]} ))
+minor=$(( 10#${BASH_REMATCH[2]} ))
 
 if (( major < 4 || ( major == 4 && minor < 23 ) )); then
   echo "Initial release ${initial_version} does not enable the OSStreams feature gate by default,"
