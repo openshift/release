@@ -21,6 +21,15 @@ chain:
     skips in-workflow CleanClusterByProfile and persists clean state to SHARED_DIR.
     Without defer, gather runs after destroy and must-gather is empty.
 
+    Guest gather is gated by SHARED_DIR/ocm-fvt-gather-eligible written by
+    rosa-e2e-ocm-fvt when OCM_FVT_DEFER_CLEAN=true:
+    - "true": cluster.ini State=ready (and guest API reachable when oc is
+      available); guest-kubeconfig proceeds; must-gather/extra run.
+    - "false" / other: guest-kubeconfig clears kubeconfig and skips; must-gather
+      and gather-extra no-op (avoids DNS failures when install never finished
+      or the cluster was already deleted).
+    - file absent: proceed (jobs that do not provision a cluster / legacy).
+
     Kept separate from rosa-gather-hcp-diagnostics so workflows that already
     include rosa-cluster-deprovision -> gather (rosa-e2e-hcp*) do not hit
     duplicate step-name registry errors. All steps are best-effort.

@@ -10,30 +10,15 @@ tests:
       QUAY_DEPLOY_MAILPIT: "false"
 {%- endif %}
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+{%- if source == "nightly" %}
+      PLAYWRIGHT_REF_MODE: strict
+{%- endif %}
 {%- if storage == "odf" %}
       SETUP_NOOBAA: "true"
       QUAY_STORAGE_PROVIDER: odf
 {%- endif %}
       QUAY_EXTRA_CONFIG: |
-        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
-        FEATURE_USER_METADATA: true
-        FEATURE_IMMUTABLE_TAGS: true
-        FEATURE_SPARSE_INDEX: true
-        FEATURE_QUOTA_NOTIFICATIONS: true
-        FEATURE_EDIT_QUOTA: true
-        FEATURE_CHANGE_TAG_EXPIRATION: true
-        FEATURE_IMAGE_PULL_STATS: false
-        LOG_ARCHIVE_LOCATION: default
-        ACTION_LOG_ARCHIVE_LOCATION: default
-        SESSION_TIMEOUT: 2h
-        DEFAULT_UI: react
-        SUPER_USERS:
-          - admin
-        GLOBAL_READONLY_SUPER_USERS:
-          - readonly
-{%- if fips %}
-        FEATURE_FIPS: true
-{%- endif %}
+{{ d.quay_extra_config(fips=fips, quay_version=quay_version | default("")) | indent(8, true) }}
     test:
 {%- if fips %}
     - ref: fips-check-fips-or-die
@@ -46,6 +31,9 @@ tests:
     - ref: quay-deploy-jaeger
 {%- if storage == "odf" %}
     - ref: quay-install-odf-operator
+{%- endif %}
+{%- if database_provision_ref %}
+    - ref: "{{ database_provision_ref }}"
 {%- endif %}
     - ref: "{{ deploy_ref }}"
     - ref: quay-test-e2e

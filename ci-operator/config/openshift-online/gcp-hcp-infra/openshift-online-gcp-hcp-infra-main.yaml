@@ -135,6 +135,43 @@ tests:
   steps:
     cluster_profile: platform-gcp
     workflow: gcp-hcp-e2e
+- always_run: false
+  as: e2e-hostedcluster-int
+  cron: 0 3,15 * * 1-5
+  presubmit: true
+  steps:
+    cluster_profile: platform-gcp
+    env:
+      E2E_STATUS_CONTEXT: e2e/hostedcluster-int
+      E2E_STATUS_TARGETS: '[{"branch":"environment/sector-integration-main","contexts":["Terraform
+        Cloud/hp-platform-engineering/repo-id-ZPRY7TkFRLq4VMVP","ArgoCD/root-app-int-reg-us-c1-nkcw-gke","ArgoCD/root-app-int-mgt-us-c1-yjiv-gke"]}]'
+      E2E_TARGET_API_ENDPOINT: https://platform-api-us-central1-nkcw.int.gcp-hcp.devshift.net
+      E2E_TARGET_CUSTOMER_PROJECT_ID: int-ci-cust-us-c1
+      E2E_TARGET_ENV: integration
+      E2E_TARGET_OIDC_ENDPOINT: https://oidc.int-reg-us-c1-nkcw.int.gcp-hcp.devshift.net
+      E2E_TARGET_REGION: us-central1
+      GCPHCPCTL_AUTHZ_BOOTSTRAP: "false"
+      HC_CLEANUP_ON_FAILURE: "true"
+    workflow: gcp-hcp-e2e-on-demand
+- always_run: false
+  as: e2e-hostedcluster-stg
+  cron: 0 4,16 * * 1-5
+  presubmit: true
+  steps:
+    cluster_profile: platform-gcp
+    env:
+      E2E_STATUS_CONTEXT: e2e/hostedcluster-stg
+      E2E_STATUS_TARGETS: '[{"branch":"environment/sector-stage-main","check_runs":["terraform-apply/environment/sector-stage-main","argocd-health/environment/sector-stage-main"]}]'
+      E2E_TARGET_API_ENDPOINT: https://platform-api-us-west1-cvxu.stg.gcp-hcp.devshift.net
+      E2E_TARGET_CUSTOMER_PROJECT_ID: stg-ci-cust-us-w1
+      E2E_TARGET_ENV: stage
+      E2E_TARGET_OIDC_ENDPOINT: https://oidc.stg-reg-us-w1-cvxu.stg.gcp-hcp.devshift.net
+      E2E_TARGET_REGION: us-west1
+      GCPHCPCTL_AUTHZ_BOOTSTRAP: "false"
+      HC_CHANNEL_GROUP: stable
+      HC_CLEANUP_ON_FAILURE: "true"
+      HC_VERSION: 4.22.14
+    workflow: gcp-hcp-e2e-on-demand
 - as: generate-bin
   postsubmit: true
   steps:

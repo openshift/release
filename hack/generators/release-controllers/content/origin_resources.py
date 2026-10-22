@@ -228,6 +228,11 @@ def add_okd_deployments(gendoc):
                                 }
                             },
                             {
+                                "resources": {
+                                    "requests": {
+                                        "memory": "11Gi"
+                                    },
+                                },
                                 "command": [
                                     "/usr/bin/release-controller",
                                     f"--release-namespace={context.is_namespace}",
@@ -299,6 +304,11 @@ def add_okd_deployments(gendoc):
                         "initContainers": get_oc_prepare_container(),
                         "containers": [
                             {
+                                "resources": {
+                                    "requests": {
+                                        "memory": "4Gi"
+                                    },
+                                },
                                 "command": [
                                     "/usr/bin/release-controller-api",
                                     f"--release-namespace={context.is_namespace}",

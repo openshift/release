@@ -18,6 +18,7 @@ ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 STORAGE_ENCRYPTION=${STORAGE_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 DISABLE_SCP_CHECKS=${DISABLE_SCP_CHECKS:-false}
+EXTERNAL_AUTH_PROVIDERS_ENABLED=${EXTERNAL_AUTH_PROVIDERS_ENABLED:-false}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 ENABLE_PROXY=${ENABLE_PROXY:-false}
 BYO_OIDC=${BYO_OIDC:-false}
@@ -26,6 +27,7 @@ FIPS=${FIPS:-false}
 POD_CIDR=${POD_CIDR:-""}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
+PRIVATE_DEFAULT_INGRESS=${PRIVATE_DEFAULT_INGRESS:-false}
 PRIVATE_SUBNET_ONLY="false"
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
@@ -449,7 +451,8 @@ cat > ${cluster_config_file} << EOF
   "enable_customer_managed_key": ${STORAGE_ENCRYPTION},
   "fips": ${FIPS},
   "private": ${PRIVATE},
-  "private_link": ${PRIVATE_LINK}
+  "private_link": ${PRIVATE_LINK},
+  "default_ingress_private": ${PRIVATE_DEFAULT_INGRESS}
 }
 EOF
 
@@ -634,10 +637,25 @@ fi
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
+    # HCP has no PrivateLink concept (see `rosa create cluster --hosted-cp --help`):
+    # honor PRIVATE_LINK=true on HCP for backward compatibility by mapping it to
+    # the HCP ingress-privacy flag. New HCP jobs should use PRIVATE_DEFAULT_INGRESS.
     PRIVATE_LINK_SWITCH="--default-ingress-private"
   else
     PRIVATE_LINK_SWITCH="--private-link"
   fi
+
+  ENABLE_BYOVPC="true"
+  PRIVATE_SUBNET_ONLY="true"
+fi
+
+PRIVATE_DEFAULT_INGRESS_SWITCH=""
+if [[ "$PRIVATE_DEFAULT_INGRESS" == "true" ]]; then
+  # HCP-only: make the default apps ingress (router) listen internally
+  # (--default-ingress-private). Per the rosa CLI this is the HCP equivalent of
+  # classic PrivateLink ingress privacy: "For Hosted Control Plane clusters, use
+  # the '--private' and '--default-ingress-private' flags instead."
+  PRIVATE_DEFAULT_INGRESS_SWITCH="--default-ingress-private"
 
   ENABLE_BYOVPC="true"
   PRIVATE_SUBNET_ONLY="true"
@@ -772,6 +790,17 @@ if [[ "$NO_CNI" == "true" ]]; then
   NO_CNI_SWITCH="--no-cni"
 fi
 
+# External authentication (external OIDC) is an HCP-only, day-1 immutable feature.
+EXTERNAL_AUTH_SWITCH=""
+if [[ "$EXTERNAL_AUTH_PROVIDERS_ENABLED" == "true" ]]; then
+  if [[ "$HOSTED_CP" != "true" ]]; then
+    echo -e "EXTERNAL_AUTH_PROVIDERS_ENABLED is only supported for HCP (HOSTED_CP=true) clusters."
+    exit 1
+  fi
+  EXTERNAL_AUTH_SWITCH="--external-auth-providers-enabled"
+  record_cluster "external_auth_config" "enabled" "true"
+fi
+
 # Save the cluster config to ARTIFACT_DIR
 cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
 
@@ -795,6 +824,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  Enable external auth providers: ${EXTERNAL_AUTH_PROVIDERS_ENABLED}"
 echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 echo "  Additional Security groups: ${ADDITIONAL_SECURITY_GROUP}"
@@ -844,6 +874,7 @@ ${FIPS_SWITCH} \
 ${POD_CIDR_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
+${PRIVATE_DEFAULT_INGRESS_SWITCH} \
 ${PROXY_SWITCH} \
 ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \
@@ -854,6 +885,7 @@ ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${SHARED_VPC_SWITCH} \
 ${SECURITY_GROUP_ID_SWITCH} \
 ${NO_CNI_SWITCH} \
+${EXTERNAL_AUTH_SWITCH} \
 ${CONFIGURE_CLUSTER_AUTOSCALER_SWITCH} \
 ${BILLING_ACCOUNT_SWITCH} \
 ${DRY_RUN_SWITCH}

@@ -7,18 +7,6 @@ base_images:
     name: scos-5.1
     namespace: origin
     tag: base-stream10
-  origin_scos-5.1_cli:
-    name: scos-5.1
-    namespace: origin
-    tag: cli
-  origin_scos-5.1_etcd:
-    name: scos-5.1
-    namespace: origin
-    tag: etcd
-  origin_scos-5.1_hyperkube:
-    name: scos-5.1
-    namespace: origin
-    tag: hyperkube
   origin_scos-5.1_installer-etcd-artifacts:
     name: scos-5.1
     namespace: origin
@@ -34,52 +22,6 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-5.0
 images:
   items:
-  - build_args:
-    - name: TAGS
-      value: scos
-    capabilities:
-    - intranet
-    dockerfile_path: images/installer/Dockerfile.upi.ci
-    from: origin_scos-5.1_base-stream10
-    inputs:
-      ocp_builder_rhel-9-golang-1.26-openshift-5.0:
-        as:
-        - builder
-        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
-      origin_scos-5.1_cli:
-        as:
-        - cli
-        - registry.ci.openshift.org/ocp/4.22:cli
-      origin_scos-5.1_installer-etcd-artifacts:
-        as:
-        - etcd-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
-      origin_scos-5.1_installer-kube-apiserver-artifacts:
-        as:
-        - kas-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
-    to: upi-installer
-  - build_args:
-    - name: TAGS
-      value: scos
-    capabilities:
-    - intranet
-    dockerfile_path: images/baremetal/Dockerfile.ci
-    from: origin_scos-5.1_base-stream10
-    inputs:
-      ocp_builder_rhel-9-golang-1.26-openshift-5.0:
-        as:
-        - builder
-        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
-      origin_scos-5.1_etcd:
-        as:
-        - etcd
-        - registry.ci.openshift.org/ocp/4.22:etcd
-      origin_scos-5.1_hyperkube:
-        as:
-        - kas
-        - registry.ci.openshift.org/ocp/4.22:hyperkube
-    to: baremetal-installer
   - build_args:
     - name: TAGS
       value: scos
@@ -137,10 +79,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  baremetal-installer:
-    requests:
-      cpu: "3"
-      memory: 5Gi
   installer:
     requests:
       cpu: "3"
@@ -150,10 +88,6 @@ resources:
       cpu: "3"
       memory: 5Gi
   src:
-    requests:
-      cpu: "3"
-      memory: 5Gi
-  upi-installer:
     requests:
       cpu: "3"
       memory: 5Gi

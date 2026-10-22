@@ -351,6 +351,8 @@ CONFIG = {
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
+    'aro-hcp-stg-westus3-shard0-slot': {},
+    'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
     'aro-hcp-arm-helper-sp-dev': {},
@@ -423,6 +425,11 @@ CONFIG = {
     # capacity carved from lnxocp11 oz-0-2 below; keep explicit arm64 lease name.
     'libvirt-s390x-vpn-arm64-quota-slice': {
         'libvirt-s390x-arm64-0-0': 1
+    },
+    # Orange zone (OZ) VPN IPv6: additional 5th concurrent lease on lnxocp12 (LPAR12).
+    # vpn-oz keeps oz-1-0..oz-1-3; this profile adds vpn-ipv6-0-0 as new capacity.
+    'libvirt-s390x-vpn-ipv6-quota-slice': {
+        'libvirt-s390x-vpn-ipv6-0-0': 1
     },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
@@ -550,6 +557,9 @@ CONFIG = {
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
+    },
+    'ibmcloud-quay-quota-slice': {
+        'us-east': 4,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
@@ -770,6 +780,9 @@ CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 # GSM: arm64-0-0 ← oz-0-2; vpn-amd64-0-0 ← oz-0-3; vpn-amd64-0-1 ← oz-0-1.
 # vpn-oz retains oz-0-0 on lnxocp11.
 
+# IPv6 on OZ lnxocp12 (LPAR12): new 5th concurrent lease (vpn-oz keeps oz-1-0..oz-1-3).
+# GSM: libvirt-s390x-vpn-ipv6-0-0 hostname/IPs on lnxocp12.
+
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
     CONFIG['libvirt-s390x-vpn-virt-quota-slice']['libvirt-s390x-virt-{}-0'.format(i)] = 1
@@ -877,6 +890,10 @@ for i in range(4):
     CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(21):
+    CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
 for i in range(20):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1

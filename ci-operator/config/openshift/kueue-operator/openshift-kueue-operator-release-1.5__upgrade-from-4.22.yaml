@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.22"
+    name: "5.0"
     namespace: ocp
     tag: cli
   upi-installer:
@@ -43,13 +43,48 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "5.0"
 resources:
   '*':
     requests:
       cpu: "4"
       memory: 4Gi
 tests:
+- always_run: false
+  as: e2e-ocp-upgrade-4-22-to-5-0-kueue-1-5
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-5
+      OPERAND_COMPONENT: kueue-operand-1-5
+      OPERATOR_COMPONENT: kueue-operator-1-5
+    post:
+    - as: kueue-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+      timeout: 20m0s
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: kueue-operator-image-env-setup
+    - ref: cert-manager-install-operator
+    - ref: kueue-operator-test-upgrade-install-bundle
+    - ref: kueue-operator-test-upgrade-setup-cr
+    test:
+    - chain: kueue-operator-test-ocp-upgrade
 - always_run: false
   as: e2e-operator-upgrade-4-22-kueue-1-4-to-1-5
   optional: true

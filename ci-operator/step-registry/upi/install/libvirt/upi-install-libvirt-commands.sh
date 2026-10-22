@@ -79,6 +79,59 @@ LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
+# Heterogeneous VPN installs only (ENSURE_LIBVIRT_NETWORK=true from
+# upi-install-libvirt-heterogeneous). Homogeneous / other consumers keep prior behavior.
+ensure_libvirt_network() {
+  echo "Verifying libvirt network '${CLUSTER_NAME}' on ${LIBVIRT_CONNECTION}..."
+  ${VIRSH} net-list --all || true
+
+  if ! ${VIRSH} net-info "${CLUSTER_NAME}" >/dev/null 2>&1; then
+    if [[ ! -f "${SHARED_DIR}/network.xml" ]]; then
+      echo "ERROR: Libvirt network '${CLUSTER_NAME}' not found and ${SHARED_DIR}/network.xml is missing"
+      exit 1
+    fi
+    echo "WARNING: Libvirt network '${CLUSTER_NAME}' missing; re-defining from network.xml..."
+    local bridge_name
+    bridge_name=$(grep -oP "(?<=<bridge name=')[^']+" "${SHARED_DIR}/network.xml" || true)
+    if [[ -n "${bridge_name}" ]]; then
+      local net net_bridge
+      for net in $(${VIRSH} net-list --all --name 2>/dev/null); do
+        [[ -z "${net}" ]] && continue
+        net_bridge=$(${VIRSH} net-info "${net}" 2>/dev/null | awk '/^Bridge:/{print $2}' || true)
+        if [[ "${net_bridge}" == "${bridge_name}" ]]; then
+          # Only reclaim networks owned by this lease; never destroy a concurrent job's network.
+          if [[ "${net}" == "${LEASED_RESOURCE}" || "${net}" == "${LEASED_RESOURCE}-"* || "${net}" == "${LEASED_RESOURCE}."* ]]; then
+            echo "Removing stale lease network '${net}' holding bridge ${bridge_name}..."
+            ${VIRSH} net-destroy "${net}" 2>/dev/null || true
+            ${VIRSH} net-undefine "${net}" 2>/dev/null || true
+          else
+            echo "ERROR: bridge ${bridge_name} is held by foreign network '${net}'; refusing to reclaim" >&2
+            exit 1
+          fi
+        fi
+      done
+    fi
+    ${VIRSH} net-define "${SHARED_DIR}/network.xml"
+    ${VIRSH} net-autostart "${CLUSTER_NAME}" || true
+  fi
+
+  local active
+  active=$(${VIRSH} net-info "${CLUSTER_NAME}" 2>/dev/null | awk '/^Active:/{print $2}' || true)
+  if [[ "${active}" != "yes" ]]; then
+    echo "Starting libvirt network '${CLUSTER_NAME}'..."
+    ${VIRSH} net-start "${CLUSTER_NAME}"
+  fi
+
+  active=$(${VIRSH} net-info "${CLUSTER_NAME}" 2>/dev/null | awk '/^Active:/{print $2}' || true)
+  if [[ "${active}" != "yes" ]]; then
+    echo "ERROR: Libvirt network '${CLUSTER_NAME}' is not active"
+    ${VIRSH} net-list --all || true
+    ${VIRSH} net-info "${CLUSTER_NAME}" || true
+    exit 1
+  fi
+  echo "Libvirt network '${CLUSTER_NAME}' is active."
+}
+
 RHCOS_RESIZED_LOCALLY=true
 
 # Returns true when BRANCH is a numeric OCP version older than 4.16.
@@ -430,6 +483,9 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
+    if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+      ${VIRSH} vol-delete --pool ${POOL_NAME} ${NAME} || true
+    fi
     ${VIRSH} vol-create-as \
       --name ${NAME} \
       --pool ${POOL_NAME} \
@@ -468,6 +524,11 @@ clone_volume () {
   if [ -z $1 ]; then
     echo "Must specify a name for the cloned volume..."
     exit 1
+  fi
+
+  if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+    # Delete stale clone volume left from a previous run before recreating.
+    ${VIRSH} vol-delete --pool ${POOL_NAME} ${1} 2>/dev/null || true
   fi
 
   echo "Cloning ${VOLUME_NAME} volume as ${1} volume..."
@@ -558,21 +619,42 @@ create_node () {
       ${VIRSH} start "${NAME}"
       ${VIRSH} autostart "${NAME}" || true
     else
-      virt-install \
-        --connect ${LIBVIRT_CONNECTION} \
-        --name ${NAME} \
-        --memory ${DOMAIN_MEMORY} \
-        --vcpus ${DOMAIN_VCPUS} \
-        --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
-        --disk="vol=${POOL_NAME}/${NAME}-volume" \
-        --osinfo ${VIRT_INSTALL_OSINFO} \
-        --graphics=none \
-        --import \
-        --noautoconsole \
-        --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      # Hetero VPN: mock-nss so virt-install resolves the hypervisor like virsh.
+      if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+        mock-nss.sh virt-install \
+          --connect ${LIBVIRT_CONNECTION} \
+          --name ${NAME} \
+          --memory ${DOMAIN_MEMORY} \
+          --vcpus ${DOMAIN_VCPUS} \
+          --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+          --disk="vol=${POOL_NAME}/${NAME}-volume" \
+          --osinfo ${VIRT_INSTALL_OSINFO} \
+          --graphics=none \
+          --import \
+          --noautoconsole \
+          --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      else
+        virt-install \
+          --connect ${LIBVIRT_CONNECTION} \
+          --name ${NAME} \
+          --memory ${DOMAIN_MEMORY} \
+          --vcpus ${DOMAIN_VCPUS} \
+          --network network=${CLUSTER_NAME},mac=${MAC_ADDRESS} \
+          --disk="vol=${POOL_NAME}/${NAME}-volume" \
+          --osinfo ${VIRT_INSTALL_OSINFO} \
+          --graphics=none \
+          --import \
+          --noautoconsole \
+          --disk vol=${POOL_NAME}/${IGNITION_VOLUME},format=raw,readonly=on,serial=ignition,startup_policy=optional
+      fi
     fi
   fi
 }
+
+# Re-confirm the network before guest creation (Z hetero VPN bridge reclaim races only).
+if [[ "${ENSURE_LIBVIRT_NETWORK:-false}" == "true" ]]; then
+  ensure_libvirt_network
+fi
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Create the bootstrap node.

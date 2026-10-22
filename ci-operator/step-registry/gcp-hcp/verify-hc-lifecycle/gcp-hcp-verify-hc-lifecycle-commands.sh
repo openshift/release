@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A newer promotion may supersede this postsubmit before status publication.
+# Ordinary presubmits still run the lifecycle, even though they skip status publication.
+if [[ -e "${SHARED_DIR}/gcp-hcp-environment-status-superseded" ]]; then
+  echo "Skipping HostedCluster lifecycle for a superseded promotion"
+  exit 0
+fi
+
 echo "=== GCP HCP HC Lifecycle Validation ==="
 echo ""
 
@@ -17,10 +24,10 @@ if [[ ! -x "/usr/bin/test-e2e" ]]; then
 fi
 
 # Verify required SHARED_DIR files exist
-for f in api-endpoint oidc-endpoint customer-project-id region region-project-id; do
+for f in api-endpoint oidc-endpoint customer-project-id region; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
-    echo "The gcp-hcp-tf-provision step must write this file"
+    echo "A workflow pre-step must write this file"
     exit 1
   fi
 done
@@ -34,9 +41,9 @@ fi
 echo "Configuring gcphcpctl with the WIF credential..."
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
-# Reuse the service account configured for WIF for the activation workflow,
-# public API bootstrap, and gcphcpctl lifecycle requests. The WIF auth step
-# uses this same value to construct wif-cred.json.
+# Record the WIF service account for the optional authorization bootstrap.
+# The INT job skips bootstrap and uses this identity for Platform API requests.
+# The WIF auth step also uses it to construct wif-cred.json.
 WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
 if [[ ! -r "${WIF_CONFIG}" ]]; then
   echo "ERROR: WIF configuration not found or unreadable: ${WIF_CONFIG}"
@@ -101,20 +108,34 @@ wait_for_platform_api() {
 if ! wait_for_platform_api; then
   echo ""
   echo "=== gcphcpctl API readiness diagnostics ==="
-  echo "API endpoint: $(cat "${SHARED_DIR}/api-endpoint")"
-  echo "Customer project: $(cat "${SHARED_DIR}/customer-project-id")"
+  echo "Configured customer project: $(cat "${SHARED_DIR}/customer-project-id")"
   echo "DNS lookup:"
   getent hosts "$(sed -E 's#https?://([^/]+)/?.*#\1#' "${SHARED_DIR}/api-endpoint")" || true
   exit 1
 fi
 
 echo "Configuration:"
-echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
-echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
+  echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
+fi
+if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
+  echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
+fi
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
 echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
 echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
 echo ""
+
+# A persistent customer project is authorized once outside CI. Verify that
+# access before --setup-infra can create customer-project IAM and networking.
+if [[ "${GCPHCPCTL_AUTHZ_BOOTSTRAP:-true}" == "false" ]]; then
+  echo "Checking pre-provisioned customer API access..."
+  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null; then
+    echo "ERROR: Cannot list clusters in the customer project through the Platform API"
+    echo "Verify one-time customer namespace activation and a cluster-admin RoleBinding for the WIF identity outside this job"
+    exit 1
+  fi
+fi
 
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
 # GCPHCPCTL_PATH points to the binary baked into the test image.
@@ -122,6 +143,7 @@ export GCPHCPCTL_PATH="/usr/bin/gcphcpctl"
 
 # Run Ginkgo v2 test binary
 echo "Running HC lifecycle validation tests..."
+touch "${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 /usr/bin/test-e2e \
   --ginkgo.v \
   --ginkgo.no-color \

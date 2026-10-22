@@ -655,6 +655,124 @@ periodics:
         secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Stale PRs rot after 30d of inactivity.
+
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten PRs close after an additional 30d of inactivity.
+
+        If this PR is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 0,8 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-pr-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=org:openshift
+        -repo:openshift/hypershift
+        is:pr
+        is:open
+        comments:<2500
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+        -label:do-not-merge/hold
+      - --updated=720h
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - |-
+        --comment=Rotten PRs close after 30d of inactivity.
+
+        Reopen the PR by commenting `/reopen`.
+        Mark the PR as fresh by commenting `/remove-lifecycle rotten`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /usr/bin/commenter
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: quay.io/openshift/ci:ci_commenter_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 1,9 * * *
   decorate: true
   labels:
@@ -664,7 +782,7 @@ periodics:
     containers:
     - args:
       - |-
-        --query=repo:openshift/hypershift
+        --query=org:openshift
         repo:openshift-eng/ai-helpers
         repo:openshift-kni/cnf-features-deploy
         repo:ComplianceAsCode/compliance-operator
@@ -682,7 +800,9 @@ periodics:
       - --github-endpoint=http://ghproxy
       - --github-graphql-endpoint=http://ghproxy/graphql
       - |-
-        --comment=Stale PRs are closed after 21d of inactivity.
+        --comment=PRs go stale after 30d of inactivity.
+
+        Stale PRs eventually rot and close according to the repository's lifecycle policy.
 
         If this PR is still relevant, comment to refresh it or remove the stale label.
         Mark the PR as fresh by commenting `/remove-lifecycle stale`.
@@ -1079,17 +1199,17 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-rosa-hyperfleet-pr-stale
+  name: periodic-rosa-seaplane-pr-stale
   spec:
     containers:
     - args:
       - |-
-        --query=repo:openshift-online/rosa-hyperfleet
-        repo:openshift-online/rosa-hyperfleet-api
-        repo:openshift-online/rosa-hyperfleet-cli
-        repo:openshift-online/rosa-hyperfleet-internal
-        repo:openshift-online/rosa-hyperfleet-kube-applier
-        repo:openshift-online/rosa-hyperfleet-zoa
+        --query=repo:openshift-online/rosa-seaplane
+        repo:openshift-online/rosa-seaplane-api
+        repo:openshift-online/rosa-seaplane-cli
+        repo:openshift-online/rosa-seaplane-internal
+        repo:openshift-online/rosa-seaplane-kube-applier
+        repo:openshift-online/rosa-seaplane-zoa
         repo:openshift-online/aws-nuke-cf
         is:pr
         is:open
@@ -1145,17 +1265,17 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-rosa-hyperfleet-pr-close
+  name: periodic-rosa-seaplane-pr-close
   spec:
     containers:
     - args:
       - |-
-        --query=repo:openshift-online/rosa-hyperfleet
-        repo:openshift-online/rosa-hyperfleet-api
-        repo:openshift-online/rosa-hyperfleet-cli
-        repo:openshift-online/rosa-hyperfleet-internal
-        repo:openshift-online/rosa-hyperfleet-kube-applier
-        repo:openshift-online/rosa-hyperfleet-zoa
+        --query=repo:openshift-online/rosa-seaplane
+        repo:openshift-online/rosa-seaplane-api
+        repo:openshift-online/rosa-seaplane-cli
+        repo:openshift-online/rosa-seaplane-internal
+        repo:openshift-online/rosa-seaplane-kube-applier
+        repo:openshift-online/rosa-seaplane-zoa
         repo:openshift-online/aws-nuke-cf
         is:pr
         is:open
@@ -1746,10 +1866,16 @@ periodics:
         for org in openshift-priv openshift; do
             echo "Filtering ${org} from org/config.yaml"
 
-            # Safety check: ensure the org exists exactly once
+            # The org may already be gone from the config (it is being removed
+            # from openshift/config as part of the Cyborg migration). Absence is
+            # fine - just skip it. Only a duplicate key is a real error.
             count=$(grep -cE "^  ${org}:" /tmp/stripped-config.yaml || true)
+            if [ "$count" -eq 0 ]; then
+                echo "${org} not present in config; nothing to filter"
+                continue
+            fi
             if [ "$count" -ne 1 ]; then
-                echo "ERROR: expected exactly one '${org}:' key, found $count" >&2
+                echo "ERROR: expected at most one '${org}:' key, found $count" >&2
                 exit 1
             fi
 
@@ -2088,65 +2214,6 @@ periodics:
         requests:
           cpu: 500m
     serviceAccountName: imagestream-importer
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  decoration_config:
-    oauth_token_secret:
-      key: oauth
-      name: github-credentials-openshift-ci-robot-private-git-cloner
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: config
-    workdir: true
-  - base_ref: main
-    org: openshift
-    repo: release
-  hidden: true
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra-internal
-  name: periodic-auto-private-org-peribolos-sync
-  spec:
-    containers:
-    - args:
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --dry-run=false
-      - --self-approve=true
-      - --github-login=openshift-ci[bot]
-      - --git-name=openshift-ci[bot]
-      - --git-email=75433959+openshift-ci[bot]@users.noreply.github.com
-      - --peribolos-config=./org/config.yaml
-      - --release-repo-path=/home/prow/go/src/github.com/openshift/release
-      - --whitelist-file=/home/prow/go/src/github.com/openshift/release/core-services/openshift-priv/_whitelist.yaml
-      - --only-org=openshift
-      command:
-      - /usr/bin/auto-peribolos-sync
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_auto-peribolos-sync_latest
-      imagePullPolicy: Always
-      name: auto-peribolos-sync
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: github-app-credentials
-        readOnly: true
-    volumes:
-    - name: github-app-credentials
-      secret:
-        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   decorate: true

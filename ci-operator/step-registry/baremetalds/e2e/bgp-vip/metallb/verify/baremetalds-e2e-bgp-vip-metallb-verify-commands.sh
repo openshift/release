@@ -64,10 +64,21 @@ fi
 
 echo "[2/4] same-neighbor merge: still exactly one Established ToR session per node per family"
 # vtysh prints a harmless 'vtysh.conf' warning on stderr; drop stderr and
-# parse stdout only so pipefail is not tripped by the noise. On dual-stack
-# clusters every node holds one session per address family; MetalLB must
-# merge into these, not add or flap sessions.
-node_ips="$(oc get nodes -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | wc -w)"
+# parse stdout only so pipefail is not tripped by the noise. Every node holds
+# one session per ToR neighbor the bgp-vip FRRConfiguration declares (one per
+# address family when dev-scripts rendered a v6 peer, v4 only otherwise);
+# MetalLB must merge into these, not add or flap sessions.
+tor_families="$(oc get frrconfiguration -n openshift-frr-k8s bgp-vip -o jsonpath='{range .spec.bgp.routers[0].neighbors[*]}{.address}{"\n"}{end}' | awk 'NF' | wc -l)"
+if [[ "${tor_families}" -lt 1 ]]; then
+    oc get frrconfiguration -n openshift-frr-k8s bgp-vip -o yaml || true
+    fail "bgp-vip FRRConfiguration declares no ToR neighbor"
+fi
+bgp_v6=false
+if oc get frrconfiguration -n openshift-frr-k8s bgp-vip -o jsonpath='{.spec.bgp.routers[0].neighbors[*].address}' | grep -q ':'; then
+    bgp_v6=true
+fi
+echo "ToR neighbors declared: ${tor_families} (IPv6 peering: ${bgp_v6})"
+node_ips=$(( nodes * tor_families ))
 check_sessions() {
     local established
     established="$( { ${CLI} exec bgp-tor vtysh -c 'show bgp ipv4 unicast summary json' 2>/dev/null; \
@@ -82,12 +93,25 @@ fi
 
 echo "[3/4] every LoadBalancer service IP is advertised to the ToR from every frr-k8s node"
 # on dual-stack clusters the Service (ipFamilyPolicy: PreferDualStack) gets
-# one LoadBalancer IP per family; every one must be advertised
+# one LoadBalancer IP per family; every one must be advertised. A v6 LB IP
+# can only reach the ToR over a v6 BGP session, so when the cluster peers
+# over IPv4 only, assert only the v4 LB IP (the v6 one is still allocated
+# from the pool, but has no path to be advertised on).
 lb_ips=""
 expected_lb_ips="$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].cidr}' | wc -w)"
 get_lb_ips() {
     lb_ips="$(oc get svc lb-echo -n default -o jsonpath='{.status.loadBalancer.ingress[*].ip}' 2>/dev/null)"
     [[ "$(echo "${lb_ips}" | wc -w)" -eq "${expected_lb_ips}" ]]
+}
+advertisable_lb_ips() {
+    local ip
+    for ip in ${lb_ips}; do
+        if is_v6 "${ip}" && [[ "${bgp_v6}" != true ]]; then
+            echo "skipping ${ip}: no IPv6 ToR neighbor to advertise it on" >&2
+            continue
+        fi
+        echo "${ip}"
+    done
 }
 if ! poll 180 get_lb_ips; then
     oc describe svc lb-echo -n default || true
@@ -105,7 +129,7 @@ else
         paths="$(paths_for_lb "$1")"
         [[ "${paths:-0}" -eq "${nodes}" ]]
     }
-    for ip in ${lb_ips}; do
+    for ip in $(advertisable_lb_ips); do
         if ! poll 300 check_lb_paths "${ip}"; then
             fail "LB IP ${ip}: $(paths_for_lb "${ip}" || echo 0) BGP paths at the ToR, expected ${nodes}"
         fi
@@ -115,7 +139,7 @@ fi
 echo "[4/4] datapath: the LB service answers over the BGP-routed path (every family)"
 # success is the curl exit code (HTTP success), not any response-body literal
 if [[ -n "${lb_ips}" ]]; then
-    for ip in ${lb_ips}; do
+    for ip in $(advertisable_lb_ips); do
         url="http://${ip}:8080/hostname"
         if is_v6 "${ip}"; then url="http://[${ip}]:8080/hostname"; fi
         check_datapath() {

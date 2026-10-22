@@ -69,6 +69,13 @@ images:
       value: linux/amd64
     - name: ARO_HCP_REVISION
       value: ci-sha
+    dockerfile_path: swift-recorder/Dockerfile
+    to: aro-hcp-swift-recorder
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
     - name: ARO_HCP_IMAGE_TAG
       value: ci-test-img
     dockerfile_path: kube-applier/Dockerfile
@@ -184,6 +191,11 @@ tests:
   steps:
     test:
     - ref: aro-hcp-verify
+- as: alert-gate
+  optional: true
+  steps:
+    test:
+    - ref: aro-hcp-alert-gate
 - as: lint
   capabilities:
   - arm64
@@ -232,12 +244,12 @@ tests:
   steps:
     test:
     - ref: aro-hcp-api-validation
-- always_run: true
-  as: integration
+- as: integration
   capabilities:
   - nested-podman
   - arm64
   nested_podman: true
+  skip_if_only_changed: ^docs/generated/
   steps:
     test:
     - ref: aro-hcp-frontend-run-integration-tests
@@ -614,25 +626,10 @@ tests:
       VAULT_SECRET_PROFILE: prod-rh
     workflow: aro-hcp-persistent-e2e
 - always_run: false
-  as: e2e-canada-swift
-  capabilities:
-  - arm64
-  optional: true
-  steps:
-    env:
-      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
-        E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
-        - 02,ARO HCP E2E Hosted Clusters - Dev - 03
-      ARO_HCP_CLOUD: dev
-      ARO_HCP_DEPLOY_ENV: ci01
-      ARO_HCP_SUITE_PARALLELISM: "60"
-      LOCATION_WEIGHTS: westus3=0,canadacentral=1,centralus=0
-    workflow: aro-hcp-local-e2e
-- always_run: false
   as: e2e-parallel
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
+  pipeline_skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/.*|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
   steps:
     env:
       ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
@@ -640,8 +637,7 @@ tests:
         - 02,ARO HCP E2E Hosted Clusters - Dev - 03
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: ci01
-      ARO_HCP_SUITE_PARALLELISM: "60"
-      LOCATION_WEIGHTS: westus3=1,canadacentral=0,centralus=1
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
     workflow: aro-hcp-local-e2e
 - always_run: false
   as: e2e-parallel-inplace-upgrade
@@ -671,8 +667,7 @@ tests:
       ARO_HCP_DEPLOY_ENV: ci01
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
-      ARO_HCP_SUITE_PARALLELISM: "60"
-      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=0
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
     workflow: aro-hcp-local-e2e
 - always_run: false
   as: e2e-parallel-slow
@@ -687,8 +682,7 @@ tests:
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: ci01
       ARO_HCP_E2E_SUITE: rp-api-compat-all/parallel/slow
-      ARO_HCP_SUITE_PARALLELISM: "60"
-      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=0
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
     workflow: aro-hcp-local-e2e
 - as: global-pipeline-postsubmit
   capabilities:
@@ -739,22 +733,6 @@ tests:
   steps:
     test:
     - ref: aro-hcp-ci-images-push
-- as: cspr-pipeline-postsubmit
-  capabilities:
-  - arm64
-  max_concurrency: 1
-  postsubmit: true
-  reporter_config:
-    channel: '#aro-hcp-failures-dev'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    env:
-      DEPLOY_ENV: cspr
-    workflow: aro-hcp-cspr
 - as: dev-ci-pipeline-postsubmit
   capabilities:
   - arm64
