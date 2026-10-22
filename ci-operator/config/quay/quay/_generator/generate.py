@@ -14,7 +14,9 @@
 #   3. generate.py    — merge and expansion logic only
 #
 # Merge order (later layers overwrite earlier; templates/repos/<repo>/base.yaml.j2
-# replaces the shared base layer for that repo's cells):
+# replaces the shared base layer for that repo's cells; a test listed in
+# model.SCENARIO_AS_BY_TEST renders templates/scenarios/<test>.yaml.j2 alone
+# instead of the layers):
 #   templates/base.yaml.j2 (or templates/presubmit/base.yaml.j2 for kind: presubmit)
 #   templates/sources/<source>.yaml.j2 (kind: periodic only)
 #   templates/clouds/<cloud>.yaml.j2
@@ -45,6 +47,7 @@ from model import (
     DATABASE_BY_CLOUD,
     EXTRA_STORAGE_BY_CLOUD,
     REPO_BY_TEST,
+    SCENARIO_AS_BY_TEST,
     STORAGE_BY_CLOUD,
     Cell,
     YamlMap,
@@ -56,6 +59,12 @@ JOBS_DIR = GENERATOR_DIR.parents[3] / "jobs" / "quay" / "quay"
 README = "ci-operator/config/quay/quay/_generator/README.md"
 SOURCES = ("nightly", "stable")
 OCP_CHANNELS = ("stable", "candidate")
+# Branches with no Quay version to derive; the scenario-only ones run nothing else.
+UNVERSIONED_BRANCHES = ("master", "mirror-registry-3.0")
+SCENARIO_ONLY_BRANCHES = ("mirror-registry-3.0",)
+# Job keys a scenario test ignores, so the matrix must not set them.
+SCENARIO_REJECTED_KEYS = ("storage", "fips", "database", "sts", "arches")
+VARIANT_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 CRON_ALIASES = {
     "daily": "@daily",
     "nightly": "@daily",
@@ -84,6 +93,7 @@ JOB_KEYS = {
     "ocp_channel",
     "sts",
     "database",
+    "variant",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -231,7 +241,7 @@ def _quay_releases(matrix: YamlMap) -> list[YamlMap]:
 
 
 def _quay_version_from_branch(branch: str) -> str | None:
-    if branch == "master":
+    if branch in UNVERSIONED_BRANCHES:
         return None
     prefix = "redhat-"
     if not branch.startswith(prefix):
@@ -355,6 +365,30 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             arches = _job_arches_field(job, default_arch, where)
             if not test or not ocps or not clouds:
                 raise ValueError(f"{where} is missing test, ocp, or clouds")
+            if branch in SCENARIO_ONLY_BRANCHES and test not in SCENARIO_AS_BY_TEST:
+                raise ValueError(
+                    f"{where} branch {branch!r} only runs tests {sorted(SCENARIO_AS_BY_TEST)}"
+                )
+            if test in SCENARIO_AS_BY_TEST:
+                if kind != "presubmit":
+                    raise ValueError(f"{where} test {test} is only valid for kind: presubmit")
+                if clouds != ["aws"]:
+                    raise ValueError(f"{where} test {test} supports only clouds: [aws]")
+                rejected = [key for key in SCENARIO_REJECTED_KEYS if key in job]
+                if rejected:
+                    raise ValueError(
+                        f"{where} test {test} does not support {', '.join(rejected)}"
+                    )
+                if layout != "variant":
+                    raise ValueError(f"{where} test {test} requires layout: variant")
+            variant = _job_str_field(job, "variant", where)
+            if variant is not None:
+                if not VARIANT_RE.match(variant):
+                    raise ValueError(
+                        f"{where}.variant must be lowercase words joined by '-', got {variant!r}"
+                    )
+                if layout != "variant":
+                    raise ValueError(f"{where}.variant requires layout: variant")
             storage = _job_str_field(job, "storage", where)
             if test == "e2e-chainsaw":
                 # Chainsaw runs only against the operator on ODF/NooBaa, as a periodic.
@@ -491,6 +525,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         upgrade_from=upgrade_from,
                         database=database,
                         ocp_channel=ocp_channel or "stable",
+                        variant_override=variant,
                     )
                 )
     return cells
@@ -544,6 +579,10 @@ def _repo_template(templates_dir: Path, cell: Cell, name: str) -> str:
 def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
     env = jinja_env(templates_dir)
     context = cell.context()
+    if cell.test in SCENARIO_AS_BY_TEST:
+        config = render_template(env, f"scenarios/{cell.test}.yaml.j2", context)
+        config = apply_kind_settings(config, cell)
+        return apply_cell_settings(config, cell)
     template_root = "presubmit/" if cell.kind == "presubmit" else ""
     cloud_template = f"{template_root}clouds/{cell.cloud}.yaml.j2"
     if template_root and not (templates_dir / cloud_template).exists():
