@@ -73,9 +73,27 @@ if [[ "${initial_version}" =~ [[:space:]] || ! "${initial_version}" =~ ${version
   echo "ERROR: '${initial_version}' is not a complete release version. Refusing to guess."
   exit 1
 fi
+major_digits="${BASH_REMATCH[1]}"
+minor_digits="${BASH_REMATCH[2]}"
+# Leading zeros stay acceptable in the grammar, but they must not count towards the range check
+# below, so drop them before measuring. A component of only zeros collapses to a single "0".
+while [[ "${major_digits}" == 0?* ]]; do major_digits="${major_digits#0}"; done
+while [[ "${minor_digits}" == 0?* ]]; do minor_digits="${minor_digits#0}"; done
+
+# Shell arithmetic is 64 bit and wraps silently, so a component too large to represent would be
+# compared as some unrelated small number: 4.18446744073709551616.0 would look like minor 0 and be
+# skipped, and 4.18446744073709551639.0 would look like minor 23 and be treated as supported. Any
+# value of at most 18 digits is below the signed 64 bit maximum, so reject anything longer before
+# converting. This is a limit of the arithmetic, not a judgement about plausible release numbers.
+if (( ${#major_digits} > 18 || ${#minor_digits} > 18 )); then
+  echo "ERROR: OSSTREAM=${OSSTREAM} was requested but the initial release version"
+  echo "ERROR: '${initial_version}' has a component too large to compare. Refusing to guess."
+  exit 1
+fi
+
 # Base 10 is explicit so that a zero-padded component is never read as octal.
-major=$(( 10#${BASH_REMATCH[1]} ))
-minor=$(( 10#${BASH_REMATCH[2]} ))
+major=$(( 10#${major_digits} ))
+minor=$(( 10#${minor_digits} ))
 
 if (( major < 4 || ( major == 4 && minor < 23 ) )); then
   echo "Initial release ${initial_version} does not enable the OSStreams feature gate by default,"
