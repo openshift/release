@@ -27,6 +27,14 @@ managed_files:
     - quay-quay-redhat-5.0__azure-ocp50-e2e-install.yaml
     - quay-quay-operator-redhat-5.0__aws-ocp50-e2e-chainsaw.yaml
     - quay-quay-redhat-3.16__aws-ocp421-e2e-install.yaml
+    - quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.15__aws-ocp419-e2e-legacy.yaml
+    - quay-quay-redhat-3.15__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.14__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.13__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.12__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.10__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.9__aws-ocp422-e2e-legacy.yaml
   retired: []
   # Hand-written configs in this directory, with the `as` of each test they
   # hold. --check fails on any other config here, or on a test added to these.
@@ -40,9 +48,19 @@ managed_files:
 quay:
   - branch: redhat-3.18
     jobs:
+      # The AWS lane rehearses an ART FBC whose image-label SHA is not available
+      # upstream. An empty value makes quay-test-e2e use its derived-ref fallback.
       - cron: daily
         source: nightly
-        clouds: [aws,gcp,azure]
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        env:
+          PLAYWRIGHT_REF_MODE: ""
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+      - cron: daily
+        source: nightly
+        clouds: [gcp,azure]
         ocp: ["4.22"]
         test: e2e-install
       # Sibling of the daily row: same files, distinct as (e.g. aws-s3-rds-nightly).
@@ -102,11 +120,23 @@ quay:
         ocp: ["4.22"]
         test: upgrade
         upgrade_from: "3.17"
+        env:
+          PLAYWRIGHT_REF_MODE: ""
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
   - branch: redhat-3.17
     jobs:
+      # Rehearse the unified FBC only on AWS; leave GCP/Azure on their normal FBC.
       - cron: daily
         source: nightly
-        clouds: [aws,gcp,azure]
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        env:
+          PLAYWRIGHT_REF_MODE: ""
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+      - cron: daily
+        source: nightly
+        clouds: [gcp,azure]
         ocp: ["4.22"]
         test: e2e-install
       - cron: daily
@@ -127,6 +157,9 @@ quay:
         ocp: ["4.22"]
         test: upgrade
         upgrade_from: "3.16"
+        env:
+          PLAYWRIGHT_REF_MODE: ""
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
   - branch: redhat-5.0
     jobs:
       - cron: daily
@@ -166,7 +199,8 @@ quay:
         test: upgrade
         upgrade_from: "3.18"
         ocp_channel: candidate
-  # newest OCP with a quay-3.16 ART nightly FBC (there is no v4.22 one)
+  # The normal quay-3.16 ART nightly FBC has no v4.22 image. The temporary
+  # unified FBC below carries stable-3.16, so rehearse it on AWS/OCP 4.22.
   - branch: redhat-3.16
     jobs:
       - cron: daily
@@ -174,6 +208,78 @@ quay:
         clouds: [aws]
         ocp: ["4.21"]
         test: e2e-install
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        env:
+          PLAYWRIGHT_REF_MODE: ""
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  # Quay 3.9-3.15 has no Playwright coverage. The unified FBC contains these
+  # stable channels except 3.11, which it does not publish, so run their legacy
+  # Cypress and REST API suites on AWS/OCP 4.22.
+  - branch: redhat-3.9
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  - branch: redhat-3.10
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  - branch: redhat-3.12
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  - branch: redhat-3.13
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  - branch: redhat-3.14
+    jobs:
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+  # Quay 3.15's normal coverage runs on its newest supported OCP release.
+  - branch: redhat-3.15
+    jobs:
+      - cron: daily
+        source: stable
+        clouds: [aws]
+        ocp: ["4.19"]
+        test: e2e-legacy
+        as: aws-s3
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-legacy
+        env:
+          QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
   - branch: master
     layout: base
     env:

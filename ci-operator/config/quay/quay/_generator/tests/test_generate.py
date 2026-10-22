@@ -66,7 +66,10 @@ def test_expand_matrix_cells() -> None:
     assert cell.arch == "amd64"
     assert cell.as_name is None
     assert cell.test_as == "aws-s3-nightly"
-    assert "PLAYWRIGHT_GREP_INVERT" not in cell.env
+    assert cell.env == {
+        "PLAYWRIGHT_REF_MODE": "",
+        "QUAY_INDEX_IMAGE_TAG": "quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22",
+    }
 
     arm_cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "arm64")
     assert arm_cell.filename == "quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml"
@@ -84,6 +87,10 @@ def test_expand_matrix_cells() -> None:
     assert upgrade_cell.filename == "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
     assert upgrade_cell.upgrade_from == "3.17"
     assert upgrade_cell.test_as == "from-317"
+    assert upgrade_cell.env == {
+        "PLAYWRIGHT_REF_MODE": "",
+        "QUAY_INDEX_IMAGE_TAG": "quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22",
+    }
 
 
 def test_job_names_have_no_trailing_arch_suffix() -> None:
@@ -500,7 +507,13 @@ def test_upgrade_nightlies() -> None:
         env = test["steps"]["env"]
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
-        assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+        expected_index_tag = f"quay-{target}__v{ocp}__quay-rhel9-operator"
+        if filename in {
+            "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml",
+            "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml",
+        }:
+            expected_index_tag = "quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22"
+        assert env["QUAY_INDEX_IMAGE_TAG"] == expected_index_tag
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
@@ -535,6 +548,7 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
     assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_REF_MODE"] == ""
     assert env["PLAYWRIGHT_WORKERS"] == "4"
     assert env["QUAYNAMESPACE"] == "quay"
     # ART FBC env still comes from the nightly source layer.
@@ -568,6 +582,19 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     ]
 
 
+def test_redhat_316_unified_fbc_rehearsal() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    config = by_name["quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml"]
+    test = config["tests"][0]
+    env = test["steps"]["env"]
+
+    assert config["releases"]["latest"]["candidate"]["version"] == "4.22"
+    assert test["as"] == "aws-s3-nightly"
+    assert env["PLAYWRIGHT_REF_MODE"] == ""
+    assert env["QUAY_INDEX_IMAGE_TAG"] == "quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22"
+
+
 def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
@@ -578,6 +605,32 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}["quay-quay-redhat-3.15__aws-ocp419-e2e-legacy.yaml"]
+    # Containerfile.playwright does not exist on redhat-3.15.
+    assert "images" not in config
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
+    assert steps["env"]["QUAY_VERSION"] == "3.15"
+    # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
+    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
+    assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert [step["ref"] for step in steps["test"]] == [
+        "quay-enable-catalogsource-art",
+        "quay-deploy-aws-s3",
+        "quay-test-e2e-legacy",
+        "quay-test-api-legacy",
+    ]
+    post = [step.get("ref") or step.get("chain") for step in steps["post"]]
+    assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
 
 
 def test_master_presubmit_expands_all_clouds() -> None:

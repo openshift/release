@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-s3-nightly
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      QUAY_EXTRA_CONFIG: |
+        SUPER_USERS:
+          - quayapici
+          - quaye2eci
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-operator-fbc-unified-4.22-20261023013034629025.ocp4.22
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.14"
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    test:
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-deploy-aws-s3
+    - ref: quay-test-e2e-legacy
+    - ref: quay-test-api-legacy
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: redhat-3.14
+  org: quay
+  repo: quay
+  variant: aws-ocp422-e2e-legacy
