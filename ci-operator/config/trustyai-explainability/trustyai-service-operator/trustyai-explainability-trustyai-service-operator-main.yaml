@@ -86,13 +86,32 @@ tests:
           NAMESPACE="${OPERATOR_NAMESPACE}" \
           OVERLAY=odh \
           OPERATOR_IMAGE="${OPERATOR_IMAGE}"
+        # odh overlay defaults to quay.io/opendatahub/...; Makefile sed only
+        # rewrites quay.io/trustyai/..., so force the CI-built image here.
+        sed -i "s|quay.io/opendatahub/trustyai-service-operator:latest|${OPERATOR_IMAGE}|g; s|quay.io/trustyai/trustyai-service-operator:latest|${OPERATOR_IMAGE}|g" \
+          release/trustyai_odh_bundle.yaml
+
         oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
         oc apply -f release/trustyai_odh_bundle.yaml
+
+        # Pod mounts webhook-server-cert from OpenShift service-ca. Ensure the
+        # annotation is present and wait until the secret exists (not Ready).
+        oc -n "${OPERATOR_NAMESPACE}" annotate service/trustyai-service-operator-webhook-service \
+          service.beta.openshift.io/serving-cert-secret-name=webhook-server-cert --overwrite
+        echo "Waiting for secret/webhook-server-cert..."
+        for _ in $(seq 1 60); do
+          if oc -n "${OPERATOR_NAMESPACE}" get secret webhook-server-cert >/dev/null 2>&1; then
+            break
+          fi
+          sleep 5
+        done
+        oc -n "${OPERATOR_NAMESPACE}" get secret webhook-server-cert
 
         if ! oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
           deployment/trustyai-service-operator-controller-manager --timeout=10m; then
           echo "ERROR: operator Deployment not Available; collecting diagnostics"
-          oc -n "${OPERATOR_NAMESPACE}" get pods,deploy,events,secret || true
+          oc -n "${OPERATOR_NAMESPACE}" get pods,deploy,events,secret,svc || true
+          oc -n "${OPERATOR_NAMESPACE}" get svc trustyai-service-operator-webhook-service -o yaml || true
           oc -n "${OPERATOR_NAMESPACE}" describe deploy/trustyai-service-operator-controller-manager || true
           oc -n "${OPERATOR_NAMESPACE}" describe pods || true
           exit 1
