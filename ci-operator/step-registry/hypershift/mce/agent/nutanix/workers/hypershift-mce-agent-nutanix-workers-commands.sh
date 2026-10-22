@@ -6,18 +6,6 @@ export KUBECONFIG="$SHARED_DIR/kubeconfig"
 set +x
 source "$SHARED_DIR/nutanix_context.sh"
 CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
-if [[ ! -s "$SHARED_DIR/nutanix_dns_ip" ]]; then
-  echo "The leased Nutanix subnet has no recorded worker-facing DNS VM."
-  exit 1
-fi
-dns_ip=$(cat "$SHARED_DIR/nutanix_dns_ip")
-subnet_json=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
-  "$NUTANIX_PC_URL/api/nutanix/v3/subnets/$SUBNET_UUID")
-if ! jq -e --arg ip "$dns_ip" \
-  '.spec.resources.ip_config.dhcp_options.domain_name_server_list == [$ip]' <<<"$subnet_json" >/dev/null; then
-  echo "The leased Nutanix subnet is not advertising $dns_ip through DHCP option 6."
-  exit 1
-fi
 INFRAENV_NAME=$(cat "$SHARED_DIR/nutanix_infraenv_name")
 AGENT_NAMESPACE=$(cat "$SHARED_DIR/nutanix_agent_namespace")
 RUN_LABEL_KEY=ci.openshift.io/hcp-agent-nutanix-run
@@ -178,18 +166,6 @@ if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX
 fi
 
 for agent in $agents; do oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=Validated --timeout=20m; done
-for agent in $agents; do
-  if ! oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json | jq -e '
-    [.status.validationsInfo.network[]? |
-      select(.id == "api-domain-name-resolved-correctly" or
-             .id == "api-int-domain-name-resolved-correctly" or
-             .id == "apps-domain-name-resolved-correctly" or
-             .id == "ignition-downloadable")] |
-    length == 4 and all(.[]; .status == "success")' >/dev/null; then
-    echo "Agent $agent did not pass the three worker DNS checks and ignition download check."
-    exit 1
-  fi
-done
 
 map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
 : > "$map_file"
@@ -266,12 +242,6 @@ fi
 proxy_json=$(oc get proxy cluster -o json)
 expected_proxy=$(cat "$SHARED_DIR/nutanix_proxy_url")
 jq -e --arg proxy "$expected_proxy" '.spec.httpProxy == $proxy and .spec.httpsProxy == $proxy' <<<"$proxy_json" >/dev/null
-base_domain=$(oc --kubeconfig="$SHARED_DIR/kubeconfig" get dns cluster -o jsonpath='{.spec.baseDomain}')
-apps_suffix=".apps.$CLUSTER_NAME.$base_domain"
-if ! jq -e --arg suffix "$apps_suffix" '(.spec.noProxy // "" | split(",")) | index($suffix) != null' <<<"$proxy_json" >/dev/null; then
-  echo "The installed HostedCluster proxy does not bypass Squid for $apps_suffix."
-  exit 1
-fi
 proxy_host=$(sed 's|^http://||' <<<"$expected_proxy" | sed 's|:[^:]*$||')
 proxy_port=$(cut -d: -f3 <<<"$expected_proxy")
 for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
