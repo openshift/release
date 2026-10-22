@@ -34,6 +34,13 @@ function leaseLookup () {
   echo "$lookup"
 }
 
+HOSTNAME="$(leaseLookup 'hostname')"
+HYPERVISOR_IP="$(getent ahostsv4 "${HOSTNAME}" | awk '{print $1; exit}')"
+if [[ -z "${HYPERVISOR_IP}" ]]; then
+  echo "Failed to resolve IP for host ${HOSTNAME}"
+  exit 1
+fi
+
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   BASE_DOMAIN="phc-cicd.cis.ibm.net"
   CLUSTER_NAME="${LEASED_RESOURCE}"
@@ -60,15 +67,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
-    <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
-    <host ip='$(leaseLookup '"control-plane"[0].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
-    <host ip='$(leaseLookup '"control-plane"[1].ip')'>
+    <host ip='${HYPERVISOR_IP}'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
@@ -101,19 +100,7 @@ else
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
-    <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
-    <host ip='$(leaseLookup '"control-plane"[0].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
-    <host ip='$(leaseLookup '"control-plane"[1].ip')'>
-      <hostname>api.${BASE_URL}</hostname>
-      <hostname>api-int.${BASE_URL}</hostname>
-    </host>
-    <host ip='$(leaseLookup '"control-plane"[2].ip')'>
+    <host ip='${HYPERVISOR_IP}'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
