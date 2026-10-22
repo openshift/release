@@ -107,6 +107,16 @@ channels, branches and the test name (`from-317`) are derived:
       - {cron: weekly, source: nightly, clouds: [aws], ocp: ["5.0"], test: e2e-chainsaw}
 ```
 
+**Add an OMR v3 disconnected-install presubmit.** `test: omr-v3-disconnected-install`
+renders the whole config from one template (see [Per-test notes](#per-test-notes)).
+`variant: omr-v3` names the file `quay-quay-{branch}__omr-v3.yaml`:
+
+```yaml
+  - branch: mirror-registry-3.0
+    jobs:
+      - {kind: presubmit, clouds: [aws], ocp: ["4.22"], test: omr-v3-disconnected-install, variant: omr-v3}
+```
+
 **Override env for one branch or one job.** `env` on a release applies to
 every job on that branch; `env` on a job overrides it. Values replace whole
 keys. Do not copy `QUAY_EXTRA_CONFIG` here; it comes from the test template.
@@ -154,7 +164,7 @@ Per release, `quay[]`:
 
 | Field | Meaning |
 | --- | --- |
-| `branch` | `redhat-X.Y` or `master`. The Quay version is `X.Y`; `master` has none. |
+| `branch` | `redhat-X.Y`, `master` or `mirror-registry-3.0`. The Quay version is `X.Y`; the others have none. `mirror-registry-3.0` runs only `omr-v3-disconnected-install`. |
 | `layout` | `variant` (default): `{org}-{repo}-{branch}__{variant}.yaml`. `base`: `{org}-{repo}-{branch}.yaml` (used for `master`). |
 | `env` | Env for every job on the branch. |
 | `jobs` | Job rows, below. |
@@ -163,14 +173,15 @@ Per job, `quay[].jobs[]`:
 
 | Field | Meaning |
 | --- | --- |
-| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`) or `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only). Picks `templates/tests/{test}.yaml.j2`. |
+| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`), `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only) or `omr-v3-disconnected-install` (OMR v3 on a disconnected cluster, presubmit on `aws` only). Picks `templates/tests/{test}.yaml.j2`; a test listed in `SCENARIO_AS_BY_TEST` (`model.py`, with its default `as`) renders `templates/scenarios/{test}.yaml.j2` instead. |
 | `kind` | `periodic` (default) or `presubmit` (renders `templates/presubmit/` where present). |
 | `cron` | Periodic only, required: `daily` or `nightly` (both `@daily`), `weekly` (`@weekly`), or a raw 5-field cron used verbatim. Changes timing only, never the test name. |
 | `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
 | `clouds` | `aws`, `gcp`, `azure`, `libvirt`. |
 | `ocp` | OCP versions, as strings (`"4.22"`). |
 | `arches` | `amd64`, `arm64`, `s390x`; defaults to `[global_defaults.arch]`. |
-| `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic) or `{cloud}-{storage}` (presubmit). Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
+| `variant` | `layout: variant` only: replaces the derived variant in the filename and job names (`omr-v3`). Lowercase words joined by `-`. |
+| `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic), `{cloud}-{storage}` (presubmit), or `disconnected-install` for `omr-v3-disconnected-install`. Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
 | `env` | Job env; overrides branch env key by key. |
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
@@ -193,7 +204,8 @@ Per job, `quay[].jobs[]`:
 
 ### Layer order
 
-Each cell deep-merges these layers; later layers win:
+A test listed in `SCENARIO_AS_BY_TEST` (`model.py`) renders
+`templates/scenarios/{test}.yaml.j2` alone, then steps 7 and 8. Every other cell deep-merges these layers; later layers win:
 
 1. `templates/base.yaml.j2` (presubmit: `templates/presubmit/base.yaml.j2`;
    a repo with `templates/repos/{repo}/base.yaml.j2` uses that instead)
@@ -223,6 +235,12 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   `quay-test-chainsaw` with `CHAINSAW_SUITE: all` (e2e, then destructive) under
   a 4h timeout. Uses `templates/repos/quay-operator/base.yaml.j2` and the
   `aws-quay-qe` cluster profile.
+- **`omr-v3-disconnected-install`**: builds `quay-mirror` from `Dockerfile.mirror`,
+  installs it as the OMR (`quay-aws-ipi-disconnected-omr-v3-provision`), mirrors a
+  stable OCP release into it, installs a disconnected AWS cluster, then runs
+  `quay-omr-v3-validate`. `run_if_changed` also gates the image build. Takes no
+  `storage`, `fips`, `database`, `sts` or `arches`. The OMR v2-to-v3 upgrade job
+  stays hand-maintained.
 - **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
   `quay-deploy-odf`; the operator manages object storage, and
   `quay-deprovision` skips bucket teardown.

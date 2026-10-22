@@ -53,6 +53,9 @@ DATABASE_DEPROVISION_REF_BY_CLOUD = {
 BUILD_ROOT_OCP_FLOOR = "4.22"
 # Tests that target another repo in the same org; the rest use global_defaults.repo.
 REPO_BY_TEST = {"e2e-chainsaw": "quay-operator"}
+# Tests rendered from one complete templates/scenarios/<test>.yaml.j2 instead of
+# the base/cloud/test layers, with the job `as` they get when the row sets none.
+SCENARIO_AS_BY_TEST = {"omr-v3-disconnected-install": "disconnected-install"}
 
 
 @dataclass(frozen=True)
@@ -87,6 +90,8 @@ class Cell:
     # The upgrade lane's OCP release channel: "stable", or "candidate" for an OCP
     # minor with no stable channel yet. Other tests render a nightly payload instead.
     ocp_channel: str = "stable"
+    # A job's `variant:`; replaces the derived variant in the filename and job name.
+    variant_override: str | None = None
 
     @property
     def upgrade_from_nodot(self) -> str:
@@ -174,6 +179,8 @@ class Cell:
 
     @property
     def variant(self) -> str:
+        if self.variant_override is not None:
+            return self.variant_override
         cloud = self.cloud if self.arch == "amd64" else f"{self.cloud}-{self.arch}"
         # The upgrade lane carries the storage token (e.g. aws-ocp422-s3-upgrade) so
         # the variant/filename stays unambiguous across storage backends.
@@ -187,6 +194,8 @@ class Cell:
         # (e.g. upgrade_from "3.17" -> "from-317"), derived rather than hand-set.
         if self.test == "upgrade":
             return f"from-{self.upgrade_from_nodot}"
+        if self.test in SCENARIO_AS_BY_TEST:
+            return SCENARIO_AS_BY_TEST[self.test]
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
         # cloud DB kind (rds/postgres) before source; fips still suffixes.
@@ -235,6 +244,7 @@ class Cell:
             "fips": self.fips,
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
+            "run_if_changed": self.run_if_changed,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

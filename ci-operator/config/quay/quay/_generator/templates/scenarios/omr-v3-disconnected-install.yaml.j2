@@ -1,0 +1,65 @@
+# A complete config, not a layer: build_config renders it alone, because the
+# OMR v3 recipe shares no base, cloud or test layer with the Quay e2e jobs.
+# The provision chain installs OMR from the PR's Dockerfile.mirror image,
+# mirrors the release into it, and installs a disconnected AWS cluster.
+base_images:
+  cli:
+    name: "{{ ocp_version }}"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "{{ ocp_version }}"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-{{ build_root_ocp_version }}
+images:
+  items:
+  - dockerfile_path: Dockerfile.mirror
+    optional: true
+    to: quay-mirror
+{% if run_if_changed %}
+  run_if_changed: {{ run_if_changed | tojson }}
+{% endif %}
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "{{ ocp_version }}"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: "{{ test_as }}"
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-quay-qe
+    dependencies:
+      OMR_IMAGE: pipeline:quay-mirror
+    env:
+      ADD_INGRESS_RECORDS_MANUALLY: "yes"
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
+      PUBLISH: Internal
+    post:
+    - ref: quay-omr-v3-gather
+    - chain: ipi-aws-post-disconnected
+    pre:
+    - chain: quay-aws-ipi-disconnected-omr-v3-provision
+    test:
+    - ref: quay-omr-v3-validate
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: "{{ branch }}"
+  org: "{{ org }}"
+  repo: "{{ repo }}"
+  variant: "{{ variant }}"
