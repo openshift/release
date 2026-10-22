@@ -379,6 +379,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     raise ValueError(
                         f"{where} test {test} does not support {', '.join(rejected)}"
                     )
+                if arches != ["amd64"]:
+                    raise ValueError(f"{where} test {test} supports only arch amd64")
                 if layout != "variant":
                     raise ValueError(f"{where} test {test} requires layout: variant")
             variant = _job_str_field(job, "variant", where)

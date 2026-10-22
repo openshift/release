@@ -64,6 +64,13 @@ def test_omr_rejects(matrix: dict[str, Any], match: str) -> None:
         expand_cells(matrix)
 
 
+def test_omr_rejects_non_amd64_default_arch() -> None:
+    matrix = _matrix()
+    matrix["global_defaults"]["arch"] = "arm64"
+    with pytest.raises(ValueError, match="supports only arch amd64"):
+        expand_cells(matrix)
+
+
 def test_variant_requires_layout_variant() -> None:
     matrix = _matrix(layout="base", test="e2e-install")
     with pytest.raises(ValueError, match="variant requires layout: variant"):
