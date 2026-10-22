@@ -25,68 +25,19 @@ current_version_x=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
 current_version_y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
 OCP_VERSION_BASELINE="${current_version_x}.${current_version_y}"
 
-# Populate the required variables to run conformance upgrade
-# The steps below will discovers the stable 4.y+1 based on the
-# cincinnati graph data, then extract the Image Digest and set it as
-# env var consumed by the 'run' step.
+# Populate the required variables to run conformance upgrade.
+# TARGET_RELEASE_IMAGE comes straight from the "release:latest" dependency
+# (OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE), which ci-operator already
+# resolves to the exact pullspec declared by the job's releases.latest
+# config. This avoids re-deriving the target via a Cincinnati channel-graph
+# crawl, which only ever assumed a same-major next-minor target and broke
+# on cross-major jumps (e.g. 4.22 -> 5.0).
 if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
-  pushd ${WORKDIR}
-
-  echo "Installing yq"
-  cmd_yq="$(which yq 2>/dev/null || true)"
-  mkdir -p /tmp/bin
-  if [ ! -x "${cmd_yq}" ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-  fi
-  PATH=${PATH}:/tmp/bin
-  export PATH
-  cmd_yq="$(which yq 2>/dev/null || true)"
-
-  UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
-  if [ -n "${UPGRADE_TO_VERSION:-}" ]; then
-    target_version_xy="${UPGRADE_TO_VERSION}"
-    target_version_y=$(echo "$target_version_xy" | awk -F'.' '{ print$2 }')
-  else
-    target_version_y=$(( current_version_y + 1 ))
-    target_version_xy="${current_version_x}.${target_version_y}"
-  fi
-  upgrade_to_channel="${UPGRADE_TO_CHANNEL_TYPE}-${target_version_xy}"
-
-  cat <<EOF > "${ARTIFACT_DIR}/release-versions"
-UPGRADE_TO_CHANNEL_TYPE=$UPGRADE_TO_CHANNEL_TYPE
-current_version_x=$current_version_x
-current_version_y=$current_version_y
-target_version_y=$target_version_y
-target_version_xy=$target_version_xy
-upgrade_to_channel=$upgrade_to_channel
-EOF
-
-  echo "Downloading upgrade graph data..."
-  curl -L -o "${WORKDIR}/cincinnati-graph-data.tar.gz" \
-    https://api.openshift.com/api/upgrades_info/graph-data
-
-  tar xvzf "${WORKDIR}/cincinnati-graph-data.tar.gz" "channels/${upgrade_to_channel}.yaml" -C "${WORKDIR}" || true
-  if [ ! -f "${WORKDIR}/channels/${upgrade_to_channel}.yaml" ]; then
-    echo "ERROR: Unable to extract/find the channels file from cincinnati: ${WORKDIR}/channels/${upgrade_to_channel}.yaml
-$(cat "${ARTIFACT_DIR}"/release-versions)
-
-# files on ${WORKDIR}/channels
-$(ls ${WORKDIR}/channels/)
-"
+  if [ -z "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]; then
+    echo "ERROR: OPCT_RUN_MODE=upgrade requires the release:latest dependency (OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE) to be set."
     exit 1
   fi
-
-  echo "Looking for target version..."
-  target_release="$($cmd_yq -r .versions[] "${WORKDIR}/channels/${upgrade_to_channel}.yaml" | grep "${target_version_xy}." | tail -n1)"
-
-  echo "Found target version [${target_release}], getting Digest..."
-  # Resolve via explicit pullspec instead of a bare version: "oc adm release info <version>"
-  # only resolves versions already present in the installed cluster's own ClusterVersion
-  # status (history/availableUpdates/conditionalUpdates), which won't include a cross-major
-  # upgrade target (e.g. 4.22 -> 5.0) even though it's listed in the downloaded channel file.
-  TARGET_RELEASE_IMAGE=$(oc adm release info "quay.io/openshift-release-dev/ocp-release:${target_release}-x86_64" -o jsonpath='{.image}')
-  popd
+  TARGET_RELEASE_IMAGE="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 fi
 
 # Object path examples:
