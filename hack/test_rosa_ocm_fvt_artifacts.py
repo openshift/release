@@ -86,11 +86,10 @@ def mock_command(command, arguments):
             if case == "bounded":
                 for index in range(40):
                     (output / f"test-result-{index}").mkdir()
-        elif case == "entry-limit":
+        elif case in ("output-entry-limit", "result-entry-limit"):
+            scan_directory = output if case == "output-entry-limit" else result
             for index in range(150):
-                (result / f"ignored-{index}").touch()
-            for index in range(150):
-                (output / f"ignored-{index}").touch()
+                (scan_directory / f"ignored-{index}").touch()
     return int(os.environ["FIXTURE_EXIT"])
 
 
@@ -200,6 +199,10 @@ class ArtifactMetadataTests(ArtifactFixture):
         self.run_step("missing", 42)
         self.assertEqual(self.metadata()["output"], {"errno": errno.ENOENT})
 
+    def test_bounded_output_entry_scan(self):
+        self.run_step("output-entry-limit")
+        self.assertTrue(self.metadata()["output"]["truncated"])
+
     def test_symlink_root(self):
         self.run_step("root-symlink")
         self.assertEqual(self.metadata()["output"]["type"], stat.S_IFLNK)
@@ -227,12 +230,11 @@ class ArtifactSafetyTests(ArtifactFixture):
         self.assertEqual(len(output["results"]), 16)
         self.assertTrue(all(len(directory["reports"]) <= 32 for directory in output["results"]))
 
-    def test_bounded_entry_scans(self):
-        self.run_step("entry-limit")
-        output = self.metadata()["output"]
-        self.assertTrue(output["truncated"])
-        for directory in output["results"]:
-            self.assertTrue(directory["truncated"])
+    def test_bounded_result_entry_scan(self):
+        self.run_step("result-entry-limit")
+        results = self.metadata()["output"]["results"]
+        self.assertEqual(len(results), 1)
+        self.assertTrue(results[0]["truncated"])
 
     def test_bounded_report_metadata(self):
         self.run_step("bounded-reports")
