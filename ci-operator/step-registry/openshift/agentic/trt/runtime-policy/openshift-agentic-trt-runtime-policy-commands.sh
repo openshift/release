@@ -305,15 +305,95 @@ if [[ $# -eq 0 ]]; then
     exit 2
 fi
 log=$(mktemp "${WORKDIR}/artifacts/check.XXXXXX")
+head_before=$(git -C "${WORKDIR}" rev-parse HEAD 2>/dev/null || true)
+dirty_before=$(git -C "${WORKDIR}" status --porcelain --untracked-files=normal -- . ':!:artifacts' 2>/dev/null) || dirty_before=unknown
 rc=0
 "$@" > "${log}" 2>&1 || rc=$?
+head_after=$(git -C "${WORKDIR}" rev-parse HEAD 2>/dev/null || true)
+# Verification generators can recreate incidental untracked outputs. They may
+# be cleaned afterward, but changes to committed source invalidate the check.
+dirty_after=$(git -C "${WORKDIR}" status --porcelain --untracked-files=no -- . ':!:artifacts' 2>/dev/null) || dirty_after=unknown
+finished_at_ns=$(python3 -c 'import time; print(time.time_ns())')
 tail -n 80 "${log}"
 jq -n --args --arg log "${log}" --argjson exit_code "${rc}" \
-    '{command: $ARGS.positional, log: $log, exit_code: $exit_code}' -- "$@" > "${log}.json"
+    --arg cwd "${PWD}" --arg head_before "${head_before}" --arg head_after "${head_after}" \
+    --arg dirty_before "${dirty_before}" --arg dirty_after "${dirty_after}" \
+    --argjson finished_at_ns "${finished_at_ns}" \
+    '{command: $ARGS.positional, cwd: $cwd, log: $log, exit_code: $exit_code,
+      head_before: $head_before, head_after: $head_after,
+      clean_before: ($dirty_before == ""), tracked_clean_after: ($dirty_after == ""),
+      finished_at_ns: $finished_at_ns}' -- "$@" > "${log}.json"
 echo "Check exit status: ${rc}; full output: ${log}"
 exit "${rc}"
 CHECK_EOF
     chmod +x "${HOOKS_DIR}/run-check.sh"
+
+    # The pipeline, not a model-authored checkbox, determines recorded passes.
+    cat > "${HOOKS_DIR}/validation-report.py" <<'VALIDATION_PY'
+import html
+import json
+from pathlib import Path
+import re
+import shlex
+import sys
+
+artifacts = Path(sys.argv[1])
+head = sys.argv[2]
+latest = {}
+for path in artifacts.glob("check.*.json"):
+    record = json.loads(path.read_text())
+    command = record["command"]
+    if not isinstance(command, list) or not command or not all(isinstance(arg, str) for arg in command):
+        raise ValueError(f"invalid command evidence: {path.name}")
+    key = (record.get("cwd", ""), tuple(command))
+    timestamp = record.get("finished_at_ns", path.stat().st_mtime_ns)
+    if key not in latest or timestamp > latest[key][0]:
+        latest[key] = (timestamp, record)
+
+records = []
+lines = ["## Recorded validation", "",
+         "Pipeline-generated from command exit statuses. These results cover only the exact commands listed, not an unrun full target.", ""]
+for _, record in sorted(latest.values(), key=lambda item: item[0]):
+    verified = (record["exit_code"] == 0 and bool(head) and
+                record.get("head_before") == head == record.get("head_after") and
+                record.get("clean_before") is True and record.get("tracked_clean_after") is True)
+    if record["exit_code"] != 0:
+        result = f"FAILED (exit {record['exit_code']}); rerun after resolving the failure"
+    elif not verified:
+        result = "UNVERIFIED for the final committed source; rerun after committing/cleanup"
+    else:
+        result = "passed (exit 0) against the final committed source"
+    record = {**record, "verified": verified, "result": result}
+    records.append(record)
+    command = html.escape(shlex.join(record["command"]).replace("\n", "\\n"))
+    cwd = html.escape(record.get("cwd", "unknown"))
+    lines.append(f"- [{'x' if verified else ' '}] <code>{command}</code> in <code>{cwd}</code> — {result}; CI log: {Path(record['log']).name}")
+if not records:
+    lines.append("- [ ] No command evidence was recorded. Validation is unverified.")
+summary = {"head": head, "publishable": bool(records) and all(r["verified"] for r in records), "checks": records}
+(artifacts / "validation-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+markdown = "\n".join(lines) + "\n"
+(artifacts / "validation-summary.md").write_text(markdown)
+
+if len(sys.argv) > 3:
+    description = Path(sys.argv[3])
+    # Replace agent-authored test/validation sections rather than allowing their
+    # checkboxes to contradict the recorded results. Other PR sections survive.
+    kept, skip_level = [], None
+    for line in description.read_text().splitlines():
+        heading = re.match(r"^(#{1,6})\s+(.+)$", line)
+        if heading:
+            level, title = len(heading[1]), re.sub(r"^[^\w]+", "", heading[2])
+            if skip_level is not None and level <= skip_level:
+                skip_level = None
+            if skip_level is None and re.match(r"(?:tests?|testing|validation|recorded validation)\b", title, re.I):
+                skip_level = level
+        if skip_level is None:
+            kept.append(line)
+    description.write_text("\n".join(kept).rstrip() + "\n\n" + markdown)
+
+print(f"Recorded validation: {sum(r['verified'] for r in records)}/{len(records)} checks verified for the final commit")
+VALIDATION_PY
 
     cp "${HOOKS_DIR}/settings.json" "${WORKDIR}/artifacts/${AGENT_POLICY_MODE}-settings.json"
     {
@@ -333,6 +413,8 @@ append_agent_runtime_policy() {
 - Do not push or create PRs. Any permitted commits must stay local; only the pipeline publishes. This does not grant write permission to read-only gate tasks.
 - When validation is part of your task, use \`${HOOKS_DIR}/run-check.sh <command> [args...]\`. It retains full output and the check's exit status while showing a short tail. For compound checks, use \`bash -o pipefail -c '...'\`; never pipe a check to head/tail or suppress its failure.
 - When reporting validation, identify each check's actual command and result. Component passes are not a passing full target. Clearly identify failed, partial, blocked, or unrun validation; do not report incomplete work as successful.
+- Commit and resolve task-created leftovers before final validation. Run every claimed passing check through run-check.sh against the final clean commit. A failed check stays failed until that exact command is rerun successfully; do not mark it passed based on an expected result after committing.
+- Preserve pre-existing files. Remove incidental generated files only when you can establish they were created by your task and are unnecessary to the solution; never blindly add or delete all untracked files.
 - Do not modify the CI hooks, permissions, or publication policy.
 CI_POLICY_EOF
 

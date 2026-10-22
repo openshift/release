@@ -6,6 +6,30 @@ set -o pipefail
 
 echo "=== TRT Jira Solver ==="
 
+SOLVE_PHASE=setup
+SOLVE_FAILURE_REASON=""
+finish_solve() {
+    local rc=$?
+    trap - EXIT
+    jq -n --arg phase "${SOLVE_PHASE}" --arg reason "${SOLVE_FAILURE_REASON}" --argjson exit_code "${rc}" \
+        '{status: (if $exit_code == 0 then "passed" else "failed" end), phase: $phase,
+          exit_code: $exit_code, reason: (if $reason != "" then $reason else "solver exited during " + $phase end)}' \
+        > "${SHARED_DIR}/solve-status.json" || echo "WARNING: Could not record solver status"
+    if [[ -d "${WORKDIR:-/workspace}/artifacts" ]]; then
+        cp "${SHARED_DIR}/solve-status.json" "${WORKDIR:-/workspace}/artifacts/solve-status.json" || true
+    fi
+    if declare -F copy_artifacts >/dev/null; then
+        copy_artifacts || echo "WARNING: Artifact collection failed"
+    fi
+    exit "${rc}"
+}
+fail_solve() {
+    SOLVE_FAILURE_REASON="$*"
+    echo "ERROR: ${SOLVE_FAILURE_REASON}" >&2
+    exit 1
+}
+trap finish_solve EXIT
+
 [[ -f "${SHARED_DIR}/github-app-auth.sh" ]] || {
     echo "ERROR: ${SHARED_DIR}/github-app-auth.sh not found — github-app-auth step must run first"
     exit 1
@@ -76,7 +100,8 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
     }
-    trap copy_artifacts EXIT TERM INT
+    trap 'exit 143' TERM
+    trap 'exit 130' INT
 fi
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---
@@ -126,12 +151,24 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
 fi
 
 setup_agent_runtime_policy solver
+git ls-files --others --exclude-standard -z -- . ':!:artifacts' | \
+    python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().split("\0")[:-1]))' \
+    > "${HOOKS_DIR}/baseline-untracked.json"
 append_agent_runtime_policy "${SYSTEM_PROMPT}"
+cat >> "${SYSTEM_PROMPT}" <<FINALIZE_POLICY
+
+Before declaring completion, inspect git status and resolve incidental files created by your task.
+The pre-implementation untracked-file inventory is ${HOOKS_DIR}/baseline-untracked.json.
+Do not delete pre-existing files or blindly stage generated outputs. Commit intended changes,
+then rerun every claimed passing validation command through ${HOOKS_DIR}/run-check.sh.
+The pipeline will replace PR test/validation checklists with recorded command evidence.
+FINALIZE_POLICY
 
 # --- Run Claude to solve the issue ---
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_SOLVE_START=$(date +%s)
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
+SOLVE_PHASE=implementation
 
 CLAUDE_EXIT=0
 agentic_ci --timeout 5400 \
@@ -154,11 +191,36 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --max-turns 10 \
         || true
 fi
+
+if [[ "${CLAUDE_EXIT}" -eq 0 ]]; then
+    SOLVE_PHASE=finalization
+    python3 "${HOOKS_DIR}/validation-report.py" "${WORKDIR}/artifacts" "$(git rev-parse HEAD)"
+    # One bounded continuation, not an implementation retry loop. Keep the
+    # publication gate strict while giving the parent a chance to resolve its
+    # own incidental outputs and substantiate its validation claims.
+    if ! jq -e '.publishable == true' "${WORKDIR}/artifacts/validation-summary.json" >/dev/null || \
+       ! git diff --quiet || ! git diff --cached --quiet || \
+       [[ -n $(git ls-files --others --exclude-standard -- . ':!:artifacts') ]]; then
+        agentic_ci --timeout 600 \
+        "Finalize delivery for ${JIRA_ISSUE_KEY}, serially and without delegation. Do not push or use gh.
+Inspect git status and ${WORKDIR}/artifacts/validation-summary.json. The baseline untracked-file inventory is ${HOOKS_DIR}/baseline-untracked.json.
+Resolve only incidental leftovers you can establish were created by your task; preserve pre-existing files and do not blindly stage or delete all untracked files. Commit intended solution/generated changes.
+After the last commit and cleanup, rerun every command you claim passed using ${HOOKS_DIR}/run-check.sh. In particular, rerun verification targets such as make verify-apm after committing their generated changes; a previous nonzero exit is not a pass.
+If those checks recreate incidental untracked outputs, clean only those task-created outputs again without changing committed source. The publication gate still requires no untracked files outside artifacts/.
+Update ${WORKDIR}/artifacts/pr-description.md honestly. If checks remain failed or unverified, report that rather than declaring success. Do not undertake unrelated implementation work." \
+            --continue \
+            --settings "${HOOKS_DIR}/settings.json" \
+            --output-format stream-json \
+            --max-turns 20 \
+            || CLAUDE_EXIT=$?
+    fi
+fi
 PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
 if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
+    SOLVE_FAILURE_REASON="Agent exited with code ${CLAUDE_EXIT} during ${SOLVE_PHASE}"
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
     # Write failure metadata before exiting so post-step can emit metrics
     PR_RESULT="failed"
@@ -193,27 +255,27 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
 fi
 
 # --- Create PR ---
+SOLVE_PHASE=publication
 PHASE_PR_START=$(date +%s)
 BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
 if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
-    echo "ERROR: Claude did not create a feature branch."
-    exit 1
+    fail_solve "Claude did not create a feature branch."
 fi
 if ! git merge-base --is-ancestor "${START_COMMIT}" HEAD || [[ $(git rev-list --count "${START_COMMIT}..HEAD") -eq 0 ]]; then
-    echo "ERROR: No solution commits on top of the starting commit. Not publishing."
-    exit 1
+    fail_solve "No solution commits on top of the starting commit. Not publishing."
 fi
 if git diff --quiet "${START_COMMIT}" HEAD; then
-    echo "ERROR: Solution commits have no net changes. Not publishing an empty PR."
-    exit 1
+    fail_solve "Solution commits have no net changes. Not publishing an empty PR."
 fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "ERROR: Uncommitted tracked changes remain. Not publishing a partial solution."
-    exit 1
+    fail_solve "Uncommitted tracked changes remain. Not publishing a partial solution."
 fi
 if [[ -n $(git ls-files --others --exclude-standard -- . ':!:artifacts') ]]; then
-    echo "ERROR: Untracked files remain outside artifacts/. Commit the solution before publication."
-    exit 1
+    fail_solve "Untracked files remain outside artifacts/. Resolve task-created leftovers before publication."
+fi
+python3 "${HOOKS_DIR}/validation-report.py" "${WORKDIR}/artifacts" "$(git rev-parse HEAD)"
+if ! jq -e '.publishable == true' "${WORKDIR}/artifacts/validation-summary.json" >/dev/null; then
+    fail_solve "Validation is failed or unverified for the final clean commit; see validation-summary.json."
 fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
@@ -242,6 +304,7 @@ if [[ ! -s "${PR_BODY_FILE}" ]]; then
 Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
+python3 "${HOOKS_DIR}/validation-report.py" "${WORKDIR}/artifacts" "$(git rev-parse HEAD)" "${PR_BODY_FILE}"
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
 
 BASE_ARGS=()
@@ -311,3 +374,4 @@ echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
 finalize_session_metrics solve
 
 echo "=== TRT Jira Solver Complete ==="
+SOLVE_PHASE=complete

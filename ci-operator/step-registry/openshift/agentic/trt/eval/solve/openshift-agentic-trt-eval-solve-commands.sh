@@ -62,16 +62,71 @@ trap copy_artifacts EXIT TERM INT
 # Each subshell gets a temp SHARED_DIR with standard filenames the solver expects:
 #   reads:  gh-fork-token, gh-upstream-token, jira-issue-key, jira-issue.json, eval-base-branch, eval-case
 #   writes: claude-branch, pr-number, pr-description.md, claude-otel.jsonl
-RESULTS_DIR="/tmp/eval-results"
 OTEL_DIR="/tmp/eval-otel"
-mkdir -p "${RESULTS_DIR}" "${OTEL_DIR}"
+mkdir -p "${OTEL_DIR}"
 RUNNING=0
 
 for case_name in "${CASE_LIST[@]}"; do
     CASE_WORKDIR="/workspace/${case_name}"
-    BASE_BRANCH=$(cat "${REAL_SHARED_DIR}/${case_name}.eval-base-branch")
-
     (
+        CASE_SHARED=""
+        CASE_PHASE=preparation
+        finish_case() {
+            local rc=$?
+            trap - EXIT
+            # Do not lose status, publication metadata, or telemetry when the
+            # solver exits nonzero. Keep bulk logs out of the shared secret.
+            python3 - "${CASE_SHARED}" "${REAL_SHARED_DIR}" "${case_name}" \
+                "${ARTIFACT_DIR}" "${OTEL_DIR}" "${rc}" "${CASE_PHASE}" <<'CASE_STATUS_PY'
+import json
+from pathlib import Path
+import shutil
+import sys
+
+case_shared, shared, case, artifacts, otel, code, phase = sys.argv[1:]
+shared, artifacts, otel = Path(shared), Path(artifacts), Path(otel)
+rc = int(code)
+status = {"status": "failed", "phase": phase, "exit_code": rc or 1,
+          "reason": f"case exited during {phase}; see solve-{case}.log"}
+if case_shared:
+    source = Path(case_shared)
+    try:
+        status = json.loads((source / "solve-status.json").read_text())
+        if not isinstance(status, dict) or type(status.get("exit_code")) is not int:
+            raise ValueError("invalid solver status")
+        if status.get("status") != "passed" or status.get("exit_code") != 0:
+            rc = rc or status.get("exit_code") or 1
+        elif rc != 0:
+            status = {"phase": phase, "reason": f"case failed during {phase} after solver completion"}
+    except (OSError, ValueError):
+        rc = rc or 1
+        status = {"phase": phase, "reason": f"missing or invalid solver status; see solve-{case}.log"}
+    try:
+        for name in ("claude-branch", "pr-number", "pr-description.md"):
+            if (source / name).is_file():
+                shutil.copyfile(source / name, shared / f"{case}.{name}")
+        if (source / "claude-otel.jsonl").is_file():
+            shutil.copyfile(source / "claude-otel.jsonl", otel / f"{case}.claude-otel.jsonl")
+        if rc == 0 and any(not (shared / f"{case}.{name}").is_file() or
+                           not (shared / f"{case}.{name}").read_text().strip()
+                           for name in ("claude-branch", "pr-number")):
+            raise ValueError("solver returned success without publication metadata")
+    except (OSError, ValueError) as error:
+        rc = rc or 1
+        status = {"phase": "handoff", "reason": str(error)}
+else:
+    rc = rc or 1
+status.update(case=case, status="passed" if rc == 0 else "failed", exit_code=rc)
+status["reason"] = status.get("reason", f"case exited during {phase}")[:2000]
+payload = json.dumps(status, indent=2) + "\n"
+(artifacts / f"solve-{case}.json").write_text(payload)
+(shared / f"{case}.solve-status.json").write_text(payload)
+sys.exit(rc)
+CASE_STATUS_PY
+            exit "$?"
+        }
+        trap finish_case EXIT
+        BASE_BRANCH=$(cat "${REAL_SHARED_DIR}/${case_name}.eval-base-branch")
         # Build a per-case SHARED_DIR with standard filenames
         CASE_SHARED=$(mktemp -d)
         for f in jira-issue-key jira-issue.json eval-base-branch eval-expected-branch eval-case; do
@@ -92,20 +147,9 @@ for case_name in "${CASE_LIST[@]}"; do
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
         export EVAL_MODE=true
+        CASE_PHASE=solve
         /opt/scripts/solve.sh
-
-        # Copy small outputs to SHARED_DIR for judge/cleanup. OTEL stays on
-        # local disk / artifacts — SHARED_DIR is a 3MiB kube secret.
-        for f in claude-branch pr-number pr-description.md; do
-            if [[ -f "${CASE_SHARED}/${f}" ]]; then
-                cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}"
-            fi
-        done
-        if [[ -f "${CASE_SHARED}/claude-otel.jsonl" ]]; then
-            cp "${CASE_SHARED}/claude-otel.jsonl" "${OTEL_DIR}/${case_name}.claude-otel.jsonl"
-        fi
-
-        echo "pass" > "${RESULTS_DIR}/${case_name}"
+        CASE_PHASE=handoff
     ) > "${ARTIFACT_DIR}/solve-${case_name}.log" 2>&1 &
 
     RUNNING=$(( RUNNING + 1 ))
@@ -122,11 +166,18 @@ echo ""
 echo "--- Solve Results ---"
 FAILURES=0
 for case_name in "${CASE_LIST[@]}"; do
-    result=$(cat "${RESULTS_DIR}/${case_name}" 2>/dev/null || echo "fail")
-    if [[ "${result}" == "pass" ]]; then
+    status_file="${REAL_SHARED_DIR}/${case_name}.solve-status.json"
+    if [[ ! -s "${status_file}" ]]; then
+        jq -n --arg case "${case_name}" \
+            '{case: $case, status: "failed", phase: "dispatch", exit_code: 1,
+              reason: "case process ended without recording status"}' > "${status_file}"
+        cp "${status_file}" "${ARTIFACT_DIR}/solve-${case_name}.json"
+    fi
+    result=$(jq -r '.status // "failed"' "${status_file}")
+    if [[ "${result}" == "passed" ]]; then
         echo "  [PASS] ${case_name}"
     else
-        echo "  [FAIL] ${case_name} (see ${ARTIFACT_DIR}/solve-${case_name}.log)"
+        echo "  [FAIL] ${case_name}: $(jq -r '.reason' "${status_file}") (see solve-${case_name}.log)"
         FAILURES=$(( FAILURES + 1 ))
     fi
 done
@@ -149,7 +200,7 @@ if [[ -s "${OTEL_COMBINED}" ]]; then
     python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
         "${OTEL_COMBINED}" "${METRICS_TMP}" || true
     if jq -e '.rows[0].model' "${METRICS_TMP}" >/dev/null 2>&1; then
-        jq '
+        jq --argjson failures "${FAILURES}" '
           .rows[0] as $r
           | ($r.total_cost_usd | tonumber) as $cost
           | {
@@ -159,7 +210,7 @@ if [[ -s "${OTEL_COMBINED}" ]]; then
               duration_s: (($r.duration_ms | tonumber) / 1000),
               cost_usd: $cost,
               num_turns: ($r.num_turns | tonumber),
-              exit_code: ($r.is_error | tonumber),
+                exit_code: (if $failures > 0 then 1 else ($r.is_error | tonumber) end),
               token_usage: {
                 input: ($r.input_tokens | tonumber),
                 output: ($r.output_tokens | tonumber),

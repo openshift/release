@@ -29,6 +29,15 @@ branch before publication; it does not delete remote branches or fall back to
 pushing upstream. The responder retains its existing pipeline push/target checks
 and no-change behavior; it does not inherit the solver's empty-solution gate.
 
+The solver records the initial untracked-file inventory for the parent. If a
+successful agent exit leaves a dirty checkout or unverified validation, one
+bounded continuation (600 seconds, 20 turns) asks the same parent to resolve its
+own incidental generated outputs and rerun checks. It must preserve pre-existing
+files and must not blindly stage or delete untracked files. The publication
+gate remains strict after that pass; an unresolved checkout/check failure is not
+turned into success. Every solver exit writes `solve-status.json` with phase,
+exit code, and reason, including publication failures after an agent exit of zero.
+
 Each solve has a separate temporary hook/settings directory, including concurrent
 evaluation cases; this does not enable delegation within a solve. The
 `guard-command.sh` Bash hook recognizes quoted arguments, literal quoted heredoc
@@ -58,6 +67,20 @@ exit status in `artifacts/check.*.json`, and returns that status. For compound
 checks use `bash -o pipefail -c '...'`. Do not pipe checks to `head`/`tail`, ignore
 their exit codes, or describe a component pass as a passing full target. These
 records describe only the commands actually run, not full validation coverage.
+
+Records include the working directory, commit before/after, checkout state, and
+completion time. Only the latest result for the exact command and working
+directory is used. A passing checkbox requires exit zero against the final
+committed source, starting from a clean checkout with no tracked source changes
+during the check. Checks that regenerate incidental untracked outputs can be
+followed by safe cleanup without a new source commit. Failed or stale checks
+must be rerun; merely committing generated changes does not make a previous
+verification failure a pass.
+
+The pipeline generates `validation-summary.json` and `.md` from this evidence,
+replaces agent-authored PR test/validation sections with the recorded results,
+and refuses solver publication if recorded validation is missing, failed, or
+unverified. This does not infer full-target coverage from component checks.
 
 `artifacts/solver-settings.json`/`solver-versions.txt` and
 `review-settings.json`/`review-versions.txt` record each mode's supplied settings
@@ -107,6 +130,16 @@ Record the rehearsal URLs, image identity, installed versions, initial and
 continuation tool events, child-session inspection, remote refs, and check
 outcomes. A passing ordinary solve alone does not verify delegation denial or
 the timeout continuation path; explicitly exercise and inspect both.
+
+The solve dispatcher preserves each case's status, available publication
+metadata, and telemetry even on failure. The judge reports failed solves
+directly instead of trying to collect an unpublished head. It invokes the
+supported CLI `--case` option separately for every successful solve, retaining
+each case's full judge reports under `cases/<case>/`. A root HTML index, JSON
+outcome summary, and JUnit report include every case, and the step fails if any
+solve or per-case judgment fails. One collection error no longer prevents the
+remaining cases from being judged. Model metrics also retain telemetry from
+failed solves and reflect a failing overall solve result.
 
 ## Parallelism remains disabled
 
