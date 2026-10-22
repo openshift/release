@@ -1,0 +1,24 @@
+ref:
+  as: openshift-appliance-build-iso-no-registry
+  from: dev-scripts
+  commands: openshift-appliance-build-iso-no-registry-commands.sh
+  grace_period: 10m0s
+  timeout: 3h0m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  dependencies:
+  - name: agent-release-iso-builder
+    env: APPLIANCE_IMAGE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: ARCH
+    default: "x86_64"
+    documentation: Target architecture for the OVE ISO.
+  documentation: |-
+    Builds the Agent OVE ISO the Konflux way (the agent-installer-utils iso_builder
+    Dockerfile, with its builder base image rewritten to the appliance image built in this
+    run, APPLIANCE_IMAGE) on the ofcir host acquired in the pre phase. The build runs on the
+    host over SSH because it needs sudo + buildah + skopeo and a privileged environment.

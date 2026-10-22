@@ -54,6 +54,22 @@ tests:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
 - always_run: false
+  as: build-iso-no-registry
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      APPLIANCE_IMAGE: agent-release-iso-builder
+    post:
+    - ref: ofcir-release
+    pre:
+    - ref: ofcir-acquire
+    test:
+    - ref: openshift-appliance-build-iso-no-registry
+- always_run: false
   as: e2e-agent-compact-ipv4-iso-no-registry
   capabilities:
   - intranet
