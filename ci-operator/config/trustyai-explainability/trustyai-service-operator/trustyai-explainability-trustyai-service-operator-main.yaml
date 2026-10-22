@@ -89,6 +89,11 @@ tests:
         oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
         oc apply -f release/trustyai_odh_bundle.yaml
 
+        # odh overlay mounts metrics TLS from OpenShift service-ca; wait so the
+        # Deployment is not stuck on CreateContainerConfigError.
+        oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Ready \
+          secret/trustyai-service-operator-metrics-tls --timeout=5m || true
+
         oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
           deployment/trustyai-service-operator-controller-manager --timeout=10m
 
