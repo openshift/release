@@ -1,0 +1,54 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-hcpmulti-kubevirt
+  documentation: |-
+    Workflow that provisions a single ephemeral multi-arch (s390x control plane with
+    amd64 or arm64 additional worker) OpenShift management cluster on libvirt, using the
+    openshift-e2e-libvirt-heterogeneous-vpn pre steps, and deploys a HyperShift KubeVirt
+    hosted cluster on top of it. Both the
+    HCP control plane pods and the KubeVirt worker VMs run on the same management
+    cluster — there is no separate external infrastructure cluster.
+    MCE, the virt operator, HPP, and MetalLB are installed on the management cluster
+    before the hosted cluster is created.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    # ── Management cluster: multi-arch (s390x control plane + amd64/arm64 worker) ──
+    # Same pre steps as the openshift-e2e-libvirt-heterogeneous-vpn workflow
+    - ref: upi-libvirt-cleanup-heterogeneous-pre
+    - chain: upi-conf-libvirt-heterogeneous
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt-heterogeneous
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+
+    # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
+    - ref: hypershift-mce-ibmz-create-hcpvirt-oz
+
+    test:
+    - chain: hypershift-mce-ibmz-test
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-heterogeneous-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+
+    env:
+      ADDITIONAL_WORKER_COUNT: "1"
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "1"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      # MetalLB pool = <mgmt node subnet>.56-57 → 192.168.1.56-57 (lease 0-0) / 192.168.3.56-57 (lease 0-1)
+      METALLB_POOL_HOST_START: "56"
+      METALLB_POOL_HOST_END: "57"
+      DOMAIN_MEMORY: "63356"   # 64 GiB
+      DOMAIN_VCPUS: "16"       # 16 vCPUs
+      VOLUME_CAPACITY: "200G"  # 200 GB root disk 
+      
