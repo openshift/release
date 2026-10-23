@@ -1,2 +1,2 @@
-MKPJ_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpj:v20261007-6ed406f29
-MKPOD_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpod:v20261007-6ed406f29
+MKPJ_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpj:v20261022-6c4d88e3b
+MKPOD_IMG=us-docker.pkg.dev/k8s-infra-prow/images/mkpod:v20261022-6c4d88e3b
