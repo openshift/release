@@ -17,6 +17,10 @@ die() {
   exit 1
 }
 
+log() {
+  printf '==> %s\n' "$*"
+}
+
 wait_for() {
   local timeout="$1" interval="$2" description="$3"
   shift 3
@@ -368,10 +372,20 @@ metadata:
   namespace: ${namespace}
 spec:
   restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: consumer
     image: registry.access.redhat.com/ubi9/ubi-minimal
     command: ["sh", "-c", "sleep 3600"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
 ${volume_consumer}
   volumes:
   - name: volume
@@ -401,18 +415,27 @@ smoke_test_storageclasses() {
 }
 
 main() {
+  log "Checking required tools"
   require_tools
   FSX_ADMIN_PASSWORD="$(random_password)"
   SVM_ADMIN_PASSWORD="$(random_password)"
   LUKS_PASSPHRASE="$(random_passphrase)"
 
+  log "Discovering the worker network"
   discover_cluster_network
+  log "Creating the FSxN security group"
   create_security_group
+  log "Creating the FSx for ONTAP filesystem"
   create_filesystem
+  log "Configuring worker SAN prerequisites"
   prepare_workers
+  log "Creating the FSxN storage virtual machine"
   create_svm
+  log "Installing Trident"
   install_trident
+  log "Configuring Trident backends and StorageClasses"
   configure_trident
+  log "Running StorageClass smoke tests"
   smoke_test_storageclasses
 }
 
