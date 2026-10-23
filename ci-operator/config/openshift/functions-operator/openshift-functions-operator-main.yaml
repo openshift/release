@@ -98,7 +98,7 @@ tests:
     - as: openshift-gather-extra
       best_effort: true
       cli: latest
-      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+      commands: curl -sSL https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
         | /bin/bash -s
       from: src
       grace_period: 1m0s
@@ -139,6 +139,9 @@ tests:
         # the downstream CLI carries the product patches (s2i templates).
         git clone --depth 1 --branch "${PULL_BASE_REF:-main}" https://github.com/openshift/functions.git /tmp/functions
         make -C /tmp/functions build
+        # The suite runs kubectl; the step image has only oc, which acts as
+        # kubectl when invoked under that name.
+        ln -s "$(command -v oc)" "$(dirname "$(command -v oc)")/kubectl"
         GOFLAGS="" FUNC_BIN=/tmp/functions/func ./hack/openshift/run-e2e-tests.sh
       from: src
       resources:
