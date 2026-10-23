@@ -13,10 +13,10 @@ state=$(cat "$STATE_FILE")
 cluster=$(jq -er '.cluster' <<<"$state")
 lease=$(jq -er '.lease' <<<"$state")
 bind_ip=$(jq -er '.bindIP' <<<"$state")
-client_cidr=$(jq -er '.clientCIDR' <<<"$state")
+client_cidr=$(jq -r '.clientCIDR // empty' <<<"$state")
 
 if [[ "$lease" != "${NUTANIX_QUOTA_SLICE:-}" || ! "$cluster" =~ ^[a-z0-9-]+$ ||
-      ! "$bind_ip" =~ ^[0-9.]+$ || ! "$client_cidr" =~ ^[0-9./]+$ ]]; then
+      ! "$bind_ip" =~ ^[0-9.]+$ || ( -n "$client_cidr" && ! "$client_cidr" =~ ^[0-9./]+$ ) ]]; then
   echo "Worker DNS cleanup state does not match this Nutanix lease."
   exit 1
 fi
@@ -40,9 +40,17 @@ if [[ ! -e "$marker_file" ]]; then
   fi
   exit 0
 fi
-read -r marker_cluster marker_bind marker_clients zone < "$marker_file"
+read -r marker_cluster marker_bind marker_client_or_zone marker_zone < "$marker_file"
+marker_matches=true
+if [[ -n "$client_cidr" ]]; then
+  zone=$marker_zone
+  [[ "$marker_client_or_zone" == "$client_cidr" ]] || marker_matches=false
+else
+  zone=$marker_client_or_zone
+  [[ -z "$marker_zone" ]] || marker_matches=false
+fi
 if [[ "$marker_cluster" != "$cluster" || "$marker_bind" != "$bind_ip" ||
-      "$marker_clients" != "$client_cidr" || ! "$zone" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+      "$marker_matches" != true || ! "$zone" =~ ^[a-zA-Z0-9_-]+$ ]]; then
   echo "The baremetal worker DNS marker does not match this run."
   exit 1
 fi
@@ -56,9 +64,15 @@ if [[ -e "$unit_file" ]]; then
 fi
 firewall-cmd --state >/dev/null
 for protocol in udp tcp; do
-  allow_rule="rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
-  deny_rule="rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
-  for rule in "$allow_rule" "$deny_rule"; do
+  if [[ -n "$client_cidr" ]]; then
+    rules=(
+      "rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
+      "rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
+    )
+  else
+    rules=("rule priority=\"-100\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept")
+  fi
+  for rule in "${rules[@]}"; do
     if firewall-cmd --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1; then
       firewall-cmd --zone="$zone" --remove-rich-rule="$rule"
     fi
