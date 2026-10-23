@@ -5,6 +5,7 @@ workflow:
     pre:
     - chain: ipi-aws-pre-m2d2m-disconnected
     test:
+    - ref: enable-image-registry-default-route
     - ref: openshift-e2e-test
     post:
     - chain: gather-core-dump
@@ -24,3 +25,9 @@ workflow:
     registry with public internet access blocked via iptables on the bastion,
     verifying that the import succeeds in a no-public-internet environment before
     cluster installation proceeds.
+
+    Before the e2e test phase, enable-image-registry-default-route patches the
+    cluster image-registry operator to expose the integrated registry via a public
+    Route, allowing the CI pod to push community e2e test images into the cluster.
+    This does not weaken the air-gap assertion: it exposes only an inbound Route,
+    not outbound cluster or bastion egress.
