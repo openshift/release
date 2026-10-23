@@ -147,10 +147,12 @@ if [[ "$needs_sso" = true ]]; then
                 rm -f "$browser_dir/url"
                 case "$url" in
                     https://idp.ci.openshift.org/auth\?*)
-                        if command -v open &>/dev/null; then
-                            open "$url" >/dev/null 2>&1 || true
-                        elif command -v xdg-open &>/dev/null; then
-                            xdg-open "$url" >/dev/null 2>&1 || true
+                        opener=xdg-open
+                        if [[ "$(uname -s)" = Darwin ]]; then
+                            opener=open
+                        fi
+                        if ! "$opener" "$url" >/dev/null 2>&1; then
+                            printf 'Could not open a browser. To log in, open this URL in a browser on this machine:\n\n    %s\n\n' "$url" >&2
                         fi
                         ;;
                 esac
