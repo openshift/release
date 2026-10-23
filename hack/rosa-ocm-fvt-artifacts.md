@@ -8,11 +8,32 @@ bash -n ci-operator/step-registry/rosa/e2e/ocm-fvt/rosa-e2e-ocm-fvt-commands.sh
 shellcheck -S warning ci-operator/step-registry/rosa/e2e/ocm-fvt/rosa-e2e-ocm-fvt-commands.sh
 ```
 
-The ref delivers only its commands script, so both staging and publication are
-embedded in that script. The fixture copies that delivered script and mocks
-Podman, not the production filesystem publication code. Registry resolution,
+The registry delivers only each ref's declared command body, not sibling files.
+Every consuming job declares `rosa-e2e-ocm-fvt-prepare` immediately before
+`rosa-e2e-ocm-fvt`. The prepare ref uses `run_as_script: true`: ci-operator mounts
+its Python command from the workflow commands ConfigMap and executes its shebang.
+That command copies its own source exclusively into
+`${SHARED_DIR}/ocm-fvt-artifacts.py` with mode 0600. Shared-state transfer carries that
+file to the FVT pod, whose Bash wrapper calls its staging, digest, metadata and
+publication entry points. No repository checkout, image change or runtime fetch
+is needed. A missing helper stops before FVT or credential handling begins.
+
+The helper source is
+`ci-operator/step-registry/rosa/e2e/ocm-fvt/prepare/rosa-e2e-ocm-fvt-prepare-commands.py`.
+Its preparation entry point handles public source code only. The fixture copies
+only the two declared command bodies, executes the prepare command from a
+temporary mount, removes that mount, and runs the wrapper using the installed
+helper. It mocks Podman, not the production filesystem publication code. Registry resolution,
 shellcheck and generated registry metadata have separate repository CI checks;
 the fixture is a standalone focused behavioral check.
+
+Delivery follows ci-tools `pkg/load/load.go:loadReference` (one command body),
+`pkg/steps/multi_stage/init.go:createCommandConfigMaps` (bodies keyed by step), and
+`pkg/steps/multi_stage/gen.go:generatePods`/`addCommandScript` (mounted executable
+for `run_as_script`). The entrypoint wrapper's `createSecret` serializes files
+with `util.SecretFromDir` for the standard shared-state mechanism; the next pod
+receives the helper bytes along with other workflow state. This is not a shared
+host filesystem or repository mount, and does not depend on retaining an inode.
 
 ## Evidence and permission model
 

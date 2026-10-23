@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Offline fixtures for the delivered step: python3 hack/test_rosa_ocm_fvt_artifacts.py.
 
-Only the ref's commands script is copied into the fixture, matching step delivery.
+The prepare ref's command installs itself into SHARED_DIR before the wrapper runs.
+Only those two delivered commands are copied, with no repository checkout at runtime.
 Metadata describes the outer collector identity, not the nested image's identity.
 Scans stop at 128 entries, 16 result locations and 32 reports per location; labels
 omit result names and phase timestamps. Report contents are never read by collection.
@@ -50,11 +51,13 @@ def mock_artifact_command(command, arguments, base, case):
             return 91
         os.execv("/bin/cp", ["cp", *arguments])
     if command == "python3":
-        if case == "publication-failure" and arguments == ["-", str(output), str(base / "artifacts")]:
+        helper = str(base / "shared/ocm-fvt-artifacts.py")
+        if case == "publication-failure" and arguments == [
+                helper, "publish", str(output), str(base / "artifacts")]:
             print(SECRET, file=sys.stderr)
             return 95
         if case == "collector-failure" and arguments == [
-                "-", str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
+                helper, "metadata", str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
             return 92
         os.execv(sys.executable, [sys.executable, *arguments])
     raise AssertionError("Unexpected artifact fixture command")
@@ -191,12 +194,31 @@ class ArtifactFixture(unittest.TestCase):
                         if line.startswith("  commands: "))
         self.script = self.base / commands
         shutil.copyfile(STEP / commands, self.script)
+        self.prepare_helpers()
         for command in ("podman", "cat", "env", "cp", "find", "python3", "oc"):
             executable = self.bin / command
             executable.write_text(
                 f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
                 f'--mock {command} "$@"\n', encoding="utf-8")
             executable.chmod(0o755)
+
+    def prepare_helpers(self):
+        """Execute only the mounted prepare command, then remove its delivery volume."""
+        ref = (STEP / "prepare/rosa-e2e-ocm-fvt-prepare-ref.yaml").read_text(encoding="utf-8")
+        self.assertIn("  run_as_script: true\n", ref)
+        commands = next(line.split(": ", 1)[1] for line in ref.splitlines()
+                        if line.startswith("  commands: "))
+        with tempfile.TemporaryDirectory(dir=self.base) as mount:
+            delivered = Path(mount) / "rosa-e2e-ocm-fvt-prepare"
+            shutil.copyfile(STEP / "prepare" / commands, delivered)
+            delivered.chmod(0o700)
+            subprocess.run([str(delivered)], env={"PATH": os.defpath,
+                           "SHARED_DIR": str(self.shared)}, cwd=mount, check=True,
+                           capture_output=True, text=True, timeout=10)
+        self.assertEqual((self.shared / "ocm-fvt-artifacts.py").read_bytes(),
+                         (STEP / "prepare" / commands).read_bytes())
+        self.assertEqual(stat.S_IMODE((self.shared / "ocm-fvt-artifacts.py").stat().st_mode),
+                         0o600)
 
     def execute_step(self, case="normal", exit_code=0):
         return subprocess.run(["bash", str(self.script)], env={
@@ -240,6 +262,43 @@ class ArtifactFixture(unittest.TestCase):
 
 
 class ArtifactPublicationTests(ArtifactFixture):
+    def test_prepare_rejects_existing_helper_and_symlink(self):
+        helper = self.shared / "ocm-fvt-artifacts.py"
+        original = helper.read_bytes()
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.prepare_helpers()
+        self.assertEqual(helper.read_bytes(), original)
+        helper.unlink()
+        helper.symlink_to(self.base / "outside/secret")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.prepare_helpers()
+        self.assertEqual((self.base / "outside/secret").read_text(), SECRET)
+
+    def test_prepare_rejects_symlinked_shared_directory(self):
+        self.shared.rename(self.base / "real-shared")
+        self.shared.symlink_to(self.base / "real-shared", target_is_directory=True)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.prepare_helpers()
+
+    def test_missing_delivered_helper_stops_before_producer(self):
+        (self.shared / "ocm-fvt-artifacts.py").unlink()
+        result = self.execute_step(exit_code=42)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("artifact helpers were not prepared", result.stderr)
+        self.assertFalse((self.base / "calls.jsonl").exists())
+        self.assertFalse((self.artifacts / "ocm-fvt-results").exists())
+
+    def test_all_consumers_declare_helper_delivery(self):
+        consumers = 0
+        for config in (REPOSITORY / "ci-operator/config").rglob("*.yaml"):
+            lines = config.read_text(encoding="utf-8").splitlines()
+            for index, line in enumerate(lines):
+                if line.strip() == "- ref: rosa-e2e-ocm-fvt":
+                    self.assertEqual(lines[index - 1].strip(),
+                                     "- ref: rosa-e2e-ocm-fvt-prepare", str(config))
+                    consumers += 1
+        self.assertGreater(consumers, 0)
+
     @unittest.skipIf(os.geteuid() == 0, "Permission denial requires an unprivileged fixture user")
     def test_censor_temporary_file_and_atomic_replacement(self):
         self.run_step("permissions", 42)
