@@ -87,8 +87,10 @@ if [[ -n "${KUBE_BURNER_OCP_REPO}" ]]; then
   echo "Building kube-burner-ocp from ${KUBE_BURNER_OCP_REPO} branch ${KUBE_BURNER_OCP_BRANCH}..."
 
   echo "Installing Go 1.22.8..."
-  curl -sL https://go.dev/dl/go1.22.8.linux-amd64.tar.gz | tar -xzC /usr/local
-  export PATH="/usr/local/go/bin:${PATH}"
+  curl -sL https://go.dev/dl/go1.22.8.linux-amd64.tar.gz | tar -xzC /tmp
+  export GOROOT=/tmp/go
+  export PATH="$GOROOT/bin:${PATH}"
+  export GOPATH=/tmp/gopath
   echo "Go version: $(go version)"
 
   echo "Cloning kube-burner-ocp source..."
