@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import yaml
 
@@ -223,6 +223,196 @@ class CatalogTests(FeatureGateFixtures):
                 self.assertEqual(enabled, known)
                 self.assertFalse(known - enabled)
                 self.assertIn('Default inheritance=', source)
+
+
+class RetryTests(FeatureGateFixtures):
+    def copy_catalog(self, arguments, **options):
+        self.assertEqual(options, {'check': True, 'timeout': 600})
+        destination = Path(next(arg[5:] for arg in arguments if arg.startswith('--to=')))
+        shutil.copytree(self.catalog, destination, dirs_exist_ok=True)
+
+    def test_release_info_retries_transient_failures_then_success(self):
+        for image in ['target', 'initial']:
+            with self.subTest(image=image), \
+                    patch.dict(os.environ, self.environment, clear=True), \
+                    patch.object(HELPER.subprocess, 'check_output', side_effect=[
+                        subprocess.CalledProcessError(1, 'oc'), subprocess.TimeoutExpired('oc', 120),
+                        json.dumps({'metadata': {'version': CI_VERSION}})]) as lookup, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                self.assertEqual(HELPER.release_info(image)['metadata']['version'], CI_VERSION)
+                self.assertEqual(lookup.call_count, 3)
+                for invocation in lookup.call_args_list:
+                    self.assertIn(image, invocation.args[0])
+                    self.assertEqual(invocation.kwargs, {'text': True, 'timeout': 120})
+                self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+
+    def test_release_info_exhaustion_preserves_shared_settings(self):
+        before = self.config.read_bytes()
+        for error in [subprocess.TimeoutExpired('oc', 120), subprocess.CalledProcessError(1, 'oc')]:
+            with self.subTest(error=type(error).__name__), \
+                    patch.dict(os.environ, self.environment, clear=True), \
+                    patch.object(HELPER.subprocess, 'check_output', side_effect=error) as lookup, \
+                    patch.object(HELPER.subprocess, 'run') as extract, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                with self.assertRaises(type(error)):
+                    HELPER.prepare()
+                self.assertEqual(lookup.call_count, 3)
+                extract.assert_not_called()
+                self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+                self.assertEqual(self.config.read_bytes(), before)
+                self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_malformed_metadata_is_not_retried(self):
+        for output, error in [('not-json', json.JSONDecodeError), ('{}', KeyError)]:
+            with self.subTest(output=output), \
+                    patch.dict(os.environ, self.environment, clear=True), \
+                    patch.object(HELPER.subprocess, 'check_output', return_value=output) as lookup, \
+                    patch.object(HELPER.subprocess, 'run') as extract, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                with self.assertRaises(error):
+                    HELPER.prepare()
+                lookup.assert_called_once()
+                extract.assert_not_called()
+                sleep.assert_not_called()
+                self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_non_target_retry_success_does_not_extract_or_mutate(self):
+        before = self.config.read_bytes()
+        for version in [NIGHTLY_VERSION, '4.22.0-0.nightly-2026-10-23-000000', '4.13.42']:
+            with self.subTest(version=version), \
+                    patch.dict(os.environ, self.environment, clear=True), \
+                    patch.object(HELPER.subprocess, 'check_output', side_effect=[
+                        subprocess.CalledProcessError(1, 'oc'),
+                        json.dumps({'metadata': {'version': version}})]) as lookup, \
+                    patch.object(HELPER.subprocess, 'run') as extract, \
+                    patch.object(HELPER.urllib.request, 'urlopen') as fetch, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                HELPER.prepare()
+                self.assertEqual(lookup.call_count, 2)
+                extract.assert_not_called()
+                fetch.assert_not_called()
+                sleep.assert_called_once_with(1)
+                self.assertEqual(self.config.read_bytes(), before)
+                self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_extraction_retries_use_fresh_cleaned_directories(self):
+        self.default_catalog()
+        directories = []
+
+        def extract(arguments, **options):
+            self.assertEqual(options, {'check': True, 'timeout': 600})
+            destination = Path(next(arg[5:] for arg in arguments if arg.startswith('--to=')))
+            self.assertFalse(list(destination.iterdir()))
+            self.assertTrue(all(not previous.exists() for previous in directories))
+            directories.append(destination)
+            if len(directories) == 1:
+                (destination / 'partial-featureGate-stale.yaml').write_text('incomplete')
+                raise subprocess.CalledProcessError(1, arguments)
+            self.copy_catalog(arguments, **options)
+
+        with patch.dict(os.environ, self.environment, clear=True), \
+                patch.object(HELPER.subprocess, 'run', side_effect=extract), \
+                patch.dict(NAMESPACE, {'pinned_source': lambda *_args: (MODERN_DISPATCH, 'pinned')}), \
+                patch.object(HELPER.time, 'sleep') as sleep:
+            (known, forced), _ = HELPER.extract_payload_gates('initial', CI_VERSION)
+        self.assertEqual(known, {'Baseline', 'Disabled', 'Preview', 'ExtraKnown'})
+        self.assertEqual(forced | {'Baseline'}, known)
+        self.assertEqual(len(set(directories)), 2)
+        self.assertTrue(all(not directory.exists() for directory in directories))
+        sleep.assert_called_once_with(1)
+
+    def test_extraction_timeout_exhaustion_cleans_up_and_fails_closed(self):
+        directories = []
+        before = self.config.read_bytes()
+
+        def extract(arguments, **options):
+            self.assertEqual(options, {'check': True, 'timeout': 600})
+            destination = Path(next(arg[5:] for arg in arguments if arg.startswith('--to=')))
+            self.assertTrue(all(not previous.exists() for previous in directories))
+            directories.append(destination)
+            (destination / 'partial').write_text('incomplete')
+            raise subprocess.TimeoutExpired(arguments, 600)
+
+        with patch.dict(os.environ, self.environment, clear=True), \
+                patch.dict(NAMESPACE, {'release_info': lambda _image: {'metadata': {'version': CI_VERSION}}}), \
+                patch.object(HELPER.subprocess, 'run', side_effect=extract) as extraction, \
+                patch.object(HELPER.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                HELPER.prepare()
+            self.assertEqual(extraction.call_count, 3)
+            self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+        self.assertEqual(len(set(directories)), 3)
+        self.assertTrue(all(not directory.exists() for directory in directories))
+        self.assertEqual(self.config.read_bytes(), before)
+        self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_invalid_catalog_is_not_retried_or_published(self):
+        self.write_catalog(enabled=['AllAlpha'])
+        before = self.config.read_bytes()
+        with patch.dict(os.environ, self.environment, clear=True), \
+                patch.dict(NAMESPACE, {'release_info': lambda _image: {'metadata': {'version': CI_VERSION}}}), \
+                patch.object(HELPER.subprocess, 'run', side_effect=self.copy_catalog) as extraction, \
+                patch.object(HELPER.time, 'sleep') as sleep:
+            with self.assertRaisesRegex(ValueError, 'Invalid OpenShift feature gate'):
+                HELPER.prepare()
+            extraction.assert_called_once()
+            sleep.assert_not_called()
+            destination = Path(next(arg[5:] for arg in extraction.call_args.args[0] if arg.startswith('--to=')))
+        self.assertFalse(destination.exists())
+        self.assertEqual(self.config.read_bytes(), before)
+        self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_pinned_source_retries_transient_transport_and_http_failures(self):
+        self.default_catalog()
+        for error in [HELPER.urllib.error.URLError('transient'), TimeoutError(),
+                      ConnectionResetError(), HELPER.http.client.IncompleteRead(b'partial'),
+                      HELPER.urllib.error.HTTPError('https://example.com', 503, 'unavailable', {}, None),
+                      HELPER.urllib.error.HTTPError('https://example.com', 429, 'rate limit', {}, None)]:
+            with self.subTest(error=type(error).__name__), \
+                    patch.object(HELPER.urllib.request, 'urlopen', side_effect=[
+                        error, io.BytesIO(MODERN_DISPATCH.encode())]) as fetch, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                (known, forced), source = HELPER.payload_gates(self.catalog, CI_VERSION)
+                self.assertEqual(known, forced | {'Baseline'})
+                self.assertIn('sha256:', source)
+                self.assertEqual(fetch.call_count, 2)
+                for invocation in fetch.call_args_list:
+                    self.assertIn('/' + 'a' * 40 + '/', invocation.args[0])
+                    self.assertEqual(invocation.kwargs, {'timeout': 30})
+                sleep.assert_called_once_with(1)
+
+    def test_source_exhaustion_does_not_repeat_extraction_or_publish(self):
+        self.default_catalog()
+        before = self.config.read_bytes()
+        with patch.dict(os.environ, self.environment, clear=True), \
+                patch.dict(NAMESPACE, {'release_info': lambda _image: {'metadata': {'version': CI_VERSION}}}), \
+                patch.object(HELPER.subprocess, 'run', side_effect=self.copy_catalog) as extraction, \
+                patch.object(HELPER.urllib.request, 'urlopen', side_effect=TimeoutError()) as fetch, \
+                patch.object(HELPER.time, 'sleep') as sleep:
+            with self.assertRaises(TimeoutError):
+                HELPER.prepare()
+            extraction.assert_called_once()
+            self.assertEqual(fetch.call_count, 3)
+            self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+            destination = Path(next(arg[5:] for arg in extraction.call_args.args[0] if arg.startswith('--to=')))
+        self.assertFalse(destination.exists())
+        self.assertEqual(self.config.read_bytes(), before)
+        self.assertEqual(list(self.shared.iterdir()), [self.config])
+
+    def test_source_semantic_errors_are_not_retried(self):
+        self.default_catalog()
+        for body, error in [(b'unsupported consumer', ValueError), (b'\xff', UnicodeDecodeError),
+                            (b'x' * (1024 * 1024 + 1), ValueError),
+                            (HELPER.urllib.error.HTTPError('https://example.com', 404, 'missing', {}, None), ValueError)]:
+            with self.subTest(error=error.__name__, body_type=type(body).__name__), \
+                    patch.object(HELPER.urllib.request, 'urlopen',
+                                 side_effect=body if isinstance(body, Exception) else None,
+                                 return_value=io.BytesIO(body) if isinstance(body, bytes) else None) as fetch, \
+                    patch.object(HELPER.time, 'sleep') as sleep:
+                with self.assertRaises(error):
+                    HELPER.payload_gates(self.catalog, CI_VERSION)
+                fetch.assert_called_once()
+                sleep.assert_not_called()
 
 
 class InstallerTests(FeatureGateFixtures):

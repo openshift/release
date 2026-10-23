@@ -38,6 +38,13 @@ unrecognized expressions. It never consults API HEAD or a static current list.
 Both pinned-source paths require HTTPS access to raw.githubusercontent.com. Missing catalogs,
 unsupported source declarations and ambiguous catalogs fail closed.
 
+External operations make at most three attempts with 1- and 2-second backoff.
+Each release-info attempt has a 120-second timeout, each extraction attempt has
+a 600-second timeout and a fresh temporary directory, and source requests use a
+30-second socket timeout. Only failed commands and transport/transient HTTP
+failures are retried, not malformed metadata, unsupported catalogs or source
+validation. Exhausted attempts abort preparation before changing install settings.
+
 IPI receives `featureSet` and (where supported) `featureGates` before
 `create manifests`. The shared file `openshift_manifests_99_feature-gate.yaml`
 then replaces the installer's `openshift/99_feature-gate.yaml` before ignition

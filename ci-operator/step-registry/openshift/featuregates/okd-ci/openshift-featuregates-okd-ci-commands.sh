@@ -5,6 +5,7 @@ helper=$(mktemp)
 trap 'rm -f "${helper}"' EXIT
 cat > "${helper}" <<'PYTHON'
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 
 import yaml
@@ -21,6 +24,32 @@ import yaml
 PROFILE = "include.release.openshift.io/self-managed-high-availability"
 OVERRIDES = "agent-install.openshift.io/install-config-overrides"
 CI_VERSION = re.compile(r"\d+\.\d+\.0-0\.okd(?:-scos)?(?:-arm64)?-\d{4}-\d{2}-\d{2}-\d{6}")
+
+
+def retry_external(operation, retryable):
+    """Make at most three transport attempts with backoff; let semantic errors fail."""
+    for attempt in range(3):
+        try:
+            return operation()
+        except retryable:
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def fetch_source(url):
+    """Fetch bounded source bytes, retrying transport and transient HTTP errors only."""
+    def fetch():
+        try:
+            with urllib.request.urlopen(url, timeout=30) as response:
+                return response.read(1024 * 1024 + 1)
+        except urllib.error.HTTPError as error:
+            if error.code not in {408, 429} and not 500 <= error.code < 600:
+                raise ValueError("Pinned source request failed with HTTP status " + str(error.code)) from error
+            raise
+
+    return retry_external(fetch, (urllib.error.URLError, TimeoutError, ConnectionError,
+                                  http.client.HTTPException))
 
 
 def gate_names(entries):
@@ -92,6 +121,7 @@ def legacy_gates(source):
 
 
 def pinned_source(directory, component, path):
+    """Validate an immutable payload source identity before fetching and hashing bytes."""
     references = json.loads((directory / "image-references").read_text())
     operator = next(tag for tag in references["spec"]["tags"] if tag["name"] == component)
     annotations = operator["annotations"]
@@ -100,8 +130,7 @@ def pinned_source(directory, component, path):
     if repository != "https://github.com/openshift/" + component or not re.fullmatch(r"[a-f0-9]{40}", commit):
         raise ValueError("Payload does not identify a pinned operator source: " + component)
     url = "https://raw.githubusercontent.com/openshift/" + component + "/" + commit + "/" + path
-    with urllib.request.urlopen(url, timeout=30) as response:
-        content = response.read(1024 * 1024 + 1)
+    content = fetch_source(url)
     if len(content) > 1024 * 1024:
         raise ValueError("Pinned operator source exceeds expected size")
     return content.decode(), url + " sha256:" + hashlib.sha256(content).hexdigest()
@@ -171,9 +200,24 @@ def configure_agent(directory, prepared):
 
 
 def release_info(image):
-    return json.loads(subprocess.check_output([
+    """Bound release-info attempts, then parse the metadata once without retrying it."""
+    output = retry_external(lambda: subprocess.check_output([
         "oc", "adm", "release", "info", "-a", os.environ["CLUSTER_PROFILE_DIR"] + "/pull-secret",
-        image, "--output=json"], text=True))
+        image, "--output=json"], text=True, timeout=120),
+        (subprocess.CalledProcessError, subprocess.TimeoutExpired))
+    return json.loads(output)
+
+
+def extract_payload_gates(image, version):
+    """Isolate every extraction attempt; retry commands, never catalog validation."""
+    def extract():
+        with tempfile.TemporaryDirectory() as temporary:
+            subprocess.run(["oc", "adm", "release", "extract", "-a",
+                            os.environ["CLUSTER_PROFILE_DIR"] + "/pull-secret", image,
+                            "--to=" + temporary], check=True, timeout=600)
+            return payload_gates(Path(temporary), version)
+
+    return retry_external(extract, (subprocess.CalledProcessError, subprocess.TimeoutExpired))
 
 
 def prepare():
@@ -191,12 +235,7 @@ def prepare():
         installed_image = os.environ.get("CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE") or installed_image
     installed = release_info(installed_image)
     version = installed["metadata"]["version"]
-    with tempfile.TemporaryDirectory() as temporary:
-        directory = Path(temporary)
-        subprocess.run(["oc", "adm", "release", "extract", "-a",
-                        os.environ["CLUSTER_PROFILE_DIR"] + "/pull-secret", installed_image,
-                        "--to=" + temporary], check=True)
-        (known, forced), source = payload_gates(directory, version)
+    (known, forced), source = extract_payload_gates(installed_image, version)
     selection = {"target": target_version, "version": version, "source": source,
                  "known": sorted(known), "overrides": sorted(forced)}
     manifest = {"apiVersion": "config.openshift.io/v1", "kind": "FeatureGate",
