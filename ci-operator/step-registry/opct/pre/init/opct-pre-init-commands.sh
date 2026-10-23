@@ -35,7 +35,7 @@ export OPCT_CLI="${OPCT_CLI}"
 
 # AWS Credentials ref to store the results (baseline)
 export AWS_DEFAULT_REGION=us-east-1
-export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/opct/.awscred-vmc-ci-opct-uploader
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/opct/aws-ci-opct-uploader
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 
