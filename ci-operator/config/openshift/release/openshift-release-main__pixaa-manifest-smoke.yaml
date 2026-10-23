@@ -1,0 +1,87 @@
+base_images:
+  claude-runtime:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM claude-runtime
+      USER root
+      RUN mkdir -p /workspace && chown 1000:0 /workspace && chmod g+rwX /workspace && \
+          git config --system --add safe.directory /workspace
+      # The merged registry commands, byte for byte from this checkout, and the
+      # rehearsal bootstrap that fetches the pinned PIXAA PR before running them.
+      # PIXAA itself is fetched at runtime with the private Git cloner mounted
+      # by the inline test step; nothing private enters the image.
+      COPY ci-operator/step-registry/openshift/claude/agent-eval/manifest/openshift-claude-agent-eval-manifest-commands.sh /usr/local/share/pixaa-smoke/manifest-commands.sh
+      COPY hack/claude-agent-eval/pixaa-smoke/consumer-env.sh /usr/local/share/pixaa-smoke/consumer-env.sh
+      WORKDIR /workspace
+      USER 1000
+    from: claude-runtime
+    optional: true
+    to: claude-ai-helpers
+  skip_if_only_changed: .*
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- always_run: false
+  as: eval-pixaa-smoke
+  optional: true
+  steps:
+    test:
+    - as: openshift-claude-agent-eval-manifest
+      commands: |
+        # Inline copy of the openshift-claude-agent-eval-manifest ref: same image,
+        # commands, environment, and credentials, plus the private Git cloner the
+        # rehearsal needs to fetch openshift-eng/pixaa. The shared ref is unchanged.
+        source /usr/local/share/pixaa-smoke/consumer-env.sh
+        exec bash /usr/local/share/pixaa-smoke/manifest-commands.sh
+      credentials:
+      - collection: ci-claude-code
+        group: claude-openshift-ci
+        mount_path: /var/run/claude-code-service-account
+      - collection: technical-release-team
+        group: github-bot-token
+        mount_path: /var/run/github-token
+      - bundle: github-credentials-openshift-ci-robot-private-git-cloner
+        mount_path: /usr/local/github-credentials
+        namespace: ci
+      env:
+      - default: /workspace
+        name: EVAL_WORKDIR
+      - default: claude-opus-4-6
+        name: CLAUDE_MODEL
+      - default: "1"
+        name: CLAUDE_CODE_USE_VERTEX
+      - default: global
+        name: CLOUD_ML_REGION
+      - default: openshift-ci-prow-agents
+        name: ANTHROPIC_VERTEX_PROJECT_ID
+      - default: /var/run/claude-code-service-account/google-token
+        name: GOOGLE_APPLICATION_CREDENTIALS
+      - default: /var/run/github-token/token
+        name: GITHUB_TOKEN_PATH
+      from: claude-ai-helpers
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+      timeout: 4h0m0s
+  timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: pixaa-manifest-smoke
