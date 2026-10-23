@@ -16,6 +16,10 @@ if [[ -s "$SHARED_DIR/nutanix_agent_namespace" ]]; then
   AGENT_NAMESPACE=$(cat "$SHARED_DIR/nutanix_agent_namespace")
   oc get agents -n "$AGENT_NAMESPACE" -o yaml > "$ARTIFACT_DIR/nutanix-agents.yaml" 2>&1 || true
   oc get events -n "$AGENT_NAMESPACE" --sort-by=.lastTimestamp > "$ARTIFACT_DIR/nutanix-agent-events.txt" 2>&1 || true
+  if [[ -s "$SHARED_DIR/cluster-name" ]]; then
+    oc get nmstateconfigs -n "$AGENT_NAMESPACE" -l "ci.openshift.io/hcp-agent-nutanix-run=$CLUSTER_NAME" \
+      -o yaml > "$ARTIFACT_DIR/nutanix-nmstateconfigs.yaml" 2>&1 || true
+  fi
 fi
 
 if [[ -s "$SHARED_DIR/nutanix_infraenv_name" && -s "$SHARED_DIR/nutanix_agent_namespace" ]]; then
@@ -23,7 +27,7 @@ if [[ -s "$SHARED_DIR/nutanix_infraenv_name" && -s "$SHARED_DIR/nutanix_agent_na
   oc get infraenv "$INFRAENV_NAME" -n "$AGENT_NAMESPACE" -o json | jq '{metadata:{name:.metadata.name,namespace:.metadata.namespace,labels:.metadata.labels},spec:{cpuArchitecture:.spec.cpuArchitecture,pullSecretRef:.spec.pullSecretRef,proxy:.spec.proxy},status:{conditions:.status.conditions}}' > "$ARTIFACT_DIR/nutanix-infraenv.json" 2>&1 || true
 fi
 
-for file in nutanix_worker_names nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts nutanix_worker_dns_state.json; do
+for file in nutanix_worker_names nutanix_worker_macs.json nutanix_worker_vms.tsv nutanix_agent_vm_mapping.tsv nutanix_squid_allowed_hosts nutanix_worker_dns_state.json; do
   if [[ -s "$SHARED_DIR/$file" ]]; then
     cp "$SHARED_DIR/$file" "$ARTIFACT_DIR/$file"
   fi
