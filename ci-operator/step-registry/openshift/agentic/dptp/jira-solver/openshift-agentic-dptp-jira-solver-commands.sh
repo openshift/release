@@ -16,6 +16,7 @@ echo "=== DPTP Jira Solver ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/dptp-telemetry.sh"
+initialize_agent
 load_github_tokens
 configure_github_git_credentials
 
@@ -48,9 +49,7 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
 
-    echo "Installing Claude Code..."
-    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-    export PATH="${HOME}/.local/bin:${PATH}"
+    setup_agent
 fi
 
 mkdir -p "${WORKDIR}/artifacts"
@@ -58,8 +57,8 @@ mkdir -p "${WORKDIR}/artifacts"
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
-        if [[ -d "${HOME}/.claude/projects" ]]; then
+        copy_agent_artifacts
+        if [[ "${AGENT_HARNESS}" == claude-code && -d "${HOME}/.claude/projects" ]]; then
             echo "Archiving Claude session logs..."
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
@@ -214,26 +213,37 @@ cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
 }
 HOOK_SETTINGS_EOF
 
-# --- Run Claude to solve the issue ---
+# --- Run the selected harness to solve the issue ---
+export CODEX_DENY_GH=true
+GIT_INSTRUCTIONS="Create a feature branch — do NOT commit on the current branch.
+Push the branch with git."
+WRAPUP_GIT_INSTRUCTIONS="Commit whatever you have and push to the fork."
+if [[ "${AGENT_HARNESS}" == codex ]]; then
+    CODEX_BRANCH="codex/${JIRA_ISSUE_KEY}-${BUILD_ID:-$(date +%s)}"
+    git check-ref-format --branch "${CODEX_BRANCH}" >/dev/null
+    git checkout -b "${CODEX_BRANCH}"
+    GIT_INSTRUCTIONS="Work on the current feature branch. Edit and test files only; the pipeline commits and pushes after you finish."
+    WRAPUP_GIT_INSTRUCTIONS="${GIT_INSTRUCTIONS}"
+fi
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_SOLVE_START=$(date +%s)
-echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
+echo "Invoking ${AGENT_DISPLAY_NAME} to solve ${JIRA_ISSUE_KEY}..."
 
-CLAUDE_EXIT=0
+AGENT_EXIT=0
 agentic_ci --timeout 5400 \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
-Create a feature branch — do NOT commit on the current branch.
-Do not use the gh CLI — the pipeline creates the PR after you exit. Push the branch with git and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
+${GIT_INSTRUCTIONS}
+Do not use the gh CLI — the pipeline creates the PR after you exit. Write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
     --settings "${HOOKS_DIR}/settings.json" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    || CLAUDE_EXIT=$?
+    || AGENT_EXIT=$?
 
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    echo "Claude timed out. Nudging to wrap up..."
+if [[ "${AGENT_EXIT}" -eq 124 ]]; then
+    echo "${AGENT_DISPLAY_NAME} timed out. Nudging to wrap up..."
     agentic_ci --timeout 600 \
-        "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
+        "You hit the timeout. Please wrap up immediately. ${WRAPUP_GIT_INSTRUCTIONS} Write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
         --continue \
         --settings "${HOOKS_DIR}/settings.json" \
         --output-format stream-json \
@@ -244,8 +254,8 @@ PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
-if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
-    echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+if [[ "${AGENT_EXIT}" -ne 0 ]]; then
+    echo "ERROR: ${AGENT_DISPLAY_NAME} exited with code ${AGENT_EXIT}."
     # Write failure metadata before exiting so post-step can emit metrics
     PR_RESULT="failed"
     jq -n \
@@ -255,7 +265,9 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         --arg result "${PR_RESULT}" \
         --arg pr_url "" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
-        --argjson claude_exit "${CLAUDE_EXIT}" \
+        --arg harness "${AGENT_HARNESS}" \
+        --arg model "${AGENT_MODEL}" \
+        --argjson agent_exit "${AGENT_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
             --argjson solve "${PHASE_SOLVE_DURATION}" \
@@ -267,24 +279,33 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           result: $result,
           pr_url: $pr_url,
           upstream_repo: $upstream_repo,
-          claude_exit: $claude_exit,
+          harness: $harness,
+          model: $model,
+          agent_exit: $agent_exit,
           phase_durations: $phase_durations
         }' > "${SHARED_DIR}/metrics-metadata-solve.json"
     finalize_session_metrics
-    exit "${CLAUDE_EXIT}"
+    exit "${AGENT_EXIT}"
 fi
 
 # --- Create PR ---
 PHASE_PR_START=$(date +%s)
 BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
 if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" ]]; then
-    echo "ERROR: Claude did not create a feature branch."
+    echo "ERROR: ${AGENT_DISPLAY_NAME} did not create a feature branch."
     exit 1
+fi
+if [[ "${AGENT_HARNESS}" == codex ]]; then
+    [[ "${BRANCH_NAME}" == "${CODEX_BRANCH}" ]] || { echo 'ERROR: Codex branch changed unexpectedly'; exit 1; }
+    commit_codex_changes
+    if [[ "${EVAL_MODE:-}" != true ]]; then
+        git -c core.hooksPath=/dev/null push fork "HEAD:refs/heads/${BRANCH_NAME}"
+    fi
 fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
     if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
-        echo "ERROR: Claude did not create a feature branch (still on base branch ${BASE_BRANCH})."
+        echo "ERROR: ${AGENT_DISPLAY_NAME} did not create a feature branch (still on base branch ${BASE_BRANCH})."
         exit 1
     fi
     EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
@@ -299,6 +320,11 @@ echo "Branch pushed: ${BRANCH_NAME}"
 echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 
 PR_BODY_FILE="${WORKDIR}/artifacts/pr-description.md"
+if [[ "${AGENT_HARNESS}" == codex ]]; then
+    # Do not let a workspace symlink make gh read a private credential file.
+    PR_BODY_FILE="${CODEX_HOME}/pr-description.md"
+    read_codex_artifact "${WORKDIR}/artifacts/pr-description.md" > "${PR_BODY_FILE}" || : > "${PR_BODY_FILE}"
+fi
 if [[ ! -s "${PR_BODY_FILE}" ]]; then
     echo "Warning: No PR description generated. Using default."
     cat > "${PR_BODY_FILE}" <<PR_DEFAULT
@@ -307,7 +333,11 @@ if [[ ! -s "${PR_BODY_FILE}" ]]; then
 Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+if [[ "${AGENT_HARNESS}" == codex ]]; then
+    printf '\n---\nGenerated with [Codex](https://developers.openai.com/codex/)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+else
+    printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+fi
 
 BASE_ARGS=()
 if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
@@ -340,7 +370,7 @@ PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
 # --- Write metrics metadata for post-step ---
 PR_RESULT="success"
-[[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
+[[ "${AGENT_EXIT}" -ne 0 ]] && PR_RESULT="failed"
 
 jq -n \
     --arg agent "dptp-jira-solver" \
@@ -349,7 +379,9 @@ jq -n \
     --arg result "${PR_RESULT}" \
     --arg pr_url "${PR_URL:-}" \
     --arg upstream_repo "${UPSTREAM_REPO}" \
-    --argjson claude_exit "${CLAUDE_EXIT}" \
+    --arg harness "${AGENT_HARNESS}" \
+    --arg model "${AGENT_MODEL}" \
+    --argjson agent_exit "${AGENT_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
         --argjson solve "${PHASE_SOLVE_DURATION}" \
@@ -362,7 +394,9 @@ jq -n \
       result: $result,
       pr_url: $pr_url,
       upstream_repo: $upstream_repo,
-      claude_exit: $claude_exit,
+      harness: $harness,
+      model: $model,
+      agent_exit: $agent_exit,
       phase_durations: $phase_durations
     }' > "${SHARED_DIR}/metrics-metadata-solve.json"
 
