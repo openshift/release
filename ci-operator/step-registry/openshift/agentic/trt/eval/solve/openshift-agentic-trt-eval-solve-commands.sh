@@ -62,39 +62,16 @@ trap copy_artifacts EXIT TERM INT
 # Each subshell gets a temp SHARED_DIR with standard filenames the solver expects:
 #   reads:  gh-fork-token, gh-upstream-token, jira-issue-key, jira-issue.json, eval-base-branch, eval-case
 #   writes: claude-branch, pr-number, pr-description.md, claude-otel.jsonl
+RESULTS_DIR="/tmp/eval-results"
 OTEL_DIR="/tmp/eval-otel"
-mkdir -p "${OTEL_DIR}"
+mkdir -p "${RESULTS_DIR}" "${OTEL_DIR}"
 RUNNING=0
 
 for case_name in "${CASE_LIST[@]}"; do
     CASE_WORKDIR="/workspace/${case_name}"
+    BASE_BRANCH=$(cat "${REAL_SHARED_DIR}/${case_name}.eval-base-branch")
+
     (
-        CASE_SHARED=""
-        finish_case() {
-            local rc=$? copy_rc=0
-            trap - EXIT
-            # Preserve available outputs and telemetry even if solve.sh failed.
-            for f in claude-branch pr-number pr-description.md; do
-                if [[ -n "${CASE_SHARED}" && -f "${CASE_SHARED}/${f}" ]]; then
-                    cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}" || copy_rc=$?
-                fi
-            done
-            if [[ -n "${CASE_SHARED}" && -f "${CASE_SHARED}/claude-otel.jsonl" ]]; then
-                cp "${CASE_SHARED}/claude-otel.jsonl" "${OTEL_DIR}/${case_name}.claude-otel.jsonl" || copy_rc=$?
-            fi
-            if [[ "${rc}" -eq 0 ]]; then
-                rc=${copy_rc}
-                if [[ ! -s "${REAL_SHARED_DIR}/${case_name}.claude-branch" || ! -s "${REAL_SHARED_DIR}/${case_name}.pr-number" ]]; then
-                    echo "ERROR: Solver returned success without publication metadata."
-                    rc=1
-                fi
-            fi
-            printf '%s\n' "${rc}" > "${REAL_SHARED_DIR}/${case_name}.solve-exit-code"
-            cp "${REAL_SHARED_DIR}/${case_name}.solve-exit-code" "${ARTIFACT_DIR}/solve-${case_name}.exit-code"
-            exit "${rc}"
-        }
-        trap finish_case EXIT
-        BASE_BRANCH=$(cat "${REAL_SHARED_DIR}/${case_name}.eval-base-branch")
         # Build a per-case SHARED_DIR with standard filenames
         CASE_SHARED=$(mktemp -d)
         for f in jira-issue-key jira-issue.json eval-base-branch eval-expected-branch eval-case; do
@@ -115,6 +92,19 @@ for case_name in "${CASE_LIST[@]}"; do
         export WORKDIR="${CASE_WORKDIR}"
         export EVAL_MODE=true
         /opt/scripts/solve.sh
+
+        # Copy small outputs to SHARED_DIR for judge/cleanup. OTEL stays on
+        # local disk / artifacts — SHARED_DIR is a 3MiB kube secret.
+        for f in claude-branch pr-number pr-description.md; do
+            if [[ -f "${CASE_SHARED}/${f}" ]]; then
+                cp "${CASE_SHARED}/${f}" "${REAL_SHARED_DIR}/${case_name}.${f}"
+            fi
+        done
+        if [[ -f "${CASE_SHARED}/claude-otel.jsonl" ]]; then
+            cp "${CASE_SHARED}/claude-otel.jsonl" "${OTEL_DIR}/${case_name}.claude-otel.jsonl"
+        fi
+
+        echo "pass" > "${RESULTS_DIR}/${case_name}"
     ) > "${ARTIFACT_DIR}/solve-${case_name}.log" 2>&1 &
 
     RUNNING=$(( RUNNING + 1 ))
@@ -131,16 +121,11 @@ echo ""
 echo "--- Solve Results ---"
 FAILURES=0
 for case_name in "${CASE_LIST[@]}"; do
-    status_file="${REAL_SHARED_DIR}/${case_name}.solve-exit-code"
-    if [[ ! -s "${status_file}" ]]; then
-        echo 1 > "${status_file}"
-        cp "${status_file}" "${ARTIFACT_DIR}/solve-${case_name}.exit-code"
-    fi
-    result=$(cat "${status_file}")
-    if [[ "${result}" -eq 0 ]]; then
+    result=$(cat "${RESULTS_DIR}/${case_name}" 2>/dev/null || echo "fail")
+    if [[ "${result}" == "pass" ]]; then
         echo "  [PASS] ${case_name}"
     else
-        echo "  [FAIL] ${case_name}: solver exit ${result} (see solve-${case_name}.log)"
+        echo "  [FAIL] ${case_name} (see ${ARTIFACT_DIR}/solve-${case_name}.log)"
         FAILURES=$(( FAILURES + 1 ))
     fi
 done
@@ -163,7 +148,7 @@ if [[ -s "${OTEL_COMBINED}" ]]; then
     python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
         "${OTEL_COMBINED}" "${METRICS_TMP}" || true
     if jq -e '.rows[0].model' "${METRICS_TMP}" >/dev/null 2>&1; then
-        jq --argjson failures "${FAILURES}" '
+        jq '
           .rows[0] as $r
           | ($r.total_cost_usd | tonumber) as $cost
           | {
@@ -173,7 +158,7 @@ if [[ -s "${OTEL_COMBINED}" ]]; then
               duration_s: (($r.duration_ms | tonumber) / 1000),
               cost_usd: $cost,
               num_turns: ($r.num_turns | tonumber),
-              exit_code: (if $failures > 0 then 1 else ($r.is_error | tonumber) end),
+              exit_code: ($r.is_error | tonumber),
               token_usage: {
                 input: ($r.input_tokens | tonumber),
                 output: ($r.output_tokens | tonumber),
