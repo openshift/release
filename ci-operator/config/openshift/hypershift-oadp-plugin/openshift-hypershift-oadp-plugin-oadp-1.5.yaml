@@ -2,7 +2,7 @@ base_images:
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
-    tag: latest
+    tag: "4.21"
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
@@ -24,13 +24,18 @@ promotion:
 releases:
   initial:
     integration:
-      name: "5.0"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "5.0"
+      name: "4.21"
       namespace: ocp
+  latest-421:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -77,9 +82,74 @@ tests:
     dependency_overrides:
       OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
     env:
+      BACKUP_RESTORE_LABEL_FILTER: backup-restore && !etcd-snapshot
+      OADP_OPERATOR_SUB_CHANNEL: stable-1.5
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
+  as: e2e-aks-velero-1-13
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    workflow: hypershift-azure-aks-velero-1-13
+- always_run: false
+  as: e2e-aro-velero-1-13
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest-421
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    env:
+      ARO_CLUSTER_VERSION: "4.21"
+    workflow: hypershift-azure-aro-velero-1-13
+- always_run: false
+  as: e2e-agent-backuprestore
+  capabilities:
+  - intranet
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_TARGET_OPERATORS: metallb
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      OADP_OPERATOR_SUB_CHANNEL: stable-1.5
+      OADP_OPERATOR_SUB_SOURCE: redhat-operators
+    workflow: hypershift-mce-agent-metal3-backuprestore
+- always_run: false
+  as: e2e-kubevirt-backuprestore
+  capabilities:
+  - intranet
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+      OADP_OPERATOR_SUB_CHANNEL: stable-1.5
+      OADP_OPERATOR_SUB_SOURCE: redhat-operators
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+    workflow: hypershift-mce-kubevirt-baremetalds-backuprestore
 zz_generated_metadata:
   branch: oadp-1.5
   org: openshift
