@@ -48,6 +48,7 @@ All set via `steps.env` in the calling CI config:
 |---|---|---|
 | `EVAL_CONFIG` | `evals/openai-agent/eval.yaml` | Repo-relative path to the eval YAML |
 | `EVAL_LABEL_SELECTOR` | `suite=core` | Label filter passed to `mcpchecker check` |
+| `EVAL_SUITE` | `` | Select OpenShift prerequisite setup for a toolset periodic; empty keeps the existing behavior |
 | `TOOLSETS` | `core,config` | MCP server toolsets to start |
 | `TASK_PASS_RATE` | `0.0` | Minimum fraction of tasks that must pass (0.0 = no gate) |
 | `ASSERTION_PASS_RATE` | `0.0` | Minimum fraction of assertions that must pass (0.0 = no gate) |
@@ -58,12 +59,21 @@ All set via `steps.env` in the calling CI config:
 
 Artifacts written to `${ARTIFACT_DIR}`: `mcpchecker-out.json` and `junit_mcpchecker.xml`.
 
+For toolset periodics, set `EVAL_SUITE` to the suite name as well as the matching
+`EVAL_CONFIG`, `EVAL_LABEL_SELECTOR`, and `TOOLSETS`. The eval step installs
+missing Argo CD CRDs or Tekton Pipelines and runs the NetObserv mock with
+cleanup on exit. OVN-Kubernetes requires running `ovnkube-node` pods. Kiali
+and KubeVirt require team-managed cluster setup and are not scheduled in the
+release-1.0 toolset periodics. The `core` suite retains its previous storage
+setup; its resize-PVC task needs the `csi-hostpath-sc` StorageClass to run
+successfully.
+
 ## Usage
 
 ### Presubmit — Vertex AI provider (Gemini or Anthropic)
 
 ```yaml
-- as: mcpchecker-eval-google
+- as: mcpchecker-eval-google-core
   optional: true
   steps:
     cluster_profile: openshift-org-aws
