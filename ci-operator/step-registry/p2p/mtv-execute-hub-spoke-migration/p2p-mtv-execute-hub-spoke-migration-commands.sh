@@ -715,13 +715,17 @@ WriteJunit() {
     done < "${junitFile}"
 
     {
+        typeset suiteName="hub-spoke-cclm-migration"
+        if [[ "${MAP_TESTS}" == "true" && -n "${DR__RP__CR_COMP_NAME}" ]]; then
+            suiteName="${DR__RP__CR_COMP_NAME}--${suiteName}"
+        fi
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="hub-spoke-cclm-migration" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${total}" "${failures}" "${totalTime}"
+        printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+            "${suiteName}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="hub-spoke-cclm-migration" time="%d">\n' \
-                "${escapedName}" "${elapsed}"
+            printf '  <testcase name="%s" classname="%s" time="%d">\n' \
+                "${escapedName}" "${suiteName}" "${elapsed}"
             if [[ "${status}" == 'FAIL' ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \
