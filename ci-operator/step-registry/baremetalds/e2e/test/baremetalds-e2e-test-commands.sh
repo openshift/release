@@ -148,6 +148,8 @@ function use_minimal_test_list() {
 
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         TEST_SKIPS=""
+        # The minimal list is already the filter; do not apply any other skips.
+        LEGACY_TEST_SKIPS=""
         echo "${TEST_MINIMAL_LIST}" > /tmp/tests
 }
 
@@ -325,17 +327,25 @@ function suite() {
         HYPERVISOR_ARGS=("--with-hypervisor-json={\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}")
     fi
 
-    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/conformance/serial" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
+    # LEGACY_TEST_SKIPS carries the baremetal-wide exclusions that predate 5.1.
+    # They are only added to the effective list for older payloads; from 5.1 on
+    # those tests are expected to pass and only TEST_SKIPS applies.
+    local skips="${TEST_SKIPS:-}"
+    if [[ -n "${LEGACY_TEST_SKIPS:-}" ]] && { [[ -z "${DS_OPENSHIFT_VERSION:-}" ]] || ! is_openshift_version_gte "5.1"; }; then
+        skips="${skips:+${skips}\\|}${LEGACY_TEST_SKIPS//$'\n'/\\|}"
+    fi
+
+    if [[ -n "${skips}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/conformance/serial" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
         TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" || return $?
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests || return $?
+        echo "${TESTS}" | grep -v "${skips}" >/tmp/tests || return $?
         echo "Tests to be skipped:"
-        if echo "${TESTS}" | grep "${TEST_SKIPS}"; then
+        if echo "${TESTS}" | grep "${skips}"; then
             :
         else
             exit_code=$?
             if [[ ${exit_code} -eq 1 ]]; then
                 echo 'Warning: no tests were found matching the TEST_SKIPS regex:'
-                echo "${TEST_SKIPS}"
+                echo "${skips}"
             else
                 return ${exit_code}
             fi
@@ -345,7 +355,7 @@ function suite() {
 
         # Warn about individual skip patterns that match nothing.
         # Assumes \| is only used as a top-level OR (true for all known usages at the time of writing).
-        echo "${TEST_SKIPS}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
+        echo "${skips}" | sed 's/\\|/\n/g' | while IFS= read -r pattern; do
             [[ -z "${pattern}" ]] && continue
             echo "${TESTS}" | grep "${pattern}" > /dev/null 2>&1 ||
                 echo "Warning: TEST_SKIPS pattern matched 0 tests (test renamed/removed or regex invalid): ${pattern}"
