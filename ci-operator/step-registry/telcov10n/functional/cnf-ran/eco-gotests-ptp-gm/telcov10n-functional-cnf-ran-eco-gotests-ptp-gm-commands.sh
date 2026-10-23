@@ -112,12 +112,30 @@ for feature in containernshide powermanagement deploymenttypes; do
   scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_${feature}_0/report/*.xml" \
     "${local_dir}/" || echo "No XML artifacts in eco_gotests_${feature}_0 — skipping"
+  # The bastion persists across jobs. Rebuild the archive from scratch and only
+  # upload it when zip actually produced output, so stale dumps are never reused.
+  remote_zip="/tmp/k8sreporter_${feature}_0.zip"
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "cd /tmp/eco_gotests_${feature}_0/report && find . -mindepth 1 ! -name '*.xml' -type f \
-     | zip /tmp/k8sreporter_${feature}_0.zip -@ 2>/dev/null || true"
-  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${feature}_0.zip" \
-    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_${feature}_0 — skipping"
+    "rm -f ${remote_zip}; cd /tmp/eco_gotests_${feature}_0/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip -q ${remote_zip} -@ 2>/dev/null || true"
+  if ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "test -s ${remote_zip}" 2>/dev/null; then
+    if scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "${BASTION_USER}@${BASTION_IP}:${remote_zip}" \
+      "${local_dir}/k8sreporter_${feature}_0.zip" 2>/dev/null; then
+      ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+        "rm -f ${remote_zip}" || true
+    else
+      echo "Failed to copy k8sreporter artifacts for eco_gotests_${feature}_0 — skipping" >&2
+    fi
+  else
+    zip_check_rc=$?
+    if [[ ${zip_check_rc} -eq 1 ]]; then
+      echo "No k8sreporter artifacts in eco_gotests_${feature}_0 — skipping"
+    else
+      echo "Failed to check for k8sreporter artifacts in eco_gotests_${feature}_0 — skipping" >&2
+    fi
+  fi
 done
 
 PTP_CYCLE_COUNT=$(python3 -c "import json; print(len(json.loads('${PTP_CYCLE_CONFIGS:-[]}')))" 2>/dev/null || echo 0)
@@ -127,12 +145,30 @@ for i in $(seq 0 "${PTP_CYCLE_COUNT}"); do
   scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_gm_${i}/report/*.xml" \
     "${local_dir}/" || echo "No XML artifacts in eco_gotests_ptp_gm_${i} — skipping"
+  # The bastion persists across jobs. Rebuild the archive from scratch and only
+  # upload it when zip actually produced output, so stale dumps are never reused.
+  remote_zip="/tmp/k8sreporter_ptp_gm_${i}.zip"
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "cd /tmp/eco_gotests_ptp_gm_${i}/report && find . -mindepth 1 ! -name '*.xml' -type f \
-     | zip /tmp/k8sreporter_ptp_gm_${i}.zip -@ 2>/dev/null || true"
-  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_ptp_gm_${i}.zip" \
-    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_ptp_gm_${i} — skipping"
+    "rm -f ${remote_zip}; cd /tmp/eco_gotests_ptp_gm_${i}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip -q ${remote_zip} -@ 2>/dev/null || true"
+  if ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "test -s ${remote_zip}" 2>/dev/null; then
+    if scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "${BASTION_USER}@${BASTION_IP}:${remote_zip}" \
+      "${local_dir}/k8sreporter_ptp_gm_${i}.zip" 2>/dev/null; then
+      ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+        "rm -f ${remote_zip}" || true
+    else
+      echo "Failed to copy k8sreporter artifacts in eco_gotests_ptp_gm_${i} — skipping" >&2
+    fi
+  else
+    zip_check_rc=$?
+    if [[ ${zip_check_rc} -eq 1 ]]; then
+      echo "No k8sreporter artifacts in eco_gotests_ptp_gm_${i} — skipping"
+    else
+      echo "Failed to check for k8sreporter artifacts in eco_gotests_ptp_gm_${i} — skipping" >&2
+    fi
+  fi
 done
 
 echo "Process report files on bastion"
