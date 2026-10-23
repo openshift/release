@@ -14,6 +14,36 @@ if [ "${1:-}" = "clean" ]; then
     exit 0
 fi
 
+# update_image_if_stale pulls IMAGE when its quay.io tag points to a different manifest
+# than the local copy. It does nothing for other registries or when quay.io cannot be checked.
+update_image_if_stale() {
+    local repo="${IMAGE%:*}" tag="${IMAGE##*:}" digest local_digests
+    if [[ "$repo" != quay.io/* || "$repo" = *@* || "$tag" = */* ]]; then
+        return 0
+    fi
+    digest="$(curl -fsSI --max-time 5 \
+        -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json' \
+        "https://quay.io/v2/${repo#quay.io/}/manifests/$tag" 2>/dev/null |
+        tr -d '\r' | awk 'tolower($1) == "docker-content-digest:" { print $2 }')" || return 0
+    if [[ "$digest" != sha256:* ]]; then
+        return 0
+    fi
+    local_digests="$("$CONTAINER_ENGINE" image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" 2>/dev/null || true)"
+    if grep -qxF "$repo@$digest" <<<"$local_digests"; then
+        return 0
+    fi
+    if [[ -z "$local_digests" ]]; then
+        echo "The secret-manager image is missing locally, downloading $IMAGE..." >&2
+    else
+        echo "A newer secret-manager image is available, updating $IMAGE..." >&2
+    fi
+    if "$CONTAINER_ENGINE" pull "$IMAGE" >/dev/null; then
+        echo "The secret-manager image is up to date." >&2
+    else
+        echo "Warning: failed to pull $IMAGE." >&2
+    fi
+}
+
 mkdir -p "$GCLOUD_CONFIG_PATH"
 
 if [ "${1:-}" = "login" ]; then
@@ -23,6 +53,7 @@ if [ "${1:-}" = "login" ]; then
     fi
     CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
     chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+    update_image_if_stale
     exit 0
 fi
 
