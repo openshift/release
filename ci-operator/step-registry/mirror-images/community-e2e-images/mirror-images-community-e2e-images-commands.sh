@@ -25,9 +25,11 @@ MIRROR_REPO="${MIRROR_REGISTRY_HOST}/${MIRROR_REGISTRY_PATH}"
 # Log in to the CI build-farm registry so that 'openshift-tests images' can
 # pull image-references from the per-job imagestream
 # (e.g. registry.build06.ci.openshift.org/ci-op-*/release@sha256:...).
-# Unset KUBECONFIG so the login targets the build farm, not the cluster under test.
-# This mirrors the pattern used by mirror-images-by-oc-adm and other peer steps.
-KUBECONFIG="" oc registry login
+# Run in a subshell so KUBECONFIG is unset only for this login, leaving the
+# cluster-under-test kubeconfig available for the later 'oc apply' calls.
+# KUBECONFIG="" is not equivalent: an explicitly empty string is not the same
+# as an unset variable for oc's config-file discovery.
+(unset KUBECONFIG; oc registry login)
 
 echo "Discovering community e2e test images required by this release via 'openshift-tests images'..."
 openshift-tests images --to-repository "${MIRROR_REPO}" | grep "${MIRROR_REPO}" >> "${SHARED_DIR}/mirror-images-list.yaml"
