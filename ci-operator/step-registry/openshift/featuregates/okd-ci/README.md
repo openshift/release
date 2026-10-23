@@ -1,6 +1,6 @@
 # OKD CI install feature gates
 
-The IPI (including stable-initial and vSphere) and agent preparation refs apply
+The IPI preparation ref (including stable-initial and vSphere) applies
 only when the **tested target** release metadata version identifies an OKD CI
 payload. The timestamped `okd` / `okd-scos` versions are distinct from ART-derived
 `okd-scos-nightly` versions. Image tags and job names are not sufficient: release
@@ -11,8 +11,7 @@ stream configuration. Nonmatching targets return before changing shared files.
 For a matching target, existing feature selections are intentionally overridden.
 The catalog comes from the **effective initial install payload**, not the upgrade
 target. IPI uses `OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE` (including the custom
-override); the upgrade workflow binds this to `release:initial`. Agent mirrors
-the dev-scripts setup step's architecture-specific initial image selection.
+override); the upgrade workflow binds this to `release:initial`.
 
 Catalog extraction uses `oc adm release extract`, without `--included`: these
 FeatureGate status catalogs are specially annotated and are not ordinary
@@ -51,19 +50,12 @@ then replaces the installer's `openshift/99_feature-gate.yaml` before ignition
 generation, using the existing shared-manifest consumer. It is not a second
 conflicting FeatureGate in the `manifests` directory.
 
-Agent preparation stages a small Make include for the remote dev-scripts setup.
-An additional `agent_create_cluster` prerequisite runs after `agent_configure`
-and before image creation. It patches either install-config or the ZTP
-AgentClusterInstall `agent-install.openshift.io/install-config-overrides`
-annotation, preserving unrelated overrides, and stages the FeatureGate under
-`${OCP_DIR}/openshift`. The pinned dev-scripts consumer at
-`ff6edd3c7ca6fe018cc264e1c126a3aa75754e35` uses `ocp/${CLUSTER_NAME}` by default;
-its agent path does **not** consume `ASSETS_EXTRA_FOLDER`. That variable is not
-used as an agent delivery mechanism here.
+Agent installs are intentionally excluded. Their workflows and dev-scripts
+provisioner do not run this preparation ref or consume its staged artifacts.
 
 Run `make test-okd-ci-featuregates` for catalog, scoping, initial selection,
-legacy, IPI/stable-initial/vSphere workflow coverage, and agent configuration /
-Make-hook ordering regression tests. These tests stub external payload reads
+legacy, IPI/stable-initial/vSphere workflow coverage, and negative dev-scripts /
+agent workflow isolation regression tests. These tests stub external payload reads
 and cluster creation; they are not end-to-end cluster verification. Configuration
 changes require `make ci-operator-config` followed by `make jobs`; registry changes
 require `make registry-metadata`, `make ci-operator-checkconfig` and

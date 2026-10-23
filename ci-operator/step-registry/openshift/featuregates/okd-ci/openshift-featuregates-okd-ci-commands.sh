@@ -12,7 +12,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.error
@@ -22,7 +21,6 @@ import yaml
 
 
 PROFILE = "include.release.openshift.io/self-managed-high-availability"
-OVERRIDES = "agent-install.openshift.io/install-config-overrides"
 CI_VERSION = re.compile(r"\d+\.\d+\.0-0\.okd(?:-scos)?(?:-arm64)?-\d{4}-\d{2}-\d{2}-\d{6}")
 
 
@@ -178,27 +176,6 @@ def configure_install_config(path, selection):
     path.write_text(yaml.safe_dump(config, sort_keys=False))
 
 
-def configure_agent(directory, prepared):
-    selection = json.loads((prepared / "selection.json").read_text())
-    install_config = directory / "install-config.yaml"
-    agent_install = directory / "cluster-manifests/agent-cluster-install.yaml"
-    if install_config.exists():
-        configure_install_config(install_config, selection)
-    elif agent_install.exists():
-        obj = yaml.safe_load(agent_install.read_text())
-        annotations = obj.setdefault("metadata", {}).setdefault("annotations", {})
-        overrides = json.loads(annotations.get(OVERRIDES, "{}"))
-        overrides.update(featureSet="CustomNoUpgrade",
-                         featureGates=[name + "=true" for name in selection["overrides"]])
-        annotations[OVERRIDES] = json.dumps(overrides, separators=(",", ":"))
-        agent_install.write_text(yaml.safe_dump(obj, sort_keys=False))
-    else:
-        raise ValueError("Agent configuration must exist before preparing feature gates")
-    extra = directory / "openshift"
-    extra.mkdir(exist_ok=True)
-    shutil.copyfile(prepared / "cluster-feature-gate.yaml", extra / "99_feature-gate.yaml")
-
-
 def release_info(image):
     """Bound release-info attempts, then parse the metadata once without retrying it."""
     output = retry_external(lambda: subprocess.check_output([
@@ -227,12 +204,8 @@ def prepare():
         print("Preserving feature gates for non-OKD-CI target " + target_version)
         return
     shared = Path(os.environ["SHARED_DIR"])
-    installer = os.environ.get("OKD_CI_FEATURE_GATES_INSTALLER", "ipi")
     installed_image = os.environ["OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"]
-    if installer == "agent" and os.environ.get("ARCHITECTURE") != "arm64":
-        installed_image = os.environ["OPENSHIFT_INSTALL_RELEASE_IMAGE"]
-    if installer == "ipi":
-        installed_image = os.environ.get("CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE") or installed_image
+    installed_image = os.environ.get("CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE") or installed_image
     installed = release_info(installed_image)
     version = installed["metadata"]["version"]
     (known, forced), source = extract_payload_gates(installed_image, version)
@@ -246,26 +219,14 @@ def prepare():
     prepared.mkdir()
     (prepared / "selection.json").write_text(json.dumps(selection, indent=2) + "\n")
     (prepared / "cluster-feature-gate.yaml").write_text(yaml.safe_dump(manifest, sort_keys=False))
-    if installer == "ipi":
-        configure_install_config(shared / "install-config.yaml", selection)
-        shutil.copyfile(prepared / "cluster-feature-gate.yaml", shared / "openshift_manifests_99_feature-gate.yaml")
-    else:
-        shutil.copyfile(__file__, prepared / "helper.py")
-        (prepared / "agent.mk").write_text(
-            ".PHONY: okd-ci-featuregates\n"
-            "agent_create_cluster: okd-ci-featuregates\n"
-            "okd-ci-featuregates: agent_configure\n"
-            "\tbash -c 'source ./common.sh; python3 /root/okd-ci-featuregates/helper.py "
-            "agent \"$${OCP_DIR}\" /root/okd-ci-featuregates'\n")
+    configure_install_config(shared / "install-config.yaml", selection)
+    shutil.copyfile(prepared / "cluster-feature-gate.yaml", shared / "openshift_manifests_99_feature-gate.yaml")
     print("OKD CI target " + target_version + ": overriding prior gate selection with CustomNoUpgrade; "
           + str(len(known)) + " known gates enabled for installed payload " + version
           + " (" + str(len(forced)) + " explicit overrides); catalog: " + source)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 4 and sys.argv[1] == "agent":
-        configure_agent(Path(sys.argv[2]), Path(sys.argv[3]))
-    else:
-        prepare()
+    prepare()
 PYTHON
 python3 "${helper}"

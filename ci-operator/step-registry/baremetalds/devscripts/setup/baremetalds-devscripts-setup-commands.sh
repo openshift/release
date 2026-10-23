@@ -68,12 +68,6 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
-okd_ci_featuregates=false
-if [[ -d "${SHARED_DIR}/okd-ci-featuregates" ]]; then
-  scp "${SSHOPTS[@]}" -r "${SHARED_DIR}/okd-ci-featuregates" "root@${IP}:/root/"
-  okd_ci_featuregates=true
-fi
-
 # Copy any additional manifests from previous CI steps
 export EXTRA_MANIFESTS=false
 echo "Will include manifests:"
@@ -369,9 +363,6 @@ fi
 echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root/.bashrc
 
 set +e
-if [[ "${okd_ci_featuregates}" == "true" ]]; then
-  export MAKEFILES="/root/okd-ci-featuregates/agent.mk \${MAKEFILES:-}"
-fi
 timeout -s 9 ${MAKE_TIMEOUT} make ${DEVSCRIPTS_TARGET}
 rv=\$?
 

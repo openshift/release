@@ -1,1 +1,0 @@
-../openshift-featuregates-okd-ci-commands.sh

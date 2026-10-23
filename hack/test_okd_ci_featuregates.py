@@ -77,7 +77,6 @@ class FeatureGateFixtures(unittest.TestCase):
         self.environment = {
             'RELEASE_IMAGE_LATEST': 'target',
             'OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE': 'initial',
-            'OPENSHIFT_INSTALL_RELEASE_IMAGE': 'agent-initial',
             'SHARED_DIR': str(self.shared),
             'CLUSTER_PROFILE_DIR': str(self.directory),
         }
@@ -457,64 +456,6 @@ class InstallerTests(FeatureGateFixtures):
         HELPER.configure_install_config(self.config, {'version': '4.13.0', 'overrides': ['Legacy']})
         self.assertEqual(yaml.safe_load(self.config.read_text()), {'featureSet': 'CustomNoUpgrade'})
 
-    def test_agent_initial_source_and_early_staging(self):
-        for architecture, expected in [('amd64', 'agent-initial'), ('arm64', 'initial')]:
-            with self.subTest(architecture=architecture):
-                prepared = self.shared / 'okd-ci-featuregates'
-                if prepared.exists():
-                    shutil.rmtree(prepared)
-                before = self.config.read_bytes()
-                lookups, _ = self.prepare(OKD_CI_FEATURE_GATES_INSTALLER='agent',
-                                          ARCHITECTURE=architecture)
-                self.assertEqual(lookups, ['target', expected])
-                self.assertEqual(before, self.config.read_bytes())
-                self.assertIn('agent_create_cluster: okd-ci-featuregates',
-                              (prepared / 'agent.mk').read_text())
-                self.assertIn('okd-ci-featuregates: agent_configure',
-                              (prepared / 'agent.mk').read_text())
-
-    def test_agent_ztp_overrides_and_extra_manifests(self):
-        self.prepare(OKD_CI_FEATURE_GATES_INSTALLER='agent')
-        agent = self.directory / 'agent'
-        manifests = agent / 'cluster-manifests'
-        manifests.mkdir(parents=True)
-        path = manifests / 'agent-cluster-install.yaml'
-        path.write_text(yaml.safe_dump({'metadata': {'annotations': {
-            'other': 'unchanged', HELPER.OVERRIDES: json.dumps({'fips': True, 'featureSet': 'Default'})}}}))
-        HELPER.configure_agent(agent, self.shared / 'okd-ci-featuregates')
-        annotations = yaml.safe_load(path.read_text())['metadata']['annotations']
-        overrides = json.loads(annotations[HELPER.OVERRIDES])
-        self.assertEqual(overrides['featureSet'], 'CustomNoUpgrade')
-        self.assertEqual(overrides['featureGates'], ['Disabled=true', 'ExtraKnown=true', 'Preview=true'])
-        self.assertTrue(overrides['fips'])
-        self.assertEqual(annotations['other'], 'unchanged')
-        self.assertTrue((agent / 'openshift/99_feature-gate.yaml').exists())
-
-    def test_agent_install_config_and_missing_configuration(self):
-        self.prepare(OKD_CI_FEATURE_GATES_INSTALLER='agent')
-        prepared = self.shared / 'okd-ci-featuregates'
-        HELPER.configure_agent(self.shared, prepared)
-        self.assertEqual(yaml.safe_load(self.config.read_text())['featureSet'], 'CustomNoUpgrade')
-        with self.assertRaises(ValueError):
-            HELPER.configure_agent(self.directory, prepared)
-
-    def test_agent_hook_consumes_config_before_image(self):
-        self.prepare(OKD_CI_FEATURE_GATES_INSTALLER='agent')
-        prepared = self.shared / 'okd-ci-featuregates'
-        hook = prepared / 'agent.mk'
-        hook.write_text(hook.read_text().replace('/root/okd-ci-featuregates', str(prepared)))
-        (self.directory / 'common.sh').write_text('OCP_DIR=ocp/ostest\n')
-        manifests = self.directory / 'ocp/ostest/cluster-manifests'
-        manifests.mkdir(parents=True)
-        (manifests / 'agent-cluster-install.yaml').write_text('metadata: {}\n')
-        recipe = next(line.strip().replace('$$', '$') for line in hook.read_text().splitlines()
-                      if line.startswith('\t'))
-        result = subprocess.run(['bash', '-c', recipe], cwd=self.directory,
-                                text=True, capture_output=True, check=False)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        manifest = yaml.safe_load((manifests.parent / 'openshift/99_feature-gate.yaml').read_text())
-        self.assertEqual(manifest['spec']['featureSet'], 'CustomNoUpgrade')
-
     def test_shell_entrypoint_uses_oc_and_delivers_ipi_manifest(self):
         self.default_catalog()
         consumer = self.directory / 'consumer.go'
@@ -568,36 +509,6 @@ else:
                          (self.shared / 'okd-ci-featuregates/cluster-feature-gate.yaml').read_bytes())
         self.assertEqual(list(destination.iterdir()), [manifest])
 
-    def test_remote_agent_setup_does_not_reuse_stale_ci_artifacts(self):
-        self.prepare(OKD_CI_FEATURE_GATES_INSTALLER='agent')
-        source = (REGISTRY / 'baremetalds/devscripts/setup/baremetalds-devscripts-setup-commands.sh').read_text()
-        preparation = 'okd_ci_featuregates=false' + source.split('okd_ci_featuregates=false', 1)[1].split(
-            '\n\n# Copy any additional manifests', 1)[0]
-        hook = source.split('set +e\n', 1)[1].split('timeout -s 9 ${MAKE_TIMEOUT}', 1)[0]
-        hook = hook.replace('/root/okd-ci-featuregates', str(self.directory / 'stale'))
-        (self.directory / 'stale').mkdir()
-        (self.directory / 'stale/agent.mk').write_text('stale content\n')
-        empty = self.directory / 'nightly-shared'
-        empty.mkdir()
-        script = ('SSHOPTS=()\nIP=unused\n'
-                  'scp() { printf "%s\\n" "$*" > "$TEST_SCP"; }\n' + preparation
-                  + '\ncat <<EOF > "$TEST_REMOTE"\n' + hook
-                  + '\nprintf "%s" "\\${MAKEFILES:-}"\nEOF\nbash "$TEST_REMOTE"\n')
-        for shared, enabled in [(empty, False), (self.shared, True)]:
-            with self.subTest(enabled=enabled):
-                result = subprocess.run(['bash', '-euc', script], env={
-                    **os.environ, 'SHARED_DIR': str(shared), 'MAKEFILES': 'preserved.mk',
-                    'TEST_SCP': str(self.directory / 'scp-arguments'),
-                    'TEST_REMOTE': str(self.directory / 'remote.sh'),
-                }, text=True, capture_output=True, check=False)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                expected = str(self.directory / 'stale/agent.mk') + ' preserved.mk' if enabled else 'preserved.mk'
-                self.assertEqual(result.stdout, expected)
-                if enabled:
-                    self.assertIn('root@unused:/root/', (self.directory / 'scp-arguments').read_text())
-                else:
-                    self.assertFalse((self.directory / 'scp-arguments').exists())
-
     def test_workflow_installers_have_preparation_before_install(self):
         definitions = {}
         for kind in ['workflow', 'chain']:
@@ -607,7 +518,7 @@ else:
 
         def flatten(steps):
             result = []
-            for step in steps:
+            for step in steps or []:
                 result.extend(flatten(definitions[('chain', step['chain'])]) if 'chain' in step
                               else [step.get('ref')])
             return result
@@ -617,15 +528,33 @@ else:
                 ('openshift-e2e-aws-ovn', 'ipi-install-install'),
                 ('openshift-e2e-gcp', 'ipi-install-install'),
                 ('openshift-e2e-vsphere', 'ipi-install-install'),
-                ('openshift-upgrade-aws', 'ipi-install-install-stableinitial'),
-                ('agent-e2e-sno-ipv6', 'baremetalds-devscripts-setup')]:
+                ('openshift-upgrade-aws', 'ipi-install-install-stableinitial')]:
             with self.subTest(workflow=workflow):
                 steps = flatten(definitions[('workflow', workflow)]['pre'])
                 helper = 'openshift-featuregates-okd-ci'
-                if workflow.startswith('agent'):
-                    helper += '-agent'
                 self.assertEqual(steps.count(helper), 1)
                 self.assertLess(steps.index(helper), steps.index(installer))
+        agent_workflows = 0
+        for (kind, name), definition in definitions.items():
+            if kind != 'workflow':
+                continue
+            steps = flatten(definition.get('pre') or [])
+            if 'baremetalds-devscripts-setup' not in steps:
+                continue
+            with self.subTest(devscripts_workflow=name):
+                self.assertFalse(any(step and step.startswith('openshift-featuregates-okd-ci')
+                                     for step in steps))
+                self.assertNotIn('ipi-install-install', steps)
+                self.assertNotIn('ipi-install-install-stableinitial', steps)
+            if name.startswith('agent-'):
+                agent_workflows += 1
+        self.assertGreater(agent_workflows, 0)
+        self.assertIn('baremetalds-devscripts-setup',
+                      flatten(definitions[('workflow', 'agent-e2e-sno-ipv6')]['pre']))
+        provisioner = (REGISTRY / 'baremetalds/devscripts/setup/baremetalds-devscripts-setup-commands.sh').read_text()
+        self.assertNotIn('okd-ci-featuregates', provisioner)
+        self.assertNotIn('agent.mk', provisioner)
+        self.assertFalse((STEP / 'agent').exists())
         upgrade = definitions[('workflow', 'openshift-upgrade-aws')]
         self.assertEqual(upgrade['dependencies']['OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE'], 'release:initial')
 
