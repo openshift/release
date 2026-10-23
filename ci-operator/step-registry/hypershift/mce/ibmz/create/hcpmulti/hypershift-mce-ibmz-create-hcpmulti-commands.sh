@@ -2,6 +2,7 @@
 
 set -x
 set -e
+set -o pipefail
 
 # --- Step 0: Download and install the hcp CLI ---
 echo "$(date) Installing hcp CLI"
@@ -43,7 +44,7 @@ elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
   HC_NS=hcpmulti-oz-ci-1-ns
   MGMT_CLUSTER_LEASE=0-1
 else
-  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.169.1.x or 192.168.3.x"
+  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.1.x or 192.168.3.x"
   exit 1
 fi
 
