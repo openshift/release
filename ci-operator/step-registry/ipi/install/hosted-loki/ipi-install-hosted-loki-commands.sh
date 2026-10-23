@@ -426,6 +426,13 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/os: linux
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/arbiter
+                operator: DoesNotExist
       containers:
       - command:
         - promtail
@@ -779,6 +786,13 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: event-exporter
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/arbiter
+                operator: DoesNotExist
       tolerations:
       - operator: Exists
       containers:
