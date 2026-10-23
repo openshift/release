@@ -1,4 +1,20 @@
 base_images:
+  centos-stream10:
+    name: centos
+    namespace: openshift
+    tag: stream10
+  metallb-frr:
+    name: "4.22"
+    namespace: ocp
+    tag: metallb-frr
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  prometheus-node-exporter:
+    name: "4.22"
+    namespace: ocp
+    tag: prometheus-node-exporter
   ubi-python:
     name: ubi-python-312
     namespace: ocp
@@ -10,6 +26,17 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+  - dockerfile_literal: |
+      FROM nested-podman
+      USER 0
+      RUN dnf -y install skopeo openssh-clients && dnf clean all
+    from: nested-podman
+    to: evpn-vm-tools
+releases:
+  latest:
+    integration:
+      name: "5.1"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -22,6 +49,24 @@ tests:
   commands: make verify OFFLINE=1
   container:
     from: ansible-test-runner
+- always_run: false
+  as: aws-vm-e2e
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_AMI: ami-0da467f007dfebd6b
+      EC2_INSTANCE_TYPE: m6i.xlarge
+      EC2_REGION: us-west-2
+      REGION: us-west-2
+    post:
+    - ref: aws-deprovision-stacks
+    pre:
+    - chain: openshift-image-based-infra-aws-ec2
+    test:
+    - ref: openshift-evpn-gateway-appliance-aws-vm-e2e
 zz_generated_metadata:
   branch: main
   org: openshift
