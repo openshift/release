@@ -1,4 +1,8 @@
 base_images:
+  python-validation:
+    name: python-validation
+    namespace: ci
+    tag: latest
   ship-status-component-monitor:
     name: component-monitor
     namespace: ship-status-dash
@@ -18,6 +22,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: okd-ci-featuregates
+  commands: python3 hack/test_okd_ci_featuregates.py
+  container:
+    clone: true
+    from: python-validation
+  run_if_changed: ^(hack/test_okd_ci_featuregates\.py|ci-operator/step-registry/(openshift/(featuregates|e2e|upgrade)|ipi|agent|baremetalds)/).*
 - as: agent-model-policy
   commands: ci-operator/model-policy/validate.sh
   container:

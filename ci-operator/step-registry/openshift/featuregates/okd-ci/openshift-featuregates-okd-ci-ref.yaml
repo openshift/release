@@ -1,0 +1,28 @@
+ref:
+  as: openshift-featuregates-okd-ci
+  from_image:
+    namespace: ci
+    name: python-validation
+    tag: latest
+  cli: latest
+  grace_period: 1m
+  commands: openshift-featuregates-okd-ci-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: Use the same custom initial payload as ipi-install-install.
+  dependencies:
+  - name: release:latest
+    env: RELEASE_IMAGE_LATEST
+  - name: release:latest
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    For non-nightly OKD CI target payloads only, configure CustomNoUpgrade before
+    installation using the effective initial payload's complete OpenShift gate
+    catalog and pinned consumer semantics. Default-enabled gates are inherited
+    only when the installed consumer supports it; otherwise every known gate is
+    explicit. Other targets retain their configured feature selection.
