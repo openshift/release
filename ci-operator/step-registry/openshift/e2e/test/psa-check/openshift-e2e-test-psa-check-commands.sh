@@ -15,6 +15,6 @@ fi
   if [[ -n "${ARTIFACT_DIR:-}" ]]; then
     printf 'export ARTIFACT_PATH=%q\n' "${ARTIFACT_DIR}"
   fi
-} >"${SHARED_DIR}/cluster-debug-tools.env"
+} >"${SHARED_DIR}/psa-e2e-runner.env"
 
 echo "kubectl-dev_tool available in the e2e test image at ${tool_path}"

@@ -11,12 +11,10 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
-# Optional shared test-tool environment. Projects that install developer tools
-# in a preceding step can expose them to openshift-tests and its extensions by
-# writing this file into SHARED_DIR.
-if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
+# Optional PSA e2e runner settings are shared with this test step through SHARED_DIR.
+if [[ -f "${SHARED_DIR}/psa-e2e-runner.env" ]]; then
     # shellcheck disable=SC1090
-    source "${SHARED_DIR}/cluster-debug-tools.env"
+    source "${SHARED_DIR}/psa-e2e-runner.env"
 fi
 
 if [[ "${PSA_CHECK_REQUIRED:-false}" == "true" ]]; then
