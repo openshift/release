@@ -130,7 +130,7 @@ function RequireInitialVersion () {
     typeset version="${1:-}"
     if [[ -z "${version}" ]]; then
         echo >&2 "ERROR: Cannot determine pre-upgrade operator version; aborting before mutation"
-        return 1
+        return 3
     fi
     echo "${version}"
     return 0
