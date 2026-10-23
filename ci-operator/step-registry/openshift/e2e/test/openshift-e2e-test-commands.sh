@@ -404,6 +404,19 @@ function upgrade_paused() {
 }
 
 
+# Returns 0 when the suite's only failure was a MonitorTest failure and the job
+# opted in with SKIP_MONITOR_TEST=true. openshift-tests only returns that error
+# when there are no blocking test failures, so no extra guard is needed.
+function tolerate_monitor_test_failure() {
+    local exit_code="$1"
+    if [[ "${exit_code}" -ne 0 && "${SKIP_MONITOR_TEST:-false}" == "true" ]] &&
+        grep -q 'failed due to a MonitorTest failure' /tmp/openshift-tests.log; then
+        echo "SKIP_MONITOR_TEST=true: ignoring MonitorTest-only failure (exit code ${exit_code})"
+        return 0
+    fi
+    return "${exit_code}"
+}
+
 # Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
@@ -423,12 +436,17 @@ function suite() {
     fi &&
 
     set -x &&
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!" &&
-    set +x
+    {
+        test_exit_code=0
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit" || test_exit_code=$?
+        echo "${test_exit_code}" > /tmp/openshift-tests-exit
+    } 2>&1 | tee /tmp/openshift-tests.log &
+    { wait "$!" || true; } &&
+    set +x &&
+    tolerate_monitor_test_failure "$(cat /tmp/openshift-tests-exit)"
 }
 
 function wait_for_ipsec_full_mode() {
