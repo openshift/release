@@ -238,8 +238,9 @@ wait_for_nodes() {
   oc get no || true
   oc get hc -A || true
   oc describe hc -n ${HC_NS} ${HC_NAME} || true
-  oc get np -A || true
-  oc describe np -n ${HC_NS} || true
+  # TODO(OCPBUGS-132920): nodepool/machine status disabled due to this bug. Uncomment once it is resolved.
+  # oc get np -A || true
+  # oc describe np -n ${HC_NS} || true
   oc get po -n ${HC_NS}-${HC_NAME} || true
   oc get vmi -A || true
   oc describe vmi -A || true
@@ -403,8 +404,9 @@ if [[ -n "${UNAVAILABLE}" ]]; then
   oc get no || true
   oc get hc -A || true
   oc describe hc -n ${HC_NS} ${HC_NAME} || true
-  oc get np -A || true
-  oc describe np -n ${HC_NS} || true
+  # TODO(OCPBUGS-132920): nodepool/machine status disabled due to this bug. Uncomment once it is resolved.
+  # oc get np -A || true
+  # oc describe np -n ${HC_NS} || true
   oc get po -n ${HC_NS}-${HC_NAME} || true
   oc get vmi -A || true
   oc describe vmi -A || true
