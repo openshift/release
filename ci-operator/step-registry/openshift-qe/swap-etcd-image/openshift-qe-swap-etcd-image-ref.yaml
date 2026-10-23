@@ -1,0 +1,24 @@
+ref:
+  as: openshift-qe-swap-etcd-image
+  cli: latest
+  commands: openshift-qe-swap-etcd-image-commands.sh
+  documentation: |-
+    Swaps the etcd operand image on the cluster by patching the etcd-operator's
+    IMAGE env var. Scales CVO to 0 to prevent reconciliation, waits for the
+    etcd member pods to roll to the new image, and verifies health.
+  env:
+  - name: ETCD_IMAGE
+    default: ""
+    documentation: |-
+      Pull spec of the etcd image to deploy (e.g.
+      quay.io/mcornea/etcd:pr397). Required.
+  - default: "900"
+    documentation: |-
+      Maximum seconds to wait for the etcd roll to complete.
+    name: ETCD_SWAP_TIMEOUT
+  from: src
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
