@@ -96,9 +96,45 @@ if [[ -n "${OCP_IMAGE_N4:-}" && "${OCP_IMAGE_N4}" != "${OCP_IMAGE_LATEST}" ]]; t
   N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
 fi
 
-MI_ARGS=""
+if [[ "${HYPERSHIFT_AZURE_KARPENTER_IDENTITY:-false}" == "true" ]]; then
+  if [[ "${AKS}" != "true" || "${AUTH_THROUGH_CERTS}" != "true" ]]; then
+    echo "Karpenter identity provisioning requires AKS=true and AUTH_THROUGH_CERTS=true" >&2
+    exit 1
+  fi
+  AZURE_AUTH_SUBSCRIPTION_ID="$(jq -er .subscriptionId "${AZURE_AUTH_LOCATION}")"
+  az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
+  RESOURCE_GROUP="$(<"${SHARED_DIR}/resourcegroup_aks")"
+  UNIQUE_SUFFIX="$(printf '%s' "${PROW_JOB_ID}" | sha256sum | cut -c1-16)"
+  IDENTITY_NAME="hshift-karpenter-${UNIQUE_SUFFIX}"
+
+  # Existing AKS resource-group teardown removes the identity and its federated credential.
+  IDENTITY="$(az identity create \
+    --name "${IDENTITY_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --location "${HYPERSHIFT_AZURE_LOCATION}" \
+    --tags "prow-job-id=${PROW_JOB_ID}" \
+    --output json)"
+  CLIENT_ID="$(jq -er .clientId <<<"${IDENTITY}")"
+
+  # Trust the hosted cluster's issuer, not the AKS management cluster's issuer.
+  az identity federated-credential create \
+    --name karpenter \
+    --identity-name "${IDENTITY_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --issuer "${AZURE_OIDC_ISSUER_URL}" \
+    --subject system:serviceaccount:kube-system:karpenter \
+    --audiences openshift \
+    --output none
+
+  # Keep the mounted component credentials unchanged.
+  jq --arg clientID "${CLIENT_ID}" '. + {karpenterClientID: $clientID}' \
+    "${AZURE_MANAGED_IDENTITIES_LOCATION}" > "${SHARED_DIR}/managed-identities-karpenter.json"
+  AZURE_MANAGED_IDENTITIES_LOCATION="${SHARED_DIR}/managed-identities-karpenter.json"
+fi
+
+MI_ARGS=()
 if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
-  MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
+  MI_ARGS=("--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}")
 fi
 
 DP_ARGS=""
@@ -170,7 +206,7 @@ hack/ci-test-e2e.sh -test.v \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${N3_NP_VERSION_TEST_ARGS:-} \
     ${N4_NP_VERSION_TEST_ARGS:-} \
-    ${MI_ARGS:-} \
+    "${MI_ARGS[@]}" \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
   --e2e.azure-encryption-key-id="${AKS_KMS_KEY}" \
