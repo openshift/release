@@ -1,14 +1,41 @@
 #!/bin/bash
-
 set -euo pipefail
-
 CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
 POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
 BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
 CREDENTIALS_PATH="/etc/sno-power-credentials"
 
+set +x
+# Read secrets into variables
+
+read -r IBMCLOUD_API_KEY < /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key
+export IBMCLOUD_API_KEY 
+BASTION="$(<"/etc/sno-power-credentials/POWERVS_SNO_ibmcloud-bastion")"
+export BASTION
+BASTION_IP="$(<"/etc/sno-power-credentials/POWERVS_SNO_ibmcloud-bastion-ip")"
+export BASTION_IP
+
 setup_env() {
   set +x
+  BASE_DOMAIN="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_BASE_DOMAIN")"
+  export BASE_DOMAIN
+  BASTION_IP="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-bastion-ip")"
+  export BASTION_IP
+  POWERVS_INSTANCE_CRN="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_INSTANCE_CRN")"
+  export POWERVS_INSTANCE_CRN
+  POWERVS_NETWORK="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_NETWORK")"
+  export POWERVS_NETWORK
+  CIS_INSTANCE="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_CIS_CRN")"
+  export CIS_INSTANCE
+  CIS_DOMAIN_ID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-cis-domain-id")"
+  export CIS_DOMAIN_ID
+  POWERVS_IMAGE="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-powervs-image")"
+  export POWERVS_IMAGE
+  POWERVS_IMG_UUID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-img-uuid")"
+  export POWERVS_IMG_UUID
+  POWERVS_NW_ID="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-nw-id")"
+  export POWERVS_NW_ID
+
   # Installing required tools
   echo "$(date) Installing required tools"
   mkdir /tmp/ibm_cloud_cli
@@ -21,7 +48,7 @@ setup_env() {
 
   # IBM cloud login
   ibmcloud config --check-version=false
-  echo | ibmcloud login --apikey @"${CREDENTIALS_PATH}/.powercreds" --no-region
+  ibmcloud login --apikey "${IBMCLOUD_API_KEY}" --no-region
 
   # Installing required ibmcloud plugins
   echo "$(date) Installing required ibmcloud plugins"
@@ -34,13 +61,13 @@ setup_env() {
 
   # Setting IBMCLOUD_TRACE to true to enable debug logs for pi and cis operations
   export IBMCLOUD_TRACE=true
-  set -x
+  #set -x
 }
 
 create_sno_node() {
   # Creating VSI in PowerVS instance
   echo "$(date) Creating VSI in PowerVS instance"
-  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}  --storage-tier tier0
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMG_UUID} --subnets ${POWERVS_NW_ID} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE}  --storage-tier tier0
 
   instance_id=$(ibmcloud pi ins ls --json | jq -r --arg serverName ${POWERVS_VSI_NAME} '.pvmInstances[] | select (.name == $serverName ) | .id')
 
@@ -127,13 +154,14 @@ patch_image_registry() {
 
 # Create private key with 0600 permission for ssh purpose
 SSH_PRIVATE="/tmp/ssh-privatekey"
-cp "${CREDENTIALS_PATH}/ssh-privatekey" ${SSH_PRIVATE}
+cp "/etc/sno-power-credentials/ssh-privatekey" ${SSH_PRIVATE}
 chmod 0600 ${SSH_PRIVATE}
 SSH_OPTIONS=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'ServerAliveInterval=60' -o 'ServerAliveCountMax=60' -o 'UserKnownHostsFile=/dev/null' -i "${SSH_PRIVATE}")
+
 # Save private-key, pull-secret and offline-token to bastion
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "mkdir -p ~/.sno"
-scp "${SSH_OPTIONS[@]}" ${CREDENTIALS_PATH}/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION}:~/.sno/.
-scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION}:~/.sno/.
+ssh "${SSH_OPTIONS[@]}" root@${BASTION_IP} "mkdir -p ~/.sno"
+scp "${SSH_OPTIONS[@]}" ${CREDENTIALS_PATH}/{ssh-publickey,pull-secret,pull-secret-ci,offline-token} root@${BASTION_IP}:~/.sno/.
+scp "${SSH_OPTIONS[@]}" ${SSH_PRIVATE} root@${BASTION_IP}:~/.sno/.
 # set the default INSTALL_TYPE to sno
 INSTALL_TYPE=${INSTALL_TYPE:-sno}
 
@@ -475,7 +503,7 @@ WWW_DIR="/var/www/html/\${CLUSTER_NAME}"
 mkdir -p \$IMAGES_DIR \$WWW_DIR \$CONFIG_DIR
 
 download_installer() {
-    echo "Dowmload openshift-install"
+    echo "Download openshift-install"
     install_tar_file="openshift-install-linux.tar.gz"
     if [[ ! -z \${INSTALLER_URL} ]]; then
         curl -s \${INSTALLER_URL} -o \${install_tar_file}
@@ -556,6 +584,11 @@ export IGNITION_FILE=\${CLUSTER_NAME}/bootstrap.ign
 export KERNEL_PATH="images/\${CLUSTER_NAME}/kernel"
 export INITRAMFS_PATH="images/\${CLUSTER_NAME}/initramfs.img"
 
+echo "Sleep START"
+sleep 40m
+echo "Sleep END"
+
+
 GRUB_MENU_START="# menuentry for \${CLUSTER_NAME} start\n"
 GRUB_MENU_END="\n# menuentry for \${CLUSTER_NAME} end"
 
@@ -575,10 +608,10 @@ cat /var/lib/tftpboot/boot/grub2/grub.cfg.cicd | envsubst > /var/lib/tftpboot/bo
 systemctl restart tftp;
 
 echo "writing host entries to dhcpd.conf"
-cat /etc/dhcp/dhcpd.conf.cicd | envsubst > /etc/dhcp/dhcpd.conf
-systemctl restart dhcpd;
+cat /etc/kea/kea-dhcp4.conf.cicd | envsubst > /etc/kea/kea-dhcp4.conf
+systemctl restart kea-dhcp4;
 
-echo "restarting services tftp & dhcpd"
+echo "restarting services tftp & kea-dhcp4"
 )200>"\$LOCK_FILE"
 
 EOF
@@ -718,8 +751,8 @@ EOF
 set -x
 
 chmod +x ${BASTION_CI_SCRIPTS_DIR}/*.sh
-ssh  "${SSH_OPTIONS[@]}" root@${BASTION} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/{scripts,auth}; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
-scp  "${SSH_OPTIONS[@]}" ${BASTION_CI_SCRIPTS_DIR}/* root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/scripts/.
+ssh  "${SSH_OPTIONS[@]}" root@${BASTION_IP} "rm -rf ${BASTION_CI_SCRIPTS_DIR}; mkdir -p ${BASTION_CI_SCRIPTS_DIR}/{scripts,auth}; touch ${BASTION_CI_SCRIPTS_DIR}/scripts/lockfile.lock"
+scp  "${SSH_OPTIONS[@]}" ${BASTION_CI_SCRIPTS_DIR}/* root@${BASTION_IP}:${BASTION_CI_SCRIPTS_DIR}/scripts/.
 
 #############################
 echo "Install required packages"
@@ -728,7 +761,7 @@ echo "Create SNO cluster node VM"
 create_sno_node
 
 # Setting up the SNO config, generating the ignition and network boot on the bastion
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS} ${INSTALL_TYPE} ${OCP_VERSION}"
+ssh "${SSH_OPTIONS[@]}" root@${BASTION_IP} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./setup-sno.sh ${CLUSTER_NAME} ${BASE_DOMAIN} ${POWERVS_MACHINE_NETWORK_CIDR} ${INSTALLATION_DISK} $(eval "echo ${LIVE_ROOTFS_URL}") $(eval "echo ${LIVE_KERNEL_URL}") $(eval "echo ${LIVE_INITRAMFS_URL}") $(printf "http://%s" "${BASTION}") ${MAC_ADDRESS} ${IP_ADDRESS} ${INSTALL_TYPE} ${OCP_VERSION}"
 
 # Creating dns records in ibmcloud cis service for SNO node to reach hosted cluster and for ingress purpose
 ibmcloud cis dns-record-create ${CIS_DOMAIN_ID} --type A --name "api.${CLUSTER_NAME}" --content "${IP_ADDRESS}"
@@ -742,29 +775,29 @@ sleep 180
 
 # Updating the boot disk of SNO node to volume attached to VSI, it required only for normal SNO installastion.
 if [[ ${INSTALL_TYPE} == "sno" ]]; then
-    ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./update-boot-disk.sh ${IP_ADDRESS} ${INSTALLATION_DISK}" &
+    ssh "${SSH_OPTIONS[@]}" root@${BASTION_IP} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./update-boot-disk.sh ${IP_ADDRESS} ${INSTALLATION_DISK}" &
 fi
 
 # Run wait-sno-complete
-ssh "${SSH_OPTIONS[@]}" root@${BASTION} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
+ssh "${SSH_OPTIONS[@]}" root@${BASTION_IP} "cd ${BASTION_CI_SCRIPTS_DIR}/scripts && ./wait-sno-complete.sh ${CLUSTER_NAME} ${INSTALL_TYPE}"
 
 set +x
 ################################################################
 echo "If installation completed successfully Copying required artifacts to shared dir"
 # Powervs requires config.json
-IBMCLOUD_API_KEY=$(cat ${CREDENTIALS_PATH}/.powercreds)
+IBMCLOUD_API_KEY=$(cat /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key)
 POWERVS_SERVICE_INSTANCE_ID=$(echo ${POWERVS_INSTANCE_CRN} | cut -f8 -d":")
 POWERVS_REGION=$(echo ${POWERVS_INSTANCE_CRN} | cut -f6 -d":")
 POWERVS_ZONE=$(echo ${POWERVS_REGION} | sed 's/-*[0-9].*//')
-POWERVS_RESOURCE_GROUP=""
+POWERVS_RESOURCE_GROUP="${POWERVS_SNO_RESOURCE_GROUP:-}"
 cat > /tmp/powervs-config.json << EOF
 {"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp /tmp/powervs-config.json "${SHARED_DIR}/"
 cp ${CREDENTIALS_PATH}/{ssh-publickey,ssh-privatekey,pull-secret,pull-secret-ci} "${SHARED_DIR}/"
 #Copy the auth artifacts to shared dir for the next steps
-scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
-scp "${SSH_OPTIONS[@]}" root@${BASTION}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
+scp "${SSH_OPTIONS[@]}" root@${BASTION_IP}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeadmin-password "${SHARED_DIR}/"
+scp "${SSH_OPTIONS[@]}" root@${BASTION_IP}:${BASTION_CI_SCRIPTS_DIR}/auth/kubeconfig "${SHARED_DIR}/"
 echo "Create proxy-conf.sh file"
 cat << EOF > "${SHARED_DIR}/proxy-conf.sh"
 echo "Setup proxy to ${BASTION_IP}:2005"
