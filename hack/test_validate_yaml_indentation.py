@@ -15,7 +15,10 @@ SPEC.loader.exec_module(VALIDATOR)
 
 
 class YAMLStructureTests(unittest.TestCase):
+    """Cover CI-operator exceptions without weakening Prow validation."""
+
     def test_ci_operator_postsubmit_boolean(self):
+        """Accept either boolean for a named root CI-operator test."""
         for enabled in (True, False):
             for filename in ("config.yaml", "jobs.yaml"):
                 with self.subTest(enabled=enabled, filename=filename):
@@ -24,7 +27,20 @@ class YAMLStructureTests(unittest.TestCase):
                         VALIDATOR.validate_yaml_structure(filename, config), [],
                     )
 
+    def test_blank_test_names_remain_rejected(self):
+        """Reject postsubmit exceptions for empty or whitespace-only names."""
+        for name in ("", " ", "\t", "\r\n", " \t\n"):
+            for enabled in (True, False):
+                with self.subTest(name=name, enabled=enabled):
+                    config = {"tests": [{"as": name, "postsubmit": enabled}]}
+                    errors = VALIDATOR.validate_yaml_structure("config.yaml", config)
+                    self.assertTrue(any(
+                        "'postsubmit' should be 'postsubmits'" in error
+                        for error in errors
+                    ), errors)
+
     def test_malformed_postsubmit_remains_rejected(self):
+        """Keep typo detection outside named boolean test entries."""
         cases = {
             "prow_repository_jobs": {"postsubmit": {"org/repo": []}},
             "root_boolean": {"postsubmit": True},
@@ -53,10 +69,12 @@ class YAMLStructureTests(unittest.TestCase):
                 ), errors)
 
     def test_valid_prow_postsubmits(self):
+        """Accept correctly spelled Prow postsubmit job collections."""
         config = {"postsubmits": {"org/repo": [{"name": "example", "decorate": True}]}}
         self.assertEqual(VALIDATOR.validate_yaml_structure("jobs.yaml", config), [])
 
     def test_other_typos_and_invalid_types_remain_rejected(self):
+        """Keep unrelated field spelling and boolean type checks active."""
         for field, value, expected in (
             ("presubmit", {}, "'presubmit' should be 'presubmits'"),
             ("periodic", [], "'periodic' should be 'periodics'"),
@@ -71,6 +89,7 @@ class YAMLStructureTests(unittest.TestCase):
                 self.assertTrue(any(expected in error for error in errors), errors)
 
     def test_syntax_and_indentation_errors_remain_rejected(self):
+        """Keep malformed YAML and tab indentation checks active."""
         with tempfile.TemporaryDirectory() as directory:
             filename = Path(directory) / "config.yaml"
             filename.write_text("tests: [\n", encoding="utf-8")

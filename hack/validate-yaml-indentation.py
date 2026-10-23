@@ -148,6 +148,7 @@ def validate_yaml_structure(file_path, data, *, is_root=True, is_ci_operator_tes
             if (key == 'postsubmit'
                     and is_ci_operator_test
                     and isinstance(data.get('as'), str)
+                    and data['as'].strip()
                     and isinstance(data[key], bool)):
                 continue
             if key in common_typos:
