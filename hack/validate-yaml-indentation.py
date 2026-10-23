@@ -115,13 +115,15 @@ def validate_yaml_syntax(file_path):
     return errors, data
 
 
-def validate_yaml_structure(file_path, data):
+def validate_yaml_structure(file_path, data, *, is_root=True, is_ci_operator_test=False):
     """
     Validate basic YAML structure and common field/value issues.
 
     Args:
         file_path: Path to the YAML file
         data: Parsed YAML data
+        is_root: Whether data is the document root
+        is_ci_operator_test: Whether data is an entry in the root tests sequence
 
     Returns:
         List of error messages
@@ -143,6 +145,11 @@ def validate_yaml_structure(file_path, data):
         }
 
         for key in data.keys():
+            if (key == 'postsubmit'
+                    and is_ci_operator_test
+                    and isinstance(data.get('as'), str)
+                    and isinstance(data[key], bool)):
+                continue
             if key in common_typos:
                 errors.append(
                     f"{file_path}: Possible typo: '{key}' should be '{common_typos[key]}'?"
@@ -166,12 +173,17 @@ def validate_yaml_structure(file_path, data):
         # Recursively check nested structures
         for key, value in data.items():
             if isinstance(value, dict):
-                nested_errors = validate_yaml_structure(f"{file_path} (key: {key})", value)
+                nested_errors = validate_yaml_structure(
+                    f"{file_path} (key: {key})", value, is_root=False
+                )
                 errors.extend(nested_errors)
             elif isinstance(value, list):
-                for i, item in enumerate(value):
+                for index, item in enumerate(value):
                     if isinstance(item, dict):
-                        nested_errors = validate_yaml_structure(f"{file_path} (list item {i})", item)
+                        nested_errors = validate_yaml_structure(
+                            f"{file_path} (list item {index})", item, is_root=False,
+                            is_ci_operator_test=is_root and key == 'tests'
+                        )
                         errors.extend(nested_errors)
 
     return errors
