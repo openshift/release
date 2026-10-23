@@ -144,8 +144,15 @@ tests:
         # Prefer CR Ready; fall back to Deployment Available for older status shapes.
         if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Ready \
           trustyaiservice/tls-scan --timeout=15m; then
-          oc -n "${TENANT_NAMESPACE}" wait --for=condition=Available \
-            deployment -l app.kubernetes.io/name=trustyai-service --timeout=15m
+          echo "ERROR: TrustyAIService not Ready; collecting diagnostics"
+          oc -n "${TENANT_NAMESPACE}" get trustyaiservice,pods,pvc,deploy,svc,events || true
+          oc -n "${TENANT_NAMESPACE}" get trustyaiservice tls-scan -o yaml || true
+          oc -n "${OPERATOR_NAMESPACE}" get pods || true
+          oc -n "${OPERATOR_NAMESPACE}" logs deploy/trustyai-service-operator-controller-manager --tail=200 || true
+          if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Available \
+            deployment -l app.kubernetes.io/name=trustyai-service --timeout=5m; then
+            exit 1
+          fi
         fi
 
         oc -n "${OPERATOR_NAMESPACE}" get pods,svc
