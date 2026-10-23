@@ -66,7 +66,15 @@ chain:
         if [ -s "${SHARED_DIR}/mgmt_kubeconfig" ] ; then
           export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
         fi
-        export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        # Workflows with a static cluster name (e.g. OZ/libvirt KubeVirt) write the
+        # real HC name to ${SHARED_DIR}/cluster-name so we don't have to derive it
+        # from PROW_JOB_ID (which would produce the wrong name and leave
+        # HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE empty).
+        if [[ -s "${SHARED_DIR}/cluster-name" ]]; then
+          export CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+        else
+          export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        fi
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
         export HYPERSHIFT_NAMESPACE="$(oc get hostedclusters -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
@@ -91,6 +99,7 @@ chain:
 
       if [[ $MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT == "true" ]]; then
         export RELEASE_IMAGE_LATEST="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
+        export EXTENSIONS_PAYLOAD_OVERRIDE="${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}"
         oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
         mkdir /tmp/tests-cli
         oc image extract "$(oc adm release info --image-for=tests "${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}")" --path /usr/bin/openshift-tests:/tmp/tests-cli --registry-config=/tmp/.dockerconfigjson

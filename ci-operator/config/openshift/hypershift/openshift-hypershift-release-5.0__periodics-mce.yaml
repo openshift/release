@@ -15,6 +15,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  libvirt-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: libvirt-installer
   test-bin:
     name: "5.0"
     namespace: ocp
@@ -31,6 +35,13 @@ releases:
   50-latest:
     candidate:
       product: ocp
+      stream: nightly
+      version: "5.0"
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
       stream: nightly
       version: "5.0"
   latest:
@@ -443,24 +454,6 @@ tests:
       CLUSTER_VERSION: "5.0"
       MCE_VERSION: "5.0"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
-- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt
-  cluster: build01
-  cron: 0 12 * * *
-  reporter_config:
-    channel: '#ibmz-prowci-notifier'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-      {{end}}'
-  steps:
-    env:
-      CLUSTER_VERSION: "5.0"
-      MCE_VERSION: "5.0"
-    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
 - as: e2e-ibmz-s390x-mgmt-ovn-openshifte2e-virt
   cluster: build01
   cron: 30 4 * * 1,4
