@@ -61,6 +61,7 @@ def mock_artifact_command(command, arguments, base, case):
 
 
 def prepare_publication_case(base, case, output, result):
+    """Build producer output for publication safety, bounds and lifecycle scenarios."""
     if case == "permissions":
         (result / "report.xml").chmod(0o444)
         result.chmod(0o555)
