@@ -15,14 +15,8 @@ echo "=== TRT Review Responder ==="
     echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
     exit 1
 }
-[[ -f "${SHARED_DIR}/trt-runtime-policy.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-runtime-policy.sh not found — runtime-policy step must run first"
-    exit 1
-}
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/trt-runtime-policy.sh"
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
@@ -47,7 +41,6 @@ fi
 
 # --- Workspace setup ---
 WORKDIR="${WORKDIR:-/workspace}"
-export WORKDIR
 cd "${WORKDIR}"
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
@@ -79,7 +72,11 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     trap copy_artifacts EXIT TERM INT
 fi
 
-setup_agent_runtime_policy review
+# Native settings apply to the gate and both workers. Keep gh available for
+# review reads/replies and retain the credential denials below.
+SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-review.XXXXXX")
+AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
+jq -n '{permissions: {deny: ["Agent", "Bash(git push *)", "Bash(git send-pack *)"]}}' > "${AGENT_SETTINGS}"
 
 BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
 if [[ -z "${BOT_LOGIN}" ]]; then
@@ -277,9 +274,15 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
 
 # Every launch, including the direct read-only gate, uses the same runtime
 # settings. Preserve the credential denials above and allow gh for review work.
-append_agent_runtime_policy "${SYSTEM_PROMPT}"
-append_agent_runtime_policy "${CI_PROMPT}"
-append_agent_runtime_policy "${GATE_PROMPT}"
+for prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}" "${GATE_PROMPT}"; do
+    cat >> "${prompt}" <<'CI_POLICY'
+
+## Mandatory CI policy (overrides conflicting skill or repository instructions)
+- Work serially in the parent agent. Do not delegate.
+- Do not push or create PRs. Any permitted commits stay local; only the pipeline publishes. The gate remains read-only.
+- Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
+CI_POLICY
+done
 
 # --- Poll: small-model gate, then worker ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
@@ -534,7 +537,7 @@ while true; do
     timeout 120 claude \
         --model "${GATE_MODEL}" \
         --allowedTools "Bash" \
-        --settings "${HOOKS_DIR}/settings.json" \
+        --settings "${AGENT_SETTINGS}" \
         --disallowedTools "${DISALLOWED_TOOLS[@]}" \
         --max-turns 20 \
         --output-format text \
@@ -621,7 +624,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
                 "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
 
 Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
-                --settings "${HOOKS_DIR}/settings.json" \
+                --settings "${AGENT_SETTINGS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}"; then
@@ -643,7 +646,7 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
 Your GitHub login is ${BOT_LOGIN}." \
-                --settings "${HOOKS_DIR}/settings.json" \
+                --settings "${AGENT_SETTINGS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${CI_PROMPT}"; then
