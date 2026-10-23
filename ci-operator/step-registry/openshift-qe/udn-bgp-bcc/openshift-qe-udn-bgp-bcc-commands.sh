@@ -80,6 +80,32 @@ fi
 
 $WAS_TRACING && set -x
 
+# Optionally build kube-burner-ocp from a custom repo/branch (e.g. for testing unreleased workloads)
+KUBE_BURNER_OCP_REPO="${KUBE_BURNER_OCP_REPO:-}"
+KUBE_BURNER_OCP_BRANCH="${KUBE_BURNER_OCP_BRANCH:-main}"
+if [[ -n "${KUBE_BURNER_OCP_REPO}" ]]; then
+  echo "Building kube-burner-ocp from ${KUBE_BURNER_OCP_REPO} branch ${KUBE_BURNER_OCP_BRANCH}..."
+
+  echo "Installing Go 1.22.8..."
+  curl -sL https://go.dev/dl/go1.22.8.linux-amd64.tar.gz | tar -xzC /usr/local
+  export PATH="/usr/local/go/bin:${PATH}"
+  echo "Go version: $(go version)"
+
+  echo "Cloning kube-burner-ocp source..."
+  git clone --depth=1 --branch="${KUBE_BURNER_OCP_BRANCH}" "${KUBE_BURNER_OCP_REPO}" /tmp/kube-burner-ocp-src
+
+  echo "Building kube-burner-ocp..."
+  cd /tmp/kube-burner-ocp-src
+  make build
+  echo "Build complete. Binary:"
+  ls -la /tmp/kube-burner-ocp-src/bin/kube-burner-ocp
+
+  echo "Creating tarball for kube-burner-ocp wrapper..."
+  tar czf /tmp/kube-burner-ocp-custom.tar.gz -C /tmp/kube-burner-ocp-src/bin kube-burner-ocp
+  export KUBE_BURNER_URL="file:///tmp/kube-burner-ocp-custom.tar.gz"
+  echo "KUBE_BURNER_URL set to ${KUBE_BURNER_URL}"
+fi
+
 # Clone e2e-benchmarking
 git clone --depth=1 https://github.com/cloud-bulldozer/e2e-benchmarking.git /tmp/e2e-benchmarking
 cd /tmp/e2e-benchmarking/workloads/kube-burner-ocp-wrapper
