@@ -8,7 +8,7 @@ chain:
         echo "$(date) Checking for the cluster-operators status to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         while true; do
-            count=$(oc get co --insecure-skip-tls-verify --no-headers| awk '$3 != "True" {print $1}' | wc -l)
+            count=$(oc get co --insecure-skip-tls-verify --no-headers --request-timeout=300s | awk '$3 != "True" {print $1}' | wc -l)
             if [ "$count" -eq 0 ]
             then
                 echo "$(date) All the cluster operators are ready"
@@ -17,10 +17,10 @@ chain:
                 echo "All the cluster operators are not ready yet"
                 sleep 5
             fi
-            oc get co --insecure-skip-tls-verify
+            oc get co --insecure-skip-tls-verify --request-timeout=300s
         done
-        oc get co --insecure-skip-tls-verify
-        oc get no --insecure-skip-tls-verify
+        oc get co --insecure-skip-tls-verify --request-timeout=300s
+        oc get no --insecure-skip-tls-verify --request-timeout=300s
       from: tests
       grace_period: 15m0s
       resources:

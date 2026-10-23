@@ -15,6 +15,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
+  libvirt-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: libvirt-installer
   test-bin:
     name: "5.0"
     namespace: ocp
@@ -27,18 +31,24 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: upi-installer
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   50-latest:
     candidate:
       product: ocp
       stream: nightly
       version: "5.0"
+  initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "5.0"
   latest:
     candidate:
+      architecture: multi
       product: ocp
-      stream: ci
+      stream: nightly
       version: "5.0"
   multi-latest:
     candidate:
@@ -295,7 +305,7 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       MCE_VERSION: "5.0"
       ODF_BACKEND_STORAGE_CLASS: managed-csi
-      ODF_OPERATOR_CHANNEL: stable-4.22
+      ODF_USE_PRERELEASE: "true"
       TEST_INCLUDES: sig-kubevirt
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-mce-kubevirt-azure-conformance
@@ -410,6 +420,7 @@ tests:
       HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:50-latest
       NODEPOOL_RELEASE_IMAGE_LATEST: release:50-latest
     env:
+      AWS_REGION_OVERWRITE: us-east-1
       MCE_VERSION: "5.0"
       TEST_SUITE: openshift/conformance/parallel/minimal
     test:
@@ -444,9 +455,11 @@ tests:
       CLUSTER_VERSION: "5.0"
       MCE_VERSION: "5.0"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
-- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt
-  cluster: build01
-  cron: 0 12 * * *
+- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt-oz
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: 30 17 * * *
   reporter_config:
     channel: '#ibmz-prowci-notifier'
     job_states_to_report:
@@ -458,20 +471,20 @@ tests:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
   steps:
+    cluster_profile: libvirt-s390x-vpn-hcp
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:initial
     env:
-      CLUSTER_VERSION: "5.0"
+      ARCH: s390x
+      BRANCH: 5.0-hcpci
+      ETCD_DISK_SPEED: slow
       MCE_VERSION: "5.0"
-    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
-- as: e2e-ibmz-s390x-mgmt-ovn-openshifte2e-virt
-  cluster: build01
-  cron: 30 4 * * 1,4
-  steps:
-    env:
-      CLUSTER_VERSION: "5.0"
-      IC_API_KEY_FILE: /etc/hypershift-agent-ibmz-credentials/ibmcloud-zcomm-apikey
-      MCE_VERSION: "5.0"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-    workflow: hypershift-mce-ibmz-openshift-e2e-test-s390xmgmt-kubevirt
+      MULTISTAGE_PARAM_OVERRIDE_TEST_EXTRACT: "true"
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      USE_RAMFS: "true"
+    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt-oz
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

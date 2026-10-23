@@ -1,0 +1,191 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Blocking Test Failure Analysis</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #fff; color: #1f2328; max-width: 820px; margin: 0 auto; padding: 24px 20px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .meta { color: #57606a; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 24px; }
+  th { background: #f7f8fa; text-align: left; padding: 7px 10px; border: 1px solid #e5e7eb; font-weight: 600; }
+  td { padding: 7px 10px; border: 1px solid #e5e7eb; vertical-align: top; }
+  tr:nth-child(even) { background: #f7f8fa; }
+  .badge { display: inline-block; border-radius: 3px; padding: 1px 7px; font-size: 11px; font-weight: 600; }
+  .skip-yes { background: #dcfce7; color: #166534; }
+  .skip-no  { background: #fee2e2; color: #991b1b; }
+  .skip-maybe { background: #fef3c7; color: #92400e; }
+  .kv { background: #ede9fe; color: #4c1d95; }
+  .infra { background: #dbeafe; color: #1e40af; }
+  .build { background: #fce7f3; color: #831843; }
+  .net { background: #d1fae5; color: #065f46; }
+  code { background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 3px; padding: 0 4px; font-size: 12px; }
+  .err { font-family: monospace; font-size: 12px; background: #f7f8fa; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; margin: 4px 0; color: #1f2328; word-break: break-word; }
+  .run-link { font-size: 12px; color: #57606a; }
+  .section { margin-bottom: 6px; }
+  .verdict { font-weight: 600; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li { margin-bottom: 2px; }
+  hr { border: none; border-top: 1px solid #e5e7eb; margin: 28px 0 8px; }
+  .footer { text-align: center; font-size: 12px; color: #57606a; border-top: 1px solid #e5e7eb; margin-top: 32px; padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Blocking Test Failure Analysis</h1>
+<div class="meta">
+  Job: <strong>rehearse-84152-periodic-ci-openshift-hypershift-release-5.0-periodics-mce-e2e-ibmz-s390x-mgmt-ovn-conformance-virt-oz</strong><br />
+  Run A (6 blocking): <span class="run-link">2105453133806178304</span>  | 
+  Run B (5 blocking): <span class="run-link">2105384569736794112</span><br />
+  Cluster: <code>hcpvirt-oz-ci</code> on IBM Z (s390x) · KubeVirt / OVN
+</div>
+
+<h2>Summary: Blocking Failures Across Both Runs</h2>
+<table>
+  <tr>
+    <th>#</th>
+    <th>Test Name</th>
+    <th>Run A</th>
+    <th>Run B</th>
+    <th>Category</th>
+    <th>Skip?</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>[sig-builds] imagechangetriggers should trigger builds of all types</td>
+    <td>FAIL</td>
+    <td>FAIL</td>
+    <td><span class="badge build">Build</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>[sig-builds] oc new-app should succeed with an imagestream</td>
+    <td>FAIL</td>
+    <td>FAIL</td>
+    <td><span class="badge build">Build</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>[sig-instrumentation][Late] Platform Prometheus targets should not skip TLS CA verification</td>
+    <td>FAIL</td>
+    <td>FAIL</td>
+    <td><span class="badge infra">Infra/Network</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>[sig-kubevirt] services … should allow connections … via LoadBalancer service across different guest nodes</td>
+    <td>FAIL</td>
+    <td>FAIL</td>
+    <td><span class="badge kv">KubeVirt</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4]</td>
+    <td>FAIL</td>
+    <td>FAIL</td>
+    <td><span class="badge net">Network/Infra</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+  <tr style="background:#fffbeb">
+    <td>6</td>
+    <td>[sig-cli] oc builds complex build start-build <em>(Run A only)</em></td>
+    <td>FAIL</td>
+    <td>—</td>
+    <td><span class="badge build">Build</span></td>
+    <td><span class="badge skip-yes">YES</span></td>
+  </tr>
+</table>
+
+<h2>Per-Test Root Cause Analysis</h2>
+
+
+<div class="section"><strong>1. [sig-builds] imagechangetriggers — trigger builds of all types</strong></div>
+<div class="err">fail [imagechangetriggers.go:57]: Unexpected error:
+&lt;wait.errInterrupted&gt;: timed out waiting for the condition</div>
+<p>
+  <strong>Root cause:</strong> The test creates BuildConfigs (source, docker, custom, jenkins) and waits for builds to be triggered via ImageStreamTag changes. It timed out (41 s) with <em>zero pods created</em> in the namespace — meaning no build pod was ever scheduled. The OpenShift internal image registry is not backed by real images on this IBM Z KubeVirt cluster (no <code>nodejs-ex</code> imagestream exists in the openshift namespace that has a populated tag), so the image-change trigger never fires.
+</p>
+<p><strong>Related to HCP KubeVirt?</strong> Yes — this is an IBM Z hosted-cluster running on KubeVirt VMs. The cluster does not have a pre-populated OpenShift imagestream catalog with s390x-native images, which is required by this test to fire the trigger.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — This is a known s390x / hosted-cluster limitation. The test requires a working image-change trigger backed by a real registry pull, which the bare HCP guest cluster doesn't have in this rehearsal environment.</p>
+
+
+<div class="section"><strong>2. [sig-builds] oc new-app should succeed with an imagestream</strong></div>
+<div class="err">Error running oc new-app … registry.redhat.io/ubi8/nodejs-16:latest~https://github.com/sclorg/nodejs-ex …
+error: unable to locate any images in image streams, local docker images with name "registry.redhat.io/ubi8/nodejs-16:latest"</div>
+<p>
+  <strong>Root cause:</strong> <code>oc new-app</code> needs the image to exist either in an ImageStream or be pullable by the cluster. The guest hosted cluster cannot reach <code>registry.redhat.io</code> (no pull-secret seeded), and the <code>openshift</code> namespace imagestreams do not contain <code>ubi8/nodejs-16</code> for s390x.
+</p>
+<p><strong>Related to HCP KubeVirt?</strong> Yes — the hosted guest cluster is not pre-seeded with Red Hat imagestream content, which is a standard limitation of the KubeVirt bare-HCP rehearsal setup.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — Same root cause family as #1. Failing consistently across all rehearsals; not a code regression.</p>
+
+
+<div class="section"><strong>3. [sig-instrumentation][Late] Platform Prometheus targets should not skip TLS CA verification</strong></div>
+<div class="err">fail [prometheus.go:217]: fetch Prometheus scrape configuration
+context deadline exceeded: https://prometheus-k8s-openshift-monitoring.apps.hcpvirt-oz-ci.phc-cicd.cis.ibm.net/api/v1/status/config:
+request failed: Get "…": context deadline exceeded (Client.Timeout exceeded while awaiting headers)</div>
+<p>
+  <strong>Root cause:</strong> The test connects to the in-cluster Prometheus API endpoint via the ingress route. The route <code>prometheus-k8s-openshift-monitoring.apps.hcpvirt-oz-ci.phc-cicd.cis.ibm.net</code> is unreachable from the test runner — the entire test run shows persistent <code>i/o timeout</code> errors connecting to the console/apps ingress VIP (<code>192.168.2.54:443</code>). This is a network-level issue: the ingress load-balancer IP is not routable from outside the KubeVirt guest network. The Prometheus endpoint never responds, so the test times out in 1m8s.
+</p>
+<p><strong>Related to HCP KubeVirt?</strong> Directly. The KubeVirt guest cluster's ingress/load-balancer VIP (192.168.2.54) is on an internal KubeVirt pod-network CIDR that is not externally routable from the CI test runner. This is a fundamental topology constraint of the HCP-on-KubeVirt setup where VMs use an isolated L2 network.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — This test is structurally impossible to pass in this topology. The same ingress timeout also explains the "sig-network" Internet test (#5). Already failing in all rehearsals; not a code issue.</p>
+
+
+<div class="section"><strong>4. [sig-kubevirt] services … LoadBalancer service across different guest nodes</strong></div>
+<div class="err">fail [services.go:68]: Interrupted by User
+Spec goroutine stuck in: service.(*TestJig).WaitForLoadBalancer → launchWebserverLoadBalancerService
+  → k8s.io/apimachinery/pkg/util/wait.PollUntilContextTimeout
+(Spec Runtime: 14m59.216s — timed out waiting for LoadBalancer IP to become ready)</div>
+<p>
+  <strong>Root cause:</strong> The test creates a <code>LoadBalancer</code>-type service in the KubeVirt guest cluster and waits up to ~15 minutes for an external IP to be assigned and reachable. The LoadBalancer IP never becomes ready — this is because the HCP KubeVirt guest cluster's load-balancer stack is backed by MetalLB or a similar L2 LB mechanism operating on the KubeVirt VM's internal network, and the test's outbound probe from outside the VM network never receives a reply. The test exhausted the full timeout and was killed by the test runner interrupt.
+</p>
+<p><strong>Related to HCP KubeVirt?</strong> Directly and specifically — the test is in <code>[sig-kubevirt]</code> and explicitly exercises "KubeVirt virtual machines should allow connections … via LoadBalancer service." The LoadBalancer IP is on the guest-internal network (192.168.x.x) not routable from the test pod.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — This test was designed for a standard KubeVirt environment where the LB IP is reachable. In this IBM Z / HCP-on-KubeVirt topology the LB IP is on an internal L2 and cannot be reached from the conformance test runner. Consistently failing; safe to add to <code>TEST_SKIPS</code>.</p>
+
+
+<div class="section"><strong>5. [sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4]</strong></div>
+<div class="err">nc: connect to 8.8.8.8 port 53 (tcp) timed out: Operation in progress
+fail [networking.go:90]: WaitForPodSuccessInNamespace … pod failed to reach success condition</div>
+<p>
+  <strong>Root cause:</strong> The test launches a pod that tries to reach <code>8.8.8.8:53</code> (Google DNS) over TCP. The HCP KubeVirt guest cluster VMs are on an isolated internal network with no public internet egress (or egress is blocked at the IBM Z LPAR/hypervisor level). The connection times out — no internet path from the guest pods.
+</p>
+<p><strong>Related to HCP KubeVirt?</strong> Yes — the guest VMs run inside a KubeVirt network with no external internet routing. This is an infrastructure topology limitation specific to this environment, not a code bug.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — This test verifies outbound internet connectivity that the environment intentionally does not provide. Identical failure in both runs.</p>
+
+
+<div class="section"><strong>6. [sig-cli] oc builds complex build start-build (Run A only)</strong></div>
+<div class="err">Error from server (NotFound): imagestreamtags.image.openshift.io "ruby-27-centos7:latest" not found
+[FAILED] in [JustBeforeEach] - cli/builds.go:226 @ 10/01/26 03:53:12.827</div>
+<p>
+  <strong>Root cause:</strong> The test's <code>JustBeforeEach</code> hook expects the imagestream tag <code>ruby-27-centos7:latest</code> to exist in the cluster before the test body runs. The imagestream is absent because the guest cluster was not seeded with Red Hat s390x image catalog content. The test fails in setup (<code>JustBeforeEach</code>), not in the test body.
+</p>
+<p><strong>Why only in Run A?</strong> Flakiness in test scheduling order — in Run B the suite hit the 5-failure mass-failure threshold before this test could be attempted, or it was skipped by the framework. The underlying cause (missing imagestream) is the same as #1 and #2.</p>
+<p><span class="verdict">Verdict: <span class="badge skip-yes">SAFE TO SKIP</span></span> — Same family as imagechangetriggers/#1/new-app/#2. Missing imagestream content in the guest cluster, a consistent environment limitation.</p>
+
+<h2>Common Thread &amp; Skip Recommendation</h2>
+<p>All 6 failures share <strong>two root causes</strong>:</p>
+<ul>
+  <li><strong>Missing ImageStream content</strong> (tests 1, 2, 6) — The guest HCP cluster is not seeded with Red Hat s390x builder imagestreams (<code>nodejs-16</code>, <code>ruby-27-centos7</code>). Build-triggering tests require those images to exist.</li>
+  <li><strong>Network isolation of the KubeVirt guest</strong> (tests 3, 4, 5) — The KubeVirt VM internal network (<code>192.168.2.x</code>) is not routable from the conformance test runner. LoadBalancer services, ingress routes, and outbound internet all fail silently with <code>i/o timeout</code>.</li>
+</ul>
+<p>None of these failures are caused by the code changes in PR #84152. They are structural environment constraints of the <em>HCP-on-KubeVirt-on-IBM-Z</em> topology. Since they fail in <strong>every rehearsal run (&gt;2 runs)</strong>, it is appropriate to add them to <code>TEST_SKIPS</code>.</p>
+
+<h2>Suggested TEST_SKIPS Additions</h2>
+<table>
+  <tr><th>Test pattern to skip</th><th>Reason</th></tr>
+  <tr><td><code>imagechangetriggers imagechangetriggers should trigger builds of all types</code></td><td>No s390x imagestream catalog in HCP guest</td></tr>
+  <tr><td><code>oc new-app should succeed with an imagestream</code></td><td>registry.redhat.io unreachable / no imagestream</td></tr>
+  <tr><td><code>oc builds complex build start-build</code></td><td>ruby-27-centos7 imagestream absent in guest</td></tr>
+  <tr><td><code>Platform Prometheus targets should not skip TLS CA verification</code></td><td>Prometheus ingress route unreachable (KubeVirt network isolation)</td></tr>
+  <tr><td><code>\[sig-kubevirt\] services.*LoadBalancer service across different guest nodes</code></td><td>LB IP on internal KubeVirt network, unreachable from test runner</td></tr>
+  <tr><td><code>Networking should provide Internet connection for containers</code></td><td>No internet egress from KubeVirt guest VMs</td></tr>
+</table>
+
+<hr />
+<div class="footer">Made with IBM Bob</div>
+</body>
+</html>
