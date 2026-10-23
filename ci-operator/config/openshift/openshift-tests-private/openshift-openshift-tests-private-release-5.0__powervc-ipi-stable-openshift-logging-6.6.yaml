@@ -19,6 +19,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  openstack-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: openstack-installer
   tests-private:
     name: tests-private
     namespace: ci
@@ -60,9 +64,10 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: logging-e2e-tests-hypershift-powervs-ppc64le
+- as: logging-e2e-tests-ipi-powervc-ppc64le
   capabilities:
   - intranet
+  - power-s2s-dns
   cron: '@yearly'
   reporter_config:
     channel: '#logging-qe'
@@ -74,13 +79,15 @@ tests:
       ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
       Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
       {{end}}'
+  restrict_network_access: false
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: cluster_profile_placeholder
     env:
-      BASE_DOMAIN: devobscluster.devcluster.openshift.com.
+      ARCH: ppc64le
+      BRANCH: "5.0"
       FORCE_SUCCESS_EXIT: "true"
+      INSTALLER: powervc
       LOGGING_TEST_VERSION: "6.6"
-      MCE_VERSION: "2.11"
       OPERATORS: |
         [
             {"name": "cluster-logging", "source": "cluster-logging-operator-registry", "channel": "stable-6.6", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
@@ -94,15 +101,13 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "35"
     test:
-    - chain: hypershift-mce-power-test
-    - ref: medik8s-sbr-hypershift-switch-kubeconfig
     - ref: cucushift-installer-rehearse-deploy-nfs-provisioner
     - ref: openshift-logging-catalogsources
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-hypershift-powervs-deploy
+    workflow: ipi-powervc-logging
 zz_generated_metadata:
   branch: release-5.0
   org: openshift
   repo: openshift-tests-private
-  variant: powervs-stable-openshift-logging-6.6
+  variant: powervc-ipi-stable-openshift-logging-6.6
