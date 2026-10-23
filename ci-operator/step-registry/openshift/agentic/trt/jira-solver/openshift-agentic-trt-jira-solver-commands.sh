@@ -44,8 +44,6 @@ fi
 git config user.name "openshift-trt"
 git config user.email "openshift-trt@redhat.com"
 git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
-START_BRANCH=$(git branch --show-current)
-START_COMMIT=$(git rev-parse HEAD)
 
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     echo "Running setup script: ${SETUP_SCRIPT}..."
@@ -56,6 +54,8 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
 fi
+START_BRANCH=$(git branch --show-current)
+START_COMMIT=$(git rev-parse HEAD)
 
 mkdir -p "${WORKDIR}/artifacts"
 
@@ -122,7 +122,7 @@ fi
 # These command rules are tool controls, not a sandbox for arbitrary scripts.
 SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-solver.XXXXXX")
 AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
-jq -n '{permissions: {deny: ["Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)"]}}' > "${AGENT_SETTINGS}"
+jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)"]}}' > "${AGENT_SETTINGS}"
 cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
@@ -224,7 +224,7 @@ fi
 
 # The agent never pushes. Publish only this branch to the configured fork; do
 # not fall back to upstream, honor push.default, or delete another remote ref.
-git -c push.followTags=false push -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
+git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
 echo "Branch pushed: ${BRANCH_NAME}"
 echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 

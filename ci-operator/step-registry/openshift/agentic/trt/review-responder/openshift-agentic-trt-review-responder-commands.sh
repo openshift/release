@@ -76,7 +76,7 @@ fi
 # review reads/replies and retain the credential denials below.
 SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-review.XXXXXX")
 AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
-jq -n '{permissions: {deny: ["Agent", "Bash(git push *)", "Bash(git send-pack *)"]}}' > "${AGENT_SETTINGS}"
+jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)"]}}' > "${AGENT_SETTINGS}"
 
 BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
 if [[ -z "${BOT_LOGIN}" ]]; then
