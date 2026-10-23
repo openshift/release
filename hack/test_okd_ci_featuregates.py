@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import io
 import json
 import os
 from pathlib import Path
@@ -28,37 +27,6 @@ NAMESPACE = NAMESPACE['prepare'].__globals__
 HELPER = types.SimpleNamespace(**NAMESPACE)
 CI_VERSION = '5.0.0-0.okd-scos-2026-10-23-035130'
 NIGHTLY_VERSION = '5.0.0-0.okd-scos-nightly-2026-10-23-035130'
-LEGACY = '''
-var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
- Default: defaultFeatures,
- TechPreviewNoUpgrade: newDefaultFeatures().with("Preview").without("Baseline").toFeatures(),
-}
-var defaultFeatures = &FeatureGateEnabledDisabled{
- Enabled: []string{"Baseline"},
- Disabled: []string{"Disabled"},
-}
-'''
-MODERN_DISPATCH = '''
-\tif featureGates.Spec.FeatureSet == configv1.CustomNoUpgrade {
-\t\tif featureGates.Spec.FeatureGateSelection.CustomNoUpgrade != nil {
-\t\t\treturn completeFeatureGatesForCustom(
-\t\t\t\tknownFeatureSets[configv1.Default],
-\t\t\t\tfeatureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Enabled,
-\t\t\t\tfeatureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Disabled,
-\t\t\t)
-\t\t}
-\t\treturn completeFeatureGatesForCustom(knownFeatureSets[configv1.Default], []configv1.FeatureGateName{}, []configv1.FeatureGateName{})
-\t}
-'''
-OLD_DISPATCH = '''
-\tif featureGates.Spec.FeatureSet == configv1.CustomNoUpgrade {
-\t\tif featureGates.Spec.FeatureGateSelection.CustomNoUpgrade != nil {
-\t\t\tcompleteEnabled, completeDisabled := completeFeatureGates(knownFeatureSets, featureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Enabled, featureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Disabled)
-\t\t\treturn completeEnabled, completeDisabled, nil
-\t\t}
-\t\treturn []configv1.FeatureGateName{}, []configv1.FeatureGateName{}, nil
-\t}
-'''
 
 
 class FeatureGateFixtures(unittest.TestCase):
@@ -96,10 +64,6 @@ class FeatureGateFixtures(unittest.TestCase):
         self.write_catalog(enabled=['Baseline'], disabled=['Disabled', 'Preview'])
         self.write_catalog('TechPreviewNoUpgrade', enabled=['Baseline', 'Preview'],
                            disabled=['Disabled', 'ExtraKnown'])
-        (self.catalog / 'image-references').write_text(json.dumps({'spec': {'tags': [{
-            'name': 'cluster-config-operator', 'annotations': {
-                'io.openshift.build.source-location': 'https://github.com/openshift/cluster-config-operator',
-                'io.openshift.build.commit.id': 'a' * 40}}]}}))
 
     def prepare(self, target=CI_VERSION, initial='4.22.0-0.nightly-2026-10-22-000000',
                 **environment):
@@ -118,8 +82,7 @@ class FeatureGateFixtures(unittest.TestCase):
 
         with patch.dict(os.environ, {**self.environment, **environment}, clear=True), \
                 patch.dict(NAMESPACE, {'release_info': release_info}), \
-                patch.object(HELPER.subprocess, 'run', side_effect=extract), \
-                patch.dict(NAMESPACE, {'pinned_source': lambda *_args: (MODERN_DISPATCH, 'pinned-consumer')}):
+                patch.object(HELPER.subprocess, 'run', side_effect=extract):
             HELPER.prepare()
         return lookups, extracts
 
@@ -130,11 +93,17 @@ class FeatureGateFixtures(unittest.TestCase):
 class CatalogTests(FeatureGateFixtures):
     def test_complete_catalog_including_nondefault_names(self):
         self.default_catalog()
-        known, overrides = HELPER.catalog_gates(self.catalog, CI_VERSION)
+        known = HELPER.catalog_gates(self.catalog, CI_VERSION)
         self.assertEqual(known, {'Baseline', 'Disabled', 'Preview', 'ExtraKnown'})
-        self.assertEqual({'Baseline'} | overrides, known)
-        self.assertEqual(known - ({'Baseline'} | overrides), set())
-        self.assertFalse({'Baseline'} & overrides)
+        self.assertEqual(known, HELPER.catalog_gates(self.catalog, '4.15.0'))
+        self.assertFalse((self.catalog / 'image-references').exists())
+
+    def test_missing_catalog_has_clear_error(self):
+        for version in ['4.13.0-0.okd-2023-10-28-065448', CI_VERSION]:
+            with self.subTest(version=version), self.assertRaisesRegex(
+                    ValueError, 'Missing or incompatible FeatureGate catalogs.*' + version):
+                HELPER.catalog_gates(self.catalog, version)
+
 
     def test_profile_major_and_version(self):
         for annotations, version, included in [
@@ -146,14 +115,17 @@ class CatalogTests(FeatureGateFixtures):
                   'release.openshift.io/major-version': '4'}, '', False)]:
             with self.subTest(annotations=annotations, version=version):
                 self.write_catalog(enabled=['Baseline'], annotations=annotations, version=version)
-                result = HELPER.catalog_gates(self.catalog, CI_VERSION)
-                self.assertEqual(result is not None, included)
+                if included:
+                    self.assertEqual(HELPER.catalog_gates(self.catalog, CI_VERSION), {'Baseline'})
+                else:
+                    with self.assertRaisesRegex(ValueError, 'Missing or incompatible'):
+                        HELPER.catalog_gates(self.catalog, CI_VERSION)
 
     def test_null_disabled_and_enabled(self):
         self.write_catalog(enabled=['Baseline'])
         self.write_catalog('TechPreviewNoUpgrade', disabled=['Other'])
         self.assertEqual(HELPER.catalog_gates(self.catalog, CI_VERSION),
-                         ({'Baseline', 'Other'}, {'Other'}))
+                         {'Baseline', 'Other'})
 
     def test_invalid_catalogs_fail_closed(self):
         for enabled, disabled, version in [(['Same'], ['Same'], ''),
@@ -172,56 +144,11 @@ class CatalogTests(FeatureGateFixtures):
         with self.assertRaises(ValueError):
             HELPER.catalog_gates(self.catalog, CI_VERSION)
 
-    def test_legacy_union_and_strict_expressions(self):
-        expected = {'Baseline', 'Preview', 'Disabled'}
-        self.assertEqual(HELPER.legacy_gates(LEGACY), (expected, expected))
-        for source in [LEGACY.replace('"Preview"', 'unresolvedVariable'),
-                       LEGACY.replace('"Preview"', '"AllAlpha"'), '',
-                       LEGACY.replace('"Preview"', '"Name-with-punctuation"')]:
-            with self.subTest(source=source), self.assertRaises(ValueError):
-                HELPER.legacy_gates(source)
-
-    def test_legacy_payload_pinned_source_only(self):
-        references = {'spec': {'tags': [{
-            'name': 'cluster-kube-apiserver-operator', 'annotations': {
-                'io.openshift.build.source-location':
-                    'https://github.com/openshift/cluster-kube-apiserver-operator',
-                'io.openshift.build.commit.id': 'a' * 40}}]}}
-        path = self.catalog / 'image-references'
-        path.write_text(json.dumps(references))
-        with patch.object(HELPER.urllib.request, 'urlopen', return_value=io.BytesIO(LEGACY.encode())) as fetch:
-            result, source = HELPER.payload_gates(self.catalog, '4.13.0-0.okd-legacy')
-            self.assertEqual(result[0], result[1])
-            self.assertIn('/' + 'a' * 40 + '/vendor/', fetch.call_args.args[0])
-            self.assertIn('sha256:', source)
-        references['spec']['tags'][0]['annotations']['io.openshift.build.commit.id'] = 'main'
-        path.write_text(json.dumps(references))
-        with self.assertRaises(ValueError):
-            HELPER.payload_gates(self.catalog, '4.13.0-0.okd-legacy')
-        with self.assertRaises(ValueError):
-            HELPER.payload_gates(self.catalog, CI_VERSION)
-
-    def test_consumer_baseline_modes_and_unknown_dispatch(self):
-        self.assertTrue(HELPER.inherits_default(MODERN_DISPATCH))
-        self.assertFalse(HELPER.inherits_default(OLD_DISPATCH))
-        for source in ['', MODERN_DISPATCH + OLD_DISPATCH,
-                       OLD_DISPATCH.replace('completeFeatureGates(', 'unknownResolver(')]:
-            with self.subTest(source=source), self.assertRaises(ValueError):
-                HELPER.inherits_default(source)
-        self.assertFalse(HELPER.inherits_default(OLD_DISPATCH + '\nfunc completeFeatureGatesForCustom() {}'))
-
-    def test_old_serialized_catalog_forces_complete_set(self):
-        self.default_catalog()
-        for consumer, expected in [(OLD_DISPATCH, {'Baseline', 'Disabled', 'ExtraKnown', 'Preview'}),
-                                   (MODERN_DISPATCH, {'Disabled', 'ExtraKnown', 'Preview'})]:
-            with self.subTest(consumer=consumer), \
-                    patch.dict(NAMESPACE, {'pinned_source': lambda *_args, consumer=consumer: (consumer, 'pinned-source')}):
-                (known, forced), source = HELPER.payload_gates(self.catalog, '4.15.0')
-                self.assertEqual(forced, expected)
-                enabled = forced if consumer == OLD_DISPATCH else forced | {'Baseline'}
-                self.assertEqual(enabled, known)
-                self.assertFalse(known - enabled)
-                self.assertIn('Default inheritance=', source)
+    def test_empty_default_cannot_be_masked_by_other_sets(self):
+        self.write_catalog()
+        self.write_catalog('TechPreviewNoUpgrade', enabled=['Other'])
+        with self.assertRaisesRegex(ValueError, 'Empty Default FeatureGate catalog'):
+            HELPER.catalog_gates(self.catalog, CI_VERSION)
 
 
 class RetryTests(FeatureGateFixtures):
@@ -284,12 +211,10 @@ class RetryTests(FeatureGateFixtures):
                         subprocess.CalledProcessError(1, 'oc'),
                         json.dumps({'metadata': {'version': version}})]) as lookup, \
                     patch.object(HELPER.subprocess, 'run') as extract, \
-                    patch.object(HELPER.urllib.request, 'urlopen') as fetch, \
                     patch.object(HELPER.time, 'sleep') as sleep:
                 HELPER.prepare()
                 self.assertEqual(lookup.call_count, 2)
                 extract.assert_not_called()
-                fetch.assert_not_called()
                 sleep.assert_called_once_with(1)
                 self.assertEqual(self.config.read_bytes(), before)
                 self.assertEqual(list(self.shared.iterdir()), [self.config])
@@ -311,11 +236,9 @@ class RetryTests(FeatureGateFixtures):
 
         with patch.dict(os.environ, self.environment, clear=True), \
                 patch.object(HELPER.subprocess, 'run', side_effect=extract), \
-                patch.dict(NAMESPACE, {'pinned_source': lambda *_args: (MODERN_DISPATCH, 'pinned')}), \
                 patch.object(HELPER.time, 'sleep') as sleep:
-            (known, forced), _ = HELPER.extract_payload_gates('initial', CI_VERSION)
+            known = HELPER.extract_payload_gates('initial', CI_VERSION)
         self.assertEqual(known, {'Baseline', 'Disabled', 'Preview', 'ExtraKnown'})
-        self.assertEqual(forced | {'Baseline'}, known)
         self.assertEqual(len(set(directories)), 2)
         self.assertTrue(all(not directory.exists() for directory in directories))
         sleep.assert_called_once_with(1)
@@ -361,57 +284,18 @@ class RetryTests(FeatureGateFixtures):
         self.assertEqual(self.config.read_bytes(), before)
         self.assertEqual(list(self.shared.iterdir()), [self.config])
 
-    def test_pinned_source_retries_transient_transport_and_http_failures(self):
-        self.default_catalog()
-        for error in [HELPER.urllib.error.URLError('transient'), TimeoutError(),
-                      ConnectionResetError(), HELPER.http.client.IncompleteRead(b'partial'),
-                      HELPER.urllib.error.HTTPError('https://example.com', 503, 'unavailable', {}, None),
-                      HELPER.urllib.error.HTTPError('https://example.com', 429, 'rate limit', {}, None)]:
-            with self.subTest(error=type(error).__name__), \
-                    patch.object(HELPER.urllib.request, 'urlopen', side_effect=[
-                        error, io.BytesIO(MODERN_DISPATCH.encode())]) as fetch, \
-                    patch.object(HELPER.time, 'sleep') as sleep:
-                (known, forced), source = HELPER.payload_gates(self.catalog, CI_VERSION)
-                self.assertEqual(known, forced | {'Baseline'})
-                self.assertIn('sha256:', source)
-                self.assertEqual(fetch.call_count, 2)
-                for invocation in fetch.call_args_list:
-                    self.assertIn('/' + 'a' * 40 + '/', invocation.args[0])
-                    self.assertEqual(invocation.kwargs, {'timeout': 30})
-                sleep.assert_called_once_with(1)
-
-    def test_source_exhaustion_does_not_repeat_extraction_or_publish(self):
-        self.default_catalog()
+    def test_missing_catalog_is_not_retried_or_published(self):
         before = self.config.read_bytes()
         with patch.dict(os.environ, self.environment, clear=True), \
                 patch.dict(NAMESPACE, {'release_info': lambda _image: {'metadata': {'version': CI_VERSION}}}), \
                 patch.object(HELPER.subprocess, 'run', side_effect=self.copy_catalog) as extraction, \
-                patch.object(HELPER.urllib.request, 'urlopen', side_effect=TimeoutError()) as fetch, \
                 patch.object(HELPER.time, 'sleep') as sleep:
-            with self.assertRaises(TimeoutError):
+            with self.assertRaisesRegex(ValueError, 'Missing or incompatible FeatureGate catalogs'):
                 HELPER.prepare()
             extraction.assert_called_once()
-            self.assertEqual(fetch.call_count, 3)
-            self.assertEqual(sleep.call_args_list, [call(1), call(2)])
-            destination = Path(next(arg[5:] for arg in extraction.call_args.args[0] if arg.startswith('--to=')))
-        self.assertFalse(destination.exists())
+            sleep.assert_not_called()
         self.assertEqual(self.config.read_bytes(), before)
         self.assertEqual(list(self.shared.iterdir()), [self.config])
-
-    def test_source_semantic_errors_are_not_retried(self):
-        self.default_catalog()
-        for body, error in [(b'unsupported consumer', ValueError), (b'\xff', UnicodeDecodeError),
-                            (b'x' * (1024 * 1024 + 1), ValueError),
-                            (HELPER.urllib.error.HTTPError('https://example.com', 404, 'missing', {}, None), ValueError)]:
-            with self.subTest(error=error.__name__, body_type=type(body).__name__), \
-                    patch.object(HELPER.urllib.request, 'urlopen',
-                                 side_effect=body if isinstance(body, Exception) else None,
-                                 return_value=io.BytesIO(body) if isinstance(body, bytes) else None) as fetch, \
-                    patch.object(HELPER.time, 'sleep') as sleep:
-                with self.assertRaises(error):
-                    HELPER.payload_gates(self.catalog, CI_VERSION)
-                fetch.assert_called_once()
-                sleep.assert_not_called()
 
 
 class InstallerTests(FeatureGateFixtures):
@@ -424,11 +308,11 @@ class InstallerTests(FeatureGateFixtures):
         self.assertIn('4.22', self.selection()['version'])
         config = yaml.safe_load(self.config.read_text())
         self.assertEqual(config['featureSet'], 'CustomNoUpgrade')
-        self.assertEqual(config['featureGates'], ['Disabled=true', 'ExtraKnown=true', 'Preview=true'])
+        self.assertEqual(config['featureGates'], ['Baseline=true', 'Disabled=true', 'ExtraKnown=true', 'Preview=true'])
         manifest = yaml.safe_load((self.shared / 'openshift_manifests_99_feature-gate.yaml').read_text())
         self.assertEqual(manifest['spec']['customNoUpgrade']['disabled'], [])
-        self.assertEqual(set(manifest['spec']['customNoUpgrade']['enabled']) | {'Baseline'},
-                         set(self.selection()['known']))
+        self.assertEqual(set(manifest['spec']['customNoUpgrade']['enabled']),
+                         {'Baseline', 'Disabled', 'ExtraKnown', 'Preview'})
 
     def test_nightly_and_ocp_targets_untouched(self):
         before = self.config.read_bytes()
@@ -452,17 +336,8 @@ class InstallerTests(FeatureGateFixtures):
         lookups, _ = self.prepare(CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE='custom-initial')
         self.assertEqual(lookups, ['target', 'custom-initial'])
 
-    def test_legacy_install_config_omits_unsupported_field(self):
-        HELPER.configure_install_config(self.config, {'version': '4.13.0', 'overrides': ['Legacy']})
-        self.assertEqual(yaml.safe_load(self.config.read_text()), {'featureSet': 'CustomNoUpgrade'})
-
     def test_shell_entrypoint_uses_oc_and_delivers_ipi_manifest(self):
         self.default_catalog()
-        consumer = self.directory / 'consumer.go'
-        consumer.write_text(MODERN_DISPATCH)
-        (self.directory / 'sitecustomize.py').write_text(
-            'import os\nimport urllib.request\n'
-            'urllib.request.urlopen = lambda *_args, **_kwargs: open(os.environ["TEST_CONSUMER"], "rb")\n')
         binary = self.directory / 'oc'
         binary.write_text('''#!/usr/bin/env python3
 import json
@@ -479,7 +354,6 @@ else:
         binary.chmod(0o755)
         result = subprocess.run(['bash', str(COMMAND)], env={
             **os.environ, **self.environment, 'TEST_VERSION': CI_VERSION,
-            'PYTHONPATH': str(self.directory), 'TEST_CONSUMER': str(consumer),
             'TEST_CATALOG': str(self.catalog), 'PATH': str(self.directory) + ':' + os.environ['PATH'],
         }, text=True, capture_output=True, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

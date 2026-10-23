@@ -4,8 +4,6 @@ set -euo pipefail
 helper=$(mktemp)
 trap 'rm -f "${helper}"' EXIT
 cat > "${helper}" <<'PYTHON'
-import hashlib
-import http.client
 import json
 import os
 from pathlib import Path
@@ -14,8 +12,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-import urllib.error
-import urllib.request
 
 import yaml
 
@@ -35,21 +31,6 @@ def retry_external(operation, retryable):
             time.sleep(2 ** attempt)
 
 
-def fetch_source(url):
-    """Fetch bounded source bytes, retrying transport and transient HTTP errors only."""
-    def fetch():
-        try:
-            with urllib.request.urlopen(url, timeout=30) as response:
-                return response.read(1024 * 1024 + 1)
-        except urllib.error.HTTPError as error:
-            if error.code not in {408, 429} and not 500 <= error.code < 600:
-                raise ValueError("Pinned source request failed with HTTP status " + str(error.code)) from error
-            raise
-
-    return retry_external(fetch, (urllib.error.URLError, TimeoutError, ConnectionError,
-                                  http.client.HTTPException))
-
-
 def gate_names(entries):
     names = {entry["name"] for entry in entries or []}
     if any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", name)
@@ -59,9 +40,10 @@ def gate_names(entries):
 
 
 def catalog_gates(directory, version):
+    """Union every applicable payload catalog, independently of Default inheritance."""
     major = version.split(".")[0]
     known = set()
-    defaults = []
+    defaults = 0
     for path in sorted(directory.glob("*featureGate-*.yaml")):
         obj = yaml.safe_load(path.read_text())
         if obj.get("apiVersion") != "config.openshift.io/v1" or obj.get("kind") != "FeatureGate":
@@ -84,95 +66,19 @@ def catalog_gates(directory, version):
         known.update(enabled | disabled)
         feature_set = obj.get("spec", {}).get("featureSet") or "Default"
         if feature_set == "Default":
-            defaults.append((enabled, disabled))
-    if not known and not defaults:
-        return None
-    if len(defaults) != 1 or not known:
-        raise ValueError("Expected one nonempty Default catalog for the installed payload/profile")
-    return known, known - defaults[0][0]
-
-
-def legacy_gates(source):
-    source = re.sub(r"//[^\n]*|/\*.*?\*/", "", source, flags=re.S)
-    blocks = []
-    for declaration in (r"var FeatureSets = map\[FeatureSet\]\*FeatureGateEnabledDisabled",
-                        r"var defaultFeatures = &FeatureGateEnabledDisabled"):
-        match = re.search(declaration + r"\s*\{(.*?)\n\}", source, re.S)
-        if not match:
-            raise ValueError("Unsupported legacy payload API catalog declaration")
-        blocks.append(match.group(1))
-    allowed = {"defaultFeatures", "Enabled", "Disabled", "string", "newDefaultFeatures",
-               "with", "without", "toFeatures"}
-    names = set()
-    for block in blocks:
-        allowed.update(re.findall(r"\b([A-Za-z]\w*)\s*:", block))
-        literals = re.findall(r'"([^"\n]*)"', block)
-        if any(not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", name) for name in literals):
-            raise ValueError("Unsupported legacy gate literal")
-        names.update(literals)
-        remaining = re.sub(r'"[^"\n]*"', "", block)
-        if set(re.findall(r"\b[A-Za-z_]\w*\b", remaining)) - allowed:
-            raise ValueError("Legacy catalog contains unevaluated gate expressions")
-    if not names or names & {"AllAlpha", "AllBeta"}:
-        raise ValueError("Empty or invalid legacy gate catalog")
-    return names, names
-
-
-def pinned_source(directory, component, path):
-    """Validate an immutable payload source identity before fetching and hashing bytes."""
-    references = json.loads((directory / "image-references").read_text())
-    operator = next(tag for tag in references["spec"]["tags"] if tag["name"] == component)
-    annotations = operator["annotations"]
-    commit = annotations["io.openshift.build.commit.id"]
-    repository = annotations["io.openshift.build.source-location"].removesuffix(".git")
-    if repository != "https://github.com/openshift/" + component or not re.fullmatch(r"[a-f0-9]{40}", commit):
-        raise ValueError("Payload does not identify a pinned operator source: " + component)
-    url = "https://raw.githubusercontent.com/openshift/" + component + "/" + commit + "/" + path
-    content = fetch_source(url)
-    if len(content) > 1024 * 1024:
-        raise ValueError("Pinned operator source exceeds expected size")
-    return content.decode(), url + " sha256:" + hashlib.sha256(content).hexdigest()
-
-
-def inherits_default(source):
-    dispatches = re.findall(
-        r"if featureGates\.Spec\.FeatureSet == configv1\.CustomNoUpgrade \{(.*?)\n\t\}",
-        source, re.S)
-    if len(dispatches) != 1:
-        raise ValueError("Unsupported CustomNoUpgrade consumer dispatch")
-    dispatch = re.sub(r"\s+", "", dispatches[0])
-    modern = "completeFeatureGatesForCustom(knownFeatureSets[configv1.Default],"
-    legacy = ("completeFeatureGates(knownFeatureSets,"
-              "featureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Enabled,"
-              "featureGates.Spec.FeatureGateSelection.CustomNoUpgrade.Disabled)")
-    if (modern in dispatch) == (legacy in dispatch):
-        raise ValueError("Unknown or ambiguous CustomNoUpgrade baseline semantics")
-    return modern in dispatch
-
-
-def payload_gates(directory, version):
-    result = catalog_gates(directory, version)
-    if result is not None:
-        consumer, source = pinned_source(directory, "cluster-config-operator",
-                                         "pkg/operator/featuregates/featuregate_controller.go")
-        inherited = inherits_default(consumer)
-        known, overrides = result
-        return (known, overrides if inherited else known), (
-            "payload FeatureGate catalogs; Default inheritance=" + str(inherited) + "; " + source)
-    if tuple(map(int, version.split(".")[:2])) >= (4, 14):
-        raise ValueError("Installed payload has no FeatureGate catalogs")
-    content, source = pinned_source(directory, "cluster-kube-apiserver-operator",
-                                    "vendor/github.com/openshift/api/config/v1/types_feature.go")
-    return legacy_gates(content), source
+            if not enabled and not disabled:
+                raise ValueError("Empty Default FeatureGate catalog: " + path.name)
+            defaults += 1
+    if defaults != 1 or not known:
+        raise ValueError("Missing or incompatible FeatureGate catalogs for installed payload "
+                         + version + " / " + PROFILE + "; expected one nonempty Default catalog")
+    return known
 
 
 def configure_install_config(path, selection):
     config = yaml.safe_load(path.read_text())
     config["featureSet"] = "CustomNoUpgrade"
-    if tuple(map(int, selection["version"].split(".")[:2])) >= (4, 14):
-        config["featureGates"] = [name + "=true" for name in selection["overrides"]]
-    else:
-        config.pop("featureGates", None)
+    config["featureGates"] = [name + "=true" for name in selection["enabled"]]
     path.write_text(yaml.safe_dump(config, sort_keys=False))
 
 
@@ -192,7 +98,7 @@ def extract_payload_gates(image, version):
             subprocess.run(["oc", "adm", "release", "extract", "-a",
                             os.environ["CLUSTER_PROFILE_DIR"] + "/pull-secret", image,
                             "--to=" + temporary], check=True, timeout=600)
-            return payload_gates(Path(temporary), version)
+            return catalog_gates(Path(temporary), version)
 
     return retry_external(extract, (subprocess.CalledProcessError, subprocess.TimeoutExpired))
 
@@ -208,13 +114,12 @@ def prepare():
     installed_image = os.environ.get("CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE") or installed_image
     installed = release_info(installed_image)
     version = installed["metadata"]["version"]
-    (known, forced), source = extract_payload_gates(installed_image, version)
-    selection = {"target": target_version, "version": version, "source": source,
-                 "known": sorted(known), "overrides": sorted(forced)}
+    known = extract_payload_gates(installed_image, version)
+    selection = {"target": target_version, "version": version, "enabled": sorted(known)}
     manifest = {"apiVersion": "config.openshift.io/v1", "kind": "FeatureGate",
                 "metadata": {"name": "cluster"},
                 "spec": {"featureSet": "CustomNoUpgrade", "customNoUpgrade": {
-                    "enabled": selection["overrides"], "disabled": []}}}
+                    "enabled": selection["enabled"], "disabled": []}}}
     prepared = shared / "okd-ci-featuregates"
     prepared.mkdir()
     (prepared / "selection.json").write_text(json.dumps(selection, indent=2) + "\n")
@@ -223,7 +128,7 @@ def prepare():
     shutil.copyfile(prepared / "cluster-feature-gate.yaml", shared / "openshift_manifests_99_feature-gate.yaml")
     print("OKD CI target " + target_version + ": overriding prior gate selection with CustomNoUpgrade; "
           + str(len(known)) + " known gates enabled for installed payload " + version
-          + " (" + str(len(forced)) + " explicit overrides); catalog: " + source)
+          + " from payload FeatureGate catalogs")
 
 
 if __name__ == "__main__":
