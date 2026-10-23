@@ -281,7 +281,38 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   )
 fi
 
-ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-results"
+if ! ocm_fvt_workdir="$(python3 - "${ARTIFACT_DIR}" 2>/dev/null <<'PY'
+import os
+import sys
+import tempfile
+
+artifacts = os.path.abspath(sys.argv[1])
+if os.path.realpath(artifacts) != artifacts:
+    raise ValueError("Artifact path must not contain symlinks")
+flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+artifact_fd = os.open(artifacts, flags)
+try:
+    parent = os.path.dirname(artifacts)
+    if parent == artifacts:
+        raise ValueError("Staging must be outside artifact collection")
+    parent_fd = os.open(parent, flags)
+    try:
+        if os.fstat(parent_fd).st_dev != os.fstat(artifact_fd).st_dev:
+            raise ValueError("Staging must use the artifact filesystem")
+        workdir = tempfile.mkdtemp(prefix=".ocm-fvt-", dir=parent)
+        if os.stat(workdir, follow_symlinks=False).st_dev != os.fstat(artifact_fd).st_dev:
+            raise ValueError("Staging must use the artifact filesystem")
+        print(workdir)
+    finally:
+        os.close(parent_fd)
+finally:
+    os.close(artifact_fd)
+PY
+)"; then
+  echo "ERROR: failed to prepare private ocm-fvt artifact staging" >&2
+  exit 1
+fi
+ocm_fvt_output="${ocm_fvt_workdir}/output"
 mkdir -p "${ocm_fvt_output}"
 chmod 1777 "${ocm_fvt_output}"
 podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
@@ -618,6 +649,104 @@ if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
   else
     echo "WARNING: ocm-fvt output dir missing (${ocm_fvt_output}); deferred clean may no-op"
   fi
+fi
+
+if ! python3 - "${ocm_fvt_output}" "${ARTIFACT_DIR}" 2>/dev/null <<'PY'
+import os
+import stat
+import sys
+
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+entries_left = 8192
+bytes_left = 256 * 1024 * 1024
+excluded = False
+
+
+def publish(source, destination, depth=0):
+    global entries_left, bytes_left, excluded
+    if depth > 16:
+        raise ValueError("Artifact nesting limit exceeded")
+    with os.scandir(source) as entries:
+        for entry in entries:
+            entries_left -= 1
+            if entries_left < 0:
+                raise ValueError("Artifact entry limit exceeded")
+            name = entry.name
+            if name in (".datainfo", "cluster.ini", "kubeconfig") or name.endswith(".kubeconfig"):
+                continue
+            info = os.stat(name, dir_fd=source, follow_symlinks=False)
+            if stat.S_ISDIR(info.st_mode):
+                try:
+                    child = os.open(name, directory_flags, dir_fd=source)
+                except PermissionError:
+                    excluded = True
+                    continue
+                try:
+                    os.mkdir(name, 0o700, dir_fd=destination)
+                    target = os.open(name, directory_flags, dir_fd=destination)
+                    try:
+                        publish(child, target, depth + 1)
+                    finally:
+                        os.close(target)
+                finally:
+                    os.close(child)
+            elif stat.S_ISREG(info.st_mode):
+                try:
+                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source)
+                except PermissionError:
+                    excluded = True
+                    continue
+                with os.fdopen(descriptor, "rb") as original:
+                    opened = os.fstat(original.fileno())
+                    if not stat.S_ISREG(opened.st_mode):
+                        raise ValueError("Artifact changed type")
+                    if opened.st_size > bytes_left:
+                        raise ValueError("Artifact size limit exceeded")
+                    target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                                     0o600, dir_fd=destination)
+                    with os.fdopen(target, "wb") as artifact:
+                        while True:
+                            chunk = original.read(min(1024 * 1024, bytes_left + 1))
+                            if not chunk:
+                                break
+                            bytes_left -= len(chunk)
+                            if bytes_left < 0:
+                                raise ValueError("Artifact size limit exceeded")
+                            artifact.write(chunk)
+            else:
+                excluded = True
+
+
+source = os.open(sys.argv[1], directory_flags)
+try:
+    holding = os.open("..", directory_flags, dir_fd=source)
+    try:
+        os.mkdir("published", 0o700, dir_fd=holding)
+        destination = os.open("published", directory_flags, dir_fd=holding)
+        try:
+            os.fchmod(destination, 0o700)
+            publish(source, destination)
+        finally:
+            os.close(destination)
+        artifacts = os.open(sys.argv[2], directory_flags)
+        try:
+            try:
+                os.stat("ocm-fvt-results", dir_fd=artifacts, follow_symlinks=False)
+            except FileNotFoundError:
+                os.rename("published", "ocm-fvt-results", src_dir_fd=holding, dst_dir_fd=artifacts)
+            else:
+                raise FileExistsError("Artifact destination already exists")
+        finally:
+            os.close(artifacts)
+    finally:
+        os.close(holding)
+finally:
+    os.close(source)
+if excluded:
+    print("WARNING: unreadable or non-regular ocm-fvt artifacts excluded from publication")
+PY
+then
+  echo "WARNING: failed to publish ocm-fvt artifacts; raw output remains private"
 fi
 
 exit "${exit_code}"
