@@ -8,7 +8,7 @@ base_images:
     namespace: origin
     tag: operator-sdk
   upi-installer:
-    name: "4.19"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -61,6 +61,11 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
+  amd64-4-22-stable:
+    release:
+      channel: stable
+      image: quay.io/openshift-release-dev/ocp-release:4.22.18-x86_64
+      version: "4.22.18"
   arm64-4-22-latest:
     candidate:
       architecture: arm64
@@ -723,8 +728,6 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-downstream-disruptive
 - as: test-e2e-disconnected
-  capabilities:
-  - arm64
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -734,11 +737,14 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-22-stable
     env:
       BUNDLE_COMPONENT: kueue-bundle-1-5
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
       CATSRC_NAME: redhat-operators
+      ENABLE_IDMS: "yes"
       MIRROR_OPERATORS: "true"
       MUST_GATHER_COMPONENT: kueue-must-gather-1-5
       OPERAND_COMPONENT: kueue-operand-1-5
@@ -747,7 +753,12 @@ tests:
     - as: kueue-must-gather-disconnected
       cli: latest
       commands: |
-        source "${SHARED_DIR}/env"
+        if [[ -s "${SHARED_DIR}/env" ]]; then source "${SHARED_DIR}/env"; fi
+        if [[ -z "${MUST_GATHER_IMAGE:-}" ]]; then
+          echo "Kueue must-gather image was not prepared; skipping Kueue-specific must-gather"
+          exit 0
+        fi
+        source "${SHARED_DIR}/proxy-conf.sh"
         export MUST_GATHER_IMAGE
         echo "Running must-gather to gather diagnostics..."
         mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
@@ -759,13 +770,17 @@ tests:
           memory: 500Mi
     - as: kueue-cleanup-disconnected
       cli: latest
-      commands: make undeploy-ocp
+      commands: |
+        source "${SHARED_DIR}/proxy-conf.sh"
+        make undeploy-ocp
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
+    - chain: ipi-aws-post-disconnected
     test:
+    - ref: kueue-operator-disconnected-endpoint
     - chain: cert-manager-install
     - chain: jobset-install
     - chain: leader-worker-set-install
@@ -773,14 +788,22 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
+        source "${SHARED_DIR}/proxy-conf.sh"
+        # Wait for API availability through the bastion proxy before starting.
+        for i in $(seq 1 60); do oc whoami --request-timeout=15s >/dev/null 2>&1 && break; sleep 30; done
+        oc whoami --request-timeout=15s >/dev/null 2>&1 || { echo "Cluster API unavailable at e2e start"; exit 1; }
+        # Retry the CLI import after the mirror CA has propagated to importers.
+        for i in $(seq 1 20); do oc import-image cli:latest -n openshift --confirm && break; sleep 15; done
+        oc get imagestreamtag cli:latest -n openshift
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        make test-e2e
+        make e2e-ci-test
+      timeout: 3h
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+    workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: test-e2e-dra-gpu-4-22
   cron: '@daily'
