@@ -1477,7 +1477,6 @@ presubmits:
     labels:
       capability/arm64: arm64
       capability/nested-podman: nested-podman
-      ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-integration
     rerun_command: /test integration
@@ -1501,6 +1500,41 @@ presubmits:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        - name: UNRESOLVED_CONFIG
+          value: |
+            # Hand maintained: variants prefix the job name and status context.
+            # Keep this job unlabelled by prowgen to preserve ci/prow/integration.
+            # Align ci-operator arguments and credential mounts with generated jobs.
+            # Clone directly into the Podman-capable root; no nested-podman-src
+            # checkout-copy image or unrelated project image builds are needed.
+            # This root must allow its configured user to clone into /go;
+            # verify the source build and Podman runtime with a Prow rehearsal.
+            build_root:
+              image_stream_tag:
+                name: aro-hcp-ci-images
+                namespace: aro-hcp
+                tag: aro-hcp-nested-podman-ci
+            resources:
+              '*':
+                limits:
+                  memory: 6Gi
+                requests:
+                  cpu: "3"
+                  memory: 6Gi
+            tests:
+            - as: integration
+              capabilities:
+              - nested-podman
+              - arm64
+              nested_podman: true
+              skip_if_only_changed: ^docs/generated/
+              steps:
+                test:
+                - ref: aro-hcp-frontend-run-integration-tests
+            zz_generated_metadata:
+              branch: main
+              org: Azure
+              repo: ARO-HCP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
