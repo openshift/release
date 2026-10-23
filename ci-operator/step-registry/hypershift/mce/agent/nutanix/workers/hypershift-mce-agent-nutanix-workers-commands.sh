@@ -21,7 +21,7 @@ else
   ANSIBLE_FILES_DIR=/go/src/github.com/openshift-eng/agent-qe-infra/ansible-files
 fi
 
-if [[ ! -f "$ANSIBLE_FILES_DIR/vars/ci_nutanix.yml" || ! -d "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image" || ! -d "$ANSIBLE_FILES_DIR/roles/nutanix/provision_vm" ]]; then
+if [[ ! -f "$ANSIBLE_FILES_DIR/vars/ci_nutanix.yml" || ! -d "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image" ]]; then
   echo "agent-qe-infra/ansible-files was not found at $ANSIBLE_FILES_DIR; configure it as a Prow extra ref."
   exit 1
 fi
@@ -41,10 +41,17 @@ function gather_failure_diagnostics() {
 trap gather_failure_diagnostics EXIT
 
 mkdir -p "$WORK_DIR"
-: > "$SHARED_DIR/hostnames.txt"
-for ((worker_index = 0; worker_index < NUTANIX_WORKERS; worker_index++)); do
-  printf '%s\n' "$CLUSTER_NAME-worker-$worker_index" >> "$SHARED_DIR/hostnames.txt"
-done
+reserved_macs_file="$SHARED_DIR/nutanix_worker_macs.json"
+if [[ ! -s "$reserved_macs_file" ]] || ! jq -e --arg cluster "$CLUSTER_NAME" --argjson count "$NUTANIX_WORKERS" '
+  type == "array" and length == $count and
+  ([.[].mac] | unique | length) == $count and
+  all(to_entries[]; .value.name == ($cluster + "-worker-" + (.key | tostring)) and
+    (.value.mac | test("^02(:[0-9a-f]{2}){5}$")))
+' "$reserved_macs_file" >/dev/null; then
+  echo "The InfraEnv did not reserve exactly $NUTANIX_WORKERS distinct worker MACs for this run."
+  exit 1
+fi
+jq -r '.[].name' "$reserved_macs_file" > "$SHARED_DIR/hostnames.txt"
 cp "$SHARED_DIR/hostnames.txt" "$SHARED_DIR/nutanix_worker_names"
 printf '%s\n' "$IMAGE_NAME" > "$SHARED_DIR/nutanix_image_name"
 : > "$SHARED_DIR/vm_uuids.txt"
@@ -78,6 +85,7 @@ cat > "$playbook" <<EOF
   vars:
     vm_memory_gb: 16
     vm_disk_size_gb: 120
+    worker_macs: "{{ lookup('file', lookup('env', 'SHARED_DIR') + '/nutanix_worker_macs.json') | from_json }}"
   module_defaults:
     group/nutanix.ncp.ntnx:
       nutanix_username: "{{ lookup('env', 'NUTANIX_USERNAME') }}"
@@ -86,7 +94,60 @@ cat > "$playbook" <<EOF
       validate_certs: false
   roles:
     - "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image"
-    - "$ANSIBLE_FILES_DIR/roles/nutanix/provision_vm"
+  tasks:
+    - name: Provision workers with their InfraEnv NMStateConfig MACs
+      nutanix.ncp.ntnx_vms:
+        name: "{{ worker.name }}"
+        vcpus: 8
+        cores_per_vcpu: 1
+        memory_gb: "{{ vm_memory_gb }}"
+        cluster:
+          name: "{{ cluster_name }}"
+        disks:
+          - type: DISK
+            size_gb: "{{ vm_disk_size_gb }}"
+            storage_container:
+              name: "{{ vm_container }}"
+            bus: SCSI
+          - type: CDROM
+            clone_image:
+              name: "{{ vm_clone_image_name }}"
+            bus: IDE
+        networks:
+          - subnet:
+              uuid: "{{ vm_network_uuid }}"
+            mac_address: "{{ worker.mac }}"
+        boot_config:
+          boot_order:
+            - DISK
+            - CDROM
+        state: present
+      loop: "{{ worker_macs }}"
+      loop_control:
+        loop_var: worker
+      async: 600
+      poll: 0
+      vars:
+        ansible_async_dir: "{{ work_dir }}/.ansible_async"
+      no_log: true
+      register: create_vm_results
+    - name: Wait for worker provisioning
+      async_status:
+        jid: "{{ item.ansible_job_id }}"
+      loop: "{{ create_vm_results.results }}"
+      register: job_result
+      until: job_result.finished
+      retries: 20
+      delay: 15
+      vars:
+        ansible_async_dir: "{{ work_dir }}/.ansible_async"
+      no_log: true
+      when: item.ansible_job_id is defined
+    - name: Record worker UUIDs for deprovisioning
+      copy:
+        content: "{{ job_result.results | map(attribute='vm_uuid') | join('\n') }}"
+        dest: "{{ shared_dir }}/vm_uuids.txt"
+      no_log: true
 EOF
 
 ansible_status=0
@@ -133,12 +194,19 @@ fi
 
 map_file="$SHARED_DIR/nutanix_worker_vms.tsv"
 : > "$map_file"
-while IFS= read -r name && IFS= read -r uuid <&3; do
+while IFS=$'\t' read -r name expected_mac && IFS= read -r uuid <&3; do
   vm_json=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
     "$NUTANIX_PC_URL/api/nutanix/v3/vms/$uuid")
-  mac=$(jq -er '[.spec.resources.nic_list[]?.mac_address // empty] | map(ascii_downcase) | unique | if length == 1 then .[0] else error("VM NIC MAC is missing or ambiguous") end' <<<"$vm_json")
+  mac=$(jq -er --arg subnet "$SUBNET_UUID" '[.spec.resources.nic_list[]? |
+    select(.subnet_reference.uuid == $subnet) | .mac_address // empty] |
+    map(ascii_downcase) | unique |
+    if length == 1 then .[0] else error("VM NIC MAC is missing or ambiguous") end' <<<"$vm_json")
+  if [[ "$mac" != "$expected_mac" ]]; then
+    echo "Nutanix VM $name did not receive its reserved NIC MAC $expected_mac."
+    exit 1
+  fi
   printf '%s\t%s\t%s\n' "$name" "$uuid" "$mac" >> "$map_file"
-done 3< "$SHARED_DIR/vm_uuids.txt" < "$SHARED_DIR/nutanix_worker_names"
+done 3< "$SHARED_DIR/vm_uuids.txt" < <(jq -r '.[] | [.name, .mac] | @tsv' "$reserved_macs_file")
 
 function matching_agents() {
   oc get agents -n "$AGENT_NAMESPACE" -o json | jq -r --arg infraenv "$INFRAENV_NAME" \

@@ -46,7 +46,7 @@ subnets_json=$(curl --silent --show-error --fail --insecure --user "${prism_cent
   -H 'Content-Type: application/json' -X POST "${pc_url}/api/nutanix/v3/subnets/list" \
   --data '{"kind":"subnet"}')
 subnet_name=${one_net_mode_network_name:-$lease_resource}
-subnet_json=$(jq -ce --arg name "${subnet_name}" '[.entities[] | select(.spec.name == $name)] | if length == 1 then .[0] else error("Leased subnet is missing or ambiguous") end' <<<"${subnets_json}")
+subnet_json=$(jq -ce --arg name "${subnet_name}" '[.entities[] | select(.spec.name == $name)] | if length == 1 then .[0] else error("Selected subnet is missing or ambiguous") end' <<<"${subnets_json}")
 subnet_uuid=$(jq -er '.metadata.uuid' <<<"${subnet_json}")
 subnet_ip=$(jq -r '.spec.resources.ip_config.subnet_ip // empty' <<<"${subnet_json}")
 if [[ -z "${subnet_ip}" || -z "${awk_ip_program:-}" ]]; then
@@ -81,5 +81,5 @@ printf 'export NUTANIX_PC_URL=%q\n' "${pc_url}" >> "${context_tmp}"
 chmod 600 "${context_tmp}"
 mv "${context_tmp}" "${SHARED_DIR}/nutanix_context.sh"
 
-printf 'Nutanix lease: %s\nPrism Element: %s (%s)\nLeased subnet: %s (%s)\nIngress VIP: %s\n' \
+printf 'Nutanix quota slice: %s\nPrism Element: %s (%s)\nSelected subnet: %s (%s)\nIngress VIP: %s\n' \
   "${lease_resource}" "${pe_name}" "${pe_uuid}" "${subnet_name}" "${subnet_uuid}" "${ingress_vip}"

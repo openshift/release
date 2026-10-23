@@ -10,8 +10,8 @@ CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
 BASE_DOMAIN=$(oc --kubeconfig="$SHARED_DIR/kubeconfig" get dns cluster -o jsonpath='{.spec.baseDomain}')
 STATE_FILE="$SHARED_DIR/nutanix_worker_dns_state.json"
 
-if [[ "$SUBNET_NAME" != "${NUTANIX_QUOTA_SLICE:-}" ]]; then
-  echo "Refusing to change DHCP on subnet $SUBNET_NAME: it is not the leased subnet ${NUTANIX_QUOTA_SLICE:-<unset>}."
+if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
+  echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
   exit 1
 fi
 if [[ ! "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ || ! "$BASE_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]]; then
@@ -36,37 +36,9 @@ function valid_cidr() {
 }
 
 function prism() {
-  local method=$1
-  local path=$2
-  if [[ "$method" == GET ]]; then
-    curl --silent --show-error --fail --insecure --max-time 30 \
-      --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" "$NUTANIX_PC_URL/api/nutanix/v3/$path"
-  else
-    curl --silent --show-error --fail --insecure --max-time 30 \
-      --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" -H 'Content-Type: application/json' \
-      -X "$method" "$NUTANIX_PC_URL/api/nutanix/v3/$path" --data-binary @-
-  fi
-}
-
-function wait_for_task() {
-  local task_uuid=$1
-  local task_json task_status
-  [[ -n "$task_uuid" ]] || return 0
-  for attempt in $(seq 1 60); do
-    if task_json=$(prism GET "tasks/$task_uuid" 2>/dev/null); then
-      task_status=$(jq -r '.status // empty' <<<"$task_json")
-      case "$task_status" in
-        SUCCEEDED) return 0 ;;
-        FAILED|ABORTED)
-          echo "DHCP DNS update failed: $(jq -r '.error_detail // .progress_message // .status' <<<"$task_json")"
-          return 1
-          ;;
-      esac
-    fi
-    sleep 10
-  done
-  echo "Timed out waiting for DHCP DNS task $task_uuid."
-  return 1
+  local path=$1
+  curl --silent --show-error --fail --insecure --max-time 30 \
+    --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" "$NUTANIX_PC_URL/api/nutanix/v3/$path"
 }
 
 management_ip=$(oc --kubeconfig="$SHARED_DIR/kubeconfig" get nodes -l node-role.kubernetes.io/worker= \
@@ -90,10 +62,10 @@ if [[ "$bind_ip" == 0.* || "$bind_ip" == 127.* || "$bind_ip" == 169.254.* ||
   exit 1
 fi
 
-subnet_json=$(prism GET "subnets/$SUBNET_UUID")
+subnet_json=$(prism "subnets/$SUBNET_UUID")
 if [[ $(jq -r '.metadata.uuid // empty' <<<"$subnet_json") != "$SUBNET_UUID" ||
       $(jq -r '.spec.name // empty' <<<"$subnet_json") != "$SUBNET_NAME" ]]; then
-  echo "The leased subnet no longer matches the Nutanix context."
+  echo "The selected Nutanix subnet no longer matches the Nutanix context."
   exit 1
 fi
 subnet_prefix=$(jq -r '.spec.resources.ip_config.prefix_length // empty' <<<"$subnet_json")
@@ -102,29 +74,12 @@ if ! valid_cidr "$client_cidr"; then
   echo "Set NUTANIX_DNS_CLIENT_CIDR to the IPv4 CIDR from which the baremetal host sees worker DNS queries."
   exit 1
 fi
-original_options=$(jq -cS '.spec.resources.ip_config.dhcp_options // null' <<<"$subnet_json")
-if ! jq -e 'type == "null" or (type == "object" and ((.domain_name_server_list // []) | type == "array" and all(.[]; type == "string")))' \
-  <<<"$original_options" >/dev/null; then
-  echo "The leased subnet has an invalid DHCP DNS server list."
-  exit 1
-fi
-if jq -e --arg ip "$advertise_ip" '(.domain_name_server_list // []) | index($ip) != null' \
-  <<<"$original_options" >/dev/null; then
-  echo "The leased subnet already advertises $advertise_ip; refusing to adopt existing DNS configuration."
-  exit 1
-fi
-# Nutanix advertises domain_name_server_list to workers as DHCP option 6.
-# Start with the subnet’s existing DHCP options (or {} if none),
-# preserve the other options, and sets domain_name_server_list to an array
-# containing only $advertise_ip.
-target_options=$(jq -ncS --argjson original "$original_options" --arg ip "$advertise_ip" \
-  '($original // {}) | .domain_name_server_list = [$ip]')
 
 umask 077
 jq -n --arg cluster "$CLUSTER_NAME" --arg subnet "$SUBNET_UUID" --arg subnetName "$SUBNET_NAME" \
   --arg lease "$NUTANIX_QUOTA_SLICE" --arg bind "$bind_ip" --arg advertised "$advertise_ip" \
-  --arg clients "$client_cidr" --argjson original "$original_options" --argjson target "$target_options" \
-  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,bindIP:$bind,advertisedIP:$advertised,clientCIDR:$clients,originalOptions:$original,targetOptions:$target}' \
+  --arg clients "$client_cidr" \
+  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,bindIP:$bind,advertisedIP:$advertised,clientCIDR:$clients}' \
   > "$STATE_FILE.tmp"
 mv "$STATE_FILE.tmp" "$STATE_FILE"
 
@@ -232,32 +187,5 @@ if command -v dig >/dev/null; then
 fi
 printf 'Worker DNS listens on %s:53 in firewall zone %s for %s.\n' "$bind_ip" "$zone" "$client_cidr"
 EOF
-
-current_subnet=$(prism GET "subnets/$SUBNET_UUID")
-if [[ $(jq -cS '.spec.resources.ip_config.dhcp_options // null' <<<"$current_subnet") != "$original_options" ]]; then
-  echo "The leased subnet's DHCP options changed during host DNS setup; refusing to overwrite them."
-  exit 1
-fi
-# Persist the updated DNS list under spec.resources.ip_config.dhcp_options on the leased subnet.
-subnet_response=$(jq --argjson target "$target_options" \
-  '{api_version,metadata,spec} | .spec.resources.ip_config.dhcp_options = $target' <<<"$current_subnet" |
-  prism PUT "subnets/$SUBNET_UUID")
-wait_for_task "$(jq -r '.status.execution_context.task_uuid // empty' <<<"$subnet_response")"
-advertised=false
-for ((attempt = 1; attempt <= 24; attempt++)); do
-  updated_subnet=$(prism GET "subnets/$SUBNET_UUID")
-  if jq -e --arg ip "$advertise_ip" \
-    '.spec.resources.ip_config.dhcp_options.domain_name_server_list == [$ip]' \
-    <<<"$updated_subnet" >/dev/null; then
-    advertised=true
-    break
-  fi
-  sleep 5
-done
-if [[ "$advertised" != true ]]; then
-  echo "The leased subnet did not advertise the baremetal DNS address through DHCP option 6."
-  exit 1
-fi
-
-printf 'Advertised worker DNS %s on leased subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
+printf 'Configured worker DNS at %s:53 without changing DHCP on shared subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
   "$advertise_ip" "$SUBNET_NAME"

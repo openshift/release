@@ -13,7 +13,8 @@ fi
 lease_resource=${NUTANIX_QUOTA_SLICE}
 
 if [[ ! -s "$context_file" ]]; then
-  if [[ -s "$SHARED_DIR/nutanix_worker_names" || -s "$SHARED_DIR/nutanix_image_name" || -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
+  if [[ -s "$SHARED_DIR/nutanix_worker_names" || -s "$SHARED_DIR/nutanix_image_name" ||
+        -s "$SHARED_DIR/nutanix_infraenv_name" || -s "$SHARED_DIR/nutanix_worker_macs.json" ]]; then
     echo "Nutanix resources may exist but the private Nutanix context is unavailable; cleanup cannot be verified for $lease_resource."
     exit 1
   fi
@@ -41,6 +42,17 @@ if [[ -s "$SHARED_DIR/nutanix_agent_namespace" || -s "$SHARED_DIR/nutanix_infrae
   elif [[ -n "$remaining_agents" ]]; then
     echo "Run-owned Agents remain in namespace $AGENT_NAMESPACE."
     management_cleanup_failed=true
+  fi
+  if [[ -s "$SHARED_DIR/nutanix_worker_macs.json" ]]; then
+    oc delete nmstateconfigs -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
+      --ignore-not-found --wait=true --timeout=2m || true
+    if ! remaining_nmstateconfigs=$(oc get nmstateconfigs -n "$AGENT_NAMESPACE" \
+      -l "$RUN_LABEL_KEY=$CLUSTER_NAME" -o name 2>/dev/null); then
+      management_cleanup_failed=true
+    elif [[ -n "$remaining_nmstateconfigs" ]]; then
+      echo "Run-owned NMStateConfigs remain in namespace $AGENT_NAMESPACE."
+      management_cleanup_failed=true
+    fi
   fi
   if [[ -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
     INFRAENV_NAME=$(cat "$SHARED_DIR/nutanix_infraenv_name")
