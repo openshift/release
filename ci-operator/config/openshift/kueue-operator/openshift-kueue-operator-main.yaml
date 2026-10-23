@@ -61,11 +61,6 @@ operator:
 prowgen:
   disable_sparse_checkout: true
 releases:
-  amd64-4-22-stable:
-    release:
-      channel: stable
-      image: quay.io/openshift-release-dev/ocp-release:4.22.18-x86_64
-      version: "4.22.18"
   arm64-4-22-latest:
     candidate:
       architecture: arm64
@@ -736,6 +731,8 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-downstream-disruptive
 - as: test-e2e-disconnected
+  capabilities:
+  - arm64
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -745,14 +742,12 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:amd64-4-22-stable
+    cluster_profile: openshift-org-gcp
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
       CATSRC_NAME: redhat-operators
-      ENABLE_IDMS: "yes"
+      MIRROR_OPERATORS: "true"
       MUST_GATHER_COMPONENT: kueue-must-gather-main
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
@@ -778,9 +773,7 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
-    - chain: ipi-aws-post-disconnected
     test:
-    - ref: kueue-operator-disconnected-endpoint
     - chain: cert-manager-install
     - chain: jobset-install
     - chain: leader-worker-set-install
@@ -788,81 +781,14 @@ tests:
     - as: e2e-kueue
       cli: latest
       commands: |
-        # CI DNS flake: the build-farm resolver intermittently returns NXDOMAIN
-        # for the cluster API name (seconds up to ~30 minutes). Probe with oc
-        # (same Go resolver as the tests; getent is unusable in step pods).
-        # Don't start the suite while it is down, and retry once after recovery.
-        for i in $(seq 1 60); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        oc whoami >/dev/null 2>&1 || { echo "Cluster API unresolvable at e2e start"; exit 1; }
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        if make test-e2e; then
-          exit 0
-        fi
-        echo "e2e failed; waiting up to 45m for the cluster API to become resolvable again"
-        for i in $(seq 1 90); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        if oc whoami >/dev/null 2>&1; then
-          echo "Cluster API recovered; retrying e2e once"
-          make test-e2e
-        else
-          echo "Cluster API still unresolvable after 45m; giving up"
-          exit 1
-        fi
+        make test-e2e
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
-    workflow: openshift-e2e-aws-disconnected
-- as: test-e2e-disconnected-aws
-  optional: true
-  reporter_config:
-    channel: '#forum-node-jira'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
-    test:
-    - chain: cert-manager-install
-    - chain: jobset-install
-    - chain: leader-worker-set-install
-    - ref: kueue-operator-mirror-images
-    - chain: kueue-operator-disconnected
-    - as: e2e-kueue
-      cli: latest
-      commands: |
-        # CI DNS flake: the build-farm resolver intermittently returns NXDOMAIN
-        # for the cluster API name (seconds up to ~30 minutes). Probe with oc
-        # (same Go resolver as the tests; getent is unusable in step pods).
-        # Don't start the suite while it is down, and retry once after recovery.
-        for i in $(seq 1 60); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        oc whoami >/dev/null 2>&1 || { echo "Cluster API unresolvable at e2e start"; exit 1; }
-        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        if make test-e2e; then
-          exit 0
-        fi
-        echo "e2e failed; waiting up to 45m for the cluster API to become resolvable again"
-        for i in $(seq 1 90); do oc whoami >/dev/null 2>&1 && break; sleep 30; done
-        if oc whoami >/dev/null 2>&1; then
-          echo "Cluster API recovered; retrying e2e once"
-          make test-e2e
-        else
-          echo "Cluster API still unresolvable after 45m; giving up"
-          exit 1
-        fi
-      from: kueue-operator-src
-      resources:
-        requests:
-          cpu: 300m
-          memory: 500Mi
-    workflow: openshift-e2e-aws-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 - always_run: false
   as: test-e2e-dra-gpu-4-22
   cron: '@daily'

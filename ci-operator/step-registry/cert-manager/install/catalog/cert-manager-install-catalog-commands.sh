@@ -121,7 +121,6 @@ kind: ImageSetConfiguration
 mirror:
   operators:
   - catalog: ${CATSRC_IMG}
-    targetCatalog: redhat/cert-manager-operator-index
     packages:
     - name: openshift-cert-manager-operator
 EOF
