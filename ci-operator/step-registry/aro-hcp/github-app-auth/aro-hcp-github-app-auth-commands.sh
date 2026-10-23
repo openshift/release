@@ -19,14 +19,14 @@ b64url() {
 
 for tool in openssl curl jq; do
     if ! command -v "${tool}" &>/dev/null; then
-        echo "WARNING: ${tool} not found. Skipping token minting." >&2
-        exit 0
+        echo "ERROR: ${tool} not found; cannot mint the GitHub App token." >&2
+        exit 1
     fi
 done
 
 if [[ ! -f "${GITHUB_APP_ID_PATH}" || ! -f "${GITHUB_APP_KEY_PATH}" ]]; then
-    echo "WARNING: aro-hcp-robot App credentials not found; skipping token minting." >&2
-    exit 0
+    echo "ERROR: aro-hcp-robot App credentials not found; cannot mint the GitHub App token." >&2
+    exit 1
 fi
 
 app_id=$(cat "${GITHUB_APP_ID_PATH}")
@@ -40,8 +40,8 @@ unsigned="${header}.${payload}"
 
 signature=$(printf '%s' "${unsigned}" | openssl dgst -sha256 -sign "${GITHUB_APP_KEY_PATH}" -binary | b64url) || true
 if [[ -z "${signature}" ]]; then
-    echo "WARNING: could not sign the GitHub App JWT; PR comment will be skipped." >&2
-    exit 0
+    echo "ERROR: could not sign the GitHub App JWT." >&2
+    exit 1
 fi
 jwt="${unsigned}.${signature}"
 
@@ -51,8 +51,8 @@ installation=$(curl --silent --fail-with-body \
     "https://api.github.com/repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/installation") || true
 installation_id=$(jq -r '.id // empty' <<<"${installation:-}")
 if [[ -z "${installation_id}" ]]; then
-    echo "WARNING: could not resolve GitHub App installation for ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}; PR comment will be skipped." >&2
-    exit 0
+    echo "ERROR: could not resolve the GitHub App installation for ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}." >&2
+    exit 1
 fi
 
 # The downstream step creates/updates/deletes PR comments, so ask for the
@@ -62,8 +62,8 @@ permissions=$(jq -c --argjson wanted "${wanted_permissions}" \
     '(.permissions // {}) | with_entries(select(.value == "write" and ((.key as $k | $wanted | index($k)) != null)))' \
     <<<"${installation}")
 if [[ -z "${permissions}" || "${permissions}" == "{}" ]]; then
-    echo "WARNING: the installation grants no write access to ${wanted_permissions}; PR comment will be skipped." >&2
-    exit 0
+    echo "ERROR: the installation grants no write access to ${wanted_permissions}." >&2
+    exit 1
 fi
 
 # Exit just before posting so that pj-rehearse can test everything above this line
@@ -86,8 +86,8 @@ token=$(curl --silent --fail-with-body -X POST \
     "https://api.github.com/app/installations/${installation_id}/access_tokens" \
     | jq -r '.token // empty') || true
 if [[ -z "${token}" ]]; then
-    echo "WARNING: could not mint GitHub App installation token; PR comment will be skipped." >&2
-    exit 0
+    echo "ERROR: could not mint the GitHub App installation token." >&2
+    exit 1
 fi
 
 touch "${TOKEN_OUTPUT}"

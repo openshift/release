@@ -12,6 +12,7 @@ export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
+export GLOBAL_INFRA_SUBSCRIPTION_ID; GLOBAL_INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-global-subscription-id")
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
@@ -39,31 +40,10 @@ resolve_config_from_templatize() {
     printf '%s\n' "${resolved_value}"
 }
 
-# Resolves an Azure subscription ID from its display name.
-# Argument 1: the subscription display name to resolve.
-resolve_subscription_id_from_name() {
-    local subscription_name="$1"
-    local subscription_id
-
-    subscription_id="$(
-        az account list --output json \
-        | jq -r --arg name "${subscription_name}" 'map(select(.name == $name) | .id) | first // ""'
-    )"
-
-    if [[ -z "${subscription_id}" ]]; then
-        echo "ERROR: Could not resolve subscription ID for '${subscription_name}'" >&2
-        exit 1
-    fi
-
-    printf '%s\n' "${subscription_id}"
-}
-
 export GRAFANA_NAME; GRAFANA_NAME="$(resolve_config_from_templatize "monitoring.grafanaName")"
 export GRAFANA_RESOURCE_GROUP; GRAFANA_RESOURCE_GROUP="$(resolve_config_from_templatize "global.rg")"
 
-SUBSCRIPTION_KEY="$(resolve_config_from_templatize "global.subscription.key")"
-SUBSCRIPTION_ID="$(resolve_subscription_id_from_name "${SUBSCRIPTION_KEY}")"
-az account set --subscription "${SUBSCRIPTION_ID}"
+az account set --subscription "${GLOBAL_INFRA_SUBSCRIPTION_ID}"
 
 # Exit just before posting so that pj-rehearse can test everything above this line
 if [[ -n "${REPO_OWNER:-}${REPO_NAME:-}" \
@@ -73,10 +53,10 @@ if [[ -n "${REPO_OWNER:-}${REPO_NAME:-}" \
 fi
 
 # Consume the GitHub token minted by the aro-hcp-github-app-auth step.
-if [[ -s "${SHARED_DIR}/github-token" ]]; then
-    export GITHUB_TOKEN; GITHUB_TOKEN=$(cat "${SHARED_DIR}/github-token")
-else
-    echo "WARNING: no GitHub token found in \${SHARED_DIR}. PR comment will be skipped." >&2
+if [[ ! -s "${SHARED_DIR}/github-token" ]]; then
+    echo "ERROR: no GitHub token found in \${SHARED_DIR}; the PR comment with the preview links cannot be posted." >&2
+    exit 1
 fi
+export GITHUB_TOKEN; GITHUB_TOKEN=$(cat "${SHARED_DIR}/github-token")
 
 bash hack/ci/grafana-preview.sh
