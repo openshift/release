@@ -60,6 +60,49 @@ def mock_artifact_command(command, arguments, base, case):
     raise AssertionError("Unexpected artifact fixture command")
 
 
+def prepare_publication_case(base, case, output, result):
+    if case == "permissions":
+        (result / "report.xml").chmod(0o444)
+        result.chmod(0o555)
+        try:
+            descriptor, name = tempfile.mkstemp(prefix="tmp-censor", dir=result)
+        except PermissionError:
+            (base / "before-denied").touch()
+        else:
+            os.close(descriptor)
+            Path(name).unlink()
+            raise AssertionError("Read-only source unexpectedly permitted censor temporary file")
+    elif case == "publication-safety":
+        for name in (".datainfo", "diagnostics"):
+            (output / name).mkdir()
+        (output / ".datainfo/private").write_text(SECRET, encoding="utf-8")
+        for name in ("cluster.ini", "kubeconfig", "guest.kubeconfig"):
+            (result / name).write_text(SECRET, encoding="utf-8")
+        (result / "linked").symlink_to(base / "outside/secret")
+        (result / "linked-directory").symlink_to(base / "outside", target_is_directory=True)
+        os.mkfifo(result / "fifo")
+        for name in ("phase.json", "test-matrix.json", "report.html", "diagnostic.log",
+                     "diagnostic.txt", "image.png", "gather.tar.gz", "unknown-diagnostic"):
+            (output / "diagnostics" / name).write_bytes(b"fixture diagnostic\n")
+    elif case == "publication-bound":
+        with (result / "oversized.log").open("wb") as artifact:
+            artifact.truncate(256 * 1024 * 1024 + 1)
+    elif case == "publication-entry-bound":
+        for index in range(8193):
+            (result / f"entry-{index}").touch()
+    elif case == "publication-depth-bound":
+        directory = result
+        for index in range(17):
+            directory /= str(index)
+            directory.mkdir()
+    elif case == "ready":
+        (output / ".datainfo").mkdir()
+        (result / "cluster.ini").write_text(
+            "ID=fixture-cluster\nState=ready\n", encoding="utf-8")
+        (result / "guest.kubeconfig").write_text(
+            "apiVersion: v1\nkind: Config\n", encoding="utf-8")
+
+
 def mock_command(command, arguments):
     base = Path(os.environ["FIXTURE_DIR"])
     case = os.environ["FIXTURE_CASE"]
@@ -125,46 +168,8 @@ def mock_command(command, arguments):
             scan_directory = output if case == "output-entry-limit" else result
             for index in range(150):
                 (scan_directory / f"ignored-{index}").touch()
-        elif case == "permissions":
-            (result / "report.xml").chmod(0o444)
-            result.chmod(0o555)
-            try:
-                descriptor, name = tempfile.mkstemp(prefix="tmp-censor", dir=result)
-            except PermissionError:
-                (base / "before-denied").touch()
-            else:
-                os.close(descriptor)
-                Path(name).unlink()
-                raise AssertionError("Read-only source unexpectedly permitted censor temporary file")
-        elif case == "publication-safety":
-            for name in (".datainfo", "diagnostics"):
-                (output / name).mkdir()
-            (output / ".datainfo/private").write_text(SECRET, encoding="utf-8")
-            for name in ("cluster.ini", "kubeconfig", "guest.kubeconfig"):
-                (result / name).write_text(SECRET, encoding="utf-8")
-            (result / "linked").symlink_to(base / "outside/secret")
-            (result / "linked-directory").symlink_to(base / "outside", target_is_directory=True)
-            os.mkfifo(result / "fifo")
-            for name in ("phase.json", "test-matrix.json", "report.html", "diagnostic.log",
-                         "diagnostic.txt", "image.png", "gather.tar.gz", "unknown-diagnostic"):
-                (output / "diagnostics" / name).write_bytes(b"fixture diagnostic\n")
-        elif case == "publication-bound":
-            with (result / "oversized.log").open("wb") as artifact:
-                artifact.truncate(256 * 1024 * 1024 + 1)
-        elif case == "publication-entry-bound":
-            for index in range(8193):
-                (result / f"entry-{index}").touch()
-        elif case == "publication-depth-bound":
-            directory = result
-            for index in range(17):
-                directory /= str(index)
-                directory.mkdir()
-        elif case == "ready":
-            (output / ".datainfo").mkdir()
-            (result / "cluster.ini").write_text(
-                "ID=fixture-cluster\nState=ready\n", encoding="utf-8")
-            (result / "guest.kubeconfig").write_text(
-                "apiVersion: v1\nkind: Config\n", encoding="utf-8")
+        else:
+            prepare_publication_case(base, case, output, result)
     return int(os.environ["FIXTURE_EXIT"])
 
 
