@@ -72,29 +72,16 @@ function getFailureDomainsWithDSwitch() {
 
     echo "[" > ${FAILURE_DOMAIN_PATH}
 
-    for LEASE in "${SHARED_DIR}"/LEASE*; do
-      if [[ $LEASE =~ "single" ]]; then
-        continue
-      fi
-
-      echo "checking lease ${LEASE} for failure domains"
-
-      server=$(jq -r .status.server "$LEASE")
-
-      echo "server is ${server}"
+    # append_failure_domain emits one failure-domain entry for the pool whose
+    # env vars (GOVC_*) are currently sourced and whose compute cluster is $1.
+    function append_failure_domain() {
+      local CLUSTER=$1
 
       if [ ${FIRST} == 0 ]; then
           echo "    }," >> ${FAILURE_DOMAIN_PATH}
       fi
       echo "    {" >> ${FAILURE_DOMAIN_PATH}
       FIRST=0
-
-      jq -r .status.envVars "${LEASE}" > /tmp/envvars
-
-      # shellcheck source=/dev/null
-      source /tmp/envvars
-
-      CLUSTER=$(jq -r .status.topology.computeCluster "${LEASE}" | cut -d '/' -f 4)
 
       DVS=$(jq --compact-output -r '."'"/${GOVC_DATACENTER}/network/$GOVC_NETWORK"'"' "${SHARED_DIR}"/dvs.json)
       echo "DVS: ${DVS}"
@@ -116,10 +103,53 @@ function getFailureDomainsWithDSwitch() {
         echo "        distributed_virtual_switch_uuid = \"${DVS_UUID}\""
       } >> "${FAILURE_DOMAIN_PATH}"
 
-      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]');
+      FAILURE_DOMAIN_OUT=$(echo "$FAILURE_DOMAIN_OUT" | jq --compact-output -r '. += [{"server":"'"${GOVC_URL}"'","datacenter":"'"${GOVC_DATACENTER}"'","cluster":"'"${CLUSTER}"'","datastore":"'"${datastoreName}"'","network":"'"${GOVC_NETWORK}"'","distributed_virtual_switch_uuid":"'"$DVS_UUID"'"}]')
+    }
+
+    for LEASE in "${SHARED_DIR}"/LEASE*; do
+      if [[ $LEASE =~ "single" ]]; then
+        continue
+      fi
+
+      echo "checking lease ${LEASE} for failure domains"
+
+      # A lease can cover multiple pools (POOL_COUNT path); every pool becomes
+      # its own failure domain.  Leases without poolInfo (legacy single-pool
+      # leases) fall back to the top-level status fields.
+      pool_info_count=$(jq -r '.status.poolInfo | length' "${LEASE}")
+      if [[ "${pool_info_count}" != "null" && "${pool_info_count}" -gt 0 ]]; then
+        for ((pool_idx = 0; pool_idx < pool_info_count; pool_idx++)); do
+          pool_name=$(jq -r ".status.poolInfo[${pool_idx}].name" "${LEASE}")
+          echo "processing pool ${pool_name}"
+
+          server=$(jq -r ".status.poolInfo[${pool_idx}].server" "${LEASE}")
+          echo "server is ${server}"
+
+          jq -r ".status.envVarsMap.\"${pool_name}\"" "${LEASE}" > /tmp/envvars
+
+          # shellcheck source=/dev/null
+          source /tmp/envvars
+
+          CLUSTER=$(jq -r ".status.poolInfo[${pool_idx}].topology.computeCluster" "${LEASE}" | cut -d '/' -f 4)
+
+          append_failure_domain "${CLUSTER}"
+        done
+      else
+        server=$(jq -r .status.server "$LEASE")
+        echo "server is ${server}"
+
+        jq -r .status.envVars "${LEASE}" > /tmp/envvars
+
+        # shellcheck source=/dev/null
+        source /tmp/envvars
+
+        CLUSTER=$(jq -r .status.topology.computeCluster "${LEASE}" | cut -d '/' -f 4)
+
+        append_failure_domain "${CLUSTER}"
+      fi
     done
-    echo "    }" >> "${FAILURE_DOMAIN_PATH}"
-    echo "]" >> "${FAILURE_DOMAIN_PATH}"
+    echo "    }" >> ${FAILURE_DOMAIN_PATH}
+    echo "]" >> ${FAILURE_DOMAIN_PATH}
 
     echo "${FAILURE_DOMAIN_OUT}" | jq . > "${FAILURE_DOMAIN_JSON}"
     cat "${FAILURE_DOMAIN_JSON}"

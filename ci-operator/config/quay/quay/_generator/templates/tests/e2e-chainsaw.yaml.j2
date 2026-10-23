@@ -2,8 +2,24 @@ tests:
 - steps:
     env:
       CHAINSAW_SUITE: all
+{%- if sts %}
+      QUAY_OPERATOR_STS: "true"
+{%- endif %}
       QUAY_STORAGE_PROVIDER: odf
       SETUP_NOOBAA: "true"
+{%- if sts %}
+    {#- Lists of mappings merge by index, so pre and post repeat the aws cloud
+        layer's entries to append the STS provision and cleanup after them. #}
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post-manual-oidc-sts
+    - ref: quay-sts-cleanup
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    - ref: quay-sts-provision
+{%- endif %}
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art

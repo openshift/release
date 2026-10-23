@@ -280,13 +280,13 @@ function update_subscription() {
 }
 
 function wait_for_upgrade_complete() {
-    # The upgrade is only complete once the CSV for the TARGET version reaches
-    # Succeeded. Checking for any Succeeded CSV is wrong: the pre-upgrade CSV is
-    # already Succeeded, so we would return immediately without verifying the
-    # upgrade actually happened.
-    local target_version
-    target_version=$(get_target_version_from_channel "${TARGET_LVMS_CHANNEL}")
-    echo "Waiting for LVMS to upgrade to version ${target_version}.x ..."
+    # The upgrade is only complete once a DIFFERENT, strictly-newer CSV reaches
+    # Succeeded. Matching the target minor (e.g. 4.12.x) is wrong for z-stream:
+    # the pre-upgrade CSV (e.g. 4.12.9) already matches and is already Succeeded,
+    # so we would return immediately or flake depending on whether OLM has begun
+    # replacing it at the first poll. Anchor on the starting version instead.
+    local baseline_version="${1}"
+    echo "Waiting for LVMS to upgrade beyond ${baseline_version} ..."
 
     local -i counter=0
     while [ $counter -lt 1800 ]; do
@@ -300,7 +300,8 @@ function wait_for_upgrade_complete() {
 
         echo "LVMS CSV: ${csv_info:-pending} (${counter}s)"
 
-        if [[ "${version}" == "${target_version}".* && "${phase}" == "Succeeded" ]]; then
+        if [[ "${phase}" == "Succeeded" && -n "${version}" && "${version}" != "${baseline_version}" \
+              && "$(printf '%s\n%s\n' "${baseline_version}" "${version}" | sort -V | tail -1)" == "${version}" ]]; then
             echo "LVMS upgrade to ${version} succeeded"
             return 0
         fi
@@ -313,7 +314,7 @@ function wait_for_upgrade_complete() {
         fi
     done
 
-    echo "ERROR: LVMS upgrade timed out (never reached ${target_version}.x in Succeeded phase)"
+    echo "ERROR: LVMS upgrade timed out (never progressed beyond ${baseline_version})"
     oc get csv -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_csv.yaml" 2>&1 || true
     oc get pods -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_pods.yaml" 2>&1 || true
     return 1
@@ -329,10 +330,19 @@ function main() {
     current_version=$(get_lvms_version)
     echo "LVMS upgrade: ${current_version:-unknown} -> ${TARGET_LVMS_CHANNEL}"
 
+    # An upgrade test requires a known starting version. If the initial CSV read
+    # yielded nothing, bail out: an empty baseline would let the wait and the
+    # final checks accept the unchanged, pre-upgrade CSV as a successful upgrade.
+    if [[ -z "${current_version}" ]]; then
+        echo "ERROR: could not determine the installed LVMS version before upgrade"
+        oc get csv -n "${LVMS_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/lvms_csv.yaml" 2>&1 || true
+        return 1
+    fi
+
     create_idms
     setup_target_catalogsource
     update_subscription
-    wait_for_upgrade_complete
+    wait_for_upgrade_complete "${current_version}"
 
     local new_version
     new_version=$(get_lvms_version)

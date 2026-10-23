@@ -29,6 +29,10 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: src-oc
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-311:1
+      RUN pip install --no-cache-dir boto3==1.35.99
+    to: quay-sts-tools
 releases:
   latest:
     candidate:
@@ -54,6 +58,7 @@ tests:
       QUAY_INDEX_IMAGE_TAG: quay-5.0__v5.0__quay-rhel9-operator
       QUAY_OPERATOR_CHANNEL: stable-5.0
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_OPERATOR_STS: "true"
       QUAY_STORAGE_PROVIDER: odf
       SETUP_NOOBAA: "true"
     post:
@@ -61,8 +66,10 @@ tests:
     - ref: quay-gather
     - ref: quay-deprovision
     - chain: ipi-aws-post-manual-oidc-sts
+    - ref: quay-sts-cleanup
     pre:
     - chain: ipi-aws-pre-manual-oidc-sts
+    - ref: quay-sts-provision
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art

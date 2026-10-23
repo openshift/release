@@ -9,8 +9,15 @@ ref:
       Which Chainsaw suite(s) to run: "all" runs the ordinary e2e suite, then
       the destructive (ca-rotation, postgres-tls-lifecycle) suite even if e2e
       failed, and fails if either did; "e2e"
-      runs only the ordinary suite, and "destructive" runs only the
-      destructive suite.
+      runs only the ordinary suite, "destructive" runs only the
+      destructive suite, and "sts" runs only the STS/CCO suite.
+  - name: QUAY_OPERATOR_STS
+    default: "false"
+    documentation: |-
+      When "true", first run the STS/CCO suite (make test-e2e-sts) against the
+      role, bucket and namespace that quay-sts-provision wrote to SHARED_DIR,
+      as CHAINSAW_SUITE=sts does. The step fails if it fails, but the
+      selected suite still runs.
   resources:
     requests:
       cpu: 100m
@@ -19,5 +26,5 @@ ref:
   documentation: |-
     Runs Chainsaw e2e tests for the quay-operator from the source repo
     against an OpenShift cluster with ODF and the quay operator bundle
-    installed. CHAINSAW_SUITE selects the ordinary e2e suite, the
-    destructive suite, or both.
+    installed. CHAINSAW_SUITE selects the suites to run, and
+    QUAY_OPERATOR_STS="true" runs the STS suite before them.

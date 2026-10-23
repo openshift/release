@@ -144,6 +144,216 @@ presubmits:
     - ^release-management$
     - ^release-management-
     cluster: build06
+    context: ci/prow/y-upgrade-4.13-e2e-aws-mno-y-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: y-upgrade-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-y-upgrade-4.13-e2e-aws-mno-y-stream-upgrade
+    rerun_command: /test y-upgrade-4.13-e2e-aws-mno-y-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno-y-stream-upgrade
+        - --variant=y-upgrade-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )y-upgrade-4.13-e2e-aws-mno-y-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/y-upgrade-4.13-e2e-aws-sno-y-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: y-upgrade-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-y-upgrade-4.13-e2e-aws-sno-y-stream-upgrade
+    rerun_command: /test y-upgrade-4.13-e2e-aws-sno-y-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno-y-stream-upgrade
+        - --variant=y-upgrade-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )y-upgrade-4.13-e2e-aws-sno-y-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
     context: ci/prow/y-upgrade-4.14-e2e-aws-mno-y-stream-upgrade
     decorate: true
     decoration_config:
@@ -348,6 +558,216 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )y-upgrade-4.14-e2e-aws-sno-y-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/y-upgrade-4.15-e2e-aws-mno-y-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: y-upgrade-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-y-upgrade-4.15-e2e-aws-mno-y-stream-upgrade
+    rerun_command: /test y-upgrade-4.15-e2e-aws-mno-y-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno-y-stream-upgrade
+        - --variant=y-upgrade-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )y-upgrade-4.15-e2e-aws-mno-y-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/y-upgrade-4.15-e2e-aws-sno-y-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: y-upgrade-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-y-upgrade-4.15-e2e-aws-sno-y-stream-upgrade
+    rerun_command: /test y-upgrade-4.15-e2e-aws-sno-y-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno-y-stream-upgrade
+        - --variant=y-upgrade-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )y-upgrade-4.15-e2e-aws-sno-y-stream-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2034,6 +2454,216 @@ presubmits:
     - ^release-management$
     - ^release-management-
     cluster: build06
+    context: ci/prow/z-upgrade-4.13-e2e-aws-mno-z-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: z-upgrade-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-z-upgrade-4.13-e2e-aws-mno-z-stream-upgrade
+    rerun_command: /test z-upgrade-4.13-e2e-aws-mno-z-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno-z-stream-upgrade
+        - --variant=z-upgrade-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )z-upgrade-4.13-e2e-aws-mno-z-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/z-upgrade-4.13-e2e-aws-sno-z-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: z-upgrade-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-z-upgrade-4.13-e2e-aws-sno-z-stream-upgrade
+    rerun_command: /test z-upgrade-4.13-e2e-aws-sno-z-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno-z-stream-upgrade
+        - --variant=z-upgrade-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )z-upgrade-4.13-e2e-aws-sno-z-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
     context: ci/prow/z-upgrade-4.14-e2e-aws-mno-z-stream-upgrade
     decorate: true
     decoration_config:
@@ -2238,6 +2868,216 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )z-upgrade-4.14-e2e-aws-sno-z-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/z-upgrade-4.15-e2e-aws-mno-z-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: z-upgrade-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-z-upgrade-4.15-e2e-aws-mno-z-stream-upgrade
+    rerun_command: /test z-upgrade-4.15-e2e-aws-mno-z-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno-z-stream-upgrade
+        - --variant=z-upgrade-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )z-upgrade-4.15-e2e-aws-mno-z-stream-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/z-upgrade-4.15-e2e-aws-sno-z-stream-upgrade
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: z-upgrade-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-z-upgrade-4.15-e2e-aws-sno-z-stream-upgrade
+    rerun_command: /test z-upgrade-4.15-e2e-aws-sno-z-stream-upgrade
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno-z-stream-upgrade
+        - --variant=z-upgrade-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )z-upgrade-4.15-e2e-aws-sno-z-stream-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3924,6 +4764,216 @@ presubmits:
     - ^release-management$
     - ^release-management-
     cluster: build06
+    context: ci/prow/zstream-4.13-e2e-aws-mno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: zstream-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-zstream-4.13-e2e-aws-mno
+    rerun_command: /test zstream-4.13-e2e-aws-mno
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno
+        - --variant=zstream-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )zstream-4.13-e2e-aws-mno,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/zstream-4.13-e2e-aws-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: zstream-4.13
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-zstream-4.13-e2e-aws-sno
+    rerun_command: /test zstream-4.13-e2e-aws-sno
+    run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno
+        - --variant=zstream-4.13
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )zstream-4.13-e2e-aws-sno,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
     context: ci/prow/zstream-4.14-e2e-aws-disc-mno-qe-integration-tests
     decorate: true
     decoration_config:
@@ -4759,6 +5809,216 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )zstream-4.14-e2e-baremetalds-sno-dualstack-qe-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/zstream-4.15-e2e-aws-mno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: zstream-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-zstream-4.15-e2e-aws-mno
+    rerun_command: /test zstream-4.15-e2e-aws-mno
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-mno
+        - --variant=zstream-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )zstream-4.15-e2e-aws-mno,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-management$
+    - ^release-management-
+    cluster: build06
+    context: ci/prow/zstream-4.15-e2e-aws-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci-operator.openshift.io/variant: zstream-4.15
+      ci.openshift.io/generator: prowgen
+      job-release: "4.15"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-lvm-operator-release-management-zstream-4.15-e2e-aws-sno
+    rerun_command: /test zstream-4.15-e2e-aws-sno
+    run_if_changed: releases/lvm-operator-(catalog-4-15|rhba-v4\.15).*
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-sno
+        - --variant=zstream-4.15
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )zstream-4.15-e2e-aws-sno,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

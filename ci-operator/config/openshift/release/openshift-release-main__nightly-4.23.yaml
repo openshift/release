@@ -1293,8 +1293,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
 - as: e2e-vsphere-ovn-upi-multi-vcenter
@@ -1309,8 +1307,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
 - as: e2e-vsphere-ovn-hybrid-env
@@ -1884,7 +1880,7 @@ tests:
     - env: LEASED_RESOURCE
       resource_type: aws-qe-quota-slice
     workflow: openshift-e2e-aws-shared-vpc-phz
-- as: e2e-agent-compact-fips
+- as: e2e-agent-compact-fips-conformance
   capabilities:
   - intranet
   cron: 0 */12 * * *
@@ -1897,6 +1893,13 @@ tests:
         MASTER_VCPU=8
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
+- as: e2e-agent-compact-fips-install
+  capabilities:
+  - intranet
+  cron: 0 6/12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
   - intranet
@@ -1920,6 +1923,13 @@ tests:
         WORKER_MEMORY=24576
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
+- as: e2e-agent-ha-dualstack-dhcp-install
+  capabilities:
+  - intranet
+  cron: 30 6/12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-ha-dualstack
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
   steps:

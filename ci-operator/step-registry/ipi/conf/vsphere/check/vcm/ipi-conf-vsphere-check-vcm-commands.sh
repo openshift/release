@@ -18,6 +18,9 @@ set -o pipefail
 # RESERVE_EXTRA_NETWORK - Requests an additional network that won't be attached
 #      to cluster nodes. Reserved networks are saved to reserved_networks.json
 #      for later use (e.g., remote worker installation).
+# MIN_VCENTERS - Requires the lease's pools to span at least this many distinct
+#      vCenters (min-vcenters lease support, SPLAT-2993).  Only valid with the
+#      POOL_COUNT single-lease path; must not exceed POOL_COUNT or MAX_VCENTERS.
 ################################################################################
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
@@ -38,11 +41,41 @@ fi
 log "POOLS: ${POOLS}"
 log "POOL_COUNT: ${POOL_COUNT}"
 log "MAX_VCENTERS: ${MAX_VCENTERS}"
+log "MIN_VCENTERS: ${MIN_VCENTERS}"
 
 # Make sure POOLS and POOL_COUNT are not both configured
 if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
   echo "Cannot set both POOL_COUNT and POOLS"
   exit 1
+fi
+
+# MIN_VCENTERS, POOL_COUNT and MAX_VCENTERS are compared arithmetically below
+# and written into the lease spec; reject anything but non-negative integers
+# here so a misconfigured value fails with a clear message instead of a cryptic
+# bash or API-server error.  0 keeps its "disabled" meaning for MIN_VCENTERS.
+for NUMERIC_VAR in MIN_VCENTERS POOL_COUNT MAX_VCENTERS; do
+  if ! [[ "${!NUMERIC_VAR}" =~ ^[0-9]+$ ]]; then
+    echo "${NUMERIC_VAR} must be a non-negative integer, got '${!NUMERIC_VAR}'"
+    exit 1
+  fi
+done
+
+# MIN_VCENTERS requires the single-lease (POOL_COUNT) path and must respect the
+# same bounds VCM enforces on spec.min-vcenters: it cannot exceed the number of
+# pools requested or the vCenters cap.
+if [[ "${MIN_VCENTERS}" != "0" ]]; then
+  if [[ "${POOLS}" != "" ]]; then
+    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
+    exit 1
+  fi
+  if (( 10#${MIN_VCENTERS} > 10#${POOL_COUNT} )); then
+    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed POOL_COUNT (${POOL_COUNT})"
+    exit 1
+  fi
+  if (( 10#${MIN_VCENTERS} > 10#${MAX_VCENTERS} )); then
+    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed MAX_VCENTERS (${MAX_VCENTERS})"
+    exit 1
+  fi
 fi
 
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
@@ -387,7 +420,7 @@ for POOL in "${pools[@]}"; do
   fi
 
   # shellcheck disable=SC1078
-  LEASES+=("$(echo "apiVersion: vspherecapacitymanager.splat.io/v1
+  lease_json=$(echo "apiVersion: vspherecapacitymanager.splat.io/v1
 kind: Lease
 metadata:
   generateName: \"${LEASED_RESOURCE}-\"
@@ -405,10 +438,24 @@ spec:
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
   pools: ${POOL_COUNT}
+  min-vcenters: ${MIN_VCENTERS}
   ${requiredPool}
   ${poolSelector}
   networks: $networks_number
-  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
+  vcenters: ${MAX_VCENTERS}" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f -)
+
+  # An API server serving a VCM CRD that predates min-vcenters (SPLAT-2993)
+  # silently prunes the field instead of rejecting the lease.  Detect that here
+  # so a job requiring a multi-vCenter lease fails loudly instead of running on
+  # fewer vCenters than intended.
+  if [[ "${MIN_VCENTERS}" != "0" ]] && [[ "$(jq -r '.spec["min-vcenters"] // empty' <<<"${lease_json}")" == "" ]]; then
+    log "ERROR: lease was created without the requested min-vcenters (${MIN_VCENTERS})"
+    log "The VCM CRD in vsphere-infra-helpers does not support min-vcenters (SPLAT-2993)."
+    log "Deploy the updated vsphere-capacity-manager before running jobs that set MIN_VCENTERS."
+    exit 1
+  fi
+
+  LEASES+=("$(jq -r '.metadata.name' <<<"${lease_json}")")
 done
 
 log "waiting for lease $(printf '%s ' "${LEASES[@]}") to be fulfilled..."
@@ -667,7 +714,43 @@ fi
 IFS=' ' read -ra NETWORK_RESOURCE <<< "$(jq -r '.metadata.ownerReferences[] | select(.kind=="Network") | .name' < "${SHARED_DIR}"/LEASE_single.json)"
 cp "${SHARED_DIR}/NETWORK_${NETWORK_RESOURCE[0]}.json" "${SHARED_DIR}"/NETWORK_single.json
 
-jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
+# Seed govc.sh from the pool backing failureDomains[0].  status.envVars is VCM's
+# deprecated top-level field and holds the LAST pool's values, which can belong
+# to a different vCenter than failureDomains[0]; a consumer that keeps govc.sh's
+# credentials while targeting another failure domain's server would then fail
+# login.  Each pool's own values are in status.envVarsMap.
+primary_fd_server=$(echo "${platformSpec}" | jq -r '.failureDomains[0].server')
+primary_fd_cluster=$(echo "${platformSpec}" | jq -r '.failureDomains[0].topology.computeCluster')
+primary_pool_name=""
+for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
+  if [[ ${_leaseJSON} =~ "single" ]]; then
+    continue
+  fi
+  _pool_count=$(jq -r '.status.poolInfo | length' < "${_leaseJSON}")
+  if [[ "${_pool_count}" == "null" || "${_pool_count}" -eq 0 ]]; then
+    continue
+  fi
+  for ((_pi = 0; _pi < _pool_count; _pi++)); do
+    _pool_server=$(jq -r ".status.poolInfo[${_pi}].server" < "${_leaseJSON}")
+    _pool_cluster=$(jq -r ".status.poolInfo[${_pi}].topology.computeCluster" < "${_leaseJSON}")
+    if [[ "${_pool_server}" == "${primary_fd_server}" && "${_pool_cluster}" == "${primary_fd_cluster}" ]]; then
+      primary_pool_name=$(jq -r ".status.poolInfo[${_pi}].name" < "${_leaseJSON}")
+      break 2
+    fi
+  done
+done
+
+if [[ -n "${primary_pool_name}" ]]; then
+  log "Seeding govc.sh from pool ${primary_pool_name} (failureDomains[0])"
+  jq -r ".status.envVarsMap.\"${primary_pool_name}\"" < "${_leaseJSON}" > /tmp/envvars
+  # failureDomains[0] already carries this pool's computed resource pool
+  resource_pool=$(echo "${platformSpec}" | jq -r '.failureDomains[0].topology.resourcePool')
+else
+  # Legacy single-pool leases have no poolInfo; their top-level status.envVars
+  # is the pool's own value and safe to seed from.
+  log "No poolInfo entry matches failureDomains[0], seeding govc.sh from status.envVars"
+  jq -r '.status.envVars' "${SHARED_DIR}"/LEASE_single.json > /tmp/envvars
+fi
 
 # shellcheck source=/dev/null
 source /tmp/envvars
@@ -675,6 +758,13 @@ source /tmp/envvars
 
 if [[ -z "${GOVC_URL}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - vcm failed to provide environment variables, exiting"
+  exit 1
+fi
+
+# An empty credential lookup would otherwise surface later as an opaque govc
+# login failure in whichever step consumes govc.sh.
+if [[ -z "${pool_usernames[${GOVC_URL}]:-}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - no credentials found for vCenter ${GOVC_URL}, exiting"
   exit 1
 fi
 
@@ -796,17 +886,39 @@ for LEASE in "${SHARED_DIR}"/LEASE*; do
     continue
   fi
 
-  jq -r .status.envVars "${LEASE}" > /tmp/envvars
+  # A lease can cover multiple pools (POOL_COUNT path) and each pool has its own
+  # portgroup, so DVS info must be gathered per pool from poolInfo/envVarsMap.
+  # Leases without poolInfo (legacy single-pool leases) fall back to the
+  # top-level status fields.
+  dvs_pool_count=$(jq -r '.status.poolInfo | length' "${LEASE}")
+  if [[ "${dvs_pool_count}" != "null" && "${dvs_pool_count}" -gt 0 ]]; then
+    for ((dvs_pool_idx = 0; dvs_pool_idx < dvs_pool_count; dvs_pool_idx++)); do
+      dvs_pool_name=$(jq -r ".status.poolInfo[${dvs_pool_idx}].name" "${LEASE}")
+      jq -r ".status.envVarsMap.\"${dvs_pool_name}\"" "${LEASE}" > /tmp/envvars
 
-  # shellcheck source=/dev/null
-  source /tmp/envvars
+      # shellcheck source=/dev/null
+      source /tmp/envvars
 
-  log "checking ${LEASE} and ${GOVC_NETWORK} for DVS UUID"
+      log "checking ${LEASE} pool ${dvs_pool_name} and ${GOVC_NETWORK} for DVS UUID"
 
-  export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
-  export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+      export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+      export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
 
-  getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+      getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+    done
+  else
+    jq -r .status.envVars "${LEASE}" > /tmp/envvars
+
+    # shellcheck source=/dev/null
+    source /tmp/envvars
+
+    log "checking ${LEASE} and ${GOVC_NETWORK} for DVS UUID"
+
+    export GOVC_USERNAME="${pool_usernames[$vsphere_url]}"
+    export GOVC_PASSWORD="${pool_passwords[$vsphere_url]}"
+
+    getDVSInfo "/${GOVC_DATACENTER}/network/${GOVC_NETWORK}"
+  fi
 done
 
 log "writing the platform spec"

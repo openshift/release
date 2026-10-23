@@ -123,11 +123,24 @@ if [[ "$(oc get network.config cluster -o jsonpath='{.status.clusterNetwork[*].c
     # dual-stack: the agnhost container also lives at 2001:db8:2::100
     agnhost_targets="${agnhost_targets} http://[2001:db8:2::100]:8000/hostname"
 fi
-for target in ${agnhost_targets}; do
-    oc delete pod bgp-ra-datapath-check --ignore-not-found
-    if oc run bgp-ra-datapath-check --restart=Never --attach --rm --pod-running-timeout=5m \
+# The imported route reaches the nodes' kernels and OVN a little after the
+# RR sessions come up (checks 2 and 3 only prove control-plane state), so a
+# single immediate curl can race the datapath convergence. Poll like the
+# other checks instead of asserting on the first attempt.
+# One attempt = pod start (image pull on a cold node can take a while) +
+# a 20s curl; bound the whole attempt so a slow pod start cannot overrun
+# the poll deadline, which poll only checks between attempts.
+datapath_attempt_timeout=120
+check_datapath() {
+    oc delete pod bgp-ra-datapath-check --ignore-not-found &>/dev/null
+    timeout "${datapath_attempt_timeout}" \
+        oc run bgp-ra-datapath-check --restart=Never --attach --rm \
+        --pod-running-timeout="$((datapath_attempt_timeout - 30))s" \
         --image=registry.k8s.io/e2e-test-images/agnhost:2.53 --command -- \
-        curl --max-time 20 -s --fail --show-error -o /dev/null "${target}"; then
+        curl --max-time 20 -s --fail --show-error -o /dev/null "$1"
+}
+for target in ${agnhost_targets}; do
+    if poll 300 check_datapath "${target}"; then
         echo "agnhost reachable from pod network via ${target}"
     else
         fail "pod could not reach agnhost ${target} over the BGP-imported route"
