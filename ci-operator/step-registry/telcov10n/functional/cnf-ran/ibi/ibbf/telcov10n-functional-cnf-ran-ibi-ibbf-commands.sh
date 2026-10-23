@@ -125,23 +125,41 @@ verify_policy_fixture() {
   # could be a GitLab login page. PyYAML is supplied by the Ansible runner.
   python3 - "${POLICY_REPO}" "${POLICY_REVISION}" "${REPLACEMENT_POLICY_PATH}" <<'PY' \
     2>&1 | tee "${REPORT_DIR}/policy-fixture.log"
+import ssl
 import sys
+import urllib.error
 import urllib.request
 import yaml
 
 repo, revision, replacement_path = sys.argv[1:]
 base_path = replacement_path.removesuffix("/ztp-test/ibbf-test")
 
+# Match the IBI mirror step's GitLab TLS workaround without changing global trust.
+# This context is used only for the policy fixture requests below.
+context = ssl._create_unverified_context()
+read_count = 0
+
 def read(path):
+    global read_count
     try:
         url = repo.removesuffix(".git") + "/-/raw/" + revision + "/" + path
-        with urllib.request.urlopen(url, timeout=60) as response:
+        with urllib.request.urlopen(url, timeout=60, context=context) as response:
             result = yaml.safe_load(response.read())
         if not isinstance(result, dict):
-            raise ValueError("Expected a YAML mapping")
+            sys.exit("Policy fixture is not a YAML mapping: " + path)
+        read_count += 1
+        print("Parsed policy fixture: " + path, flush=True)
         return result
-    except Exception:
-        sys.exit("Cannot read policy fixture YAML at the recorded Git revision.")
+    except urllib.error.HTTPError as error:
+        sys.exit(f"Policy fixture {path}: HTTP {error.code}")
+    except urllib.error.URLError as error:
+        sys.exit(f"Policy fixture {path}: transport error ({type(error.reason).__name__})")
+    except (ssl.SSLError, TimeoutError) as error:
+        sys.exit(f"Policy fixture {path}: {type(error).__name__}")
+    except yaml.YAMLError:
+        sys.exit("Policy fixture contains invalid YAML: " + path)
+    except Exception as error:
+        sys.exit(f"Policy fixture {path}: {type(error).__name__}")
 
 def policies(path):
     kustomization = read(path + "/kustomization.yaml")
@@ -168,6 +186,7 @@ spoke = base_path.split("/")[1]
 for name in ("ztp-group.group-du-sno-config-policy", "ztp-site." + spoke + "-config-policy"):
     if name not in replacement or original[name] == replacement[name]:
         sys.exit("Replacement fixture must contain the changed group and site hardware policies.")
+print(f"Successfully downloaded and parsed {read_count} policy fixture files.")
 print("Original and replacement policy fixtures have matching identities and changed hardware settings.")
 print("Policy rendering and synchronization will be checked by Argo CD during handover.")
 PY
@@ -566,8 +585,19 @@ def definitions(templates):
     return result
 
 def matches_spec(actual, expected):
-    # CRD defaults may add top-level fields. Opaque object-template payloads
-    # must match exactly; TALM alone may change inform/enforce during remediation.
+    def normalized(spec):
+        result = dict(spec)
+        if "object-templates" in result:
+            # This typed envelope field defaults on the spoke ConfigurationPolicy.
+            # Keep explicit values and the opaque objectDefinition payload intact.
+            result["object-templates"] = [
+                dict(template, recreateOption=template.get("recreateOption", "None"))
+                for template in result["object-templates"]
+            ]
+        return result
+
+    actual, expected = normalized(actual), normalized(expected)
+    # Preserve the existing top-level defaults and TALM remediationAction handling.
     return all(actual.get(key) == value for key, value in expected.items() if key != "remediationAction")
 
 def activate_replacement_policies():
