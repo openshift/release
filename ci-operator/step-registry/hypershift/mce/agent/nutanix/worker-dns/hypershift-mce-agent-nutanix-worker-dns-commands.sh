@@ -28,13 +28,6 @@ function valid_ipv4() {
     awk -F. 'NF == 4 { for (octet_index = 1; octet_index <= 4; octet_index++) if ($octet_index > 255) exit 1; exit 0 } { exit 1 }' <<<"$1"
 }
 
-function valid_cidr() {
-  local address=${1%/*}
-  local prefix=${1#*/}
-  [[ "$1" == */* && "$prefix" =~ ^[0-9]{1,2}$ ]] &&
-    valid_ipv4 "$address" && (( 10#$prefix >= 8 && 10#$prefix <= 32 ))
-}
-
 function prism() {
   local path=$1
   curl --silent --show-error --fail --insecure --max-time 30 \
@@ -68,23 +61,15 @@ if [[ $(jq -r '.metadata.uuid // empty' <<<"$subnet_json") != "$SUBNET_UUID" ||
   echo "The selected Nutanix subnet no longer matches the Nutanix context."
   exit 1
 fi
-subnet_prefix=$(jq -r '.spec.resources.ip_config.prefix_length // empty' <<<"$subnet_json")
-client_cidr=${NUTANIX_DNS_CLIENT_CIDR:-$SUBNET_IP/$subnet_prefix}
-if ! valid_cidr "$client_cidr"; then
-  echo "Set NUTANIX_DNS_CLIENT_CIDR to the IPv4 CIDR from which the baremetal host sees worker DNS queries."
-  exit 1
-fi
-
 umask 077
 jq -n --arg cluster "$CLUSTER_NAME" --arg subnet "$SUBNET_UUID" --arg subnetName "$SUBNET_NAME" \
   --arg lease "$NUTANIX_QUOTA_SLICE" --arg bind "$bind_ip" --arg advertised "$advertise_ip" \
-  --arg clients "$client_cidr" \
-  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,bindIP:$bind,advertisedIP:$advertised,clientCIDR:$clients}' \
+  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,bindIP:$bind,advertisedIP:$advertised}' \
   > "$STATE_FILE.tmp"
 mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
-  "$CLUSTER_NAME" "$BASE_DOMAIN" "$bind_ip" "$upstream" "$management_ip" "$INGRESS_VIP" "$client_cidr" <<'EOF'
+  "$CLUSTER_NAME" "$BASE_DOMAIN" "$bind_ip" "$upstream" "$management_ip" "$INGRESS_VIP" <<'EOF'
 set -euo pipefail
 
 cluster=$1
@@ -93,7 +78,6 @@ bind_ip=$3
 upstream=$4
 management_ip=$5
 ingress_vip=$6
-client_cidr=$7
 state_dir=/etc/hypershift-nutanix-worker-dns
 config_file="$state_dir/$cluster.conf"
 marker_file="$state_dir/$cluster.state"
@@ -117,7 +101,7 @@ if [[ -z "$zone" || "$zone" == "no zone" ]]; then
 fi
 for protocol in udp tcp; do
   deny_rule="rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
-  allow_rule="rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
+  allow_rule="rule priority=\"-100\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
   for rule in "$allow_rule" "$deny_rule"; do
     if firewall-cmd --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 ||
       firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1; then
@@ -128,7 +112,7 @@ for protocol in udp tcp; do
 done
 
 install -d -m 700 "$state_dir"
-printf '%s %s %s %s\n' "$cluster" "$bind_ip" "$client_cidr" "$zone" > "$marker_file"
+printf '%s %s %s\n' "$cluster" "$bind_ip" "$zone" > "$marker_file"
 chmod 600 "$marker_file"
 cat > "$config_file" <<CONF
 port=53
@@ -153,23 +137,18 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=$dnsmasq_binary --no-daemon --conf-file=$config_file
-Restart=on-failure
-RestartSec=5s
+RuntimeMaxSec=26h
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
 for protocol in udp tcp; do
-  deny_rule="rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
-  allow_rule="rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
-  firewall-cmd --permanent --zone="$zone" --add-rich-rule="$deny_rule"
-  firewall-cmd --zone="$zone" --add-rich-rule="$deny_rule"
-  firewall-cmd --permanent --zone="$zone" --add-rich-rule="$allow_rule"
-  firewall-cmd --zone="$zone" --add-rich-rule="$allow_rule"
+  allow_rule="rule priority=\"-100\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
+  firewall-cmd --zone="$zone" --add-rich-rule="$allow_rule" --timeout=24h
 done
 systemctl daemon-reload
-systemctl enable --now "$unit"
+systemctl start "$unit"
 systemctl is-active --quiet "$unit"
 if command -v dig >/dev/null; then
   api_answer=$(dig +short +time=2 +tries=1 @"$bind_ip" "api.$cluster.$base_domain" A)
@@ -185,7 +164,7 @@ if command -v dig >/dev/null; then
     exit 1
   fi
 fi
-printf 'Worker DNS listens on %s:53 in firewall zone %s for %s.\n' "$bind_ip" "$zone" "$client_cidr"
+printf 'Worker DNS listens on %s:53 in firewall zone %s without a source-IP restriction.\n' "$bind_ip" "$zone"
 EOF
 printf 'Configured worker DNS at %s:53 without changing DHCP on shared subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
   "$advertise_ip" "$SUBNET_NAME"

@@ -233,6 +233,7 @@ if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX
   exit 1
 fi
 
+# TODO: This should be checked after approving them.
 for agent in $agents; do
   oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=Validated --timeout=20m
   agent_json=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json)
