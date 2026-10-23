@@ -92,6 +92,33 @@ tests:
           release/trustyai_odh_bundle.yaml
 
         oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+        # TrustyAIService controller watches InferenceService; without the CRD
+        # controller-runtime never starts that reconciler (no status, no pods).
+        # Stub CRD is enough for watches; full KServe is not required for PVC deploy.
+        oc apply -f - <<'EOF'
+        apiVersion: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        metadata:
+          name: inferenceservices.serving.kserve.io
+        spec:
+          group: serving.kserve.io
+          names:
+            kind: InferenceService
+            listKind: InferenceServiceList
+            plural: inferenceservices
+            singular: inferenceservice
+          scope: Namespaced
+          versions:
+          - name: v1beta1
+            served: true
+            storage: true
+            schema:
+              openAPIV3Schema:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+        EOF
+
         # Webhook Service has no metadata.namespace; without -n it lands in
         # default while the Deployment (and cert mount) are in OPERATOR_NAMESPACE.
         oc apply -n "${OPERATOR_NAMESPACE}" -f release/trustyai_odh_bundle.yaml
