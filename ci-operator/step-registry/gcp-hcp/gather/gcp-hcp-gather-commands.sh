@@ -11,7 +11,7 @@ STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 readonly STARTED_AT
 readonly TEXT_FILE_MAX_BYTES="${GATHER_TEXT_MAX_BYTES:-5242880}"
 readonly CHAI_MAX_BYTES="${GATHER_CHAI_MAX_BYTES:-20971520}"
-readonly GCP_REGION_VALUE="${GCP_REGION:-us-central1}"
+GCP_REGION_VALUE="${GCP_REGION:-}"
 
 mkdir -p "${GATHER_ROOT}"
 temp_root="$(mktemp -d)"
@@ -506,6 +506,15 @@ customer_project="$(read_shared customer-project-id)"
 hosted_cluster="$(read_shared hosted-cluster-name)"
 tested_sha="$(read_shared gcp-hcp-tested-sha)"
 [[ -n "${tested_sha}" ]] || tested_sha="${PULL_PULL_SHA:-${PULL_BASE_SHA:-}}"
+
+# Connect Gateway is regional: env override, then the provisioned region.
+if [[ ! "${GCP_REGION_VALUE}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  GCP_REGION_VALUE="$(read_shared region)"
+fi
+if [[ ! "${GCP_REGION_VALUE}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  GCP_REGION_VALUE="northamerica-northeast2"
+fi
+readonly GCP_REGION_VALUE
 
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 GCPHCPCTL_API_ENDPOINT="$(read_shared api-endpoint)"

@@ -48,12 +48,54 @@ ref:
       under test. "derived" (default) clones the upstream vX.Y.Z tag matching
       the image's version label, else branch redhat-X.Y, else
       PLAYWRIGHT_GIT_FALLBACK_BRANCH, with a warning.
+  - name: PLAYWRIGHT_PHASE
+    default: ""
+    documentation: |-
+      Optional version-control mode for a composed upgrade workflow. "n-minus-one"
+      consumes PLAYWRIGHT_N_MINUS_ONE_* controls and "n" consumes PLAYWRIGHT_N_*
+      controls. Empty retains the normal PLAYWRIGHT_GIT_* behavior.
+  - name: PLAYWRIGHT_N_MINUS_ONE_GIT_REPO
+    default: ""
+    documentation: Explicit repository for the n-1 Playwright suite when PLAYWRIGHT_PHASE=n-minus-one.
+  - name: PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH
+    default: ""
+    documentation: Explicit branch, tag, or commit SHA for the n-1 Playwright suite.
+  - name: PLAYWRIGHT_N_MINUS_ONE_USE_IMAGE_TESTS
+    default: "false"
+    documentation: Use the runner-image suite for the n-1 phase instead of its explicit Git controls.
+  - name: PLAYWRIGHT_N_GIT_REPO
+    default: ""
+    documentation: Explicit repository for the target n Playwright suite when PLAYWRIGHT_PHASE=n.
+  - name: PLAYWRIGHT_N_GIT_BRANCH
+    default: ""
+    documentation: Explicit branch, tag, or commit SHA for the target n Playwright suite.
+  - name: PLAYWRIGHT_N_USE_IMAGE_TESTS
+    default: "false"
+    documentation: Use the runner-image suite for the target n phase instead of its explicit Git controls.
   - name: PLAYWRIGHT_GIT_FALLBACK_BRANCH
     default: "redhat-3.18"
     documentation: |-
       Last-resort branch in PLAYWRIGHT_REF_MODE "derived", cloned when the
       image yields no usable version label or its derived ref cannot be
       fetched from PLAYWRIGHT_GIT_REPO. Unused in "strict".
+  - name: PLAYWRIGHT_REQUIRE_EXPLICIT_REF
+    default: "false"
+    documentation: |-
+      When "true", fail unless PLAYWRIGHT_GIT_REPO and PLAYWRIGHT_GIT_BRANCH
+      are both explicitly set (unless PLAYWRIGHT_USE_IMAGE_TESTS is "true").
+      This lets an upgrade job pin each phase to the intended product version
+      rather than use a derived or fallback branch.
+  - name: PLAYWRIGHT_ARTIFACT_SUBDIR
+    default: ""
+    documentation: |-
+      Optional child directory under ARTIFACT_DIR for this invocation's
+      Playwright artifacts. Use distinct values when this ref runs in multiple
+      phases of one job.
+  - name: PLAYWRIGHT_GREP
+    default: ""
+    documentation: |-
+      Optional positive regex passed to `playwright test --grep`. Unlike
+      PLAYWRIGHT_GREP_INVERT, this selects tests for a tagged smoke phase.
   - name: QUAY_OPERATOR_CHANNEL
     default: "stable-3.16"
     documentation: Installed Quay operator channel (informational in this step).
@@ -64,6 +106,27 @@ ref:
       exclude unsupported auth backends (OIDC/LDAP), all webhook tests (out of
       scope), and tests tracking known product bugs / UI-version gaps. See
       E2E_FAILURE_REPORT.md for the rationale behind each quarantined entry.
+  - name: PLAYWRIGHT_WORKERS
+    default: "2"
+    documentation: |-
+      Playwright worker count passed to `playwright test --workers`. The suite's
+      playwright.config.ts defaults to 4 in CI, but heavy @container pushes and
+      @feature:BUILD_SUPPORT builds contend at that concurrency and time out
+      flakily. Default is 2; raise via the job env (for example "4") when the
+      cluster and Quay load can absorb more parallelism.
+  - name: PLAYWRIGHT_SPYGLASS_TITLE
+    default: "Quay e2e results"
+    documentation: |-
+      Title written into custom-link-quay-results.html when
+      PLAYWRIGHT_WRITE_SPYGLASS_CARD is true. Prow's html lens uses the HTML
+      <title> as the Spyglass section name. e2e-install lanes keep this default.
+  - name: PLAYWRIGHT_WRITE_SPYGLASS_CARD
+    default: "true"
+    documentation: |-
+      When "true" (default), write custom-link-quay-results.html for Prow's
+      Spyglass html lens. Upgrade seed/verify/functional chains set this to
+      "false" so only quay-operator-upgrade-report emits the single upgrade
+      Spyglass card; e2e-install lanes leave the default.
   documentation: |-
     Execute Quay Playwright e2e smoke tests against a deployed Quay instance.
     By default the suite is cloned at runtime from PLAYWRIGHT_GIT_REPO; set

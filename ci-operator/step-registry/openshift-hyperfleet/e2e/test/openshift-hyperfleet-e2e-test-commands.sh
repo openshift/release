@@ -11,6 +11,8 @@ log(){
 }
 
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
+AUTH_MODE=$(cat "${SHARED_DIR}/auth_mode")
+export AUTH_MODE
 
 cp -r /e2e/ /tmp/
 
@@ -25,6 +27,7 @@ if [ -n "$E2E_REF" ]; then
   git clone --branch "$E2E_REF" --depth 1 \
     https://github.com/openshift-hyperfleet/hyperfleet-e2e.git "${SRC_DIR}"
   cd "${SRC_DIR}"
+  log "E2E_REF ${E2E_REF} -> $(git rev-parse HEAD) (binary built from this commit, not the pod image)"
   make build
   # Build ginkgo CLI and test binary for parallel execution. Build the CLI
   # from the cloned module's own go.mod: every supported ref pins ginkgo/v2
@@ -80,10 +83,6 @@ export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # JWT authentication via K8s TokenRequest API
 # The E2E framework acquires a JWT at startup using the SA token
-export HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME="${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME:-default}"
-export HYPERFLEET_IDENTITY_TOKENREQUEST_NAMESPACE="${NAMESPACE}"
-export HYPERFLEET_IDENTITY_EXPECTEDIDENTITY="system:serviceaccount:${NAMESPACE}:${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME}"
-
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
 
 # Copy test binary to writable working directory so ginkgo workers inherit

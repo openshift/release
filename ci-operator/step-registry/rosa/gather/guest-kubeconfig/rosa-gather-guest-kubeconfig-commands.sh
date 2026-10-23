@@ -12,6 +12,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ---- gather eligibility (ocm-fvt deferred-clean jobs) ------------------------
+# When SHARED_DIR/ocm-fvt-gather-eligible exists and is not "true", skip export
+# and clear any stale kubeconfig so gather-must-gather / gather-extra no-op.
+# Missing file = proceed (jobs that do not provision a cluster / legacy callers).
+
+eligible_file="${SHARED_DIR}/ocm-fvt-gather-eligible"
+if [[ -f "${eligible_file}" ]]; then
+  eligible="$(tr -d '[:space:]' < "${eligible_file}")"
+  if [[ "${eligible}" != "true" ]]; then
+    log "ocm-fvt-gather-eligible=${eligible:-empty}; skipping guest kubeconfig (must-gather/extra will no-op)"
+    rm -f "${SHARED_DIR}/kubeconfig"
+    exit 0
+  fi
+  log "ocm-fvt-gather-eligible=true; proceeding with guest kubeconfig export"
+fi
+
+guest_api_reachable() {
+  local kc="$1"
+  [[ -s "${kc}" ]] || return 1
+  command -v oc >/dev/null 2>&1 || return 1
+  oc --kubeconfig="${kc}" --request-timeout=15s --insecure-skip-tls-verify \
+    get ns default >/dev/null 2>&1
+}
+
 # ---- resolve cluster ID -----------------------------------------------------
 
 CLUSTER_ID=""
@@ -30,18 +54,26 @@ if [[ -z "${CLUSTER_ID}" ]]; then
   exit 0
 fi
 
-# Reuse an existing kubeconfig if a prior step already wrote one.
+# Reuse an existing kubeconfig if a prior step already wrote one and API answers.
 if [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
-  log "SHARED_DIR/kubeconfig already present; leaving as-is"
-  exit 0
+  if guest_api_reachable "${SHARED_DIR}/kubeconfig"; then
+    log "SHARED_DIR/kubeconfig already present and guest API reachable; leaving as-is"
+    exit 0
+  fi
+  log "WARNING: SHARED_DIR/kubeconfig present but guest API unreachable; clearing before refresh"
+  rm -f "${SHARED_DIR}/kubeconfig"
 fi
 
 for candidate in "${SHARED_DIR}/guest-kubeconfig" "${SHARED_DIR}/nested-kubeconfig"; do
   if [[ -s "${candidate}" ]]; then
     cp "${candidate}" "${SHARED_DIR}/kubeconfig"
     chmod 0600 "${SHARED_DIR}/kubeconfig"
-    log "Copied ${candidate} -> SHARED_DIR/kubeconfig"
-    exit 0
+    if guest_api_reachable "${SHARED_DIR}/kubeconfig"; then
+      log "Copied ${candidate} -> SHARED_DIR/kubeconfig (guest API reachable)"
+      exit 0
+    fi
+    log "WARNING: ${candidate} copied but guest API unreachable; clearing"
+    rm -f "${SHARED_DIR}/kubeconfig"
   fi
 done
 
@@ -122,10 +154,14 @@ kc_data="$(echo "${kc_json}" | python3 -c "import sys,json; print(json.load(sys.
 if [[ -n "${kc_data}" ]]; then
   printf '%s\n' "${kc_data}" > "${SHARED_DIR}/kubeconfig"
   chmod 0600 "${SHARED_DIR}/kubeconfig"
-  log "Wrote SHARED_DIR/kubeconfig from OCM credentials API"
-  exit 0
+  if guest_api_reachable "${SHARED_DIR}/kubeconfig"; then
+    log "Wrote SHARED_DIR/kubeconfig from OCM credentials API (guest API reachable)"
+    exit 0
+  fi
+  log "WARNING: OCM credentials kubeconfig written but guest API unreachable; clearing and trying backplane"
+  rm -f "${SHARED_DIR}/kubeconfig"
 fi
-log "OCM credentials API did not return a kubeconfig; trying backplane login..."
+log "OCM credentials API did not yield a reachable guest kubeconfig; trying backplane login..."
 
 # ---- backplane fallback -----------------------------------------------------
 
@@ -147,7 +183,12 @@ fi
 if [[ -s "${KUBECONFIG}" ]]; then
   cp "${KUBECONFIG}" "${SHARED_DIR}/kubeconfig"
   chmod 0600 "${SHARED_DIR}/kubeconfig"
-  log "Wrote SHARED_DIR/kubeconfig from backplane login"
+  if guest_api_reachable "${SHARED_DIR}/kubeconfig"; then
+    log "Wrote SHARED_DIR/kubeconfig from backplane login (guest API reachable)"
+  else
+    log "WARNING: backplane kubeconfig written but guest API unreachable; clearing"
+    rm -f "${SHARED_DIR}/kubeconfig"
+  fi
 else
   log "ERROR: Backplane login succeeded but kubeconfig file is empty"
 fi

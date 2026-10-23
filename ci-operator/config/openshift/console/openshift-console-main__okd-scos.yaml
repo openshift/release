@@ -11,6 +11,10 @@ base_images:
     name: scos-5.1
     namespace: origin
     tag: base-stream10
+  origin_scos-5.1_cli-artifacts:
+    name: scos-5.1
+    namespace: origin
+    tag: cli-artifacts
 build_root:
   image_stream_tag:
     name: builder
@@ -33,6 +37,21 @@ images:
         - nodebuilder
         - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.22
     to: console
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.downloads
+    from: origin_scos-5.1_base-stream10
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+        as:
+        - gobuilder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.1
+      origin_scos-5.1_cli-artifacts:
+        as:
+        - origincli
+        - quay.io/openshift/origin-cli-artifacts:5.1
+    to: console-downloads
 promotion:
   to:
   - name: scos-5.1

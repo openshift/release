@@ -207,6 +207,11 @@ def _add_hypershift_resources(gendoc):
                                 }
                             },
                             {
+                                "resources": {
+                                    "requests": {
+                                        "memory": "13Gi"
+                                    },
+                                },
                                 "command": [
                                     "/usr/bin/release-controller",
                                     "--release-namespace=hypershift",
@@ -277,6 +282,11 @@ def _add_hypershift_resources(gendoc):
                     "spec": {
                         "containers": [
                             {
+                                "resources": {
+                                    "requests": {
+                                        "memory": "4Gi"
+                                    },
+                                },
                                 "command": [
                                     "/usr/bin/release-controller-api",
                                     "--release-namespace=hypershift",

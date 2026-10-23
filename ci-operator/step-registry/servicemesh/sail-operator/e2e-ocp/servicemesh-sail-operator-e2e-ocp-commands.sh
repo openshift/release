@@ -123,7 +123,7 @@ check_cluster_operators() {
   exit 1
 }
 
-# run_tests executes the main test command inside the test pod.
+# run_tests executes the main test command inside the test pod via oc rsh.
 run_tests() {
   # Pre-flight check to ensure cluster is stable before running tests
   check_cluster_operators
@@ -151,7 +151,64 @@ run_tests() {
     "
 }
 
-# execute_and_collect_artifacts runs the test suite and copies artifacts.
+# run_tests_local executes the test command directly in the step container.
+# Used when SKIP_BUILD=true: the operator image was already built and pushed by a
+# preceding servicemesh-sail-operator-build-image step. Ginkgo runs in-process;
+# no oc rsh, no oc cp.
+run_tests_local() {
+  check_cluster_operators
+
+  # Resolve image coordinates: prefer values written by the build-image step,
+  # fall back to environment variables set in the CI config.
+  local hub="${HUB:-quay.io/sail-dev}"
+  local tag="${TAG:-}"
+  if [[ -f "${SHARED_DIR}/BUILD_HUB" ]]; then
+    hub=$(cat "${SHARED_DIR}/BUILD_HUB")
+  fi
+  if [[ -f "${SHARED_DIR}/BUILD_TAG" ]]; then
+    tag=$(cat "${SHARED_DIR}/BUILD_TAG")
+  fi
+
+  if [[ -z "${tag}" ]]; then
+    echo "ERROR: Image tag is unset. Set the TAG env var or ensure the build-image step wrote BUILD_TAG to SHARED_DIR." >&2
+    exit 1
+  fi
+
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  export BUILD_WITH_CONTAINER="0"
+  export CI="${CI:-true}"
+  export HUB="${hub}"
+  export TAG="${tag}"
+  export SKIP_BUILD="true"
+  export USE_INTERNAL_REGISTRY="false"
+  export PR_NUMBER="${PULL_NUMBER:-}"
+  export OLM="${OLM:-true}"
+  export GINKGO_LABEL_FILTER="${GINKGO_LABEL_FILTER:-}"
+  export EXPECTED_REGISTRY="${EXPECTED_REGISTRY:-}"
+
+  # VERSIONS_YAML_CONFIG, if set, must be an export assignment of the form
+  # "export VERSIONS_YAML_FILE=<path>". Validate before evaluating to prevent
+  # arbitrary shell execution in CI step container context.
+  if [[ -n "${VERSIONS_YAML_CONFIG:-}" ]]; then
+    if [[ "${VERSIONS_YAML_CONFIG}" =~ ^export[[:space:]]+VERSIONS_YAML_FILE=[^[:space:]\;\|\&\`\$]+$ ]]; then
+      eval "${VERSIONS_YAML_CONFIG}"
+    else
+      echo "ERROR: VERSIONS_YAML_CONFIG has unexpected format: '${VERSIONS_YAML_CONFIG}'" >&2
+      echo "       Expected: export VERSIONS_YAML_FILE=<filename>" >&2
+      exit 1
+    fi
+  fi
+
+  oc project default
+  oc version
+
+  echo "--- Executing E2E Command locally (SKIP_BUILD=true) ---"
+  echo "  HUB=${HUB}  TAG=${TAG}  OLM=${OLM:-true}"
+  echo "  Command: ${E2E_COMMAND:-make test.e2e.ocp}"
+  ${E2E_COMMAND:-make test.e2e.ocp}
+}
+
+# execute_and_collect_artifacts runs the test suite via oc rsh and copies artifacts.
 # Globals:
 #   MAISTRA_NAMESPACE, MAISTRA_SC_POD, ARTIFACT_DIR
 # Arguments:
@@ -201,6 +258,39 @@ execute_and_collect_artifacts() {
   return ${test_rc}
 }
 
+# execute_local runs the test suite directly in the step container and collects
+# artifacts from the local filesystem (no oc cp needed).
+# Arguments:
+#   $1: The attempt number.
+# Returns:
+#   The exit code of the test run.
+execute_local() {
+  local attempt=$1
+  local test_rc=0
+
+  echo "--- Running e2e tests locally (attempt ${attempt}) ---"
+  set +o errexit
+  run_tests_local
+  test_rc=$?
+  echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
+
+  # make test.e2e.ocp writes JUnit to out/report.xml (relative to source root).
+  # Copy all XMLs from out/ into ARTIFACT_DIR so has_junit_reports() can find them.
+  find out/ -name "*.xml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
+
+  # Also check ./test_artifacts/ which some make targets use as the output directory.
+  if [[ -d "./test_artifacts" ]]; then
+    cp -r ./test_artifacts/. "${ARTIFACT_DIR}/" 2>/dev/null || true
+  fi
+
+  echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
+  cp "${ARTIFACT_DIR}/"*.xml "${SHARED_DIR}" 2>/dev/null || true
+
+  set -o errexit
+
+  return ${test_rc}
+}
+
 # has_junit_reports checks if any JUnit XML reports exist in the artifact directory.
 # Globals:
 #   ARTIFACT_DIR
@@ -212,35 +302,73 @@ has_junit_reports() {
 
 # --- Execution ---
 
-# Step 1: Login to quay.io using provided credentials
-if [ -f /tmp/secrets/username ] && [ -f /tmp/secrets/password ]; then
-    echo "Logging into quay.io registry..."
-    QUAY_USERNAME=$(cat /tmp/secrets/username)
-    QUAY_PASSWORD=$(cat /tmp/secrets/password)
-    docker login -u="${QUAY_USERNAME}" -p="${QUAY_PASSWORD}" quay.io
-else
-    echo "Quay.io credentials not found. Exit with failure."
-    exit 1 
-fi
+if [[ "${SKIP_BUILD:-false}" == "true" ]]; then
+  # Helm install path required: the pre-built image is deployed via Helm, not OLM bundle.
+  if [[ "${OLM:-true}" == "true" ]]; then
+    echo "ERROR: SKIP_BUILD=true requires OLM=false. Set OLM=false in the CI config." >&2
+    exit 1
+  fi
 
-# Step 2: Run the tests for the first time
-echo "Starting e2e test execution in pod ${MAISTRA_SC_POD}..."
-execute_and_collect_artifacts 1
-TEST_RC=$?
+  # -----------------------------------------------------------------------
+  # Local execution path (BuildConfig approach)
+  # The operator image was already built and pushed by a preceding
+  # servicemesh-sail-operator-build-image step. Ginkgo runs directly in
+  # this step container; no oc rsh or oc cp required.
+  # -----------------------------------------------------------------------
+  echo "SKIP_BUILD=true: running tests locally (no oc rsh)."
 
-# Step 3: Check for the specific premature exit bug and retry if necessary
-# The bug is identified by a '0' exit code but no JUnit reports being generated.
-if [[ "${TEST_RC}" -eq 0 ]] && ! has_junit_reports; then
-  echo "WARNING: oc rsh exited with 0 but no JUnit report found. This may indicate a known bug (e.g., K8s #130885)."
-  echo "Retrying test execution in ${RETRY_SLEEP_INTERVAL} seconds..."
-  sleep "${RETRY_SLEEP_INTERVAL}"
-
-  echo "Cleaning up resources before retry..."
-  CI=${CI:-true} BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
-
-  # Retry the test execution
-  execute_and_collect_artifacts 2
+  # Step 1: Run the tests for the first time
+  execute_local 1
   TEST_RC=$?
+
+  # Step 2: Retry if no JUnit produced (precaution; should not happen for local runs)
+  if [[ "${TEST_RC}" -eq 0 ]] && ! has_junit_reports; then
+    echo "WARNING: Test exited 0 but no JUnit report found. Retrying in ${RETRY_SLEEP_INTERVAL} seconds..."
+    sleep "${RETRY_SLEEP_INTERVAL}"
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
+    execute_local 2
+    TEST_RC=$?
+  fi
+
+else
+  # -----------------------------------------------------------------------
+  # Legacy pod execution path (oc rsh into MAISTRA_SC_POD)
+  # -----------------------------------------------------------------------
+
+  # Step 1: Login to quay.io using provided credentials
+  if [[ -f /tmp/secrets/username ]] && [[ -f /tmp/secrets/password ]]; then
+      echo "Logging into quay.io registry..."
+      [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+      set +x
+      QUAY_USERNAME=$(cat /tmp/secrets/username)
+      QUAY_PASSWORD=$(cat /tmp/secrets/password)
+      docker login -u="${QUAY_USERNAME}" -p="${QUAY_PASSWORD}" quay.io
+      $WAS_TRACING && set -x
+  else
+      echo "Quay.io credentials not found. Exit with failure."
+      exit 1
+  fi
+
+  # Step 2: Run the tests for the first time
+  echo "Starting e2e test execution in pod ${MAISTRA_SC_POD}..."
+  execute_and_collect_artifacts 1
+  TEST_RC=$?
+
+  # Step 3: Check for the specific premature exit bug and retry if necessary
+  # The bug is identified by a '0' exit code but no JUnit reports being generated.
+  if [[ "${TEST_RC}" -eq 0 ]] && ! has_junit_reports; then
+    echo "WARNING: oc rsh exited with 0 but no JUnit report found. This may indicate a known bug (e.g., K8s #130885)."
+    echo "Retrying test execution in ${RETRY_SLEEP_INTERVAL} seconds..."
+    sleep "${RETRY_SLEEP_INTERVAL}"
+
+    echo "Cleaning up resources before retry..."
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
+
+    # Retry the test execution
+    execute_and_collect_artifacts 2
+    TEST_RC=$?
+  fi
+
 fi
 
 # Step 4: Final validation of artifacts

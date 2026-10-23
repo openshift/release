@@ -3,18 +3,25 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs make git golang
-      RUN ln -s /cli/oc /usr/bin/kubectl
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
 images:
   items:
   - context_dir: tests/
     dockerfile_path: Dockerfile
     from: os
     to: trustyai-service-operator-ci-tests
+  - dockerfile_path: Dockerfile
+    to: trustyai-service-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -43,6 +50,97 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
+    workflow: hypershift-hostedcluster-workflow
+- as: tls-scan-pqc
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "2"
+      OPERATOR_NAMESPACE: opendatahub
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: opendatahub,trustyai-tls-scan
+      SCANNER_NAMESPACE: opendatahub
+      TENANT_NAMESPACE: trustyai-tls-scan
+    test:
+    - as: deploy-and-prepare-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Builder defaults to -mod=vendor; clear so make can install kustomize.
+        export GOFLAGS=''
+
+        # Makefile deploy/manifest-gen invoke kubectl; cli image only ships oc.
+        # Use a writable dir: step pods often run as non-root and cannot write
+        # to /usr/local/bin.
+        if ! command -v kubectl >/dev/null 2>&1; then
+          mkdir -p /tmp/bin
+          ln -sf "$(command -v oc)" /tmp/bin/kubectl
+          export PATH="/tmp/bin:${PATH}"
+        fi
+
+        make manifest-gen \
+          NAMESPACE="${OPERATOR_NAMESPACE}" \
+          OVERLAY=odh \
+          OPERATOR_IMAGE="${OPERATOR_IMAGE}"
+        oc apply -f release/trustyai_odh_bundle.yaml
+
+        oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
+          deployment/trustyai-service-operator-controller-manager --timeout=10m
+
+        # Tenant/workload namespace: TrustyAIService exposes TLS endpoints
+        # (e.g. 4443/8443) that must be PQC-ready for AI Safety.
+        oc create namespace "${TENANT_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<EOF
+        apiVersion: trustyai.opendatahub.io/v1
+        kind: TrustyAIService
+        metadata:
+          name: tls-scan
+          namespace: ${TENANT_NAMESPACE}
+        spec:
+          storage:
+            format: "PVC"
+            folder: "/inputs"
+            size: "1Gi"
+          data:
+            filename: "data.csv"
+            format: "CSV"
+          metrics:
+            schedule: "5s"
+            batchSize: 5000
+          replicas: 1
+        EOF
+
+        # Prefer CR Ready; fall back to Deployment Available for older status shapes.
+        if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Ready \
+          trustyaiservice/tls-scan --timeout=15m; then
+          oc -n "${TENANT_NAMESPACE}" wait --for=condition=Available \
+            deployment -l app.kubernetes.io/name=trustyai-service --timeout=15m
+        fi
+
+        oc -n "${OPERATOR_NAMESPACE}" get pods,svc
+        oc -n "${TENANT_NAMESPACE}" get pods,svc
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: trustyai-service-operator
+      env:
+      - default: opendatahub
+        documentation: Namespace where trustyai-service-operator is deployed.
+        name: OPERATOR_NAMESPACE
+      - default: trustyai-tls-scan
+        documentation: Tenant namespace where TrustyAIService workload is created
+          for scanning.
+        name: TENANT_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h15m0s
+    - ref: tls-scanner-run
     workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main

@@ -18,8 +18,30 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
 fi
 
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+IFS=. read -r CLUSTER_VERSION_MAJOR CLUSTER_VERSION_MINOR <<< "${CLUSTER_VERSION}"
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+# LVMS product images (operator, must-gather, topolvm) carry a RHEL suffix:
+# rhel8 through OpenShift 4.13, rhel9 from 4.14 on.
+# The operator bundle image is unsuffixed.
+LVMS_RHEL_SUFFIX="rhel9"
+if [[ "${CLUSTER_VERSION_MAJOR}" -eq 4 && "${CLUSTER_VERSION_MINOR}" -le 13 ]]; then
+	LVMS_RHEL_SUFFIX="rhel8"
+fi
+echo "Using LVMS product image RHEL suffix: ${LVMS_RHEL_SUFFIX}"
+
+# ImageDigestMirrorSet (config.openshift.io/v1) exists from 4.13 on; 4.12 only has
+# the older ImageContentSourcePolicy. Both express digest mirrors the same way.
+MIRROR_API_VERSION="config.openshift.io/v1"
+MIRROR_KIND="ImageDigestMirrorSet"
+MIRROR_SPEC_FIELD="imageDigestMirrors"
+if [[ "${CLUSTER_VERSION_MAJOR}" -eq 4 && "${CLUSTER_VERSION_MINOR}" -le 12 ]]; then
+	MIRROR_API_VERSION="operator.openshift.io/v1alpha1"
+	MIRROR_KIND="ImageContentSourcePolicy"
+	MIRROR_SPEC_FIELD="repositoryDigestMirrors"
+fi
+echo "Using mirror resource kind: ${MIRROR_KIND}"
 
 if [[ "${LVM_CATALOG_SOURCE}" == "redhat-operators" ]]; then
   if [[ -n "${REDHAT_OPERATORS_INDEX_TAG:-}" ]]; then
@@ -167,6 +189,7 @@ if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
 		"https://api.github.com/repos/openshift/lvm-operator/pulls/${PULL_NUMBER}/files")
 	snapshot=$(echo "${pr_files}" | jq -r \
 		'[.[] | select(.filename | contains("catalog")) | .patch // ""] | join("\n")' \
+		| grep '^+' | grep -v '^+++' \
 		| grep -oP "(?<=snapshot: )${catalog_prefix}\S*" | head -1)
 
 	if [[ -z "${snapshot}" ]]; then
@@ -238,24 +261,24 @@ function disable_default_catalogsource {
 function create_idms_connected {
 
 	cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${MIRROR_API_VERSION}
+kind: ${MIRROR_KIND}
 metadata:
   name: $IDMS_NAME
 spec:
-  imageDigestMirrors:
+  ${MIRROR_SPEC_FIELD}:
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${LVMS_RHEL_SUFFIX}-operator
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - quay.io/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${LVMS_RHEL_SUFFIX}
 EOF
 
 	if [ $? -ne 0 ]; then
@@ -272,24 +295,24 @@ function create_idms_disconnected {
 	echo "Creating ImageDigestMirrorSet for LVMS images in disconnected environment"
 
 	cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: ${MIRROR_API_VERSION}
+kind: ${MIRROR_KIND}
 metadata:
   name: $IDMS_NAME
 spec:
-  imageDigestMirrors:
+  ${MIRROR_SPEC_FIELD}:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-${LVMS_RHEL_SUFFIX}-operator
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
     source: registry.redhat.io/lvms4/lvms-operator-bundle
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/topolvm
-    source: registry.redhat.io/lvms4/topolvm-rhel9
+    source: registry.redhat.io/lvms4/topolvm-${LVMS_RHEL_SUFFIX}
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
     source: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog
@@ -299,13 +322,16 @@ spec:
 EOF
 
 	if [ $? -ne 0 ]; then
-		echo "!!! failed to create ImageDigestMirrorSet for disconnected environment"
+		echo "!!! failed to create ${MIRROR_KIND} for disconnected environment"
 		return 1
 	fi
 
-	echo "ImageDigestMirrorSet $IDMS_NAME created successfully for disconnected environment"
+	echo "${MIRROR_KIND} $IDMS_NAME created successfully for disconnected environment"
 
-	cat <<EOF | oc apply -f -
+	# ImageTagMirrorSet is config.openshift.io/v1 (4.13+) and has no ICSP equivalent
+	# (ICSP mirrors by digest only). Skip tag mirroring on 4.12.
+	if [[ "${MIRROR_KIND}" != "ImageContentSourcePolicy" ]]; then
+		cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
 metadata:
@@ -317,12 +343,15 @@ spec:
     source: registry.redhat.io/rhel8/support-tools
 EOF
 
-	if [ $? -ne 0 ]; then
-		echo "!!! failed to create the ITMS for disconnected environment"
-		return 1
-	fi
+		if [ $? -ne 0 ]; then
+			echo "!!! failed to create the ITMS for disconnected environment"
+			return 1
+		fi
 
-	echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+		echo "ITMS ${IDMS_NAME}-tag created successfully for disconnected environment"
+	else
+		echo "Skipping ImageTagMirrorSet on 4.12 (unsupported; no ICSP tag-mirror equivalent)"
+	fi
 	return 0
 }
 

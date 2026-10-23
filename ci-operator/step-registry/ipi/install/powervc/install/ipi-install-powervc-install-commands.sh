@@ -22,7 +22,7 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.11"
+readonly POWERVC_TOOL_VERSION="v2.4.12"
 readonly YQ_VERSION="v4.53.6"
 readonly IBMCLOUD_VERSION="2.47.1"
 

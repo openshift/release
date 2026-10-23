@@ -17,7 +17,7 @@ SAMPLE_SPREADSHEET_ID = "1g4EFkOrcr6D4WJKo4O8bmOK7txA4ZRTfqFazHtCoM3E"
 # filled with the job data
 # The tab id is available in the URL of the template tab after "gid="
 TEMPLATE_TAB_ID = "1597804194"
-TOKEN_PATH = "/secret/ga-gsheet/googlesheet-api-token"
+TOKEN_PATH = "/secret/googlesheet/api-token"
 GCSWEB_BASE = "https://gcs.ci.openshift.org/gcs/test-platform-results-public"
 TEST_STEPS = [
     "conformance-tests", "csi-conformance-tests",

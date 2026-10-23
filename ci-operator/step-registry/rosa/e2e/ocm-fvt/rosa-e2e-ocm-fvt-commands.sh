@@ -290,16 +290,13 @@ podman_args+=(--rm)
 ocmtest_args=(test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}")
 
 # Defer CleanClusterByProfile to Prow post (rosa-e2e-ocm-fvt-clean) so guest
-# must-gather can run against a live API. GINKGO_SKIP works with current images;
-# OCM_FVT_DEFER_CLEAN is also honored in tear_down once the image picks it up.
-# See ROSAENG-67965.
+# must-gather can run against a live API. Do NOT set GINKGO_SKIP=CleanClusterByProfile:
+# that filters the cleaner to 0 specs and fails --fail-on-empty, marking green
+# test runs as failed. Instead rely on OCM_FVT_DEFER_CLEAN so ocmtest skips the
+# post phase (and tear_down Skip() if post still runs). See ROSAENG-67965.
 if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
-  echo "OCM_FVT_DEFER_CLEAN=true: skipping in-workflow CleanClusterByProfile (Prow post will justClean)"
+  echo "OCM_FVT_DEFER_CLEAN=true: in-workflow post-clean deferred to Prow rosa-e2e-ocm-fvt-clean"
   echo "OCM_FVT_DEFER_CLEAN=true" >> "${podman_env_file}"
-  # Skip the cleaner It even if the image lacks the tear_down Skip() yet.
-  if ! grep -q '^GINKGO_SKIP=' "${podman_env_file}" 2>/dev/null; then
-    echo "GINKGO_SKIP=CleanClusterByProfile" >> "${podman_env_file}"
-  fi
 fi
 
 # ROSAENG-67791: osdfm metrics/alerts query RHOBS (in-cluster prometheus-app-sre PF removed).
@@ -371,10 +368,28 @@ echo "=== ocmci image digest ==="
 podman pull \
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest
-podman inspect \
+[[ $- == *x* ]] && WAS_TRACING_DIGEST=true || WAS_TRACING_DIGEST=false
+set +x
+image_digest="$(podman inspect \
   --format '{{index .RepoDigests 0}}' \
-  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
-  || echo "WARNING: failed to get ocmci image digest"
+  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest 2>/dev/null)" || image_digest=""
+image_digest="${image_digest##*@}"
+if [[ "${image_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  printf '%s\n' "${image_digest}"
+  (
+    umask 022
+    python3 - "${ARTIFACT_DIR}/ocm-fvt-image-digest.txt" "${image_digest}" <<'PY'
+import os
+import sys
+
+with os.fdopen(os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644), "w") as artifact:
+    artifact.write(sys.argv[2] + "\n")
+PY
+  ) 2>/dev/null || echo "WARNING: failed to persist ocmci image digest"
+else
+  echo "WARNING: failed to get ocmci image digest"
+fi
+$WAS_TRACING_DIGEST && set -x
 echo "=========================="
 
 echo "Running ocmtest: ${ocmtest_args[*]}"
@@ -389,15 +404,100 @@ podman run \
   "${zero_egress_env[@]}" \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
+trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
+(echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
+(
+  umask 022
+  python3 - "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-artifact-metadata.json" <<'PY'
+import itertools
+import json
+import os
+import re
+import stat
+import sys
+
+directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+phase_report = re.compile(
+    r"(pre-env-validation|pre-vpc-cleaner|pre-cluster-creation|post-clean)_[0-9]{6}\.(xml|json)"
+)
+
+
+def metadata(parent, name):
+    try:
+        info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+        return {
+            "type": stat.S_IFMT(info.st_mode),
+            "mode": format(stat.S_IMODE(info.st_mode), "04o"),
+            "uid": info.st_uid,
+            "gid": info.st_gid,
+        }
+    except OSError as error:
+        return {"errno": error.errno}
+
+
+def collect(parent, name, result_directory=False):
+    result = metadata(parent, name)
+    if result.get("type") != stat.S_IFDIR:
+        return result
+    try:
+        descriptor = os.open(name, directory_flags, dir_fd=parent)
+    except OSError as error:
+        result["errno"] = error.errno
+        return result
+    try:
+        children = []
+        result["reports" if result_directory else "results"] = children
+        with os.scandir(descriptor) as entries:
+            for index, entry in enumerate(itertools.islice(entries, 129)):
+                if index == 128 or len(children) == (32 if result_directory else 16):
+                    result["truncated"] = True
+                    break
+                if result_directory:
+                    match = phase_report.fullmatch(entry.name)
+                    if entry.name == "report.xml":
+                        label = "merged-xml"
+                    elif match:
+                        label = "-".join(match.groups())
+                    else:
+                        continue
+                    child = metadata(descriptor, entry.name)
+                else:
+                    if not entry.name.startswith("test-result-"):
+                        continue
+                    label = "result-" + str(len(children) + 1)
+                    child = collect(descriptor, entry.name, result_directory=True)
+                children.append(dict(child, label=label))
+    except OSError as error:
+        result["errno"] = error.errno
+    finally:
+        os.close(descriptor)
+    return result
+
+
+groups = os.getgroups()
+with os.fdopen(os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644), "w") as artifact:
+    json.dump({
+        "collector": {
+            "euid": os.geteuid(), "egid": os.getegid(),
+            "groups": groups[:32], "groups_truncated": len(groups) > 32,
+        },
+        "output": collect(None, sys.argv[1]),
+    }, artifact)
+    artifact.write("\n")
+PY
+) 2>/dev/null || echo "WARNING: failed to collect ocm-fvt artifact metadata"
 $WAS_TRACING_RUN && set -x
 
 # Copy merged report.xml (skip per-phase duplicates).
-find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
-  cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"
-done
-
-# Exit code for post-steps (e.g. stage promotion).
-echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
+if ! {
+  find "${ocm_fvt_output}" -type f -name 'report.xml' -print0 | while IFS= read -r -d '' xml_file; do
+    if ! cp "${xml_file}" "${ARTIFACT_DIR}/junit-ocm-fvt-report.xml"; then
+      echo "WARNING: failed to copy ocm-fvt report"
+    fi
+  done
+} 2>/dev/null; then
+  echo "WARNING: failed to scan ocm-fvt reports"
+fi
 
 # Publish cluster id (+ best-effort guest kubeconfig) for post gather steps
 # (rosa-gather-hcp-guest-artifacts / gather-extra). OCM FVT keeps cluster state
@@ -438,6 +538,41 @@ if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
       break
     fi
   done < <(find "${ocm_fvt_output}" -type f \( -name 'kubeconfig' -o -name '*.kubeconfig' \) -print0 2>/dev/null)
+fi
+
+# Gate guest gather (must-gather / gather-extra) when deferred clean is enabled.
+# Write SHARED_DIR/ocm-fvt-gather-eligible=true only when the cluster reached ready
+# (and the guest API still answers if oc is available). When false, clear any
+# stale kubeconfig so post gather steps no-op instead of failing on dead DNS.
+# Jobs that do not provision a cluster omit this flag and do not use the
+# guest-artifacts chain; guest-kubeconfig treats a missing flag as "proceed".
+if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
+  gather_eligible=false
+  cluster_state=""
+  while IFS= read -r -d '' ini; do
+    cluster_state="$(awk -F'=[[:space:]]*' '/^State[[:space:]]*=/{print $2; exit}' "${ini}" | tr -d '[:space:]')"
+    [[ -n "${cluster_state}" ]] && break
+  done < <(find "${ocm_fvt_output}" -type f -name 'cluster.ini' -print0 2>/dev/null)
+
+  if [[ -s "${SHARED_DIR}/cluster-id" && "${cluster_state}" == "ready" ]]; then
+    gather_eligible=true
+    if [[ -s "${SHARED_DIR}/kubeconfig" ]] && command -v oc >/dev/null 2>&1; then
+      if ! oc --kubeconfig="${SHARED_DIR}/kubeconfig" --request-timeout=15s --insecure-skip-tls-verify \
+          get ns default >/dev/null 2>&1; then
+        echo "WARNING: cluster.ini State=ready but guest API unreachable; marking gather ineligible"
+        gather_eligible=false
+      fi
+    fi
+  fi
+
+  printf '%s' "${gather_eligible}" > "${SHARED_DIR}/ocm-fvt-gather-eligible"
+  cp -f "${SHARED_DIR}/ocm-fvt-gather-eligible" "${ARTIFACT_DIR}/ocm-fvt-gather-eligible" 2>/dev/null || true
+  echo "Wrote SHARED_DIR/ocm-fvt-gather-eligible=${gather_eligible} (cluster State=${cluster_state:-unknown})"
+
+  if [[ "${gather_eligible}" != "true" ]]; then
+    rm -f "${SHARED_DIR}/kubeconfig"
+    echo "Cleared SHARED_DIR/kubeconfig; rosa-gather-hcp-guest-artifacts will skip must-gather/extra"
+  fi
 fi
 
 # Persist profile recording (.datainfo + */cluster.ini) for rosa-e2e-ocm-fvt-clean.

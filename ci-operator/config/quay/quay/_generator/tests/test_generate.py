@@ -12,6 +12,7 @@ from generate import (
     GENERATED_HEADER,
     GENERATOR_DIR,
     _check_configs,
+    _hand_maintained,
     _print_list,
     apply_cell_settings,
     apply_kind_settings,
@@ -59,7 +60,8 @@ def _phase0_cell(**kwargs: Any) -> Cell:
 def test_expand_matrix_cells() -> None:
     matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
     cells = expand_cells(matrix)
-    cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64")
+    # The upgrade lane is also redhat-3.18/amd64, so pin this lookup to e2e-install.
+    cell = next(c for c in cells if c.branch == "redhat-3.18" and c.arch == "amd64" and c.test == "e2e-install")
     assert cell.filename == PHASE0_NAME
     assert cell.arch == "amd64"
     assert cell.as_name is None
@@ -77,6 +79,11 @@ def test_expand_matrix_cells() -> None:
     assert master_cell.optional is True
     assert master_cell.quay_version is None
     assert "QUAY_EXTRA_CONFIG" not in cell.env
+
+    upgrade_cell = next(c for c in cells if c.test == "upgrade")
+    assert upgrade_cell.filename == "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
+    assert upgrade_cell.upgrade_from == "3.17"
+    assert upgrade_cell.test_as == "from-317"
 
 
 def test_job_names_have_no_trailing_arch_suffix() -> None:
@@ -345,6 +352,222 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
+def test_upgrade_requires_upgrade_from() -> None:
+    matrix = _matrix_with_job(
+        {"cron": "weekly", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade"}
+    )
+    with pytest.raises(ValueError, match="requires upgrade_from"):
+        expand_cells(matrix)
+
+
+def test_upgrade_from_must_be_x_y() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "v3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="upgrade_from must look like 'X.Y'"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_fips() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "fips": True,
+        }
+    )
+    with pytest.raises(ValueError, match="fips is not supported for test: upgrade"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_non_aws_cloud() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["gcp"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="supports only aws with s3 storage"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_non_s3_storage() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "storage": "odf",
+        }
+    )
+    with pytest.raises(ValueError, match="supports only aws with s3 storage"):
+        expand_cells(matrix)
+
+
+def test_upgrade_from_only_valid_for_upgrade() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "upgrade_from": "3.17",
+        }
+    )
+    with pytest.raises(ValueError, match="upgrade_from is only valid for test: upgrade"):
+        expand_cells(matrix)
+
+
+def test_upgrade_edge_is_derived_from_versions() -> None:
+    # A different n-1 must derive a different source channel / n-1 branch / job name,
+    # with the target derived from quay_version (the branch) — nothing hand-set.
+    cell = _phase0_cell(test="upgrade", upgrade_from="3.16")
+    assert cell.test_as == "from-316"
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    env = config["tests"][0]["steps"]["env"]
+    assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.16"
+    assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
+
+
+def test_ocp_channel_only_valid_for_upgrade() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "ocp_channel": "candidate",
+        }
+    )
+    with pytest.raises(ValueError, match="ocp_channel is only valid for test: upgrade"):
+        expand_cells(matrix)
+
+
+def test_upgrade_rejects_unknown_ocp_channel() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade",
+            "upgrade_from": "3.17",
+            "ocp_channel": "fast",
+        }
+    )
+    with pytest.raises(ValueError, match="ocp_channel must be one of"):
+        expand_cells(matrix)
+
+
+def test_upgrade_nightlies() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    expected = {
+        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": ("from-316", "stable", "4.22", "3.16", "3.17"),
+        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": ("from-317", "stable", "4.22", "3.17", "3.18"),
+        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": ("from-318", "candidate", "5.0", "3.18", "5.0"),
+    }
+    for filename, (as_name, channel, ocp, source, target) in expected.items():
+        config = by_name[filename]
+        assert config["releases"]["latest"] == {
+            "release": {"architecture": "amd64", "channel": channel, "version": ocp}
+        }
+        test = config["tests"][0]
+        assert test["as"] == as_name
+        assert test["cron"] == "@daily"
+        env = test["steps"]["env"]
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+
+
+def test_redhat_318_aws_upgrade_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    assert config["zz_generated_metadata"]["variant"] == "aws-ocp422-s3-upgrade"
+
+    # Upgrade runs on a STABLE OCP release, not a nightly candidate payload.
+    assert config["releases"]["latest"] == {
+        "release": {"architecture": "amd64", "channel": "stable", "version": "4.22"}
+    }
+    assert "candidate" not in config["releases"]["latest"]
+
+    test = config["tests"][0]
+    assert test["as"] == "from-317"
+    assert test["cron"] == "@daily"
+    # The upgrade lane spans cluster install, n-1 seed, channel upgrade and the
+    # full functional suite on top; it needs a larger budget than e2e-install.
+    assert test["timeout"] == "6h0m0s"
+    assert test["steps"]["cluster_profile"] == "aws-quay-qe"
+    assert test["steps"]["workflow"] == "ipi-aws"
+    assert test["steps"]["allow_best_effort_post_steps"] is True
+
+    env = test["steps"]["env"]
+    # The upgrade lane drives the channel move itself; it must NOT pin a single
+    # operator channel (no upgrade step declares QUAY_OPERATOR_CHANNEL).
+    assert "QUAY_OPERATOR_CHANNEL" not in env
+    assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
+    assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_WORKERS"] == "4"
+    assert env["QUAYNAMESPACE"] == "quay"
+    # ART FBC env still comes from the nightly source layer.
+    assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+    # The functional phase reuses the e2e-install quarantine, which must also drop
+    # the specs the seed and verify phases already ran.
+    e2e_env = by_name[PHASE0_NAME]["tests"][0]["steps"]["env"]
+    assert env["PLAYWRIGHT_GREP_INVERT"] == e2e_env["PLAYWRIGHT_GREP_INVERT"]
+    assert {"@upgrade-seed", "@upgrade-verify"} <= set(env["PLAYWRIGHT_GREP_INVERT"].split("|"))
+
+    # The upgrade phase order must be: install n-1 -> seed -> channel upgrade ->
+    # verify/functional Playwright phases -> report gate.
+    steps = test["steps"]["test"]
+    refs = [s.get("ref") or s.get("chain") for s in steps]
+    assert refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-operator-upgrade-install-source",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-provisioning-storage-s3",
+        "quay-install-external-storage",
+        "quay-operator-upgrade-prepare-e2e",
+        "quay-operator-upgrade-seed",
+        "quay-operator-upgrade-channel",
+        "quay-operator-upgrade-verify",
+        "quay-operator-upgrade-functional",
+        "quay-operator-upgrade-report",
+    ]
+
+
 def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
@@ -511,24 +734,27 @@ def test_list_shows_one_row_per_cell_in_grouped_file(capsys: object) -> None:
 
 
 def test_check_clean_after_generate(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    assert (tmp_path / PHASE0_NAME).exists()
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    assert (out / PHASE0_NAME).exists()
+    assert main(["--check", "--output", str(out)]) == 0
 
 
 def test_check_fails_when_stale(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / PHASE0_NAME).write_text("foo: bar\n")
-    assert main(["--check", "--output", str(tmp_path)]) == 1
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    (out / PHASE0_NAME).write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
 
 
 def test_check_ignores_header_and_quoting_drift(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    path = tmp_path / PHASE0_NAME
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    path = out / PHASE0_NAME
     parsed = yaml.safe_load(path.read_text())
     path.write_text("# extra comment\n" + yaml.dump(parsed, sort_keys=False))
     assert yaml.safe_load(path.read_text()) == parsed
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+    assert main(["--check", "--output", str(out)]) == 0
 
 
 def test_check_fails_when_missing(tmp_path: Path) -> None:
@@ -561,12 +787,52 @@ def test_check_fails_when_retired_present(tmp_path: Path) -> None:
     assert _check_configs(results, retired, output_dir) == 1
 
 
-def test_check_ignores_unrelated_branch_neighbors(tmp_path: Path) -> None:
-    assert main(["--output", str(tmp_path)]) == 0
-    (tmp_path / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
-    (tmp_path / "quay-quay-master__claim.yaml").write_text("foo: bar\n")
-    (tmp_path / "quay-quay-master__omr-v3.yaml").write_text("foo: bar\n")
-    assert main(["--check", "--output", str(tmp_path)]) == 0
+def test_check_fails_on_unowned_config(tmp_path: Path) -> None:
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    (out / "quay-quay-redhat-0.0__aws-ocp422-e2e-install.yaml").write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
+
+
+def test_check_fails_on_sibling_repo_filename(tmp_path: Path) -> None:
+    out = tmp_path / "quay"
+    assert main(["--output", str(out)]) == 0
+    sibling = next(p for p in (tmp_path).glob("*/*.yaml") if p.parent != out)
+    (out / sibling.name).write_text("foo: bar\n")
+    assert main(["--check", "--output", str(out)]) == 1
+
+
+def test_check_pins_hand_maintained_tests(tmp_path: Path) -> None:
+    results = _phase0_results()
+    for _group, filename, config in results:
+        (tmp_path / filename).write_text(dump_config(config))
+    hand = {"quay-quay-master__claim.yaml": ["claim-cluster"]}
+    claim = tmp_path / "quay-quay-master__claim.yaml"
+    claim.write_text("tests:\n- as: claim-cluster\n")
+    assert _check_configs(results, [], tmp_path, hand) == 0
+    claim.write_text("tests:\n- as: claim-cluster\n- as: e2e-extra\n")
+    assert _check_configs(results, [], tmp_path, hand) == 1
+
+
+def test_check_fails_on_job_not_from_prowgen(tmp_path: Path) -> None:
+    jobs = tmp_path / "jobs"
+    jobs.mkdir()
+    prowgen = {"name": "generated", "labels": {"ci.openshift.io/generator": "prowgen"}}
+    path = jobs / "quay-quay-master-presubmits.yaml"
+    path.write_text(yaml.dump({"presubmits": {"quay/quay": [prowgen]}}))
+    assert _check_configs([], [], tmp_path, {}, jobs) == 0
+    path.write_text(yaml.dump({"periodics": [prowgen, {"name": "by-hand"}]}))
+    assert _check_configs([], [], tmp_path, {}, jobs) == 1
+
+
+def test_hand_maintained_must_not_be_generated() -> None:
+    matrix = {"managed_files": {"active": [PHASE0_NAME], "hand_maintained": {PHASE0_NAME: []}}}
+    with pytest.raises(ValueError, match="hand_maintained and generated"):
+        _hand_maintained(matrix)
+
+
+def test_repo_check_is_clean() -> None:
+    assert main(["--check"]) == 0
 
 
 def test_managed_files_active_must_match_generated(tmp_path: Path) -> None:
@@ -1147,11 +1413,69 @@ def test_redhat_318_aws_fips_shares_aws_file() -> None:
 
 def test_robot_api_tokens_only_on_quay_5() -> None:
     results, _retired = generate_all()
-    for _group, filename, config in results:
+    for group, filename, config in results:
+        if group[0].test != "e2e-install":
+            continue
         enabled = "redhat-5." in filename
         for test in config["tests"]:
             extra = test["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
             assert ("FEATURE_ROBOT_API_TOKENS: true" in extra) == enabled, (filename, test["as"])
+
+
+def test_redhat_318_database_shares_cloud_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    aws = {test["as"]: test for test in by_name[PHASE0_NAME]["tests"]}
+    assert "aws-s3-rds-nightly" in aws
+    rds = aws["aws-s3-rds-nightly"]
+    assert rds["cron"] == "@weekly"
+    assert {"ref": "quay-database-intg-aws-rds"} in rds["steps"]["test"]
+    assert rds["steps"]["test"].index({"ref": "quay-database-intg-aws-rds"}) < rds[
+        "steps"
+    ]["test"].index({"ref": "quay-deploy-aws-s3"})
+    assert {"ref": "quay-database-intg-aws-rds-deprovision"} in rds["steps"]["post"]
+    assert {"ref": "quay-database-intg-aws-rds"} not in aws["aws-s3-nightly"]["steps"]["test"]
+
+    azure_name = "quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml"
+    azure = {test["as"]: test for test in by_name[azure_name]["tests"]}
+    assert set(azure) == {"azure-blob-nightly", "azure-blob-postgres-nightly"}
+    assert {"ref": "quay-database-intg-azure-postgres"} in azure[
+        "azure-blob-postgres-nightly"
+    ]["steps"]["test"]
+    assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
+        "azure-blob-postgres-nightly"
+    ]["steps"]["post"]
+
+
+def test_database_rejects_unsupported_cloud() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["libvirt"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "database": True,
+        }
+    )
+    with pytest.raises(ValueError, match="database: true is not supported for cloud"):
+        expand_cells(matrix)
+
+
+def test_database_rejects_non_bool() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "weekly",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "database": "yes",
+        }
+    )
+    with pytest.raises(ValueError, match="database must be a boolean"):
+        expand_cells(matrix)
 
 
 def test_fips_rejects_non_bool() -> None:
@@ -1181,6 +1505,57 @@ def test_presubmit_rejects_fips() -> None:
         release_overrides={"branch": "master", "layout": "base"},
     )
     with pytest.raises(ValueError, match="fips is only valid for kind: periodic"):
+        expand_cells(matrix)
+
+
+def test_aws_cells_install_with_sts_by_default() -> None:
+    results, _retired = generate_all()
+    aws = gcp = 0
+    for _group, _filename, config in results:
+        for test in config["tests"]:
+            steps = test["steps"]
+            if steps.get("workflow") == "ipi-aws":
+                aws += 1
+                # e2e-chainsaw appends quay-sts-provision and quay-sts-cleanup.
+                assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+                assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
+            elif steps.get("workflow") == "ipi-gcp":
+                gcp += 1
+                assert "pre" not in steps
+    assert aws and gcp
+
+
+def test_sts_false_opts_out_on_aws() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws", "gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "sts": False,
+        }
+    )
+    assert [cell.sts for cell in expand_cells(matrix)] == [False, False]
+    matrix["quay"][0]["jobs"][0].pop("sts")
+    assert [(cell.cloud, cell.sts) for cell in expand_cells(matrix)] == [
+        ("aws", True),
+        ("gcp", False),
+    ]
+
+
+def test_sts_rejected_without_aws() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["gcp"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "sts": False,
+        }
+    )
+    with pytest.raises(ValueError, match="sts is only valid when clouds include aws"):
         expand_cells(matrix)
 
 

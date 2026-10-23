@@ -405,6 +405,38 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-aws
+- as: e2e-test-hcp-guest-aws-periodic
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: ci-bundle0
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      OO_INSTALL_NAMESPACE: openshift-adp
+      TEST_NAME: e2e-test-hcp-guest-aws-periodic
+      USE_HOSTED_KUBECONFIG: "true"
+      WAIT_FOR_OLM: "true"
+    post:
+    - ref: oadp-analyze-e2e-failure
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        HC_BACKUP_RESTORE_MODE=external \
+        KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig" \
+          HC_NAME="$(cat "${SHARED_DIR}/cluster-name")" \
+          make TEST_HCP_EXTERNAL=true TEST_HCP_GUEST=true test-e2e
+      credentials:
+      - collection: oadp-credentials
+        group: cloud-credentials
+        mount_path: /var/run/oadp-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-operator-sdk-hypershift
 - as: e2e-test-cli-aws-periodic
   cron: 0 2 * * *
   steps:
@@ -418,68 +450,6 @@ tests:
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
       TEST_NAME: e2e-test-cli-aws-periodic
-    post:
-    - ref: oadp-analyze-e2e-failure
-    test:
-    - as: e2e
-      cli: latest
-      commands: make TEST_CLI=true test-e2e
-      credentials:
-      - collection: oadp-credentials
-        group: cloud-credentials
-        mount_path: /var/run/oadp-credentials
-      from: test-oadp-operator
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-aws
-- always_run: false
-  as: e2e-test-aws-allnamespaces
-  optional: true
-  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
-  steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OADP_BRANCH: oadp-dev
-      OO_CHANNEL: dev
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!all'
-      TEST_NAME: e2e-test-aws-allnamespaces
-    post:
-    - ref: oadp-analyze-e2e-failure
-    test:
-    - as: e2e
-      cli: latest
-      commands: make TEST_ALLNAMESPACES=true test-e2e
-      credentials:
-      - collection: oadp-credentials
-        group: cloud-credentials
-        mount_path: /var/run/oadp-credentials
-      from: test-oadp-operator
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-aws
-- always_run: false
-  as: e2e-test-cli-aws-allnamespaces
-  optional: true
-  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
-  steps:
-    cluster_profile: openshift-org-aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OADP_BRANCH: oadp-dev
-      OO_CHANNEL: dev
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!all'
-      TEST_NAME: e2e-test-cli-aws-allnamespaces
     post:
     - ref: oadp-analyze-e2e-failure
     test:
