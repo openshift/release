@@ -12,35 +12,36 @@ resources:
       memory: 200Mi
 tests:
 - as: rebasebot
-  cron: 0 10,14 * * Mon-Fri
+  cron: 42 22 * * Mon-Fri
   steps:
     test:
     - as: rebasebot
       commands: |
         rebasebot --source https://github.com/openperouter/openperouter:main \
                   --dest openshift-kni/openperouter:main \
+                  --post-rebase-hook git:https://github.com/zeeke/openperouter/ds/rebase-bot-hooks:openshift/rebasebot/update_go_modules.sh \
                   --rebase openshift-kni/openperouter:merge-bot-sync-main \
-                  --sync-mode merge \
-                  --github-app-id 173683198 \
-                  --github-app-key /secrets/rebasebot/openshift-rebasebot-key \
-                  --github-cloner-id 173683198 \
-                  --github-cloner-key /secrets/rebasebot/openshift-rebasebot-key \
-                  --git-username "openshift-rebasebot[bot]" \
-                  --git-email 289950310+openshift-rebasebot[bot]@users.noreply.github.com
+                  --github-app-id 5439243 \
+                  --github-app-key /secrets/rebasebot/gh-rebasebot-app-key \
+                  --github-cloner-id 5439243 \
+                  --github-cloner-key /secrets/rebasebot/gh-rebasebot-app-key \
+                  --git-username "openperouter-rebasebot-placeholder[bot]" \
+                  --git-email "346813417+openperouter-rebasebot-placeholder[bot]@users.noreply.github.com" \
+                  --sync-mode merge
       credentials:
-      - mount_path: /secrets/rebasebot
-        name: rebasebot-credentials
-        namespace: test-credentials
+      - collection: openperouter-rebasebot-credentials
+        group: telco-5g-maintainers-konflux
+        mount_path: /secrets/rebasebot
       from_image:
         name: rebasebot
         namespace: ci
         tag: latest
       resources:
         limits:
-          memory: 12Gi
+          memory: 4Gi
         requests:
-          cpu: 800m
-          memory: 2Gi
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-kni
