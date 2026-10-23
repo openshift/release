@@ -90,37 +90,6 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 export EXTRA_FLAGS UUID
 
-# Start periodic pod state capture in background
-POD_CAPTURE_INTERVAL=${POD_CAPTURE_INTERVAL:-60}
-if [[ "${POD_CAPTURE_ENABLED:-true}" == "true" ]]; then
-  POD_STATE_DIR="${ARTIFACT_DIR}/pod-states"
-  mkdir -p "${POD_STATE_DIR}"
-  (
-    while true; do
-      TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-      oc get pods --all-namespaces -o wide > "${POD_STATE_DIR}/pods-${TIMESTAMP}.txt" 2>&1 || true
-      oc get namespaces > "${POD_STATE_DIR}/namespaces-${TIMESTAMP}.txt" 2>&1 || true
-      oc get daemonsets --all-namespaces > "${POD_STATE_DIR}/daemonsets-${TIMESTAMP}.txt" 2>&1 || true
-      for ns in $(oc get namespaces --no-headers -o custom-columns=':metadata.name' 2>/dev/null | grep '^berserker-' || true); do
-        oc get namespace "${ns}" -o yaml > "${POD_STATE_DIR}/namespace-${ns}-${TIMESTAMP}.yaml" 2>&1 || true
-        oc get serviceaccounts -n "${ns}" > "${POD_STATE_DIR}/sa-${ns}-${TIMESTAMP}.txt" 2>&1 || true
-        oc get rolebindings -n "${ns}" > "${POD_STATE_DIR}/rolebindings-${ns}-${TIMESTAMP}.txt" 2>&1 || true
-      done
-      sleep ${POD_CAPTURE_INTERVAL}
-    done
-  ) &
-  POD_CAPTURE_PID=$!
-  echo "Started pod state capture (PID: ${POD_CAPTURE_PID}, interval: ${POD_CAPTURE_INTERVAL}s)"
-fi
-
-cleanup_pod_capture() {
-  if [[ -n "${POD_CAPTURE_PID:-}" ]]; then
-    kill ${POD_CAPTURE_PID} 2>/dev/null || true
-    echo "Stopped pod state capture"
-  fi
-}
-trap cleanup_pod_capture EXIT
-
 set +o errexit
 ./run.sh
 RUN_EXIT_CODE=$?
