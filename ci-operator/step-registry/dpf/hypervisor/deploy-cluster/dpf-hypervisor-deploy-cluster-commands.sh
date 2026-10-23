@@ -5,6 +5,14 @@ export PATH="/cli:${PATH}"
 
 export HOME="/root/dpf-ci"
 
+# UID 1000 has no subuid/subgid ranges and the pod filesystem is already
+# overlay, so rootless podman cannot use the overlay driver. Use vfs.
+mkdir -p "${HOME}/.config/containers"
+cat > "${HOME}/.config/containers/storage.conf" <<'STORAGECFG'
+[storage]
+driver = "vfs"
+STORAGECFG
+
 # A workflow can require an exact version handoff. Validate it before touching
 # the hypervisor, independently of the workflow that supplied the request.
 REQUESTED_DPF_OPENSHIFT_VERSION=""
