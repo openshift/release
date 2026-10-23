@@ -115,6 +115,8 @@ spec:
 EOF
         fi
     else
+        # FORCED PR OVERRIDE: pin catalog resolution to a specific lvm-operator PR
+        PULL_NUMBER=3932
         # Z-stream presubmit: resolve catalog image from PR content
         if [[ -n "${PULL_NUMBER:-}" ]]; then
             echo "Resolving z-stream catalog image for version ${ZSTREAM_VERSION} from PR #${PULL_NUMBER}"

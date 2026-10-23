@@ -176,6 +176,8 @@ resolve_snapshot_to_digest() {
 
 # Z-stream presubmit: resolve catalog image from PR content
 if [[ -n "${ZSTREAM_VERSION:-}" ]]; then
+	# FORCED PR OVERRIDE: pin catalog resolution to a specific lvm-operator PR
+	PULL_NUMBER=3932
 	if [[ -z "${PULL_NUMBER:-}" ]]; then
 		echo "ERROR: ZSTREAM_VERSION is set but PULL_NUMBER is not available"
 		exit 1
