@@ -36,6 +36,8 @@ spec:
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 EOF
+
+sleep 15
 CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE -o name)
 
 oc wait --for=condition=Ready=true $CREATED_POD_NAME -n $TEST_NAMESPACE --timeout=300s
