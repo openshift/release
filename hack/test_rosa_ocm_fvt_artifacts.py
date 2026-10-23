@@ -20,11 +20,59 @@ import tarfile
 import tempfile
 import unittest
 
+import yaml
+
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 STEP = REPOSITORY / "ci-operator/step-registry/rosa/e2e/ocm-fvt"
 SECRET = "FIXTURE_SECRET_DO_NOT_PRINT"
 DIGEST = "sha256:" + "a" * 64
+
+
+def read_yaml(path):
+    """Read repository YAML using the safe loader, with its faster variant if present."""
+    return yaml.load(path.read_text(encoding="utf-8"),
+                     Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
+
+
+def delivery_registry(root, wrapper):
+    """Resolve command symlinks rather than assuming only one ref executes the wrapper."""
+    definitions = {kind: {} for kind in ("ref", "chain", "workflow")}
+    consumers = set()
+    for kind, entries in definitions.items():
+        for path in root.rglob(f"*-{kind}.yaml"):
+            entry = read_yaml(path)[kind]
+            entries[entry["as"]] = entry
+            if kind == "ref" and (path.parent / entry["commands"]).resolve() == wrapper.resolve():
+                consumers.add(entry["as"])
+    return definitions, consumers
+
+
+def expand_delivery_steps(steps, chains, active=()):
+    """Flatten nested chains in execution order, rejecting dependency cycles."""
+    for step in steps or []:
+        if "chain" in step:
+            name = step["chain"]
+            if name in active:
+                raise ValueError("Cyclic step chain")
+            yield from expand_delivery_steps(chains[name]["steps"], chains, (*active, name))
+        else:
+            yield step.get("ref", step.get("as"))
+
+
+def missing_helper_delivery(configuration, definitions, consumers):
+    """Check resolved workflow phases, including explicit phase overrides, for delivery."""
+    for test in configuration.get("tests", []):
+        steps = test.get("steps") or {}
+        workflow = definitions["workflow"].get(steps.get("workflow"), {}).get("steps", {})
+        for phase in ("pre", "test", "post"):
+            sequence = steps.get(phase)
+            if sequence is None:
+                sequence = workflow.get(phase) or []
+            expanded = list(expand_delivery_steps(sequence, definitions["chain"]))
+            for index, name in enumerate(expanded):
+                if name in consumers and (index == 0 or expanded[index - 1] != "rosa-e2e-ocm-fvt-prepare"):
+                    yield test["as"], phase, name
 
 
 def raw_output(base):
@@ -289,15 +337,44 @@ class ArtifactPublicationTests(ArtifactFixture):
         self.assertFalse((self.artifacts / "ocm-fvt-results").exists())
 
     def test_all_consumers_declare_helper_delivery(self):
-        consumers = 0
+        definitions, consumers = delivery_registry(REPOSITORY / "ci-operator/step-registry",
+                                                  STEP / "rosa-e2e-ocm-fvt-commands.sh")
+        self.assertIn("rosa-e2e-ocm-fvt", consumers)
+        self.assertIn("rosa-e2e-ocm-fvt-longrunning", consumers)
+        missing = []
         for config in (REPOSITORY / "ci-operator/config").rglob("*.yaml"):
-            lines = config.read_text(encoding="utf-8").splitlines()
-            for index, line in enumerate(lines):
-                if line.strip() == "- ref: rosa-e2e-ocm-fvt":
-                    self.assertEqual(lines[index - 1].strip(),
-                                     "- ref: rosa-e2e-ocm-fvt-prepare", str(config))
-                    consumers += 1
-        self.assertGreater(consumers, 0)
+            missing.extend((str(config), *failure) for failure in
+                           missing_helper_delivery(read_yaml(config), definitions, consumers))
+        self.assertEqual(missing, [])
+
+    def test_delivery_dependencies_follow_symlinks_chains_and_workflows(self):
+        registry = self.base / "registry"
+        registry.mkdir()
+        wrapper = registry / "original.sh"
+        wrapper.write_text("wrapper", encoding="utf-8")
+        (registry / "alias.sh").symlink_to(wrapper.name)
+        entries = {
+            "ref": {"as": "alias", "commands": "alias.sh"},
+            "chain": {"as": "inner", "steps": [{"ref": "alias"}]},
+            "workflow": {"as": "flow", "steps": {"test": [{"chain": "outer"}]}},
+        }
+        for kind, entry in entries.items():
+            (registry / f"fixture-{kind}.yaml").write_text(yaml.safe_dump({kind: entry}),
+                                                         encoding="utf-8")
+        definitions, consumers = delivery_registry(registry, wrapper)
+        self.assertEqual(consumers, {"alias"})
+        definitions["chain"]["outer"] = {"steps": [{"chain": "inner"}]}
+        configuration = {"tests": [{"as": "fixture", "steps": {"workflow": "flow"}}]}
+        self.assertEqual(list(missing_helper_delivery(configuration, definitions, consumers)),
+                         [("fixture", "test", "alias")])
+        definitions["chain"]["outer"]["steps"].insert(0, {"ref": "rosa-e2e-ocm-fvt-prepare"})
+        self.assertEqual(list(missing_helper_delivery(configuration, definitions, consumers)), [])
+        definitions["chain"]["outer"]["steps"].pop(0)
+        configuration["tests"][0]["steps"]["test"] = []
+        self.assertEqual(list(missing_helper_delivery(configuration, definitions, consumers)), [])
+        definitions["chain"]["inner"]["steps"] = [{"chain": "outer"}]
+        with self.assertRaises(ValueError):
+            list(expand_delivery_steps([{"chain": "outer"}], definitions["chain"]))
 
     @unittest.skipIf(os.geteuid() == 0, "Permission denial requires an unprivileged fixture user")
     def test_censor_temporary_file_and_atomic_replacement(self):

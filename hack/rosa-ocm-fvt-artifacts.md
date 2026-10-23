@@ -10,7 +10,9 @@ shellcheck -S warning ci-operator/step-registry/rosa/e2e/ocm-fvt/rosa-e2e-ocm-fv
 
 The registry delivers only each ref's declared command body, not sibling files.
 Every consuming job declares `rosa-e2e-ocm-fvt-prepare` immediately before
-`rosa-e2e-ocm-fvt`. The prepare ref uses `run_as_script: true`: ci-operator mounts
+`rosa-e2e-ocm-fvt` or `rosa-e2e-ocm-fvt-longrunning`. The longrunning command is a
+Git symlink to the same wrapper, not an independent implementation. The prepare
+ref uses `run_as_script: true`: ci-operator mounts
 its Python command from the workflow commands ConfigMap and executes its shebang.
 That command copies its own source exclusively into
 `${SHARED_DIR}/ocm-fvt-artifacts.py` with mode 0600. Shared-state transfer carries that
@@ -26,6 +28,12 @@ temporary mount, removes that mount, and runs the wrapper using the installed
 helper. It mocks Podman, not the production filesystem publication code. Registry resolution,
 shellcheck and generated registry metadata have separate repository CI checks;
 the fixture is a standalone focused behavioral check.
+
+The fixture requires PyYAML, also supplied by the repository Python validation
+image. Its delivery regression resolves ref command symlinks and expands nested
+chains and workflow defaults (respecting phase overrides), rather than checking
+only the primary ref name. A synthetic missing-prepare dependency must fail before
+adding preparation makes the same dependency pass.
 
 Delivery follows ci-tools `pkg/load/load.go:loadReference` (one command body),
 `pkg/steps/multi_stage/init.go:createCommandConfigMaps` (bodies keyed by step), and
