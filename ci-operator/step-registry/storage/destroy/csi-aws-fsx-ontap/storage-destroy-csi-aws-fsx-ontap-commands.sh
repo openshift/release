@@ -98,13 +98,25 @@ gather_diagnostics() {
 delete_test_pvcs() {
   [[ -s "${KUBECONFIG}" ]] || return 0
 
-  local namespace name
+  local namespace name target_pvcs
+  target_pvcs="$(oc get pvc --all-namespaces -o json 2>/dev/null | jq '[.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | "\(.metadata.namespace)/\(.metadata.name)"]' || true)"
+  [[ -n "${target_pvcs}" ]] || target_pvcs='[]'
+
+  # PVC protection prevents deletion until every pod that mounts the claim is gone.
+  while read -r namespace name; do
+    [[ -n "${namespace}" && -n "${name}" ]] || continue
+    oc delete pod "${name}" --namespace "${namespace}" --ignore-not-found --wait=false || record_failure "could not delete pod ${namespace}/${name} using an FSxN test PVC"
+  done < <(oc get pod --all-namespaces -o json 2>/dev/null | jq -r --argjson target_pvcs "${target_pvcs}" '.items[] | . as $pod | select(any(.spec.volumes[]?; .persistentVolumeClaim? as $claim | $claim != null and ($target_pvcs | index("\($pod.metadata.namespace)/\($claim.claimName)")))) | "\(.metadata.namespace) \(.metadata.name)"' || true)
+
   while read -r namespace name; do
     [[ -n "${namespace}" && -n "${name}" ]] || continue
     oc delete pvc "${name}" --namespace "${namespace}" --ignore-not-found --wait=false || record_failure "could not delete PVC ${namespace}/${name}"
   done < <(oc get pvc --all-namespaces -o json 2>/dev/null | jq -r '.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | "\(.metadata.namespace) \(.metadata.name)"' || true)
 
-  wait_for 900 10 "FSxN test PVC cleanup" test_pvcs_removed || true
+  if ! wait_for_test_pvcs; then
+    clear_test_volume_finalizers
+    wait_for 120 10 "forced FSxN test PVC cleanup" test_pvcs_removed || true
+  fi
   oc delete namespace fsxn-trident-smoke --ignore-not-found --wait=true --timeout=15m || record_failure "could not delete smoke-test namespace"
 }
 
@@ -112,6 +124,36 @@ test_pvcs_removed() {
   local remaining
   remaining="$(oc get pvc --all-namespaces -o json 2>/dev/null | jq '[.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks")] | length')"
   [[ "${remaining}" == "0" ]]
+}
+
+wait_for_test_pvcs() {
+  local deadline=$(( $(date +%s) + 900 ))
+
+  until test_pvcs_removed; do
+    [[ $(date +%s) -lt ${deadline} ]] || return 1
+    sleep 10
+  done
+}
+
+clear_test_volume_finalizers() {
+  local namespace name
+
+  # Trident may be unavailable after a failed teardown. These claims and
+  # volumes belong solely to the CI StorageClasses, so unblock their deletion.
+  while read -r namespace name; do
+    [[ -n "${namespace}" && -n "${name}" ]] || continue
+    oc patch pvc "${name}" --namespace "${namespace}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on PVC ${namespace}/${name}"
+  done < <(oc get pvc --all-namespaces -o json 2>/dev/null | jq -r '.items[] | select((.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") and .metadata.deletionTimestamp != null) | "\(.metadata.namespace) \(.metadata.name)"' || true)
+
+  while read -r name; do
+    [[ -n "${name}" ]] || continue
+    oc delete pv "${name}" --ignore-not-found --wait=false || record_failure "could not delete PV ${name}"
+  done < <(oc get pv -o json 2>/dev/null | jq -r '.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | .metadata.name' || true)
+
+  while read -r name; do
+    [[ -n "${name}" ]] || continue
+    oc patch pv "${name}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on PV ${name}"
+  done < <(oc get pv -o json 2>/dev/null | jq -r '.items[] | select((.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") and .metadata.deletionTimestamp != null) | .metadata.name' || true)
 }
 
 clear_trident_finalizers() {
@@ -149,6 +191,30 @@ cleanup_trident() {
 
   clear_trident_finalizers
   oc delete namespace "${TRIDENT_NAMESPACE}" --ignore-not-found --wait=true --timeout=10m || record_failure "could not delete Trident namespace"
+}
+
+svm_data_volumes_removed() {
+  local svm_id="$1"
+  local remaining
+  remaining="$(aws fsx describe-volumes --filters "Name=storage-virtual-machine-id,Values=${svm_id}" --query 'length(Volumes[?OntapConfiguration.StorageVirtualMachineRoot==`false`])' --output text)"
+  [[ "${remaining}" == "0" ]]
+}
+
+delete_svm_data_volumes() {
+  local svm_id="$1" volume_ids volume_id
+  [[ -n "${svm_id}" ]] || return 0
+
+  # The SVM is dedicated to this CI environment. Remove orphaned Trident
+  # volumes so a failed Kubernetes cleanup cannot block SVM deletion.
+  volume_ids="$(aws fsx describe-volumes --filters "Name=storage-virtual-machine-id,Values=${svm_id}" --query 'Volumes[?OntapConfiguration.StorageVirtualMachineRoot==`false`].VolumeId' --output text)" || {
+    record_failure "could not list FSx volumes for SVM ${svm_id}"
+    return 0
+  }
+  for volume_id in ${volume_ids}; do
+    [[ "${volume_id}" == "None" ]] && continue
+    aws fsx delete-volume --volume-id "${volume_id}" >/dev/null 2>&1 || record_failure "could not delete FSx volume ${volume_id}"
+  done
+  wait_for 1200 20 "FSx SVM ${svm_id} data volume deletion" svm_data_volumes_removed "${svm_id}" || true
 }
 
 delete_svm() {
@@ -206,11 +272,13 @@ main() {
 
   if [[ -n "${region}" ]]; then
     cleanup_trident
+    delete_svm_data_volumes "${svm_id}"
     delete_svm "${svm_id}"
     delete_filesystem "${filesystem_id}"
     delete_security_group "${security_group}"
   else
     cleanup_trident
+    delete_svm_data_volumes "${svm_id}"
     if [[ -n "${filesystem_id}" || -n "${svm_id}" || -n "${security_group}" ]]; then
       record_failure "FSxN cleanup state is incomplete: ${SHARED_DIR}/fsxn-region is missing"
     fi
