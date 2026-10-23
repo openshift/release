@@ -784,10 +784,19 @@ tests:
     cluster_profile: vsphere-dis-2
     env:
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build05.ci.openshift.org/ci-ln-yg5q0z2/release:latest
-      TIMEOUT: +6 hours
+      PULL_THROUGH_CACHE: disabled
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: ipi-install-rbac
+    - chain: vsphere-provision-bastionhost
+    - ref: mirror-images-by-oc-adm-in-bastion
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-install
+    - ref: ipi-install-vsphere-registry
     test:
     - ref: wait
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
