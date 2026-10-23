@@ -15,8 +15,9 @@ omits the step at configuration resolution time instead.
 The existing `rosa-cluster-deprovision` chain remains the indexing-capable
 path: `gather`, `rosa-cluster-deprovision`, then `rosa-cluster-index`.
 Workflows such as `rosa-aws-sts-hcp` and `rosa-aws-sts-hcp-mp` still select
-that chain. Jobs using those workflows enable uploads with
-`INDEX_ENABLED: "true"`; their indexing step and credentials are unchanged.
+`rosa-aws-sts-hcp-deprovision`, which includes that chain. Jobs using those
+workflows enable uploads with `INDEX_ENABLED: "true"`; their indexing step and
+credentials are unchanged.
 
 To enable indexing in a ROSA E2E job, explicitly supply the workflow's
 complete `steps.post` list in the job configuration, replacing only
