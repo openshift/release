@@ -1,8 +1,9 @@
 workflow:
-  as: hypershift-kubevirt-baremetalds-conformance-cilium
+  as: hypershift-mce-kubevirt-baremetalds-conformance-cilium
   documentation: |-
-    Executes tests against a new ephemeral HyperShift cluster with Cilium CNI.
-    Administrative access to the control plane is provided via the `KUBECONFIG`
+    Executes conformance tests against a new ephemeral HyperShift KubeVirt cluster
+    managed by MCE with Cilium CNI installed in the hosted cluster.
+    Administrative access to the hosted cluster is provided via the `KUBECONFIG`
     environment variable.
 
     Learn more about HyperShift here: https://github.com/openshift/hypershift
@@ -10,10 +11,10 @@ workflow:
     Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
   steps:
     post:
-    - chain: hypershift-dump
+    - ref: hypershift-mce-dump
     - chain: gather-core-dump
     - chain: cilium-dump
-    - chain: hypershift-kubevirt-destroy
+    - chain: hypershift-mce-kubevirt-destroy
     - chain: baremetalds-ofcir-post
     test:
     - chain: hypershift-conformance
@@ -26,24 +27,24 @@ workflow:
     - chain: hypershift-kubevirt-baremetalds-metallb
     - chain: hypershift-kubevirt-baremetalds-odf
     - ref: hypershift-kubevirt-install
-    - ref: hypershift-install
+    - ref: hypershift-mce-install
     - ref: hypershift-kubevirt-create
     - ref: hypershift-kubevirt-baremetalds-proxy
     - ref: cucushift-hypershift-extended-cilium
     - ref: cucushift-hypershift-extended-cilium-network-policies
     - ref: cucushift-hypershift-extended-cilium-health-check
     env:
-      HYPERSHIFT_NETWORK_TYPE: "Other" # Required for Cilium.
+      HYPERSHIFT_NETWORK_TYPE: "Other"
       TUNNEL_PORT: "4790"
       CNI_PROVIDER: "cilium"
       KONFLUX_DEPLOY_OPERATORS: "false"
       KONFLUX_TARGET_OPERATORS: metallb,local-storage
       CLUSTERTYPE: host_384gb_el9
-      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
-      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: local-storage-konflux
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
       ETCD_STORAGE_CLASS: lvms-vg1
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
         access to server in CIDR block\| Netpol NetworkPolicy between server and client
