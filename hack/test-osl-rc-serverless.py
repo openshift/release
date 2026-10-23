@@ -11,7 +11,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / (
     "ci-operator/step-registry/redhat-developer/rhdh-plugin-export-overlays/"
-    "ocp/helm/osl/rc/"
+    "ocp/helm/"
     "redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc-commands.sh"
 )
 SOURCE = SCRIPT.read_text()
