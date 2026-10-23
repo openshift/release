@@ -92,10 +92,11 @@ tests:
           release/trustyai_odh_bundle.yaml
 
         oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-        oc apply -f release/trustyai_odh_bundle.yaml
+        # Webhook Service has no metadata.namespace; without -n it lands in
+        # default while the Deployment (and cert mount) are in OPERATOR_NAMESPACE.
+        oc apply -n "${OPERATOR_NAMESPACE}" -f release/trustyai_odh_bundle.yaml
 
-        # Pod mounts webhook-server-cert from OpenShift service-ca. Ensure the
-        # annotation is present and wait until the secret exists (not Ready).
+        # Pod mounts webhook-server-cert from OpenShift service-ca on the webhook Service.
         oc -n "${OPERATOR_NAMESPACE}" annotate service/trustyai-service-operator-webhook-service \
           service.beta.openshift.io/serving-cert-secret-name=webhook-server-cert --overwrite
         echo "Waiting for secret/webhook-server-cert..."
