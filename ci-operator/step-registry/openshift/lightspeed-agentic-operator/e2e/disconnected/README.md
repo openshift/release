@@ -1,6 +1,6 @@
 # Agentic OLS disconnected GPU periodic (OLS-4227)
 
-Job: `periodic-ci-openshift-lightspeed-agentic-operator-main-5.0-e2e-disconnected-gemma`
+Job: `periodic-ci-openshift-lightspeed-agentic-operator-main-5.0-e2e-disconnected-qwen`
 
 Schedule: Sunday at **08:10 UTC** (`10 8 * * 0`). Job timeout is 18 hours;
 connected provisioning is bounded to 2 hours and the core product suite to 12 hours.
@@ -10,7 +10,8 @@ connected provisioning is bounded to 2 hours and the core product suite to 12 ho
 The job claims the existing `obs` OCP **5.0**, AWS/amd64 GPU pool. Selectors use
 **us-east-1**, matching the pool's actual metadata and AWS configuration, even
 though its manifest filename ends in `aws-us-east-2_clusterpool.yaml`.
-The pool uses `g5.12xlarge` workers for the four-GPU Gemma 4 profile.
+The pool uses `g5.12xlarge` workers; their four A10G GPUs serve the four-GPU
+model profiles, and the job selects Qwen 3.8 via `VLLM_MODEL_PROFILE`.
 
 The operator image is built from the periodic's source checkout. Prow also
 generates an ordinary `5.0-images` presubmit to validate that image build.
@@ -19,11 +20,14 @@ The runner build-root includes Python, jq, gettext/envsubst, and util-linux
 
 Credentials reuse `openshift-lightspeed-service-creds`:
 
-- `huggingface/token`: must have access to the gated Gemma model/template.
+- `huggingface/token`: must have access to the selected model and its chat template (Qwen 3.8 by default).
 - `vllm-apikey/token`: authenticated inference key.
 
 `LIGHTSPEED_SERVICE_REF` in the CI config pins a merged upstream service commit
-with `tests/rhoai` Gemma 4 assets. Update deliberately when changing provisioning.
+with `tests/rhoai` assets for the selected profile; it must contain the
+`qwen-3.8-27b` profile and the model-cache PVC manifest. Update deliberately
+when changing provisioning, and keep it in sync with the service PR merge
+order: the referenced commit must exist on `main` before this job runs.
 The operator's `make product-e2e-disconnected` entrypoint (OLS-4226) must be present
 on `main`; this was verified against upstream during implementation.
 
@@ -45,7 +49,8 @@ skill mapping to the existing suite. If core scenarios introduce another skill
 image, extend mirroring/mapping here; unmapped external images fail closed rather
 than falling back to external pulls. This is not a scenario allowlist.
 
-The existing product harness provisions RHOAI/KServe/Gemma while connected, then
+The existing product harness provisions RHOAI/KServe with the selected
+`VLLM_MODEL_PROFILE` while connected, then
 runs `product_e2e` with `E2E_SCENARIO_TAGS=core`, preflight checks, and its
 NetworkPolicy-based restricted sandbox boundary. This is restricted runtime E2E,
 not an air-gapped cluster installation. There is no LSEval or external LLM provider.
