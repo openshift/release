@@ -35,14 +35,21 @@ _opp_cleanup() {
 # --- Atomic JUnit Writer (INTEROP-9527) ---
 _junit_emit_safe() {
   local kind="$1" message="$2" rc="${3:-0}"
+  # XML-escape kind and message to prevent malformed JUnit output
+  # when error strings contain XML special characters (& < > " ').
+  # _xml_escape is defined later in this file but that is fine —
+  # bash resolves function names at call time, not definition time.
+  local safe_kind safe_message
+  safe_kind="$(_xml_escape "${kind}")"
+  safe_message="$(_xml_escape "${message}")"
   local tmpf
   tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
-  <testcase name="${kind}">
-    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
+  <testcase name="${safe_kind}">
+    $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${safe_message}" "${rc}" )
   </testcase>
 </testsuite>
 XMLEOF
@@ -468,6 +475,9 @@ _xml_escape() {
     text="${text//>/\&gt;}"
     text="${text//\"/\&quot;}"
     text="${text//\'/\&apos;}"
+    text="${text//$'\n'/\&#10;}"
+    text="${text//$'\t'/\&#9;}"
+    text="${text//$'\r'/\&#13;}"
     printf '%s' "${text}"
 }
 
@@ -518,7 +528,8 @@ _finalize_exit() {
   if [[ -n "${_JUNIT_KIND}" ]]; then
     _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
   fi
-  # Product no-op results should not emit trace or cluster diagnostics.
+  # Product no-op results remain visible as JUnit failures, but are valid
+  # outcomes that exit 0 without emitting trace or cluster diagnostics.
   if [[ "${_EXIT_CLASS}" == "product" ]]; then
     (exit 0); _opp_cleanup
     exit 0
@@ -595,7 +606,7 @@ function Main () {
       _JUNIT_KIND="acm-upgrade-not-needed"
       _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
       _EXIT_CLASS="product"
-      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+      return 1   # Keep JUnit failing; the product finalizer makes the process exit 0.
     elif (( resolve_rc != 0 )); then
       _JUNIT_KIND="resolve-target-channel"
       _JUNIT_MESSAGE="ResolveTargetChannel failed"
@@ -688,6 +699,31 @@ function Main () {
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
+
+    # --- Missing version guard (INTEROP-9527) ---
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Pre-upgrade ACM version is empty; cannot verify transition"
+        _JUNIT_KIND="version-missing"
+        _JUNIT_MESSAGE="Pre-upgrade ACM version is empty; cannot verify transition"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+    if [[ -z "${newVersion}" ]]; then
+        echo >&2 "ERROR: Post-upgrade ACM version is empty; cannot verify transition"
+        _JUNIT_KIND="version-missing"
+        _JUNIT_MESSAGE="Post-upgrade ACM version is empty; cannot verify transition"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
+
+    # --- Version transition check (INTEROP-9527) ---
+    if [[ "${newVersion}" == "${currentVersion}" ]]; then
+        echo >&2 "WARNING: ACM version did not change after upgrade (${currentVersion})"
+        _JUNIT_KIND="version-unchanged"
+        _JUNIT_MESSAGE="ACM version did not change after channel switch: still ${currentVersion}"
+        _EXIT_CLASS="infra"
+        return 1
+    fi
 
     typeset _acm_upgrade_output=""
     if ! _acm_upgrade_output="$(ValidateMceUpgrade 2>&1)"; then

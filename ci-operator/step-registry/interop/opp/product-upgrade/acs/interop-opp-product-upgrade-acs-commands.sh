@@ -112,15 +112,28 @@ function GetCsvPhase () {
 }
 
 function GetInstalledVersion () {
-    # Return the installed operator version from the current CSV spec.
-    typeset csvName
-    csvName="$(GetCurrentCsv)"
+    # Return the installed operator version from the current or given CSV spec.
+    typeset csvName="${1:-}"
+    if [[ -z "${csvName}" ]]; then
+        csvName="$(GetCurrentCsv)"
+    fi
     if [[ -z "${csvName}" ]]; then
         return 1
     fi
     oc get csv "${csvName}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.version}' || true
+}
+
+function RequireInitialVersion () {
+    # Verify the captured pre-upgrade operator version is nonempty before any mutation.
+    typeset version="${1:-}"
+    if [[ -z "${version}" ]]; then
+        echo >&2 "ERROR: Cannot determine pre-upgrade operator version; aborting before mutation"
+        return 3
+    fi
+    echo "${version}"
+    return 0
 }
 
 function GetCurrentChannel () {
@@ -167,6 +180,11 @@ function ResolveTargetChannel () {
     typeset currentVersion nextChannel=""
     currentVersion="$(echo "${currentChannel}" | grep -oE '[0-9]+\.[0-9]+' || true)"
 
+    if [[ -z "${currentVersion}" ]]; then
+        echo >&2 "ERROR: current ACS channel '${currentChannel}' is unversioned; set ACS_TARGET_CHANNEL explicitly"
+        return 3
+    fi
+
     typeset -a channelList
     read -ra channelList <<< "${channels}"
     for ch in "${channelList[@]}"; do
@@ -174,10 +192,6 @@ function ResolveTargetChannel () {
         chVersion="$(echo "${ch}" | grep -oE '[0-9]+\.[0-9]+' || true)"
         if [[ -z "${chVersion}" ]]; then
             continue
-        fi
-        if [[ -z "${currentVersion}" ]]; then
-            nextChannel="${ch}"
-            break
         fi
         typeset currentMajor currentMinor chMajor chMinor
         currentMajor="${currentVersion%%.*}"
@@ -274,8 +288,12 @@ function ValidateAcsHealth () {
     # Check Central, SecuredCluster, and key deployment availability post-upgrade.
     echo "Validating ACS health post-upgrade..."
 
-    typeset centralNs
-    centralNs="$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)"
+    typeset centralNamespaces centralNs
+    if ! centralNamespaces="$(oc get central -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}')"; then
+        echo >&2 "ERROR: Unable to query required Central CR"
+        return 1
+    fi
+    centralNs="${centralNamespaces%%$'\n'*}"
 
     if [[ -z "${centralNs}" ]]; then
         echo "WARNING: No Central CR found; skipping Central validation"
@@ -305,8 +323,12 @@ function ValidateAcsHealth () {
         fi
     fi
 
-    typeset scNs
-    scNs="$(oc get securedcluster -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)"
+    typeset scNamespaces scNs
+    if ! scNamespaces="$(oc get securedcluster -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\n"}{end}')"; then
+        echo >&2 "ERROR: Unable to query required SecuredCluster CR"
+        return 1
+    fi
+    scNs="${scNamespaces%%$'\n'*}"
 
     if [[ -z "${scNs}" ]]; then
         echo "WARNING: No SecuredCluster CR found; skipping SecuredCluster validation"
@@ -419,7 +441,7 @@ function Main () {
         exit 3
     fi
 
-    currentVersion="$(GetInstalledVersion)"
+    currentVersion="$(GetInstalledVersion "${currentCsv}")"
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
@@ -448,8 +470,10 @@ function Main () {
             echo "InstallPlan ${prePatchPlan} already complete; no pending upgrade"
             exit 0
         fi
+        RequireInitialVersion "${currentVersion}" >/dev/null
         installPlan="${prePatchPlan}"
     else
+        RequireInitialVersion "${currentVersion}" >/dev/null
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
         oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
@@ -493,6 +517,16 @@ function Main () {
     WaitForCsvSucceeded "${currentCsv}"
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
+
+    if [[ -z "${newVersion}" ]]; then
+        echo >&2 "ERROR: Post-upgrade version is empty; cannot confirm upgrade succeeded"
+        exit 1
+    fi
+    if [[ "${newVersion}" == "${currentVersion}" ]]; then
+        echo >&2 "ERROR: Operator version unchanged after upgrade (${newVersion}); upgrade may have failed"
+        exit 1
+    fi
+
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
     typeset _acs_upgrade_output=""
