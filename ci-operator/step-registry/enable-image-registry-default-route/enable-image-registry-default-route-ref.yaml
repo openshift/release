@@ -1,0 +1,22 @@
+ref:
+  as: enable-image-registry-default-route
+  from: cli
+  commands: enable-image-registry-default-route-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 5m0s
+  grace_period: 1m0s
+  documentation: |-
+    Enables the OpenShift integrated image-registry's default route
+    (configs.imageregistry.operator.openshift.io cluster spec.defaultRoute=true)
+    and waits until 'oc registry info --public' resolves successfully.
+
+    Required before any step that pushes images to the cluster's integrated
+    registry from outside the cluster (e.g. mirror-images-community-e2e-images),
+    because the internal registry Service is not reachable from CI pods.
+
+    This step does not restore or weaken any air-gap or disconnected-egress
+    configuration: it only exposes an inbound OpenShift Route so the CI pod
+    can push test images into the cluster.

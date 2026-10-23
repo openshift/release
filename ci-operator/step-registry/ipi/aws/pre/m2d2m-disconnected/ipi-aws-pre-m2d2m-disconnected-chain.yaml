@@ -1,0 +1,65 @@
+chain:
+  as: ipi-aws-pre-m2d2m-disconnected
+  steps:
+  - ref: aws-provision-vpc-disconnected
+  - chain: aws-provision-bastionhost
+  - chain: mirror-images-by-oc-mirror-m2d2m
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-manual-creds
+  - ref: ipi-conf-aws
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: aws-provision-cco-manual-users-static
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-aws
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - as: disable-default-sources
+    from: cli
+    commands: |-
+      set -euo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json \
+        -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+    grace_period: 5m0s
+  env:
+  - name: MIRROR_BIN
+    default: "oc-mirror"
+    documentation: "Mirror binary to use. Must be 'oc-mirror' for the m2d2m workflow."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy for disconnected install."
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Manually create ingress DNS records for private clusters."
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: "Number of availability zones. Default 2 to avoid regions with fewer than 3 AZs."
+  documentation: |-
+    The ipi-aws-pre-m2d2m-disconnected chain provisions a fully disconnected
+    OpenShift cluster on AWS using the two-phase oc-mirror mirror-to-disk/
+    disk-to-mirror (m2d2m) workflow.
+
+    Identical to ipi-aws-pre-disconnected except that the mirror-images-payload
+    dispatch chain is replaced by mirror-images-by-oc-mirror-m2d2m, which:
+      1. Mirrors the release payload to a local disk archive (Phase 1, with
+         internet access).
+      2. Transfers the archive and oc-mirror binary to the bastion host.
+      3. Pushes from the archive into the bastion mirror registry with public
+         internet access blocked via iptables (Phase 2).
+      4. Runs an isolation acceptance test before the import.
+      5. Patches install-config.yaml with the generated IDMS.
