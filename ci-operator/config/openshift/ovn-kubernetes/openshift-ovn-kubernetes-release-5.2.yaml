@@ -531,14 +531,45 @@ tests:
       TEST_SUITE: ovn-kubernetes/conformance/parallel
     workflow: hypershift-aws-conformance
 - always_run: false
-  as: e2e-aws-hypershift-kubevirt-core-networking-ote
+  as: e2e-bm-hypershift-kubevirt-multinet-localnet-ote
+  capabilities:
+  - intranet
+  cluster: build09
   optional: true
   steps:
-    cluster_profile: openshift-org-aws
+    cluster_profile: equinix-ocp-hcp
     env:
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      DEBUG_WAIT_TIMEOUT: "64800"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      SKIP_QE_APP_REGISTRY: "true"
       TEST_SUITE: ovn-kubernetes/conformance/parallel
-    workflow: hypershift-kubevirt-conformance
+    workflow: hypershift-kubevirt-baremetalds-multinet-localnet-conformance
+  timeout: 24h0m0s
+- always_run: false
+  as: e2e-bm-hypershift-kubevirt-secondary-localnet-ote
+  capabilities:
+  - intranet
+  cluster: build09
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      DEBUG_WAIT_TIMEOUT: "64800"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-22
+      REDHAT_OPERATORS_INDEX_TAG: v4.22
+      SKIP_QE_APP_REGISTRY: "true"
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-kubevirt-baremetalds-secondary-localnet-conformance
+  timeout: 24h0m0s
 - as: unit
   commands: |
     status=0
