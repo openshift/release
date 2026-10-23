@@ -159,7 +159,12 @@ if [[ "$needs_sso" = true ]]; then
         done
     ) &
     browser_pid=$!
-    auth_flags=(-p 127.0.0.1:8085:8085
+    # Map the host user to the image's UID 1001 so it can write the mode-700 SSO directories.
+    case "$(basename "$CONTAINER_ENGINE")" in
+        docker) auth_flags=(--user "$(id -u):$(id -g)") ;;
+        *) auth_flags=(--userns=keep-id:uid=1001,gid=1001) ;;
+    esac
+    auth_flags+=(-p 127.0.0.1:8085:8085
         -v "$SSO_AUTH_CONFIG_PATH:/auth:z"
         -v "$browser_dir:/browser:z"
         -e SM_AUTH_DIR=/auth -e SM_CALLBACK_HOST=0.0.0.0
