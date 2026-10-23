@@ -630,18 +630,13 @@ function Main () {
 
     rm -f /tmp/quay-auth.json
 
-    if [[ "${MAP_TESTS}" == "true" ]]; then
-        eval "$(
-            typeset -a fetchCmd=()
-            type -t wget 1>/dev/null && fetchCmd=(wget --timeout=30 -qO-) || fetchCmd=(curl --connect-timeout 10 --max-time 30 -fsSL)
-            "${fetchCmd[@]}" \
-                https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-        )" || true
-        if type -t ExitTrap--PostProcessPrep; then
-            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep || true
-        fi
-    fi
+    eval "$(
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )" || true
+    ExitTrap--PostProcessPrep || true
 
     exit "${status}"
 }
