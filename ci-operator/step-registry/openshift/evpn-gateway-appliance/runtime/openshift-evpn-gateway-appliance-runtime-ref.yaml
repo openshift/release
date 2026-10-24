@@ -1,0 +1,44 @@
+ref:
+  as: openshift-evpn-gateway-appliance-runtime
+  from: ansible-test-runner
+  commands: openshift-evpn-gateway-appliance-runtime-commands.sh
+  # Bounded worst case: four 2m10s remote calls, 11m setup, 48m runtime and 2m45s collection.
+  timeout: 75m
+  # A deferred 2m10s SSH, 3m30s runtime stop and three 55s cleanup calls fit this grace.
+  grace_period: 9m
+  credentials:
+  - namespace: test-credentials
+    bundle: ci-pull-credentials
+    mount_path: /var/run/secrets/ci-pull-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: BOOTC_BASE
+    default: ""
+    documentation: Optional CI bootc base override; empty uses the appliance Containerfile default.
+  - name: EGA_PAYLOAD_RHEL10_FRR_REPOSITORY
+    default: ""
+    documentation: Optional FRR repository override; set repository, tag, and digest together.
+  - name: EGA_PAYLOAD_RHEL10_FRR_TAG
+    default: ""
+    documentation: Optional FRR tag override; set repository, tag, and digest together.
+  - name: EGA_PAYLOAD_RHEL10_FRR_DIGEST
+    default: ""
+    documentation: Optional FRR digest override; set repository, tag, and digest together.
+  - name: EGA_PAYLOAD_RHEL10_NODE_EXPORTER_REPOSITORY
+    default: ""
+    documentation: Optional node-exporter repository override; set repository, tag, and digest together.
+  - name: EGA_PAYLOAD_RHEL10_NODE_EXPORTER_TAG
+    default: ""
+    documentation: Optional node-exporter tag override; set repository, tag, and digest together.
+  - name: EGA_PAYLOAD_RHEL10_NODE_EXPORTER_DIGEST
+    default: ""
+    documentation: Optional node-exporter digest override; set repository, tag, and digest together.
+  documentation: |-
+    Build the tested appliance source and run its offline nested service/restart smoke
+    on the provisioned RHEL VM. Only the registry.redhat.io credentials reach the VM;
+    they are used only for builds and removed before diagnostic collection. The
+    workflow must deprovision the VM in post.
+    This checks appliance runtime, not network e2e or bootc disk installation.
