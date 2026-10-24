@@ -15,7 +15,9 @@ ref:
     2. Run ibu-prepare-spoke-sno.yml to retrieve the target spoke kubeconfig
        from the target hub ACM
     3. Verify ztp-group/oadp-cm exists on the target hub and the ztp-group namespace
-       exists on the target spoke so TALM can copy the ConfigMap
+       exists on the target spoke so TALM can copy the ConfigMap. Require a
+       reconciled target DPA, an Available dataprotectionapplication-1 storage
+       location, and matching explicit Backup storageLocation and manifest labels.
     4. Run eco-gotests IBU upgrade test suite using the retrieved spoke kubeconfig;
        hub_clusterconfigs_path mounts the target hub config directory into the
        container at /clusterconfigs, and
@@ -23,9 +25,10 @@ ref:
        /clusterconfigs/auth/kubeconfig, while
        ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO points to the mounted spoke kubeconfig
        at /kubeconfig/kubeconfig
-    5. Collect XML reports for the post-phase reporter before returning the test
-       exit code. Missing suite reports or failed artifact collection also fail
-       the step.
+    5. Watch OADP/IBU resources and follow Velero/LCA logs during the tests to
+       preserve evidence before test recovery deletes it. Save diagnostics and
+       XML reports before returning the test exit code. Missing suite reports or
+       failed artifact collection also fail the step.
 
     This step runs after the seed image has been mirrored to the target bastion
     and is ready for use in upgrade testing.

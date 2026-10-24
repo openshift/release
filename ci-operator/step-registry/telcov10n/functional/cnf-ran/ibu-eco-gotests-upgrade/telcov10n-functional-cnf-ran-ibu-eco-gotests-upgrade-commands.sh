@@ -139,21 +139,91 @@ BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/b
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
 
 echo "Check OADP prerequisites and run eco-gotests via SSH tunnel"
-printf -v REMOTE_COMMAND 'bash -s -- %q %q' \
-  "${TARGET_HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig" "${TARGET_SPOKE_KUBECONFIG}"
+REMOTE_DIAGNOSTICS="/tmp/ibu-upgrade-diagnostics-${BUILD_ID:-manual}-$$"
+printf -v REMOTE_COMMAND 'bash -s -- %q %q %q' \
+  "${TARGET_HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig" "${TARGET_SPOKE_KUBECONFIG}" "${REMOTE_DIAGNOSTICS}"
 TEST_EXIT_CODE=0
 if ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=3 \
   -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
   "${REMOTE_COMMAND}" <<'REMOTE_SCRIPT'
 set -euo pipefail
-# TALM copies the hub ConfigMap only if its namespace already exists on the spoke.
-echo "Verify hub OADP ConfigMap"
-oc --kubeconfig "$1" --request-timeout=30s -n ztp-group get configmap oadp-cm -o name
-echo "Verify target spoke OADP ConfigMap namespace"
-oc --kubeconfig "$2" --request-timeout=30s get namespace ztp-group -o name
 cd /tmp/eco_gotests
-exec ./eco-gotests-run.sh
+SPOKE_OC=(oc --kubeconfig "$2" --request-timeout=30s)
+DIAGNOSTICS=$3
+mkdir -m 700 "${DIAGNOSTICS}"
+
+# TALM only copies the ConfigMap when its namespace already exists on the spoke.
+"${SPOKE_OC[@]}" get namespace ztp-group -o name
+"${SPOKE_OC[@]}" -n openshift-adp get dataprotectionapplications.oadp.openshift.io \
+  dataprotectionapplication -o json > "${DIAGNOSTICS}/dpa-preflight.json"
+if ! jq -e 'any(.status.conditions[]?; .type == "Reconciled" and .status == "True")' \
+  "${DIAGNOSTICS}/dpa-preflight.json" > /dev/null; then
+  echo "Target DPA is not Reconciled=True" >&2
+  exit 1
+fi
+"${SPOKE_OC[@]}" -n openshift-adp get backupstoragelocations.velero.io \
+  dataprotectionapplication-1 -o json > "${DIAGNOSTICS}/bsl-preflight.json"
+if ! jq -e '.status.phase == "Available"' "${DIAGNOSTICS}/bsl-preflight.json" > /dev/null; then
+  echo "Target BackupStorageLocation dataprotectionapplication-1 is not Available" >&2
+  exit 1
+fi
+# Client dry-run decodes YAML without creating any Backup or Restore objects.
+oc --kubeconfig "$1" --request-timeout=30s -n ztp-group get configmap oadp-cm -o json |
+  jq -er '[.data[]] | join("\n---\n")' |
+  "${SPOKE_OC[@]}" create --dry-run=client --validate=false -f - -o json |
+  jq -s '[.[] | if .kind == "List" then .items[] else . end]' > "${DIAGNOSTICS}/backup-manifests.json"
+if ! jq -e --arg bsl dataprotectionapplication-1 '
+  any(.[]; .kind == "Backup") and
+  all(.[] | select(.kind == "Backup" or .kind == "Restore");
+    .metadata.namespace == "openshift-adp" and
+    .metadata.labels["velero.io/storage-location"] == $bsl and
+    (if .kind == "Backup" then .spec.storageLocation == $bsl else true end))
+' "${DIAGNOSTICS}/backup-manifests.json" > /dev/null; then
+  echo "Hub oadp-cm must use openshift-adp and storage location dataprotectionapplication-1" >&2
+  exit 1
+fi
+echo "OADP preflight passed"
+
+# Save events and logs before test recovery deletes evidence; reconnect after API outages.
+collect() {
+  local name=$1 child
+  shift
+  trap - EXIT
+  trap 'kill "${child}" 2>/dev/null || true; wait "${child}" 2>/dev/null || true; exit 0' TERM INT HUP
+  while true; do
+    "$@" >> "${DIAGNOSTICS}/${name}.log" 2>&1 &
+    child=$!
+    wait "${child}" || true
+    sleep 5 &
+    child=$!
+    wait "${child}" || true
+  done
+}
+collector_pids=()
+stop_collectors() {
+  kill "${collector_pids[@]}" 2>/dev/null || true
+  wait "${collector_pids[@]}" 2>/dev/null || true
+}
+trap stop_collectors EXIT
+for resource in backups.velero.io restores.velero.io backupstoragelocations.velero.io \
+  deletebackuprequests.velero.io dataprotectionapplications.oadp.openshift.io; do
+  collect "${resource}" "${SPOKE_OC[@]}" -n openshift-adp get "${resource}" \
+    --watch --output-watch-events -o json &
+  collector_pids+=("$!")
+done
+collect ibu "${SPOKE_OC[@]}" get imagebasedupgrades.lca.openshift.io --watch --output-watch-events -o json &
+collector_pids+=("$!")
+for namespace in openshift-adp openshift-lifecycle-agent; do
+  while read -r deployment; do
+    collect "${deployment}" "${SPOKE_OC[@]}" -n "${namespace}" logs "deployment/${deployment}" \
+      --all-containers=true --prefix=true --timestamps=true --since=2m --follow=true &
+    collector_pids+=("$!")
+  done < <("${SPOKE_OC[@]}" -n "${namespace}" get deployments -o json \
+    2>> "${DIAGNOSTICS}/collector-errors.log" |
+    jq -r '.items[].metadata.name | select(. == "velero" or contains("lifecycle-agent"))')
+done
+./eco-gotests-run.sh
 REMOTE_SCRIPT
 then
   echo "IBU upgrade suite completed successfully"
@@ -164,6 +234,14 @@ fi
 
 echo "Gather artifacts from bastion"
 ARTIFACT_EXIT_CODE=0
+mkdir -p "${ARTIFACT_DIR}/ibu-upgrade-diagnostics"
+if ! scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  -i "${PROJECT_DIR}/temp_ssh_key" \
+  "${BASTION_USER}@${BASTION_IP}:${REMOTE_DIAGNOSTICS}/." \
+  "${ARTIFACT_DIR}/ibu-upgrade-diagnostics/"; then
+  echo "Failed to collect IBU upgrade diagnostics" >&2
+  ARTIFACT_EXIT_CODE=1
+fi
 mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests_upgrade"
 if ! scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
