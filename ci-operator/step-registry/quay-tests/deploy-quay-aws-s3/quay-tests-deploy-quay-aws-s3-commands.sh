@@ -39,7 +39,7 @@ QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
-QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
+QUAY_AWS_S3_BUCKET="quayprowci${BUILD_ID}"
 
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
@@ -85,10 +85,19 @@ EOF
 echo "quay aws s3 bucket name is ${QUAY_AWS_S3_BUCKET}"
 export TF_VAR_aws_bucket="${QUAY_AWS_S3_BUCKET}"
 terraform init
-terraform apply -auto-approve || true
 
-#Share Terraform Var and Terraform Directory
+#Share bucket name before apply so cleanup can find it even if apply fails
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
+
+terraform apply -auto-approve || {
+    # Save terraform state for cleanup even on failure
+    tar -czf terraform.tgz --exclude=".terraform" *
+    cp terraform.tgz "${SHARED_DIR}"
+    echo "ERROR: terraform apply failed" >&2
+    exit 1
+}
+
+#Share Terraform Directory
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
 
