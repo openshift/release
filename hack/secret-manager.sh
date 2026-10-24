@@ -4,12 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 GCLOUD_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-gcloud"
+SSO_AUTH_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-dex"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 IMAGE="${SECRET_MANAGER_IMAGE:-quay.io/openshift/ci-public:ci_secret-manager_latest}"
 
 if [ "${1:-}" = "clean" ]; then
     echo "Removing cached credentials..."
-    rm -rf "$GCLOUD_CONFIG_PATH"
+    rm -rf "$GCLOUD_CONFIG_PATH" "$SSO_AUTH_CONFIG_PATH"
     echo "Done. Run the 'login' command to re-authenticate."
     exit 0
 fi
@@ -46,7 +47,7 @@ update_image_if_stale() {
 
 mkdir -p "$GCLOUD_CONFIG_PATH"
 
-if [ "${1:-}" = "login" ]; then
+if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
     if ! command -v gcloud &>/dev/null; then
         echo "Error: 'gcloud' is not installed. Install it with: brew install google-cloud-sdk" >&2
         exit 1
@@ -54,7 +55,6 @@ if [ "${1:-}" = "login" ]; then
     CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
     chmod -R a+rX "$GCLOUD_CONFIG_PATH"
     update_image_if_stale
-    exit 0
 fi
 
 tty_flags=()
@@ -112,7 +112,69 @@ done
 if ! "$CONTAINER_ENGINE" image exists "$IMAGE" 2>/dev/null; then
     "$CONTAINER_ENGINE" pull "$IMAGE" >/dev/null
 fi
-exec "$CONTAINER_ENGINE" run --rm ${tty_flags[@]+"${tty_flags[@]}"} \
+auth_flags=()
+browser_pid=""
+browser_dir=""
+cleanup() {
+    if [[ -n "$browser_pid" ]]; then
+        kill "$browser_pid" 2>/dev/null || true
+        wait "$browser_pid" 2>/dev/null || true
+    fi
+    if [[ -n "$browser_dir" ]]; then
+        rm -rf "$browser_dir"
+    fi
+}
+trap cleanup EXIT
+
+needs_sso=false
+if [[ "${args[0]:-}" = "login" ]]; then
+    needs_sso=true
+elif [[ "${args[0]:-}" = "list" ]]; then
+    for arg in ${args[@]+"${args[@]}"}; do
+        case "$arg" in
+            -c*|--collection|--collection=*) needs_sso=true ;;
+        esac
+    done
+fi
+if [[ "$needs_sso" = true ]]; then
+    mkdir -p "$SSO_AUTH_CONFIG_PATH"
+    chmod 700 "$SSO_AUTH_CONFIG_PATH"
+    browser_dir="$(mktemp -d "$SSO_AUTH_CONFIG_PATH/browser.XXXXXX")"
+    (
+        while true; do
+            if [[ -f "$browser_dir/url" ]]; then
+                url="$(<"$browser_dir/url")"
+                rm -f "$browser_dir/url"
+                case "$url" in
+                    https://idp.ci.openshift.org/auth\?*)
+                        opener=xdg-open
+                        if [[ "$(uname -s)" = Darwin ]]; then
+                            opener=open
+                        fi
+                        if ! "$opener" "$url" >/dev/null 2>&1; then
+                            printf 'Could not open a browser. To log in, open this URL in a browser on this machine:\n\n    %s\n\n' "$url" >&2
+                        fi
+                        ;;
+                esac
+            fi
+            sleep 0.2
+        done
+    ) &
+    browser_pid=$!
+    # Map the host user to the image's UID 1001 so it can write the mode-700 SSO directories.
+    case "$(basename "$CONTAINER_ENGINE")" in
+        docker) auth_flags=(--user "$(id -u):$(id -g)") ;;
+        *) auth_flags=(--userns=keep-id:uid=1001,gid=1001) ;;
+    esac
+    auth_flags+=(-p 127.0.0.1:8085:8085
+        -v "$SSO_AUTH_CONFIG_PATH:/auth:z"
+        -v "$browser_dir:/browser:z"
+        -e SM_AUTH_DIR=/auth -e SM_CALLBACK_HOST=0.0.0.0
+        -e SM_BROWSER_REQUEST=/browser/url)
+fi
+
+"$CONTAINER_ENGINE" run --rm ${tty_flags[@]+"${tty_flags[@]}"} \
+    ${auth_flags[@]+"${auth_flags[@]}"} \
     -v "$GCLOUD_CONFIG_PATH:/gcloud:z" \
     ${file_mount[@]+"${file_mount[@]}"} \
     -e CLOUDSDK_CONFIG=/gcloud \
