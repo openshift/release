@@ -44,6 +44,9 @@ tests:
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:731
       COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CUSTOM_KB_BRANCH: build_farm_metrics
+      CUSTOM_KB_BUILD: "true"
+      CUSTOM_KB_FORK_URL: https://github.com/mcornea/kube-burner-ocp
       ENABLE_AUTOSCALING: "true"
       INDEX_ENABLED: "true"
       KUBE_BURNER_VERSION: 1.11.18
@@ -54,6 +57,76 @@ tests:
       REPLICAS: "114"
       RUN_ORION: "true"
     test:
+    - chain: openshift-qe-build-farm
+    - ref: openshift-qe-orion
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: build-farm-114nodes-rhel9-kernel-etcd-pr397
+  cron: 0 8 8,22 * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false --job-iterations=80 --set=jobs.2.jobPause=10m
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CUSTOM_KB_BRANCH: build_farm_metrics
+      CUSTOM_KB_BUILD: "true"
+      CUSTOM_KB_FORK_URL: https://github.com/mcornea/kube-burner-ocp
+      ENABLE_AUTOSCALING: "true"
+      ETCD_IMAGE: quay.io/mcornea/etcd:pr397
+      INDEX_ENABLED: "true"
+      KUBE_BURNER_VERSION: 1.11.18
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      ORION_CONFIG: examples/build-farm.yaml
+      REPLICAS: "114"
+      RUN_ORION: "true"
+    test:
+    - ref: openshift-qe-swap-etcd-image
+    - as: apply-rhel9-os-image
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o pipefail
+
+        OS_IMAGE_URL="quay.io/mcornea/rhel-coreos-10:5.14.0-687.59.1"
+
+        echo "=== Applying MachineConfig to overlay RHEL 9 image via osImageURL on masters ==="
+        oc apply -f - <<MCEOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          name: os-layer-custom-master
+          labels:
+            machineconfiguration.openshift.io/role: master
+        spec:
+          osImageURL: ${OS_IMAGE_URL}
+        MCEOF
+
+        echo "=== MachineConfig applied, waiting for master MCP to start updating ==="
+        oc wait mcp master --for condition=Updating=True --timeout=5m || true
+
+        echo "=== Waiting for master MachineConfigPool to finish rolling out ==="
+        oc wait mcp master --for condition=Updated=True --timeout=2h
+        echo "=== Master MachineConfigPool is Updated after RHEL 9 image overlay ==="
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
     - chain: openshift-qe-build-farm
     - ref: openshift-qe-orion
     workflow: rosa-aws-sts
