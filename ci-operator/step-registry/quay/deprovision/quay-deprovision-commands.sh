@@ -20,9 +20,17 @@ if [[ -f /var/run/quay-qe-aws-secret/access_key ]]; then
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
-    #Copy GCP auth.json from mounted secret to current directory
+    # The deploy step creates the bucket with the gcp-quay-qe cluster profile's
+    # service-account key (gce.json) in the cluster's project/region, and keeps it
+    # out of the archived terraform. Restore the same credential for terraform
+    # destroy from the profile; fall back to the legacy mounted secret if the
+    # profile is not present. Do not echo the key material.
     mkdir -p QUAY_GCP && cd QUAY_GCP
-    cp /var/run/quay-qe-gcp-secret/auth.json .
+    if [[ -r "${CLUSTER_PROFILE_DIR}/gce.json" ]]; then
+        cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
+    else
+        cp /var/run/quay-qe-gcp-secret/auth.json .
+    fi
     cp ${SHARED_DIR}/terraform.tgz .
     tar -xzvf terraform.tgz && ls
 
