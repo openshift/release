@@ -112,6 +112,15 @@ _propagate_junit () {
 
 trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
 
+# Load ExitTrap library for JUnit XML post-processing at script level
+# (must be loaded before trap can fire to avoid secondary errors)
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+)" || true
+
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
     if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>&1)"; then
@@ -597,14 +606,6 @@ sys.exit(0 if len(images) > 0 else 1)
 ################################################################################
 
 function Main () {
-    # Load ExitTrap library for JUnit XML post-processing
-    eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
-            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-    )" || true
-
     typeset -i discoverRc=0
     DiscoverQuay || discoverRc=$?
     if (( discoverRc == 1 )); then
