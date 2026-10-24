@@ -516,7 +516,13 @@ _finalize_exit() {
     _EXIT_CLASS="infra"
   fi
   if [[ -n "${_JUNIT_KIND}" ]]; then
-    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${rc}"
+    # Product no-op results (e.g. already on the latest channel) are not
+    # failures: emit JUnit with rc=0 so CI does not see failures="1".
+    local junit_rc="${rc}"
+    if [[ "${_EXIT_CLASS}" == "product" ]]; then
+      junit_rc=0
+    fi
+    _junit_emit_safe "${_JUNIT_KIND}" "${_JUNIT_MESSAGE}" "${junit_rc}"
   fi
   # Product no-op results should not emit trace or cluster diagnostics.
   if [[ "${_EXIT_CLASS}" == "product" ]]; then
@@ -595,7 +601,7 @@ function Main () {
       _JUNIT_KIND="acm-upgrade-not-needed"
       _JUNIT_MESSAGE="Channel ${currentChannel} head (${head}) already installed -- nothing to upgrade"
       _EXIT_CLASS="product"
-      return 1   # _finalize_exit will see product -> exit 0, but emit a JUnit failure
+      return 1   # _finalize_exit will see product -> exit 0, JUnit emitted with failures="0"
     elif (( resolve_rc != 0 )); then
       _JUNIT_KIND="resolve-target-channel"
       _JUNIT_MESSAGE="ResolveTargetChannel failed"
