@@ -1,0 +1,85 @@
+base_images:
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: build/Dockerfile.nodeagent
+    from: ubi9-minimal
+    to: cluster-power-node-agent
+  - additional_architectures:
+    - arm64
+    dockerfile_path: build/Dockerfile
+    from: ubi9-minimal
+    to: cluster-power-manager-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: bundle.Dockerfile
+    to: cluster-power-manager-operator-bundle
+operator:
+  bundles:
+  - as: cluster-power-manager-operator-bundle-pipeline
+    capabilities:
+    - arm64
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift-kni/cluster-power-manager-operator:.*
+    with: pipeline:cluster-power-manager-operator
+  - pullspec: quay.io/openshift-kni/cluster-power-node-agent:.*
+    with: pipeline:cluster-power-node-agent
+promotion:
+  to:
+  - name: "5.1"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci-job
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: golangci-lint
+  commands: make golangci-lint
+  container:
+    from: src
+- as: install-operator
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: cluster-power-manager-operator-bundle-pipeline
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: power-manager
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: cluster-power-manager
