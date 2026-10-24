@@ -1,0 +1,29 @@
+ref:
+  as: openshift-os-publish-art
+  from_image:
+    namespace: ocp
+    name: "4.23"
+    tag: cli
+  commands: openshift-os-publish-art-commands.sh
+  timeout: 20m
+  grace_period: 1m
+  credentials:
+  - bundle: promotion-quay-tagger-kubeconfig
+    namespace: ci
+    mount_path: /etc/app-ci-kubeconfig
+  - bundle: registry-push-credentials-ci-central
+    namespace: ci
+    mount_path: /etc/push-secret
+  dependencies:
+  - name: stream-coreos
+    env: STREAM_COREOS_IMAGE
+  - name: stream-coreos-extensions
+    env: STREAM_COREOS_EXTENSIONS_IMAGE
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Publish the images job's two CoreOS manifest lists after successful normal
+    CI promotion. Use originating build digests, verify CI reference equality,
+    update only the two ART ImageStreamTags, and verify imports and generations.
