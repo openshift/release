@@ -1,16 +1,16 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.22
-  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+  go-builder:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-5.1
+  node-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-5.1
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      FROM node-builder
       USER root
       RUN mkdir -p /go/src && chmod -R 777 /go
       ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -23,10 +23,10 @@ images:
   - dockerfile_path: Dockerfile.downloads
     to: console-downloads
   - dockerfile_path: Dockerfile.plugins.demo
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: node-builder
     to: console-plugin-demo
   - dockerfile_literal: |
-      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      FROM node-builder
       USER root
       RUN dnf install -y \
           alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
@@ -43,7 +43,7 @@ images:
       RUN cd frontend && \
           yarn install --immutable && \
           yarn playwright install chromium
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: node-builder
     inputs:
       src:
         paths:
@@ -101,7 +101,7 @@ tests:
     go install -mod= github.com/jstemmer/go-junit-report@latest
     /home/prow/go/src/github.com/openshift/console/test-backend.sh
   container:
-    from: ocp_builder_rhel-9-golang-1.26-openshift-5.1
+    from: go-builder
   skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
 - as: frontend
   commands: |
