@@ -317,7 +317,7 @@ class ArtifactSafetyTests(ArtifactFixture):
 
 
 class ImageAcquisitionTests(ArtifactFixture):
-    def check_acquisition(self, errors, expected_status, attempts, test_status=0, trace=False):
+    def check_acquisition(self, errors, expected_status, attempts, trace=False):
         sleep = self.bin / "sleep"
         sleep.write_text('#!/bin/bash\nprintf "%s\\n" "$1" >> "$FIXTURE_DIR/delays"\n')
         sleep.chmod(0o755)
@@ -327,7 +327,7 @@ class ImageAcquisitionTests(ArtifactFixture):
                 "HOME": str(self.base), "ARTIFACT_DIR": str(self.artifacts),
                 "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
                 "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
-                "FIXTURE_CASE": "normal", "FIXTURE_EXIT": str(test_status),
+                "FIXTURE_CASE": "normal", "FIXTURE_EXIT": str(expected_status),
                 "FIXTURE_PULL_ERRORS": json.dumps(errors),
             }, capture_output=True, text=True, timeout=30, check=False)
         calls = [json.loads(line)[0] for line in
@@ -396,7 +396,7 @@ class ImageAcquisitionTests(ArtifactFixture):
         self.check_acquisition([], 0, 1)
 
     def test_test_failure_does_not_retry(self):
-        self.check_acquisition(["StatusCode: 503"], 42, 2, test_status=42)
+        self.check_acquisition(["StatusCode: 503"], 42, 2)
 
     def test_trace_does_not_disclose_pull_output(self):
         self.check_acquisition(["HTTP/1.1 503 Service Unavailable"], 0, 2, trace=True)
