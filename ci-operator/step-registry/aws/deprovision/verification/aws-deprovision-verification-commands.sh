@@ -10,12 +10,14 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 METADATA_FILE="${SHARED_DIR}/metadata.json"
 
-# IAM and Route53 are global services
-# For EUSC partition, explicitly set the region
-# For other partitions, rely on AWS SDK defaults (from config or environment)
+# IAM and Route53 are global services within a partition.
+# EUSC and AWS China require an explicit region to select the correct partition endpoint.
+# For other partitions, rely on AWS SDK defaults (from config or environment).
 REGION_FLAG=""
 if [[ "${REGION}" == eusc-* ]]; then
     REGION_FLAG="--region eusc-de-east-1"
+elif [[ "${CLUSTER_TYPE:-}" == "aws-china" ]]; then
+    REGION_FLAG="--region cn-northwest-1"
 fi
 
 function run_command() {
@@ -200,7 +202,7 @@ function verify_arn_exists() {
             fi
             ;;
         route53)
-            # Route53 is global in standard AWS, but requires --region in EUSC partition
+            # Route53 is global within a partition; REGION_FLAG selects special partition endpoints.
             local hosted_zone_id
             hosted_zone_id=$(echo "$resource_part" | cut -d/ -f2)
             aws route53 get-hosted-zone $REGION_FLAG --id "$hosted_zone_id" &>/dev/null
