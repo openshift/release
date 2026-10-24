@@ -13,6 +13,84 @@ read_profile_file() {
   fi
 }
 
+collect_previous_rollout_diagnostics() {
+  set +x
+  [[ -n "${ARTIFACT_DIR:-}" && -f "${MC_KUBECONFIG:-}" && -r "${MC_KUBECONFIG}" && -s "${MC_KUBECONFIG}" ]] || return 0
+  grep -q '[^[:space:]]' "${MC_KUBECONFIG}" || return 0
+  local destination="${ARTIFACT_DIR}/ho-deploy-previous"
+  mkdir -p "${destination}" || return 0
+
+  diagnostic_get() {
+    timeout --foreground --kill-after=1s 8s oc --kubeconfig="${MC_KUBECONFIG}" --request-timeout=5s \
+      -n hypershift get "$@" -o json 2>/dev/null
+  }
+
+  local projection='
+    def reason:
+      if IN("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "ContainerCreating",
+            "PodInitializing", "CreateContainerConfigError", "CreateContainerError",
+            "RunContainerError", "Error", "Completed", "OOMKilled", "DeadlineExceeded",
+            "ProgressDeadlineExceeded", "ReplicaSetUpdated", "NewReplicaSetAvailable",
+            "MinimumReplicasUnavailable", "MinimumReplicasAvailable", "FailedCreate",
+            "FailedScheduling", "Failed", "BackOff", "Pulling", "Pulled", "Created",
+            "Started", "Killing", "Unhealthy", "ScalingReplicaSet") then . else "Other" end;
+    def identity: {name: .metadata.name, uid: .metadata.uid};
+    def conditions: [.[]? | {type, status, reason: (.reason | reason)}];
+    def state:
+      {waiting: (if .waiting then {reason: (.waiting.reason | reason)} else null end),
+       terminated: (if .terminated then {reason: (.terminated.reason | reason), exitCode: .terminated.exitCode,
+                                        signal: .terminated.signal} else null end),
+       running: (.running != null)};
+    def containers: [.[]? | {name, ready, restartCount, image, imageID,
+                            state: (.state | state), lastState: (.lastState | state)}];
+    def replicas: {replicas, readyReplicas, availableReplicas, unavailableReplicas,
+                   updatedReplicas, fullyLabeledReplicas, observedGeneration};
+    def workload:
+      identity + {generation: .metadata.generation,
+                  desiredReplicas: .spec.replicas, status: (.status | replicas),
+                  images: [.spec.template.spec.containers[]? | {name, image}],
+                  conditions: (.status.conditions | conditions)};
+    def pod:
+      identity + {phase: .status.phase, conditions: (.status.conditions | conditions),
+                  containers: (.status.containerStatuses | containers),
+                  initContainers: (.status.initContainerStatuses | containers)};
+  '
+  local deployment selector deployment_uid replicas pods resource_uid
+  deployment=$(diagnostic_get deployment operator) || return 0
+  printf '%s' "${deployment}" | jq -e "${projection} workload" > "${destination}/deployment.json" || return 0
+  deployment_uid=$(printf '%s' "${deployment}" | jq -er '.metadata.uid | select(type == "string" and test("^[a-zA-Z0-9-]+$"))') || return 0
+  selector=$(printf '%s' "${deployment}" | jq -er '
+    .spec.selector |
+    [((.matchLabels // {}) | to_entries[] | "\(.key)=\(.value)"),
+     (.matchExpressions // [] | .[] |
+      if .operator == "In" then "\(.key) in (\(.values | join(",")))"
+      elif .operator == "NotIn" then "\(.key) notin (\(.values | join(",")))"
+      elif .operator == "Exists" then .key
+      elif .operator == "DoesNotExist" then "!\(.key)"
+      else error("unsupported selector") end)] | join(",") | select(length > 0)
+  ') || return 0
+  replicas=$(diagnostic_get replicasets --selector="${selector}" | jq -ce --arg uid "${deployment_uid}" '
+    [.items[] | select(any(.metadata.ownerReferences[]?; .uid == $uid and .controller == true))] |
+    sort_by([(.spec.replicas // 0), (.metadata.creationTimestamp // "")]) | reverse
+  ') || replicas='[]'
+  printf '%s' "${replicas}" | jq "${projection} .[:10] | map(workload)" > "${destination}/replicasets.json" || true
+  pods=$(diagnostic_get pods --selector="${selector}" | jq -ce --argjson replicas "${replicas}" '
+    [.items[] | select(any(.metadata.ownerReferences[]?;
+      .uid as $uid | .controller == true and any($replicas[]; .metadata.uid == $uid)))] |
+    sort_by(any(.status.conditions[]?; .type == "Ready" and .status == "True")) | .[:10]
+  ') || pods='[]'
+  printf '%s' "${pods}" | jq "${projection} map(pod)" > "${destination}/pods.json" || true
+  while IFS= read -r resource_uid; do
+    diagnostic_get events --field-selector="involvedObject.uid=${resource_uid}" | \
+      jq --arg uid "${resource_uid}" "${projection}"'
+        [.items[] | select(.involvedObject.uid == $uid) |
+          {type, reason: (.reason | reason), count, firstTimestamp, lastTimestamp}][:20]
+      ' > "${destination}/events-${resource_uid}.json" || true
+  done < <(printf '%s\n%s\n%s' "${deployment}" "${pods}" "${replicas}" | jq -r '
+    (if type == "array" then .[] else . end) | .metadata.uid |
+    select(type == "string" and test("^[a-zA-Z0-9-]+$"))' | head -n 11)
+}
+
 # Log in to OCM
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
@@ -101,7 +179,15 @@ KUBECONFIG="${MC_KUBECONFIG}" oc set image deployment/operator -n hypershift \
 
 # Wait for rollout
 echo "Waiting for HO rollout..."
-KUBECONFIG="${MC_KUBECONFIG}" oc rollout status deployment/operator -n hypershift --timeout=300s
+if KUBECONFIG="${MC_KUBECONFIG}" oc rollout status deployment/operator -n hypershift --timeout=300s; then
+  :
+else
+  rollout_status=$?
+  export -f collect_previous_rollout_diagnostics
+  MC_KUBECONFIG="${MC_KUBECONFIG}" ARTIFACT_DIR="${ARTIFACT_DIR:-}" \
+    timeout --signal=KILL 60s bash -c 'collect_previous_rollout_diagnostics' >/dev/null 2>&1 || true
+  exit "${rollout_status}"
+fi
 
 # Verify the deployment
 DEPLOYED_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment operator -n hypershift -o jsonpath='{.spec.template.spec.containers[0].image}')
