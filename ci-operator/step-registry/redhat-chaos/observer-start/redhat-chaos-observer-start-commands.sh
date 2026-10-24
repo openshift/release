@@ -1,12 +1,14 @@
 #!/bin/bash
 
+set -o errexit
 set -o nounset
+set -o pipefail
 
-oc create ns $TEST_NAMESPACE
+oc create ns "$TEST_NAMESPACE"
 
-oc adm policy add-scc-to-user privileged -z default -n $TEST_NAMESPACE
+oc adm policy add-scc-to-user privileged -z default -n "$TEST_NAMESPACE"
 
-oc apply -f- -n $TEST_NAMESPACE <<EOF
+oc apply -f- -n "$TEST_NAMESPACE" <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,10 +38,9 @@ spec:
       restartPolicy: Always
       dnsPolicy: ClusterFirst
 EOF
-CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE -o name)
 
-oc wait --for=condition=Ready=true $CREATED_POD_NAME -n $TEST_NAMESPACE --timeout=300s
+oc rollout status "deployment/$POD_NAME" -n "$TEST_NAMESPACE" --timeout=300s
 
-oc get pods -n $TEST_NAMESPACE
+oc get pods -n "$TEST_NAMESPACE"
 
 oc cluster-info
