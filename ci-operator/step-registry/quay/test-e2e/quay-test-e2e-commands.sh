@@ -816,6 +816,18 @@ if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
   echo "SSL_CERT_FILE=${SSL_CERT_FILE}"
 fi
 
+# The upgrade image specs skip when skopeo or oras is missing, whatever
+# UPGRADE_REQUIRE_IMAGES says, so check the tools here when it is set.
+UPGRADE_REQUIRE_IMAGES="${UPGRADE_REQUIRE_IMAGES:-}"
+if [[ "${UPGRADE_REQUIRE_IMAGES,,}" =~ ^(1|true|yes)$ ]]; then
+  for tool in skopeo oras; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+      echo "ERROR: UPGRADE_REQUIRE_IMAGES is set but ${tool} is not on PATH" >&2
+      exit 1
+    fi
+  done
+fi
+
 # Route preflight gate. The suite fires hundreds of rapid apiRequestContext calls
 # with tight 5-10s timeouts; on a freshly provisioned cluster the test pod's resolver
 # intermittently returns ENOTFOUND for the *.apps wildcard (and TCP/TLS is slow) until
