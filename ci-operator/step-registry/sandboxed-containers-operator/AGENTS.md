@@ -42,6 +42,7 @@ also contains install, gather, peerpods, IPI, and miscellaneous steps; run
 e2e/{azure,aro,aws}/…-e2e-{azure,aro,aws}-workflow.yaml   # top-level e2e scenarios
 pre/sandboxed-containers-operator-pre-chain.yaml           # install/setup
 test/sandboxed-containers-operator-test-chain.yaml         # shared test-phase chain
+sanity/                                                     # test-phase step; one workload must run before anything else is tested
 testsuites-gate/                                            # test-phase step; creates ${SHARED_DIR}/testsuites_gate
 testsuites/                                                 # POST-phase test suites (see testsuites/AGENTS.md)
 ```
@@ -100,10 +101,14 @@ The `test` phase references the shared `sandboxed-containers-operator-test`
 chain.  Keeping the test phase in one chain means test-phase changes are made
 once and apply to every workflow.
 
-This test chain should have a minimal test step (to be created), followed by the
+The test chain runs the `sanity` step — create a pod, check it runs, delete it,
+and for confidential containers read a resource from Trustee — followed by the
 `testsuites-gate` step that creates `${SHARED_DIR}/testsuites_gate`.  If the pre
-or test phase fails, `testsuites_gate` is not created and the post testsuits
-should skip.
+or test phase fails, `testsuites_gate` is not created and the post testsuites
+skip.  That ordering is the point of the sanity step: a broken installation
+fails one short test instead of every suite at once.  It is enabled by
+default and turned off per job with `SANITY_ENABLE: "false"` — the
+disconnected job does that, as its mirror does not carry the workload image.
 
 The **first** post entry is the `sandboxed-containers-operator-testsuites` chain,
 followed by must-gather and deprovision. The workflows set

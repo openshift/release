@@ -35,7 +35,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -50,11 +50,14 @@ tests:
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
+      RUNTIMECLASS: kata
+      SANITY_RUNNER_REPO_REF: refs/pull/3501/head
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
       TESTS_KATA_UPSTREAM_ENABLE: "true"
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
+      WORKLOAD_TO_TEST: kata
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 - as: azure-ipi-peerpods
@@ -70,7 +73,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -87,6 +90,7 @@ tests:
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
+      SANITY_RUNNER_REPO_REF: refs/pull/3501/head
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
       TESTS_CAA_ENABLE: "true"
@@ -108,7 +112,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -124,6 +128,8 @@ tests:
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
+      SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
+      SANITY_RUNNER_REPO_REF: refs/pull/3501/head
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
       TESTS_CAA_ENABLE: "true"
@@ -158,10 +164,13 @@ tests:
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
       OSC_INSTALL: "true"
+      RUNTIMECLASS: kata
+      SANITY_ENABLE: "false"
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: GA
       TESTS_KATA_UPSTREAM_ENABLE: "true"
       TESTS_KATA_UPSTREAM_PROFILE: k8s-configmap.bats
+      WORKLOAD_TO_TEST: kata
     workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
   timeout: 24h0m0s
 - as: aro-ipi-peerpods
@@ -232,6 +241,7 @@ tests:
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
+      SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
