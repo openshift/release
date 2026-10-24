@@ -16,14 +16,25 @@ ref:
     Collect Quay's OTLP traces from the in-cluster Jaeger deployed by
     quay-deploy-jaeger. Runs in post so it gathers on both pass and fail. Skips
     cleanly if Jaeger was never deployed. Port-forwards the query API and exports
-    traces for service "quay" to ${ARTIFACT_DIR}/jaeger-traces in JAEGER_WINDOW
+    traces for JAEGER_SERVICE to ${ARTIFACT_DIR}/jaeger-traces in JAEGER_WINDOW
     time slices (start/end bounded) rather than one request, so a large store
     cannot OOM-kill Jaeger by serializing every trace at once. Gzips the
-    per-window dumps. Best-effort throughout: always exits 0.
+    per-window dumps. Writes jaeger-traces/trace-collection-unavailable.txt with
+    the reason when Jaeger was not deployed, its query API never answered, every
+    window query failed, or no traces were found for the service. Best-effort
+    throughout: always exits 0.
   env:
   - name: QUAYNAMESPACE
     default: "quay-enterprise"
-    documentation: Namespace where Quay (and Jaeger) are deployed.
+    documentation: Namespace where Quay is deployed; also Jaeger's when JAEGER_NAMESPACE is empty.
+  - name: JAEGER_NAMESPACE
+    default: ""
+    documentation: |-
+      Namespace Jaeger runs in. Empty means the namespace quay-deploy-jaeger
+      recorded in ${SHARED_DIR}/jaeger_namespace, else QUAYNAMESPACE.
+  - name: JAEGER_SERVICE
+    default: "quay"
+    documentation: Jaeger service name whose traces are exported.
   - name: JAEGER_TRACE_LIMIT
     default: "5000"
     documentation: |-
