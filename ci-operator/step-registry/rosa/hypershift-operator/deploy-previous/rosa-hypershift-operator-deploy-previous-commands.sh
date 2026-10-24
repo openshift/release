@@ -33,7 +33,15 @@ collect_previous_rollout_diagnostics() {
             "ProgressDeadlineExceeded", "ReplicaSetUpdated", "NewReplicaSetAvailable",
             "MinimumReplicasUnavailable", "MinimumReplicasAvailable", "FailedCreate",
             "FailedScheduling", "Failed", "BackOff", "Pulling", "Pulled", "Created",
-            "Started", "Killing", "Unhealthy", "ScalingReplicaSet") then . else "Other" end;
+            "Started", "Killing", "Unhealthy", "ScalingReplicaSet", "FailedMount") then . else "Other" end;
+    def timestamp:
+      if type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$")
+      then . else null end;
+    def time_key:
+      if . == null then "" else
+        capture("^(?<second>[^.Z]+)(\\.(?<fraction>[0-9]+))?Z$") |
+        .second + "." + (((.fraction // "") + "000000000")[:9]) + "Z"
+      end;
     def identity: {name: .metadata.name, uid: .metadata.uid};
     def conditions: [.[]? | {type, status, reason: (.reason | reason)}];
     def state:
@@ -84,7 +92,14 @@ collect_previous_rollout_diagnostics() {
     diagnostic_get events --field-selector="involvedObject.uid=${resource_uid}" | \
       jq --arg uid "${resource_uid}" "${projection}"'
         [.items[] | select(.involvedObject.uid == $uid) |
-          {type, reason: (.reason | reason), count, firstTimestamp, lastTimestamp}][:20]
+          {type, reason: (.reason | reason), count,
+           firstTimestamp: (.firstTimestamp | timestamp), lastTimestamp: (.lastTimestamp | timestamp),
+           eventTime: (.eventTime | timestamp),
+           creationTimestamp: (.metadata.creationTimestamp | timestamp),
+           series: (if .series then {count: .series.count,
+                    lastObservedTime: (.series.lastObservedTime | timestamp)} else null end)}] |
+        sort_by((.series.lastObservedTime // .lastTimestamp // .eventTime //
+                 .firstTimestamp // .creationTimestamp) | time_key) | reverse | .[:20]
       ' > "${destination}/events-${resource_uid}.json" || true
   done < <(printf '%s\n%s\n%s' "${deployment}" "${pods}" "${replicas}" | jq -r '
     (if type == "array" then .[] else . end) | .metadata.uid |
