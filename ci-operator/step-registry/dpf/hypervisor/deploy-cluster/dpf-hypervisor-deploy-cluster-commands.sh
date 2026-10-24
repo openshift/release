@@ -187,6 +187,7 @@ sync_artifacts() {
   if [[ -f "${WORK_DIR}/.env" ]]; then
     cp "${WORK_DIR}/.env" "${SHARED_DIR}/.env"
     sed -i 's/^PAYLOAD_URL=.*$/PAYLOAD_URL=/' "${SHARED_DIR}/.env"
+    sed -i '/^LIBVIRT_HOST=/d' "${SHARED_DIR}/.env"
     scp ${SSH_OPTS} "${WORK_DIR}/.env" "root@${REMOTE_HOST}:${REMOTE_OPENSHIFT_DPF_DIR}/" 2>/dev/null \
       && echo ".env copied to bastion" \
       || echo "WARNING: Failed to copy .env to bastion"
@@ -222,18 +223,8 @@ export SSH_KEY="${WORK_DIR}/ssh_key.pub"
 echo "SSH public key(s) for VM injection: ${SSH_KEY}"
 
 cp "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" "${WORK_DIR}/dpf_pull_secret.json"
-if ! jq empty "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null; then
-  echo "DPF pull secret is not raw JSON, attempting base64 decode..."
-  base64 -d "${CLUSTER_PROFILE_DIR}/dpf-pull-secret" > "${WORK_DIR}/dpf_pull_secret.json"
-  if ! jq empty "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null; then
-    echo "ERROR: DPF pull secret is not valid JSON (even after base64 decode)"
-    echo "First 80 chars: $(head -c 80 "${WORK_DIR}/dpf_pull_secret.json")"
-    exit 1
-  fi
-  echo "DPF pull secret decoded from base64"
-fi
 export DPF_PULL_SECRET="${WORK_DIR}/dpf_pull_secret.json"
-echo "DPF pull secret ready ($(jq -r '.auths | keys | join(", ")' "${WORK_DIR}/dpf_pull_secret.json" 2>/dev/null || echo "unknown format"))"
+echo "DPF pull secret copied from Vault cluster profile"
 
 # Handle CI release payload
 if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
