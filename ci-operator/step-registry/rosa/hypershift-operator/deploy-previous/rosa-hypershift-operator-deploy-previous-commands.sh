@@ -26,6 +26,14 @@ collect_previous_rollout_diagnostics() {
   }
 
   local projection='
+    def image_digest:
+      if type != "string" then null else
+        (capture("\\A(?:(?:docker-pullable|docker|containerd|cri-o)://)?" +
+                 "(?:(?:[A-Za-z0-9][A-Za-z0-9.-]*(?::[0-9]+)?/)?" +
+                 "[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*" +
+                 "(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?@)?(?<digest>sha256:[A-Fa-f0-9]{64})\\z").digest |
+         ascii_downcase) // null
+      end;
     def reason:
       if IN("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "ContainerCreating",
             "PodInitializing", "CreateContainerConfigError", "CreateContainerError",
@@ -49,14 +57,15 @@ collect_previous_rollout_diagnostics() {
        terminated: (if .terminated then {reason: (.terminated.reason | reason), exitCode: .terminated.exitCode,
                                         signal: .terminated.signal} else null end),
        running: (.running != null)};
-    def containers: [.[]? | {name, ready, restartCount, image, imageID,
+    def containers: [.[]? | {name, ready, restartCount, image: (.image | image_digest),
+                            imageID: (.imageID | image_digest),
                             state: (.state | state), lastState: (.lastState | state)}];
     def replicas: {replicas, readyReplicas, availableReplicas, unavailableReplicas,
                    updatedReplicas, fullyLabeledReplicas, observedGeneration};
     def workload:
       identity + {generation: .metadata.generation,
                   desiredReplicas: .spec.replicas, status: (.status | replicas),
-                  images: [.spec.template.spec.containers[]? | {name, image}],
+                  images: [.spec.template.spec.containers[]? | {name, image: (.image | image_digest)}],
                   conditions: (.status.conditions | conditions)};
     def pod:
       identity + {phase: .status.phase, conditions: (.status.conditions | conditions),

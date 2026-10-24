@@ -20,6 +20,9 @@ STEP = REPOSITORY / "ci-operator/step-registry/rosa/hypershift-operator/deploy-p
 SCRIPT = STEP / "rosa-hypershift-operator-deploy-previous-commands.sh"
 SENTINEL = "FIXTURE_SECRET_DO_NOT_PRINT"
 IMAGE = "quay.io/example/operator@sha256:" + "a" * 64
+IMAGE_DIGEST = IMAGE.rsplit("@", 1)[1]
+PRIVATE_IMAGE_PARTS = ("registry.private.example.invalid", "private-repository", "private-tag",
+                       "fixture-user", "fixture-password", "opaque-private-text")
 SELECTOR = "operator-role=control,track in (stable,canary),tier notin (customer),control,!disabled"
 
 
@@ -68,6 +71,44 @@ def fixture(resource):
                                                               "message": SENTINEL}}}]})
         return {"items": [result, workload("foreign-pod", "foreign-pod-uid", "foreign-rs-uid")]}
     raise AssertionError(resource)
+
+
+def image_identity_cases():
+    """Pair synthetic image inputs with the only identity safe to retain."""
+    reference = "registry.private.example.invalid:5000/private-repository/operator:private-tag"
+    return [
+        (IMAGE, IMAGE_DIGEST), (IMAGE_DIGEST, IMAGE_DIGEST),
+        (reference + "@" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("operator@" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("docker-pullable://" + reference + "@" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("docker://" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("containerd://" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("cri-o://" + IMAGE_DIGEST, IMAGE_DIGEST),
+        ("sha256:" + "A" * 64, IMAGE_DIGEST),
+        (reference, None),
+        ("https://fixture-user:fixture-password@" + reference + "@" + IMAGE_DIGEST, None),
+        ("docker://fixture-user:fixture-password@" + reference + "@" + IMAGE_DIGEST, None),
+        (reference + "@" + IMAGE_DIGEST + "?token=opaque-private-text", None),
+        (IMAGE_DIGEST + "opaque-private-text", None), (IMAGE_DIGEST + "\n", None),
+        ("opaque-private-text " + IMAGE_DIGEST, None),
+        ("opaque-private-text@" + IMAGE_DIGEST + "/suffix", None),
+        ("sha256:" + "g" * 64, None), ("sha256:" + "a" * 63, None),
+        ("sha256:" + "a" * 65, None), ("sha512:" + "a" * 64, None),
+        (None, None), (123, None), ({"private": "opaque-private-text"}, None),
+        (["opaque-private-text"], None), (True, None)]
+
+
+def with_image_identities(result, resource):
+    """Exercise every diagnostic image field with identical adversarial inputs."""
+    selected = result if resource == "deployment" else result["items"][0]
+    containers = [{"name": "image-" + str(index), "image": value, "imageID": value}
+                  for index, (value, _) in enumerate(image_identity_cases())]
+    containers.append({"name": "missing"})
+    selected["spec"]["template"]["spec"]["containers"] = containers
+    if resource == "pods":
+        selected["status"]["containerStatuses"] = containers
+        selected["status"]["initContainerStatuses"] = containers
+    return result
 
 
 def event_fixture(uid, case):
@@ -195,6 +236,8 @@ def mock_oc(arguments, base, case):
         else:
             assert arguments[6] == ("operator" if resource == "deployment" else "--selector=" + SELECTOR)
             result = fixture(resource)
+            if case == "image-privacy":
+                result = with_image_identities(result, resource)
             if case == "empty-selector" and resource == "deployment":
                 result["spec"]["selector"] = {}
             if case == "invalid-selector" and resource == "deployment":
@@ -309,13 +352,29 @@ class DeployPreviousDiagnosticsTest(unittest.TestCase):
                                      "events-deployment-uid.json", "events-rs-uid.json", "events-pod-uid.json"})
         deployment = json.loads(files["deployment.json"])
         self.assertEqual(deployment["status"]["readyReplicas"], 0)
-        self.assertEqual(deployment["images"], [{"name": "operator", "image": IMAGE}])
+        self.assertEqual(deployment["images"], [{"name": "operator", "image": IMAGE_DIGEST}])
         pod = json.loads(files["pods.json"])[0]
         self.assertFalse(pod["containers"][0]["ready"])
         self.assertEqual(pod["containers"][0]["state"]["waiting"]["reason"], "CrashLoopBackOff")
         self.assertEqual(pod["containers"][0]["lastState"]["terminated"]["exitCode"], 137)
         self.assertEqual(pod["initContainers"][0]["state"]["waiting"]["reason"], "Other")
         self.assertEqual(json.loads(files["events-pod-uid.json"])[0]["reason"], "FailedMount")
+
+    def test_image_identity_privacy(self):
+        """Retain validated digests, never registry, repository, tag or userinfo."""
+        files, _, _ = self.run_case("image-privacy")
+        serialized = "".join(files.values())
+        for private in PRIVATE_IMAGE_PARTS:
+            self.assertNotIn(private, serialized)
+        expected = [digest for _, digest in image_identity_cases()] + [None]
+        deployment = json.loads(files["deployment.json"])
+        replicaset = json.loads(files["replicasets.json"])[0]
+        pod = json.loads(files["pods.json"])[0]
+        for workload_status in (deployment, replicaset):
+            self.assertEqual([image["image"] for image in workload_status["images"]], expected)
+        for statuses in (pod["containers"], pod["initContainers"]):
+            self.assertEqual([container["image"] for container in statuses], expected)
+            self.assertEqual([container["imageID"] for container in statuses], expected)
 
     def test_newest_events_survive_cap(self):
         """Sort matching core Events by timestamp fallbacks before limiting."""
