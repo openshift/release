@@ -65,12 +65,30 @@ for suite in "${TEST_SUITES[@]}"; do
   scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
     "${BASTION_USER}@${BASTION_IP}:${remote_dir}/report/*.xml" \
     "${artifact_dir}/" || echo "No XML artifacts in eco_gotests_${suite} — skipping"
+  # The bastion persists across jobs. Rebuild the archive from scratch and only
+  # upload it when zip actually produced output, so stale dumps are never reused.
+  remote_zip="/tmp/k8sreporter_${suite}.zip"
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "cd ${remote_dir}/report && find . -mindepth 1 ! -name '*.xml' -type f \
-     | zip /tmp/k8sreporter_${suite}.zip -@ 2>/dev/null || true"
-  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${suite}.zip" \
-    "${artifact_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_${suite} — skipping"
+    "rm -f ${remote_zip}; cd ${remote_dir}/report && find . -mindepth 1 ! -name '*.xml' -type f \
+     | zip -q ${remote_zip} -@ 2>/dev/null || true"
+  if ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "test -s ${remote_zip}" 2>/dev/null; then
+    if scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+      "${BASTION_USER}@${BASTION_IP}:${remote_zip}" \
+      "${artifact_dir}/k8sreporter_${suite}.zip" 2>/dev/null; then
+      ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+        "rm -f ${remote_zip}" || true
+    else
+      echo "Failed to copy k8sreporter artifacts for eco_gotests_${suite} — skipping" >&2
+    fi
+  else
+    zip_check_rc=$?
+    if [[ ${zip_check_rc} -eq 1 ]]; then
+      echo "No k8sreporter artifacts in eco_gotests_${suite} — skipping"
+    else
+      echo "Failed to check for k8sreporter artifacts in eco_gotests_${suite} — skipping" >&2
+    fi
+  fi
 done
 
 rm -rf "${PROJECT_DIR}/temp_ssh_key"
