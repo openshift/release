@@ -20,6 +20,10 @@ STORAGE_BY_CLOUD = {
     "gcp": "gcs",
     "azure": "blob",
     "libvirt": "s3",
+    # Bare metal (Equinix) has no cloud object store and the dev-scripts cluster
+    # has no default StorageClass for ODF/NooBaa, so Quay uses an external AWS S3
+    # bucket (objectstorage managed:false) for registry storage.
+    "baremetal": "s3",
 }
 # Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
 EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
@@ -30,6 +34,9 @@ DEPLOY_REF_BY_CLOUD = {
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
+    # Bare metal uses the external AWS S3 deploy step (bucket creds come from the
+    # quay-tests vault, not the cluster profile).
+    "baremetal": "quay-deploy-aws-s3",
 }
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",
