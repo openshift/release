@@ -274,6 +274,33 @@ def mock_oc(arguments, base, case):
 class DeployPreviousDiagnosticsTest(unittest.TestCase):
     """Exercise the delivered shell script using strict command mocks."""
 
+    def assert_process_stopped(self, pid):
+        """Allow bounded scheduling time for asynchronous SIGKILL delivery."""
+        status = Path("/proc") / str(pid) / "stat"
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            try:
+                if status.read_text(encoding="utf-8").rsplit(") ", 1)[1].split()[0] == "Z":
+                    return
+            except FileNotFoundError:
+                return
+            time.sleep(0.01)
+        self.fail("Fixture process did not terminate after SIGKILL")
+
+    def test_termination_observation_is_bounded(self):
+        """Observe delayed termination without accepting a persistently live process."""
+        with mock.patch.object(Path, "read_text", side_effect=["1 (mock) R", "1 (mock) Z"]), \
+                mock.patch.object(time, "sleep") as pause:
+            self.assert_process_stopped(1)
+            pause.assert_called_once_with(0.01)
+        with mock.patch.object(Path, "read_text", side_effect=FileNotFoundError):
+            self.assert_process_stopped(1)
+        with mock.patch.object(Path, "read_text", return_value="1 (mock) R"), \
+                mock.patch.object(time, "sleep"), \
+                mock.patch.object(time, "monotonic", side_effect=[0, 0, 2]), \
+                self.assertRaisesRegex(AssertionError, "did not terminate"):
+            self.assert_process_stopped(1)
+
     def run_case(self, case, expected=42):
         """Run a case with automatically removed temporary artifacts."""
         with tempfile.TemporaryDirectory() as directory:
@@ -340,8 +367,7 @@ class DeployPreviousDiagnosticsTest(unittest.TestCase):
         self.assertEqual(len(mutations), 0 if case in ("no-op", "locked", "missing-kubeconfig") else 1)
         if (base / "diagnostic.pid").exists():
             pid = (base / "diagnostic.pid").read_text(encoding="utf-8")
-            process_status = Path("/proc") / pid / "stat"
-            self.assertTrue(not process_status.exists() or process_status.read_text(encoding="utf-8").split()[2] == "Z")
+            self.assert_process_stopped(pid)
         return files, diagnostics, elapsed
 
     def test_rollout_failure_artifacts(self):
@@ -403,9 +429,7 @@ class DeployPreviousDiagnosticsTest(unittest.TestCase):
                     self.run_fixture(case, 42, base, deadline=0.1)
                 self.assertLess(time.monotonic() - start, 8)
                 for pid in (base / "cleanup-pids").read_text(encoding="utf-8").splitlines():
-                    status = Path("/proc") / pid / "stat"
-                    self.assertTrue(not status.exists() or
-                                    status.read_text(encoding="utf-8").split()[2] == "Z")
+                    self.assert_process_stopped(pid)
 
     def test_diagnostic_failure_preserves_status(self):
         """Diagnostic API, artifact, and parsing errors preserve rollout status."""
