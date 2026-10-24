@@ -316,7 +316,7 @@ class ArtifactSafetyTests(ArtifactFixture):
         self.metadata()
 
 
-class ImageAcquisitionTests(ArtifactFixture):
+class ImageAcquisitionFixture(ArtifactFixture):
     def check_acquisition(self, errors, expected_status, attempts, trace=False):
         sleep = self.bin / "sleep"
         sleep.write_text('#!/bin/bash\nprintf "%s\\n" "$1" >> "$FIXTURE_DIR/delays"\n')
@@ -343,6 +343,8 @@ class ImageAcquisitionTests(ArtifactFixture):
         self.assertIn("elapsed=", result.stdout)
         return result
 
+
+class ImageAcquisitionTests(ImageAcquisitionFixture):
     def test_transient_then_success(self):
         result = self.check_acquisition(["fetching blob: StatusCode: 503"], 0, 2)
         self.assertIn("http_status=503", result.stdout)
@@ -400,6 +402,38 @@ class ImageAcquisitionTests(ArtifactFixture):
 
     def test_trace_does_not_disclose_pull_output(self):
         self.check_acquisition(["HTTP/1.1 503 Service Unavailable"], 0, 2, trace=True)
+
+
+class ImageAcquisitionFormatTests(ImageAcquisitionFixture):
+    def test_http_status_format_retries(self):
+        self.check_acquisition(["received unexpected HTTP status: 503"], 0, 2)
+
+    def test_registry_status_format_retries(self):
+        self.check_acquisition(["invalid status code from registry 503"], 0, 2)
+
+    def test_original_blob_failure_retries(self):
+        self.check_acquisition([
+            "Error: parsing image configuration: fetching blob: "
+            "received unexpected HTTP status: 503 Service Unavailable"], 0, 2)
+
+    def test_http_status_format_exhaustion(self):
+        self.check_acquisition(["received unexpected HTTP status: 503"] * 3, 75, 3)
+
+    def test_registry_status_format_exhaustion(self):
+        self.check_acquisition(["invalid status code from registry 503"] * 3, 75, 3)
+
+    def test_http_status_format_permanent_precedence(self):
+        self.check_acquisition([
+            "received unexpected HTTP status: 503: unauthorized"], 75, 1)
+
+    def test_registry_status_format_permanent_precedence(self):
+        self.check_acquisition([
+            "invalid status code from registry 503: manifest unknown"], 75, 1)
+
+    def test_original_blob_failure_trace_safety(self):
+        self.check_acquisition([
+            "Error: parsing image configuration: fetching blob: "
+            "received unexpected HTTP status: 503 Service Unavailable"], 0, 2, trace=True)
 
 
 class ArtifactPostprocessingTests(ArtifactFixture):

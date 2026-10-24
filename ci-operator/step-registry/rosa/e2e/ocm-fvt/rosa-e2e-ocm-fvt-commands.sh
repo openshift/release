@@ -379,7 +379,7 @@ pull_ocmci_image() (
     fi
     http_status=unknown
     retryable=false
-    if [[ "${pull_output,,}" =~ (statuscode:|status[[:space:]]code:|http(/[0-9.]+)?)[[:space:]]+([0-9]{3})([^0-9]|$) ]]; then
+    if [[ "${pull_output,,}" =~ (statuscode:|status[[:space:]]code:|http(/[0-9.]+)?|http[[:space:]]status:|invalid[[:space:]]status[[:space:]]code[[:space:]]from[[:space:]]registry)[[:space:]]+([0-9]{3})([^0-9]|$) ]]; then
       http_status="${BASH_REMATCH[3]}"
       case "${http_status}" in
         408|429|500|502|503|504) retryable=true ;;
