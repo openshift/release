@@ -110,8 +110,7 @@ extract_container_logs || true
 # OPCT storage.
 show_reader "Consolidating artifacts as Baseline Results"
 INVALID_OPCT_REPO="true"
-VALID_REPOS=("redhat-openshift-ecosystem-provider-certification-tool")
-VALID_REPOS+=("redhat-openshift-ecosystem-opct")
+VALID_REPOS=("redhat-openshift-ecosystem-opct")
 VALID_REPOS+=("periodic-ci-openshift-release-main")
 show_msg "Checking if JOB name is allowed to upload results: ${JOB_NAME}"
 for VR in "${VALID_REPOS[@]}"; do
