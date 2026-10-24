@@ -49,8 +49,7 @@ XMLEOF
   } > "${tmpf}"
   mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/" 2>/dev/null || true
   fi
 }
 

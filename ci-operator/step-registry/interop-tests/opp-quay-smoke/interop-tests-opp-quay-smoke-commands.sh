@@ -106,8 +106,7 @@ EOF
 
 # shellcheck disable=SC2317
 _propagate_junit () {
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/" \; 2>/dev/null || true
 }
 
 trap '_opp_cleanup; GenerateJunit; _propagate_junit' EXIT

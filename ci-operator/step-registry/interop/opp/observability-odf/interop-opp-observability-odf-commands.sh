@@ -140,8 +140,7 @@ function CollectExitArtifacts () {
 
 # shellcheck disable=SC2317
 _propagate_junit () {
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/" \; 2>/dev/null || true
 }
 
 trap '_jrc=$?; set +e; WriteJunit || true; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT

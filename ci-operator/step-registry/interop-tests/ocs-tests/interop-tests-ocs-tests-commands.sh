@@ -69,12 +69,10 @@ cleanup() {
 }
 
 _propagate_junit() {
-    local shared_junit="${SHARED_DIR}/junit"
-    mkdir -p "${shared_junit}"
     # ocs-tests writes JUnit into ${ARTIFACT_DIR}/ocs-tests/
     local ocs_dir="${ARTIFACT_DIR}/ocs-tests"
     if compgen -G "${ocs_dir}"/junit*.xml > /dev/null 2>&1; then
-        cp -v "${ocs_dir}"/junit*.xml "${shared_junit}/"
+        cp -v "${ocs_dir}"/junit*.xml "${SHARED_DIR}/"
     fi
 }
 
