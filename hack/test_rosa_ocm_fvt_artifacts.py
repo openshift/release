@@ -64,6 +64,11 @@ def mock_command(command, arguments):
     with (base / "calls.jsonl").open("a", encoding="utf-8") as calls:
         calls.write(json.dumps(arguments) + "\n")
     if arguments[0] == "pull":
+        errors = json.loads(os.environ.get("FIXTURE_PULL_ERRORS", "[]"))
+        attempt = len((base / "calls.jsonl").read_text().splitlines())
+        if attempt <= len(errors):
+            print(errors[attempt - 1] + " " + SECRET, file=sys.stderr)
+            return 75
         return 0
     if arguments[0] == "inspect":
         if case == "invalid-digest":
@@ -309,6 +314,92 @@ class ArtifactSafetyTests(ArtifactFixture):
     def test_inspect_failure_is_best_effort(self):
         self.run_step("inspect-failure")
         self.metadata()
+
+
+class ImageAcquisitionTests(ArtifactFixture):
+    def check_acquisition(self, errors, expected_status, attempts, test_status=0, trace=False):
+        sleep = self.bin / "sleep"
+        sleep.write_text('#!/bin/bash\nprintf "%s\\n" "$1" >> "$FIXTURE_DIR/delays"\n')
+        sleep.chmod(0o755)
+        result = subprocess.run(
+            ["bash", *(["-x"] if trace else []), str(self.script)], env={
+                "PATH": str(self.bin) + os.pathsep + os.defpath,
+                "HOME": str(self.base), "ARTIFACT_DIR": str(self.artifacts),
+                "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
+                "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
+                "FIXTURE_CASE": "normal", "FIXTURE_EXIT": str(test_status),
+                "FIXTURE_PULL_ERRORS": json.dumps(errors),
+            }, capture_output=True, text=True, timeout=30, check=False)
+        calls = [json.loads(line)[0] for line in
+                 (self.base / "calls.jsonl").read_text().splitlines()]
+        self.assertEqual(result.returncode, expected_status)
+        self.assertEqual(calls, ["pull"] * attempts +
+                         ([] if expected_status == 75 else ["inspect", "run"]))
+        delays = self.base / "delays"
+        self.assertEqual(delays.read_text().splitlines() if delays.exists() else [],
+                         ["10", "20"][:attempts - 1])
+        self.assertNotIn(SECRET, result.stdout + result.stderr)
+        self.assertIn(f"attempt={attempts}/3", result.stdout)
+        self.assertIn("elapsed=", result.stdout)
+        return result
+
+    def test_transient_then_success(self):
+        result = self.check_acquisition(["fetching blob: StatusCode: 503"], 0, 2)
+        self.assertIn("http_status=503", result.stdout)
+
+    def test_exhaustion(self):
+        self.check_acquisition(["fetching blob: StatusCode: 503"] * 3, 75, 3)
+
+    def test_request_timeout_retries(self):
+        self.check_acquisition(["HTTP 408 Request Timeout"], 0, 2)
+
+    def test_rate_limit_retries(self):
+        self.check_acquisition(["HTTP 429 Too Many Requests"], 0, 2)
+
+    def test_server_error_retries(self):
+        self.check_acquisition(["HTTP 500 Internal Server Error"], 0, 2)
+
+    def test_bad_gateway_retries(self):
+        self.check_acquisition(["HTTP 502 Bad Gateway"], 0, 2)
+
+    def test_gateway_timeout_retries(self):
+        self.check_acquisition(["HTTP 504 Gateway Timeout"], 0, 2)
+
+    def test_status_code_format_retries(self):
+        self.check_acquisition(["unexpected status code: 503 Service Unavailable"], 0, 2)
+
+    def test_authentication_fails_fast(self):
+        self.check_acquisition(["HTTP 401 Unauthorized"], 75, 1)
+
+    def test_authorization_fails_fast(self):
+        self.check_acquisition(["HTTP 403 Forbidden"], 75, 1)
+
+    def test_not_found_fails_fast(self):
+        self.check_acquisition(["HTTP 404 Not Found"], 75, 1)
+
+    def test_manifest_unknown_fails_fast(self):
+        self.check_acquisition(["manifest unknown"], 75, 1)
+
+    def test_unknown_failure_fails_fast(self):
+        self.check_acquisition(["unrecognized failure"], 75, 1)
+
+    def test_unlisted_server_error_fails_fast(self):
+        self.check_acquisition(["HTTP 501 Not Implemented"], 75, 1)
+
+    def test_permanent_error_takes_precedence(self):
+        self.check_acquisition(["HTTP 503: unauthorized: authentication required"], 75, 1)
+
+    def test_manifest_error_takes_precedence(self):
+        self.check_acquisition(["HTTP 503: manifest unknown"], 75, 1)
+
+    def test_success_does_not_repeat_tests(self):
+        self.check_acquisition([], 0, 1)
+
+    def test_test_failure_does_not_retry(self):
+        self.check_acquisition(["StatusCode: 503"], 42, 2, test_status=42)
+
+    def test_trace_does_not_disclose_pull_output(self):
+        self.check_acquisition(["HTTP/1.1 503 Service Unavailable"], 0, 2, trace=True)
 
 
 class ArtifactPostprocessingTests(ArtifactFixture):

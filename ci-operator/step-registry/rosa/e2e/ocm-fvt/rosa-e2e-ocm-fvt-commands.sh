@@ -365,9 +365,38 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 fi
 
 echo "=== ocmci image digest ==="
-podman pull \
-  --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest
+pull_ocmci_image() (
+  set +x
+  local attempt pull_output pull_status http_status retryable started=${SECONDS}
+  for attempt in 1 2 3; do
+    if pull_output="$(podman pull \
+      --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+      quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest 2>&1)"; then
+      echo "ocmci image acquisition: attempt=${attempt}/3 exit_status=0 elapsed=$((SECONDS - started))s"
+      return 0
+    else
+      pull_status=$?
+    fi
+    http_status=unknown
+    retryable=false
+    if [[ "${pull_output,,}" =~ (statuscode:|status[[:space:]]code:|http(/[0-9.]+)?)[[:space:]]+([0-9]{3})([^0-9]|$) ]]; then
+      http_status="${BASH_REMATCH[3]}"
+      case "${http_status}" in
+        408|429|500|502|503|504) retryable=true ;;
+      esac
+    fi
+    if [[ "${pull_output,,}" =~ unauthorized|forbidden|denied|authentication|manifest[[:space:]]unknown|name[[:space:]]unknown|not[[:space:]]found ]]; then
+      retryable=false
+    fi
+    echo "ocmci image acquisition: attempt=${attempt}/3 exit_status=${pull_status} http_status=${http_status} retryable=${retryable} elapsed=$((SECONDS - started))s"
+    if [[ "${retryable}" != true || "${attempt}" == 3 ]]; then
+      return "${pull_status}"
+    fi
+    echo "ocmci image acquisition: retry_in=$((attempt * 10))s"
+    sleep "$((attempt * 10))"
+  done
+)
+pull_ocmci_image
 [[ $- == *x* ]] && WAS_TRACING_DIGEST=true || WAS_TRACING_DIGEST=false
 set +x
 image_digest="$(podman inspect \
