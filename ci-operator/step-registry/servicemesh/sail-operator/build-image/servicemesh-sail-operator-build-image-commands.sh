@@ -7,16 +7,17 @@
 # it to an external quay.io registry. The built image coordinates (HUB and TAG)
 # are written to SHARED_DIR for consumption by downstream test steps.
 #
-# The image tag is suffixed with the target architecture (e.g. "-amd64", "-arm64")
-# so that parallel amd64 and arm64 CI jobs push to distinct tags and do not
-# overwrite each other.
-#
 # Steps:
-# 1. Detects the current architecture via `go env GOARCH`.
-# 2. Derives a unique, arch-suffixed image tag from Prow build metadata.
+# 1. Detects the target architecture: OCP_ARCH if set (for ARM clusters), else
+#    the CI build node's native arch via `go env GOARCH`.
+# 2. Derives a unique image tag from Prow build metadata.
+#    Tag format: pr-${PULL_NUMBER} for presubmit jobs (matches what the test
+#    suite computes internally so the operator pod can pull the image), or
+#    ${BUILD_ID} for periodic/postsubmit jobs.
 # 3. Creates an OCP Secret with the quay.io push credentials.
-# 4. Pre-compiles the operator binary with `make build` (which auto-selects
-#    the binary output path via setup_env.sh: out/linux_${ARCH}/sail-operator).
+# 4. Pre-compiles the operator binary with `make build`. When the target arch
+#    differs from the build node arch (ARM clusters), cross-compiles by passing
+#    TARGET_ARCH and GOARCH to make.
 # 5. Creates (or updates) an OCP BuildConfig with Docker strategy.
 #    Patches the BuildConfig with TARGETARCH so the Dockerfile picks up the
 #    correct pre-compiled binary from the uploaded source tree.
@@ -41,30 +42,20 @@ readonly BUILD_NAME="sail-operator-ci-build"
 readonly OCP_NAMESPACE="default"
 
 # --- Architecture detection ---
-# go env GOARCH reflects the native arch of the CI node (amd64 on standard nodes,
-# arm64 on r6g.xlarge nodes). This matches what setup_env.sh derives from uname -m,
-# so 'make build' compiles to out/linux_${ARCH}/sail-operator.
-ARCH=$(go env GOARCH)
-echo "Target architecture: ${ARCH}"
+# Use OCP_ARCH if set (passed by ARM job configs), falling back to the CI build
+# node's native arch. The CI build cluster is always amd64, so OCP_ARCH must be
+# set explicitly for ARM target clusters.
+ARCH="${OCP_ARCH:-$(go env GOARCH)}"
+echo "Target architecture: ${ARCH} (build node: $(go env GOARCH))"
 
 # --- Tag derivation ---
-# Suffix the tag with the arch so amd64 and arm64 jobs push to separate images.
-#
-# For presubmit (PR) jobs, use the first 8 chars of PULL_PULL_SHA to match the
-# tag that common-operator-integ-suite.sh computes internally. If we use BUILD_ID
-# instead, the test suite deploys a different tag than the one we pushed and the
-# operator pod fails to pull the image.
-# For periodic/postsubmit jobs (no PULL_NUMBER), fall back to BUILD_ID which is
-# always unique per run.
+# For presubmit (PR) jobs, use pr-${PULL_NUMBER} — this matches the tag that
+# common-operator-integ-suite.sh computes independently so the operator pod can
+# pull the image. For periodic/postsubmit jobs fall back to BUILD_ID.
 if [[ -n "${PULL_NUMBER:-}" ]]; then
-  if [[ -z "${PULL_PULL_SHA:-}" ]]; then
-    echo "ERROR: PULL_PULL_SHA is not set for a presubmit job. Cannot compute PR image tag." >&2
-    exit 1
-  fi
-  COMMIT_HASH="${PULL_PULL_SHA:0:8}"
-  COMPUTED_TAG="pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH}"
+  COMPUTED_TAG="pr-${PULL_NUMBER}"
 else
-  COMPUTED_TAG="${BUILD_ID}-${ARCH}"
+  COMPUTED_TAG="${BUILD_ID}"
 fi
 readonly COMPUTED_TAG
 echo "Image tag: ${COMPUTED_TAG}"
@@ -95,11 +86,12 @@ oc create secret docker-registry sail-quay-push \
 $WAS_TRACING && set -x
 
 # --- Pre-compile the operator binary ---
-# setup_env.sh (sourced by make via Makefile) auto-detects TARGET_ARCH from uname -m
-# and compiles the binary to out/linux_${ARCH}/sail-operator.
 # BUILD_WITH_CONTAINER=0 ensures the build runs in-process without spawning a container.
+# When the target arch differs from the build node (cross-compilation for ARM clusters),
+# TARGET_ARCH and GOARCH are passed explicitly so the Makefile/setup_env.sh outputs
+# to out/linux_${ARCH}/sail-operator instead of the native arch path.
 echo "Pre-compiling operator binary for ${ARCH}..."
-BUILD_WITH_CONTAINER=0 XDG_CACHE_HOME="${XDG_CACHE_HOME:-/tmp/cache}" make build
+TARGET_ARCH="${ARCH}" GOARCH="${ARCH}" BUILD_WITH_CONTAINER=0 XDG_CACHE_HOME="${XDG_CACHE_HOME:-/tmp/cache}" make build
 
 # Verify the binary exists at the path the Dockerfile expects
 readonly BINARY_PATH="out/linux_${ARCH}/sail-operator"
