@@ -67,6 +67,16 @@ tests:
 - always_run: false
   as: berserker-scale-test
   optional: true
+  reporter_config:
+    channel: '#acs-perfscale'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-stackrox
@@ -77,7 +87,9 @@ tests:
       DAEMONSET_REPLICAS: "5"
       JOB_ITERATIONS: "5"
       MAX_WAIT_TIMEOUT: 10m
-      ROX_SCANNER_V4_ENABLED: "true"
+      ROXIE_VERSION: 0.4.5
+      SCANNER_V4_MATCHER_READINESS: vulnerability
+      SCANNER_V4_MATCHER_VULN_BUNDLE_ALLOWLIST: nvd,manual
       TEST_SUITE: ocp-perf-scale-tests
       USER_TAGS: |
         TicketId 382
