@@ -70,7 +70,20 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  fips-check:
+    requests:
+      cpu: "2"
+      memory: 4Gi
 tests:
+- as: fips-check
+  commands: |
+    CGO_ENABLED=0 GOFIPS140=certified go build -tags no_openssl -o ./opentelemetry-operator -trimpath -ldflags "-s -w"
+    CGO_ENABLED=0 GOFIPS140=certified go build -C ./cmd/otel-allocator -tags no_openssl -o ./opentelemetry-target-allocator -trimpath -ldflags "-s -w"
+    GOFLAGS= go install github.com/os-observability/konflux-opentelemetry/tools/fips-check@latest
+    fips-check --binary ./opentelemetry-operator --module . --allowlist ./fips-allowlist.yaml
+    fips-check --binary ./cmd/otel-allocator/opentelemetry-target-allocator --module . --allowlist ./fips-allowlist.yaml
+  container:
+    from: src
 - as: e2e-pre-merge
   cluster_claim:
     architecture: amd64
