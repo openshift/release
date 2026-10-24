@@ -1,0 +1,72 @@
+base_images:
+  e2e-tests-5-1:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: tests
+  e2e-tests-5-2:
+    name: "5.2"
+    namespace: ocp-priv
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+canonical_go_repository: github.com/openshift/operator-framework-olm
+images:
+  items:
+  - build_args:
+    - name: PSA_E2E_RUNNER_TOOL_VERSION
+      value: b81366aabacc7f76624e53c438dcb1ede70c5324
+    dockerfile_literal: |-
+      FROM pipeline:src AS psa-e2e-runner-builder
+      ARG PSA_E2E_RUNNER_TOOL_VERSION
+      RUN mkdir -p /tmp/psa-e2e-runner && \
+          GOFLAGS="" GOBIN=/tmp/psa-e2e-runner go install \
+            "github.com/openshift/cluster-debug-tools/cmd/kubectl-dev_tool@${PSA_E2E_RUNNER_TOOL_VERSION}" && \
+          test -x /tmp/psa-e2e-runner/kubectl-dev_tool
+      FROM e2e-tests-5-1
+      COPY --from=psa-e2e-runner-builder /tmp/psa-e2e-runner/kubectl-dev_tool /usr/local/bin/kubectl-dev_tool
+      RUN test -x /usr/local/bin/kubectl-dev_tool
+    from: e2e-tests-5-1
+    to: psa-e2e-runner-5.1-b81366a
+  - build_args:
+    - name: PSA_E2E_RUNNER_TOOL_VERSION
+      value: b81366aabacc7f76624e53c438dcb1ede70c5324
+    dockerfile_literal: |-
+      FROM pipeline:src AS psa-e2e-runner-builder
+      ARG PSA_E2E_RUNNER_TOOL_VERSION
+      RUN mkdir -p /tmp/psa-e2e-runner && \
+          GOFLAGS="" GOBIN=/tmp/psa-e2e-runner go install \
+            "github.com/openshift/cluster-debug-tools/cmd/kubectl-dev_tool@${PSA_E2E_RUNNER_TOOL_VERSION}" && \
+          test -x /tmp/psa-e2e-runner/kubectl-dev_tool
+      FROM e2e-tests-5-2
+      COPY --from=psa-e2e-runner-builder /tmp/psa-e2e-runner/kubectl-dev_tool /usr/local/bin/kubectl-dev_tool
+      RUN test -x /usr/local/bin/kubectl-dev_tool
+    from: e2e-tests-5-2
+    to: psa-e2e-runner-5.2-b81366a
+promotion:
+  to:
+  - name: psa-e2e-runner
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp-priv
+  latest:
+    integration:
+      name: "5.2"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: operator-framework-olm
+  variant: image
