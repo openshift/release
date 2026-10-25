@@ -119,7 +119,7 @@ eval "$(
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)" || true
+)"
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
