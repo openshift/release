@@ -56,18 +56,19 @@ periodics:
                 WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
               from: nested-podman
               inputs:
-                aro-src:
+                src-aro:
                   paths:
                   - destination_dir: src
                     source_path: /go/src/github.com/Azure/ARO-HCP
+              ref: aro
               to: nested-podman-src
           raw_steps:
           - source_step:
               clonerefs_path: /ko-app/clonerefs
               from: root
-              pull_spec: registry.ci.openshift.org/ci/clonerefs@sha256:5f8268c43643af4d422fe2427de4371754781e6b5282b0654c291d303b49357a
+              pull_spec: quay-proxy.ci.openshift.org/openshift/ci@sha256:c4ae6b5b100e76cea7a191ae195f3059c3b31214e428eb1618ce8110cf553df2
               ref: Azure.ARO-HCP
-              to: aro-src
+              to: src-aro
           resources:
             '*':
               limits:
@@ -125,7 +126,7 @@ periodics:
             branch: main
             org: Azure
             repo: ARO-HCP
-      image: registry.ci.openshift.org/ci/ci-operator@sha256:32016120881913a8c871a85d20b694581cc3da81db3f92a4dab1ca737807cf8e
+      image: quay-proxy.ci.openshift.org/openshift/ci@sha256:c2abd31836b9f43a8232b167f03517943d00b0a2af8db71e7aa203d43f84d476
       imagePullPolicy: Always
       name: ""
       ports:
@@ -230,9 +231,9 @@ periodics:
           - source_step:
               clonerefs_path: /ko-app/clonerefs
               from: root
-              pull_spec: registry.ci.openshift.org/ci/clonerefs@sha256:5f8268c43643af4d422fe2427de4371754781e6b5282b0654c291d303b49357a
+              pull_spec: quay-proxy.ci.openshift.org/openshift/ci@sha256:c4ae6b5b100e76cea7a191ae195f3059c3b31214e428eb1618ce8110cf553df2
               ref: Azure.ARO-HCP
-              to: aro-src
+              to: src-aro
           resources:
             '*':
               limits:
@@ -280,7 +281,7 @@ periodics:
                   test-integration/hack/stop-cosmos-emulator.sh
 
                   '
-                from: aro-src
+                from: src-aro
                 nested_podman: true
                 resources:
                   requests:
@@ -290,7 +291,7 @@ periodics:
             branch: main
             org: Azure
             repo: ARO-HCP
-      image: registry.ci.openshift.org/ci/ci-operator@sha256:32016120881913a8c871a85d20b694581cc3da81db3f92a4dab1ca737807cf8e
+      image: quay-proxy.ci.openshift.org/openshift/ci@sha256:c2abd31836b9f43a8232b167f03517943d00b0a2af8db71e7aa203d43f84d476
       imagePullPolicy: Always
       name: ""
       ports:
