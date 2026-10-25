@@ -65,6 +65,7 @@ trap '_jrc=$?; set +e; _junit_emit ${_jrc}; _opp_cleanup; exit ${_jrc}' EXIT
 echo ">>> PHASE: initialization"
 
 ACS_CHANNEL="${ACS_CHANNEL:-stable}"
+ACS_CSV_WAIT_TIMEOUT="${ACS_CSV_WAIT_TIMEOUT:-5m}"
 ACS_INSTALL_TIMEOUT="${ACS_INSTALL_TIMEOUT:-15m}"
 ACS_NAMESPACE="${ACS_NAMESPACE:-rhacs-operator}"
 ACS_CENTRAL_NAMESPACE="${ACS_CENTRAL_NAMESPACE:-stackrox}"
@@ -80,7 +81,7 @@ duration_to_seconds() {
     esac
 }
 
-CSV_TIMEOUT_SECONDS=$(duration_to_seconds "${ACS_INSTALL_TIMEOUT}")
+CSV_TIMEOUT_SECONDS=$(duration_to_seconds "${ACS_CSV_WAIT_TIMEOUT}")
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
