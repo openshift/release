@@ -110,8 +110,6 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
-
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors)
 eval "$(
@@ -120,6 +118,8 @@ eval "$(
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
+
+trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
