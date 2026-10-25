@@ -1,0 +1,64 @@
+periodics:
+- agent: kubernetes
+  cluster: build11
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+    timeout: 20m0s
+  interval: 720h
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-Azure-ARO-HCP-main-integration-comparison-operator-pin
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        import base64, hashlib, json, os, re, shutil, subprocess, urllib.error, urllib.parse, urllib.request
+        registry = "quay-proxy.ci.openshift.org"
+        repository = "openshift/ci"
+        auths = json.load(open("/etc/pull-secret/.dockerconfigjson"))["auths"]
+        matching = [v for k, v in auths.items() if k.removeprefix("https://").removeprefix("http://").split("/")[0] == registry]
+        if not matching:
+            raise SystemExit("No configured pull credential for the production CI proxy")
+        credential = matching[0]
+        basic = credential.get("auth") or base64.b64encode((credential["username"] + ":" + credential["password"]).encode()).decode()
+        accept = "application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json"
+        for tag, label in [("ci_ci-operator_latest", "OPERATOR_IMAGE"), ("ci_clonerefs_latest", "CLONEREFS_IMAGE")]:
+            url = "https://" + registry + "/v2/" + repository + "/manifests/" + tag
+            try:
+                response = urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": accept}), timeout=60)
+            except urllib.error.HTTPError as error:
+                challenge = error.headers.get("WWW-Authenticate", "")
+                fields = dict(re.findall(r'(\w+)="([^"]+)"', challenge))
+                realm = fields.get("realm", "")
+                if urllib.parse.urlparse(realm).hostname != registry:
+                    raise SystemExit("Unexpected registry token realm; refusing credential forwarding")
+                query = urllib.parse.urlencode({"service": fields.get("service", registry), "scope": "repository:" + repository + ":pull"})
+                token_request = urllib.request.Request(realm + "?" + query, headers={"Authorization": "Basic " + basic})
+                token_data = json.load(urllib.request.urlopen(token_request, timeout=60))
+                token = token_data.get("token") or token_data["access_token"]
+                response = urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": accept, "Authorization": "Bearer " + token}), timeout=60)
+            with response:
+                content = response.read()
+                digest = response.headers.get("Docker-Content-Digest") or "sha256:" + hashlib.sha256(content).hexdigest()
+                print(label + "=" + registry + "/" + repository + "@" + digest, flush=True)
+        print("BASH_AVAILABLE=" + str(bool(shutil.which("bash"))), flush=True)
+        print("JQ_VERSION=" + subprocess.check_output(["jq", "--version"], text=True).strip(), flush=True)
+      command:
+      - python3
+      image: registry.ci.openshift.org/ci/ci-operator@sha256:32016120881913a8c871a85d20b694581cc3da81db3f92a4dab1ca737807cf8e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
