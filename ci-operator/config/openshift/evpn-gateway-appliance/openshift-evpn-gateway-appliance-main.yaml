@@ -1,4 +1,8 @@
 base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ubi-python:
     name: ubi-python-312
     namespace: ocp
@@ -10,6 +14,17 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src/
+      WORKDIR /opt/app-root/src/evpn-gateway-appliance
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift/evpn-gateway-appliance
+    to: src-podman
 resources:
   '*':
     limits:
@@ -17,7 +32,68 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  image-ci:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
 tests:
+- as: image-ci
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    test:
+    - as: build
+      commands: |
+        secret=/var/run/registry-pull-credentials/.dockerconfigjson
+        test -f "$secret"
+        test -f image/rhel10/Containerfile
+        test -f image/rhel10/Containerfile.nested-ci
+        test -f image/tools/smoke-payloads.py
+        export REGISTRY_AUTH_FILE="$secret"
+        run_timed() {
+          local start end elapsed rc
+          start=$(date +%s.%N)
+          echo "image-ci: $(date -u +%Y-%m-%dT%H:%M:%SZ) start $*"
+          set +e
+          "$@"
+          rc=$?
+          set -e
+          end=$(date +%s.%N)
+          elapsed=$(awk -v e="$end" -v s="$start" 'BEGIN{printf "%.1f", e-s}')
+          echo "image-ci: $(date -u +%Y-%m-%dT%H:%M:%SZ) finish $* elapsed ${elapsed}s rc $rc"
+          return $rc
+        }
+        parent=localhost/evpn-appliance-rhel10:ci
+        nested=localhost/evpn-appliance-rhel10:nested-ci
+        run_timed timeout 45m podman build --log-level=debug \
+          -f image/rhel10/Containerfile \
+          -t "$parent" \
+          --build-arg BOOTC_BASE=quay.io/centos-bootc/centos-bootc:stream10 \
+          --build-arg FRR_IMAGE=registry.ci.openshift.org/ocp/4.22:metallb-frr \
+          --build-arg NODE_EXPORTER_IMAGE=registry.ci.openshift.org/ocp/4.22:prometheus-node-exporter \
+          --secret "id=dockerconfig,src=$secret" \
+          image/rhel10
+        run_timed timeout 45m podman build --log-level=debug --pull=never \
+          -f image/rhel10/Containerfile.nested-ci \
+          --build-arg "APPLIANCE_IMAGE=$parent" \
+          -t "$nested" \
+          image/rhel10
+        timeout 10m python3 image/tools/smoke-payloads.py "$parent"
+      credentials:
+      - bundle: registry-pull-credentials
+        mount_path: /var/run/registry-pull-credentials
+        namespace: test-credentials
+      from: src-podman
+      nested_podman: true
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
 - as: verify
   commands: make verify OFFLINE=1
   container:
