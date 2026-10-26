@@ -450,7 +450,42 @@ for pod in d.get('items',[]):
 WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
 
 # ---------------------------------------------------------------------------
-# Check 5: Default policies loaded (count > 80)
+# Check 5: Collector DaemonSet ready
+# ---------------------------------------------------------------------------
+function CheckCollectorReady () {
+    typeset dsJson=""
+    dsJson="$(oc get daemonset -n "${scNs}" -l app.kubernetes.io/name=collector \
+        -o json 2>/dev/null)" || return 1
+    typeset dsCount=""
+    dsCount="$(echo "${dsJson}" | python3 -c \
+        "import json,sys; d=json.load(sys.stdin); print(len(d.get('items',[])))" \
+        2>/dev/null)" || return 1
+    [[ "${dsCount}" -ge 1 ]] || return 1
+
+    typeset desired=""
+    typeset ready=""
+    desired="$(echo "${dsJson}" | python3 -c \
+        "import json,sys; d=json.load(sys.stdin); print(d['items'][0].get('status',{}).get('desiredNumberScheduled',0))" \
+        2>/dev/null)" || return 1
+    ready="$(echo "${dsJson}" | python3 -c \
+        "import json,sys; d=json.load(sys.stdin); print(d['items'][0].get('status',{}).get('numberReady',0))" \
+        2>/dev/null)" || return 1
+
+    if [[ "${desired}" -le 0 ]]; then
+        echo "[readiness]   collector DS: desired=${desired} ready=${ready}"
+        return 1
+    fi
+    if [[ "${ready}" -lt "${desired}" ]]; then
+        echo "[readiness]   collector DS: desired=${desired} ready=${ready}"
+        return 1
+    fi
+    true
+}
+
+WaitFor "collector DaemonSet ready" CheckCollectorReady
+
+# ---------------------------------------------------------------------------
+# Check 6: Default policies loaded (count > 80)
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
     typeset policyCount=""
