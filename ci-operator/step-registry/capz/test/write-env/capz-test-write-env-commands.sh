@@ -136,13 +136,13 @@ if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
   QUAY_AUTH_DIAGNOSTICS=true
   if ! jq -e '.auths["quay.io"].auth | strings | @base64d | test("^[^:]+:.+$")' \
     "${QUAY_CREDS_FILE}" >/dev/null 2>&1; then
-    echo "[quay-diag] Mounted Quay credential: INVALID (expected nonempty username:token)"
+    echo "[quay-diag] Mounted Quay credential structure: INVALID (expected nonempty username:token)"
     exit 1
   fi
   QUAY_AUTH_SHA256=$(jq -jr '.auths["quay.io"].auth | @base64d' "${QUAY_CREDS_FILE}" | sha256sum | cut -d ' ' -f 1)
-  echo "[quay-diag] Mounted Quay credential: VALID"
+  echo "[quay-diag] Mounted Quay credential structure: VALID"
   if [[ "${QUAY_AUTH_SHA256}" != "${QUAY_AUTH_EXPECTED_SHA256}" ]]; then
-    echo "[quay-diag] Known-good Vault credential → Prow mount: MISMATCH"
+    echo "[quay-diag] Tested Vault download → Prow mount: MISMATCH (informational)"
     quay_source_metadata() {
       # Use the CI pod's in-cluster identity, not the future AKS kubeconfig.
       # Reading metadata is best effort and never changes RBAC or secrets.
@@ -196,7 +196,7 @@ if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
         echo "[quay-diag] Resolved GSM version: UNAVAILABLE (no numeric version in CSI status)"
       fi
     }
-    quay_source_metadata
+    quay_source_metadata 2>/dev/null || echo "[quay-diag] Source metadata: UNAVAILABLE (lookup failed)"
 
     # A rotated sibling field can differ from an unchanged .dockerconfigjson.
     # Report comparisons only; these files are never copied into artifacts.
@@ -263,10 +263,63 @@ if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
         echo "[quay-diag] ${component} after trimming whitespace vs known-good: MISMATCH"
       fi
     done
-    exit 1
+  else
+    echo "[quay-diag] Tested Vault download → Prow mount: MATCH"
   fi
-  echo "[quay-diag] Known-good Vault credential → Prow mount: MATCH"
+  # Downstream checks compare the actual mounted value, even if it differs
+  # from our locally tested reference. A different credential may still work.
   (umask 077; printf '%s\n' "${QUAY_AUTH_SHA256}" > "${SHARED_DIR}/quay-auth.sha256")
+
+  probe_quay_images() {
+    if [[ -z "${QUAY_DIAGNOSTIC_IMAGES:-}" ]]; then
+      echo "[quay-diag] Manifest access checks: NOT REQUESTED"
+      return 0
+    fi
+    local error_file image status category failed=0
+    error_file=$(mktemp "${SHARED_DIR}/quay-image-probe.XXXXXX")
+    # The private error file is never copied into ARTIFACT_DIR. Neither stdout
+    # nor raw registry errors are logged; even failed responses can hold secrets.
+    for image in ${QUAY_DIAGNOSTIC_IMAGES}; do
+      if [[ ! "${image}" =~ ^quay[.]io/[a-z0-9._/-]+(:[A-Za-z0-9._-]+|@sha256:[a-f0-9]{64})$ ]]; then
+        echo "[quay-diag] Manifest access: INVALID IMAGE REFERENCE"
+        failed=1
+        continue
+      fi
+      status=0
+      timeout 25s oc image info --registry-config "${QUAY_CREDS_FILE}" \
+        --filter-by-os=linux/amd64 --output=json "${image}" \
+        >/dev/null 2>"${error_file}" || status=$?
+      if [[ "${status}" -eq 0 ]]; then
+        echo "[quay-diag] ${image} manifest access: SUCCESS"
+        continue
+      fi
+      failed=1
+      if [[ "${status}" -eq 124 ]]; then
+        category="TIMEOUT"
+      elif grep -Eiq 'too many requests|rate.?limit' "${error_file}"; then
+        category="RATE LIMITED"
+      elif grep -Eiq 'unauthorized|authentication required|invalid username/password|no basic auth credentials' "${error_file}"; then
+        category="AUTHENTICATION REJECTED"
+      elif grep -Eiq 'forbidden|denied' "${error_file}"; then
+        category="ACCESS DENIED"
+      elif grep -Eiq 'manifest unknown|name unknown|not found' "${error_file}"; then
+        category="IMAGE OR TAG NOT FOUND"
+      elif grep -Eiq 'no such host|temporary failure in name resolution' "${error_file}"; then
+        category="DNS FAILURE"
+      elif grep -Eiq 'x509|certificate verify|tls handshake' "${error_file}"; then
+        category="TLS FAILURE"
+      elif grep -Eiq 'timed out|timeout|deadline exceeded' "${error_file}"; then
+        category="TIMEOUT"
+      elif grep -Eiq 'connection refused|network is unreachable|connection reset' "${error_file}"; then
+        category="NETWORK FAILURE"
+      else
+        category="UNCLASSIFIED ERROR"
+      fi
+      echo "[quay-diag] ${image} manifest access: ${category}"
+    done
+    rm -f "${error_file}"
+    return "${failed}"
+  }
 fi
 
 # Write resolved environment to SHARED_DIR (sourced by subsequent steps).
@@ -306,3 +359,9 @@ echo "[write-env] REGION=${REGION:-uksouth} USE_K8S=${USE_K8S:-false} DEPLOYMENT
 echo "[write-env] ARO_REPO_URL=${ARO_REPO_URL:-https://github.com/stolostron/cluster-api-installer.git} ARO_REPO_BRANCH=${ARO_REPO_BRANCH:-main}"
 echo "[write-env] NAME_PREFIX=${NAME_PREFIX} RESOURCEGROUPNAME=${RESOURCEGROUPNAME}"
 echo "[write-env] MSI_RESOURCEGROUPNAME=${MSI_RESOURCEGROUPNAME} MSI_SUFFIX=${MSI_SUFFIX} MSI_REGION=${MSI_REGION}"
+
+# Write the shared environment first so post steps can still initialize if the
+# registry check fails. Successful checks permit provisioning and AKS diagnostics.
+if [[ "${QUAY_AUTH_DIAGNOSTICS}" == "true" ]]; then
+  probe_quay_images
+fi

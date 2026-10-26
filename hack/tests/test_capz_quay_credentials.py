@@ -27,7 +27,7 @@ class QuayCredentialTests(unittest.TestCase):
         for value in (AUTH, "test-token-do-not-log", DIGEST):
             self.assertNotIn(value, result.stdout + result.stderr)
 
-    def source_check(self, config, expected=DIGEST, metadata=None):
+    def source_check(self, config, expected=DIGEST, metadata=None, registry=None):
         source = (STEPS / "write-env/capz-arohcp-write-env-commands.sh").read_text()
         start = source.index('# Validate and fingerprint the mounted Quay credential.')
         end = source.index('# Write resolved environment', start)
@@ -37,16 +37,25 @@ class QuayCredentialTests(unittest.TestCase):
                    QUAY_CREDS_FILE=str(credential), QUAY_AUTH_EXPECTED_SHA256=expected,
                    QUAY_USERNAME_EXPECTED_SHA256=hashlib.sha256(b"robot").hexdigest(),
                    QUAY_TOKEN_EXPECTED_SHA256=hashlib.sha256(b"test-token-do-not-log").hexdigest(),
-                   NAMESPACE="")
-        if metadata is not None:
+                   NAMESPACE="", QUAY_DIAGNOSTIC_IMAGES="")
+        if metadata is not None or registry is not None:
             binary = self.directory / "bin"
             binary.mkdir(exist_ok=True)
             fixture = self.directory / "metadata.json"
-            fixture.write_text(json.dumps(metadata))
+            fixture.write_text(json.dumps(metadata or {}))
+            registry_fixture = self.directory / "registry.json"
+            registry_fixture.write_text(json.dumps(registry or {}))
             oc = binary / "oc"
             oc.write_text("#!/usr/bin/env python3\nimport json, os, sys\n"
-                          "assert 'KUBECONFIG' not in os.environ\n"
                           "args=sys.argv[1:]\n"
+                          "if args[:2] == ['image','info']:\n"
+                          " assert args[args.index('--registry-config')+1] == os.environ['QUAY_CREDS_FILE']\n"
+                          " assert '--filter-by-os=linux/amd64' in args\n"
+                          " data=json.load(open(os.environ['REGISTRY_FIXTURE']))\n"
+                          " print(data.get('stdout','test-token-do-not-log'))\n"
+                          " print(data.get('stderr',''),file=sys.stderr)\n"
+                          " sys.exit(data.get('status',0))\n"
+                          "assert 'KUBECONFIG' not in os.environ\n"
                           "kind=args[args.index('get')+1]\n"
                           "data=json.load(open(os.environ['METADATA_FIXTURE']))\n"
                           "if kind not in data:\n"
@@ -55,8 +64,16 @@ class QuayCredentialTests(unittest.TestCase):
             oc.chmod(0o755)
             env.update(PATH=str(binary) + os.pathsep + env["PATH"],
                        METADATA_FIXTURE=str(fixture), NAMESPACE="ci-test",
+                       REGISTRY_FIXTURE=str(registry_fixture),
                        HOSTNAME="write-env", KUBECONFIG="/must-not-use-aks-config")
-        result = subprocess.run(["bash", "-euo", "pipefail", "-c", source[start:end]],
+        if registry is not None:
+            env['QUAY_DIAGNOSTIC_IMAGES'] = (
+                'quay.io/acm-d/ose-cluster-api-rhel9:v5.0 '
+                'quay.io/acm-d/mce-capi-webhook-config-rhel9:5.0-dev '
+                'quay.io/acm-d/cluster-api-provider-azure-rhel9:5.0-dev '
+                'quay.io/acm-d/azure-service-operator-rhel9:5.0-dev')
+        command = source[start:end] + '\nif [[ "$QUAY_AUTH_DIAGNOSTICS" == true ]]; then probe_quay_images; fi\n'
+        result = subprocess.run(["bash", "-euo", "pipefail", "-c", command],
                                 env=env, text=True, capture_output=True, check=False)
         self.assert_private(result)
         return result
@@ -66,12 +83,12 @@ class QuayCredentialTests(unittest.TestCase):
         self.assertEqual((self.directory / "quay-auth.sha256").read_text().strip(), DIGEST)
         self.assertEqual((self.directory / "quay-auth.sha256").stat().st_mode & 0o777, 0o600)
 
-    def test_empty_malformed_and_stale_mounted_credentials_fail_privately(self):
+    def test_empty_and_malformed_mounted_credentials_fail_privately(self):
         for config in ({"auths": {}}, "not-json", {"auths": {"quay.io": {"auth": "!!!"}}},
                        {"auths": {"quay.io": {"auth": base64.b64encode(b"robot:").decode()}}}):
             with self.subTest(config=config):
                 self.assertNotEqual(self.source_check(config).returncode, 0)
-        self.assertNotEqual(self.source_check(CONFIG, "0" * 64).returncode, 0)
+        self.assertEqual(self.source_check(CONFIG, "0" * 64).returncode, 0)
 
     def test_csi_source_and_resolved_version_are_reported_without_payloads(self):
         resource = "projects/openshift-ci-secrets/secrets/collection__group__field/versions/latest"
@@ -89,7 +106,7 @@ class QuayCredentialTests(unittest.TestCase):
                 "podName": "write-env", "secretProviderClassName": "quay-spc",
                 "objects": [{"id": resource, "version": "17"}]}}]}}
         result = self.source_check(CONFIG, "0" * 64, metadata)
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0)
         self.assertIn("CSI provider: gcp", result.stdout)
         self.assertIn(resource, result.stdout)
         self.assertIn("Resolved GSM version: 17", result.stdout)
@@ -101,7 +118,7 @@ class QuayCredentialTests(unittest.TestCase):
 
     def test_metadata_access_failure_does_not_hide_credential_mismatch(self):
         result = self.source_check(CONFIG, "0" * 64, {})
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0)
         self.assertIn("Source metadata: UNAVAILABLE", result.stdout)
         self.assertIn("username vs known-good: MATCH", result.stdout)
 
@@ -111,7 +128,7 @@ class QuayCredentialTests(unittest.TestCase):
         (self.directory / "acm_d_mce_quay_pullsecret").write_text("test-token-do-not-log")
         stale = {"auths": {"quay.io": {"auth": base64.b64encode(b"old:old-token").decode()}}}
         result = self.source_check(stale)
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 0)
         self.assertIn("Sibling auth decoded pair vs known-good: MATCH", result.stdout)
         self.assertIn("Sibling username vs known-good: MATCH", result.stdout)
         self.assertIn("Sibling token vs known-good: MATCH", result.stdout)
@@ -124,7 +141,7 @@ class QuayCredentialTests(unittest.TestCase):
                 config = {"auths": {"quay.io": {
                     "auth": base64.b64encode(credential).decode()}}}
                 result = self.source_check(config)
-                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.returncode, 0)
                 self.assertIn("username vs known-good: " + username, result.stdout)
                 self.assertIn("token vs known-good: " + token, result.stdout)
                 self.assertNotIn(credential.decode(), result.stdout + result.stderr)
@@ -138,10 +155,34 @@ class QuayCredentialTests(unittest.TestCase):
                 config = {"auths": {"quay.io": {
                     "auth": base64.b64encode(credential).decode()}}}
                 result = self.source_check(config)
-                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.returncode, 0)
                 self.assertIn(component + " leading/trailing whitespace: YES", result.stdout)
                 self.assertIn(component + " after trimming whitespace vs known-good: MATCH", result.stdout)
-                self.assertFalse((self.directory / "quay-auth.sha256").exists())
+                self.assertEqual((self.directory / "quay-auth.sha256").read_text().strip(),
+                                 hashlib.sha256(credential).hexdigest())
+
+    def test_different_reference_does_not_block_successful_manifest_access(self):
+        result = self.source_check(CONFIG, "0" * 64, registry={"status": 0})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Prow mount: MISMATCH", result.stdout)
+        self.assertEqual(result.stdout.count("manifest access: SUCCESS"), 4)
+        self.assertFalse(list(self.directory.glob("quay-image-probe.*")))
+
+    def test_manifest_errors_are_classified_without_raw_output(self):
+        for message, status, category in [
+                ("unauthorized test-token-do-not-log", 1, "AUTHENTICATION REJECTED"),
+                ("403 Forbidden test-token-do-not-log", 1, "ACCESS DENIED"),
+                ("429 Too Many Requests test-token-do-not-log", 1, "RATE LIMITED"),
+                ("no such host test-token-do-not-log", 1, "DNS FAILURE"),
+                ("x509: certificate test-token-do-not-log", 1, "TLS FAILURE"),
+                ("test-token-do-not-log", 124, "TIMEOUT"),
+                ("manifest unknown test-token-do-not-log", 1, "IMAGE OR TAG NOT FOUND"),
+                ("unknown test-token-do-not-log", 1, "UNCLASSIFIED ERROR")]:
+            with self.subTest(category=category):
+                result = self.source_check(CONFIG, registry={"status": status, "stderr": message})
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout.count("manifest access: " + category), 4)
+                self.assertFalse(list(self.directory.glob("quay-image-probe.*")))
 
     def cluster_check(self, *, changed_secret=False, empty_environment=False,
                       wrong_reference=False, kubectl_failure=False, test_status=0, enabled=True):
