@@ -1,8 +1,8 @@
 base_images:
   nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-nested-podman-ci
 binary_build_commands: make -C backend backend
 build_root:
   image_stream_tag:
@@ -13,18 +13,8 @@ images:
   items:
   - dockerfile_literal: |
       FROM nested-podman
-      COPY /src /opt/app-root/src/github.com/Azure
+      COPY --chown=1000:0 /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-      USER root
-      # allow anyone to create content in GOPATH so we can go install stuff
-      RUN chmod 777 /opt/app-root
-      RUN dnf install -y git go make
-      RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
-      RUN dnf install -y pass || true
-      RUN dnf install -y qrencode || true
-      RUN dnf install -y net-tools || true
-      RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
-      RUN dnf clean all
     from: nested-podman
     inputs:
       src:
@@ -74,6 +64,13 @@ images:
       value: ci-test-img
     dockerfile_path: mgmt-agent/Dockerfile
     to: aro-hcp-mgmt-agent
+  - build_args:
+    - name: PLATFORM
+      value: linux/amd64
+    - name: ARO_HCP_REVISION
+      value: ci-sha
+    dockerfile_path: swift-recorder/Dockerfile
+    to: aro-hcp-swift-recorder
   - build_args:
     - name: PLATFORM
       value: linux/amd64
@@ -142,6 +139,17 @@ images:
       RUN cd api && npm ci --legacy-peer-deps
     from: aro-hcp-e2e-tools
     to: aro-hcp-api-tools
+  - dockerfile_literal: |
+      FROM aro-hcp-e2e-tools
+      USER root
+      # Install amg Azure CLI extension
+      ENV AZURE_EXTENSION_DIR=/usr/local/lib/azure-cli-extensions
+      RUN az extension add --name amg --version 3.0.0 && \
+          az extension show --name amg --output none && \
+          chgrp -R 0 "${AZURE_EXTENSION_DIR}" && \
+          chmod -R g=u "${AZURE_EXTENSION_DIR}"
+    from: aro-hcp-e2e-tools
+    to: aro-hcp-grafana-tools
 promotion:
   to:
   - additional_images:
@@ -152,8 +160,6 @@ promotion:
     namespace: aro-hcp
     tag: latest
     tag_by_commit: true
-prowgen:
-  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -196,6 +202,11 @@ tests:
   steps:
     test:
     - ref: aro-hcp-verify
+- as: alert-gate
+  optional: true
+  steps:
+    test:
+    - ref: aro-hcp-alert-gate
 - as: lint
   capabilities:
   - arm64
@@ -230,6 +241,13 @@ tests:
   steps:
     test:
     - ref: aro-hcp-observability-prometheus
+- as: grafana-preview
+  optional: true
+  run_if_changed: ^observability/grafana-dashboards/
+  steps:
+    test:
+    - ref: aro-hcp-github-app-auth
+    - ref: aro-hcp-grafana-preview
 - as: bicep-lint
   capabilities:
   - arm64
@@ -244,15 +262,6 @@ tests:
   steps:
     test:
     - ref: aro-hcp-api-validation
-- always_run: true
-  as: integration
-  capabilities:
-  - nested-podman
-  - arm64
-  nested_podman: true
-  steps:
-    test:
-    - ref: aro-hcp-frontend-run-integration-tests
 - always_run: false
   as: integration-canary-arm-endpoint-e2e-parallel
   capabilities:
@@ -267,8 +276,10 @@ tests:
       <{{.Status.URL}}|View logs>'
   steps:
     env:
+      ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: westus3
       RESOURCE_MANAGER_ENDPOINT: https://eastus2euap.management.azure.com
@@ -376,9 +387,55 @@ tests:
       <{{.Status.URL}}|View logs>'
   steps:
     env:
+      ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: westus3
+      VAULT_SECRET_PROFILE: int-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: integration-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-int'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
+      ARO_HCP_SUITE_NAME: integration/parallel/slow
+      LOCATION: westus3
+      VAULT_SECRET_PROFILE: int-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: integration-e2e-parallel-all
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-int'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
+      ARO_HCP_SUITE_NAME: integration/parallel/all
       LOCATION: westus3
       VAULT_SECRET_PROFILE: int-rh
     workflow: aro-hcp-persistent-e2e
@@ -389,8 +446,10 @@ tests:
   optional: true
   steps:
     env:
+      ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: stable
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -404,8 +463,10 @@ tests:
   optional: true
   steps:
     env:
+      ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: fast
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -419,8 +480,10 @@ tests:
   optional: true
   steps:
     env:
+      ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -444,6 +507,46 @@ tests:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: stage-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-stg'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_SUITE_NAME: stage/parallel/slow
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: stage-e2e-parallel-all
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-stg'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_SUITE_NAME: stage/parallel/all
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: stg-rh
     workflow: aro-hcp-persistent-e2e
@@ -522,6 +625,28 @@ tests:
       VAULT_SECRET_PROFILE: prod-rh
     workflow: aro-hcp-persistent-e2e
 - always_run: false
+  as: prod-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-prod'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_SUITE_NAME: prod/parallel/slow
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
   as: prod-e2e-parallel-ocp-stable
   capabilities:
   - arm64
@@ -583,7 +708,7 @@ tests:
   as: e2e-parallel
   capabilities:
   - arm64
-  pipeline_skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
+  pipeline_skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/.*|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
   steps:
     env:
       ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
@@ -591,8 +716,7 @@ tests:
         - 02,ARO HCP E2E Hosted Clusters - Dev - 03
       ARO_HCP_CLOUD: dev
       ARO_HCP_DEPLOY_ENV: ci01
-      ARO_HCP_SUITE_PARALLELISM: "60"
-      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=0
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
     workflow: aro-hcp-local-e2e
 - always_run: false
   as: e2e-parallel-inplace-upgrade
@@ -608,6 +732,37 @@ tests:
       ARO_HCP_DEPLOY_ENV: ci01
       MULTISTAGE_PARAM_OVERRIDE_LOCATION: canadacentral
     workflow: aro-hcp-local-e2e-upgrade
+- always_run: false
+  as: e2e-parallel-ocp-nightly
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
+        E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
+        - 02,ARO HCP E2E Hosted Clusters - Dev - 03
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
+    workflow: aro-hcp-local-e2e
+- always_run: false
+  as: e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters (EA Subscription),ARO HCP
+        E2E Hosted Clusters 2 (EA Subscription),ARO HCP E2E Hosted Clusters - Dev
+        - 02,ARO HCP E2E Hosted Clusters - Dev - 03
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_E2E_SUITE: rp-api-compat-all/parallel/slow
+      LOCATION_WEIGHTS: westus3=1,canadacentral=1,centralus=1
+    workflow: aro-hcp-local-e2e
 - as: global-pipeline-postsubmit
   capabilities:
   - arm64
@@ -657,22 +812,6 @@ tests:
   steps:
     test:
     - ref: aro-hcp-ci-images-push
-- as: cspr-pipeline-postsubmit
-  capabilities:
-  - arm64
-  max_concurrency: 1
-  postsubmit: true
-  reporter_config:
-    channel: '#aro-hcp-failures-dev'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-      <{{.Status.URL}}|View logs>'
-  steps:
-    env:
-      DEPLOY_ENV: cspr
-    workflow: aro-hcp-cspr
 - as: dev-ci-pipeline-postsubmit
   capabilities:
   - arm64

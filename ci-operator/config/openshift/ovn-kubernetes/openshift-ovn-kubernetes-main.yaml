@@ -27,8 +27,6 @@ promotion:
   to:
   - name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -65,6 +63,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       TEST_ARGS: --disable-monitor=legacy-test-framework-invariants-alerts,metrics-endpoints-down
       TEST_SKIPS: alerts in firing state
@@ -84,6 +83,8 @@ tests:
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
     workflow: openshift-e2e-aws-edge-zones
 - always_run: false
   as: e2e-aws-ovn-local-gateway
@@ -91,6 +92,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
@@ -188,7 +190,22 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_SUITE: ovn-kubernetes/conformance/parallel
-    workflow: baremetalds-e2e-ovn-dualstack
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote-tp
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
 - always_run: false
   as: e2e-metal-ipi-core-networking-dualstack-serial-ote
   capabilities:
@@ -199,13 +216,29 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_SUITE: ovn-kubernetes/conformance/serial
-    workflow: baremetalds-e2e-ovn-dualstack
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
 - always_run: false
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
 - always_run: false
@@ -214,6 +247,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - always_run: false
@@ -249,6 +283,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
       TEST_TIMEOUT: "60"
@@ -278,6 +313,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
     test:
@@ -323,6 +359,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
@@ -332,6 +369,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - always_run: false
@@ -340,6 +378,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - always_run: false
@@ -348,6 +387,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
       TEST_TYPE: upgrade-conformance
@@ -427,6 +467,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - always_run: false
@@ -435,6 +476,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - always_run: false
@@ -443,6 +485,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -452,6 +495,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -535,6 +579,23 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-hypershift-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-hypershift-kubevirt-core-networking-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: hypershift-kubevirt-conformance
 - as: unit
   commands: |
     status=0
@@ -568,9 +629,11 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-serial
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
 - as: security
@@ -585,6 +648,7 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       ADDITIONAL_WORKER_NODES: "3"
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.devcluster.openshift.com
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
       CDV2_ITERATION_MULTIPLIER: "15"
@@ -710,6 +774,30 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - always_run: false
+  as: cudn-density-single-ns-1000-24nodes-ibmcloud
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "24"
+      BASE_DOMAIN: ibmcloud-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: bxf-16x64
+      CONTROL_PLANE_INSTANCE_TYPE: bx3d-96x480
+      DISK_NAME: vdb
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
+        --local-indexing
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bxf-64x256
+      RESOURCE_GROUP: ocp-cpt
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cudn-density
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- always_run: false
   as: cudn-incremental-1000-24nodes
   optional: true
   steps:
@@ -741,6 +829,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -764,6 +853,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-gcp-ovn-techpreview
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -776,6 +866,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
@@ -863,18 +954,7 @@ tests:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
     workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
 - always_run: false
-  as: e2e-metal-ipi-core-networking-virt-dualstack-ote
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
-      TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
-    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
-- always_run: false
-  as: e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
+  as: e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
   capabilities:
   - intranet
   optional: true
@@ -883,6 +963,7 @@ tests:
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
     workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
 - always_run: false
   as: perfscale-aws-ovn-small-cluster-density-v2
@@ -891,6 +972,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_REPLICAS: "24"
@@ -909,6 +991,7 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge

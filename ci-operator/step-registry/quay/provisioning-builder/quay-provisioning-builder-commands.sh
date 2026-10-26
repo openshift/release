@@ -7,7 +7,6 @@ set -o pipefail
 #env vars
 QUAYREGISTRY=${QUAYREGISTRY}
 QUAYNAMESPACE=${QUAYNAMESPACE}
-BUILDERIMAGE=${QUAY_BUILDER_IMAGE}
 
 #credentials
 QUAY_USERNAME=$(cat /var/run/quay-qe-quaybuilder-secret/username)
@@ -69,7 +68,9 @@ BUILD_MANAGER:
     MINIMUM_RETRY_THRESHOLD: 0
     QUAY_USERNAME: "${QUAY_USERNAME}"
     QUAY_PASSWORD: ${QUAY_PASSWORD}
-    BUILDER_CONTAINER_IMAGE: ${BUILDERIMAGE}
+    # The quay-deploy-* step replaces from-csv with the installed CSV's
+    # RELATED_IMAGE_COMPONENT_BUILDER.
+    BUILDER_CONTAINER_IMAGE: from-csv
     # Kubernetes resource options
     K8S_API_SERVER: api.$ocp_base_domain_name:6443
     K8S_API_TLS_CA: /conf/stack/extra_ca_certs/build_cluster.crt

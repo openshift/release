@@ -17,10 +17,14 @@ spec:
         enabled: false
       route:
         enabled: false
+  cmdParams:
+    controller.profile.enabled: "true"
   controller:
     env:
       - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
         value: round-robin
+      - name: GOMEMLIMIT
+        value: "48103633715B" # 80% of the controller memory limit (56Gi), rounded down.
     processors: {}
     resources:
       limits:
@@ -59,6 +63,7 @@ spec:
       requests:
         cpu: 250m
         memory: 128Mi
+  image: quay.io/argoproj/argocd
   imageUpdater:
     enabled: false
   initialSSHKnownHosts: {}
@@ -97,6 +102,7 @@ spec:
     env:
       - name: ARGOCD_REPO_SERVER_PLUGIN_USE_MANIFEST_GENERATE_PATHS
         value: "true"
+    replicas: 3
     resources:
       limits:
         cpu: "8"
@@ -186,6 +192,12 @@ spec:
       - '*'
       kinds:
       - Image
+    - apiGroups:
+      - prow.k8s.io
+      clusters:
+      - '*'
+      kinds:
+      - ProwJob
   server:
     autoscale:
       enabled: false
@@ -218,3 +230,4 @@ spec:
     provider: dex
   tls:
     ca: {}
+  version: v3.6.0-rc4

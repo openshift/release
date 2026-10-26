@@ -46,8 +46,6 @@ promotion:
     - testopenscap
     name: "4.17"
     namespace: ComplianceAsCode
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   arm64-latest:
     candidate:
@@ -94,34 +92,13 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$
-- as: e2e-aws-parallel
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*|^renovate\.json$
-  steps:
-    cluster_profile: aws-stackrox
-    env:
-      BASE_DOMAIN: perfscale.rox.systems
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e-parallel
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-aws-serial
   skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*|^renovate\.json$
   steps:
     cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "6"
     test:
     - as: test
       cli: latest
@@ -138,9 +115,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-deployment
-  optional: true
+- as: e2e-aws-deployment
+  run_if_changed: ^(tests/e2e/(deployment|framework)/|pkg/controller/(metrics|compliancescan|profilebundle|common)/|pkg/apis/compliance/|config/|cmd/manager/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
@@ -163,10 +139,57 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-tls-scanner-5-0
+- as: e2e-aws-prerelease
+  run_if_changed: ^(tests/e2e/(prerelease|framework)/|version/version\.go|version\.Makefile)
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-prerelease
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-remediation
+  run_if_changed: ^(tests/e2e/(remediation|framework)/|pkg/controller/(complianceremediation|common)/|pkg/apis/compliance/)
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-remediation
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-tls-scanner-5-0
   optional: true
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  run_if_changed: ^(cmd/manager/(resultserver|resultcollector|tls)|pkg/controller/(resultserver|metrics|common)/|pkg/apis/compliance/v1alpha1/|config/|go\.(mod|sum)$|Makefile$|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
@@ -174,7 +197,6 @@ tests:
     env:
       BASE_DOMAIN: perfscale.rox.systems
       COMPUTE_NODE_TYPE: m5.2xlarge
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.ci.openshift.org/ocp/release-5:5.0.0-0.nightly-2026-09-09-111616
     post:
     - chain: ipi-deprovision
     pre:
@@ -378,10 +400,9 @@ tests:
       resources:
         requests:
           cpu: 100m
-- always_run: false
-  as: e2e-aws-tls-scanner
+- as: e2e-aws-tls-scanner
   optional: true
-  skip_if_only_changed: ^.*(md|adoc)$|^LICENSE$|^.github/workflows/*
+  run_if_changed: ^(cmd/manager/(resultserver|resultcollector|tls)|pkg/controller/(resultserver|metrics|common)/|pkg/apis/compliance/v1alpha1/|config/|go\.(mod|sum)$|Makefile$|Dockerfile\.ci$|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     dependencies:
@@ -550,9 +571,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-- always_run: false
-  as: e2e-aws-scan-config
-  optional: true
+- as: e2e-aws-scan-config
+  run_if_changed: ^(tests/e2e/(scan-config|framework)/|pkg/controller/(compliancescan|compliancesuite|scansettingbinding)/|pkg/apis/compliance/|go\.(mod|sum)$|Makefile|Dockerfile\.ci$|cmd/manager/|main\.go$)
   steps:
     cluster_profile: aws-stackrox
     env:
@@ -573,9 +593,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-tailoring
-  optional: true
+- as: e2e-aws-tailoring
+  run_if_changed: ^(tests/e2e/(tailoring_tests|framework)/|pkg/controller/(tailoredprofile|scansettingbinding|profilebundle|compliancescan|compliancesuite|complianceremediation)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
     cluster_profile: quay-aws
     env:
@@ -596,9 +615,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-parsing
-  optional: true
+- as: e2e-aws-parsing
+  run_if_changed: ^(tests/e2e/(parsing_tests|framework)/|pkg/controller/(profilebundle|tailoredprofile|compliancescan)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
     cluster_profile: quay-aws
     env:
@@ -619,9 +637,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- always_run: false
-  as: e2e-aws-cel
-  optional: true
+- as: e2e-aws-cel
+  run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/)
   steps:
     cluster_profile: quay-aws
     env:
@@ -667,34 +684,6 @@ tests:
         requests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
-- always_run: false
-  as: e2e-aws-parallel-arm
-  optional: true
-  steps:
-    cluster_profile: aws-stackrox
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: perfscale.rox.systems
-      COMPUTE_ARCH: arm64
-      CONTROL_ARCH: arm64
-      OCP_ARCH: arm64
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e-parallel
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: compliance-operator
-      - env: CONTENT_IMAGE_FROM_CI
-        name: testcontent
-      - env: OPENSCAP_IMAGE_FROM_CI
-        name: testopenscap
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - always_run: false
   as: e2e-aws-serial-arm
   optional: true

@@ -72,7 +72,7 @@ export PATH="/tmp:${PATH}"
 # Re-render using the same run-id
 cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
 
-REGION="${GCP_REGION:-us-central1}"
+REGION="${GCP_REGION:-northamerica-northeast2}"
 TESTED_SHA_PATH="${SHARED_DIR}/gcp-hcp-tested-sha"
 
 if [[ ! -s "${TESTED_SHA_PATH}" ]]; then

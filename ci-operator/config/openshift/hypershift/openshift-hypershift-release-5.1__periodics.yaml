@@ -35,8 +35,6 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: upi-installer
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -137,13 +135,14 @@ tests:
     cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aro-hcp
-  cron: 0 2 * * *
+  cron: 0 8 * * *
   steps:
     cluster_profile: aro-hcp-dev
     env:
@@ -166,6 +165,7 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       AZURE_MULTI_ARCH: "true"
+      HYPERSHIFT_AZURE_LOCATION: westus3
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
@@ -287,6 +287,11 @@ tests:
       HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
       TEST_ARGS: --disable-monitor=apiserver-incluster-availability
     workflow: hypershift-aws-conformance-cilium-private
+- as: e2e-aws-conformance-dynamic-dns
+  cron: 6 6 7,16,23,30 * *
+  steps:
+    cluster_profile: aws-qe
+    workflow: hypershift-aws-conformance-dynamic-dns
 - as: e2e-aws-conformance-calico
   minimum_interval: 168h
   steps:
@@ -351,7 +356,7 @@ tests:
       ODF_USE_PRERELEASE: "true"
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
-  cron: 0 */2 * * *
+  cron: 0 10,22 * * *
   steps:
     cluster_profile: hypershift-aks
     env:
@@ -387,6 +392,21 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-e2e-v2-self-managed
+- as: e2e-aks-managed-hsm
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestCreateClusterCustomConfig$
+      HYPERSHIFT_AZURE_LOCATION: westus3
+      HYPERSHIFT_AZURE_MANAGED_HSM: "true"
+      HYPERSHIFT_AZURE_MANAGED_HSM_LOCATION: eastus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *
   steps:
@@ -494,14 +514,22 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
-- as: e2e-v2-aws-techpreview-osimagestream
-  cron: 0 0,6,12,18 * * *
+- as: e2e-rosa-seaplane
+  cron: 0 8 * * *
   steps:
-    cluster_profile: hypershift-aws
     env:
-      GUEST_FEATURE_SET: TechPreviewNoUpgrade
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    workflow: hypershift-aws-e2e-v2-osimagestream
+      OCP_RELEASE_STREAM: ocp-branch-nightly
+      ROSA_REGIONAL_COMPONENTS: |
+        - target: argocd/config/management-cluster/hypershift/values.yaml
+          override:
+            hypershift:
+              hypershift:
+                image: quay.io/hypershift/hypershift-operator:latest
+      ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET: "false"
+    pre:
+    - ref: rosa-seaplane-resolve-ocp-image
+    - ref: rosa-seaplane-provision
+    workflow: rosa-seaplane-ephemeral-e2e
 zz_generated_metadata:
   branch: release-5.1
   org: openshift

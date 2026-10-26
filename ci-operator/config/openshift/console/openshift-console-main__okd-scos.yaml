@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-5.0
+    tag: rhel-9-golang-1.26-openshift-5.1
   ocp_builder_rhel-9-openshift-nodejs-base-5.0.art:
     name: builder
     namespace: ocp
@@ -11,11 +11,15 @@ base_images:
     name: scos-5.1
     namespace: origin
     tag: base-stream10
+  origin_scos-5.1_cli-artifacts:
+    name: scos-5.1
+    namespace: origin
+    tag: cli-artifacts
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-5.0
+    tag: rhel-9-golang-1.26-openshift-5.1
 images:
   items:
   - build_args:
@@ -24,7 +28,7 @@ images:
     dockerfile_path: Dockerfile
     from: origin_scos-5.1_base-stream10
     inputs:
-      ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.1:
         as:
         - gobuilder
         - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
@@ -33,12 +37,25 @@ images:
         - nodebuilder
         - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.22
     to: console
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.downloads
+    from: origin_scos-5.1_base-stream10
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.1:
+        as:
+        - gobuilder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.1
+      origin_scos-5.1_cli-artifacts:
+        as:
+        - origincli
+        - quay.io/openshift/origin-cli-artifacts:5.1
+    to: console-downloads
 promotion:
   to:
   - name: scos-5.1
     namespace: origin
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     integration:

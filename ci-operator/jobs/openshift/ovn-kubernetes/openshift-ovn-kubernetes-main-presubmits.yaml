@@ -2,6 +2,8 @@ presubmits:
   openshift/ovn-kubernetes:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     branches:
     - ^main$
     - ^main-
@@ -22,7 +24,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-main-5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade
     rerun_command: /test 5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade
-    skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     spec:
       containers:
       - args:
@@ -109,7 +110,9 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     branches:
     - ^main$
     - ^main-
@@ -218,10 +221,12 @@ presubmits:
     trigger: (?m)^/test( | .* )5.1-upgrade-from-stable-5.0-e2e-aws-ovn-upgrade-ipsec,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-rt-upgrade
     decorate: true
     decoration_config:
@@ -238,7 +243,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-main-5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-rt-upgrade
     rerun_command: /test 5.1-upgrade-from-stable-5.0-e2e-gcp-ovn-rt-upgrade
-    skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     spec:
       containers:
       - args:
@@ -329,7 +333,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/5.1-upgrade-from-stable-5.0-images
     decorate: true
     decoration_config:
@@ -491,6 +495,112 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cudn-density-single-ns-1000-24nodes,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/cudn-density-single-ns-1000-24nodes-ibmcloud
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: ibmcloud
+      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-perfscale
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-cudn-density-single-ns-1000-24nodes-ibmcloud
+    optional: true
+    rerun_command: /test cudn-density-single-ns-1000-24nodes-ibmcloud
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=cudn-density-single-ns-1000-24nodes-ibmcloud
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cudn-density-single-ns-1000-24nodes-ibmcloud,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1131,6 +1241,218 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-aws-core-networking-serial-ote,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/e2e-aws-hypershift-core-networking-ote
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-aws-hypershift-core-networking-ote
+    optional: true
+    rerun_command: /test e2e-aws-hypershift-core-networking-ote
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-hypershift-core-networking-ote
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-hypershift-core-networking-ote,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/e2e-aws-hypershift-kubevirt-core-networking-ote
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-aws-hypershift-kubevirt-core-networking-ote
+    optional: true
+    rerun_command: /test e2e-aws-hypershift-kubevirt-core-networking-ote
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-hypershift-kubevirt-core-networking-ote
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-hypershift-kubevirt-core-networking-ote,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     annotations:
       pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     branches:
@@ -1563,7 +1885,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -2204,7 +2526,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/e2e-aws-ovn-serial
+    context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -2217,8 +2539,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-main-e2e-aws-ovn-serial
-    rerun_command: /test e2e-aws-ovn-serial
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-aws-ovn-serial-1of2
+    rerun_command: /test e2e-aws-ovn-serial-1of2
     spec:
       containers:
       - args:
@@ -2229,6 +2551,7 @@ presubmits:
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-serial
@@ -2302,7 +2625,115 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-serial-2of2
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-aws-ovn-serial-2of2
+    rerun_command: /test e2e-aws-ovn-serial-2of2
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3162,7 +3593,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-azure-core-networking-ote
     decorate: true
     decoration_config:
@@ -3267,7 +3698,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-azure-core-networking-serial-ote
     decorate: true
     decoration_config:
@@ -3373,7 +3804,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -3479,7 +3910,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
     decoration_config:
@@ -3587,7 +4018,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
     decoration_config:
@@ -3694,7 +4125,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-core-networking-ote
     decorate: true
     decoration_config:
@@ -3799,7 +4230,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-core-networking-serial-ote
     decorate: true
     decoration_config:
@@ -3907,7 +4338,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -4009,10 +4440,12 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
@@ -4111,7 +4544,114 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-gcp-ovn-techpreview|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
+    optional: true
+    rerun_command: /test e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -4441,6 +4981,113 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/e2e-metal-ipi-core-networking-dualstack-ote-tp
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-metal-ipi-core-networking-dualstack-ote-tp
+    optional: true
+    rerun_command: /test e2e-metal-ipi-core-networking-dualstack-ote-tp
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-ipi-core-networking-dualstack-ote-tp
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-core-networking-dualstack-ote-tp,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-core-networking-dualstack-serial-ote
     decorate: true
     decoration_config:
@@ -4542,6 +5189,113 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-core-networking-dualstack-serial-ote,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+      - Dockerfile.base
+      - Dockerfile.microshift
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-main-e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+    optional: true
+    rerun_command: /test e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-core-networking-dualstack-serial-ote-tp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -4977,113 +5731,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/e2e-metal-ipi-core-networking-virt-dualstack-ote
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile
-      - Dockerfile.base
-      - Dockerfile.microshift
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-main-e2e-metal-ipi-core-networking-virt-dualstack-ote
-    optional: true
-    rerun_command: /test e2e-metal-ipi-core-networking-virt-dualstack-ote
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-core-networking-virt-dualstack-ote
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-core-networking-virt-dualstack-ote,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
     decoration_config:
@@ -5185,113 +5832,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-bgp-virt-dualstack,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build10
-    context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile
-      - Dockerfile.base
-      - Dockerfile.microshift
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-main-e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
-    optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -7223,7 +7763,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -7290,7 +7830,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -7350,7 +7890,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -7524,7 +8064,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -7585,7 +8125,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
     decorate: true
     decoration_config:
@@ -9235,7 +9775,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -9338,7 +9878,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:

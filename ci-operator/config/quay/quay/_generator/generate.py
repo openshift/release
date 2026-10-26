@@ -13,7 +13,8 @@
 #                        kind: presubmit renders templates/presubmit/ instead
 #   3. generate.py    — merge and expansion logic only
 #
-# Merge order (later layers overwrite earlier):
+# Merge order (later layers overwrite earlier; templates/repos/<repo>/base.yaml.j2
+# replaces the shared base layer for that repo's cells):
 #   templates/base.yaml.j2 (or templates/presubmit/base.yaml.j2 for kind: presubmit)
 #   templates/sources/<source>.yaml.j2 (kind: periodic only)
 #   templates/clouds/<cloud>.yaml.j2
@@ -40,10 +41,21 @@ from typing import Any
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateError
-from model import Cell, YamlMap
+from model import (
+    DATABASE_BY_CLOUD,
+    EXTRA_STORAGE_BY_CLOUD,
+    REPO_BY_TEST,
+    STORAGE_BY_CLOUD,
+    Cell,
+    YamlMap,
+)
 
 GENERATOR_DIR = Path(__file__).resolve().parent
+# ci-operator/jobs/quay/quay, next to the config dir this generator writes.
+JOBS_DIR = GENERATOR_DIR.parents[3] / "jobs" / "quay" / "quay"
+README = "ci-operator/config/quay/quay/_generator/README.md"
 SOURCES = ("nightly", "stable")
+OCP_CHANNELS = ("stable", "candidate")
 CRON_ALIASES = {
     "daily": "@daily",
     "nightly": "@daily",
@@ -66,6 +78,12 @@ JOB_KEYS = {
     "optional",
     "run_if_changed",
     "skip_if_only_changed",
+    "fips",
+    "storage",
+    "upgrade_from",
+    "ocp_channel",
+    "sts",
+    "database",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
@@ -337,10 +355,33 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             arches = _job_arches_field(job, default_arch, where)
             if not test or not ocps or not clouds:
                 raise ValueError(f"{where} is missing test, ocp, or clouds")
+            storage = _job_str_field(job, "storage", where)
+            if test == "e2e-chainsaw":
+                # Chainsaw runs only against the operator on ODF/NooBaa, as a periodic.
+                if kind != "periodic":
+                    raise ValueError(f"{where} test e2e-chainsaw is only valid for kind: periodic")
+                if storage not in (None, "odf"):
+                    raise ValueError(f"{where}.storage must be 'odf' for test e2e-chainsaw")
+                if job.get("fips"):
+                    raise ValueError(f"{where}.fips is not supported for test e2e-chainsaw")
+                storage = "odf"
+            if storage is not None:
+                for cloud in clouds:
+                    allowed = {STORAGE_BY_CLOUD[cloud]} if cloud in STORAGE_BY_CLOUD else set()
+                    allowed |= EXTRA_STORAGE_BY_CLOUD.get(cloud, set())
+                    if storage not in allowed:
+                        raise ValueError(
+                            f"{where}.storage {storage!r} is not allowed for cloud {cloud!r}"
+                        )
             always_run = _job_bool_field(job, "always_run", where)
             optional = _job_bool_field(job, "optional", where)
             run_if_changed = _job_str_field(job, "run_if_changed", where)
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
+            fips = _job_bool_field(job, "fips", where) or False
+            sts = _job_bool_field(job, "sts", where)
+            if sts is not None and "aws" not in clouds:
+                raise ValueError(f"{where}.sts is only valid when clouds include aws")
+            database = _job_bool_field(job, "database", where) or False
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -369,6 +410,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         f"branch {branch!r} has none"
                     )
             else:
+                if fips:
+                    raise ValueError(f"{where}.fips is only valid for kind: periodic")
                 if cron_raw is not None:
                     raise ValueError(f"{where} presubmit job must not set cron")
                 cron = None
@@ -388,12 +431,43 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     )
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
+            upgrade_from = _job_str_field(job, "upgrade_from", where)
+            ocp_channel = _job_str_field(job, "ocp_channel", where)
+            if test == "upgrade":
+                if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
+                    raise ValueError(f"{where} ocp_channel must be one of {OCP_CHANNELS}, got {ocp_channel!r}")
+                if not upgrade_from:
+                    raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
+                if not re.match(r"^\d+\.\d+$", upgrade_from):
+                    raise ValueError(f"{where} upgrade_from must look like 'X.Y', got {upgrade_from!r}")
+                if quay_version is None:
+                    raise ValueError(
+                        f"{where} test 'upgrade' requires a quay_version-bearing branch; "
+                        f"branch {branch!r} has none"
+                    )
+                # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
+                if fips:
+                    raise ValueError(f"{where}.fips is not supported for test: upgrade")
+                if any(cloud != "aws" for cloud in clouds) or storage not in (None, "s3"):
+                    raise ValueError(
+                        f"{where} test 'upgrade' supports only aws with s3 storage, "
+                        f"got clouds {clouds!r}, storage {storage!r}"
+                    )
+            elif upgrade_from is not None:
+                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
+            elif ocp_channel is not None:
+                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
+                if database and cloud not in DATABASE_BY_CLOUD:
+                    raise ValueError(
+                        f"{where}.database: true is not supported for cloud {cloud!r}; "
+                        f"supported: {sorted(DATABASE_BY_CLOUD)}"
+                    )
                 cells.append(
                     Cell(
                         org=org,
-                        repo=repo,
+                        repo=REPO_BY_TEST.get(test, repo),
                         branch=branch,
                         quay_version=quay_version,
                         ocp_version=ocp,
@@ -411,6 +485,12 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         optional=optional,
                         run_if_changed=run_if_changed,
                         skip_if_only_changed=skip_if_only_changed,
+                        fips=fips,
+                        sts=cloud == "aws" and sts is not False,
+                        storage_override=storage,
+                        upgrade_from=upgrade_from,
+                        database=database,
+                        ocp_channel=ocp_channel or "stable",
                     )
                 )
     return cells
@@ -456,6 +536,11 @@ def apply_cell_settings(config: YamlMap, cell: Cell) -> YamlMap:
     return config
 
 
+def _repo_template(templates_dir: Path, cell: Cell, name: str) -> str:
+    repo_name = f"repos/{cell.repo}/{name}"
+    return repo_name if (templates_dir / repo_name).exists() else name
+
+
 def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
     env = jinja_env(templates_dir)
     context = cell.context()
@@ -465,7 +550,8 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
         # No presubmit-specific cloud layer: share the periodic one instead of
         # forking a byte-identical copy that would need editing twice.
         cloud_template = f"clouds/{cell.cloud}.yaml.j2"
-    layers = [render_template(env, f"{template_root}base.yaml.j2", context)]
+    base_template = _repo_template(templates_dir, cell, f"{template_root}base.yaml.j2")
+    layers = [render_template(env, base_template, context)]
     if cell.kind == "periodic":
         layers.append(render_template(env, f"sources/{cell.source}.yaml.j2", context))
     layers.append(render_template(env, cloud_template, context))
@@ -579,6 +665,21 @@ def _managed_files(matrix: YamlMap) -> tuple[list[str], list[str]]:
     return active, retired
 
 
+def _hand_maintained(matrix: YamlMap) -> dict[str, list[str]]:
+    hand = matrix["managed_files"].get("hand_maintained") or {}
+    if not isinstance(hand, dict) or not all(
+        isinstance(names, list) and all(isinstance(n, str) for n in names)
+        for names in hand.values()
+    ):
+        raise ValueError("managed_files.hand_maintained must map filenames to test name lists")
+    active, retired = _managed_files(matrix)
+    overlap = set(hand) & (set(active) | set(retired))
+    if overlap:
+        names = ", ".join(sorted(overlap))
+        raise ValueError(f"managed_files: {names} listed as hand_maintained and generated")
+    return hand
+
+
 def generate_all(
     generator_dir: Path = GENERATOR_DIR,
     matrix_path: Path | None = None,
@@ -634,29 +735,38 @@ def _print_list(results: list[tuple[list[Cell], str, YamlMap]]) -> None:
         print("  ".join(value.ljust(widths[i]) for i, value in enumerate(row)))
 
 
+def _repo_dir(output_dir: Path, cell: Cell) -> Path:
+    # Another repo's configs go to the sibling dir named after it.
+    return output_dir.parent / cell.repo if cell.test in REPO_BY_TEST else output_dir
+
+
 def _write_configs(
     results: list[tuple[list[Cell], str, YamlMap]], output_dir: Path, dry_run: bool
 ) -> None:
-    if not dry_run:
-        output_dir.mkdir(parents=True, exist_ok=True)
-    for _group, filename, config in results:
+    for group, filename, config in results:
         text = dump_config(config)
-        path = output_dir / filename
+        path = _repo_dir(output_dir, group[0]) / filename
         if dry_run:
             print(f"=== {path} ===")
             print(text, end="" if text.endswith("\n") else "\n")
             continue
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
         print(f"wrote {path}")
 
 
 def _check_configs(
-    results: list[tuple[list[Cell], str, YamlMap]], retired: list[str], output_dir: Path
+    results: list[tuple[list[Cell], str, YamlMap]],
+    retired: list[str],
+    output_dir: Path,
+    hand_maintained: dict[str, list[str]] | None = None,
+    jobs_dir: Path | None = None,
 ) -> int:
     failures = 0
-    expected = {filename: config for _group, filename, config in results}
-    for filename, config in expected.items():
-        path = output_dir / filename
+    # Every repo dir, so a retired file is found after its last active cell is gone.
+    dirs = {output_dir} | {output_dir.parent / repo for repo in REPO_BY_TEST.values()}
+    for group, filename, config in results:
+        path = _repo_dir(output_dir, group[0]) / filename
         if not path.exists():
             print(f"missing {path}", file=sys.stderr)
             failures += 1
@@ -666,15 +776,66 @@ def _check_configs(
             print(f"stale {path}", file=sys.stderr)
             failures += 1
     for filename in retired:
-        path = output_dir / filename
-        if path.exists():
-            print(f"retired {path}", file=sys.stderr)
-            failures += 1
+        for path in (d / filename for d in sorted(dirs)):
+            if path.exists():
+                print(f"retired {path}", file=sys.stderr)
+                failures += 1
+    failures += _check_unowned(results, retired, hand_maintained or {}, output_dir)
+    if jobs_dir is not None:
+        failures += _check_jobs(jobs_dir)
     if failures:
         print(f"{failures} config(s) out of date", file=sys.stderr)
         return 1
     print(f"{len(results)} config(s) up to date")
     return 0
+
+
+def _check_unowned(
+    results: list[tuple[list[Cell], str, YamlMap]],
+    retired: list[str],
+    hand_maintained: dict[str, list[str]],
+    output_dir: Path,
+) -> int:
+    # A config the generator does not produce must be listed as hand-maintained,
+    # with exactly its tests, so a new job cannot skip the matrix unnoticed.
+    known = {
+        filename for group, filename, _config in results
+        if _repo_dir(output_dir, group[0]) == output_dir
+    } | set(retired)
+    failures = 0
+    for path in sorted(output_dir.glob("*.yaml")):
+        if path.name in known:
+            continue
+        if path.name not in hand_maintained:
+            print(f"unowned {path}: not generated by the matrix; see {README}", file=sys.stderr)
+            failures += 1
+            continue
+        tests = [t.get("as") for t in (yaml.safe_load(path.read_text()) or {}).get("tests") or []]
+        if sorted(tests) != sorted(hand_maintained[path.name]):
+            print(
+                f"unowned {path}: tests {tests} differ from managed_files.hand_maintained;"
+                f" see {README}",
+                file=sys.stderr,
+            )
+            failures += 1
+    return failures
+
+
+def _check_jobs(jobs_dir: Path) -> int:
+    # Prow jobs here must come from prowgen, so every job traces back to a checked config.
+    failures = 0
+    for path in sorted(jobs_dir.glob("*.yaml")):
+        for kind in (yaml.safe_load(path.read_text()) or {}).values():
+            jobs = kind if isinstance(kind, list) else [j for js in kind.values() for j in js]
+            for job in jobs:
+                if (job.get("labels") or {}).get("ci.openshift.io/generator") != "prowgen":
+                    print(
+                        f"unowned {path}: job {job.get('name')} is not generated by prowgen;"
+                        f" see {README}",
+                        file=sys.stderr,
+                    )
+                    failures += 1
+    return failures
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -699,7 +860,9 @@ def main(argv: list[str] | None = None) -> int:
         _print_list(results)
         return 0
     if args.check:
-        return _check_configs(results, retired, output_dir)
+        hand = _hand_maintained(load_yaml(GENERATOR_DIR / "matrix.yaml.in"))
+        jobs_dir = None if args.output else JOBS_DIR
+        return _check_configs(results, retired, output_dir, hand, jobs_dir)
     _write_configs(results, output_dir, dry_run=args.dry_run)
     return 0
 

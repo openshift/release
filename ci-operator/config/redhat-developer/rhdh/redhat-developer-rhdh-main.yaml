@@ -1,14 +1,6 @@
 base_images:
-  nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
-  rhdh-e2e-runner:
-    name: rhdh-e2e-runner
-    namespace: ci
-    tag: main
   upi-installer:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -16,45 +8,12 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
-  use_build_cache: true
-images:
-  items:
-  - dockerfile_literal: |
-      FROM rhdh-e2e-runner
-      USER root
-      COPY --from=nested-podman /entrypoint.sh /entrypoint.sh
-      RUN apt-get update && \
-          apt-get install -y --no-install-recommends uidmap catatonit fuse-overlayfs && \
-          apt-get clean && rm -rf /var/lib/apt/lists/* && \
-          chmod +x /entrypoint.sh && \
-          setcap cap_setuid+ep /usr/bin/newuidmap && \
-          setcap cap_setgid+ep /usr/bin/newgidmap && \
-          touch /etc/subuid /etc/subgid && \
-          chmod 666 /etc/subuid /etc/subgid && \
-          chmod g=u /etc/passwd /etc/group && \
-          mkdir -p /home/user /projects && \
-          chgrp -R 0 /home/user && \
-          chmod -R g=u /home/user /projects
-      ENV HOME=/home/user
-      ENV BUILDAH_ISOLATION=chroot
-      USER 1000
-      WORKDIR /projects
-      ENTRYPOINT ["/usr/bin/catatonit","--","/entrypoint.sh"]
-    from: rhdh-e2e-runner
-    inputs:
-      nested-podman:
-        as:
-        - nested-podman
-    to: rhdh-e2e-runner-podman
-  run_if_changed: ^$
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -102,8 +61,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -132,8 +91,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -161,8 +120,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -193,8 +152,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -226,8 +185,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -260,8 +219,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -308,11 +267,8 @@ tests:
     workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: e2e-ocp-disconnected-operator-nightly
-  capabilities:
-  - nested-podman
   cron: 0 2 * * TUE,THU
   max_concurrency: 2
-  nested_podman: true
   optional: true
   presubmit: true
   steps:
@@ -351,8 +307,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -373,8 +329,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -395,8 +351,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -417,8 +373,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
@@ -439,8 +395,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -457,8 +413,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -484,8 +440,8 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     post:
@@ -531,12 +487,12 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
-      OSD_VERSION: 4.20.17
+      OSD_VERSION: 4.22.18
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -554,12 +510,12 @@ tests:
     channel: '#rhdh-e2e-alerts'
     job_states_to_report:
     - error
-    report_template: '<!subteam^S07BMJ56R8S> <@U08UP0REWG1> :failed: `{{.Spec.Job}}`
-      ended with *{{.Status.State}}*, :scroll: <{{.Status.URL}}| logs>'
+    report_template: '<@U08UP0REWG1> :failed: `{{.Spec.Job}}` ended with *{{.Status.State}}*,
+      :scroll: <{{.Status.URL}}| logs>'
   steps:
     allow_skip_on_success: true
     env:
-      OSD_VERSION: 4.20.17
+      OSD_VERSION: 4.22.18
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -592,7 +548,7 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}
       <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
       Open Report: <https://gcs.ci.openshift.org/gcs/test-platform-results-public/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/showcase-auth-providers/index.html|nightly>
       | <https://gcs.ci.openshift.org/gcs/test-platform-results-public/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-operator-auth-providers-nightly/redhat-developer-rhdh-ocp-operator-nightly/artifacts/|Open
@@ -626,7 +582,7 @@ tests:
     - success
     - failure
     - error
-    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}<!subteam^S07BMJ56R8S>
+    report_template: '{{if eq .Status.State "success"}} :done-circle-check: {{else}}
       <@U08UP0REWG1> :failed: {{end}} Job *`{{.Spec.Job}}`* ended with *{{.Status.State}}*.
       Open Report: <https://gcs.ci.openshift.org/gcs/test-platform-results-public/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/showcase-upgrade-nightly/index.html|nightly>
       | <https://gcs.ci.openshift.org/gcs/test-platform-results-public/logs/{{.Spec.Job}}/{{.Status.BuildID}}/artifacts/e2e-ocp-helm-upgrade-nightly/redhat-developer-rhdh-ocp-helm-upgrade-nightly/artifacts/|Open

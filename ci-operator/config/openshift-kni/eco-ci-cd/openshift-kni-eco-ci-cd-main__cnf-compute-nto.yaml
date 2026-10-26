@@ -3,6 +3,8 @@ build_root:
     name: eco-ci-cd
     namespace: telcov10n-ci
     tag: eco-ci-cd
+prowgen:
+  enable_secrets_store_csi_driver: false
 resources:
   '*':
     limits:
@@ -11,12 +13,42 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-telcov10n-nto-tests-v2-crun-bm-5
+  capabilities:
+  - intranet
+  cron: 59 11 * * 0
+  reporter_config:
+    channel: '#compute-qe-ci-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    - success
+    - aborted
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      CGROUP_VERSION: v2
+      CLUSTER_NAME: hlxcl15
+      CONTAINER_RUNTIME: crun
+      FEATURES: compute
+      HUGEPAGES_DEFAULT_SIZE: 1G
+      HUGEPAGES_PAGES: '[{"count": 1, "size": "1G"}, {"count": 128, "size": "2M"}]'
+      LABEL_FILTER: tier-0
+      LABELS: nto
+      RT_KERNEL: "true"
+      VERSION: "5.0"
+    test:
+    - ref: telcov10n-functional-cnf-compute-nto-eco-gotests
+    workflow: telcov10n-functional-cnf-compute-nto-ocp-setup
 - as: e2e-telcov10n-nto-tests-v2-crun-bm-4-22
   capabilities:
   - intranet
   cron: 59 11 * * 5
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -46,7 +78,7 @@ tests:
   - intranet
   cron: 59 23 * * 0
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -76,7 +108,7 @@ tests:
   - intranet
   cron: 59 23 * * 1
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -106,7 +138,7 @@ tests:
   - intranet
   cron: 59 23 * * 2
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -136,7 +168,7 @@ tests:
   - intranet
   cron: 59 11 * * 6
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -165,7 +197,7 @@ tests:
   - intranet
   cron: 59 23 * * 3
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -195,7 +227,7 @@ tests:
   - intranet
   cron: 59 23 * * 4
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -225,7 +257,7 @@ tests:
   - intranet
   cron: 59 23 * * 5
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error
@@ -254,7 +286,7 @@ tests:
   - intranet
   cron: 59 11 * * 2
   reporter_config:
-    channel: '#eco-ci-cd-notifications'
+    channel: '#compute-qe-ci-notifications'
     job_states_to_report:
     - failure
     - error

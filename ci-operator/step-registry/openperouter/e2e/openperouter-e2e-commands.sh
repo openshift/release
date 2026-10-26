@@ -17,6 +17,7 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" \
   "mkdir -p /root/openperouter && tar -C /root/openperouter -xzf -"
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
+set +e
 ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
 set -xeo pipefail
 cd /root/dev-scripts
@@ -36,3 +37,10 @@ bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
 bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
 
 RUNTESTS
+
+test_rc="$?"
+
+echo "### Copying e2e test artifacts (ginkgo report + per-failure dumps) back from remote host"
+scp "${SSHOPTS[@]}" -r "root@${IP}:/tmp/kind_logs" "${ARTIFACT_DIR}/openperouter-e2e-logs" || true
+
+exit "${test_rc}"

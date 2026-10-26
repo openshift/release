@@ -69,7 +69,6 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
   - capabilities:
@@ -142,8 +141,6 @@ promotion:
     - src-oc
     name: "5.0"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -358,7 +355,6 @@ tests:
 - always_run: false
   as: aws-private
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -1086,7 +1082,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-devpreview
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1127,7 +1122,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1137,7 +1131,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-upi
-  pipeline_run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
+  optional: true
   reporter_config:
     channel: '#forum-ocp-splat-alerts'
     job_states_to_report:
@@ -1151,7 +1145,6 @@ tests:
 - always_run: false
   as: e2e-vsphere-ovn-upi-zones
   optional: true
-  pipeline_run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
@@ -1173,18 +1166,14 @@ tests:
 - always_run: false
   as: e2e-vsphere-multi-vcenter-ovn
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
 - always_run: false
   as: e2e-vsphere-ovn-hybrid-env
   optional: true
-  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1362,7 +1351,7 @@ tests:
   pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
 - always_run: false
   as: e2e-agent-compact-ipv4-appliance-diskimage
   capabilities:
@@ -1686,8 +1675,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
 - always_run: false

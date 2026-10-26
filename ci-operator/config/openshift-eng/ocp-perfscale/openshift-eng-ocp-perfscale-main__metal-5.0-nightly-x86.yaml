@@ -12,8 +12,6 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -46,11 +44,17 @@ tests:
     cluster_profile: metal-perfscale-cpt
     env:
       BOND: "true"
+      BRIDGE_PORT: ens6f0np0
       CNV_VERSION: "5.0"
       CONFIG: config/standard-scalelab.yml
       ENABLE_LOCAL_INDEX: "true"
       INFRA: "true"
+      LOCALNET: physnet-ens6f1np1
+      LOCALNET_BRIDGE: br-ens6f1np1
+      LOCALNET_PORT: ens6f1np1
       LVM_VG_NAME: nvme
+      OCP_BUILD: dev
+      OPERATOR_SOURCE_INDEX: prega-operator-index
       OUTPUT_FORMAT: JUNIT
       PUBLIC_VLAN: "false"
       RUN_ORION: deferred
@@ -63,10 +67,16 @@ tests:
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-lvms
     - ref: openshift-qe-installer-bm-day2-cnv
+    - ref: openshift-qe-installer-bm-day2-prega-operators
+    - ref: openshift-qe-installer-bm-day2-nmstate
+    - ref: openshift-qe-network-vm-bridge-perf
+    - ref: openshift-qe-network-vm-localnet-perf
     - chain: openshift-qe-data-path-tests
     - ref: openshift-qe-orion-data-path
     - ref: openshift-qe-orion-ingress
     - ref: openshift-qe-orion-virt-data-path
+    - ref: openshift-qe-orion-virt-bridge-datapath
+    - ref: openshift-qe-orion-virt-localnet-datapath
     - ref: openshift-qe-virt-udn-density
     - ref: openshift-qe-orion-virt-udn-density
     - ref: openshift-qe-windows-bootstorm
@@ -131,7 +141,6 @@ tests:
       logs> :warning: {{end}}'
   restrict_network_access: false
   steps:
-    allow_skip_on_success: true
     cluster_profile: metal-perfscale-cpt
     env:
       CHURN_CYCLES: "2"
@@ -192,6 +201,9 @@ tests:
       OPERATOR_SOURCE_INDEX: prega-operator-index
       PODS_PER_NODE: "200"
       TYPE: sno
+    post:
+    - ref: openshift-qe-installer-bm-gather-extra
+    - ref: openshift-qe-installer-bm-must-gather
     test:
     - ref: openshift-qe-installer-bm-day2-prega-operators
     - ref: openshift-qe-installer-bm-day2-sriov

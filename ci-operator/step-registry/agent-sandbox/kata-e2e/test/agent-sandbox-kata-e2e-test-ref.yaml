@@ -1,0 +1,34 @@
+ref:
+  as: agent-sandbox-kata-e2e-test
+  from: src
+  cli: latest
+  timeout: 45m0s
+  grace_period: 5m
+  commands: agent-sandbox-kata-e2e-test-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  env:
+  - name: SANDBOX_RUNTIME_CLASS
+    default: "kata"
+    documentation: |-
+      RuntimeClass name to test against. The tests skip when this is unset.
+      Common values: "kata", "kata-remote", "kata-clh".
+  - name: SANDBOX_TEST_TIMEOUT
+    default: "30m"
+    documentation: |-
+      Go test timeout passed to gotestsum.
+  - name: SANDBOX_TEST_PATTERN
+    default: "TestRuntimeClassLifecycle|TestRuntimeClassStartupComparison"
+    documentation: |-
+      Go test -run pattern selecting which tests to execute. Widen to
+      "TestRuntimeClass" to run all runtime-class e2e tests as new ones land.
+  documentation: |-
+    Runs agent-sandbox runtime-class e2e tests against an OpenShift cluster
+    with a kata RuntimeClass installed. Requires the agent-sandbox operator
+    to be deployed (via the agent-sandbox-install-operator step) and OSC to
+    provide the kata runtime.
+
+    Produces JUnit XML and JSON test output in ARTIFACT_DIR for Spyglass.
+    On failure, dumps pod status and controller logs for diagnosis.

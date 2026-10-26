@@ -1,196 +1,252 @@
 # Quay CI config generator
 
-Python generator that reads a compact `matrix.yaml.in` and writes [ci-operator](https://docs.ci.openshift.org/) config files for each test cell.
+`generate.py` turns one short file, `matrix.yaml.in`, into the Quay
+[ci-operator](https://docs.ci.openshift.org/) configs under
+`ci-operator/config/quay/quay/` and `ci-operator/config/quay/quay-operator/`.
+Edit the matrix or the templates, never the generated configs.
 
-Templating is Jinja `{{ variable }}` placeholders only. Conditionals and loops stay in `generate.py`, not in the YAML templates.
+## Quick start
 
-Each generated file starts with a `# DO NOT EDIT` header pointing back at `matrix.yaml.in`, `templates/`, and `generate.py`.
-
-## Setup
-
-```bash
-make generate
-```
-
-## CLI
-
-From this directory (in-tree: `python3 _generator/generate.py`):
+All commands run from the `openshift/release` root.
 
 ```bash
-python3 generate.py              # generate all configs
-python3 generate.py --dry-run    # preview without writing
-python3 generate.py --check      # verify configs are up to date
-python3 generate.py --list       # show matrix expansion table (includes KIND and SOURCE columns)
-python3 generate.py --output DIR # write or check a specific directory
+# 1. Edit _generator/matrix.yaml.in (or a template), then regenerate the configs
+make -C ci-operator/config/quay/quay/_generator generate
+
+# 2. Normalize the configs and regenerate the Prow jobs
+make update
+
+# 3. Run the generator's tests and check the configs are up to date
+make -C ci-operator/config/quay/quay/_generator check
 ```
 
-Standalone default output is `./out`. When this directory is named `_generator`, output is the parent directory (`ci-operator/config/quay/quay/` in openshift/release).
+Commit the matrix or template change together with the regenerated files under
+`ci-operator/config/quay/{quay,quay-operator}/` and
+`ci-operator/jobs/quay/{quay,quay-operator}/`.
 
-`--check` is the CI verification step: exit `1` if any file listed in `managed_files.active` is missing or its parsed YAML differs from what the matrix generates, or if any file listed in `managed_files.retired` still exists in the output directory. Files not listed in either list are ignored entirely, including hand-written neighbours like `quay-quay-master__claim.yaml` and `quay-quay-master__omr-*.yaml`. Content comparison is parsed YAML (comments and `determinize-ci-operator` quoting are ignored).
+Step 3 is also the CI gate: the `pull-ci-openshift-release-main-quay-quay-quay-quay-check`
+presubmit (`/test quay-quay-quay-quay-check`) runs it whenever
+`ci-operator/(config|jobs)/quay/(quay|quay-operator)/` changes.
 
-## `matrix.yaml.in`
+`make generate` adds a `# DO NOT EDIT` header to each file; `make update`
+strips it again, so committed configs carry no header.
+
+## How it works
+
+```
+matrix.yaml.in ──> generate.py ──> config files by filename ──> make update ──> Prow jobs
+  releases           expands each job       ci-operator/config/quay/...        ci-operator/jobs/quay/...
+  jobs               across clouds × ocp × arches,
+                     merges template layers
+```
+
+- Each row under `quay[].jobs` expands into cells: one per cloud × OCP version × arch.
+- Each cell is rendered by deep-merging Jinja templates from `templates/`
+  (base, source, cloud, arch, test; see [Layer order](#layer-order)).
+- Cells that share a filename merge into one file; their tests are listed in matrix order.
+- `matrix.yaml.in` lists every file the generator owns under `managed_files.active`.
+  Generation fails if that list and the expanded matrix disagree.
+- Hand-written configs here (such as `quay-quay-master__claim.yaml`) are listed under
+  `managed_files.hand_maintained` with their test names. `--check` fails on any other
+  config in this directory, on a test added to a hand-maintained file, and on a Prow job
+  in `ci-operator/jobs/quay/quay/` without the `ci.openshift.io/generator: prowgen` label.
+
+## Common tasks
+
+Every task ends with the three [Quick start](#quick-start) commands. A task that
+creates a new file also needs that filename added to `managed_files.active`;
+otherwise generation fails with `generated but not active`.
+
+**Add a Quay release.** Append to `quay:`. This adds
+`quay-quay-redhat-3.19__aws-ocp422-e2e-install.yaml`:
 
 ```yaml
-version: 2
-
-global_defaults:
-  image_source: build  # reserved; templates do not use it yet
-  arch: amd64
-  repo: quay/quay
-
-managed_files:
-  active:
-    - quay-quay-master.yaml
-    - quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml
-  retired: []
-
-quay:
-  - branch: redhat-3.18
+  - branch: redhat-3.19
     jobs:
       - {cron: daily, source: nightly, clouds: [aws], ocp: ["4.22"], test: e2e-install}
-  - branch: master
-    layout: base
-    env:
-      QUAY_OPERATOR_CHANNEL: stable-3.18
-      # presubmit renders no source layer, so the ART FBC env that periodics get
-      # from templates/sources/nightly.yaml.j2 is set on the branch instead
-      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
-      QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
-      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-    jobs:
-      - {kind: presubmit, clouds: [aws], ocp: ["4.22"], test: e2e-install, always_run: false, optional: true}
 ```
 
-| Field | Meaning |
-| --- | --- |
-| `global_defaults.repo` | GitHub `org/repo` used in `zz_generated_metadata` and filenames |
-| `global_defaults.arch` | Cluster architecture |
-| `global_defaults.image_source` | How images are obtained (`build` today). Not referenced by templates yet. |
-| `managed_files.active` | Required, non-empty list of every filename the matrix must generate. Generation fails loudly if this set doesn't exactly match what the matrix expands to. |
-| `managed_files.retired` | Filenames the generator used to own but no longer generates. `--check` fails if any of these still exist in the output directory; run `generate.py` (without `--check`) and delete them, then drop them from this list. Defaults to `[]`. |
-| `quay[]` | One Quay release, identified by git `branch` (`redhat-X.Y`, or `master`). The Quay version `X.Y` is derived from that suffix; `master` has no Quay version. |
-| `quay[].layout` | `variant` (default) writes `{org}-{repo}-{branch}__{variant}.yaml`; `base` writes `{org}-{repo}-{branch}.yaml` in place (used for `master`). |
-| `quay[].env` | Env keys applied to every job on that branch. Values replace whole keys. |
-| `quay[].jobs[]` | One job spec, expanded across `clouds` × `ocp` |
-| `quay[].jobs[].kind` | `periodic` (default, renders `templates/`) or `presubmit` (renders `templates/presubmit/`) |
-| `quay[].jobs[].cron` | Required for `periodic`; must be unset for `presubmit`. Either an alias (`daily` / `nightly` / `weekly`) or a raw 5-field cron expression, passed through verbatim |
-| `quay[].jobs[].source` | Required for periodic: `nightly` (`fbc-operator-catalog` + `QUAY_INDEX_IMAGE_REPO`) or `stable` (`redhat-operators`, no index image); must be unset for presubmit |
-| `quay[].jobs[].always_run` / `.optional` / `.run_if_changed` / `.skip_if_only_changed` | Presubmit trigger fields, copied onto the test when set. `run_if_changed` and `skip_if_only_changed` are mutually exclusive; `always_run: true` cannot combine with either. Only valid when `kind: presubmit`. |
-| `quay[].jobs[].env` | Optional per-job env; keys replace branch env of the same name |
-| `quay[].jobs[].as` | Optional ci-operator test name. Defaults to `{cloud}-{storage}-{source}` for `periodic` (for example `aws-s3-nightly`) and `{cloud}-{storage}` for `presubmit` (for example `aws-s3`) -- cron changes only timing, never the name. Split the job into its own row when only some clouds need a different name. |
-| `quay[].jobs[].arches` | Optional non-empty list of `amd64` / `arm64` / `s390x`, no duplicates. Defaults to `[global_defaults.arch]`. Expands into the cartesian product alongside `ocp` and `clouds`. |
-
-The `libvirt` cloud maps to S3 storage (`STORAGE_BY_CLOUD` in `model.py`); its `s390x` arch cell provisions through the IBM Z libvirt workflow (`quay-tests-libvirt-s390x`) instead of an `ipi-*` cloud installer.
-
-Each job is cartesian-expanded to one ci-operator file named `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml` (`layout: base` rows instead write `{org}-{repo}-{branch}.yaml`). A non-`amd64` arch folds into that same naming: `variant` becomes `{cloud}-{arch}-ocp{ocp_nodot}-{test}`, the derived `as` gets a `-{arch}` suffix, and a `layout: base` row writes `{org}-{repo}-{branch}__{arch}.yaml` instead (with `zz_generated_metadata.variant` set to `{arch}`) since `arch` isn't otherwise part of its filename. Cells that share a filename (for example a periodic and a presubmit row for the same branch/cloud/OCP/test) merge into one file: their tests concatenate in matrix order, and everything but `tests` must be identical across the group or generation fails with `incompatible file-level inputs`. Two rows in one file that derive or set the same `as` collide: the generator fails with `duplicate as`. Periodic derives `{cloud}-{storage}-{source}` and presubmit derives `{cloud}-{storage}`, so a periodic/presubmit pair does not collide on its own. Two rows of the same kind can still collide; set an explicit `as` on one row to resolve it, and the name must not encode the kind.
-
-## Layer order
-
-Each cell is assembled by deep-merge, later layers win. `kind: presubmit` jobs render from `templates/presubmit/` for base and clouds; the test layer instead builds on top of the shared periodic one:
-
-1. `templates/base.yaml.j2` (or `templates/presubmit/base.yaml.j2`)
-2. `templates/sources/{source}.yaml.j2` (periodic only; presubmit renders no source layer)
-3. `templates/clouds/{cloud}.yaml.j2`, or the optional override `templates/presubmit/clouds/{cloud}.yaml.j2` when present; presubmit falls back to the shared file otherwise
-4. `templates/arches/{arch}.yaml.j2`, then `templates/clouds/{cloud}-{arch}.yaml.j2` -- only when `arch != amd64`; both are required and generation fails loudly if either is missing
-5. `templates/tests/{test}.yaml.j2`
-6. `templates/presubmit/tests/{test}.yaml.j2`, when present, merged on top of layer 5 (presubmit only); if it does not exist, presubmit uses layer 5 unchanged
-7. Kind settings in `generate.py`: periodic sets `cron` from the resolved `cron` field (alias or raw expression); presubmit copies `always_run` / `optional` / `run_if_changed` / `skip_if_only_changed` onto the test when set
-8. Branch `env`, then job `env` / `as`
-
-`templates/arches/{arch}.yaml.j2` adds the arch's OCP release (for example `releases.arm64-latest`) and the install override / node-arch env; `templates/clouds/{cloud}-{arch}.yaml.j2` overlays the cloud's arch-specific machine type (for s390x, the libvirt-s390x layer also carries the workflow, cluster profile and install target). `templates/base.yaml.j2` and `templates/presubmit/base.yaml.j2` keep `releases.latest.candidate.architecture` hard-coded to `amd64` -- that release is for CI tooling (build root, `cli` base image), which stays `amd64` regardless of the test cluster's arch. `templates/presubmit/base.yaml.j2` also adds `capabilities: [arm64]` to the `quay-server` image item (not the Playwright runner) when `arch != amd64`, and only emits the `quay:latest` `promotion` block when `layout == base and arch == amd64` -- a non-`amd64` `layout: base` variant never promotes.
-
-Mappings recurse. Lists of mappings merge by index. Scalar lists replace. Env values replace whole keys. `QUAY_EXTRA_CONFIG` lives once, in `templates/tests/e2e-install.yaml.j2`, and is shared by every branch and kind; unknown feature flags are treated as no-ops on older Quay releases. `templates/presubmit/tests/e2e-install.yaml.j2` layers only the presubmit-specific delta (image-test dependencies/env and the extra `quay-deploy-custom-image` step) on top of it. Each cell's own rendered config must contain exactly one test; cells sharing a filename are grouped afterward (see above).
-
-### How often a job runs (periodic cron)
-
-The `cron` field controls **timing** only. Its value is either a short alias or a raw 5-field cron expression, and the resolved value is passed through verbatim to the ci-operator `cron` field. Presubmit jobs (`kind: presubmit`) don't set `cron` at all — they run per matching trigger fields instead (see the matrix table above).
-
-| Alias | When | Result |
-| --- | --- | --- |
-| `daily` | Once a day | `cron: '@daily'`. Broader matrix (several clouds × OCP versions). |
-| `nightly` | Once a day | Same cron as `daily` (`'@daily'`). |
-| `weekly` | Once a week | `cron: '@weekly'`. Long tail — older versions, upgrades. |
-
-A `cron` value that isn't one of those aliases must be a raw 5-field cron expression (for example `17 3 * * 1`); it is used verbatim.
-
-The old `tier` field was removed outright, with no aliasing or deprecation window — `matrix.yaml.in` was its only consumer. A job that still sets `tier:` fails generation; migrate it to `cron:`.
-
-## Adding coverage
-
-Every new filename the matrix generates (a new release, job, or OCP version that changes `variant`) must be added to `managed_files.active`, or generation fails with `active but not generated` / `generated but not active`.
-
-Add a Quay release by appending to `quay:`:
-
-```yaml
-  - branch: redhat-3.17
-    jobs:
-      - cron: daily
-        source: nightly
-        clouds: [aws]
-        ocp: ["4.22"]
-        test: e2e-install
-```
-
-Add an OCP version on an existing job:
+**Add an OCP version to a job.** Extend its `ocp` list; each new version is a
+new file (`...__aws-ocp423-e2e-install.yaml`):
 
 ```yaml
         ocp: ["4.22", "4.23"]
 ```
 
-Both add a new generated filename for `layout: variant` releases; add it to `managed_files.active` in the same change. `layout: base` rows (for example `master`) share one file per branch: an extra cloud on an existing job needs a distinct `as` instead of a new filename, but an extra OCP version does not work the same way — `ocp` is a file-level input for base rows, so it needs its own variant/file.
+**Add a cloud.** Extend `clouds` (`aws`, `gcp`, `azure`, `libvirt`, `baremetal`). Each cloud
+gets its own file and its default storage (`STORAGE_BY_CLOUD` in `model.py`).
 
-Add a `stable` source alongside a `nightly` one on the same branch/cloud/OCP/test: `source` isn't part of the filename, so both jobs land in one shared file with distinct `as` names:
+**Add a stable-catalog job next to a nightly one.** `source` is not part of the
+filename, so both rows land in one file as `aws-s3-nightly` and `aws-s3-stable`:
 
 ```yaml
-  - branch: redhat-3.18
-    jobs:
-      - cron: daily
-        source: nightly
-        clouds: [aws]
-        ocp: ["4.22"]
-        test: e2e-install
-      - cron: daily
-        source: stable
-        clouds: [aws]
-        ocp: ["4.22"]
-        test: e2e-install
+      - {cron: daily, source: nightly, clouds: [aws], ocp: ["4.22"], test: e2e-install}
+      - {cron: daily, source: stable,  clouds: [aws], ocp: ["4.22"], test: e2e-install}
 ```
 
-This generates `aws-s3-nightly` and `aws-s3-stable` in the same `quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml`.
+**Add a variant of an existing job** (FIPS, managed database, ODF storage).
+Add a sibling row with the flag. It shares the file and gets a distinct test
+name, such as `aws-s3-nightly-fips`, `aws-s3-rds-nightly` or `aws-odf-nightly`:
 
-Branch `env` overrides the test template's default for every job on that branch (for example a shorter `PLAYWRIGHT_GREP_INVERT` on an older release that lacks a feature the default filter excludes). Do not copy `QUAY_EXTRA_CONFIG` here; it comes from the test template.
+```yaml
+      - {cron: weekly, source: nightly, clouds: [aws], ocp: ["4.22"], test: e2e-install, fips: true}
+```
+
+**Add an operator upgrade lane.** Only the previous Quay version is needed;
+channels, branches and the test name (`from-317`) are derived:
+
+```yaml
+      - {cron: weekly, source: nightly, clouds: [aws], ocp: ["4.22"], test: upgrade, upgrade_from: "3.17"}
+```
+
+**Add a quay-operator Chainsaw job.** One row plus its
+`quay-quay-operator-{branch}__aws-ocp{ocp_nodot}-e2e-chainsaw.yaml` line in
+`managed_files.active`:
+
+```yaml
+      - {cron: weekly, source: nightly, clouds: [aws], ocp: ["5.0"], test: e2e-chainsaw}
+```
+
+**Override env for one branch or one job.** `env` on a release applies to
+every job on that branch; `env` on a job overrides it. Values replace whole
+keys. Do not copy `QUAY_EXTRA_CONFIG` here; it comes from the test template.
 
 ```yaml
   - branch: redhat-3.16
     env:
       PLAYWRIGHT_GREP_INVERT: "@auth:OIDC|@auth:LDAP"
-    jobs:
-      - {cron: daily, source: nightly, clouds: [gcp, azure], ocp: ["4.22"], test: e2e-install}
 ```
 
-The presubmit test template adds the two image-unsafe test titles to `PLAYWRIGHT_GREP_INVERT`; the shared regex lives in `templates/tests/_e2e-install.defaults.j2`.
+**Stop generating a file.** Remove its row and move the filename from
+`managed_files.active` to `managed_files.retired`. Delete the file, then drop it
+from `retired` once it is gone; `--check` fails while a retired file still exists.
 
-Then regenerate:
+**Preview without writing.** From `_generator/`, using the venv `make` creates
+(`/tmp/quay-ci-generator-venv` by default):
 
 ```bash
-python3 generate.py
+/tmp/quay-ci-generator-venv/bin/python generate.py --list      # table of every cell: file, test name, cron
+/tmp/quay-ci-generator-venv/bin/python generate.py --dry-run   # print the YAML
+/tmp/quay-ci-generator-venv/bin/python generate.py --check     # exit 1 if any managed file is stale or a config is unowned
 ```
 
-## In-tree workflow
+`--output DIR` writes or checks another directory instead of the in-tree ones;
+`e2e-chainsaw` configs go to `DIR/../quay-operator`. `--check` compares parsed
+YAML, so the header and quoting differences do not count as stale.
 
-This generator lives in `openshift/release` directly (`ci-operator/config/quay/quay/_generator/`); there is no separate repo to sync from.
+## Reference
 
-1. Edit `matrix.yaml.in` or `templates/`.
-2. Regenerate the managed files: `make -C ci-operator/config/quay/quay/_generator generate`.
-3. Regenerate Prow jobs and determinize the config from the repo root: `make update`.
-4. Commit the generator source together with the regenerated files under `ci-operator/config/quay/quay/` and `ci-operator/jobs/quay/quay/`.
+### `matrix.yaml.in` fields
 
-`make -C ci-operator/config/quay/quay/_generator check` is the CI gate: it installs dependencies, runs `pytest`, then `generate.py --check`. It runs as the `quay-quay-check` presubmit whenever `ci-operator/(config|jobs)/quay/quay/` changes.
+Top level:
 
-## Tests
+| Field | Meaning |
+| --- | --- |
+| `version` | Matrix format version (`2`). |
+| `global_defaults.repo` | `org/repo` for filenames and metadata (`quay/quay`). A test in `REPO_BY_TEST` (`model.py`) writes to its own repo instead: `e2e-chainsaw` -> `quay/quay-operator`. |
+| `global_defaults.arch` | Default cluster arch (`amd64`). |
+| `global_defaults.image_source` | Reserved (`build`); no template reads it yet. |
+| `managed_files.active` | Every file the matrix must generate, exactly. |
+| `managed_files.retired` | Files the generator no longer owns; `--check` fails while any still exists. |
+| `managed_files.hand_maintained` | Hand-written configs in this directory, each mapped to the `as` of its tests. Prefer a matrix row; add an entry only for a config the generator cannot produce. |
 
-```bash
-make check
-```
+Per release, `quay[]`:
 
-Golden output and other fixed expectations use `tests/fixtures/matrix-phase0.yaml.in`, not the checked-in `matrix.yaml.in`. You can add releases, clouds, and OCP versions to `matrix.yaml.in` without updating those tests; `test_production_matrix_expands_without_error` only checks that the production matrix expands with unique filenames.
+| Field | Meaning |
+| --- | --- |
+| `branch` | `redhat-X.Y` or `master`. The Quay version is `X.Y`; `master` has none. |
+| `layout` | `variant` (default): `{org}-{repo}-{branch}__{variant}.yaml`. `base`: `{org}-{repo}-{branch}.yaml` (used for `master`). |
+| `env` | Env for every job on the branch. |
+| `jobs` | Job rows, below. |
+
+Per job, `quay[].jobs[]`:
+
+| Field | Meaning |
+| --- | --- |
+| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`) or `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only). Picks `templates/tests/{test}.yaml.j2`. |
+| `kind` | `periodic` (default) or `presubmit` (renders `templates/presubmit/` where present). |
+| `cron` | Periodic only, required: `daily` or `nightly` (both `@daily`), `weekly` (`@weekly`), or a raw 5-field cron used verbatim. Changes timing only, never the test name. |
+| `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
+| `clouds` | `aws`, `gcp`, `azure`, `libvirt`, `baremetal`. |
+| `ocp` | OCP versions, as strings (`"4.22"`). |
+| `arches` | `amd64`, `arm64`, `s390x`; defaults to `[global_defaults.arch]`. |
+| `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic) or `{cloud}-{storage}` (presubmit). Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
+| `env` | Job env; overrides branch env key by key. |
+| `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
+| `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
+| `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
+| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp`, `libvirt`, or `baremetal`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
+| `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
+| `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
+| `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
+
+### File naming
+
+- `layout: variant`: `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml`.
+  A non-`amd64` arch goes into the variant: `{cloud}-{arch}-ocp{ocp_nodot}-{test}`.
+  `upgrade` files carry the storage too: `aws-ocp422-s3-upgrade`.
+- `layout: base`: `{org}-{repo}-{branch}.yaml`, or `{org}-{repo}-{branch}__{arch}.yaml`
+  for a non-`amd64` arch. A base file holds one OCP version; another needs a
+  separate `layout: variant` entry for the branch.
+- Cells sharing a file must render the same config outside `tests`, or
+  generation fails with `incompatible file-level inputs`.
+
+### Layer order
+
+Each cell deep-merges these layers; later layers win:
+
+1. `templates/base.yaml.j2` (presubmit: `templates/presubmit/base.yaml.j2`;
+   a repo with `templates/repos/{repo}/base.yaml.j2` uses that instead)
+2. `templates/sources/{source}.yaml.j2` (periodic only)
+3. `templates/clouds/{cloud}.yaml.j2` (presubmit: `templates/presubmit/clouds/{cloud}.yaml.j2` if present)
+4. Non-`amd64` only, both required: `templates/arches/{arch}.yaml.j2`, then `templates/clouds/{cloud}-{arch}.yaml.j2`
+5. `templates/tests/{test}.yaml.j2`
+6. Presubmit only: `templates/presubmit/tests/{test}.yaml.j2` if present
+7. `cron` (periodic) or the trigger fields (presubmit)
+8. Branch `env`, then job `env` and `as`
+
+Merge rules: mappings recurse, lists of mappings merge by index, scalar lists
+and env values replace. Templates use `{{ variable }}` and `{% if %}` on cell
+fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
+`quay_version` and others); expansion and merging live in `generate.py`.
+
+### Per-test notes
+
+- **`e2e-install`, `upgrade`**: `QUAY_EXTRA_CONFIG` is defined once, in
+  `templates/tests/_e2e-install.defaults.j2`, and shared by both.
+  `FEATURE_ROBOT_API_TOKENS` is added for Quay 5.0 and later.
+- **`upgrade`**: installs a released OCP (`releases.latest` is a stable
+  `release`, not the nightly payload) and moves the Subscription channel itself,
+  so `QUAY_OPERATOR_CHANNEL` is not set.
+- **`e2e-chainsaw`**: installs ODF (NooBaa) and the operator from the ART
+  nightly catalog on channel `stable-{quay_version}`, then runs
+  `quay-test-chainsaw` with `CHAINSAW_SUITE: all` (e2e, then destructive) under
+  a 4h timeout. Uses `templates/repos/quay-operator/base.yaml.j2` and the
+  `aws-quay-qe` cluster profile.
+- **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
+  `quay-deploy-odf`; the operator manages object storage, and
+  `quay-deprovision` skips bucket teardown.
+- **`libvirt` / `s390x`**: S3 storage; the `s390x` cell installs through the
+  IBM Z libvirt workflow (`quay-tests-libvirt-s390x`).
+- **`baremetal`**: S3 storage with external AWS credentials from the `quay-tests`
+  vault (no cluster-profile bucket); installs through the Equinix
+  `baremetalds-e2e-ovn-dualstack` workflow instead of an `ipi-*` installer.
+  The dev-scripts cluster has no default StorageClass, so
+  `templates/clouds/baremetal.yaml.j2` installs LVMS (`lvms-catalogsource` →
+  operator → `LVMCluster` on the extra disks) and sets `lvms-vg1` as the
+  default before the Quay deploy, and sizes the worker VMs within the
+  `equinix-ocp-metal` host budget (2× Xeon Silver 4210, 40 threads / 128 GiB)
+  -- oversized workers get the VM OOM-killed mid-run. The Quay and Mailpit
+  routes are only reachable through the bastion proxy
+  (`baremetalds-devscripts-proxy` writes `proxy-conf.sh`), which the test step
+  accounts for.
+- **`arches`**: `releases.latest` stays `amd64` for build tooling; the arch
+  layer adds the test cluster's release. A non-`amd64` `layout: base` file
+  never promotes.
+
+### Tests
+
+`make -C ci-operator/config/quay/quay/_generator check` runs `pytest`, then
+`generate.py --check`. Golden-output tests use
+`tests/fixtures/matrix-phase0.yaml.in`, not the real matrix, so adding coverage
+to `matrix.yaml.in` needs no test changes.

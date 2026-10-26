@@ -252,6 +252,12 @@ if [ "${ipv4_enabled:-false}" == "true" ]; then
     api_ip=$(nsenter -t "$CONTAINER_PID" -n /sbin/ip -o -4 a list ${api_ip_interface} | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
   fi
   api_int_ip="$api_ip"
+  if [ "${DISCONNECTED}" != "true" ] && \
+     { [ "${LOAD_BALANCER_TYPE}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE}" == "none" ]; }; then
+    # Connected user-managed LBs use the reserved ingress VIP on eth2 for
+    # both API and ingress listeners. Keep node-to-API traffic on that network.
+    api_int_ip="$INTERNAL_INGRESS_IPV4"
+  fi
   ingress_vip="$INTERNAL_INGRESS_IPV4"
 
   if [ "${#api_ip}" -eq 0 ]; then
@@ -267,6 +273,12 @@ if [ "${ipv6_enabled:-false}" == "true" ]; then
     api_ip_v6=$(nsenter -t "$CONTAINER_PID" -n /sbin/ip -o -6 a list ${api_ip_interface} | grep global | sed 's/.*inet6 \(.*\)\/[0-9]* scope global.*/\1/')
   fi
   api_int_ip_v6="$api_ip_v6"
+  if [ "${DISCONNECTED}" != "true" ] && \
+     { [ "${LOAD_BALANCER_TYPE}" == "user-managed" ] || [ "${AGENT_PLATFORM_TYPE}" == "none" ]; }; then
+    # Using eth1 here makes internal IPv6 clients traverse AUX on the way out,
+    # while HAProxy replies directly over eth2, bypassing AUX's connection tracking.
+    api_int_ip_v6="$INTERNAL_INGRESS_IPV6"
+  fi
   ingress_vip_v6="$INTERNAL_INGRESS_IPV6"
 
   if [ "${#api_ip_v6}" -eq 0 ]; then

@@ -69,7 +69,6 @@ base_images:
     tag: latest
 build_root:
   from_repository: true
-  use_build_cache: true
 images:
   items:
   - capabilities:
@@ -143,8 +142,6 @@ promotion:
     - src-oc
     name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -359,7 +356,6 @@ tests:
 - always_run: false
   as: aws-private
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -804,6 +800,7 @@ tests:
       AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
         etcd:etcddisk:64:0:Premium_LRS:
         user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
+      COMPUTE_NODE_TYPE: Standard_D4as_v6
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -1110,8 +1107,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-ovn-devpreview
@@ -1121,8 +1117,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: DevPreviewNoUpgrade
-      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
-        In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
+      TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-host-groups-ovn-techpreview
@@ -1207,8 +1202,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
 - always_run: false
@@ -1327,6 +1320,9 @@ tests:
   restrict_network_access: false
   steps:
     cluster_profile: powervc-1
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       ARCH: ppc64le
       BRANCH: "5.0"
@@ -1394,7 +1390,17 @@ tests:
   pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: agent-e2e-two-node-fencing-ipv4
+    workflow: agent-e2e-two-node-fencing-ipv4-hostname
+- always_run: false
+  as: e2e-agent-two-node-fencing-ipv4-mac
+  capabilities:
+  - intranet
+  - nested-podman
+  optional: true
+  pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-two-node-fencing-ipv4-mac
 - always_run: false
   as: e2e-agent-compact-ipv4-appliance-diskimage
   capabilities:
@@ -1718,8 +1724,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
 - always_run: false

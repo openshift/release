@@ -15,8 +15,12 @@ ref:
     2. Run ibu-prepare-spoke-sno.yml to retrieve the target spoke kubeconfig
        from the target hub ACM
     3. Run eco-gotests IBU upgrade test suite using the retrieved spoke kubeconfig;
-       ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO points to the target hub kubeconfig
-       at the standard telcov10n path on the target bastion
+       hub_clusterconfigs_path mounts the target hub config directory into the
+       container at /clusterconfigs, and
+       ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_HUB points to
+       /clusterconfigs/auth/kubeconfig, while
+       ECO_LCA_IBU_CNF_KUBECONFIG_TARGET_SNO points to the mounted spoke kubeconfig
+       at /kubeconfig/kubeconfig
 
     This step runs after the seed image has been mirrored to the target bastion
     and is ready for use in upgrade testing.
@@ -43,7 +47,7 @@ ref:
     documentation: Disconnected mirror registry address for seed image
   - name: VERSION
     default: "4.20"
-    documentation: OCP version used to tag the seed image
+    documentation: OCP version used for deployment and as the seed image tag; the full seed OCP version is read from the seed hub
 
   credentials:
   - namespace: test-credentials

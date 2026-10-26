@@ -7,8 +7,6 @@ base_images:
     name: vsphere-python
     namespace: ci
     tag: latest
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     candidate:
@@ -33,9 +31,14 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-rhcos9-techpreview
   interval: 12h
@@ -44,9 +47,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-rhcos9-10-techpreview
   interval: 12h
@@ -56,9 +64,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-rhcos10-techpreview
   interval: 168h
@@ -68,9 +81,14 @@ tests:
       AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
 - as: e2e-gcd-ovn
   cron: 0 0,12 * * *
@@ -119,9 +137,14 @@ tests:
         serve a basic image on each replica with a private image\|regional PD should
         store data and sync across zones\|API LBs follow /readyz of kube-apiserver
         and stop sending requests
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcd
 - as: e2e-gcp-ovn-rhcos10-fips-techpreview-serial
   interval: 168h
@@ -133,12 +156,17 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
     pre:
     - chain: ipi-gcp-pre
     - ref: fips-check
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-no-capabilities
@@ -165,7 +193,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-proxy
-  interval: 168h
+  cron: 40 3 * * 5
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -173,7 +201,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-aws-ovn-serial
-  interval: 168h
+  cron: 19 23 * * 6
   steps:
     cluster_profile: openshift-org-aws
     observers:
@@ -188,9 +216,14 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-rhcos9-techpreview-serial
@@ -201,9 +234,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-rhcos9-10-techpreview-serial
@@ -215,9 +253,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-rhcos10-techpreview-serial
@@ -229,9 +272,14 @@ tests:
       AWS_REGION_OVERWRITE: us-east-1
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: e2e-aws-ovn-upgrade
@@ -253,9 +301,14 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-ovn-upgrade-out-of-change
   interval: 168h
@@ -285,9 +338,14 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-ovn
 - as: e2e-azure-ovn-serial
   interval: 168h
@@ -305,9 +363,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-serial
   timeout: 5h0m0s
 - as: e2e-azure-ovn-serial-rhcos9-10-techpreview
@@ -319,9 +382,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-serial
   timeout: 5h0m0s
 - as: e2e-azure-ovn-techpreview-serial
@@ -331,9 +399,14 @@ tests:
     cluster_profile: openshift-org-azure
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-serial
   timeout: 5h0m0s
 - as: e2e-azure-ovn-rhcos10-techpreview-serial
@@ -344,9 +417,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OSSTREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-azure-serial
   timeout: 5h0m0s
 - as: e2e-azure-ovn-upgrade
@@ -369,9 +447,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-upgrade-rhcos9-10-techpreview
   interval: 12h
@@ -383,6 +466,8 @@ tests:
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
@@ -392,6 +477,9 @@ tests:
     - ref: rhcos-conf-osstream
     - chain: ipi-install-stableinitial
     - ref: ipi-azure-rbac
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-techpreview-upgrade
   interval: 168h
@@ -401,9 +489,14 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-ovn-upgrade-out-of-change
   interval: 168h
@@ -443,9 +536,14 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-rhcos10-techpreview
   interval: 168h
@@ -454,9 +552,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn
   interval: 168h
@@ -476,9 +579,14 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-rhcos9-10-techpreview
   interval: 12h
@@ -489,9 +597,14 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-9
       OS_IMAGE_STREAM_MCP_WORKER: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-xpn
   interval: 168h
@@ -521,9 +634,14 @@ tests:
     env:
       CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-serial
   timeout: 5h0m0s
 - as: e2e-gcp-ovn-rhcos10-techpreview-serial
@@ -535,9 +653,14 @@ tests:
       CONTROL_PLANE_NODE_TYPE: e2-custom-6-16384
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-serial
   timeout: 5h0m0s
 - as: e2e-gcp-ovn-usernamespace
@@ -547,9 +670,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
@@ -568,9 +696,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_TYPE: upgrade-conformance
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     observers:
       enable:
       - observers-resource-watch
+    test:
+    - ref: tls-13
+    - ref: openshift-e2e-test
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-upgrade-out-of-change
   interval: 168h
@@ -641,7 +774,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-runc
 - as: e2e-aws-runc-upgrade
-  cron: '@daily'
+  cron: 13 17 * * 5
   steps:
     cluster_profile: openshift-org-aws
     env:

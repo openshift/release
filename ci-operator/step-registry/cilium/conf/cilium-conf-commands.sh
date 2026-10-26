@@ -10,7 +10,7 @@ CILIUM_REPOSITORY="${CILIUM_REPOSITORY:-oci://quay.io/cilium/charts/cilium}"
 CILIUM_CLI_VERSION="${CILIUM_CLI_VERSION:-0.19.2}"
 ENDPOINT_ROUTES="${ENDPOINT_ROUTES:-true}"
 HUBBLE="${HUBBLE:-true}"
-TUNNEL_PORT="${TUNNEL_PORT:-4790}"
+TUNNEL_PORT="${TUNNEL_PORT:-4789}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared_dir}"
 
 if [[ -f "${SHARED_DIR}/install-config.yaml" ]]; then
@@ -48,6 +48,32 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: cilium
+EOF
+
+# Workaround for OCPBUGS-86033: override the default 0.3.1 cniVersion
+cat > "${SHARED_DIR}/manifest_cilium-00-cni-override-configmap.yaml" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-cni-override
+  namespace: cilium
+data:
+  cilium-override.conf: |
+    {
+      "cniVersion": "0.4.0",
+      "name": "portmap",
+      "plugins": [
+        {
+            "type": "cilium-cni",
+            "enable-debug": true,
+            "log-file": "/var/run/cilium/cilium-cni.log"
+        },
+        {
+          "type": "portmap",
+          "capabilities": {"portMappings": true}
+        }
+      ]
+    }
 EOF
 
 # Workaround for OCPBUGS-85607: Apply Cilium NetworkPolicy to allow DNS pods to reach kube-apiserver
@@ -116,6 +142,11 @@ cilium install \
     --set tunnelPort="${TUNNEL_PORT}" \
     --set clusterHealthPort=9940 \
     --set socketLB.enabled=false \
+    --set cni.readCniConf=/etc/cilium-cni/cilium-override.conf \
+    --set extraVolumes[0].name=cni-override \
+    --set extraVolumes[0].configMap.name=cilium-cni-override \
+    --set extraVolumeMounts[0].name=cni-override \
+    --set extraVolumeMounts[0].mountPath=/etc/cilium-cni \
     > "${WORKDIR}/cilium-install-all.yaml"
 
 # Split the multi-document YAML into individual manifest files

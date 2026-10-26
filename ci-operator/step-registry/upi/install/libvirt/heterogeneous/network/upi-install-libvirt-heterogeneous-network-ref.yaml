@@ -1,0 +1,31 @@
+ref:
+  as: upi-install-libvirt-heterogeneous-network
+  from: libvirt-installer
+  commands: upi-install-libvirt-heterogeneous-network-commands.sh
+  env:
+  - name: ARCH
+    default: "s390x"
+  - name: USE_EXTERNAL_DNS
+    default: 'false'
+  - name: VXLAN_ADDITIONAL_BRIDGE
+    default: ""
+    documentation: |-
+      Optional fallback for the infra-owned additional-host VXLAN bridge when the
+      lease record does not yet contain 'vxlan.additional-bridge'. Lease value wins
+      when present. Known VPN defaults when unset:
+      libvirt-s390x-vpn-amd64-0-0→ocp1-amd, ...-0-1→ocp3-amd;
+      libvirt-s390x-arm64-0-0→ocp2-arm.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dnsConfig:
+    nameservers:
+    - 172.30.38.188
+    searches:
+    - "bastion-z.svc.cluster.local"
+  documentation: |-
+    Defines and starts the primary libvirt NAT network and publishes the additional-host
+    VXLAN bridge name (SHARED_DIR/additional-bridge-name). Prefers lease
+    'vxlan.additional-bridge', with VXLAN_ADDITIONAL_BRIDGE / known-lease fallbacks.
+    Infra owns VXLAN endpoints; this step performs no hypervisor SSH operations.

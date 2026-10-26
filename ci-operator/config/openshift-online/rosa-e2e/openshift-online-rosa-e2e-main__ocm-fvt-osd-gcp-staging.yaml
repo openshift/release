@@ -8,8 +8,6 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-4.23
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -103,6 +101,24 @@ tests:
     env:
       OCM_FVT_GCP_CREDS: "true"
       OCM_FVT_JOB_NAME: cs-osd-gcp-wif-sv-staging-main
+    post:
+    - ref: rosa-e2e-gather-cluster-diagnostics
+    - ref: rosa-e2e-collect-cs-telemetry
+    pre:
+    - ref: rosa-e2e-record-start-time
+    test:
+    - ref: rosa-e2e-ocm-fvt
+  timeout: 5h0m0s
+- as: ocm-fvt-periodic-cs-osd-gcp-psc-wif-sv-staging-main
+  capabilities:
+  - nested-podman
+  cron: 0 10 * * *
+  nested_podman: true
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OCM_FVT_GCP_CREDS: "true"
+      OCM_FVT_JOB_NAME: cs-osd-gcp-psc-wif-sv-staging-main
     post:
     - ref: rosa-e2e-gather-cluster-diagnostics
     - ref: rosa-e2e-collect-cs-telemetry

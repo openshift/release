@@ -20,9 +20,12 @@ gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-GOOGLE_COMPUTE_ZONE="$(gcloud compute zones list --filter="region=$GOOGLE_COMPUTE_REGION" --format='csv[no-heading](name)' | head -n 1)"
-echo "$GOOGLE_COMPUTE_ZONE" > "$SHARED_DIR/openshift_gcp_compute_zone"
-gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+mapfile -t ZONES < <(gcloud compute zones list --filter="region=${GOOGLE_COMPUTE_REGION}" --format='csv[no-heading](name)')
+if [[ ${#ZONES[@]} -eq 0 ]]; then
+  echo "$(date -u --rfc-3339=seconds) - No zones found in region ${GOOGLE_COMPUTE_REGION}"
+  exit 1
+fi
+echo "${ZONES[0]}" > "${SHARED_DIR}/openshift_gcp_compute_zone"
 
 set -x
 
@@ -42,14 +45,29 @@ if [[ -n "${CPU_PLATFORM}" ]]; then
   CPU_PLATFORM_ARGS=(--min-cpu-platform "${CPU_PLATFORM}")
 fi
 
-gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family "${INSTANCE_IMAGE}" \
-  --image-project rhel-cloud \
-  --enable-nested-virtualization \
-  "${CPU_PLATFORM_ARGS[@]}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --machine-type "${MACHINE_TYPE}" \
-  --boot-disk-type pd-ssd \
-  --boot-disk-size 256GB \
-  --subnet "${INSTANCE_PREFIX}" \
-  --network "${INSTANCE_PREFIX}"
+GOOGLE_COMPUTE_ZONE=""
+for zone in "${ZONES[@]}"; do
+  echo "$(date -u --rfc-3339=seconds) - Creating VM ${INSTANCE_PREFIX} in zone ${zone}..."
+  echo "${zone}" > "${SHARED_DIR}/openshift_gcp_compute_zone"
+  gcloud --quiet config set compute/zone "${zone}"
+  if gcloud compute instances create "${INSTANCE_PREFIX}" \
+    --image-family "${INSTANCE_IMAGE}" \
+    --image-project rhel-cloud \
+    --enable-nested-virtualization \
+    "${CPU_PLATFORM_ARGS[@]}" \
+    --zone "${zone}" \
+    --machine-type "${MACHINE_TYPE}" \
+    --boot-disk-type pd-ssd \
+    --boot-disk-size 256GB \
+    --subnet "${INSTANCE_PREFIX}" \
+    --network "${INSTANCE_PREFIX}"; then
+    GOOGLE_COMPUTE_ZONE="${zone}"
+    break
+  fi
+  echo "$(date -u --rfc-3339=seconds) - Failed to create VM in ${zone}; trying the next zone"
+done
+
+if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Failed to create VM ${INSTANCE_PREFIX} in any zone of ${GOOGLE_COMPUTE_REGION}: ${ZONES[*]}"
+  exit 1
+fi

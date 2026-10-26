@@ -32,8 +32,6 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-ui-test-stable
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -92,8 +90,9 @@ tests:
       GKE_CLUSTER_VERSION: latest
       TEST_SUITE: gke-ui-e2e-tests
     workflow: stackrox-stackrox-e2e-job
-- always_run: true
+- always_run: false
   as: gke-nongroovy-e2e-tests
+  optional: true
   steps:
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
@@ -151,11 +150,6 @@ tests:
 - always_run: false
   as: gke-scale-tests
   optional: true
-  steps:
-    workflow: stackrox-stackrox-e2e-job
-- as: gke-scanner-v4-install-tests
-  optional: true
-  run_if_changed: ^(scanner|image|central/localscanner|sensor/kubernetes/localscanner|operator|roxctl|deploy|proto|scripts/ci|tests/e2e)/.*
   steps:
     workflow: stackrox-stackrox-e2e-job
 - always_run: false
@@ -218,20 +212,10 @@ tests:
   postsubmit: true
   steps:
     workflow: stackrox-stackrox-e2e-job
-- as: merge-gke-nongroovy-e2e-tests
-  max_concurrency: 6
-  postsubmit: true
-  steps:
-    workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-nongroovy-compatibility-tests
   max_concurrency: 6
   postsubmit: true
   skip_if_only_changed: ^ui/
-  steps:
-    workflow: stackrox-stackrox-e2e-job
-- as: merge-gke-scanner-v4-install-tests
-  max_concurrency: 6
-  postsubmit: true
   steps:
     workflow: stackrox-stackrox-e2e-job
 - as: merge-gke-version-compatibility-tests

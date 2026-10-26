@@ -13,8 +13,6 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.23-openshift-4.20
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -25,9 +23,9 @@ releases:
       channel: fast
       version: "4.20"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      architecture: amd64
+      channel: fast
       version: "4.21"
 resources:
   '*':
@@ -52,6 +50,8 @@ tests:
       :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
     workflow: opct-test-platform-none-vsphere
 - as: platform-none-vsphere-upgrade
   cron: 0 5 1 * *
@@ -65,8 +65,8 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      COMPUTE_NODE_REPLICAS: "3"
       OPCT_RUN_MODE: upgrade
-      UPGRADE_TO_CHANNEL_TYPE: candidate
     workflow: opct-test-platform-none-vsphere
   timeout: 8h0m0s
 - as: platform-external-vsphere
@@ -96,7 +96,7 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       OPCT_RUN_MODE: upgrade
-      UPGRADE_TO_CHANNEL_TYPE: candidate
+      PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 8h0m0s
 zz_generated_metadata:

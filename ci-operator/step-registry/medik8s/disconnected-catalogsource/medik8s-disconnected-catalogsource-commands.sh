@@ -20,7 +20,25 @@ if [[ ! -s "${SHARED_DIR}/workload_image" ]]; then
     exit 1
 fi
 WORKLOAD_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/workload_image")
+# Injector image for SBR privileged iptables-injection pods. Must be mirrored
+# here so the disconnected cluster can pull it; the e2e-test step exports the
+# same ref as SBR_INJECTOR_IMAGE from SHARED_DIR/injector_image (written by
+# medik8s-lib). ubi-minimal lacks nsenter/iptables, so this is the full ubi.
+if [[ ! -s "${SHARED_DIR}/injector_image" ]]; then
+    echo "ERROR: injector_image not found in SHARED_DIR." >&2
+    echo "Include the medik8s-lib ref before this step." >&2
+    exit 1
+fi
+SBR_INJECTOR_IMAGE=$(sed 's/:[^/]*$//' "${SHARED_DIR}/injector_image")
 declare MEDIK8S_PACKAGES="${MEDIK8S_PACKAGES:-fence-agents-remediation,storage-based-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation}"
+# Must-gather image used by the observability/must-gather e2e specs. It must be
+# mirrored here so the disconnected cluster can pull it, and exported to
+# SHARED_DIR so the test step pulls the same ref. The default is the latest
+# downstream GA image; the intended primary source is the latest downstream
+# build's must-gather from the FBC catalog (TODO: scrape it instead of pinning
+# by hand, falling back to this GA image). The default tag-valued ref is
+# redirected by the oc-mirror ITMS, a digest-valued ref uses the IDMS.
+declare MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/workload-availability/node-healthcheck-must-gather-rhel9:v0.12}"
 
 collect_artifacts() {
     log "Collecting debug artifacts..."
@@ -147,6 +165,8 @@ kind: ImageSetConfiguration
 mirror:
   additionalImages:
   - name: ${WORKLOAD_IMAGE}:latest
+  - name: ${SBR_INJECTOR_IMAGE}:latest
+  - name: ${MUST_GATHER_IMAGE}
   operators:
   - catalog: ${fbc_image}
     packages:
@@ -352,6 +372,9 @@ main() {
 
     echo "${FBC_COMMIT_SHA}" > "${SHARED_DIR}/rhwa_fbc_commit_sha"
     echo "${CATALOG_SOURCE_NAME}" > "${SHARED_DIR}/catsrc_name"
+    # Export the resolved must-gather ref so the e2e-test step pulls the same
+    # image that was mirrored above (kept in one place: the ref default).
+    echo "${MUST_GATHER_IMAGE}" > "${SHARED_DIR}/must_gather_image"
     log "=== Done. Disconnected CatalogSource ${CATALOG_SOURCE_NAME} is READY ==="
 }
 main

@@ -9,6 +9,7 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 # fi
 
 export_env_vars_from_json 'collect_node_info' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
+apply_gangway_overrides
 setup_continue_on_fail
 setup_debug_on_fail
 

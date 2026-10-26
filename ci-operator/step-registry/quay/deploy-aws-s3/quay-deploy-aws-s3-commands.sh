@@ -4,11 +4,26 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Quay route calls below can connect; cloud
+# jobs have no such file and skip this (no-op).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+  # The bastion squid proxy only allows the cluster's own domains, so Terraform's
+  # public provider registry must bypass it and use the CI pod's direct egress
+  # (AWS APIs already bypass via amazonaws.com in NO_PROXY). Without this,
+  # `terraform init` gets HTTP 403 Forbidden from squid for registry.terraform.io.
+  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}registry.terraform.io,releases.hashicorp.com"
+  export no_proxy="${no_proxy:+${no_proxy},}registry.terraform.io,releases.hashicorp.com"
+fi
+
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
+        curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
 fi
@@ -70,7 +85,6 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-aws-s3__quay-tests-deploy-quay-aws-s3.xml || true
   fi
   write_quay_install_junit "${ec}"
-  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -101,114 +115,6 @@ function print_quayregistry_conditions() {
   else
     oc -n "${ns}" get quayregistry quay -o yaml 2>/dev/null >&2 || true
   fi
-}
-
-# Resolve a digest pullspec through the cluster's configured mirrors, most specific
-# first, with the original pullspec last. The kubelet reports the quay-app image
-# under its SOURCE pullspec (registry.redhat.io/quay/quay-rhel9@<digest>), but on
-# the nightly jobs that digest is only ever published in the Konflux repo the
-# ImageContentSourcePolicy created by quay-enable-catalogsource points at. CRI-O
-# rewrites the pull; `oc image info` is a plain client-side registry call and does
-# not, so asking registry.redhat.io for it returns "manifest unknown".
-function mirror_pullspecs() {
-  local pullspec="$1" repo digest
-  if [[ "${pullspec}" == *@* ]]; then
-    repo="${pullspec%@*}"
-    digest="${pullspec#*@}"
-    oc get imagecontentsourcepolicies,imagedigestmirrorsets -o json 2>/dev/null \
-      | jq -r --arg repo "${repo}" --arg digest "${digest}" '
-          .items[]?.spec
-          | (.repositoryDigestMirrors // .imageDigestMirrors // [])[]?
-          | select(.source == $repo)
-          | .mirrors[]?
-          | "\(.)@\($digest)"' 2>/dev/null || true
-  fi
-  printf '%s\n' "${pullspec}"
-}
-
-# Derive the Playwright test ref from the deployed Quay app image so the e2e suite
-# is version-matched to the product with no manual pin. Written to
-# ${SHARED_DIR}/playwright_git_ref for the test-e2e step; best-effort (the test step
-# keeps its own fallback for a ref that turns out not to be fetchable). This script
-# runs without `set -x`, so the pull-secret authfile below is never traced; it is
-# also removed immediately.
-#
-# The source-commit labels (org.opencontainers.image.revision / vcs-ref) are NOT
-# usable here. The deployed image is built midstream, so that commit is a midstream
-# commit and is never present in the upstream PLAYWRIGHT_GIT_REPO: eleven product
-# digests spanning 3.16-3.18 were checked and none of them resolved upstream. That
-# is how the label is built, not a bad digest, so there is nothing to recover.
-#
-# The version label does resolve. Upstream carries a vX.Y.Z tag for 12 of the 13
-# released versions those images report (v3.16.6 is the lone exception), so:
-#   a. version X.Y.Z with an upstream tag vX.Y.Z  -> pin that tag.
-#   b. anything else -> deliberately pin branch redhat-X.Y for the image's series.
-#      This is the expected path for a nightly, which has no upstream commit or tag
-#      equivalent at all, so it is logged as a deliberate pin rather than a warning:
-#      a warning that fires on correct behaviour teaches people to ignore warnings.
-# The labels actually read are logged verbatim every run, so a build whose labels
-# do not match these expectations says so in its own log.
-function derive_playwright_ref() {
-  local ns="${QUAY_NS}"
-  local app_img authfile errfile candidate info="" version release series ref
-  local repo="${PLAYWRIGHT_GIT_REPO:-https://github.com/quay/quay.git}"
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
-  if [[ -z "${app_img}" ]]; then
-    echo "WARNING: could not determine quay-app imageID; Playwright ref will fall back" >&2
-    return 0
-  fi
-  echo "Deployed Quay app image: ${app_img}" >&2
-  authfile=$(mktemp)
-  errfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
-  # stderr is captured separately, never merged into ${info}: a stray warning on the
-  # success path would be prepended to the JSON, jq would return an empty label, and
-  # the step would report a missing label for what is really a readable image.
-  for candidate in $(mirror_pullspecs "${app_img}"); do
-    if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
-                --registry-config="${authfile}" -o json 2>"${errfile}"); then
-      echo "Read deployed image metadata from ${candidate}" >&2
-      break
-    fi
-    echo "Could not read ${candidate}: $(tr '\n' ' ' < "${errfile}")" >&2
-    info=""
-  done
-  rm -f "${authfile}" "${errfile}"
-  if [[ -z "${info}" ]]; then
-    echo "WARNING: deployed image not readable from any configured mirror; Playwright ref will fall back" >&2
-    return 0
-  fi
-  version=$(jq -r '.config.config.Labels["version"] // ""' <<<"${info}" 2>/dev/null || true)
-  release=$(jq -r '.config.config.Labels["release"] // ""' <<<"${info}" 2>/dev/null || true)
-  echo "Deployed image labels: version='${version}' release='${release}' revision='$(
-    jq -r '.config.config.Labels["org.opencontainers.image.revision"] // ""' <<<"${info}" 2>/dev/null || true)'" >&2
-  if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
-     && git ls-remote --exit-code "${repo}" "refs/tags/v${version}" >/dev/null 2>&1; then
-    ref="v${version}"
-    echo "Pinning Playwright ref to upstream tag ${ref}, matching the deployed version label" >&2
-    echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
-    return 0
-  fi
-  # The version label's X.Y prefix is the product series, so it is the first choice
-  # even when the version itself carries a suffix a tag would never match. Release is
-  # only X.Y on product builds - a build-id release such as 6.1759012345 also matches
-  # an X.Y shape - so it is consulted only when version yields nothing.
-  series=""
-  if [[ "${version}" =~ ^([0-9]+\.[0-9]+) ]]; then
-    series="${BASH_REMATCH[1]}"
-  elif [[ "${release}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    series="${release}"
-  fi
-  if [[ -z "${series}" ]]; then
-    echo "WARNING: deployed image has no usable version or release label (version='${version}' release='${release}'); Playwright ref will fall back" >&2
-    return 0
-  fi
-  ref="redhat-${series}"
-  echo "No upstream tag matches the deployed image; deliberately pinning Playwright ref to branch ${ref}." >&2
-  echo "This is the expected outcome for a build with no released upstream tag, not a degraded one." >&2
-  echo "${ref}" > "${SHARED_DIR}/playwright_git_ref"
 }
 
 function print_failing_pod_logs() {
@@ -256,7 +162,7 @@ QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 export AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}"
 export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
 
-mkdir -p QUAY_AWS && cd QUAY_AWS
+mkdir -p /tmp/QUAY_AWS && cd /tmp/QUAY_AWS
 cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"
@@ -463,28 +369,20 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once into a private temp dir: used below to merge config
-# fragments and to strip operator-managed keys, which now run
-# unconditionally.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o "${YQ}" && chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
 # not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# Merge order: Mailpit -> OTel -> unmanaged database -> QUAY_EXTRA_CONFIG,
 # so an explicit override still wins over the service-owned fragments. A
 # missing fragment is a silent no-op, leaving the disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
@@ -497,6 +395,25 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+# Unmanaged DB fragments from quay-database-intg-* steps. At most one should
+# exist; the first match wins.
+DATABASE_CONFIG_FRAGMENT=""
+for candidate in \
+	"${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
+	"${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
+do
+	if [[ -s "${candidate}" ]]; then
+		DATABASE_CONFIG_FRAGMENT="${candidate}"
+		break
+	fi
+done
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
+	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+	POSTGRES_MANAGED="false"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -505,9 +422,9 @@ fi
 
 # Strip field-group keys for components this CR keeps managed. The operator
 # injects those values; leaving them in configBundleSecret blocks rollout.
-# Runs unconditionally now: a no-op on the defaults block when no overlay
-# above added any of these keys.
-"${YQ}" -i '
+# Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
+# merged above; otherwise strip them so the operator manages postgres.
+yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,
@@ -522,13 +439,14 @@ fi
 		.REPO_MIRROR_TLS_VERIFY,
 		.BUILDLOGS_REDIS,
 		.USER_EVENTS_REDIS,
-		.DB_URI,
-		.DB_CONNECTION_ARGS,
 		.SERVER_HOSTNAME,
 		.PREFERRED_URL_SCHEME,
 		.EXTERNAL_TLS_TERMINATION
 	)
 ' config.yaml
+if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+	yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
+fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -550,14 +468,43 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   TLS_MANAGED="false"
   cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
 
-  oc create secret generic -n quay-enterprise config-bundle-secret \
-    --from-file config.yaml=./config.yaml \
-    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
-    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+  # The builder image is always the RELATED_IMAGE_COMPONENT_BUILDER the
+  # Subscription's installed CSV ships, so the builder matches the installed
+  # operator. quay-provisioning-builder leaves "from-csv" for it. No fallback.
+  if ! grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
+    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' line to fill" >&2
+    QL_INSTALL_STATUS="failed"
+    QL_INSTALL_FAILURE="config_builder.yaml has no builder image placeholder"
+    exit 1
+  fi
+  csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
+  mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+      | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
+      | unique | .[]' <<<"$csv_json")
+  if [[ ${#builder_images[@]} -ne 1 ]]; then
+    echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
+    QL_INSTALL_STATUS="failed"
+    QL_INSTALL_FAILURE="Quay Operator CSV ${CSV} has no unique builder image"
+    exit 1
+  fi
+  echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
+  sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
+
+  secret_args=(
+    --from-file config.yaml=./config.yaml
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert"
+    --from-file ssl.key="${SHARED_DIR}/ssl.key"
     --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+  )
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  secret_args=(--from-file config.yaml=./config.yaml)
 fi
+
+# configBundleSecret name. The GCP SQL handling (client certs in the bundle
+# and the postgresql-client-certs name) returns with the GCP database lane.
+CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
+
+oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -567,12 +514,14 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: ${CONFIG_BUNDLE_SECRET_NAME}
   components:
   - kind: objectstorage
     managed: false
   - kind: monitoring
     managed: false
+  - kind: postgres
+    managed: ${POSTGRES_MANAGED}
   - kind: horizontalpodautoscaler
     managed: false
   - kind: quay
@@ -598,7 +547,6 @@ for i in $(seq 1 90); do
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
-    derive_playwright_ref || true
     archive_pod_info
     exit 0
   fi

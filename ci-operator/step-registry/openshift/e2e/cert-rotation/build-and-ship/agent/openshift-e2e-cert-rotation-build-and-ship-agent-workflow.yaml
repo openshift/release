@@ -9,7 +9,8 @@ workflow:
         NETWORK_TYPE=OVNKubernetes
       DEVSCRIPTS_TARGET: agent
       NODE_CLIENT_CERT_RECOVERY_TOGGLE: "on"
-      SERVING_APPROVER: recovery
+      ROTATION_CHECK: "true"
+      SERVING_APPROVER: machine-approver
     pre:
     - chain: agent-pre
     test:
@@ -23,7 +24,10 @@ workflow:
     install, power every VM off while the cluster is still on its 24h install-time kubelet signer,
     power it back on with node clocks past that expiry (SKEW, default 2d), and require every node to
     recover with no manual CSR approval. The topology comes from DEVSCRIPTS_CONFIG (default HA_IPV4).
-    The agent installer's Machines list only IP addresses, so machine-approver rejects the kubelets'
-    serving CSRs and the recovery approver must approve them (SERVING_APPROVER=recovery).
+    The agent installer's Machines list only IP addresses, but machine-approver accepts the node's own
+    name as a serving SAN (openshift/cluster-machine-approver#344), so it must approve every serving CSR
+    (SERVING_APPROVER=machine-approver) once it's running again; the recovery approver only handles client CSRs.
+    Before the power-off, prep also rotates one node's serving cert and requires the recovery approver
+    to leave that routine CSR alone (ROTATION_CHECK).
     Set NODE_CLIENT_CERT_RECOVERY_TOGGLE=off in the job's env to leave the approver disabled and require
     the unfixed behavior instead (client CSRs stay pending).

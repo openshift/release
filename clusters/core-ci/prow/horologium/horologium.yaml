@@ -1,4 +1,22 @@
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: horologium
+  labels:
+    app: prow
+    component: horologium
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: horologium
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +38,8 @@ spec:
         app: prow
         component: horologium
     spec:
+      nodeSelector:
+        kubernetes.io/arch: amd64
       serviceAccountName: horologium
       automountServiceAccountToken: false
       initContainers:
@@ -55,7 +75,10 @@ spec:
         # - --projected-token-file=/var/sa-token/token
         - --kubeconfig=/etc/kubeconfig/sa.horologium.app.ci.config
         - --dry-run=false
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260908-104d452f4
+        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20261022-6c4d88e3b
+        ports:
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         # - name: service-account-token
         #   mountPath: /var/sa-token
