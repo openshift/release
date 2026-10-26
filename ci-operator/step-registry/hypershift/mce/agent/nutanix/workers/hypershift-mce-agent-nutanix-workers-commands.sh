@@ -290,8 +290,19 @@ fi
 nodepool_selector=$(jq -n --arg key "$RUN_LABEL_KEY" --arg value "$CLUSTER_NAME" \
   '{spec:{replicas:0,platform:{agent:{agentLabelSelector:{matchLabels:{($key):$value}}}}}}')
 oc patch nodepool "$CLUSTER_NAME" -n local-cluster --type=merge -p "$nodepool_selector"
+# The Agent provider does not copy ignition.proxy from HyperShift user-data; Assisted Service
+# regenerates the disk-boot pointer, so restore the proxy before the Agents install.
+ignition_overrides=$(jq -nc --arg proxy "$proxy_url" \
+  '{ignition:{version:"3.2.0",proxy:{httpProxy:$proxy,httpsProxy:$proxy}}}')
+agent_patch=$(jq -nc --arg overrides "$ignition_overrides" \
+  '{spec:{approved:true,ignitionConfigOverrides:$overrides}}')
 for agent in $agents; do
-  oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p '{"spec":{"approved":true}}'
+  oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p "$agent_patch"
+  if ! oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json | jq -e --arg overrides "$ignition_overrides" \
+    '.spec.approved == true and .spec.ignitionConfigOverrides == $overrides' >/dev/null; then
+    echo "Agent $agent did not retain its Ignition proxy override."
+    exit 1
+  fi
 done
 # The NodePool must be scaled first otherwise the api domain conditions do not appear.
 oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas="$NUTANIX_WORKERS"
