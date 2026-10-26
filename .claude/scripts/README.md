@@ -70,6 +70,24 @@ python3 migrate_periodic_file.py \
 
 **Output**: Creates new file with `-release-{to_version}__periodics.yaml` suffix in same directory
 
+### set_ocp_merge_criteria.py
+
+Generate and audit Tide merge criteria for a repository that follows the OCP
+development process, including the 4.12-through-previous-minor release query
+and the all-release complement exclusions.
+
+**Used by**: `set-ocp-merge-criteria` skill (`.claude/skills/set-ocp-merge-criteria/`)
+
+**Usage**:
+```bash
+python3 .claude/scripts/set_ocp_merge_criteria.py <org>/<repo> [--check]
+```
+
+**Example**:
+```bash
+python3 .claude/scripts/set_ocp_merge_criteria.py openshift/networking-console-plugin
+```
+
 ## Development
 
 When adding new scripts:
