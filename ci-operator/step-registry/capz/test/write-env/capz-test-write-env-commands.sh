@@ -143,6 +143,89 @@ if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
   echo "[quay-diag] Mounted Quay credential: VALID"
   if [[ "${QUAY_AUTH_SHA256}" != "${QUAY_AUTH_EXPECTED_SHA256}" ]]; then
     echo "[quay-diag] Known-good Vault credential → Prow mount: MISMATCH"
+    quay_source_metadata() {
+      # Use the CI pod's in-cluster identity, not the future AKS kubeconfig.
+      # Reading metadata is best effort and never changes RBAC or secrets.
+      if [[ -z "${NAMESPACE:-}" || -z "${HOSTNAME:-}" ]]; then
+        echo "[quay-diag] Source metadata: UNAVAILABLE (no CI pod identity)"
+        return
+      fi
+      ci_oc() {
+        env -u KUBECONFIG -u KUBECONFIGMINIMAL oc --request-timeout=5s -n "${NAMESPACE}" "$@"
+      }
+      local pod_json volume_name spc_name spc_json provider statuses_json versions
+      if ! pod_json=$(ci_oc get pod "${HOSTNAME}" -o json 2>/dev/null); then
+        echo "[quay-diag] Source metadata: UNAVAILABLE (cannot read CI pod)"
+        return
+      fi
+      if ! volume_name=$(printf '%s' "${pod_json}" | jq -er '
+        first(.spec.containers[] | select(.name == "test") | .volumeMounts[] |
+          select(.mountPath == "/etc/quay-pull-credentials") | .name)' 2>/dev/null) ||
+        ! spc_name=$(printf '%s' "${pod_json}" | jq -er --arg volume "${volume_name}" '
+        .spec.volumes[] | select(.name == $volume) |
+          .csi.volumeAttributes.secretProviderClass' 2>/dev/null); then
+        echo "[quay-diag] Source metadata: UNAVAILABLE (no CSI mount mapping)"
+        return
+      fi
+      if ! spc_json=$(ci_oc get secretproviderclass "${spc_name}" -o json 2>/dev/null); then
+        echo "[quay-diag] Source metadata: UNAVAILABLE (cannot read SecretProviderClass; check CI RBAC)"
+        return
+      fi
+      provider=$(printf '%s' "${spc_json}" | jq -r '.spec.provider // "unknown"')
+      case "${provider}" in
+        gcp|vault|azure|aws) echo "[quay-diag] CSI provider: ${provider}" ;;
+        *) echo "[quay-diag] CSI provider: OTHER OR UNKNOWN" ;;
+      esac
+      # GCP's mapping is YAML embedded in JSON. Print only validated resource
+      # identifiers and file names, never the complete parameters or payload.
+      printf '%s' "${spc_json}" | jq -r '.spec.parameters.secrets // ""' | sed -nE \
+        -e 's/^[[:space:]-]*resourceName:[[:space:]]*"?(projects\/[[:alnum:]_-]+\/secrets\/[[:alnum:]_-]+\/versions\/(latest|[0-9]+))"?[[:space:]]*$/[quay-diag] GSM source resource: \1/p' \
+        -e 's/^[[:space:]-]*fileName:[[:space:]]*"?([[:alnum:]_.-]+)"?[[:space:]]*$/[quay-diag] Mounted source field: \1/p'
+      if ! statuses_json=$(ci_oc get secretproviderclasspodstatuses -o json 2>/dev/null); then
+        echo "[quay-diag] Resolved GSM version: UNAVAILABLE (cannot read CSI pod status)"
+        return
+      fi
+      versions=$(printf '%s' "${statuses_json}" | jq -r --arg pod "${HOSTNAME}" --arg spc "${spc_name}" '
+        .items[] | select(.status.podName == $pod and .status.secretProviderClassName == $spc) |
+        .status.objects[]? | select(.id | test("^projects/[A-Za-z0-9_-]+/secrets/[A-Za-z0-9_-]+/versions/(latest|[0-9]+)$")) |
+        (.version | tostring | capture("^(?:projects/[A-Za-z0-9_-]+/secrets/[A-Za-z0-9_-]+/versions/)?(?<number>[0-9]+)$").number) as $version |
+        "[quay-diag] Resolved GSM version: \($version) for \(.id)"' 2>/dev/null)
+      if [[ -n "${versions}" ]]; then
+        printf '%s\n' "${versions}"
+      else
+        echo "[quay-diag] Resolved GSM version: UNAVAILABLE (no numeric version in CSI status)"
+      fi
+    }
+    quay_source_metadata
+
+    # A rotated sibling field can differ from an unchanged .dockerconfigjson.
+    # Report comparisons only; these files are never copied into artifacts.
+    for sibling in auth acm_d_mce_quay_username acm_d_mce_quay_pullsecret; do
+      sibling_file="${QUAY_CREDS_FILE%/*}/${sibling}"
+      case "${sibling}" in
+        auth) sibling_label="auth decoded pair"; sibling_expected="${QUAY_AUTH_EXPECTED_SHA256}" ;;
+        acm_d_mce_quay_username) sibling_label="username"; sibling_expected="${QUAY_USERNAME_EXPECTED_SHA256:-}" ;;
+        acm_d_mce_quay_pullsecret) sibling_label="token"; sibling_expected="${QUAY_TOKEN_EXPECTED_SHA256:-}" ;;
+      esac
+      if [[ ! -r "${sibling_file}" || -z "${sibling_expected}" ]]; then
+        echo "[quay-diag] Sibling ${sibling_label} vs known-good: NOT AVAILABLE"
+        continue
+      fi
+      if [[ "${sibling}" == "auth" ]]; then
+        if ! sibling_sha256=$(base64 --decode < "${sibling_file}" 2>/dev/null | sha256sum | cut -d ' ' -f 1); then
+          echo "[quay-diag] Sibling ${sibling_label} vs known-good: INVALID BASE64"
+          continue
+        fi
+      else
+        sibling_sha256=$(sha256sum < "${sibling_file}" | cut -d ' ' -f 1)
+      fi
+      if [[ "${sibling_sha256}" == "${sibling_expected}" ]]; then
+        echo "[quay-diag] Sibling ${sibling_label} vs known-good: MATCH"
+      else
+        echo "[quay-diag] Sibling ${sibling_label} vs known-good: MISMATCH"
+      fi
+    done
+
     # Stream decoded components through pipes so command substitution cannot
     # remove trailing newlines. Compare only; never repair or log credentials.
     quay_component() {

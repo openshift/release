@@ -27,7 +27,7 @@ class QuayCredentialTests(unittest.TestCase):
         for value in (AUTH, "test-token-do-not-log", DIGEST):
             self.assertNotIn(value, result.stdout + result.stderr)
 
-    def source_check(self, config, expected=DIGEST):
+    def source_check(self, config, expected=DIGEST, metadata=None):
         source = (STEPS / "write-env/capz-arohcp-write-env-commands.sh").read_text()
         start = source.index('# Validate and fingerprint the mounted Quay credential.')
         end = source.index('# Write resolved environment', start)
@@ -36,7 +36,26 @@ class QuayCredentialTests(unittest.TestCase):
         env = dict(os.environ, SHARED_DIR=str(self.directory),
                    QUAY_CREDS_FILE=str(credential), QUAY_AUTH_EXPECTED_SHA256=expected,
                    QUAY_USERNAME_EXPECTED_SHA256=hashlib.sha256(b"robot").hexdigest(),
-                   QUAY_TOKEN_EXPECTED_SHA256=hashlib.sha256(b"test-token-do-not-log").hexdigest())
+                   QUAY_TOKEN_EXPECTED_SHA256=hashlib.sha256(b"test-token-do-not-log").hexdigest(),
+                   NAMESPACE="")
+        if metadata is not None:
+            binary = self.directory / "bin"
+            binary.mkdir(exist_ok=True)
+            fixture = self.directory / "metadata.json"
+            fixture.write_text(json.dumps(metadata))
+            oc = binary / "oc"
+            oc.write_text("#!/usr/bin/env python3\nimport json, os, sys\n"
+                          "assert 'KUBECONFIG' not in os.environ\n"
+                          "args=sys.argv[1:]\n"
+                          "kind=args[args.index('get')+1]\n"
+                          "data=json.load(open(os.environ['METADATA_FIXTURE']))\n"
+                          "if kind not in data:\n"
+                          " print('test-token-do-not-log',file=sys.stderr)\n sys.exit(1)\n"
+                          "print(json.dumps(data[kind]))\n")
+            oc.chmod(0o755)
+            env.update(PATH=str(binary) + os.pathsep + env["PATH"],
+                       METADATA_FIXTURE=str(fixture), NAMESPACE="ci-test",
+                       HOSTNAME="write-env", KUBECONFIG="/must-not-use-aks-config")
         result = subprocess.run(["bash", "-euo", "pipefail", "-c", source[start:end]],
                                 env=env, text=True, capture_output=True, check=False)
         self.assert_private(result)
@@ -53,6 +72,49 @@ class QuayCredentialTests(unittest.TestCase):
             with self.subTest(config=config):
                 self.assertNotEqual(self.source_check(config).returncode, 0)
         self.assertNotEqual(self.source_check(CONFIG, "0" * 64).returncode, 0)
+
+    def test_csi_source_and_resolved_version_are_reported_without_payloads(self):
+        resource = "projects/openshift-ci-secrets/secrets/collection__group__field/versions/latest"
+        metadata = {
+            "pod": {"spec": {
+                "containers": [{"name": "test", "volumeMounts": [
+                    {"name": "quay", "mountPath": "/etc/quay-pull-credentials"}]}],
+                "volumes": [{"name": "quay", "csi": {
+                    "driver": "secrets-store.csi.k8s.io",
+                    "volumeAttributes": {"secretProviderClass": "quay-spc"}}}]}},
+            "secretproviderclass": {"spec": {"provider": "gcp", "parameters": {
+                "secrets": "- resourceName: " + resource + "\n  fileName: .dockerconfigjson\n",
+                "unexpected-secret": "test-token-do-not-log"}}},
+            "secretproviderclasspodstatuses": {"items": [{"status": {
+                "podName": "write-env", "secretProviderClassName": "quay-spc",
+                "objects": [{"id": resource, "version": "17"}]}}]}}
+        result = self.source_check(CONFIG, "0" * 64, metadata)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CSI provider: gcp", result.stdout)
+        self.assertIn(resource, result.stdout)
+        self.assertIn("Resolved GSM version: 17", result.stdout)
+        self.assertNotIn("unexpected-secret", result.stdout)
+        metadata["secretproviderclasspodstatuses"]["items"][0]["status"]["objects"][0]["version"] = (
+            resource.rsplit("/", 1)[0] + "/17")
+        result = self.source_check(CONFIG, "0" * 64, metadata)
+        self.assertIn("Resolved GSM version: 17", result.stdout)
+
+    def test_metadata_access_failure_does_not_hide_credential_mismatch(self):
+        result = self.source_check(CONFIG, "0" * 64, {})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Source metadata: UNAVAILABLE", result.stdout)
+        self.assertIn("username vs known-good: MATCH", result.stdout)
+
+    def test_sibling_fields_can_match_when_docker_config_is_stale(self):
+        (self.directory / "auth").write_text(AUTH)
+        (self.directory / "acm_d_mce_quay_username").write_text("robot")
+        (self.directory / "acm_d_mce_quay_pullsecret").write_text("test-token-do-not-log")
+        stale = {"auths": {"quay.io": {"auth": base64.b64encode(b"old:old-token").decode()}}}
+        result = self.source_check(stale)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Sibling auth decoded pair vs known-good: MATCH", result.stdout)
+        self.assertIn("Sibling username vs known-good: MATCH", result.stdout)
+        self.assertIn("Sibling token vs known-good: MATCH", result.stdout)
 
     def test_username_and_token_changes_are_distinguished_without_values(self):
         for credential, username, token in [
