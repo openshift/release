@@ -23,6 +23,126 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
+  as: kmm-qe-smoke-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: KMM_CHANNEL=release-2.5 make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- always_run: false
+  as: kmm-qe-smoke-2-6
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: KMM_CHANNEL=release-2.6 make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- always_run: false
   as: kmm-qe-smoke
   cluster_claim:
     architecture: amd64
@@ -35,7 +155,147 @@ tests:
     test:
     - as: install-kmm
       cli: latest
-      commands: make cluster-operators
+      commands: KMM_CHANNEL=release-2.7 make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- as: kmm-qe-nightly-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 3 * * *
+  reporter_config:
+    channel: '#kmm-nfd-gpu-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: KMM_CHANNEL=release-2.5 make cluster-operators
+      from: kmm-ci
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=modules
+        export ECO_TEST_LABELS='module && !kmm-longrun'
+        export ECO_TEST_TIMEOUT=80m
+        export ECO_TEST_VERBOSE="true"
+        export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE=quay.io/cvultur/device-plugin:latest-%s
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ginkgo --label-filter="${ECO_TEST_LABELS}" \
+          --timeout="${ECO_TEST_TIMEOUT}" \
+          --keep-going \
+          --require-suite \
+          --junit-report=junit-kmm.xml \
+          --json-report=ginkgo-kmm.json \
+          --output-dir="${ARTIFACT_DIR}" \
+          ./tests/hw-accel/kmm/modules/...
+        test_rc="$?"
+
+        oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
+        oc get pods --namespace openshift-kmm -o wide \
+          > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-kmm -o yaml \
+          > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- as: kmm-qe-nightly-2-6
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 30 2 * * *
+  reporter_config:
+    channel: '#kmm-nfd-gpu-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    test:
+    - as: install-kmm
+      cli: latest
+      commands: KMM_CHANNEL=release-2.6 make cluster-operators
       from: kmm-ci
       resources:
         requests:
@@ -105,7 +365,7 @@ tests:
     test:
     - as: install-kmm
       cli: latest
-      commands: make cluster-operators
+      commands: KMM_CHANNEL=release-2.7 make cluster-operators
       from: kmm-ci
       resources:
         requests:
