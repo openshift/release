@@ -77,70 +77,30 @@ EOF
     echo "${auth_file}"
 }
 
-# opm comes from the operator-registry image of the OpenShift release payload that the
-# cluster under test is running. This step installs tooling only from that payload, so
-# there is deliberately no second source to fall back on: the previous build was fetched
-# from github.com/operator-framework, which is outside the openshift organisation.
+# opm is still fetched from the upstream operator-framework release. Sourcing it from the
+# OpenShift release payload instead was tried and measurably does not work for this
+# workload:
 #
-# Pulling the image is registry traffic, not a source download, and it works in
-# disconnected environments because the payload has already been mirrored into the
-# internal registry by the time this step runs.
+#   * The vendored script renders the catalog by TAG
+#     (quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__<ver>__<operator>), and
+#     those images are multi-arch OCI indexes. The payload's opm fails such a reference
+#     with 'Invalid image', while the pinned v1.26.2 renders it. Both were run against the
+#     real 4.23 and 5.0 nmstate FBC tags; only a by-digest reference works with the
+#     payload build, and the pinned deployment logic does not use digests.
+#   * The payload binary is dynamically linked and needs GLIBC_2.34 (RHEL 9), whereas the
+#     upstream build is static. The step runs in each consumer's own 'tests' image, which
+#     is not guaranteed to be RHEL 9.
 #
-# The copy is staged in a scratch directory and only installed once it has been shown to
-# run, so ${TOOLS_DIR} is never left holding a partial or unusable binary.
+# Rendering semantics are otherwise identical: both builds produce byte-identical output
+# for the same catalog, and opm does not synthesise olm.csv.metadata (it is already in the
+# published catalog, and 'opm render --migrate-level' defaults to none).
 #
-# Note that the binary in that image lives at /bin/registry/opm; /usr/bin/opm is only a
-# symlink to it, and "oc image extract" would copy the symlink rather than follow it.
+# Replacing this download therefore needs a change to the deployment logic itself (for
+# example rendering a catalog directory rather than a tag), which is out of scope while
+# that logic is kept byte-identical to the pinned upstream tag.
 function install_opm() {
     echo "Install opm"
-    local scratch release_image="" operator_registry_image="" pull_secret="" err="" encoded=""
-
-    scratch=$(mktemp -d)
-    pull_secret="${scratch}/pull-secret.json"
-
-    # The cluster's own pull-secret is what it used to pull this payload, so it is the
-    # credential that works in connected and disconnected environments alike. Keep it in a
-    # variable and a scratch file only; never log it.
-    encoded=$(oc get secret pull-secret -n openshift-config \
-                -o jsonpath='{.data.\.dockerconfigjson}' 2>&1) \
-        || { err="${encoded}"; encoded=""; }
-    if [[ -n "${encoded}" ]]; then
-        printf '%s' "${encoded}" | base64 -d > "${pull_secret}" 2>/dev/null \
-            || err="could not decode the cluster pull-secret"
-    fi
-
-    if [[ -s "${pull_secret}" ]]; then
-        release_image=$(oc get clusterversion version -o jsonpath='{.status.desired.image}' 2>&1) \
-            || { err="${release_image}"; release_image=""; }
-    fi
-
-    if [[ -n "${release_image}" ]]; then
-        operator_registry_image=$(oc adm release info "${release_image}" \
-            --image-for=operator-registry -a "${pull_secret}" 2>&1) \
-            || { err="${operator_registry_image}"; operator_registry_image=""; }
-    fi
-
-    if [[ -n "${operator_registry_image}" ]]; then
-        if err=$(oc image extract "${operator_registry_image}" \
-                    --path "/bin/registry/opm:${scratch}" -a "${pull_secret}" --confirm 2>&1) &&
-           [[ -f "${scratch}/opm" ]] &&
-           chmod +x "${scratch}/opm" &&
-           "${scratch}/opm" version >/dev/null 2>&1; then
-            cp "${scratch}/opm" "${TOOLS_DIR}/opm"
-            chmod +x "${TOOLS_DIR}/opm"
-            rm -rf "${scratch}"
-            echo "Installed opm from the cluster release payload (${operator_registry_image})"
-            return 0
-        fi
-    fi
-
-    rm -rf "${scratch}"
-    echo "ERROR: could not take opm from the operator-registry image of the cluster's release payload"
-    echo "ERROR: this step installs tooling only from that payload, so there is no other source to try"
-    if [[ -n "${err}" ]]; then
-        echo "ERROR: last error was: ${err}"
-    fi
-    exit 1
+    run_command "curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o ${TOOLS_DIR}/opm && chmod +x ${TOOLS_DIR}/opm"
 }
 
 # oc is injected into the step container by ci-operator itself (see the `cli` field of the
@@ -156,8 +116,8 @@ function install_oc() {
 function install_deps() {
     run_command "mkdir -p ${TOOLS_DIR}"
     run_command "export PATH=${TOOLS_DIR}:${PATH}"
-    install_oc # we need a modern client, and install_opm below relies on it
     install_opm
+    install_oc # we need a modern client
 }
 
 # write_deploy_operator_script materialises the vendored deployment script.
