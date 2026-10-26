@@ -83,8 +83,8 @@ _scrub_leaktk_patterns() {
         -e 's|(Authorizatio[n]:[[:blank:]]*([Bb]earer[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1[REDACTED]|g' \
         -e 's|([Bb]eare[r][[:blank:]]+)[A-Za-z0-9._~+/=-]{16,}|\1[REDACTED]|g' \
         -e 's|(toke[n]=[[:blank:]]*)([A-Za-z0-9._~+/=-]{16,})|\1[REDACTED]|g' \
-        -e 's|-----BEGI[N] (CERTIFICATE|PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|PUBLIC KEY)[-----]+|[REDACTED:PEM-HEADER]|g' \
-        -e 's|-----EN[D] (CERTIFICATE|PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|PUBLIC KEY)[-----]+|[REDACTED:PEM-FOOTER]|g' \
+        -e 's#-----BEGI[N] (CERTIFICATE|PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|PUBLIC KEY)-----#[REDACTED:PEM-HEADER]#g' \
+        -e 's#-----EN[D] (CERTIFICATE|PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|PUBLIC KEY)-----#[REDACTED:PEM-FOOTER]#g' \
         -e 's#("[A-Za-z0-9_-]*(passwo[r]d|secre[t]|toke[n]|beare[r]|credentia[l])(_?(key|code))?[[:blank:]]*"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1[REDACTED]#Ig' \
         "$1"
 }
@@ -152,8 +152,12 @@ rm -f "${_grc_raw_log}"
 # ci-operator embeds this script in pods.json / pod spec, which leaktk also
 # scans.
 _grc_pattern_scrubbed="$(mktemp)"
-_scrub_leaktk_patterns "${_grc_scrubbed_log}" > "${_grc_pattern_scrubbed}"
-mv "${_grc_pattern_scrubbed}" "${_grc_scrubbed_log}"
+if ! _scrub_leaktk_patterns "${_grc_scrubbed_log}" > "${_grc_pattern_scrubbed}"; then
+    echo "ERROR: pattern-based scrub (Pass 2) failed; keeping Pass-1 log to avoid data loss" >&2
+    rm -f "${_grc_pattern_scrubbed}"
+else
+    mv "${_grc_pattern_scrubbed}" "${_grc_scrubbed_log}"
+fi
 
 # Write scrubbed output to $ARTIFACT_DIR so it is uploaded to GCS.
 # NOTE: Files in $ARTIFACT_DIR are still subject to BOTH censoring layers
