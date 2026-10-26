@@ -1,0 +1,34 @@
+chain:
+  as: rosa-e2e-ocm-fvt-validate-customer-idp
+  env:
+  - name: FVT_GINKGO_FOCUS
+    default: "IDP|Identity Provider|identity provider"
+    documentation: |-
+      Ginkgo focus selecting the FVT IDP variant cases (the specs from
+      cluster_idp_test.go and hcp_identity_providers_test.go in
+      rosa-backend-tests cases/cms/). DRAFT: the exact spec-description
+      spelling must be confirmed with CS/OCM QE; override at the workflow or
+      job level to correct the selection without touching this chain.
+  steps:
+  - ref: rosa-e2e-ocm-fvt-validate-customer
+  documentation: |-
+    IDP-variant selection of the customer-facing FVT (ocm-backend-tests) cases
+    (ROSAENG-67780, spun out of the gap analysis in ROSAENG-67586): the FVT
+    suite covers multiple identity provider types (LDAP, GitHub, Google, OIDC,
+    htpasswd variants) that had no corresponding ROSAENG-308 story.
+
+    Pure composition over rosa-e2e-ocm-fvt-validate-customer (ROSAENG-67586):
+    the same SHARED_DIR contract (cluster-id + customer-plane kubeconfig), the
+    same ocmtest test-phase-only invocation with deferred clean, and the same
+    cs-qe-credentials handling. This chain only pins the Ginkgo focus to the
+    IDP specs; everything else is inherited from the wrapped ref. The FVT
+    suite and its harness stay owned by CS/OCM QE.
+
+    The consuming workflow or job must still provide OCM_FVT_JOB_NAME
+    selecting an FVT profile whose case set includes the IDP variants
+    (DRAFT: profile name to be confirmed with CS/OCM QE). Whether the IDP
+    cases self-configure their identity providers against the composed
+    cluster or expect them pre-configured — and which credentials beyond the
+    existing cs-qe-credentials collection the LDAP/GitHub/Google/OIDC variants
+    need — is part of the same harness contract; the focus default above may
+    need an accompanying GINKGO_SKIP for variants that cannot run in CI yet.
