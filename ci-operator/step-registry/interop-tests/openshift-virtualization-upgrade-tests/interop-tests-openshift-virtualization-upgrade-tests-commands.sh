@@ -66,6 +66,110 @@ HandleExit() {
 trap 'HandleExit' EXIT
 
 # shellcheck disable=SC2329
+# RedactUrlCredentials: Strip URL userinfo and credential query parameters from
+# stdin. Resource names and other query parameters stay. GNU sed; the cli image
+# provides it. '#' is the delimiter because the pattern contains '|'. The value
+# match stops before a double quote so a credential at the end of a JSON string
+# does not eat the closer.
+RedactUrlCredentials() {
+    sed -E 's#(https?://)[^@[:space:]]*@#\1REDACTED@#g; s#([?&]([^=[:space:]]*[-_])?(token|password|passwd|secret|api_key|apikey|signature|sig)=)[^&[:space:]"]*#\1REDACTED#gI'
+}
+
+# shellcheck disable=SC2329
+# DumpCnvOnFailureDiagnostics: Collect filtered PVC, VolumeSnapshot, HCO,
+# VM, and VMI status for CNV failure root-cause analysis.
+# $1 is the boot-image namespace; it defaults to
+# openshift-virtualization-os-images. VM and VMI queries also include
+# openshift-cnv. Artifacts keep name plus status and conditions, including
+# free-text messages so resource names in those messages remain. Messages pass
+# through RedactUrlCredentials. oc stderr goes to a sibling .oc-err.txt so a
+# failed get cannot corrupt the JSON.
+# Writes artifacts to $ARTIFACT_DIR. All commands are best-effort. Pytest
+# failures still exit 0 afterward so later steps run; this function does not
+# start the debug hold.
+DumpCnvOnFailureDiagnostics() {
+    typeset dvNamespace="${1:-openshift-virtualization-os-images}"
+    typeset ns
+    # openshift-cnv is already the boot-image namespace when those names match.
+    typeset -a queryNamespaces=("${dvNamespace}")
+    if [[ "${dvNamespace}" != "openshift-cnv" ]]; then
+        queryNamespaces+=("openshift-cnv")
+    fi
+
+    oc get pvc -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-pvcs-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            phase: .status.phase,
+            capacity: .status.capacity.storage,
+            accessModes: .status.accessModes,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+          }]' \
+        | RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-pvcs-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-pvcs-on-failure.json"
+    oc get volumesnapshot -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            readyToUse: .status.readyToUse,
+            restoreSize: .status.restoreSize,
+            error: .status.error.message,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+          }]' \
+        | RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.json"
+    oc get hco kubevirt-hyperconverged -n openshift-cnv -o json \
+        2>>"${ARTIFACT_DIR}/cnv-hco-on-failure.oc-err.txt" \
+        | jq '{
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            observedGeneration: .status.observedGeneration,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+            versions: [.status.versions[]? | {name, version}]
+          }' \
+        | RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-hco-on-failure.json" \
+        || echo '{}' > "${ARTIFACT_DIR}/cnv-hco-on-failure.json"
+    # Name, run strategy, and status only. Omits spec, annotations, and
+    # cloudInitNoCloud userData. oc stderr stays out of the JSON file.
+    {
+        for ns in "${queryNamespaces[@]}"; do
+            oc get vm -n "${ns}" -o json \
+                2>>"${ARTIFACT_DIR}/cnv-vms-on-failure.oc-err.txt" \
+                | jq '[.items[]? | {
+                    namespace: .metadata.namespace,
+                    name: .metadata.name,
+                    runStrategy: (.spec.runStrategy // .spec.running),
+                    printableStatus: .status.printableStatus,
+                    ready: .status.ready,
+                    conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+                }]' || echo '[]'
+        done | jq -s 'add // []'
+    } | RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-vms-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-vms-on-failure.json"
+    {
+        for ns in "${queryNamespaces[@]}"; do
+            oc get vmi -n "${ns}" -o json \
+                2>>"${ARTIFACT_DIR}/cnv-vmis-on-failure.oc-err.txt" \
+                | jq '[.items[]? | {
+                    namespace: .metadata.namespace,
+                    name: .metadata.name,
+                    phase: .status.phase,
+                    conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+                }]' || echo '[]'
+        done | jq -s 'add // []'
+    } | RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-vmis-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-vmis-on-failure.json"
+    true
+}
+
+# shellcheck disable=SC2329
 # DebugOnExit — mainScriptEC is the script's own exit status. It is nonzero only for
 # infrastructure failures before pytest. The main script exits 0 after pytest, and
 # test failures stay in JUnit for Firewatch. postProcessEC is RunPostProcessPrep's
@@ -81,10 +185,21 @@ DebugOnExit() {
 
     if (( mainScriptEC != 0 )); then
         : "SCRIPT EXITED PREMATURELY (runtime: ${executionTime}s, PID: $$, exitCode: ${mainScriptEC})"
-        # Best-effort diagnostics on an already-failing step. || true is the allowed
-        # diagnostic-artifact pattern; stderr is merged into the artifact.
-        oc get -n "${hcoNamespace}" hco kubevirt-hyperconverged -o yaml \
-            > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml 2>&1 || true
+        # Best-effort diagnostics on an already-failing step. A failed oc must
+        # not be written into the JSON artifact.
+        DumpCnvOnFailureDiagnostics
+        oc get -n "${hcoNamespace}" hco kubevirt-hyperconverged -o json \
+            2>>"${ARTIFACT_DIR}/hco-kubevirt-hyperconverged-cr.oc-err.txt" \
+            | jq '{
+                name: .metadata.name,
+                namespace: .metadata.namespace,
+                observedGeneration: .status.observedGeneration,
+                conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+                versions: [.status.versions[]? | {name, version}]
+              }' \
+            | RedactUrlCredentials \
+            > "${ARTIFACT_DIR}/hco-kubevirt-hyperconverged-cr.json" \
+            || echo '{}' > "${ARTIFACT_DIR}/hco-kubevirt-hyperconverged-cr.json"
         oc logs --since=1h -n "${hcoNamespace}" -l name=hyperconverged-cluster-operator \
             > "${ARTIFACT_DIR}"/hco.log 2>&1 || true
         RunMustGather
@@ -103,10 +218,9 @@ DebugOnExit() {
     exit "${mainScriptEC}"
 }
 
-# Resolves the CNV must-gather image reference from the HCO CSV's relatedImages list
-# (looked up by name containing "must-gather"). Prints the image pull spec, or nothing
-# if the CSV/image entry can't be found — callers fall back to a version-pinned default.
 # shellcheck disable=SC2329
+# GetMustGatherImage: Print the CNV must-gather image from the HCO CSV relatedImages
+# list, or nothing when that entry is missing. Callers fall back to a version-pinned default.
 GetMustGatherImage() {
     oc get csv --namespace='openshift-cnv' --selector='!olm.copiedFrom' --output='json' \
         | jq -r '
@@ -118,13 +232,11 @@ GetMustGatherImage() {
     true
 }
 
-# Runs `oc adm must-gather` with the CNV-specific gather script (--vms_details), using the
-# image resolved by GetMustGatherImage, or a version-pinned fallback image when that lookup
-# comes up empty (e.g. HCO CSV already gone). Output is collected under
-# ${ARTIFACT_DIR}/must-gather-cnv for post-mortem debugging. || true is the allowed
-# diagnostic-artifact pattern: this runs only after the step has already failed, and
-# both streams are kept in the artifact instead of replacing DebugOnExit's exit code.
 # shellcheck disable=SC2329
+# RunMustGather: Run oc adm must-gather with the CNV gather script (--vms_details).
+# Uses GetMustGatherImage, or a version-pinned fallback when that lookup is empty.
+# Output goes under ${ARTIFACT_DIR}/must-gather-cnv. Best-effort: this runs only
+# after the step has already failed and must not replace DebugOnExit's exit code.
 RunMustGather() {
     typeset image
     typeset fallbackImage="registry.redhat.io/container-native-virtualization/cnv-must-gather-rhel9:v${OCP_VERSION}"
@@ -325,6 +437,7 @@ typeset -i exitCode=0
 RunCnvUpgradePytest "${hcoSubscription}" "${cnvUpgradeArgs[@]}" || exitCode=$?
 
 if (( exitCode != 0 )); then
-    : "pytest exited ${exitCode} — test failures recorded in JUnit XML; step exits 0 to allow subsequent steps to run"
+    : "pytest exited ${exitCode} — collecting CNV diagnostics for the test, VM, or infrastructure failure; step exits 0 so later steps still run"
+    DumpCnvOnFailureDiagnostics
 fi
 exit 0
