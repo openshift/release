@@ -293,6 +293,8 @@ oc patch nodepool "$CLUSTER_NAME" -n local-cluster --type=merge -p "$nodepool_se
 for agent in $agents; do
   oc patch agent "$agent" -n "$AGENT_NAMESPACE" --type=merge -p '{"spec":{"approved":true}}'
 done
+# The NodePool must be scaled first otherwise the api domain conditions do not appear.
+oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas="$NUTANIX_WORKERS"
 validation_deadline=$((SECONDS + 1200))
 for agent in $agents; do
   while :; do
@@ -320,7 +322,6 @@ for agent in $agents; do
   oc wait agent "$agent" -n "$AGENT_NAMESPACE" --for=condition=RequirementsMet --timeout=20m
 done
 
-oc scale nodepool "$CLUSTER_NAME" -n local-cluster --replicas="$NUTANIX_WORKERS"
 oc wait agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
   --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=60m
 
