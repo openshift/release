@@ -1,6 +1,7 @@
 ref:
   as: deploy-konflux-operator
   from: tests
+  cli: latest
   timeout: 30m
   grace_period: 1m
   commands: deploy-konflux-operator-commands.sh
@@ -52,5 +53,18 @@ ref:
     group: mirror-registry
     mount_path: /var/run/vault/mirror-registry
   documentation: |-
-     Deploy Konflux-built operators for connected environments using
-     https://github.com/ajaggapa/deploy-konflux-operator
+     Deploy Konflux-built operators for connected environments.
+
+     The deployment script is vendored into this step's command file; it is a verbatim
+     copy of deploy-operator.sh at tag v8.1 of
+     https://github.com/ajaggapa/deploy-konflux-operator (commit
+     8b1833e2592825b007525219e28fd9fffaef4a89), which this step used to clone at run
+     time. Nothing is cloned at run time any more.
+
+     oc comes from the release payload via ci-operator's cli injection. opm is taken
+     from the payload's operator-registry image when that is reachable, and otherwise
+     falls back to the pinned upstream build the step has always used
+     (operator-framework/operator-registry v1.26.2).
+
+     The step is not network-free: it still talks to the image registries holding the
+     operator catalogs, bundles and the release payload.
