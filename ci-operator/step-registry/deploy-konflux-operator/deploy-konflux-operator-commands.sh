@@ -77,10 +77,19 @@ EOF
     echo "${auth_file}"
 }
 
-# opm is taken from the OpenShift operator-registry image, which is built from
-# github.com/openshift/operator-framework-olm, rather than downloaded from the upstream
-# operator-framework project. The step already pulls operator content from
-# registry.redhat.io, so this adds no new network dependency.
+# opm is taken from the OpenShift operator-registry image rather than downloaded from the
+# upstream operator-framework project. The image is in the openshift organisation on
+# quay.io and is built from github.com/openshift/operator-framework-olm.
+#
+# quay.io is deliberately the host: the deployment script renders its catalogs from
+# quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc and mirrors from
+# quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share, so any job that actually
+# uses opm already has to reach quay.io. Taking opm from the same host therefore adds no
+# registry that the step did not already need. (An earlier revision of this step used
+# registry.redhat.io; that host is only contacted by the cluster's own nodes when they
+# pull operator images, never by this step, so it would have been a new dependency.)
+#
+# The reference is a digest so the binary cannot change underneath the step.
 #
 # The version is pinned rather than taken from the cluster's own payload, because the
 # payload build has to match the cluster and not every build can render the catalogs this
@@ -97,7 +106,7 @@ EOF
 #
 # The binary is staged in a scratch directory and only installed once it has been shown
 # to run, so ${TOOLS_DIR} never holds a partial or unusable binary.
-declare -r OPM_IMAGE=registry.redhat.io/openshift4/ose-operator-registry:v4.14
+declare -r OPM_IMAGE=quay.io/openshift/origin-operator-registry@sha256:f3986f2395c248aaa36bfb33e44d258841013958106d1efb4c842ba78a3a8e2d
 
 function install_opm() {
     echo "Install opm"
@@ -107,8 +116,9 @@ function install_opm() {
     scratch=$(mktemp -d)
     pull_secret="${scratch}/pull-secret.json"
 
-    # The cluster's own pull-secret carries the registry.redhat.io credentials. Keep it in
-    # a variable and a scratch file only; never log it.
+    # The opm image is public, but pass the cluster's pull-secret when it can be read so
+    # that quay.io is reached with the same credentials the rest of the step uses. Keep
+    # the secret in a variable and a scratch file only; never log it.
     encoded=$(oc get secret pull-secret -n openshift-config \
                 -o jsonpath='{.data.\.dockerconfigjson}' 2>&1) \
         || { err="${encoded}"; encoded=""; }
