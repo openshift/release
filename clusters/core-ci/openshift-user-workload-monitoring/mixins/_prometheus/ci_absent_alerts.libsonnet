@@ -34,7 +34,7 @@
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
-          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", 'retester', 'alert-proxy']
+          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", 'retester']
         ],
       },
     ],

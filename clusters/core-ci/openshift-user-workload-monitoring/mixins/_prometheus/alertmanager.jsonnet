@@ -14,8 +14,7 @@ local routes = (import 'alertmanager.libsonnet').alertmanagerRoutes;
     group_interval: '5m',
     // Safety net: cap re-notification of a still-firing alert at once per day
     // so any residual flapping/noise that slips past the per-rule hysteresis
-    // cannot re-page frequently. Individual routes may override (e.g. the
-    // alert-proxy watchdog probe stays at 15m).
+    // cannot re-page frequently. Individual routes may override.
     repeat_interval: '24h',
     receiver: 'slack-warnings',
     routes: routes,
