@@ -7,7 +7,9 @@ connected provisioning is bounded to 2 hours and the core product suite to 12 ho
 
 ## Cluster and inputs
 
-The job claims the existing `obs` OCP **5.0**, AWS/amd64 GPU pool. Selectors use
+The job claims the existing `obs` OCP **5.0**, AWS/amd64 GPU pool, holding
+the claim for eight hours so provisioning plus the core suite fit inside its
+lifetime. Selectors use
 **us-east-1**, matching the pool's actual metadata and AWS configuration, even
 though its manifest filename ends in `aws-us-east-2_clusterpool.yaml`.
 The pool uses `g5.12xlarge` workers; their four A10G GPUs serve the four-GPU
