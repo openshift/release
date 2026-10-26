@@ -7,8 +7,13 @@ chain:
     - name: HYPERSHIFT_PLATFORM
       default: ""
       documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
+    - name: EXTRA_TEST_ENV
+      default: ""
+      documentation: "Additional environment variables for the test process, one NAME=value assignment per line. Empty lines are ignored. Values are passed literally without shell expansion."
     commands: |-
-      set -xuo pipefail
+      # Environment overrides may contain sensitive values.
+      set +x
+      set -euo pipefail
       export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
       export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       export AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -16,7 +21,16 @@ chain:
       if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
           export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
       fi
-      /hypershift/bin/run-tests
+      test_env=()
+      while IFS= read -r assignment; do
+          [[ -z "${assignment}" ]] && continue
+          if [[ ! "${assignment}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
+              echo "EXTRA_TEST_ENV entries must use NAME=value syntax" >&2
+              exit 1
+          fi
+          test_env+=("${assignment}")
+      done <<< "${EXTRA_TEST_ENV}"
+      env "${test_env[@]}" /hypershift/bin/run-tests
     timeout: 150m
     grace_period: 5m
     from: hypershift-tests
