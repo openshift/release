@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# verify-interop-opp-unique-basenames.sh — CI-time guard for OPP step basename uniqueness.
-#
-# OPP steps write JUnit XML files flat into SHARED_DIR using each step
-# script's basename (minus the .sh suffix).  If two scripts share a
-# basename the later one silently overwrites the earlier JUnit report.
-#
-# Run this script from the repo root to verify every *-commands.sh under
-# ci-operator/step-registry/interop/opp has a unique basename.
+# Verify every *-commands.sh under ci-operator/step-registry/interop/opp
+# has a unique basename.  OPP steps write JUnit XML files flat into
+# SHARED_DIR keyed on the script basename (minus .sh); a collision
+# silently overwrites earlier test results.
 
 set -euo pipefail
 
