@@ -125,7 +125,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     if ! echo "${applyPolicies}" |
       xargs oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
-        --timeout=40m; then
+        --timeout=${POLICY_COMPLIANCE_TIMEOUT:-40m}; then
       : "Non-skipped policies failed to become compliant:"
       oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
       oc get policies -n policies --ignore-not-found -o yaml
@@ -141,7 +141,7 @@ else
     "$(date -u +%FT%TZ)"
   if ! oc wait policies --all -n policies \
     --for jsonpath='{.status.compliant}'=Compliant \
-    --timeout=40m; then
+    --timeout=${POLICY_COMPLIANCE_TIMEOUT:-40m}; then
     : "Policies failed to become compliant:"
     oc get policies -n policies --ignore-not-found
     oc get policies -n policies --ignore-not-found -o yaml
