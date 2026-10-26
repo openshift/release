@@ -72,10 +72,12 @@ set +x
 
 # Read ES credentials from mounted secret files
 if [[ -f /secret/server ]]; then
-  export ES_SERVER=$(cat /secret/server)
+  ES_SERVER=$(cat /secret/server)
+  export ES_SERVER
 fi
 if [[ -f /secret/index ]]; then
-  export ES_INDEX=$(cat /secret/index)
+  ES_INDEX=$(cat /secret/index)
+  export ES_INDEX
 fi
 
 $WAS_TRACING && set -x
