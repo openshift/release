@@ -27,7 +27,7 @@
       {
         "description": "monitoring namespace",
         "name": "MONITORING_NAMESPACE",
-        "value": "openshift-user-workload-monitoring"
+        "value": "ci-monitoring"
       },
     ],
   "objects": [
