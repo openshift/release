@@ -99,11 +99,12 @@ if [[ -n "${KUBE_BURNER_OCP_REPO}" ]]; then
   echo "Building kube-burner-ocp..."
   cd /tmp/kube-burner-ocp-src
   make build
+  ARCH=$(go env GOARCH)
   echo "Build complete. Binary:"
-  ls -la /tmp/kube-burner-ocp-src/bin/kube-burner-ocp
+  ls -la /tmp/kube-burner-ocp-src/bin/${ARCH}/kube-burner-ocp
 
   echo "Creating tarball for kube-burner-ocp wrapper..."
-  tar czf /tmp/kube-burner-ocp-custom.tar.gz -C /tmp/kube-burner-ocp-src/bin kube-burner-ocp
+  tar czf /tmp/kube-burner-ocp-custom.tar.gz -C /tmp/kube-burner-ocp-src/bin/${ARCH} kube-burner-ocp
   export KUBE_BURNER_URL="file:///tmp/kube-burner-ocp-custom.tar.gz"
   echo "KUBE_BURNER_URL set to ${KUBE_BURNER_URL}"
 fi
