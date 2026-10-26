@@ -732,7 +732,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
-    # Verify provisioning clusters still exist in OCM
+    # Reconcile provisioning clusters from their current OCM state
     if [[ "${STATUS}" == "provisioning" ]]; then
         ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
         if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
@@ -749,8 +749,53 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                 echo "STALE PROVISIONING: ${CM_NAME} (delete failed)" >> "${REPORT}"
             fi
             UNHEALTHY=$((UNHEALTHY + 1))
-        else
+        elif [[ "${OCM_CHECK_STATUS}" == "ready" ]]; then
+            API_URL=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.api.url // empty')
+            ACTUAL_VERSION=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.openshift_version // empty')
+            VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
+            if [[ -z "${API_URL}" || -z "${ACTUAL_VERSION}" ]]; then
+                log "WARNING: Incomplete cluster data for ${CM_NAME}, leaving provisioning for retry"
+                echo "SKIPPED: ${CM_NAME} (ready, incomplete cluster data)" >> "${REPORT}"
+                continue
+            fi
+            if dry_run_guard "Would mark ${CM_NAME} as available"; then
+                echo "DRY RUN: ${CM_NAME} (ready, would mark available)" >> "${REPORT}"
+            elif lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "$(jq -n \
+                --arg api_url "${API_URL}" --arg version "${ACTUAL_VERSION}" --arg version_label "${VERSION_LABEL}" '{
+                    metadata: {labels: {"rosa-cluster-lease/status": "available", "rosa-cluster-lease/version": $version_label}},
+                    data: {"api-url": $api_url, version: $version}
+                }')"; then
+                log "PROVISIONED: ${CM_NAME} is ready, restored to available"
+                echo "PROVISIONED: ${CM_NAME} (available)" >> "${REPORT}"
+            else
+                log "WARNING: Failed to mark ${CM_NAME} as available"
+                echo "SKIPPED: ${CM_NAME} (ready, patch failed)" >> "${REPORT}"
+                continue
+            fi
             HEALTHY=$((HEALTHY + 1))
+        elif [[ "${OCM_CHECK_STATUS}" == "error" || "${OCM_CHECK_STATUS}" == "uninstalling" ]]; then
+            log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_CHECK_STATUS}"
+            if dry_run_guard "Would mark ${CM_NAME} as error"; then
+                echo "DRY RUN: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS}, would mark error)" >> "${REPORT}"
+            elif lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "$(jq -n \
+                --arg reason "OCM status: ${OCM_CHECK_STATUS}" --arg error_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{
+                    metadata: {
+                        labels: {"rosa-cluster-lease/status": "error"},
+                        annotations: {"rosa-cluster-lease/error-reason": $reason, "rosa-cluster-lease/error-at": $error_at}
+                    }
+                }')"; then
+                echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
+            else
+                log "WARNING: Failed to mark ${CM_NAME} as error"
+                echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS}, patch failed)" >> "${REPORT}"
+            fi
+            UNHEALTHY=$((UNHEALTHY + 1))
+        elif [[ "${OCM_CHECK_STATUS}" == "pending" || "${OCM_CHECK_STATUS}" == "installing" || "${OCM_CHECK_STATUS}" == "waiting" ]]; then
+            echo "PROVISIONING: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
+            HEALTHY=$((HEALTHY + 1))
+        else
+            log "WARNING: ${CM_NAME} has unexpected OCM state ${OCM_CHECK_STATUS}, leaving provisioning for retry"
+            echo "SKIPPED: ${CM_NAME} (unexpected OCM state: ${OCM_CHECK_STATUS})" >> "${REPORT}"
         fi
         continue
     fi
