@@ -77,30 +77,78 @@ EOF
     echo "${auth_file}"
 }
 
-# opm is still fetched from the upstream operator-framework release. Sourcing it from the
-# OpenShift release payload instead was tried and measurably does not work for this
-# workload:
+# opm is taken from the OpenShift operator-registry image, which is built from
+# github.com/openshift/operator-framework-olm, rather than downloaded from the upstream
+# operator-framework project. The step already pulls operator content from
+# registry.redhat.io, so this adds no new network dependency.
 #
-#   * The vendored script renders the catalog by TAG
-#     (quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__<ver>__<operator>), and
-#     those images are multi-arch OCI indexes. The payload's opm fails such a reference
-#     with 'Invalid image', while the pinned v1.26.2 renders it. Both were run against the
-#     real 4.23 and 5.0 nmstate FBC tags; only a by-digest reference works with the
-#     payload build, and the pinned deployment logic does not use digests.
-#   * The payload binary is dynamically linked and needs GLIBC_2.34 (RHEL 9), whereas the
-#     upstream build is static. The step runs in each consumer's own 'tests' image, which
-#     is not guaranteed to be RHEL 9.
+# The version is pinned rather than taken from the cluster's own payload, because the
+# payload build has to match the cluster and not every build can render the catalogs this
+# step uses. Those catalogs are multi-arch OCI indexes and are referenced by tag; the
+# 4.20 and 4.23 builds fail such a reference ('Invalid image' / empty output), while
+# 4.14, 4.16 and 5.0 handle it. The 4.14 build is also the most portable one: it needs
+# only GLIBC_2.28, so it runs on both RHEL 8 and RHEL 9 test images, whereas later builds
+# need GLIBC_2.34.
 #
-# Rendering semantics are otherwise identical: both builds produce byte-identical output
-# for the same catalog, and opm does not synthesise olm.csv.metadata (it is already in the
-# published catalog, and 'opm render --migrate-level' defaults to none).
+# Output was compared against the previously used upstream v1.26.2 build over the five
+# predefined operators on 4.23 and 5.0: byte-identical on 4.23, and identical apart from
+# JSON key ordering on 5.0, which the deployment script does not depend on because it
+# parses with jq.
 #
-# Replacing this download therefore needs a change to the deployment logic itself (for
-# example rendering a catalog directory rather than a tag), which is out of scope while
-# that logic is kept byte-identical to the pinned upstream tag.
+# The binary is staged in a scratch directory and only installed once it has been shown
+# to run, so ${TOOLS_DIR} never holds a partial or unusable binary.
+declare -r OPM_IMAGE=registry.redhat.io/openshift4/ose-operator-registry:v4.14
+
 function install_opm() {
     echo "Install opm"
-    run_command "curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o ${TOOLS_DIR}/opm && chmod +x ${TOOLS_DIR}/opm"
+    local scratch pull_secret err="" encoded=""
+    local auth_args=()
+
+    scratch=$(mktemp -d)
+    pull_secret="${scratch}/pull-secret.json"
+
+    # The cluster's own pull-secret carries the registry.redhat.io credentials. Keep it in
+    # a variable and a scratch file only; never log it.
+    encoded=$(oc get secret pull-secret -n openshift-config \
+                -o jsonpath='{.data.\.dockerconfigjson}' 2>&1) \
+        || { err="${encoded}"; encoded=""; }
+    if [[ -n "${encoded}" ]]; then
+        printf '%s' "${encoded}" | base64 -d > "${pull_secret}" 2>/dev/null \
+            || err="could not decode the cluster pull-secret"
+    fi
+    if [[ -s "${pull_secret}" ]]; then
+        auth_args=(-a "${pull_secret}")
+    fi
+
+    if err=$(oc image extract "${OPM_IMAGE}" --path "/usr/bin/registry/opm:${scratch}" \
+                ${auth_args[@]+"${auth_args[@]}"} --confirm 2>&1) &&
+       [[ -f "${scratch}/opm" ]] &&
+       chmod +x "${scratch}/opm" &&
+       "${scratch}/opm" version >/dev/null 2>&1; then
+        cp "${scratch}/opm" "${TOOLS_DIR}/opm"
+        chmod +x "${TOOLS_DIR}/opm"
+        rm -rf "${scratch}"
+        echo "Installed opm from ${OPM_IMAGE}"
+        return 0
+    fi
+
+    rm -rf "${scratch}"
+
+    # The deployment script exits before it checks for opm when operator deployment is
+    # switched off, so a missing opm is not fatal in that case.
+    if [[ "${KONFLUX_DEPLOY_OPERATORS:-true}" == "false" ]]; then
+        echo "WARNING: could not install opm from ${OPM_IMAGE}; continuing because KONFLUX_DEPLOY_OPERATORS is false and opm is not used"
+        if [[ -n "${err}" ]]; then
+            echo "WARNING: last error was: ${err}"
+        fi
+        return 0
+    fi
+
+    echo "ERROR: could not install opm from ${OPM_IMAGE}"
+    if [[ -n "${err}" ]]; then
+        echo "ERROR: last error was: ${err}"
+    fi
+    exit 1
 }
 
 # oc is injected into the step container by ci-operator itself (see the `cli` field of the
@@ -116,8 +164,8 @@ function install_oc() {
 function install_deps() {
     run_command "mkdir -p ${TOOLS_DIR}"
     run_command "export PATH=${TOOLS_DIR}:${PATH}"
+    install_oc # we need a modern client, and install_opm below uses it
     install_opm
-    install_oc # we need a modern client
 }
 
 # write_deploy_operator_script materialises the vendored deployment script.
