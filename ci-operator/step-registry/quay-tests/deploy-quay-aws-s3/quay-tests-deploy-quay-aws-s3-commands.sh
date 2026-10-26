@@ -123,7 +123,7 @@ while (( retry < max_retries )); do
   if (( tf_exit == 0 )); then
     break
   fi
-  if grep -qi "BucketAlreadyExists\|409 Conflict" /tmp/tf_apply.log; then
+  if grep -q "BucketAlreadyExists" /tmp/tf_apply.log; then
     retry=$((retry + 1))
     if (( retry >= max_retries )); then
       echo "Terraform apply failed after ${max_retries} retries due to S3 bucket conflict" >&2
