@@ -37,26 +37,6 @@ tests:
     ruby -e "$(cat <<EOF
     require 'html-proofer'
 
-    module CiDocsLinkRetries
-        def response_handler(response, filenames)
-            href = response.request.base_url.to_s
-            @retry_attempts ||= Hash.new(0)
-            retryable = response.timed_out? || [500, 502, 503, 504].include?(response.code)
-            if retryable && !@options[:http_status_ignore].include?(response.code) && @retry_attempts[href] < 2
-                delay = 2 ** @retry_attempts[href]
-                @retry_attempts[href] += 1
-                @logger.log :info, "Retrying request after #{response.code} #{response.return_code} (retry #{@retry_attempts[href]}/2) in #{delay}s"
-                sleep(delay)
-                queue_request(response.request.options[:method], href, filenames)
-            elsif response.timed_out? && !@options[:http_status_ignore].include?(response.code)
-                handle_timeout(href, filenames, response.code)
-            else
-                super
-            end
-        end
-    end
-    HTMLProofer::UrlValidator.prepend(CiDocsLinkRetries)
-
     puts "Using html-proofer version: #{HTMLProofer::VERSION}"
     puts "With config options https://github.com/gjtorikian/html-proofer/blob/v#{HTMLProofer::VERSION}/lib/html-proofer/configuration.rb"
 
@@ -69,6 +49,7 @@ tests:
             429,
         ],
         :url_ignore => [
+            /\Ahttps?:\/\/docs\.redhat\.com(?::\d+)?(?:[\/?#]|\z)/,
             /mojo.redhat.com/,
             /source.redhat.com/,
             /rover.redhat.com/,
@@ -86,10 +67,6 @@ tests:
         ],
         :hydra => {
             :max_concurrency => 1,
-        },
-        :typhoeus => {
-            :connecttimeout => 10,
-            :timeout => 30,
         },
     }
 
