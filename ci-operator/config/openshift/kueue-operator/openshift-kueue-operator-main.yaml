@@ -733,6 +733,7 @@ tests:
 - as: test-e2e-disconnected
   capabilities:
   - arm64
+  - intranet
   cron: '@daily'
   reporter_config:
     channel: '#forum-node-jira'
@@ -742,12 +743,12 @@ tests:
     report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
-    cluster_profile: openshift-org-gcp
+    cluster_profile: openshift-org-aws
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
       CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.20
       CATSRC_NAME: redhat-operators
-      MIRROR_OPERATORS: "true"
+      MIRROR_CUSTOM_IMAGES: kueue-bundle-main,kueue-operator-main,kueue-operand-main,kueue-must-gather-main
       MUST_GATHER_COMPONENT: kueue-must-gather-main
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
@@ -773,7 +774,22 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
+    - chain: ipi-aws-post-disconnected
+    pre:
+    - chain: ipi-aws-pre-disconnected
     test:
+    - as: proxy-redirect
+      commands: |
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          # shellcheck disable=SC1091
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+      from: src-with-oc-and-kubectl
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
     - chain: cert-manager-install
     - chain: jobset-install
     - chain: leader-worker-set-install
@@ -788,7 +804,6 @@ tests:
         requests:
           cpu: 300m
           memory: 500Mi
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 - always_run: false
   as: test-e2e-dra-gpu-4-22
   cron: '@daily'
