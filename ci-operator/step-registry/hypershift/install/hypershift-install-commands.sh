@@ -155,6 +155,10 @@ if [ "${TECH_PREVIEW_NO_UPGRADE}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --tech-preview-no-upgrade"
 fi
 
+if [ -n "${METRICS_SET}" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --metrics-set=${METRICS_SET}"
+fi
+
 if [ "${ENABLE_STANDALONE_KARPENTER_OPERATOR}" = "true" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-standalone-karpenter-operator"
 fi

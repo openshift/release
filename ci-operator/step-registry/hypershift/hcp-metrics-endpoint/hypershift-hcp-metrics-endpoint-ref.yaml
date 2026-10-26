@@ -1,0 +1,81 @@
+ref:
+  as: hypershift-hcp-metrics-endpoint
+  # Same image as the openshift-qe workload steps, which is where the curl and
+  # jq this step needs come from.
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: HCP_METRICS_PROFILES
+    default: "etcd-density-metrics-hcp.yml metrics.yml"
+    documentation: |-
+      Space separated list of metrics profiles to collect from the endpoint.
+      The names are resolved by kube-burner itself: it looks for the path on
+      disk first and falls back to the profiles embedded in the kube-burner-ocp
+      binary, so these are the tool's own profiles at whatever KUBE_BURNER_VERSION
+      the workload step runs, and no copy of them exists in this repo.
+
+      The defaults are the two the etcd-density workloads use on a hosted
+      control plane: etcd-density-metrics-hcp.yml, the etcd and kube-apiserver
+      series for the hosted control plane namespace, broken down by pod so each
+      shard is reported separately; and metrics.yml, the standard management
+      cluster series. etcd-density-metrics-hcp.yml binds the namespace from
+      HOSTED_CLUSTER_NAMESPACE, which the workload step exports from
+      ${SHARED_DIR}/hcp-namespace.
+  - name: METRICS_STEP
+    default: "30s"
+    documentation: "Prometheus range query resolution used when collecting the profiles."
+  - name: SCRAPE_WAIT_SECONDS
+    default: "600"
+    documentation: |-
+      How long to keep retrying before giving up on the hosted control plane etcd
+      targets being scraped. User workload monitoring is usually enabled moments
+      before this step runs, so Prometheus has to start, discover the
+      ServiceMonitors and complete a scrape before anything can be queried.
+  - name: SCRAPE_POLL_INTERVAL
+    default: "15"
+    documentation: "Seconds between scrape probes while waiting for the first etcd series."
+  - name: PROM_TOKEN_DURATION
+    default: "8h"
+    documentation: |-
+      Lifetime of the Thanos bearer token. Must outlast the workload step that
+      consumes the endpoint file.
+  commands: hypershift-hcp-metrics-endpoint-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  documentation: |-
+    Prepares ${SHARED_DIR}/hcp-metrics-endpoint.yml so that a kube-burner
+    workload driven against a hosted cluster collects its control plane metrics
+    from the management cluster.
+
+    A hosted cluster is split: the workload is applied to the guest API server,
+    but the etcd and kube-apiserver being measured run as pods in the
+    "clusters-<name>" namespace of the management cluster. kube-burner's own
+    Prometheus discovery finds the cluster in KUBECONFIG, which is the wrong one
+    of the two, so this step resolves the management cluster's thanos-querier
+    route, mints a cluster-monitoring-view token for it, and writes an endpoint
+    file the workload step picks up.
+
+    The queries are not written here and not copied here either. The endpoint
+    file names kube-burner-ocp's own embedded metrics profiles, so what is
+    measured is whatever the tool ships at the version the workload step runs.
+    Changes to it belong in kube-burner-ocp.
+
+    Results are indexed to Elasticsearch, which is what the perf and scale
+    Grafana dashboards read, and in parallel to collected-metrics-<uuid>/ in
+    the job artifacts. The Elasticsearch server is referenced as a
+    {{.ES_SERVER}} template placeholder that kube-burner resolves from the
+    environment at run time, so the credential stays in the openshift-qe
+    workload step that already owns it.
+
+    Requires hypershift-enable-user-workload-monitoring to have run, and a
+    hosted cluster to exist: ${SHARED_DIR}/cluster-name and
+    ${SHARED_DIR}/management_cluster_kubeconfig must be present.
+
+    The endpoint file carries a Prometheus bearer token. It is written to
+    SHARED_DIR with mode 600 and is never copied to ARTIFACT_DIR.
