@@ -243,250 +243,71 @@ function show_results() {
   fi
 }
 
-# extract_intended_plugins reads the authoritative list of plugins that were
-# loaded for execution from the archive's meta/info.json.  Sonobuoy (v0.57.3)
-# iterates every cfg.LoadedPlugins entry in discovery.go and appends each
-# name to RunInfo.LoadedPlugins, then writes meta/info.json regardless of
-# plugin success or failure.  This list therefore reflects launch intent,
-# not observed results.
+# check_plugin_gate validates that every plugin OPCT actually executed
+# reports stat.status == "passed", reading the structured opct-report.json
+# produced by 'opct report --save-to' -- the same data contract the OPCT
+# web UI consumes (internal/report/data.go ReportFileNameIndexJSON).
 #
-# Outputs one plugin name per line on stdout; returns nonzero on any error.
-function extract_intended_plugins() {
-  if [[ -z "${RESULT_FILE:-}" ]]; then
-    echo "ERROR: RESULT_FILE not set; cannot determine intended plugins" >&2
-    return 1
-  fi
-
-  # The archive layout is <uuid>/meta/info.json or just meta/info.json.
-  # Use a wildcard for the optional uuid prefix and count matches to
-  # reject ambiguous archives with multiple info.json entries.
-  local match_list
-  match_list=$(tar -tzf "${RESULT_FILE}" 2>/dev/null | command grep -E '(^|/)meta/info\.json$') || {
-    echo "ERROR: no meta/info.json found in archive" >&2
-    return 1
-  }
-
-  local match_count
-  match_count=$(echo "${match_list}" | wc -l)
-  if [[ ${match_count} -ne 1 ]]; then
-    echo "ERROR: expected exactly 1 meta/info.json in archive, found ${match_count}" >&2
-    return 1
-  fi
-
-  local info_member
-  info_member=$(echo "${match_list}" | head -1)
-  local info_json
-  info_json=$(tar -xzf "${RESULT_FILE}" -O -- "${info_member}" 2>/dev/null) || {
-    echo "ERROR: failed to extract ${info_member} from archive" >&2
-    return 1
-  }
-
-  if [[ -z "${info_json}" ]]; then
-    echo "ERROR: meta/info.json is empty in archive" >&2
-    return 1
-  fi
-
-  # Parse with jq.  This step uses the 'cli-jq' supplemental image
-  # (base cli + jq) because the base 'cli' image does not include jq.
-  #
-  # Validation rules:
-  #   - Input must be exactly one valid JSON document (reject concatenated)
-  #   - Top level must be an object
-  #   - .plugins must be an array of non-empty strings
-  #   - No duplicate names
-  #   - Names must not contain control characters or be whitespace-only
-  local parsed
-  parsed=$(echo "${info_json}" | jq -e -r '
-    # Collect all documents; reject if more than one.
-    [., inputs]
-    | if length != 1 then error("expected 1 JSON document, found \(length)") else .[0] end
-    | if type != "object" then error("top-level is not an object: \(type)") else . end
-    | if (.plugins | type) != "array" then error(".plugins is not an array: \(.plugins | type)") else . end
-    | if (.plugins | length) == 0 then error(".plugins array is empty") else . end
-    | if (.plugins | map(type) | unique) != ["string"] then error(".plugins contains non-string elements") else . end
-    | if (.plugins | map(select(. == "" or test("^\\s+$") or test("[\\x00-\\x1f\\x7f]"))) | length) > 0
-      then error(".plugins contains empty/whitespace-only/control-char names") else . end
-    | if (.plugins | unique | length) != (.plugins | length) then error("duplicate plugin names in .plugins") else . end
-    | .plugins[]
-  ' 2>&1) || {
-    echo "ERROR: meta/info.json plugins validation failed: ${parsed}" >&2
-    return 1
-  }
-
-  if [[ -z "${parsed}" ]]; then
-    echo "ERROR: no plugin names extracted from meta/info.json" >&2
-    return 1
-  fi
-
-  echo "${parsed}"
-}
-
-# check_plugin_gate validates that every intended plugin reports
-# Status: passed in the results output.
+# .provider.plugins is populated only for plugins that produced results
+# (internal/report/data.go populatePluginConformance skips absent plugins),
+# so its key set already reflects run-mode intent -- e.g. upgrade mode
+# omitting plugins 10/20/80 -- without a separate parse of the archive's
+# meta/info.json. .stat.status mirrors the raw Sonobuoy plugin status
+# (same source Sonobuoy's own results text output prints), as opposed to
+# .stat.result which OPCT overrides for display (e.g. forced to "---" for
+# the Replay plugin when filtered failures exist).
 #
 # Return values (contract):
-#   0 = all intended plugins report Status: passed
-#   1 = valid intent parsed, but at least one required plugin is missing
-#       or has a non-passed status (plugin failure)
-#   2 = untrustworthy intent or results parse error (processing problem)
+#   0 = all executed plugins report stat.status == "passed"
+#   1 = valid report parsed, but at least one plugin is non-passed
+#       (plugin failure)
+#   2 = report missing or malformed (processing problem)
 #
 # The caller must capture the return value directly; using 'if !' would
 # lose the distinction between 1 and 2.
 function check_plugin_gate() {
   show_reader "Checking plugin results gate"
 
-  local results_file="${ARTIFACT_DIR}/log-results.txt"
-  if [[ ! -f "${results_file}" ]]; then
-    plugin_gate_reason="results file missing"
+  local report_json="${ARTIFACT_DIR}/opct-report/opct-report.json"
+  if [[ ! -f "${report_json}" ]]; then
+    plugin_gate_reason="opct-report.json missing at ${report_json}"
     show_msg "ERROR: ${plugin_gate_reason}"
     return 2
   fi
 
-  # --- Extract intended plugin names from archive -----------------------
-  local intended_output
-  intended_output=$(extract_intended_plugins 2>&1) || {
-    plugin_gate_reason="failed to extract intended plugins: ${intended_output}"
+  # Parse with jq.  This step uses the 'cli-jq' supplemental image
+  # (base cli + jq) because the base 'cli' image does not include jq.
+  local plugins_json
+  plugins_json=$(jq -e -c '
+    .provider.plugins
+    | if type != "object" then error("provider.plugins is not an object: \(type)") else . end
+    | if length == 0 then error("provider.plugins is empty") else . end
+    | to_entries
+    | map({name: .key, status: .value.stat.status})
+  ' "${report_json}" 2>&1) || {
+    plugin_gate_reason="failed to parse ${report_json}: ${plugins_json}"
     show_msg "ERROR: ${plugin_gate_reason}"
     return 2
   }
 
-  local -a intended_plugins=()
-  local line
-  while IFS= read -r line; do
-    [[ -n "${line}" ]] && intended_plugins+=("${line}")
-  done <<< "${intended_output}"
+  local total
+  total=$(echo "${plugins_json}" | jq 'length')
+  show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
 
-  if [[ ${#intended_plugins[@]} -eq 0 ]]; then
-    plugin_gate_reason="no intended plugins extracted from archive"
-    show_msg "ERROR: ${plugin_gate_reason}"
-    return 2
-  fi
+  local failed_json
+  failed_json=$(echo "${plugins_json}" | jq -c '[.[] | select(.status != "passed")]')
+  local failed_count
+  failed_count=$(echo "${failed_json}" | jq 'length')
 
-  show_msg "Intended plugins (from archive meta/info.json): ${intended_plugins[*]}"
-
-  # --- Parse Plugin:/Status: sections from results output ---------------
-  # The output format (sonobuoy results.go printResultsSummary) is:
-  #   Plugin: NAME
-  #   Status: VALUE
-  #   Total: N
-  #   Passed: N
-  #   Failed: N
-  #   Skipped: N    (testcase count, not plugin status)
-  #   [Failed tests: ...]
-  #   <blank line>
-  #   ...repeat for next plugin...
-  #   Run Details:  (health summary -- not a plugin)
-  local -A parsed_status=()
-  local current_plugin=""
-  local had_status_for_current=""
-  while IFS= read -r line || [[ -n "${line}" ]]; do
-    # Stop at the health summary section -- it is not a plugin.
-    if [[ "${line}" == "Run Details:"* ]]; then
-      if [[ -n "${current_plugin}" && -z "${had_status_for_current}" ]]; then
-        plugin_gate_reason="Plugin '${current_plugin}' has no Status before Run Details"
-        show_msg "ERROR: ${plugin_gate_reason}"
-        return 2
-      fi
-      break
-    fi
-
-    if [[ "${line}" == "Plugin: "* ]]; then
-      if [[ -n "${current_plugin}" && -z "${had_status_for_current}" ]]; then
-        plugin_gate_reason="Plugin '${current_plugin}' has no Status before next header"
-        show_msg "ERROR: ${plugin_gate_reason}"
-        return 2
-      fi
-
-      current_plugin="${line#Plugin: }"
-      had_status_for_current=""
-      if [[ -z "${current_plugin}" ]]; then
-        plugin_gate_reason="empty Plugin: header in results"
-        show_msg "ERROR: ${plugin_gate_reason}"
-        return 2
-      fi
-      if [[ -n "${parsed_status[${current_plugin}]+x}" ]]; then
-        plugin_gate_reason="duplicate Plugin section in results: ${current_plugin}"
-        show_msg "ERROR: ${plugin_gate_reason}"
-        return 2
-      fi
-      continue
-    fi
-
-    # Reject malformed Plugin:/Status: syntax (missing space after colon).
-    if [[ "${line}" == "Plugin:"* && "${line}" != "Plugin: "* ]]; then
-      plugin_gate_reason="malformed Plugin header (missing space after colon): ${line}"
-      show_msg "ERROR: ${plugin_gate_reason}"
-      return 2
-    fi
-
-    if [[ "${line}" == "Status: "* && -n "${current_plugin}" ]]; then
-      if [[ -n "${had_status_for_current}" ]]; then
-        plugin_gate_reason="duplicate Status in Plugin '${current_plugin}'"
-        show_msg "ERROR: ${plugin_gate_reason}"
-        return 2
-      fi
-      local status_val="${line#Status: }"
-      parsed_status[${current_plugin}]="${status_val}"
-      had_status_for_current=1
-      continue
-    fi
-
-    # Reject malformed Status: syntax (missing space after colon)
-    # regardless of whether we are inside a plugin section.
-    if [[ "${line}" == "Status:"* && "${line}" != "Status: "* ]]; then
-      if [[ -n "${current_plugin}" ]]; then
-        plugin_gate_reason="malformed Status line (missing space after colon): ${line}"
-      else
-        plugin_gate_reason="malformed orphan Status line (missing space after colon): ${line}"
-      fi
-      show_msg "ERROR: ${plugin_gate_reason}"
-      return 2
-    fi
-
-    # Orphan Status: line without a preceding Plugin: header.
-    if [[ "${line}" == "Status: "* && -z "${current_plugin}" ]]; then
-      plugin_gate_reason="orphan Status line without Plugin header"
-      show_msg "ERROR: ${plugin_gate_reason}"
-      return 2
-    fi
-  done < "${results_file}"
-
-  if [[ -n "${current_plugin}" && -z "${had_status_for_current}" ]]; then
-    plugin_gate_reason="Plugin '${current_plugin}' has no Status at EOF"
-    show_msg "ERROR: ${plugin_gate_reason}"
-    return 2
-  fi
-
-  if [[ ${#parsed_status[@]} -eq 0 ]]; then
-    plugin_gate_reason="no Plugin:/Status: sections found in results"
-    show_msg "ERROR: ${plugin_gate_reason}"
-    return 2
-  fi
-
-  # --- Validate: every intended plugin present with Status: passed ------
-  local gate_failed=0
-  local reasons=""
-  local p
-  for p in "${intended_plugins[@]}"; do
-    if [[ -z "${parsed_status[${p}]+x}" ]]; then
-      reasons="${reasons}missing plugin '${p}' in results; "
-      gate_failed=1
-      continue
-    fi
-    local s="${parsed_status[${p}]}"
-    if [[ "${s}" != "passed" ]]; then
-      reasons="${reasons}plugin '${p}' Status: ${s} (expected passed); "
-      gate_failed=1
-    fi
-  done
-
-  if [[ ${gate_failed} -ne 0 ]]; then
-    plugin_gate_reason="${reasons%;*}"
+  if [[ ${failed_count} -ne 0 ]]; then
+    plugin_gate_reason=$(echo "${failed_json}" | jq -r '
+      [.[] | "plugin \u0027\(.name)\u0027 status: \(.status) (expected passed)"] | join("; ")
+    ')
     show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
     return 1
   fi
 
-  show_msg "Plugin gate passed: all ${#intended_plugins[@]} intended plugin(s) report Status: passed"
+  show_msg "Plugin gate passed: all ${total} executed plugin(s) report stat.status: passed"
   return 0
 }
 
@@ -567,7 +388,7 @@ extract_container_logs || true
 
 # Required: check plugin results gate.
 # Capture the return value directly to preserve the 0/1/2 contract.
-if [[ -f "${ARTIFACT_DIR}/log-results.txt" ]]; then
+if [[ -f "${ARTIFACT_DIR}/opct-report/opct-report.json" ]]; then
   local_gate_rc=0
   check_plugin_gate || local_gate_rc=$?
   plugin_gate_rc=${local_gate_rc}
@@ -579,9 +400,9 @@ if [[ -f "${ARTIFACT_DIR}/log-results.txt" ]]; then
        show_msg "ERROR: Plugin gate encountered a processing error." ;;
   esac
 elif [[ -n "${RESULT_FILE:-}" ]]; then
-  show_msg "ERROR: Results file missing after results generation."
+  show_msg "ERROR: opct-report.json missing after results generation."
   plugin_gate_rc=2
-  plugin_gate_reason="results file not generated"
+  plugin_gate_reason="opct-report.json not generated"
   exit_class=$((exit_class | 2))
 else
   plugin_gate_rc="NOT_RUN"
