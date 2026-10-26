@@ -57,6 +57,12 @@ cp -r "${SHARED_DIR}"/all /eco-ci-cd/inventories/ocp-deployment/group_vars/
 cp -r "${SHARED_DIR}"/bastions /eco-ci-cd/inventories/ocp-deployment/group_vars/
 cp -r "${SHARED_DIR}"/hypervisors /eco-ci-cd/inventories/ocp-deployment/group_vars/
 
+
 cd /eco-ci-cd
 ansible-playbook -vv playbooks/ran/create-spoke-masters.yml \
   -i inventories/ocp-deployment/build-inventory.py
+
+
+# copy inventory to SHARED_DIR
+cp -rf /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
+cp -rf /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/

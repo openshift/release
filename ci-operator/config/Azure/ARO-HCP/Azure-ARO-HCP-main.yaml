@@ -270,6 +270,7 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: westus3
       RESOURCE_MANAGER_ENDPOINT: https://eastus2euap.management.azure.com
@@ -380,7 +381,30 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: westus3
+      VAULT_SECRET_PROFILE: int-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: integration-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-int'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
+      ARO_HCP_SUITE_NAME: integration/parallel/slow
       LOCATION: westus3
       VAULT_SECRET_PROFILE: int-rh
     workflow: aro-hcp-persistent-e2e
@@ -401,6 +425,7 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_SUITE_NAME: integration/parallel/all
       LOCATION: westus3
       VAULT_SECRET_PROFILE: int-rh
@@ -415,6 +440,7 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: stable
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: stable
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -431,6 +457,7 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: fast
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: fast
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -447,6 +474,7 @@ tests:
       ALLOWED_LOCATIONS: westus3
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: int
+      ARO_HCP_MAX_CONCURRENCY: "60"
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
       ARO_HCP_SUITE_NAME: integration/parallel
@@ -470,6 +498,26 @@ tests:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: stg-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: stage-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-stg'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_SUITE_NAME: stage/parallel/slow
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: stg-rh
     workflow: aro-hcp-persistent-e2e
@@ -564,6 +612,28 @@ tests:
       ARO_HCP_CLOUD: public
       ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+      VAULT_SECRET_PROFILE: prod-rh
+    workflow: aro-hcp-persistent-e2e
+- always_run: false
+  as: prod-e2e-parallel-slow
+  capabilities:
+  - arm64
+  optional: true
+  reporter_config:
+    channel: '#aro-hcp-failures-prod'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      ALLOWED_SUBSCRIPTIONS: ARO HCP E2E Hosted Clusters - Prod - 00,ARO HCP E2E Hosted
+        Clusters - Prod - 01
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
+      ARO_HCP_SUITE_NAME: prod/parallel/slow
       LOCATION: uksouth
       VAULT_SECRET_PROFILE: prod-rh
     workflow: aro-hcp-persistent-e2e

@@ -1,0 +1,47 @@
+base_images:
+  claude-runtime:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM claude-runtime
+      USER root
+      COPY pixaa /opt/pixaa
+      RUN chown -R 1000:0 /opt/pixaa && chmod -R g+rwX /opt/pixaa && \
+          git config --system --add safe.directory /opt/pixaa
+      WORKDIR /opt/pixaa
+      USER 1000
+    from: claude-runtime
+    inputs:
+      src:
+        paths:
+        - destination_dir: pixaa
+          source_path: /go/src/github.com/openshift-eng/pixaa/.
+    to: claude-ai-helpers
+  skip_if_only_changed: .*
+prowgen:
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: eval-runner
+  optional: true
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$|^(?:README|CONTRIBUTING)\.md$
+  steps:
+    env:
+      EVAL_WORKDIR: /opt/pixaa
+    workflow: openshift-claude-agent-eval-manifest
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: pixaa

@@ -32,16 +32,10 @@ tests:
     - failure
     - error
     - aborted
-    report_template: |-
-      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
-      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-      {{- if eq .Status.State "aborted" }}
-        The job was aborted, check for orphaned cloud resources.
-      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: g4dn.xlarge
@@ -51,6 +45,7 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - as: nvidia-dra-gpu-e2e-tests

@@ -32,16 +32,10 @@ tests:
     - failure
     - error
     - aborted
-    report_template: |-
-      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
-      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-      {{- if eq .Status.State "aborted" }}
-        The job was aborted, check for orphaned cloud resources.
-      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
       MCO_CONF_DAY1_INSTALL_KERNEL_MCPS: master
       MCO_CONF_DAY1_INSTALL_KERNEL_TYPE: realtime
@@ -57,6 +51,7 @@ tests:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
     - ref: mco-conf-day1-kerneltype
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - as: gpu-operator-e2e
@@ -79,16 +74,10 @@ tests:
     - failure
     - error
     - aborted
-    report_template: |-
-      {{- $emoji := ":warning:" }}{{- if eq .Status.State "success" }}{{- $emoji = ":white_check_mark:" }}{{- end }}
-      {{- $prInfo := "" }}{{- with .Spec.Refs }}{{- if .Pulls }}{{- $pull := index .Pulls 0 }}{{- $prInfo = printf " (<%s|PR #%d> by %s)" $pull.Link $pull.Number $pull.Author }}{{- end }}{{- end -}}
-      {{$emoji}} Job *{{.Spec.Job}}*{{$prInfo}} ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{$emoji}}
-      {{- if eq .Status.State "aborted" }}
-        The job was aborted, check for orphaned cloud resources.
-      {{- end }}
   steps:
     cluster_profile: aws-edge-infra
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
       MCO_CONF_DAY1_INSTALL_KERNEL_MCPS: master
       MCO_CONF_DAY1_INSTALL_KERNEL_TYPE: realtime
@@ -104,6 +93,7 @@ tests:
     - chain: ipi-conf-aws
     - ref: single-node-conf-aws
     - ref: mco-conf-day1-kerneltype
+    - chain: aws-provision-iam-user-minimal-permission
     - chain: ipi-install
     test:
     - as: gpu-operator-e2e
