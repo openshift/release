@@ -2063,18 +2063,129 @@ periodics:
         dnf install -y git
         export HOME=/tmp
         cd /tmp
+
         # Avoid putting credentials in argv/env/logs
         git_cmd() {
           git -c credential.helper= -c credential.helper='!f() { echo username=openshift-merge-robot; printf password=; cat /etc/github/oauth; echo; }; f' "$@"
         }
+
+        repo=openshift/openshift-mcp-server
+        repo_url="https://github.com/${repo}.git"
         src=main
-        dst=release-1.1
-        repo_url=https://github.com/openshift/openshift-mcp-server.git
-        echo "Fast-forwarding ${src} -> ${dst} for openshift/openshift-mcp-server"
-        git_cmd clone -b "${dst}" "${repo_url}" repo
-        cd repo
-        git_cmd pull --ff-only origin "${src}"
-        git_cmd push
+
+        # Release branches that have shipped and no longer track main. A
+        # branch must be retired here once its Konflux release setup lands
+        # on it (".tekton/*-main-*" files renamed to
+        # ".tekton/*-release-XY-*", ".konflux_release/releasePlan/*" added,
+        # "Dockerfile.ocp" version labels bumped): those commits can never
+        # exist on main, so the branch can never be fast-forwarded again.
+        # When retiring a branch, make sure the next release branch has
+        # been cut so it is picked up by the loop below.
+        retired_branches=(
+          release-0.0.1
+          release-0.2.0
+          release-0.3
+          release-0.4
+          release-0.5
+          release-1.0
+          release-1.1
+        )
+
+        # Every other release-* branch is active and gets fast-forwarded to
+        # main. Active branches are discovered automatically, so cutting
+        # release-X.Y is all it takes to start tracking it.
+        echo "Cloning ${repo}"
+        git_cmd clone "${repo_url}" ffwork
+        cd ffwork
+
+        is_retired() {
+          local b
+          for b in ${retired_branches[@]+"${retired_branches[@]}"}; do
+            [[ "${b}" == "$1" ]] && return 0
+          done
+          return 1
+        }
+
+        join_by() { local IFS=,; echo "$*"; }
+
+        declare -a ffed=() up_to_date=() backmerged=() diverged=() failed=() retired=()
+        exit_code=0
+
+        branches=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin/ | sed 's|^origin/||' | grep -E '^release-[0-9]' | sort -V || true)
+        for branch in ${branches}; do
+          if is_retired "${branch}"; then
+            retired+=("${branch}")
+            continue
+          fi
+
+          # Branch already contains main: nothing to fast-forward. If the
+          # tips differ, main was merged into the branch manually and the
+          # branch will diverge again once main advances.
+          if git merge-base --is-ancestor "origin/${src}" "origin/${branch}" 2>/dev/null; then
+            if [[ "$(git rev-parse "origin/${src}")" == "$(git rev-parse "origin/${branch}")" ]]; then
+              up_to_date+=("${branch}")
+              echo "INFO: ${branch} is already up to date with ${src}"
+            else
+              backmerged+=("${branch}")
+              echo "WARNING: ${branch} contains ${src} via a backmerge; it will diverge once ${src} advances"
+            fi
+            continue
+          fi
+
+          # Branch has commits main does not: it can never be
+          # fast-forwarded again; report it and let a human retire it (or
+          # investigate).
+          if ! git merge-base --is-ancestor "origin/${branch}" "origin/${src}" 2>/dev/null; then
+            diverged+=("${branch}")
+            echo "ERROR: ${branch} has diverged from ${src}"
+            git --no-pager log --oneline "origin/${branch}..origin/${src}" | sed -n '1,5s|^|  on main only: |p'
+            git --no-pager log --oneline "origin/${src}..origin/${branch}" | sed -n "1,5s|^|  on ${branch} only: |p"
+            konflux_diff=$(git diff --name-only "origin/${src}" "origin/${branch}" | grep -E '^\.tekton/|^\.konflux_release/|^Dockerfile\.ocp' || true)
+            if [[ -n "${konflux_diff}" ]]; then
+              echo "  (Konflux release configuration differs between the branches)"
+            fi
+            continue
+          fi
+
+          commits=$(git rev-list --count "origin/${branch}..origin/${src}")
+          echo "Fast-forwarding ${src} -> ${branch} (${commits} commits)"
+          if git checkout -q -B "${branch}" "origin/${branch}" && git_cmd pull --ff-only origin "${src}" && git_cmd push origin "${branch}"; then
+            ffed+=("${branch} (${commits} commits)")
+          else
+            failed+=("${branch}")
+            echo "ERROR: failed to fast-forward ${branch}"
+          fi
+        done
+
+        echo ""
+        echo "======================================================"
+        echo " ${repo} fast-forward summary (${src})"
+        echo "======================================================"
+        echo "Fast-forwarded: $(join_by ${ffed[@]+"${ffed[@]}"})"
+        echo "Up to date:     $(join_by ${up_to_date[@]+"${up_to_date[@]}"})"
+        echo "Backmerged:     $(join_by ${backmerged[@]+"${backmerged[@]}"})"
+        echo "Retired (skip): $(join_by ${retired[@]+"${retired[@]}"})"
+        echo "Diverged:       $(join_by ${diverged[@]+"${diverged[@]}"})"
+        echo "Failed:         $(join_by ${failed[@]+"${failed[@]}"})"
+        echo ""
+
+        if [[ ${#diverged[@]} -gt 0 ]]; then
+          echo "ACTION REQUIRED: the diverged branch(es) above can no longer be"
+          echo "fast-forwarded. This usually means the release shipped and its"
+          echo "Konflux release setup landed on the branch. If so, add it to"
+          echo "retired_branches for this job in ci-operator/jobs/infra-periodics.yaml"
+          echo "and make sure the next release branch has been cut."
+          exit_code=1
+        fi
+        if [[ ${#failed[@]} -gt 0 ]]; then
+          echo "ERROR: some fast-forwards failed, see log above"
+          exit_code=1
+        fi
+        if [[ $(( ${#ffed[@]} + ${#up_to_date[@]} + ${#backmerged[@]} )) -eq 0 ]]; then
+          echo "ERROR: no active release branch is tracking ${src}; cut the next release branch"
+          exit_code=1
+        fi
+        exit ${exit_code}
       command:
       - /bin/bash
       image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
