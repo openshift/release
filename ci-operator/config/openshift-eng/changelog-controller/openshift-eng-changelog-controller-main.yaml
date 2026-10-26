@@ -1,0 +1,87 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
+  tools:
+    name: "4.23"
+    namespace: ocp
+    tag: tools
+binary_build_commands: make
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/changelog-controller/Dockerfile
+    from: tools
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/changelog-controller/changelog-controller
+    to: changelog-controller
+  - dockerfile_literal: |-
+      FROM pipeline:govulncheck
+      COPY changelog-controller /workdir
+      WORKDIR /workdir
+    from: govulncheck
+    inputs:
+      src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-eng/changelog-controller
+    to: govulncheck-src
+promotion:
+  to:
+  - excluded_images:
+    - govulncheck-src
+    name: latest
+    namespace: continuous-release-jobs
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: lint
+  commands: HOME=/tmp golangci-lint run --timeout=20m
+  container:
+    from: golangci-lint
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: fix
+  commands: go fix -diff ./...
+  container:
+    from: src
+- as: govulncheck
+  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 11Gi
+        requests:
+          cpu: 500m
+          memory: 8Gi
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift-eng/changelog-controller
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: changelog-controller
