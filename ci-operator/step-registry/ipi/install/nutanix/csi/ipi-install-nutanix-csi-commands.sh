@@ -107,6 +107,18 @@ reclaimPolicy: Delete
 EOF
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
+
+# The Nutanix CSI operator deployment references an image pull secret named
+# "regcred". Without it, kubelet emits repeated FailedToRetrieveImagePullSecret
+# events that trip the pathological-events monitor. Mirror the cluster global
+# pull secret into "regcred" so the reference resolves. Piped directly to avoid
+# writing the credential to disk or the log.
+oc create secret generic regcred \
+  --type=kubernetes.io/dockerconfigjson \
+  --from-file=.dockerconfigjson=<(oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d) \
+  -n openshift-cluster-csi-drivers \
+  --dry-run=client -o yaml | oc apply -f -
+
 oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
