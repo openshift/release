@@ -1,0 +1,64 @@
+resources:
+  '*':
+    requests:
+      cpu: "2"
+      memory: 4Gi
+tests:
+# Nightly search for new Azure fuzz crashes. ci/prow/unit only replays f.Add seeds.
+# One -fuzz command can run one test. A failure is recorded and the next target still runs.
+# Crash inputs are copied to $ARTIFACT_DIR because the CI workspace is discarded.
+# Replay a saved input with: go test ./pkg/destroy/azure/ -run '^FuzzGroupFromID$'
+- as: fuzz-azure
+  cron: 0 2 * * *
+  commands: |
+    set -uo pipefail
+    FUZZTIME="${FUZZ_TIME:-2m}"
+    rc=0
+    run_fuzz() {
+      local pkg="$1" fn="$2"
+      echo "--- fuzz: $fn ($pkg) ---"
+      go test "./$pkg" -run='^$' -fuzz="^${fn}$" -fuzztime="${FUZZTIME}" || rc=$?
+    }
+    trap 'find . -path "*/testdata/fuzz/*/*" | while read -r f; do
+            dest="$ARTIFACT_DIR/$(dirname "$f")"; mkdir -p "$dest"; cp "$f" "$dest/"; done' EXIT
+    run_fuzz pkg/destroy/azure                          FuzzGroupFromID
+    run_fuzz pkg/types/azure                            FuzzAddressFamilySubnets
+    run_fuzz pkg/types/azure                            FuzzAzureResourceNames
+    run_fuzz pkg/types/azure                            FuzzSetBaseDomain
+    run_fuzz pkg/types/azure                            FuzzStorageAccountName
+    run_fuzz pkg/types/azure/validation                 FuzzDiskEncryptionSetID
+    run_fuzz pkg/types/azure/validation                 FuzzFindDuplicateTagKeys
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDataDisk
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDataDiskSetup
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDiskEncryption
+    run_fuzz pkg/types/azure/validation                 FuzzValidateEncryptionAtHost
+    run_fuzz pkg/types/azure/validation                 FuzzValidateOSImage
+    run_fuzz pkg/types/azure/validation                 FuzzValidateSecurityProfile
+    run_fuzz pkg/types/azure/validation                 FuzzValidateTag
+    run_fuzz pkg/types/azure/validation                 FuzzValidateUserTags
+    run_fuzz pkg/asset/installconfig/azure              FuzzAcceleratedNetworkingCapability
+    run_fuzz pkg/asset/installconfig/azure              FuzzAzureStackClusterOSImage
+    run_fuzz pkg/asset/installconfig/azure              FuzzAzureStackClusterOSImageSet
+    run_fuzz pkg/asset/installconfig/azure              FuzzInstanceSecurityType
+    run_fuzz pkg/asset/installconfig/azure              FuzzPremiumDiskCapability
+    run_fuzz pkg/asset/installconfig/azure              FuzzWindowsVMFamily
+    run_fuzz pkg/asset/machines/azure                   FuzzBootDiagnosticsObject
+    run_fuzz pkg/asset/machines/azure                   FuzzBootstrapFailureDomain
+    run_fuzz pkg/asset/machines/azure                   FuzzCapzUserTags
+    run_fuzz pkg/asset/machines/azure                   FuzzMachineImage
+    run_fuzz pkg/asset/machines/azure                   FuzzTrimSubscriptionPrefix
+    run_fuzz pkg/asset/manifests/azure                  FuzzGetIPWithinCIDR
+    run_fuzz pkg/asset/manifests/azure                  FuzzSubnetAddressPrefixes
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzCheckIfNewer
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzConvertToSemver
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzMatchesRHELMajor
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzParseAROSKUs
+    exit $rc
+  container:
+    from: src
+  timeout: 2h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: installer
+  variant: periodics
