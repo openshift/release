@@ -34,7 +34,9 @@ class QuayCredentialTests(unittest.TestCase):
         credential = self.directory / "auth.json"
         credential.write_text(config if isinstance(config, str) else json.dumps(config))
         env = dict(os.environ, SHARED_DIR=str(self.directory),
-                   QUAY_CREDS_FILE=str(credential), QUAY_AUTH_EXPECTED_SHA256=expected)
+                   QUAY_CREDS_FILE=str(credential), QUAY_AUTH_EXPECTED_SHA256=expected,
+                   QUAY_USERNAME_EXPECTED_SHA256=hashlib.sha256(b"robot").hexdigest(),
+                   QUAY_TOKEN_EXPECTED_SHA256=hashlib.sha256(b"test-token-do-not-log").hexdigest())
         result = subprocess.run(["bash", "-euo", "pipefail", "-c", source[start:end]],
                                 env=env, text=True, capture_output=True, check=False)
         self.assert_private(result)
@@ -51,6 +53,33 @@ class QuayCredentialTests(unittest.TestCase):
             with self.subTest(config=config):
                 self.assertNotEqual(self.source_check(config).returncode, 0)
         self.assertNotEqual(self.source_check(CONFIG, "0" * 64).returncode, 0)
+
+    def test_username_and_token_changes_are_distinguished_without_values(self):
+        for credential, username, token in [
+                (b"other-robot:test-token-do-not-log", "MISMATCH", "MATCH"),
+                (b"robot:other-token-do-not-log", "MATCH", "MISMATCH")]:
+            with self.subTest(username=username, token=token):
+                config = {"auths": {"quay.io": {
+                    "auth": base64.b64encode(credential).decode()}}}
+                result = self.source_check(config)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("username vs known-good: " + username, result.stdout)
+                self.assertIn("token vs known-good: " + token, result.stdout)
+                self.assertNotIn(credential.decode(), result.stdout + result.stderr)
+                self.assertNotIn("other-token-do-not-log", result.stdout + result.stderr)
+
+    def test_whitespace_only_difference_is_identified_without_trimming_credentials(self):
+        for credential, component in [
+                (b" robot :test-token-do-not-log", "username"),
+                (b"robot: test-token-do-not-log\r\n", "token")]:
+            with self.subTest(component=component):
+                config = {"auths": {"quay.io": {
+                    "auth": base64.b64encode(credential).decode()}}}
+                result = self.source_check(config)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(component + " leading/trailing whitespace: YES", result.stdout)
+                self.assertIn(component + " after trimming whitespace vs known-good: MATCH", result.stdout)
+                self.assertFalse((self.directory / "quay-auth.sha256").exists())
 
     def cluster_check(self, *, changed_secret=False, empty_environment=False,
                       wrong_reference=False, kubectl_failure=False, test_status=0, enabled=True):

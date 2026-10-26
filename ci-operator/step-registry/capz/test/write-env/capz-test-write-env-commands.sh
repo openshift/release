@@ -143,6 +143,43 @@ if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
   echo "[quay-diag] Mounted Quay credential: VALID"
   if [[ "${QUAY_AUTH_SHA256}" != "${QUAY_AUTH_EXPECTED_SHA256}" ]]; then
     echo "[quay-diag] Known-good Vault credential → Prow mount: MISMATCH"
+    # Stream decoded components through pipes so command substitution cannot
+    # remove trailing newlines. Compare only; never repair or log credentials.
+    quay_component() {
+      jq -jr --arg component "$1" '
+        .auths["quay.io"].auth | @base64d |
+        if $component == "username" then split(":")[0]
+        else sub("^[^:]*:"; "") end
+      ' "${QUAY_CREDS_FILE}"
+    }
+    for component in username token; do
+      if [[ "${component}" == "username" ]]; then
+        expected_component_sha256="${QUAY_USERNAME_EXPECTED_SHA256:-}"
+      else
+        expected_component_sha256="${QUAY_TOKEN_EXPECTED_SHA256:-}"
+      fi
+      if quay_component "${component}" | jq -eRs 'test("^\\s|\\s$")' >/dev/null; then
+        echo "[quay-diag] ${component} leading/trailing whitespace: YES"
+      else
+        echo "[quay-diag] ${component} leading/trailing whitespace: NO"
+      fi
+      if [[ -z "${expected_component_sha256}" ]]; then
+        echo "[quay-diag] ${component} vs known-good: NOT CHECKED (no reference supplied)"
+        continue
+      fi
+      component_sha256=$(quay_component "${component}" | sha256sum | cut -d ' ' -f 1)
+      if [[ "${component_sha256}" == "${expected_component_sha256}" ]]; then
+        echo "[quay-diag] ${component} vs known-good: MATCH"
+      else
+        echo "[quay-diag] ${component} vs known-good: MISMATCH"
+      fi
+      trimmed_sha256=$(quay_component "${component}" | jq -jRs 'gsub("^\\s+|\\s+$"; "")' | sha256sum | cut -d ' ' -f 1)
+      if [[ "${trimmed_sha256}" == "${expected_component_sha256}" ]]; then
+        echo "[quay-diag] ${component} after trimming whitespace vs known-good: MATCH"
+      else
+        echo "[quay-diag] ${component} after trimming whitespace vs known-good: MISMATCH"
+      fi
+    done
     exit 1
   fi
   echo "[quay-diag] Known-good Vault credential → Prow mount: MATCH"
