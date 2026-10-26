@@ -690,11 +690,11 @@ JStep() {
 
 XmlEscape() {
     typeset s="${1}"
-    s="${s//&/&amp;}"
-    s="${s//</&lt;}"
-    s="${s//>/&gt;}"
-    s="${s//\"/&quot;}"
-    s="${s//\'/&apos;}"
+    s="${s//&/\&amp;}"
+    s="${s//</\&lt;}"
+    s="${s//>/\&gt;}"
+    s="${s//\"/\&quot;}"
+    s="${s//\'/\&apos;}"
     printf '%s' "${s}"
 }
 
@@ -719,13 +719,14 @@ WriteJunit() {
         if [[ "${MAP_TESTS}" == "true" && -n "${DR__RP__CR_COMP_NAME}" ]]; then
             suiteName="${DR__RP__CR_COMP_NAME}--${suiteName}"
         fi
+        typeset escapedSuiteName; escapedSuiteName="$(XmlEscape "${suiteName}")"
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
         printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${suiteName}" "${total}" "${failures}" "${totalTime}"
+            "${escapedSuiteName}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
             printf '  <testcase name="%s" classname="%s" time="%d">\n' \
-                "${escapedName}" "${suiteName}" "${elapsed}"
+                "${escapedName}" "${escapedSuiteName}" "${elapsed}"
             if [[ "${status}" == 'FAIL' ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \
