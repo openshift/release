@@ -48,6 +48,8 @@ tests:
                 @logger.log :info, "Retrying #{href} after #{response.code} #{response.return_code} (retry #{@retry_attempts[href]}/2) in #{delay}s"
                 sleep(delay)
                 queue_request(response.request.options[:method], href, filenames)
+            elsif response.timed_out? && !@options[:http_status_ignore].include?(response.code)
+                handle_timeout(href, filenames, response.code)
             else
                 super
             end

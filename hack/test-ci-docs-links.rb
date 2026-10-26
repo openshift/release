@@ -27,6 +27,14 @@ class CiDocsLinksTest < Minitest::Test
             sleep(options.fetch(:delay, 0))
             response.status = options.fetch(:code)
             response.body = ''
+            if options[:slow_body]
+                response.chunked = true
+                response.body = proc do |output|
+                    output.write('partial')
+                    sleep(0.3)
+                    output.write('complete')
+                end
+            end
         end
         @base_url = "http://127.0.0.1:#{@server.config[:Port]}"
         @server_thread = Thread.new { @server.start }
@@ -51,6 +59,10 @@ class CiDocsLinksTest < Minitest::Test
                 assert_equal 10, options.fetch(:typhoeus).fetch(:connecttimeout)
                 assert_equal 30, options.fetch(:typhoeus).fetch(:timeout)
                 options[:typhoeus][:timeout_ms] = 100 if @timeout_test
+                @observed_responses = []
+                proofer.before_request do |request|
+                    request.on_complete { |response| @observed_responses << [response.code, response.timed_out?] }
+                end
                 HTMLProofer::UrlValidator.prepend(CiDocsLinksTestSleep)
                 self.class.delays.clear
                 begin
@@ -104,6 +116,24 @@ class CiDocsLinksTest < Minitest::Test
         assert_equal 1, check_links(['https://example.com/unavailable'])
         assert_equal [:head, :head, :head, :get], @requests.map(&:last)
         assert_equal [1, 2], self.class.delays
+    end
+
+    def test_timeout_after_success_headers_is_not_a_success
+        @timeout_test = true
+        serve_link('https://example.com/slow-body', [{ code: 404 }, { code: 200, slow_body: true }])
+        assert_equal 1, check_links(['https://example.com/slow-body'])
+        assert_equal [:head, :get, :get, :get], @requests.map(&:last)
+        assert_equal [[404, false], [200, true], [200, true], [200, true]], @observed_responses
+        assert_equal [1, 2], self.class.delays
+    end
+
+    def test_timeout_after_success_headers_can_recover
+        @timeout_test = true
+        serve_link('https://example.com/slow-body', [{ code: 404 }, { code: 200, slow_body: true }, { code: 200 }])
+        assert_equal 0, check_links(['https://example.com/slow-body'])
+        assert_equal [:head, :get, :get], @requests.map(&:last)
+        assert_equal [[404, false], [200, true], [200, false]], @observed_responses
+        assert_equal [1], self.class.delays
     end
 
     def test_get_fallback_can_retry
