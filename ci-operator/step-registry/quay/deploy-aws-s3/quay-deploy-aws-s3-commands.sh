@@ -374,9 +374,10 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit -> OTel -> unmanaged database -> QUAY_EXTRA_CONFIG,
-# so an explicit override still wins over the service-owned fragments. A
-# missing fragment is a silent no-op, leaving the disabled default above.
+# Merge order: Mailpit -> OTel -> unmanaged database -> IdP auth ->
+# QUAY_EXTRA_CONFIG, so an explicit override still wins over the service-owned
+# fragments. A missing fragment is a silent no-op, leaving the disabled default
+# above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
 	echo "Merging Mailpit config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
@@ -404,6 +405,12 @@ if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
 	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
 	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
 	POSTGRES_MANAGED="false"
+fi
+
+# Never print this fragment: an LDAP fragment carries LDAP_ADMIN_PASSWD.
+if [[ -s "${SHARED_DIR}/quay-auth-config.yaml" ]]; then
+	echo "Merging IdP auth config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-auth-config.yaml"
 fi
 
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
