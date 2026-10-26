@@ -5,19 +5,8 @@ export PATH="/cli:${PATH}"
 
 export HOME="/root/dpf-ci"
 
-# UID 1000 cannot create user namespaces inside the Prow pod (kernel
-# rejects uid_map writes) and the pod filesystem is already overlay, so
-# rootless podman cannot use the overlay driver. Use vfs storage and
-# skip user namespace creation.
-mkdir -p "${HOME}/.config/containers"
-cat > "${HOME}/.config/containers/storage.conf" <<'STORAGECFG'
-[storage]
-driver = "vfs"
-STORAGECFG
-cat > "${HOME}/.config/containers/containers.conf" <<'CONTAINERCFG'
-[containers]
-userns = "host"
-CONTAINERCFG
+# Podman storage/subuid are configured by the container entrypoint
+# (ci/podman-entrypoint.sh). Nothing to do here.
 
 # A workflow can require an exact version handoff. Validate it before touching
 # the hypervisor, independently of the workflow that supplied the request.
