@@ -1,0 +1,47 @@
+ref:
+  as: openshift-evpn-gateway-appliance-e2e
+  from: ansible-test-runner
+  commands: openshift-evpn-gateway-appliance-e2e-commands.sh
+  credentials:
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  grace_period: 30m
+  dependencies:
+  - name: ansible-test-runner
+    env: CI_IMAGE
+  - name: centos-stream10
+    env: EE_BASE_IMAGE
+  - name: metallb-frr
+    env: FRR_IMAGE
+  - name: prometheus-node-exporter
+    env: NODE_EXPORTER_IMAGE
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  env:
+  - name: APPLIANCE_BASE_IMAGE
+    default: quay.io/centos-bootc/centos-bootc:stream10
+    documentation: Appliance bootc base. Not mirrored in the CI registry, so no dependency.
+  - name: CI_IMAGE
+    default: ""
+    documentation: CI image (Dockerfile.ci) that runs run_remote.sh; set by the ansible-test-runner dependency.
+  - name: EE_BASE_IMAGE
+    default: ""
+    documentation: Execution-environment base; set by the centos-stream10 dependency.
+  - name: FRR_IMAGE
+    default: ""
+    documentation: FRR payload baked into the appliance; set by the metallb-frr dependency.
+  - name: NODE_EXPORTER_IMAGE
+    default: ""
+    documentation: node-exporter payload baked into the appliance; set by the prometheus-node-exporter dependency.
+  documentation: >-
+    Runs the emulated EVPN e2e lane on the EC2 VM from the
+    openshift-image-based-infra-aws-ec2 chain. This runs in the CI image
+    (ansible-test-runner), which bakes test/e2e/run_remote.sh and carries skopeo + ssh,
+    and runs run_remote.sh in remote mode: it exports CI_IMAGE and the base images to
+    tarballs, ships them to the VM, and builds and runs the lane there. The image inputs
+    default to public images and are overridden by the base_images dependencies
+    (CI_IMAGE/FRR_IMAGE/NODE_EXPORTER_IMAGE/EE_BASE_IMAGE); APPLIANCE_BASE_IMAGE has no
+    mirror so it stays the public default.
