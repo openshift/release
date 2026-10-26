@@ -110,7 +110,7 @@ declare -r OPM_IMAGE=quay.io/openshift/origin-operator-registry@sha256:f3986f239
 
 function install_opm() {
     echo "Install opm"
-    local scratch pull_secret err="" encoded=""
+    local scratch pull_secret err="" encoded="" out=""
     local auth_args=()
 
     scratch=$(mktemp -d)
@@ -124,25 +124,33 @@ function install_opm() {
         || { err="${encoded}"; encoded=""; }
     if [[ -n "${encoded}" ]]; then
         printf '%s' "${encoded}" | base64 -d > "${pull_secret}" 2>/dev/null \
-            || err="could not decode the cluster pull-secret"
+            || { err="could not decode the cluster pull-secret"; rm -f "${pull_secret}"; }
     fi
     if [[ -s "${pull_secret}" ]]; then
         auth_args=(-a "${pull_secret}")
     fi
 
-    if err=$(oc image extract "${OPM_IMAGE}" --path "/usr/bin/registry/opm:${scratch}" \
+    # Keep the extract output in its own variable: on success it is empty, and overwriting
+    # ${err} with it would discard the reason the pull-secret could not be read.
+    if out=$(oc image extract "${OPM_IMAGE}" --path "/usr/bin/registry/opm:${scratch}" \
                 ${auth_args[@]+"${auth_args[@]}"} --confirm 2>&1) &&
        [[ -f "${scratch}/opm" ]] &&
        chmod +x "${scratch}/opm" &&
        "${scratch}/opm" version >/dev/null 2>&1; then
-        cp "${scratch}/opm" "${TOOLS_DIR}/opm"
-        chmod +x "${TOOLS_DIR}/opm"
-        rm -rf "${scratch}"
-        echo "Installed opm from ${OPM_IMAGE}"
-        return 0
+        # Guarded so that a failure here cannot exit under `set -e` and leave the scratch
+        # directory, which holds the decoded pull-secret, behind.
+        if cp "${scratch}/opm" "${TOOLS_DIR}/opm" && chmod +x "${TOOLS_DIR}/opm"; then
+            rm -rf "${scratch}"
+            echo "Installed opm from ${OPM_IMAGE}"
+            return 0
+        fi
+        out="could not install the extracted opm into ${TOOLS_DIR}"
     fi
 
     rm -rf "${scratch}"
+    if [[ -n "${out}" ]]; then
+        err="${out}"
+    fi
 
     # The deployment script exits before it checks for opm when operator deployment is
     # switched off, so a missing opm is not fatal in that case.
