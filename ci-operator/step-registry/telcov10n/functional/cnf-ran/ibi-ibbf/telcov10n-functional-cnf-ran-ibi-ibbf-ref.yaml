@@ -14,7 +14,7 @@ ref:
   env:
   - name: IBI_IBBF_ENABLED
     default: "false"
-    documentation: Enable blocking hardware replacement tests after replacement preinstall.
+    documentation: Enable hardware replacement tests after replacement preinstall. Completed test failures are enforced after reporting; setup and execution errors remain blocking.
   - name: IBI_REPLACEMENT_PREINSTALL_ENABLED
     default: "false"
     documentation: Must be enabled so replacement hardware is preinstalled before IBBF.
@@ -53,7 +53,7 @@ ref:
     hub ImportAndSync strategy before allowing original-node power-off.
     Read original BMC credentials privately and verify they authenticate both
     the original and replacement BMC. Capture the expected target policies.
-    Require hardware replacement to execute and pass. When a replacement policy
+    Require hardware replacement to execute; remediate policies only after it passes. When a replacement policy
     path is configured, check its YAML identities at the recorded seed revision
     before the test. After replacement, verify original fencing, switch policies
     to that path and revision, and require Argo synchronization and propagation
@@ -67,6 +67,9 @@ ref:
     Record this independent check in its own JUnit report; image policy spec
     87996 is deliberately not selected
     because some images repeat the changed Git path in that spec's BeforeEach.
-    Stream output, collect reports even on failure, and return failure immediately.
-    Leave the original hardware off and Argo on the replacement fixture.
-    Deployment Types final-result handling is unchanged.
+    Stream output and collect reports even on failure. Setup, execution, cleanup,
+    and report collection errors stop the workflow. Completed hardware or policy
+    assertion failures are saved in SHARED_DIR/ibi-ibbf-exit-code and deferred
+    until final verification after reporting. Missing or skipped hardware tests
+    remain blocking; a failed hardware test skips dependent policy remediation.
+    Leave hardware and Argo in their resulting state for investigation.

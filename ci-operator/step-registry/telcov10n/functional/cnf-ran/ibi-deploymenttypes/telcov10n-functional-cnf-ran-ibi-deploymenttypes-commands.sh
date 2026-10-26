@@ -5,6 +5,9 @@ umask 077
 
 TEMP_DIR=
 SSH_READY=false
+REPORTS_COLLECTED=false
+RUN_RC=1
+TEST_RESULT=1
 
 record_result() {
   printf '%s\n' "$1" > "${RESULT_FILE}"
@@ -15,7 +18,7 @@ finish() {
   trap - EXIT
   set +e
 
-  if [[ "${SSH_READY}" == true ]]; then
+  if [[ "${SSH_READY}" == true && "${REPORTS_COLLECTED}" == false ]]; then
     collect_reports
     copy_rc=$?
     if (( result == 0 )); then
@@ -23,7 +26,11 @@ finish() {
     fi
   fi
 
-  record_result "${result}"
+  if (( result == 0 )); then
+    record_result "${TEST_RESULT}"
+  else
+    record_result "${result}"
+  fi
   save_rc=$?
   [[ -z "${TEMP_DIR}" ]] || rm -rf -- "${TEMP_DIR}"
   if (( save_rc != 0 )); then
@@ -31,9 +38,13 @@ finish() {
     exit "${save_rc}"
   fi
 
-  echo "Deployment Types step status: ${result}; report-copy status: ${copy_rc}."
-  echo "Subsequent stages may continue; the shared JUnit verifier will check this status and the reports."
-  exit 0
+  echo "Deployment Types step status: ${result}; test result: ${TEST_RESULT}; report-copy status: ${copy_rc}."
+  if (( result == 0 )); then
+    echo "Tests completed; later stages may continue. Final verification will enforce the saved test result."
+  else
+    echo "Deployment Types setup, execution, or report collection failed; stopping the workflow." >&2
+  fi
+  exit "${result}"
 }
 
 validate_inputs() {
@@ -141,9 +152,36 @@ run_tests() {
   status=("${PIPESTATUS[@]}")
   set -e
   echo "Test execution status: ${status[0]}; log-write status: ${status[2]}."
-  (( status[0] == 0 )) || return "${status[0]}"
+  RUN_RC=${status[0]}
   (( status[1] == 0 )) || return "${status[1]}"
-  return "${status[2]}"
+  (( status[2] == 0 )) || return "${status[2]}"
+  # Exit 1 is provisional: only a completed JUnit failure may be deferred.
+  case "${RUN_RC}" in
+    0|1) return 0 ;;
+    *) return "${RUN_RC}" ;;
+  esac
+}
+
+verify_test_result() {
+  python3 - "${REPORT_DIR}/report/deployment_suite_test_junit.xml" "${RUN_RC}" <<'PYTEST'
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+cases = list(root.iter("testcase"))
+tests = [case for case in cases if case.get("name", "").startswith("[It] ")]
+if root.tag not in ("testsuite", "testsuites") or not any(case.find("skipped") is None for case in tests):
+    sys.exit("Deployment Types did not execute any test cases.")
+if (any(prop.get("name") == "SpecialSuiteFailureReason" and prop.get("value") for prop in root.iter("property")) or
+        any(case.find("error") is not None or
+            any(failure.get("type") == "aborted" for failure in case.findall("failure")) or
+            (case not in tests and case.find("failure") is not None) for case in cases)):
+    sys.exit("Deployment Types reported an execution or suite setup/teardown error.")
+failed = any(case.find("failure") is not None for case in tests)
+if int(sys.argv[2]) != 0 and not failed:
+    sys.exit("Deployment Types runner failed without a matching JUnit test failure.")
+print(int(failed))
+PYTEST
 }
 
 collect_reports() {
@@ -182,6 +220,9 @@ main() {
   fetch_target_kubeconfig
   prepare_launcher
   run_tests
+  collect_reports
+  REPORTS_COLLECTED=true
+  TEST_RESULT=$(verify_test_result)
 }
 
 main "$@"

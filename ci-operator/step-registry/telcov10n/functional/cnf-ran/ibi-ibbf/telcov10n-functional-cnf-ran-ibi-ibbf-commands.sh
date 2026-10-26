@@ -5,21 +5,40 @@ umask 077
 
 TEMP_DIR=
 SSH_READY=false
+REPORTS_COLLECTED=false
+RUN_RC=1
+TEST_RESULT=1
 
 finish() {
-  local result=$1 copy_rc=0
+  local result=$1 copy_rc=0 cleanup_rc=0 save_rc=0
   trap - EXIT
   set +e
   if [[ "${SSH_READY}" == true ]]; then
-    collect_reports
-    copy_rc=$?
-    (( result != 0 )) || result=${copy_rc}
+    if [[ "${REPORTS_COLLECTED}" == false ]]; then
+      collect_reports
+      copy_rc=$?
+      (( result != 0 )) || result=${copy_rc}
+    fi
     ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
       "rm -f -- '${BMC_ENV_FILE}' '${SPOKE_KUBECONFIG}' '${POLICY_BASELINE}'" \
       2>&1 | redact_bastion
+    cleanup_rc=$?
+    (( result != 0 )) || result=${cleanup_rc}
   fi
+  if (( result == 0 )); then
+    printf '%s\n' "${TEST_RESULT}" > "${RESULT_FILE}"
+  else
+    printf '%s\n' "${result}" > "${RESULT_FILE}"
+  fi
+  save_rc=$?
+  (( result != 0 )) || result=${save_rc}
   [[ -z "${TEMP_DIR}" ]] || rm -rf -- "${TEMP_DIR}"
-  echo "IBBF step status: ${result}; report-copy status: ${copy_rc}."
+  echo "IBBF step status: ${result}; test result: ${TEST_RESULT}; report-copy status: ${copy_rc}; cleanup status: ${cleanup_rc}."
+  if (( result == 0 )); then
+    echo "Tests completed; reporting may continue. Final verification will enforce the saved test result."
+  else
+    echo "IBBF setup, execution, or report collection failed; stopping the workflow." >&2
+  fi
   exit "${result}"
 }
 
@@ -230,9 +249,14 @@ run_tests() {
   status=("${PIPESTATUS[@]}")
   set -e
   echo "Test execution status: ${status[0]}; log-write status: ${status[2]}."
-  (( status[0] == 0 )) || return "${status[0]}"
+  RUN_RC=${status[0]}
   (( status[1] == 0 )) || return "${status[1]}"
-  return "${status[2]}"
+  (( status[2] == 0 )) || return "${status[2]}"
+  # Exit 1 is provisional: only a completed JUnit failure may be deferred.
+  case "${RUN_RC}" in
+    0|1) return 0 ;;
+    *) return "${RUN_RC}" ;;
+  esac
 }
 
 collect_reports() {
@@ -424,28 +448,35 @@ PY
 }
 
 verify_hardware_test() {
-  # A missing Git fixture makes the suite skip with exit 0. Require a real pass.
-  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
-    python3 - "${WORK_DIR}/report" <<'PY' \
-    2>&1 | redact_bastion | tee "${REPORT_DIR}/coverage.log"
-from pathlib import Path
+  # A missing fixture can skip the selected spec with exit 0. Require execution.
+  python3 - "${REPORT_DIR}/report/ztp_suite_test_junit.xml" "${RUN_RC}" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
 
-cases = []
-for report in Path(sys.argv[1]).glob("*junit*.xml"):
-    cases.extend(ET.parse(report).getroot().iter("testcase"))
-hardware = [case for case in cases if "tests HW replacement via IBBF" in case.get("name", "")]
-if len(hardware) != 1 or any(hardware[0].find(tag) is not None for tag in ("skipped", "failure", "error")):
-    sys.exit("IBBF hardware replacement did not execute and pass exactly once.")
-print("IBBF hardware replacement test executed and passed.")
-print("Policy compliance is checked separately after TALM remediation; image policy spec 87996 is not selected.")
+root = ET.parse(sys.argv[1]).getroot()
+cases = list(root.iter("testcase"))
+tests = [case for case in cases if case.get("name", "").startswith("[It] ")]
+hardware = [case for case in tests if "tests HW replacement via IBBF" in case.get("name", "")]
+executed = [case for case in tests if case.find("skipped") is None]
+if root.tag not in ("testsuite", "testsuites") or len(hardware) != 1 or executed != hardware:
+    sys.exit("IBBF must execute only the selected hardware replacement test, exactly once.")
+if (any(prop.get("name") == "SpecialSuiteFailureReason" and prop.get("value") for prop in root.iter("property")) or
+        any(case.find("error") is not None or
+            any(failure.get("type") == "aborted" for failure in case.findall("failure")) or
+            (case not in tests and case.find("failure") is not None) for case in cases)):
+    sys.exit("IBBF reported an execution or suite setup/teardown error.")
+failed = any(case.find("failure") is not None for case in tests)
+if int(sys.argv[2]) != 0 and not failed:
+    sys.exit("IBBF runner failed without a matching JUnit test failure.")
+print(int(failed))
 PY
 }
 
 remediate_and_verify_policies() {
   # Run remediation before this independent compliance assertion. The image
   # runs only the hardware spec because its policy spec can skip on a changed path.
+  local -a status
+  set +e
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
     python3 - "${HUB_CONFIG_DIR}/auth/kubeconfig" "${TARGET_SPOKE_NAME}" \
     "${SPOKE_KUBECONFIG}" "${POLICY_BASELINE}" "${WORK_DIR}/report" <<'PY' \
@@ -470,10 +501,15 @@ deadline = started + 3000
 # policies may already have evaluated by then and need not evaluate again.
 cutoff = None
 passed = False
+failure_kind = "error"
+last_poll_error = None
 failure = "Post-replacement policy recovery did not complete."
 cgu_status = {}
 expected_templates = {}
 expected_source = None
+
+class PolicyAssertionError(Exception):
+    """Observed test failure, distinct from an inability to execute the check."""
 
 def oc(config, *args, manifest=None):
     try:
@@ -488,14 +524,19 @@ def oc(config, *args, manifest=None):
     return json.loads(result.stdout)
 
 def wait_for(description, check, limit=None):
+    global last_poll_error
     limit = deadline if limit is None else min(deadline, limit)
+    last_poll_error = None
     while time.monotonic() < limit:
+        last_poll_error = None
         if check():
             print(description + ": complete.", flush=True)
             return
         print("Waiting for " + description + ".", flush=True)
         time.sleep(30)
-    raise RuntimeError(description + ": timed out.")
+    if last_poll_error is not None:
+        raise last_poll_error
+    raise PolicyAssertionError(description + ": timed out.")
 
 def timestamp(value):
     try:
@@ -507,10 +548,11 @@ def timestamp(value):
         return datetime.min.replace(tzinfo=timezone.utc)
 
 def replacement_ready():
-    global cutoff
+    global cutoff, last_poll_error
     try:
         nodes = oc(spoke_config, "get", "nodes", "-o", "json")["items"]
     except RuntimeError as error:
+        last_poll_error = error
         print(str(error), flush=True)
         return False
     if len(nodes) != 1:
@@ -530,11 +572,11 @@ def verify_handover():
             spoke, "-o", "json")
     nodes = ci["spec"]["nodes"]
     if len(nodes) != 1 or urllib.parse.urlparse(nodes[0]["bmcAddress"]).hostname != saved["replacement_bmc"]:
-        raise RuntimeError("ClusterInstance does not reference the replacement BMC.")
+        raise PolicyAssertionError("ClusterInstance does not reference the replacement BMC.")
     bmh = oc(hub_config, "-n", spoke, "get", "baremetalhosts.metal3.io", nodes[0]["hostName"], "-o", "json")
     if (bmh["metadata"].get("deletionTimestamp") or
             urllib.parse.urlparse(bmh["spec"]["bmc"]["address"]).hostname != saved["replacement_bmc"]):
-        raise RuntimeError("BareMetalHost does not reference the replacement BMC.")
+        raise PolicyAssertionError("BareMetalHost does not reference the replacement BMC.")
     secret = oc(hub_config, "-n", spoke, "get", "secret", saved["bmc_secret"], "-o", "json")["data"]
     credentials = b":".join(base64.b64decode(secret[key]) for key in ("username", "password"))
     opener = urllib.request.build_opener(
@@ -546,10 +588,11 @@ def verify_handover():
             headers={"Authorization": "Basic " + base64.b64encode(credentials).decode()})
         try:
             with opener.open(request, timeout=30) as response:
-                if json.load(response).get("PowerState") != expected:
-                    raise ValueError("Unexpected power state")
+                power = json.load(response)["PowerState"]
         except Exception:
             raise RuntimeError("Original fencing and replacement power state could not be verified.") from None
+        if power != expected:
+            raise PolicyAssertionError("Original fencing or replacement power state did not match the expected state.")
 
 def policy_application_synced():
     app = oc(hub_config, "-n", "openshift-gitops", "get", "applications.argoproj.io", "policies", "-o", "json")
@@ -622,16 +665,18 @@ def activate_replacement_policies():
         if set(templates) != {item["name"] for item in baseline[key]}:
             raise RuntimeError("Replacement ConfigurationPolicy identities changed.")
         if namespace in ("ztp-group", "ztp-site") and templates == definitions(saved["root_templates"][key]):
-            raise RuntimeError("Hardware policy specification did not change after Argo synchronization.")
+            raise PolicyAssertionError("Hardware policy specification did not change after Argo synchronization.")
         expected_templates[key] = templates
 
 def policy_state():
+    global last_poll_error
     try:
         hub = oc(hub_config, "-n", spoke, "get", "policies.policy.open-cluster-management.io", "-o", "json")
         leaf = oc(spoke_config, "get", "configurationpolicies.policy.open-cluster-management.io",
                   "-A", "-o", "json")
     except RuntimeError as error:
         # ACM availability can precede the policy add-on and its CRDs.
+        last_poll_error = error
         print(str(error), flush=True)
         return False, False
     hub = {item["metadata"]["name"]: item for item in hub["items"]}
@@ -717,26 +762,43 @@ try:
     passed = True
     print(f"All {len(baseline)} expected target policies are present, freshly evaluated and Compliant.",
           flush=True)
+except PolicyAssertionError as error:
+    failure = str(error)
+    failure_kind = "failure"
 except Exception as error:
     failure = str(error)
 finally:
     (report_dir / "post-ibbf-cgu-status.json").write_text(json.dumps(cgu_status, indent=2))
     suite = ET.Element("testsuite", name="IBBF policy recovery", tests="1",
-                       failures="0" if passed else "1",
+                       failures=str(int(not passed and failure_kind == "failure")),
+                       errors=str(int(not passed and failure_kind == "error")),
                        time=str(round(time.monotonic() - started, 3)))
     case = ET.SubElement(suite, "testcase", name="target policies compliant after TALM remediation",
                          classname="ibi.ibbf.policy-gate")
     if not passed:
-        ET.SubElement(case, "failure", message=failure)
+        ET.SubElement(case, failure_kind, message=failure)
     ET.ElementTree(suite).write(report_dir / "junit_ibbf_policy_gate.xml",
                                encoding="utf-8", xml_declaration=True)
 if not passed:
-    sys.exit(failure)
+    print(failure, file=sys.stderr)
+    sys.exit(10 if failure_kind == "failure" else 1)
 PY
+  status=("${PIPESTATUS[@]}")
+  set -e
+  (( status[1] == 0 )) || return "${status[1]}"
+  (( status[2] == 0 )) || return "${status[2]}"
+  case "${status[0]}" in
+    0) return 0 ;;
+    10) TEST_RESULT=1; return 0 ;;
+    *) return "${status[0]}" ;;
+  esac
 }
 
 main() {
+  RESULT_FILE="${SHARED_DIR}/ibi-ibbf-exit-code"
+  printf '1\n' > "${RESULT_FILE}"
   if [[ -f "${SHARED_DIR}/skip.txt" || "${IBI_IBBF_ENABLED:-false}" == false ]]; then
+    printf '0\n' > "${RESULT_FILE}"
     echo "Skipping IBI IBBF tests."
     return 0
   fi
@@ -751,7 +813,15 @@ main() {
   prepare_bmc_environment
   prepare_launcher
   run_tests
-  verify_hardware_test
+  collect_reports
+  REPORTS_COLLECTED=true
+  TEST_RESULT=$(verify_hardware_test)
+  if (( TEST_RESULT != 0 )); then
+    echo "IBBF test failed; skipping dependent policy remediation and continuing to reporting."
+    return 0
+  fi
+  echo "IBBF hardware replacement test executed and passed."
+  REPORTS_COLLECTED=false
   remediate_and_verify_policies
 }
 
