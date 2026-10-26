@@ -297,6 +297,15 @@ elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2
 "[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should delete PVCs after adopting pod (WhenScaled)"
 "[sig-apps] StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy should not delete PVCs when there is another controller"
 EOF
+    # Skip the failing NetworkSegmentation tests for 4.22 and higher versions (including 5.x) on PowerVC
+    if echo "${BRANCH}" | awk -F. '{ if ($1 > 4 || ($1 == 4 && $2 >= 22)) { exit 0 } else { exit 1 } }'; then
+       cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation: services on a user defined primary network should be reachable through their cluster IP, node port and load balancer L2 primary UDN with custom network, cluster-networked pods, NodePort service [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network pod connected to UserDefinedNetwork cannot be deleted when being used [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network should delete NetworkAttachmentDefinition when UserDefinedNetwork is deleted [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network should create NetworkAttachmentDefinition according to spec [Suite:openshift/conformance/parallel]"
+EOF
+    fi
 # Excluding few loadbalancer tests with UDP from 4.13 and above Libvirt and PowerVS ppc64le jobs since power environment does not currently support loadbalancing UDP traffic
 # Skipping the DRA test case due to its current failure in libvirt CI. It will be re-enabled once the issue is resolved.
 elif (echo ${BRANCH} | sed 's/.* //;q' | awk -F. '{ if ($1 > 4 || ($1 >= 4 && $2 >= 13)) { exit 0 } else {exit 1} }' || [[ "${BRANCH}" == "main" ]] || [[ "${BRANCH}" == "master" ]]) && [ "${ARCH}" == "ppc64le" ]; then
@@ -353,6 +362,15 @@ EOF
 "[sig-network][Feature:Router][apigroup:operator.openshift.io] The HAProxy router should respond with 503 to unrecognized hosts [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 EOF
        fi
+    fi
+    # Skip the failing NetworkSegmentation tests for 4.22 and higher versions (including 5.x) on libvirt (non-PowerVS) ppc64le jobs
+    if [ "${INSTALLER}" != "powervs" ] && echo "${BRANCH}" | awk -F. '{ if ($1 > 4 || ($1 == 4 && $2 >= 22)) { exit 0 } else { exit 1 } }'; then
+       cat >> "${SHARED_DIR}/excluded_tests" << EOF
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation: services on a user defined primary network should be reachable through their cluster IP, node port and load balancer L2 primary UDN with custom network, cluster-networked pods, NodePort service [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network pod connected to UserDefinedNetwork cannot be deleted when being used [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network should delete NetworkAttachmentDefinition when UserDefinedNetwork is deleted [Suite:openshift/conformance/parallel]"
+"[Feature:NetworkSegmentation][ovn-kubernetes-ote][sig-network] Network Segmentation UserDefinedNetwork CRD Controller for L2 secondary network should create NetworkAttachmentDefinition according to spec [Suite:openshift/conformance/parallel]"
+EOF
     fi
 else
     echo "Executing all tests"
