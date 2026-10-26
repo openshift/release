@@ -10,9 +10,10 @@
 #   tag      : v8.1
 #   commit   : 8b1833e2592825b007525219e28fd9fffaef4a89
 #   sha256   : 9fdc0046fb7de8c3b809d371df7fbfadaef9d63e26ace7950c2a9085ed63f9dc
+#   authors  : Martin Gencur, Anvesh Jaggapatruni
 #
-# The upstream project carries no LICENSE file; it was contributed here by its author, so
-# the vendored copy is covered by this repository's licence.
+# That project publishes no LICENSE file, so the terms covering this copy are not stated
+# upstream. See the pull request that introduced this file for the provenance record.
 #
 # The record above is the fork base: as vendored, the copy is byte-for-byte identical to
 # the tag this step already pinned, so moving it here changed nothing about what it does.
@@ -76,14 +77,17 @@ EOF
     echo "${auth_file}"
 }
 
-# Preferred source of opm: the operator-registry image of the OpenShift release payload
-# that the cluster under test is running. That keeps the tool inside the OpenShift product
-# and, in disconnected setups, inside the registry the payload was already mirrored to.
+# opm comes from the operator-registry image of the OpenShift release payload that the
+# cluster under test is running. This step installs tooling only from that payload, so
+# there is deliberately no second source to fall back on: the previous build was fetched
+# from github.com/operator-framework, which is outside the openshift organisation.
 #
-# Everything below is best effort. The payload copy is staged in a scratch directory and
-# only installed once it has been shown to run, and no failure path ever writes to
-# ${TOOLS_DIR}. If any part of it does not work out, the step falls back to the build it
-# has always used, so the worst case is exactly the previous behaviour.
+# Pulling the image is registry traffic, not a source download, and it works in
+# disconnected environments because the payload has already been mirrored into the
+# internal registry by the time this step runs.
+#
+# The copy is staged in a scratch directory and only installed once it has been shown to
+# run, so ${TOOLS_DIR} is never left holding a partial or unusable binary.
 #
 # Note that the binary in that image lives at /bin/registry/opm; /usr/bin/opm is only a
 # symlink to it, and "oc image extract" would copy the symlink rather than follow it.
@@ -131,11 +135,12 @@ function install_opm() {
     fi
 
     rm -rf "${scratch}"
-    echo "WARNING: could not take opm from the cluster release payload, falling back to the pinned upstream build"
+    echo "ERROR: could not take opm from the operator-registry image of the cluster's release payload"
+    echo "ERROR: this step installs tooling only from that payload, so there is no other source to try"
     if [[ -n "${err}" ]]; then
-        echo "WARNING: last error was: ${err}"
+        echo "ERROR: last error was: ${err}"
     fi
-    run_command "curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o ${TOOLS_DIR}/opm && chmod +x ${TOOLS_DIR}/opm"
+    exit 1
 }
 
 # oc is injected into the step container by ci-operator itself (see the `cli` field of the
