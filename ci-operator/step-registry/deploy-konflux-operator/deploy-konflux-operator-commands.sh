@@ -74,6 +74,8 @@ function install_deps() {
     install_oc # we need a modern client
 }
 
+# Restore the saved OperatorHub setting and wait for redhat-operators when enabled.
+# Takes the original OperatorHub JSON; returns nonzero on restoration or readiness failure.
 function restore_default_catalogs() {
     local operatorhub_config="$1"
     local patch
@@ -82,9 +84,10 @@ function restore_default_catalogs() {
     echo "Restoring the original OperatorHub default catalog configuration"
     oc patch operatorhub cluster --type=merge -p "${patch}" --request-timeout=30s || return 1
 
-    # Do not wait for a catalog that was disabled before this step.
-    if ! jq -e '(.spec.disableAllDefaultSources != true) and
-        ([.spec.sources[]? | select(.name == "redhat-operators" and .disabled == true)] | length == 0)' \
+    # Per-source settings take precedence over disableAllDefaultSources.
+    if ! jq -e '([.spec.sources[]? | select(.name == "redhat-operators")] | first) as $source |
+        if $source != null then $source.disabled != true
+        else .spec.disableAllDefaultSources != true end' \
         <<< "${operatorhub_config}" >/dev/null; then
         return 0
     fi
@@ -103,6 +106,7 @@ function restore_default_catalogs() {
     return 1
 }
 
+# Run the Konflux helper and optionally restore catalogs, preserving deployment failures.
 function deploy_operators() {
     run_command "cd $(mktemp -d)"
     run_command "git clone --depth 1 --branch ${DEPLOY_KONFLUX_OPERATOR_VERSION} https://github.com/ajaggapa/deploy-konflux-operator.git"
