@@ -129,6 +129,26 @@ if [[ -f "${QUAY_CREDS_FILE}" ]]; then
   echo "[write-env] Quay pull secret resolved"
 fi
 
+# Validate and fingerprint the mounted Quay credential. Never log credential
+# values, parser errors, or fingerprints; SHARED_DIR is not a public artifact.
+QUAY_AUTH_DIAGNOSTICS=false
+if [[ -n "${QUAY_AUTH_EXPECTED_SHA256:-}" ]]; then
+  QUAY_AUTH_DIAGNOSTICS=true
+  if ! jq -e '.auths["quay.io"].auth | strings | @base64d | test("^[^:]+:.+$")' \
+    "${QUAY_CREDS_FILE}" >/dev/null 2>&1; then
+    echo "[quay-diag] Mounted Quay credential: INVALID (expected nonempty username:token)"
+    exit 1
+  fi
+  QUAY_AUTH_SHA256=$(jq -jr '.auths["quay.io"].auth | @base64d' "${QUAY_CREDS_FILE}" | sha256sum | cut -d ' ' -f 1)
+  echo "[quay-diag] Mounted Quay credential: VALID"
+  if [[ "${QUAY_AUTH_SHA256}" != "${QUAY_AUTH_EXPECTED_SHA256}" ]]; then
+    echo "[quay-diag] Known-good Vault credential → Prow mount: MISMATCH"
+    exit 1
+  fi
+  echo "[quay-diag] Known-good Vault credential → Prow mount: MATCH"
+  (umask 077; printf '%s\n' "${QUAY_AUTH_SHA256}" > "${SHARED_DIR}/quay-auth.sha256")
+fi
+
 # Write resolved environment to SHARED_DIR (sourced by subsequent steps).
 { set +o xtrace; } 2>/dev/null
 cat > "${ENV_FILE}" << ENVEOF
@@ -155,6 +175,7 @@ export MSI_RESOURCEGROUPNAME="${MSI_RESOURCEGROUPNAME}"
 export MSI_SUFFIX="${MSI_SUFFIX}"
 export MSI_REGION="${MSI_REGION}"
 export IMAGE_PULL_SECRET_B64="${IMAGE_PULL_SECRET_B64}"
+export QUAY_AUTH_DIAGNOSTICS="${QUAY_AUTH_DIAGNOSTICS}"
 ENVEOF
 
 chmod 600 "${ENV_FILE}"
