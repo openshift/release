@@ -271,6 +271,25 @@ function check_plugin_gate() {
   local report_json="${ARTIFACT_DIR}/opct-report/opct-report.json"
   if [[ ! -f "${report_json}" ]]; then
     plugin_gate_reason="opct-report.json missing at ${report_json}"
+
+    # opct-report.json is only written on a successful 'opct report' run, so
+    # its absence is always a processing failure (gate still returns 2 below).
+    # But 'opct report' can crash (e.g. the known SIGSEGV in
+    # GetClusterVersion) after 'opct results' already wrote its plain-text
+    # summary, in which case a real plugin failure is still knowable. Fold
+    # that into exit_class directly (best-effort, diagnostic only -- not a
+    # substitute for the opct-report.json gate above) so a genuine plugin
+    # failure isn't masked behind "report processing crashed".
+    local fallback_failed
+    fallback_failed=$(awk '
+      /^Plugin: / { plugin = $2 }
+      /^Status: / { if ($2 != "passed" && plugin != "") print plugin": "$2 }
+    ' "${ARTIFACT_DIR}/log-results.txt" 2>/dev/null)
+    if [[ -n "${fallback_failed}" ]]; then
+      exit_class=$((exit_class | 1))
+      plugin_gate_reason="${plugin_gate_reason}; fallback from log-results.txt found non-passed plugin(s): $(echo "${fallback_failed}" | paste -sd'; ' -)"
+    fi
+
     show_msg "ERROR: ${plugin_gate_reason}"
     return 2
   fi
