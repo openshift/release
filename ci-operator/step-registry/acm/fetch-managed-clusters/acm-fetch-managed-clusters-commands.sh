@@ -55,13 +55,29 @@ if [ -s /tmp/ci/managed.cluster.name ] && ! grep -q "null" /tmp/ci/managed.clust
             --timeout=10m 2>&1); then
         echo "ERROR: ManagedCluster/${mcName} did not become Available within 10m" 1>&2
         [[ -n "${waitErr}" ]] && echo "  oc-wait: ${waitErr}" 1>&2
-        oc get "managedcluster/${mcName}" \
-            -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")]}' 2>/dev/null | \
-            jq -r '"  status=\(.status)  reason=\(.reason // "n/a")  message=\(.message // "n/a")"' || \
-            echo "  (could not retrieve condition details)" 1>&2
+        if command -v jq &>/dev/null; then
+            oc get "managedcluster/${mcName}" \
+                -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")]}' | \
+                jq -r '"  status=\(.status)  reason=\(.reason // "n/a")  message=\(.message // "n/a")"' || \
+                echo "  (could not retrieve condition details)" 1>&2
+        else
+            echo "  (jq not available; falling back to oc get -o yaml)" 1>&2
+            oc get "managedcluster/${mcName}" -o yaml || \
+                echo "  (could not retrieve condition details)" 1>&2
+        fi
         exit 1
     fi
     echo "ManagedCluster/${mcName} is Available."
+else
+    echo "ERROR: /tmp/ci/managed.cluster.name is missing, empty, or contains 'null'." 1>&2
+    if [ -f /tmp/ci/managed.cluster.name ]; then
+        echo "  File content: $(cat /tmp/ci/managed.cluster.name)" 1>&2
+    else
+        echo "  File does not exist." 1>&2
+    fi
+    echo "  The CLC smoke step likely failed to provision a managed cluster." 1>&2
+    echo "  Check the clc-smoke step artifacts (under artifacts/clc-smoke/) for details." 1>&2
+    exit 1
 fi
 
 # run the test execution script
