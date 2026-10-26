@@ -5,6 +5,8 @@ set -o pipefail
 set -o xtrace
 
 export AZURE_TOKEN_CREDENTIALS=prod
+# Use the checkout's module files instead of vendor content inherited from src.
+export GOFLAGS=-mod=readonly
 
 # Validate configurations
 if ! make validate-config; then

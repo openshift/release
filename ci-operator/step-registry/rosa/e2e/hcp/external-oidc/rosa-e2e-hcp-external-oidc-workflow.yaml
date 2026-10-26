@@ -1,0 +1,82 @@
+workflow:
+  as: rosa-e2e-hcp-external-oidc
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      # The BYO shared VPC (aws-provision-vpc-shared) provides 3 private
+      # subnets, and HCP requires the compute-node count to be a multiple of
+      # the private-subnet count: 2 is rejected with "Hosted clusters require
+      # that the number of compute nodes be a multiple of the number of private
+      # subnets 3". Use 3 (same as the other workflows on this VPC); dropping
+      # to 2 would require ZONES_COUNT=1 on aws-provision-vpc-shared.
+      REPLICAS: "3"
+    pre:
+      # rosa-CLI provisioner head, external-OIDC variant: provisions the HCP
+      # cluster with external auth enabled, configures the external auth provider,
+      # and publishes the SHARED_DIR contract (cluster-id, kubeconfig,
+      # cluster-metadata.json) — the customer-plane kubeconfig is the elevated
+      # backplane one, since external-auth clusters have no OAuth stack.
+      # See the chain for why the public rosa-e2e-hcp-rosa-cli-provision chain
+      # cannot be reused as-is.
+      - chain: rosa-e2e-hcp-rosa-cli-external-oidc-provision
+      # Wait for the HostedCluster to settle (Available, not Degraded) before
+      # the validation tail: the external-auth rollout restarts the
+      # kube-apiserver and can leave dependent control-plane deployments
+      # (openshift-apiserver) briefly unavailable, which the platform-plane
+      # HostedCluster health spec asserts against. The head's dedicated
+      # readiness step only covers the kube-apiserver rollout.
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      # Platform-plane kubeconfigs (mc/sc) plus the raw bp-kubeconfig fallback.
+      - ref: rosa-backplane-login
+    test:
+      # Provisioner-agnostic two-plane validation tail (ROSAENG-67581): each ref
+      # carries its own area label filter. The customer plane runs
+      # Area:DataPlane || Area:CustomerFeatures, which includes the external
+      # OIDC verification spec; because the cluster has an external auth
+      # provider configured, it verifies rather than skips.
+      - ref: rosa-e2e-validate-customer
+      - ref: rosa-e2e-validate-platform
+    post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA HCP cluster with external authentication
+    (external OIDC) enabled at provision time via the rosa-CLI head
+    (rosa-e2e-hcp-rosa-cli-external-oidc-provision), which also configures an
+    external auth provider via rosa-conf-external-oidc-create, mints the
+    customer-plane kubeconfig via rosa-cluster-credentials-backplane (elevated
+    backplane-cluster-admin — external-auth clusters have no OAuth stack, and
+    the raw bp-kubeconfig lacks the RBAC the customer-plane specs need), and
+    publishes the SHARED_DIR provisioner-to-validator contract.
+    rosa-cluster-wait-ready-hosted-cp then waits for the HostedCluster to
+    settle (Available, not Degraded) after the external-auth rollout, since
+    dependent control-plane deployments (openshift-apiserver) can be briefly
+    unavailable while the kube-apiserver rollout completes.
+    rosa-backplane-login adds the platform-plane kubeconfigs (mc/sc).
+
+    The provisioner-agnostic validation tail then runs the customer plane
+    (rosa-e2e-validate-customer: Area:DataPlane, Area:CustomerFeatures — the
+    external OIDC verification spec exercises the configured provider rather
+    than skipping) followed by the platform plane
+    (rosa-e2e-validate-platform: Area:ManagedService, Area:InfraTiers,
+    Area:MgmtPlane). rosa-gap-analysis snapshots are written while the cluster
+    is still up, then the cluster is torn down.
+
+    The platform plane (and the backplane-based customer plane) requires
+    corp-network reachability: run this workflow only where backplane is
+    reachable (capabilities: [intranet], restrict_network_access: false,
+    network-access-rehearsals-ok label for rehearsals).

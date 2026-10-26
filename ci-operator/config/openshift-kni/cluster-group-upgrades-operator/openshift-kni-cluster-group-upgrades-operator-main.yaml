@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
 build_root:
   from_repository: true
 images:
@@ -135,6 +139,109 @@ tests:
       PROJECT_NAME: cluster-group-upgrades-operator
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
     workflow: openshift-ci-security
+- always_run: false
+  as: tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-cluster-group-upgrades
+      OO_PACKAGE: cluster-group-upgrades-operator
+      OO_TARGET_NAMESPACES: '!all'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-group-upgrades
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    pre:
+    - chain: ipi-aws-pre
+    - as: install-acm-crds
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make non-kind-deps-update
+        make install-acm-crds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: optional-operators-subscribe
+    test:
+    - ref: tls-13
+    - as: wait-talm-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for TALM operator to restart after TLS profile change..."
+        oc rollout status deployment cluster-group-upgrades-controller-manager-v2 -n openshift-cluster-group-upgrades --timeout=300s
+        echo "TALM operator restarted with new TLS profile"
+        oc get pods -n openshift-cluster-group-upgrades
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- as: tls-scan-periodic
+  cron: 0 3 * * 5
+  reporter_config:
+    channel: '#telco-platform-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '@channel Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-cluster-group-upgrades
+      OO_PACKAGE: cluster-group-upgrades-operator
+      OO_TARGET_NAMESPACES: '!all'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-group-upgrades
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    pre:
+    - chain: ipi-aws-pre
+    - as: install-acm-crds
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make non-kind-deps-update
+        make install-acm-crds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: optional-operators-subscribe
+    test:
+    - ref: tls-13
+    - as: wait-talm-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for TALM operator to restart after TLS profile change..."
+        oc rollout status deployment cluster-group-upgrades-controller-manager-v2 -n openshift-cluster-group-upgrades --timeout=300s
+        echo "TALM operator restarted with new TLS profile"
+        oc get pods -n openshift-cluster-group-upgrades
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

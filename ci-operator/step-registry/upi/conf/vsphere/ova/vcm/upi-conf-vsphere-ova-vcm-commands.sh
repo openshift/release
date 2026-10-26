@@ -64,6 +64,28 @@ while [[ $fd_idx -lt $FDS ]]; do
     # shellcheck disable=SC2034
     GOVC_URL=$(echo "${FD}" | jq -r '.server')
 
+    # A failure domain can be on a different vCenter than the pool govc.sh was
+    # seeded from, so source this domain's per-pool govc file for credentials
+    # that match GOVC_URL.  Pool names are <server>-<datacenter>-<cluster>, the
+    # same format as status.poolInfo[].name.  Leases without poolInfo (legacy
+    # single-pool leases) have no per-pool files and keep the govc.sh credentials.
+    pool_filename=$(echo "${GOVC_URL}-${GOVC_DATACENTER}-$(basename "${CLUSTER}")" | tr '.' '_' | tr ':' '_')
+    if [[ -f "${SHARED_DIR}/govc_${pool_filename}.sh" ]]; then
+        echo "$(date -u --rfc-3339=seconds) - Sourcing govc_${pool_filename}.sh for failure domain ${fd_idx} credentials"
+        # shellcheck source=/dev/null
+        source "${SHARED_DIR}/govc_${pool_filename}.sh"
+        unset SSL_CERT_FILE
+        unset GOVC_TLS_CA_CERTS
+        # The pool file exports this domain's own values, but re-assert the
+        # target domain's topology so the sourcing cannot silently change it.
+        GOVC_DATASTORE=$(echo "${FD}" | jq -r .topology.datastore)
+        GOVC_DATACENTER=$(echo "${FD}" | jq -r .topology.datacenter)
+        # shellcheck disable=SC2034
+        GOVC_URL=$(echo "${FD}" | jq -r '.server')
+    else
+        echo "$(date -u --rfc-3339=seconds) - No govc_${pool_filename}.sh for failure domain ${fd_idx}, using govc.sh credentials"
+    fi
+
     # Since the resource pool doesn't exist yet use the cluster hidden Resources
     GOVC_RESOURCE_POOL="${CLUSTER}/Resources"
     vsphere_portgroup=$(echo "${FD}" | jq -r .topology.networks[0])
