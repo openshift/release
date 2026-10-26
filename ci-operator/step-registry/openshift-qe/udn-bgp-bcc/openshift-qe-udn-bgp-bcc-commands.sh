@@ -70,12 +70,12 @@ echo "Route Server ID: ${ROUTE_SERVER_ID}"
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
 set +x
 
-# Set up ES credentials from mounted secret
-if [[ -f /secret/perfscale/server ]]; then
-  ES_SERVER=$(cat /secret/perfscale/server)
+# Read ES credentials from mounted secret files
+if [[ -f /secret/server ]]; then
+  export ES_SERVER=$(cat /secret/server)
 fi
-if [[ -f /secret/perfscale/index ]]; then
-  ES_INDEX=$(cat /secret/perfscale/index)
+if [[ -f /secret/index ]]; then
+  export ES_INDEX=$(cat /secret/index)
 fi
 
 $WAS_TRACING && set -x
