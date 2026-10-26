@@ -127,4 +127,68 @@ for region in ${REGIONS}; do
   echo ""
 done
 
+# Clean up stale IAM operator roles (op-gate-stg-* prefix, global resource).
+# These are created per cluster by the OCP5 operator credential flow and are
+# not removed when the cluster is deleted, causing the account to hit the
+# 1000-role quota limit over time.
+#
+# Safety: all OCP5 FVT jobs have a maximum Prow timeout of 5h. Using the
+# default HOURS_OLD=12 means any role older than 12h is guaranteed to belong
+# to a cluster that has already finished (and been deleted by OCM). No OCM
+# API check is needed — the age threshold is the cluster-liveness proxy.
+echo "=== IAM operator role cleanup (global) ==="
+echo "  Listing op-gate-stg-* roles older than ${HOURS_OLD}h..."
+
+iam_roles_output=""
+if ! iam_roles_output=$(aws iam list-roles \
+  --query 'Roles[?starts_with(RoleName, `op-gate-stg-`)].[RoleName,CreateDate]' \
+  --output text 2>&1); then
+  echo "  WARNING: failed to query op-gate-stg-* IAM roles: ${iam_roles_output}" >&2
+  overall_exit=1
+  iam_roles_output=""
+fi
+
+iam_deleted=0
+iam_skipped=0
+while IFS=$'\t' read -r role_name create_time; do
+  [[ -z "${role_name}" || "${role_name}" == "None" ]] && continue
+
+  create_epoch=$(date -u -d "${create_time}" '+%s' 2>/dev/null) || {
+    echo "  WARNING: could not parse timestamp '${create_time}' for role ${role_name}, skipping" >&2
+    continue
+  }
+
+  if [[ "${create_epoch}" -ge "${cutoff_epoch}" ]]; then
+    iam_skipped=$((iam_skipped + 1))
+    continue
+  fi
+
+  echo "  Deleting stale IAM role ${role_name} (created ${create_time})"
+
+  # Detach all managed policies first
+  managed=$(aws iam list-attached-role-policies --role-name "${role_name}" \
+    --query 'AttachedPolicies[*].PolicyArn' --output text 2>/dev/null) || managed=""
+  for arn in ${managed}; do
+    aws iam detach-role-policy --role-name "${role_name}" --policy-arn "${arn}" 2>/dev/null || true
+  done
+
+  # Delete all inline policies
+  inline=$(aws iam list-role-policies --role-name "${role_name}" \
+    --query 'PolicyNames' --output text 2>/dev/null) || inline=""
+  for policy in ${inline}; do
+    aws iam delete-role-policy --role-name "${role_name}" --policy-name "${policy}" 2>/dev/null || true
+  done
+
+  if aws iam delete-role --role-name "${role_name}" 2>/dev/null; then
+    iam_deleted=$((iam_deleted + 1))
+  else
+    echo "  WARNING: failed to delete IAM role ${role_name}" >&2
+    overall_exit=1
+  fi
+done <<< "${iam_roles_output}"
+
+echo "  IAM role cleanup done: deleted=${iam_deleted}, skipped_recent=${iam_skipped}"
+echo "=== Done: IAM operator roles ==="
+echo ""
+
 exit ${overall_exit}
