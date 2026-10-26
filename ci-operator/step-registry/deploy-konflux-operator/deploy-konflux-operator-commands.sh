@@ -2,23 +2,40 @@
 #
 # This step deploys Konflux-built operators onto the cluster under test.
 #
-# The deployment logic below (see write_deploy_operator_script) is vendored verbatim from
-# the project this step used to clone at run time:
+# The deployment logic below (see write_deploy_operator_script) is vendored from the
+# project this step used to clone at run time:
 #
-#   upstream : https://github.com/ajaggapa/deploy-konflux-operator
-#   file     : deploy-operator.sh
-#   tag      : v8.1
-#   commit   : 8b1833e2592825b007525219e28fd9fffaef4a89
-#   sha256   : 9fdc0046fb7de8c3b809d371df7fbfadaef9d63e26ace7950c2a9085ed63f9dc
-#   authors  : Martin Gencur, Anvesh Jaggapatruni
+#   upstream        : https://github.com/ajaggapa/deploy-konflux-operator
+#   file            : deploy-operator.sh
+#   tag             : v8.1
+#   commit          : 8b1833e2592825b007525219e28fd9fffaef4a89
+#   upstream sha256 : 9fdc0046fb7de8c3b809d371df7fbfadaef9d63e26ace7950c2a9085ed63f9dc
+#   authors         : Martin Gencur, Anvesh Jaggapatruni
 #
 # That project publishes no LICENSE file, so the terms covering this copy are not stated
 # upstream. See the pull request that introduced this file for the provenance record.
 #
-# The record above is the fork base: as vendored, the copy is byte-for-byte identical to
-# the tag this step already pinned, so moving it here changed nothing about what it does.
-# This file is now the only place the deployment logic lives, so later fixes land here and
-# will make it diverge from that base; the provenance block is not re-synced.
+# The copy is not byte-for-byte identical to that upstream file. One normalisation was
+# applied, and nothing else:
+#
+#   sed 's/[ \t]*$//'   -- remove trailing horizontal whitespace
+#
+# It changes 21 lines (57 bytes) that this repository's clean-diff gate rejects. Each is
+# either a whitespace-only line or a single space after a shell token; none ends in a
+# backslash and none lies inside a here-document body or a quoted string, so no string,
+# here-document or line continuation is affected. `shfmt -ln bash` produces identical
+# canonical output for the upstream file and for this copy, which is the parse-tree proof
+# that the normalisation carries no meaning.
+#
+#   embedded sha256 : 4c1c8f552d486addf908f266d2a7a0f9f7b877c599b44e27f7341c85223cb4e6
+#
+# which is the sha256 of `sed 's/[ \t]*$//' deploy-operator.sh` at the commit above, so the
+# copy below can be reproduced from upstream and checked.
+#
+# Apart from that normalisation the logic is unchanged, so moving it here changed nothing
+# about what it does. This file is now the only place the deployment logic lives, so later
+# fixes land here and will make it diverge from that base; the provenance block is not
+# re-synced.
 #
 
 set -e
@@ -240,13 +257,13 @@ display_metadata() {
     echo "============================================================"
     echo -e "${YELLOW}              EXTRACTED OPERATOR METADATA FROM FBC${NC}"
     echo "============================================================"
-    
+
     # Read all input into an array
     local lines=()
     while IFS= read -r line; do
         lines+=("$line")
     done
-    
+
     # Find the empty line separator
     local separator_index=-1
     for i in "${!lines[@]}"; do
@@ -255,14 +272,14 @@ display_metadata() {
             break
         fi
     done
-    
+
     # Print basic metadata (before empty line)
     for ((i=0; i<separator_index; i++)); do
         if [[ -n "${lines[i]}" ]]; then
             echo -e "${YELLOW}${lines[i]}${NC}"
         fi
     done
-    
+
     # Print related images with label but no extra separators
     echo -e "${YELLOW}Related Images:${NC}"
     for ((i=separator_index+1; i<${#lines[@]}; i++)); do
@@ -293,17 +310,17 @@ while [[ $# -gt 0 ]]; do
             # This argument is checked against the VALID_OPERATORS list
             OPERATOR="$2"
             log "INFO" "Operator specified: $2"
-            shift 2 
+            shift 2
             ;;
-        --fbc-tag) 
+        --fbc-tag)
             FBC_TAG_INPUT="$2"
             log "INFO" "FBC tag specified: $2"
-            shift 2 
+            shift 2
             ;;
-        --internal-registry) 
+        --internal-registry)
             INTERNAL_REGISTRY="$2"
             log "INFO" "Internal registry specified: $2"
-            shift 2 
+            shift 2
             ;;
         --internal-registry-auth)
             INTERNAL_REGISTRY_AUTH="$2"
@@ -320,19 +337,19 @@ while [[ $# -gt 0 ]]; do
             log "INFO" "Internal registry proxy auth file specified: $2"
             shift 2
             ;;
-        --quay-auth) 
+        --quay-auth)
             QUAY_AUTH="$2"
             log "INFO" "Quay auth file specified: $2"
-            shift 2 
+            shift 2
             ;;
-        --mcp-timeout) 
+        --mcp-timeout)
             MCP_TIMEOUT="$2"
             log "INFO" "MCP timeout set to: $2"
-            shift 2 
+            shift 2
             ;;
-        *) 
+        *)
             log "ERROR" "Unknown argument: $1"
-            exit 1 
+            exit 1
             ;;
     esac
 done
@@ -355,7 +372,7 @@ fi
 if [[ -n "${OPERATOR:-}" ]]; then
     IFS=',' read -ra OPERATORS <<< "$OPERATOR"
     log "INFO" "Parsing operators: ${OPERATORS[*]}"
-    
+
     # Validate all operators are in predefined list
     for op in "${OPERATORS[@]}"; do
         if [[ ! " $VALID_OPERATORS " =~ " $op " ]]; then
@@ -876,10 +893,10 @@ ALL_IMAGES_FILE=$(mktemp)
 
 for op in "${DEPLOYMENT_KEYS[@]}"; do
     log "INFO" "Processing operator: $op"
-    
+
     fbc_source="${OPERATOR_FBC_SOURCES[$op]}"
     fbc_target="${OPERATOR_FBC_TARGETS[$op]}"
-    
+
     # Mirror FBC image if disconnected and not using proxy
     if [[ "$DISCONNECTED" == true && "$USE_REGISTRY_PROXY" == false ]]; then
         echo "Mirroring FBC image..."
@@ -1060,7 +1077,7 @@ spec:
         done < <(echo "$bundle_data" | jq -r '.relatedImages[]?.image // empty' | grep -v '^$' | sed 's/@sha256:[a-f0-9]\{64\}$//' | sort -u)
     } > "$idms_file"
 done
-    
+
 # Loop 2: Apply all IDMS YAMLs to cluster
 echo ""
 echo "Applying all IDMS to cluster..."
@@ -1115,7 +1132,7 @@ declare -a FAILED_OPERATORS=()
 declare -a SUCCESS_OPERATORS=()
 
 for op in "${DEPLOYMENT_KEYS[@]}"; do
-      
+
     catalog_name="${OPERATOR_CATALOG_NAMES[$op]}"
     fbc_target="${OPERATOR_FBC_TARGETS[$op]}"
     operator_name="${OPERATOR_NAMES[$op]}"
@@ -1146,7 +1163,7 @@ for op in "${DEPLOYMENT_KEYS[@]}"; do
 
     # Re-enable exit on error
     set -e
-        
+
         # Record result
     if [[ "$deployment_failed" == true ]]; then
         FAILED_OPERATORS+=("$op")
