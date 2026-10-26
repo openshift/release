@@ -10,7 +10,7 @@ trap 'echo "PIXAA rehearsal bootstrap failed at ${BASH_SOURCE[0]}:${LINENO}" >&2
 # openshift-eng/pixaa#51 (pixaa-23-manifest-consumer-smoke) and its merge base
 # with pixaa main. Pin each rehearsal explicitly; never follow a moving head.
 EVAL_SMOKE_PR=51
-EVAL_SMOKE_HEAD=5fa51075185c6ac51bddb6b9778ecf15dcea81ba
+EVAL_SMOKE_HEAD=b0da4950691f2cf317e5bd30078e25094838209e
 EVAL_SMOKE_BASE=c88c63715cdc84e3fb5360c6094a5c49468e3e8c
 
 test "${REPO_OWNER}/${REPO_NAME}" = openshift/release

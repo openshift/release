@@ -39,7 +39,7 @@ permission. The test uses public Prow artifacts, as agreed for this smoke run.
 | Input | Value |
 | --- | --- |
 | Consumer PR | openshift-eng/pixaa#51 |
-| Consumer head | `5fa51075185c6ac51bddb6b9778ecf15dcea81ba` |
+| Consumer head | `b0da4950691f2cf317e5bd30078e25094838209e` |
 | Consumer base | `c88c63715cdc84e3fb5360c6094a5c49468e3e8c` (merge base with pixaa `main`) |
 | Runner | the `openshift-claude-agent-eval-manifest` commands at this branch's base on `main` |
 
