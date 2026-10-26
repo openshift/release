@@ -165,10 +165,6 @@ new-repo:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_repo-init_latest --release-repo /release
 	$(MAKE) update
 
-test-ci-docs-links:
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm --network=none -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" --entrypoint=ruby docker.io/klakegg/html-proofer:3.19.0 /release/hack/test-ci-docs-links.rb
-.PHONY: test-ci-docs-links
-
 .PHONY: test-tls-scanner
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
