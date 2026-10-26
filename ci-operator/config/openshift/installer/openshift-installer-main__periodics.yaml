@@ -15,9 +15,14 @@ tests:
     FUZZTIME="${FUZZ_TIME:-2m}"
     rc=0
     run_fuzz() {
-      local pkg="$1" fn="$2"
+      local pkg="$1" fn="$2" out
       echo "--- fuzz: $fn ($pkg) ---"
-      go test "./$pkg" -run='^$' -fuzz="^${fn}$" -fuzztime="${FUZZTIME}" || rc=$?
+      # A missing Fuzz target exits 0 with "no fuzz tests to fuzz".
+      out=$(go test "./$pkg" -run='^$' -fuzz="^${fn}$" -fuzztime="${FUZZTIME}" 2>&1) || rc=$?
+      printf '%s\n' "$out"
+      case "$out" in
+        *"no fuzz tests to fuzz"*) rc=1 ;;
+      esac
     }
     trap 'find . -path "*/testdata/fuzz/*/*" | while read -r f; do
             dest="$ARTIFACT_DIR/$(dirname "$f")"; mkdir -p "$dest"; cp "$f" "$dest/"; done' EXIT
