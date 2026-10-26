@@ -74,6 +74,35 @@ function install_deps() {
     install_oc # we need a modern client
 }
 
+function restore_default_catalogs() {
+    local operatorhub_config="$1"
+    local patch
+    patch=$(jq -c '{spec: {disableAllDefaultSources: .spec.disableAllDefaultSources}}' <<< "${operatorhub_config}") || return 1
+
+    echo "Restoring the original OperatorHub default catalog configuration"
+    oc patch operatorhub cluster --type=merge -p "${patch}" --request-timeout=30s || return 1
+
+    # Do not wait for a catalog that was disabled before this step.
+    if ! jq -e '(.spec.disableAllDefaultSources != true) and
+        ([.spec.sources[]? | select(.name == "redhat-operators" and .disabled == true)] | length == 0)' \
+        <<< "${operatorhub_config}" >/dev/null; then
+        return 0
+    fi
+
+    echo "Waiting for the redhat-operators catalog to be ready"
+    local deadline=$((SECONDS + 300))
+    local state
+    while (( SECONDS < deadline )); do
+        if state=$(oc get catalogsource redhat-operators -n openshift-marketplace \
+            -o jsonpath='{.status.connectionState.lastObservedState}' --request-timeout=30s) && [[ "${state}" == READY ]]; then
+            return 0
+        fi
+        sleep 5
+    done
+    echo "ERROR: redhat-operators catalog was not ready within 300 seconds"
+    return 1
+}
+
 function deploy_operators() {
     run_command "cd $(mktemp -d)"
     run_command "git clone --depth 1 --branch ${DEPLOY_KONFLUX_OPERATOR_VERSION} https://github.com/ajaggapa/deploy-konflux-operator.git"
@@ -123,7 +152,24 @@ function deploy_operators() {
         args+=(--quay-auth "${PULL_SECRET}/.dockerconfigjson")
     fi
 
-    run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
+    local operatorhub_config=""
+    if [[ "${KONFLUX_RESTORE_DEFAULT_CATALOGS:-false}" == true && "${KONFLUX_DEPLOY_OPERATORS:-true}" != false ]]; then
+        operatorhub_config=$(oc get operatorhub cluster -o json --request-timeout=30s)
+    fi
+
+    local deploy_status=0
+    run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}" || deploy_status=$?
+
+    # Restore catalogs even when the helper fails, preserving its failure status.
+    if [[ -n "${operatorhub_config}" ]]; then
+        restore_default_catalogs "${operatorhub_config}" || {
+            echo "ERROR: Failed to restore default catalogs"
+            if (( deploy_status == 0 )); then
+                deploy_status=1
+            fi
+        }
+    fi
+    return "${deploy_status}"
 }
 
 set_proxy
