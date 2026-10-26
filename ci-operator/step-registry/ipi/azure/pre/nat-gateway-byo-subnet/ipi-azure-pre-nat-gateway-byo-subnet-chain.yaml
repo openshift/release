@@ -1,0 +1,19 @@
+chain:
+  as: ipi-azure-pre-nat-gateway-byo-subnet
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisioned-resourcegroup
+  - ref: ipi-conf-azure-provisionednetwork
+  - chain: azure-provision-service-principal-minimal-permission
+  - chain: ipi-install
+  - ref: ipi-azure-rbac
+  env:
+  - name: AZURE_BYO_SUBNETS_ENABLED
+    default: "yes"
+  - name: OUTBOUND_TYPE
+    default: "NATGatewaySingleZone"
+  documentation: |-
+    The IPI setup step contains all steps that provision an OpenShift cluster
+    in a pre-created resource group with bring-your-own subnets and a single-zone NAT gateway on Azure.
