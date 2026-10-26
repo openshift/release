@@ -113,7 +113,8 @@ fi
 
 echo ">>> PHASE: Deploy ACS Operator"
 : "Channel: ${ACS_CHANNEL}"
-: "Timeout: ${ACS_INSTALL_TIMEOUT} (${CSV_TIMEOUT_SECONDS}s)"
+: "CSV name timeout: ${ACS_CSV_WAIT_TIMEOUT} (${CSV_TIMEOUT_SECONDS}s)"
+: "Install timeout: ${ACS_INSTALL_TIMEOUT}"
 
 # --- Create namespace ---
 oc create namespace "${ACS_NAMESPACE}" --dry-run=client -o yaml | oc apply -f - 2>&1
