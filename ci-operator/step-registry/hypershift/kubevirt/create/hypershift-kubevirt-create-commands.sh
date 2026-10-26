@@ -881,6 +881,49 @@ ensure_localnet_multi_worker_networking() {
   return 0
 }
 
+# patch_localnet_multi_vm_dns_policy patches VMs with dnsPolicy=None and explicit
+# nameservers so KubeVirt's bridge DHCP serves correct DNS to guest VMs.
+#
+# KubeVirt's bridge binding runs a DHCP server inside the virt-launcher pod that
+# copies DNS from the pod's /etc/resolv.conf. With the default dnsPolicy=ClusterFirst,
+# pods get the management cluster's CoreDNS (172.30.0.10), which is unreachable from
+# localnet. This DHCP server always wins the race against OVN DHCP (it's local to
+# the pod), so VMs get incorrect DNS and ignition cannot resolve the API hostname.
+#
+# Setting dnsPolicy=None with explicit nameservers ensures the pod's resolv.conf
+# (and hence KubeVirt's DHCP) provides the correct DNS server from first boot.
+patch_localnet_multi_vm_dns_policy() {
+  local ns="$1"
+  local dns_server="$2"
+  local expected_count="$3"
+  local vm current_policy patched=0
+
+  for vm in $(oc get vm -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vm}" ]] && continue
+    current_policy=$(oc get vm "${vm}" -n "${ns}" -o jsonpath='{.spec.template.spec.dnsPolicy}' 2>/dev/null || true)
+    if [[ "${current_policy}" == "None" ]]; then
+      patched=$((patched + 1))
+      continue
+    fi
+    if oc patch vm "${vm}" -n "${ns}" --type=merge -p "{
+      \"spec\": {
+        \"template\": {
+          \"spec\": {
+            \"dnsPolicy\": \"None\",
+            \"dnsConfig\": {
+              \"nameservers\": [\"${dns_server}\"]
+            }
+          }
+        }
+      }
+    }" 2>/dev/null; then
+      echo "  Patched VM ${vm} with dnsPolicy=None, DNS=${dns_server}"
+      patched=$((patched + 1))
+    fi
+  done
+  return $(( patched >= expected_count ? 0 : 1 ))
+}
+
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
   HCP_CLI="/usr/bin/hypershift"
@@ -1027,9 +1070,11 @@ EOF
     fi
 
     # Parse subnets from comma-separated LOCALNET_MULTI_SUBNETS into an array.
-    # Format: "192.168.111.128/25,192.168.224.0/24,..." — first subnet gets default gateway.
+    # Format: "192.168.111.0/24,192.168.224.0/24,..." — first subnet gets default gateway.
     # On baremetal dev-scripts the primary subnet must not overlap management VIPs on br-ex
-    # (ingress .4, api .5, node .20-.25, MetalLB/HC API .30-.32); default uses .128/25.
+    # (ingress .4, api .5, node .20-.25, MetalLB/HC API .30-.32); default uses /24 with
+    # excludeSubnets=192.168.111.0/25 to keep IPAM in .128-.254 while making the gateway
+    # (.1) reachable in-subnet (no DHCP option 3/121 needed for first-hop connectivity).
     IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
     if [[ ${#SUBNETS[@]} -lt ${NETWORK_COUNT} ]]; then
       echo "ERROR: LOCALNET_MULTI_SUBNETS has ${#SUBNETS[@]} entries but LOCALNET_MULTI_NETWORK_COUNT=${NETWORK_COUNT}"
@@ -1302,6 +1347,23 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
     fi
   fi
 
+  # Patch VMs with dnsPolicy=None so KubeVirt's bridge DHCP serves correct DNS.
+  # This must happen before VMs boot — the virt-launcher pod's /etc/resolv.conf
+  # determines what DNS KubeVirt's DHCP advertises to the guest. The NodePool
+  # controller creates VMs after the control plane infrastructure is partially
+  # ready, giving us a window to patch before the first boot.
+  echo "Waiting for VMs to apply dnsPolicy=None (DNS=${LOCALNET_MULTI_PRIMARY_DNS})..."
+  for dns_attempt in $(seq 1 120); do
+    if patch_localnet_multi_vm_dns_policy "${MULTI_NAMESPACE}" "${LOCALNET_MULTI_PRIMARY_DNS}" "${HYPERSHIFT_NODE_COUNT}"; then
+      echo "All VMs patched with dnsPolicy=None and DNS=${LOCALNET_MULTI_PRIMARY_DNS} (attempt ${dns_attempt})"
+      break
+    fi
+    if [[ $((dns_attempt % 12)) -eq 0 ]]; then
+      echo "  DNS policy patching: waiting for VMs... (attempt ${dns_attempt}/120)"
+    fi
+    sleep 5
+  done
+
   # Poll for virt-launcher pods and configure OVN DHCP on those worker nodes before
   # the VM's first DHCP request. Per-node ovn-nbctl works on standalone and INTERCONNECT modes.
   echo "Waiting for virt-launcher pods so we can configure OVN DHCP before VM first boot..."
@@ -1313,6 +1375,8 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
       echo "Found virt-launcher pods on ${LAUNCHER_COUNT} node(s) (attempt ${attempt})"
       break
     fi
+    # Keep patching VMs in case new ones appear during scaling
+    patch_localnet_multi_vm_dns_policy "${MULTI_NAMESPACE}" "${LOCALNET_MULTI_PRIMARY_DNS}" "${HYPERSHIFT_NODE_COUNT}" 2>/dev/null || true
     echo "Waiting for virt-launcher pods... (${LAUNCHER_COUNT}/${HYPERSHIFT_NODE_COUNT} nodes, attempt ${attempt}/120)"
     sleep 5
   done
@@ -1657,6 +1721,10 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
 
   # Create a primary localnet NAD in the ip-echo namespace
+  IPECHO_EXCLUDE=""
+  if [[ -n "${LOCALNET_MULTI_EXCLUDE_SUBNETS:-}" ]]; then
+    IPECHO_EXCLUDE=",\"excludeSubnets\": \"${LOCALNET_MULTI_EXCLUDE_SUBNETS}\""
+  fi
   oc apply -f - <<IPECHO_NAD_EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -1670,7 +1738,7 @@ spec:
       "type": "ovn-k8s-cni-overlay",
       "topology": "localnet",
       "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-1",
-      "subnets": "${SUBNETS[0]}"
+      "subnets": "${SUBNETS[0]}"${IPECHO_EXCLUDE}
   }'
 IPECHO_NAD_EOF
 

@@ -153,8 +153,77 @@ EOF
 RETRIES=30
 CSV=
 errlog="$(mktemp)"
+
+# Helper function to check for OLM constraint/resolution failures
+check_subscription_failed_state() {
+  local sub_name=$1
+  local namespace=$2
+  local failed_reason failed_msg
+  
+  failed_reason=$(oc get subscription "${sub_name}" -n "${namespace}" --request-timeout=30s -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].reason}' 2>/dev/null || echo "")
+  failed_msg=$(oc get subscription "${sub_name}" -n "${namespace}" --request-timeout=30s -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].message}' 2>/dev/null || echo "")
+  
+  if [[ -n "${failed_reason}" ]]; then
+    echo "Subscription in failed state: reason=${failed_reason}"
+    if [[ "${failed_msg}" == *"ConstraintsNotSatisfiable"* ]] || [[ "${failed_msg}" == *"clusterserviceversion"*"exists and is not referenced"* ]]; then
+      echo "Detected orphaned CSV constraint violation. Attempting recovery..."
+      return 0  # True - failed state detected
+    fi
+  fi
+  return 1  # False - not in failed state
+}
+
+# Helper function to clean up orphaned CSV
+cleanup_orphaned_csv() {
+  local namespace=$1
+  local package=$2
+  
+  echo "Searching for orphaned CSV entries for ${package}..."
+  set +e
+  local orphaned_csvs
+  orphaned_csvs=$(oc get csv -n "${namespace}" -o jsonpath='{.items[?(@.metadata.name | test("'${package}'"))].metadata.name}' 2>/dev/null)
+  set -e
+  
+  if [[ -n "${orphaned_csvs}" ]]; then
+    echo "Found orphaned CSVs: ${orphaned_csvs}"
+    for csv_name in ${orphaned_csvs}; do
+      echo "Deleting orphaned CSV: ${csv_name}"
+      set +e
+      oc delete csv "${csv_name}" -n "${namespace}" --wait=true --timeout=60s 2>&1
+      set -e
+    done
+    echo "Cleaned up orphaned CSVs, waiting 10s before retry..."
+    sleep 10
+    return 0
+  fi
+  return 1
+}
+
 for i in $(seq "${RETRIES}") max; do
   [[ "${i}" == "max" ]] && break
+  
+  # Check if subscription is in a failed state due to orphaned CSV
+  if check_subscription_failed_state "${METALLB_OPERATOR_SUB_PACKAGE}" "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"; then
+    if cleanup_orphaned_csv "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" "${METALLB_OPERATOR_SUB_PACKAGE}"; then
+      # After cleanup, recreate the subscription
+      echo "Recreating subscription after cleanup..."
+      oc_apply_with_retry <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: "${METALLB_OPERATOR_SUB_PACKAGE}"
+  namespace: "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"
+spec:
+  channel: "${METALLB_OPERATOR_SUB_CHANNEL}"
+  installPlanApproval: Automatic
+  name: "${METALLB_OPERATOR_SUB_PACKAGE}"
+  source: "${METALLB_OPERATOR_SUB_SOURCE}"
+  sourceNamespace: openshift-marketplace
+EOF
+      CSV=  # Reset CSV so we fetch it again
+    fi
+  fi
+  
   sleep 30
   if [[ -z "${CSV}" ]]; then
     echo "[Retry ${i}/${RETRIES}] The subscription is not yet available. Trying to get it..."
@@ -181,7 +250,7 @@ for i in $(seq "${RETRIES}") max; do
     echo "${METALLB_OPERATOR_SUB_PACKAGE} is deployed"
     break
   fi
-  echo "Try ${i}/${RETRIES}: ${METALLB_OPERATOR_SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
+  echo "Try ${i}/${RETRIES}: ${METALLB_OPERATOR_SUB_PACKAGE} is not deployed yet (phase: ${phase}). Checking again in 30 seconds"
 done
 rm -f "${errlog}"
 

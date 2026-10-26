@@ -91,13 +91,14 @@ ref:
         OVN-K bridge-mapping). Set to a custom name (e.g. physnet-localnet) when using a
         secondary OVS bridge so the mapping does not conflict with the default physnet:br-ex.
     - name: LOCALNET_MULTI_SUBNETS
-      default: "192.168.111.128/25,192.168.224.0/24"
+      default: "192.168.111.0/24,192.168.224.0/24"
       documentation: |-
         Comma-separated list of subnets for multi-localnet networks. Must have at least
         LOCALNET_MULTI_NETWORK_COUNT entries. First subnet gets default gateway and DNS.
         On baremetal dev-scripts clusters the primary subnet must avoid 192.168.111.4
         (ingress VIP), .5 (api VIP), node br-ex (.20-.25), and MetalLB/HC API (.30-.32).
-        Default 192.168.111.128/25 keeps worker IPAM in the upper half of the /24 on br-ex.
+        Default uses /24 so LOCALNET_MULTI_PRIMARY_GATEWAY (.1) is within the VM subnet,
+        paired with LOCALNET_MULTI_EXCLUDE_SUBNETS to restrict IPAM to the upper half.
     - name: LOCALNET_MULTI_PRIMARY_GATEWAY
       default: "192.168.111.1"
       documentation: "Gateway IP for the primary localnet in the multi-localnet architecture (also used as DNS server)."
@@ -105,11 +106,12 @@ ref:
       default: "192.168.111.1"
       documentation: "DNS server IP for the primary localnet in the multi-localnet architecture."
     - name: LOCALNET_MULTI_EXCLUDE_SUBNETS
-      default: ""
+      default: "192.168.111.0/25"
       documentation: |-
-        Optional comma-separated CIDRs excluded from OVN IPAM on the primary localnet NAD
-        (in addition to choosing a non-overlapping primary subnet). Use when the primary
-        subnet must be a full /24 but must not assign dev-scripts VIP addresses.
+        Comma-separated CIDRs excluded from OVN IPAM on the primary localnet NAD.
+        Default 192.168.111.0/25 keeps VM IP allocation in .128-.254 while using a
+        /24 subnet mask, avoiding dev-scripts VIPs (.1 gateway, .4 ingress, .5 api,
+        .20-.25 nodes, .30-.32 MetalLB/HC API) and ensuring the gateway is in-subnet.
     - name: LOCALNET_MULTI_IPV6_SUBNET
       default: ""
       documentation: |-
