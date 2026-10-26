@@ -30,82 +30,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: event-storm-standard
+- as: annotation-churn-standard
   cron: 20 7 * * 2
   steps:
     cluster_profile: hypershift-aws
     env:
-      ETCD_MAX_LEADER_CHANGES: "5"
-      ETCD_MAX_P99_COMMIT_LATENCY_MS: "500"
-      ETCD_PERF_FLAGS: --iterations=60 --pod-replicas=2 --event-iterations=2000 --event-replicas=100
-        --storm-workers=20
-      ETCD_PERF_VARIANT: standard
-      ETCD_PERF_WORKLOAD: event-storm
+      ANNOTATION_CHURN_ITERATIONS: "10"
       HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
       HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
-      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_NODE_COUNT: "24"
+      PATCH_REPLICAS: "50"
+      PATCH_ROUNDS: "100"
     test:
-    - ref: hypershift-etcd-perf
+    - chain: hypershift-etcd-perf
     workflow: hypershift-aws-e2e-cluster
   timeout: 6h0m0s
-- as: event-storm-sharded
+- as: annotation-churn-sharded
   cron: 20 13 * * 2
   steps:
     cluster_profile: hypershift-aws
     env:
-      ETCD_MAX_LEADER_CHANGES: "5"
-      ETCD_MAX_P99_COMMIT_LATENCY_MS: "500"
-      ETCD_PERF_FLAGS: --iterations=60 --pod-replicas=2 --event-iterations=2000 --event-replicas=100
-        --storm-workers=20
-      ETCD_PERF_VARIANT: sharded
-      ETCD_PERF_WORKLOAD: event-storm
+      ANNOTATION_CHURN_ITERATIONS: "10"
       HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
-      HYPERSHIFT_ETCD_SHARDS: name=events,resources=/events;events.k8s.io/events,replicas=3,storage=PersistentVolume
+      HYPERSHIFT_ETCD_SHARDS: |-
+        name=leases,resources=coordination.k8s.io/leases,replicas=3,storage=PersistentVolume
+        name=events,resources=/events;events.k8s.io/events,replicas=1,storage=EmptyDir
       HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
-      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_NODE_COUNT: "24"
+      PATCH_REPLICAS: "50"
+      PATCH_ROUNDS: "100"
       TECH_PREVIEW_NO_UPGRADE: "true"
     test:
-    - ref: hypershift-etcd-perf
-    workflow: hypershift-aws-e2e-cluster
-  timeout: 6h0m0s
-- as: db-quota-pressure-standard
-  cron: 20 7 * * 4
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      ETCD_MAX_LEADER_CHANGES: "5"
-      ETCD_MAX_P99_COMMIT_LATENCY_MS: "500"
-      ETCD_PERF_FLAGS: --iterations=2000 --iterations-per-namespace=10 --kb-chunks=8
-        --kb-size=100
-      ETCD_PERF_VARIANT: standard
-      ETCD_PERF_WORKLOAD: db-quota-pressure
-      GC: "false"
-      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
-      HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
-      HYPERSHIFT_NODE_COUNT: "3"
-    test:
-    - ref: hypershift-etcd-perf
-    workflow: hypershift-aws-e2e-cluster
-  timeout: 6h0m0s
-- as: db-quota-pressure-sharded
-  cron: 20 13 * * 4
-  steps:
-    cluster_profile: hypershift-aws
-    env:
-      ETCD_MAX_LEADER_CHANGES: "5"
-      ETCD_MAX_P99_COMMIT_LATENCY_MS: "500"
-      ETCD_PERF_FLAGS: --iterations=2000 --iterations-per-namespace=10 --kb-chunks=8
-        --kb-size=100
-      ETCD_PERF_VARIANT: sharded
-      ETCD_PERF_WORKLOAD: db-quota-pressure
-      GC: "false"
-      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
-      HYPERSHIFT_ETCD_SHARDS: name=events,resources=/events;events.k8s.io/events,replicas=3,storage=PersistentVolume
-      HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
-      HYPERSHIFT_NODE_COUNT: "3"
-      TECH_PREVIEW_NO_UPGRADE: "true"
-    test:
-    - ref: hypershift-etcd-perf
+    - chain: hypershift-etcd-perf
     workflow: hypershift-aws-e2e-cluster
   timeout: 6h0m0s
 zz_generated_metadata:

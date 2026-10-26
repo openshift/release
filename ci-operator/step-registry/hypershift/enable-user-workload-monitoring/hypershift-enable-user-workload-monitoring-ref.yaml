@@ -1,0 +1,37 @@
+ref:
+  as: hypershift-enable-user-workload-monitoring
+  from: cli
+  env:
+  - name: MONITORING_KUBECONFIG
+    default: ""
+    documentation: |-
+      Kubeconfig of the cluster to enable user workload monitoring on. Defaults
+      to ${SHARED_DIR}/management_cluster_kubeconfig, which is where the
+      HyperShift workflows put the management cluster. Point it elsewhere to
+      reuse this step on a standalone cluster.
+  - name: UWM_WAIT_ATTEMPTS
+    default: "60"
+    documentation: |-
+      How many 10 second polls to wait for the prometheus-user-workload
+      StatefulSet to appear after the ConfigMap is written.
+  - name: UWM_ROLLOUT_TIMEOUT
+    default: "10m"
+    documentation: "Timeout passed to \"oc rollout status\" for prometheus-user-workload."
+  commands: hypershift-enable-user-workload-monitoring-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  documentation: |-
+    Enables user workload monitoring on a cluster and waits for the user
+    workload Prometheus to roll out.
+
+    Anything that runs in a namespace the cluster monitoring stack does not own
+    -- a hosted control plane in "clusters-<name>", an operator shipping its own
+    ServiceMonitor -- is only scraped once user workload monitoring is on. Any
+    step that later queries those series needs this to have happened first, so
+    it is a step of its own rather than a preamble inside one workload.
+
+    The ConfigMap is merged rather than overwritten, and the step is a no-op when
+    user workload monitoring is already enabled.

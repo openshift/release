@@ -41,6 +41,13 @@ chain:
         use an empty apiGroup for the core group. Requires the EtcdSharding feature gate, so the
         HyperShift operator must be installed with TECH_PREVIEW_NO_UPGRADE=true, and shards with
         replicas=3 require HYPERSHIFT_CP_AVAILABILITY_POLICY=HighlyAvailable.
+
+        The topology the performance jobs use, agreed with the performance and scale team, is a
+        three member PersistentVolume backed main etcd plus:
+          name=leases,resources=coordination.k8s.io/leases,replicas=3,storage=PersistentVolume
+          name=events,resources=/events;events.k8s.io/events,replicas=1,storage=EmptyDir
+        Leases get their own highly available shard because they carry the cluster heartbeat, and
+        events get a single EmptyDir shard because they are high churn and disposable.
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
@@ -113,13 +120,15 @@ chain:
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
 
+      # Renders the HostedCluster, rewrites the NodePool release image and applies
+      # the result. COMMAND is passed as an argument array rather than a shell
+      # string so that values containing shell metacharacters -- most notably the
+      # ";" that separates resources inside an --etcd-shard value -- survive.
       support_np_skew() {
         curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-        local extra_flags=""
-        extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
-        extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
-        extra_flags+="&& oc apply -f /tmp/hc.yaml"
-        echo "$extra_flags"
+        "${COMMAND[@]}" --render-sensitive --render > /tmp/hc.yaml
+        /tmp/yq e -i "(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"" /tmp/hc.yaml
+        oc apply -f /tmp/hc.yaml
       }
       
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
@@ -247,9 +256,8 @@ chain:
       fi
 
       # Execute the command
-      # When using np_skew (different release images), we need eval to properly handle shell operators
       if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-        eval "${COMMAND[*]} $(support_np_skew)"
+        support_np_skew
       else
         "${COMMAND[@]}"
       fi

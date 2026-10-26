@@ -1,0 +1,71 @@
+ref:
+  as: hypershift-hcp-metrics-endpoint
+  # Same image as the openshift-qe workload steps, so the e2e-benchmarking
+  # checkout this step does and the one the workload step does are identical.
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      e2e-benchmarking tag to take the metrics profiles from. "default" resolves
+      to the latest tag, which is what the openshift-qe workload steps do, so
+      the profiles and the wrapper that consumes them stay on the same release.
+  - name: HCP_METRICS_PROFILES
+    default: "rosa/hosted-cp-metrics.yml"
+    documentation: |-
+      Space separated list of metrics profiles to take from the kube-burner-ocp
+      wrapper's "metrics-profiles" directory in e2e-benchmarking. The default is
+      the hosted control plane profile: etcd, kube-apiserver and OVN series for
+      the control plane namespace. The "rosa" directory is the hosted control
+      plane profile for OpenShift-flavoured management clusters; self-managed
+      HyperShift reuses it, the difference between the two products is the
+      namespace layout, which this step binds for you.
+  - name: METRICS_STEP
+    default: "30s"
+    documentation: "Prometheus range query resolution used when collecting the profiles."
+  - name: SCRAPE_SETTLE_SECONDS
+    default: "180"
+    documentation: |-
+      How long to wait before checking that the hosted control plane etcd
+      targets are actually being scraped. Enabling user workload monitoring and
+      the first scrape of a newly created namespace are not instantaneous.
+  - name: PROM_TOKEN_DURATION
+    default: "8h"
+    documentation: |-
+      Lifetime of the Thanos bearer token. Must outlast the workload step that
+      consumes the endpoint file.
+  commands: hypershift-hcp-metrics-endpoint-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 30m0s
+  documentation: |-
+    Prepares ${SHARED_DIR}/hcp-metrics-endpoint.yml so that a kube-burner
+    workload driven against a hosted cluster collects its control plane metrics
+    from the management cluster.
+
+    A hosted cluster is split: the workload is applied to the guest API server,
+    but the etcd and kube-apiserver being measured run as pods in the
+    "clusters-<name>" namespace of the management cluster. kube-burner's own
+    Prometheus discovery finds the cluster in KUBECONFIG, which is the wrong one
+    of the two, so this step resolves the management cluster's thanos-querier
+    route, mints a cluster-monitoring-view token for it, and writes an endpoint
+    file the workload step picks up.
+
+    The queries are not written here. They are copied from the kube-burner-ocp
+    wrapper in cloud-bulldozer/e2e-benchmarking, the same source and the same
+    tag the openshift-qe workload steps use, with the hosted control plane
+    namespace bound for self-managed HyperShift. Changes to what is measured
+    belong in that repo.
+
+    Requires hypershift-enable-user-workload-monitoring to have run, and a
+    hosted cluster to exist: ${SHARED_DIR}/cluster-name and
+    ${SHARED_DIR}/management_cluster_kubeconfig must be present.
+
+    The endpoint file carries a bearer token. It is written to SHARED_DIR with
+    mode 600 and is never copied to ARTIFACT_DIR.
