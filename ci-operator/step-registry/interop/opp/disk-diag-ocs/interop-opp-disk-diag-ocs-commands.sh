@@ -9,7 +9,7 @@
 #
 # This step:
 #   1. Identifies OCS-labeled nodes specifically
-#   2. Uses oc debug to capture real disk utilization (df -h) on each
+#   2. Uses oc debug to capture real disk utilization (df -P -B1 + df -i) on each
 #      OCS node -- something the early step deliberately avoids
 #   3. Reports ephemeral-storage capacity vs allocatable for ALL nodes
 #   4. Checks DiskPressure conditions on every node
@@ -73,20 +73,22 @@ fi
 # 2. oc debug -- capture real disk utilization on OCS nodes
 # -----------------------------------------------------------------------
 echo "" | tee -a "${SUMMARY}"
-echo "--- Real disk utilization on OCS nodes (df -h via oc debug) ---" | tee -a "${SUMMARY}"
+echo "--- Real disk utilization on OCS nodes (df -P -B1 + df -i via oc debug) ---" | tee -a "${SUMMARY}"
 
 for node in "${OCS_NODES[@]+"${OCS_NODES[@]}"}"; do
     echo "" | tee -a "${SUMMARY}"
     echo "  Node: ${node}" | tee -a "${SUMMARY}"
     DF_FILE="${DIAG_DIR}/df-${node}.txt"
 
-    if DF_OUTPUT="$(timeout 120 oc debug "node/${node}" -- chroot /host df -h 2>&1)"; then
-        echo "${DF_OUTPUT}" > "${DF_FILE}"
-        echo "${DF_OUTPUT}" | tee -a "${SUMMARY}"
-    else
-        echo "  WARNING: oc debug failed for ${node}: ${DF_OUTPUT}" | tee -a "${SUMMARY}"
-        echo "${DF_OUTPUT}" > "${DF_FILE}" 2>/dev/null || true
-    fi
+    # Write block usage
+    echo "=== Block usage (df -P -B1) ===" >> "${DF_FILE}"
+    timeout 120 oc debug --to-namespace default "node/${node}" -- chroot /host df -P -B1 2>/dev/null >> "${DF_FILE}" || echo "WARNING: oc debug failed for ${node} (block)" >> "${DF_FILE}"
+
+    # Write inode usage
+    echo "=== Inode usage (df -i) ===" >> "${DF_FILE}"
+    timeout 120 oc debug --to-namespace default "node/${node}" -- chroot /host df -i 2>/dev/null >> "${DF_FILE}" || echo "WARNING: oc debug failed for ${node} (inode)" >> "${DF_FILE}"
+
+    tee -a "${SUMMARY}" < "${DF_FILE}"
 done
 
 # -----------------------------------------------------------------------
