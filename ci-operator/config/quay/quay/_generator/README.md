@@ -174,6 +174,7 @@ Per job, `quay[].jobs[]`:
 | `env` | Job env; overrides branch env key by key. |
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
+| `auth_mode` | `ldap`; absent means Database auth. `e2e-install` periodic on `s3` storage only. Inserts `quay-deploy-openldap` after `quay-deploy-jaeger` and stops inverting `@auth:LDAP`, so those specs run. Adds `-ldap` to the name, after any `-fips`. |
 | `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
 | `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp` or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |

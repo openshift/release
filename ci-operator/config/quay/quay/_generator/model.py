@@ -87,6 +87,7 @@ class Cell:
     # The upgrade lane's OCP release channel: "stable", or "candidate" for an OCP
     # minor with no stable channel yet. Other tests render a nightly payload instead.
     ocp_channel: str = "stable"
+    auth_mode: str | None = None
 
     @property
     def upgrade_from_nodot(self) -> str:
@@ -189,15 +190,17 @@ class Cell:
             return f"from-{self.upgrade_from_nodot}"
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
-        # cloud DB kind (rds/postgres) before source; fips still suffixes.
-        # Filename/variant are unchanged, so sibling rows share one file.
+        # cloud DB kind (rds/postgres) before source; fips, then auth_mode,
+        # still suffix. Filename/variant are unchanged, so sibling rows share
+        # one file.
         parts = [self.cloud, self.storage]
         if self.database:
             parts.append(self.database_kind)
         if self.kind == "periodic":
             parts.append(str(self.source))
         base = "-".join(parts)
-        return f"{base}-fips" if self.fips else base
+        base = f"{base}-fips" if self.fips else base
+        return f"{base}-{self.auth_mode}" if self.auth_mode else base
 
     @property
     def filename(self) -> str:
@@ -235,6 +238,7 @@ class Cell:
             "fips": self.fips,
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
+            "auth_mode": self.auth_mode,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version
