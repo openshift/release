@@ -136,6 +136,11 @@ metadata:
   name: multicluster-engine
 EOF
 
+CILIUM_MCE_POLICY="${SHARED_DIR}/cilium-network-policy-infrastructure-operator-allow-kube-apiserver.yaml"
+if [[ -f "${CILIUM_MCE_POLICY}" ]]; then
+  oc apply -f "${CILIUM_MCE_POLICY}"
+fi
+
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
