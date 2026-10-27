@@ -13,8 +13,9 @@ set -o pipefail
 #  - the test phase honoring a pre-seeded cluster state under output/ (cluster.ini
 #    ID/State=ready + .datainfo/kube-configs/<cluster-id>.kubeconfig), symmetric
 #    to --justClean consuming recorded state (which rosa-e2e-ocm-fvt-clean
-#    already relies on), or a first-class existing-cluster mode if preferred;
-#  - the exact spelling of the test-only phase selector (--justTest assumed).
+#    already relies on), or a first-class existing-cluster mode if preferred.
+#    (--justTest does not exist in ocmtest; test-only execution comes from
+#    OCM_FVT_DEFER_CLEAN=true, confirmed by the 87743 rehearsal CLI help.)
 
 # Apply Gangway override before any use of OCM_FVT_EXTRA_ENVS (same as
 # rosa-e2e-ocm-fvt).
@@ -150,15 +151,18 @@ podman_args=(
   --rm
 )
 
-echo "Running ocmtest (test phase only) for job ${OCM_FVT_JOB_NAME} against existing cluster ${CLUSTER_ID}"
+echo "Running ocmtest against existing cluster ${CLUSTER_ID} (OCM_FVT_DEFER_CLEAN=true skips the post/clean phase)"
 exit_code=0
 # Do not trace secret env expansion.
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
+# No --justTest flag exists in ocmtest (only --justClean, which is post-only);
+# test-only execution comes from OCM_FVT_DEFER_CLEAN=true in the env file,
+# same as rosa-e2e-ocm-fvt.
 podman run \
   "${podman_args[@]}" \
   "${OCMCI_IMAGE}" \
-  ocmtest test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}" --justTest || exit_code=$?
+  ocmtest test --service "${OCM_FVT_SERVICE:-cms}" --job "${OCM_FVT_JOB_NAME}" || exit_code=$?
 $WAS_TRACING_RUN && set -x
 
 # Copy merged report.xml to artifacts (skip per-phase duplicates).
