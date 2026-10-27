@@ -14,10 +14,33 @@ ref:
     default: "rhacs-operator"
     documentation: |-
       Namespace where the ACS operator is installed. Override this in your config env if you need to change it.
+  - name: ACS_EVIDENCE_SELF_TEST
+    default: "0"
+    documentation: |-
+      Set to "1" to run the removal-predicate fixture self-test instead of a
+      cluster capture: the step evaluates the per-run removal-precondition
+      terms against embedded TRUE and FALSE fixtures and exits 22 if either
+      evaluates wrongly. Used to validate the detector in rehearsals (a
+      detector never observed TRUE is not actionable).
   documentation: |-
     Downloads ACS/StackRox diagnostic bundle via the Central API and captures
     OLM lifecycle evidence (INTEROP-9525) for debugging operator installation
     failures on OCP 5.0/5.1. The OLM evidence section runs independently of
-    ACS diagnostics — it collects OperatorPolicy, CatalogSource, Subscription,
-    InstallPlan, CSV, CRD, Central CR, and PackageManifest state even when
-    ACS is not yet installed.
+    ACS diagnostics — it collects OperatorPolicy (spec + conditions),
+    CatalogSource, OLM Subscription (fully-qualified
+    subscriptions.operators.coreos.com — with ACM installed the bare kind
+    resolves to ACM's CRD), InstallPlan, CSV, Central/SecuredCluster CRs,
+    PackageManifest, ACM policy compliance verdicts, and the ACM CSV version
+    with the governance-policy-addon-controller image ref, even when ACS is
+    not yet installed.
+
+    Capture contract: every query is classified present | absent |
+    probe_error (a query failure is never rendered as absence); both 08-*
+    packagemanifest files are always written; cross-artifact agreement
+    assertions run at the end and fail the step with exit code 20
+    (disagreement) or 21 (probe sanity). The per-run removal-precondition
+    terms are written to olm-evidence/acs-central-status.properties; the
+    two-run aggregation is a ticket-level rule, not computed here. This step
+    is best_effort, so finished.json (not job color) is the failure signal.
+    Durable authority for the classification and predicate:
+    opp-interop-testing docs/design/acs-deploy-evidence.md.
