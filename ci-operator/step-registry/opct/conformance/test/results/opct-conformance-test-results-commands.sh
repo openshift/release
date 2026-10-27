@@ -26,6 +26,11 @@ retrieve_pipe_rc="NOT_RUN"
 results_rc="NOT_RUN"
 report_rc="NOT_RUN"
 publish_rc="NOT_RUN"
+# publish_reason classifies a nonzero publish_rc as either:
+#   rejected          = OPCT's own SLO checks declined the baseline (not an
+#                        infra/processing failure -- see publish step below)
+#   processing_error  = genuine infra/processing failure (e.g. S3 upload)
+publish_reason="NOT_RUN"
 indexer_rc="NOT_RUN"
 
 # check_plugin_gate return contract:
@@ -84,6 +89,7 @@ retrieve_pipe_rc=${retrieve_pipe_rc}
 results_rc=${results_rc}
 report_rc=${report_rc}
 publish_rc=${publish_rc}
+publish_reason=${publish_reason}
 indexer_rc=${indexer_rc}
 plugin_gate_rc=${plugin_gate_rc}
 plugin_gate_reason='${safe_reason}'
@@ -484,9 +490,23 @@ publish_rc=${local_publish_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish.txt\n"
 
 if [[ ${local_publish_rc} -ne 0 ]]; then
-  show_msg "ERROR: '${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}"
-  exit_class=$((exit_class | 2))
-  # Indexer depends on successful publish -- mark NOT_RUN.
+  # A rejected baseline (OPCT's own SLO checks, e.g. OPCT-001 Kubernetes
+  # Conformance pass-rate) and a genuine infra/processing error (e.g. S3
+  # upload failure) both exit nonzero from 'adm baseline publish' -- grep
+  # the literal rejection message (pkg/cmd/adm/baseline/publish.go) to tell
+  # them apart. Per OPCT maintainer direction (Slack 2026-10-26, OPCT-500):
+  # a rejected baseline is OPCT correctly declining a bad conformance
+  # result, not a CI/processing failure, and must not fail the job;
+  # a processing error must.
+  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+    publish_reason="rejected"
+    show_msg "WARNING: '${OPCT_CLI} adm baseline publish' rejected the baseline (not an infra/processing failure, not failing the job): see log-publish.txt"
+  else
+    publish_reason="processing_error"
+    show_msg "ERROR: '${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}"
+    exit_class=$((exit_class | 2))
+  fi
+  # Indexer depends on successful publish -- mark NOT_RUN either way.
   indexer_rc="NOT_RUN"
   emit_summary
   exit ${exit_class}
