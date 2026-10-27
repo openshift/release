@@ -1,3 +1,8 @@
+base_images:
+  ocp_base-rhel10:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: base-rhel10
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/cloud-provider-openstack
@@ -9,12 +14,27 @@ images:
     to: openstack-cinder-csi-driver
   - dockerfile_path: images/cloud-controller-manager/Dockerfile
     to: openstack-cloud-controller-manager
+  - dockerfile_path: images/osbrick-sidecar/Dockerfile
+    from: openstack-base-rhel10
+    inputs:
+      openstack-base-rhel10:
+        as:
+        - registry.ci.openshift.org/ocp/5.1:base-rhel10
+    to: openstack-cinder-csi-driver-osbrick-sidecar
 promotion:
   to:
-  - name: "5.1"
+  - excluded_images:
+    - openstack-cinder-csi-driver-osbrick-sidecar
+    name: "5.1"
     namespace: ocp-priv
 prowgen:
   private: true
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-5-1.ocp.svc/ > /etc/yum.repos.art/ci/base-openstack-5-1.repo
+    from: ocp_base-rhel10
+    to: openstack-base-rhel10
 releases:
   initial:
     integration:
