@@ -101,7 +101,7 @@ Deploys the HyperShift operator to the management cluster. Key controls:
 **Operations**: install/, hostedcluster/, conformance/, e2e-v2/, e2e-backuprestore/, operatorhub/, optional-operators/, performanceprofile/
 **Infrastructure**: setup-nested-management-cluster/, setup-root-management-cluster/, destroy-nested-management-cluster/
 **Diagnostics**: dump/, debug/, analyze-e2e-failure/, k8sgpt/
-**AI/Automation**: agentic-qe/, review-agent/, jira-agent/, dependabot-triage/
+**AI/Automation**: agentic-qe/, jira-agent/, dependabot-triage/
 
 ## Timeouts
 
