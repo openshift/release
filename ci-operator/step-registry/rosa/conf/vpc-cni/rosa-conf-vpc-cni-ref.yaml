@@ -1,0 +1,50 @@
+ref:
+  as: rosa-conf-vpc-cni
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-conf-vpc-cni-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: AWS region fallback when cluster-metadata.json does not carry one.
+  - name: HELM_VERSION
+    default: "v3.16.4"
+    documentation: helm version downloaded when the image does not ship one.
+  - name: VPC_CNI_CHART_VERSION
+    default: ">= 1.21.2"
+    documentation: Version constraint for the eks/aws-vpc-cni helm chart.
+  documentation: |-
+    Installs the AWS VPC CNI on a ROSA cluster created with NO_CNI=true
+    (rosa-cluster-provision --no-cni), following the procedure documented in
+    https://github.com/phbergsmann/rosa-vpc-cni:
+
+    - creates an IRSA IAM role (<cluster-id>-vpc-cni) trusting
+      system:serviceaccount:kube-system:aws-node and attaches the AWS-managed
+      AmazonEKS_CNI_Policy (custom policies with tag conditions do not work:
+      the VPC CNI tags ENIs with node.k8s.amazonaws.com/* and the primary ENI
+      carries no CNI-managed tags)
+    - grants the hostaccess and privileged SCCs to the aws-node service account
+    - enables net.ipv4.ip_forward=1 via a rosa CLI tuning config (on HCP the
+      Node Tuning Operator reconciles away Tuned CRs applied with oc)
+    - helm-installs eks/aws-vpc-cni with the ROSA/CRI-O host-path overrides:
+      CNI binaries live in /var/lib/cni/bin and configs in /run/multus/cni/net.d
+      on CRI-O nodes, not the EKS/containerd defaults the chart assumes
+
+    The role name is written to ${SHARED_DIR}/aws-vpc-cni-role-name for
+    rosa-conf-vpc-cni-role-delete; the standard deprovision chain does not know
+    about the role and would leak it.
+
+    After a successful install the step records cni=aws-vpc-cni in the
+    provisioner-to-validator SHARED_DIR contract (${SHARED_DIR}/cluster-metadata.json,
+    ROSAENG-67580) so the validation tail can condition on the CNI type. The
+    field is additive; heads that do not run this step are unaffected.
+
+    Requires ${SHARED_DIR}/cluster-id, a kubeconfig (kubeconfig.kubeadmin or
+    kubeconfig), cluster-metadata.json, and the rosa / oc / aws / jq binaries
+    provided by the rosa-aws-cli image. Run it between
+    rosa-cluster-wait-ready-cluster and rosa-cluster-wait-ready-operators:
+    nodes stay NotReady until the CNI is installed.
