@@ -224,41 +224,67 @@ def get_oc_env_vars():
     ]
 
 
-def get_oc_prepare_container():
+# Release source used to pre-populate the changelog git cache, selected by the product the
+# release-controller belongs to.
+RELEASE_SOURCES = {
+    'ocp': {
+        'streams_host': 'amd64.ocp.releases.ci.openshift.org',
+        'stable_stream': '4-stable',
+        'preview_stream': '4-dev-preview',
+        'release_image': 'quay.io/openshift-release-dev/ocp-release',
+        'tag_suffix': '-x86_64',
+    },
+    'okd': {
+        'streams_host': 'amd64.origin.releases.ci.openshift.org',
+        'stable_stream': '4-scos-stable',
+        'preview_stream': '4-scos-next',
+        'release_image': 'quay.io/okd/scos-release',
+        'tag_suffix': '',
+    },
+}
+
+
+def get_oc_prepare_container(context):
+    release_source = RELEASE_SOURCES[context.product.name]
+    streams_url = f"https://{release_source['streams_host']}/api/v1/releasestreams/accepted"
+    stable_stream = release_source['stable_stream']
+    preview_stream = release_source['preview_stream']
+    release_image = release_source['release_image']
+    tag_suffix = release_source['tag_suffix']
     return [
         {
             "name": "oc-prepare",
             "command": ["/bin/bash", "-c",
-                        """#!/bin/bash
+                        f"""#!/bin/bash
             set -euo pipefail
             trap 'kill $(jobs -p); exit 0' TERM
 
             SECONDS=0
 
             # ensure we are logged in to our registry
-            mkdir -p ${XDG_RUNTIME_DIR}/containers
-            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true
+            mkdir -p ${{XDG_RUNTIME_DIR}}/containers
+            cp /tmp/pull-secret/auth.json ${{XDG_RUNTIME_DIR}}/containers/auth.json || true
 
             # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods
             git config --global credential.helper store
             git config --global user.name test
             git config --global user.email test@test.com
-            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json
+            oc registry login --to ${{XDG_RUNTIME_DIR}}/containers/auth.json
 
-            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)
+            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{{http_code}}' {streams_url})
             if [[ "$RC_SERVICE_AVAILABLE" -ne 200 ]]
             then
                 FROM=""
                 TO=""
             else
-                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
-                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+                FROM=$(curl -s {streams_url} | jq -r '.["{stable_stream}"][0] // empty')
+                TO=$(curl -s {streams_url} | jq -r '.["{preview_stream}"][0] // empty')
             fi
 
             if [[ -n "$FROM" && -n "$TO" ]]
             then
                 echo "Pre-populating the git cache..."
-                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64
+                oc adm release info --changelog=/tmp/git {release_image}:$FROM{tag_suffix} {release_image}:$TO{tag_suffix}
             else
                 echo "Unable to Pre-populate the git cache!"
             fi
@@ -328,7 +354,7 @@ def _add_osd_rc_deployment(gendoc):
                                                       "mountPath": "/tmp/git-sync"
                                                   }
                                               ]
-                                          }] + get_oc_prepare_container(),
+                                          }] + get_oc_prepare_container(context),
                     "containers": [
                         {
                             "name": "git-sync",
@@ -444,7 +470,7 @@ def _add_osd_rc_deployment(gendoc):
                     }
                 },
                 'spec': {
-                    'initContainers': get_oc_prepare_container(),
+                    'initContainers': get_oc_prepare_container(context),
                     'containers': [
                         *_get_osd_rc_deployment_sidecars(context),
                         {
