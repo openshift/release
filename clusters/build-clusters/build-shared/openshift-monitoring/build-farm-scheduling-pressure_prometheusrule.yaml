@@ -13,7 +13,11 @@ spec:
     rules:
     - alert: BuildFarmHighPendingPods
       expr: |
-        count(kube_pod_status_phase{job="kube-state-metrics",namespace="ci",phase="Pending"} == 1) > 50
+        count(kube_pod_status_phase{job="kube-state-metrics",namespace="ci",phase="Pending"} == 1) > 35
+        and
+        max_over_time(
+          (count(kube_pod_status_phase{job="kube-state-metrics",namespace="ci",phase="Pending"} == 1))[15m:1m]
+        ) > 50
       for: 10m
       labels:
         severity: warning
@@ -25,6 +29,7 @@ spec:
       expr: |
         count(kube_node_status_condition{job="kube-state-metrics",condition=~"MemoryPressure|DiskPressure|PIDPressure",status="true"} == 1) > 0
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: warning
       annotations:
