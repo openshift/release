@@ -26,7 +26,7 @@ set -euo pipefail
 
 cluster=$1
 bind_ip=$2
-client_cidr=$3
+client_cidr=${3-}
 state_dir=/etc/hypershift-nutanix-worker-dns
 config_file="$state_dir/$cluster.conf"
 marker_file="$state_dir/$cluster.state"
