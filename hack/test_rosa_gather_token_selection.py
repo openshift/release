@@ -59,7 +59,8 @@ def mock_command(command, arguments):
 
 
 class GatherTokenSelectionTests(unittest.TestCase):
-    def run_fixture(self, tracing, sourced=None, individual=None, expected="", fail=False):
+    def run_fixture(self, tracing, credentials=(None, None), expected="", fail=False):
+        sourced, individual = credentials
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             for name in ("credentials", "tmp", "bin", "home", "shared", "artifacts"):
@@ -144,12 +145,12 @@ class GatherTokenSelectionTests(unittest.TestCase):
         for tracing in (False, True):
             for name, sourced, individual, expected in cases:
                 with self.subTest(case=name, tracing=tracing):
-                    self.run_fixture(tracing, sourced, individual, expected)
+                    self.run_fixture(tracing, (sourced, individual), expected)
 
     def test_authentication_failure_is_best_effort(self):
         for tracing in (False, True):
             with self.subTest(tracing=tracing):
-                self.run_fixture(tracing, f'ORG_MEMBER_TOKEN={TOKENS[1]}\n',
+                self.run_fixture(tracing, (f'ORG_MEMBER_TOKEN={TOKENS[1]}\n', None),
                                  expected=TOKENS[1], fail=True)
 
 
