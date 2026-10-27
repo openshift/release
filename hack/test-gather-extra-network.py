@@ -81,7 +81,7 @@ class NetworkTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'pod-a\tnode-a\ttrue\tovnkube-controller,\npod-b\t<none>\tfalse\tovnkube-node,\n')
 
-    def run_gather(self, pods, scenario='', namespace='openshift-ovn-kubernetes', container='ovn', zone=None):
+    def run_gather(self, pods, scenario='', namespace='openshift-ovn-kubernetes', zone=None):
         directory = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, directory)
         artifacts = directory / 'network'
@@ -102,7 +102,8 @@ class NetworkTests(unittest.TestCase):
         all_calls = directory / 'all-calls'
         result = subprocess.run(['bash', '-e', '-c', RUNNER], check=False, capture_output=True, text=True, env=dict(
             os.environ, ARTIFACT_DIR=str(directory), fixture=str(fixture), calls=str(calls),
-            all_calls=str(all_calls), nodes=str(nodes), scenario=scenario, namespace=namespace, container=container,
+            all_calls=str(all_calls), nodes=str(nodes), scenario=scenario, namespace=namespace,
+            container='sdn' if namespace == 'openshift-sdn' else 'ovn',
         ))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn(' get node ', all_calls.read_text())
@@ -134,7 +135,7 @@ class NetworkTests(unittest.TestCase):
                 self.assertTrue((artifacts / 'iptables-save-pod-b').is_file())
 
     def test_sdn(self):
-        _, _, calls = self.run_gather([pod('sdn-pod', 'node-a', 'sdn')], namespace='openshift-sdn', container='sdn')
+        _, _, calls = self.run_gather([pod('sdn-pod', 'node-a', 'sdn')], namespace='openshift-sdn')
         self.assertEqual(len(calls), 2)
         self.assertTrue(all('-c sdn sdn-pod ' in call for call in calls))
 
