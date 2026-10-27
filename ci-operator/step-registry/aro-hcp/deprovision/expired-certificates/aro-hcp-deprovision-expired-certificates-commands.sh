@@ -20,7 +20,7 @@ fi
 /tmp/cleanup-sweeper --workflow=certificates \
   --policy="${CERTIFICATE_CLEANUP_POLICY}" \
   --dry-run="${dry_run}" \
-  --max-deletions="${CERTIFICATE_CLEANUP_MAX_DELETIONS}" \
-  --max-purges="${CERTIFICATE_CLEANUP_MAX_PURGES}" \
+  --options="certificates.max-deletions=${CERTIFICATE_CLEANUP_MAX_DELETIONS}" \
+  --options="certificates.max-purges=${CERTIFICATE_CLEANUP_MAX_PURGES}" \
   --parallelism="${CERTIFICATE_CLEANUP_PARALLELISM}" \
   --timeout="${CERTIFICATE_CLEANUP_TIMEOUT}"
