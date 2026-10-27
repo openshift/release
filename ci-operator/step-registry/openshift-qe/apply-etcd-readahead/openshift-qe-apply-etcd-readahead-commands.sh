@@ -74,7 +74,13 @@ echo "  cluster:    $(oc get clusterversion -o jsonpath='{.items[0].status.desir
 oc wait "mcp/${MCP}" --for=condition=Updated --timeout=900s \
   || fail "mcp/${MCP} not Updated before start (another update in flight?)"
 
-RENDERED_BEFORE=$(oc get "mcp/${MCP}" -o jsonpath='{.status.configuration.name}')
+# spec.configuration.name is the render controller's TARGET: it is set within
+# seconds of a new render, BEFORE any node starts rolling. Do not use
+# status.configuration.name to detect the start of an update — that field is
+# the CONVERGED config and only flips after every node has finished rolling
+# (30+ min for a serial master roll; observed 2026-10-27: still the old hash
+# with Updating=True and 0/3 nodes done).
+RENDERED_BEFORE=$(oc get "mcp/${MCP}" -o jsonpath='{.spec.configuration.name}')
 echo "  rendered:   ${RENDERED_BEFORE}"
 
 # ---------------------------------------------------------------- build MC
@@ -88,8 +94,10 @@ trap 'rm -f "${MC_FILE}"' EXIT
 #     not exist) — resolve to the whole disk via lsblk PKNAME (259:0).
 #   - dm/LVM stacks DO have their own bdi (used directly).
 #   - lsblk pads columns: trim whitespace from everything it prints.
-#   - knob name differs by kernel (RHEL: read_ahead_kb, mainline:
-#     readahead_kb) — detect by scanning the bdi directory, not [ -e ].
+#   - knob name differs by kernel — RHCOS el10: read_ahead_kb (ONE word,
+#     "read ahead", confirmed via od on 2026-10-27; NOT read_a_head_kb),
+#     mainline/newer: readahead_kb. Detect by globbing the directory, which
+#     is immune to all spellings.
 NODE_SCRIPT=$(cat <<'EOS'
 #!/bin/bash
 set -euo pipefail
@@ -117,14 +125,23 @@ else
 fi
 [ -n "${bdi}" ] || { log "FATAL: cannot resolve bdi for ${src} (${mm})"; exit 1; }
 
-knob=$(ls "/sys/class/bdi/${bdi}" 2>/dev/null | grep -xE 'read_ahead_kb|readahead_kb' | head -1)
+# glob the directory: matches read_ahead_kb / read_a_head_kb / readahead_kb
+knob=""
+for k in "/sys/class/bdi/${bdi}"/read*head*kb; do
+  [ -e "${k}" ] && knob="${k##*/}" && break
+done
 [ -n "${knob}" ] || { log "FATAL: no readahead knob under /sys/class/bdi/${bdi}"; exit 1; }
 
 cur=$(cat "/sys/class/bdi/${bdi}/${knob}")
-[ "${cur}" = "${TARGET}" ] || echo "${TARGET}" > "/sys/class/bdi/${bdi}/${knob}"
-now=$(cat "/sys/class/bdi/${bdi}/${knob}")
-log "${src} (${mm}) bdi=${bdi} ${knob}: ${cur} -> ${now} KiB"
-[ "${now}" = "${TARGET}" ] || { log "FATAL: value is ${now}, expected ${TARGET}"; exit 1; }
+if [ "${cur}" != "${TARGET}" ]; then
+  echo "${TARGET}" > "/sys/class/bdi/${bdi}/${knob}"
+  now=$(cat "/sys/class/bdi/${bdi}/${knob}")
+  log "${src} (${mm}) bdi=${bdi} ${knob}: ${cur} -> ${now} KiB"
+  [ "${now}" = "${TARGET}" ] || { log "FATAL: value is ${now}, expected ${TARGET}"; exit 1; }
+fi
+# silent (exit 0) when already at target: the unit also runs from a 1-minute
+# timer, and only actual changes are worth a journal line
+exit 0
 EOS
 )
 NODE_SCRIPT="${NODE_SCRIPT//__VALUE__/${READAHEAD_KB}}"
@@ -160,9 +177,23 @@ spec:
           [Service]
           Type=oneshot
           ExecStart=/usr/local/sbin/etcd-bdi-readahead
-          RemainAfterExit=yes
           [Install]
           WantedBy=multi-user.target
+      # tuned runs as an NTO DaemonSet POD: it schedules after node-Ready and
+      # re-applies readahead=4096 long after any boot-time oneshot. No systemd
+      # ordering can win against that — so re-assert every minute instead.
+      # The script is idempotent and silent when already at target.
+      - name: etcd-bdi-readahead.timer
+        enabled: true
+        contents: |
+          [Unit]
+          Description=Re-assert etcd readahead cap (tuned pod re-applies 4096 after boot)
+          [Timer]
+          OnBootSec=2min
+          OnUnitActiveSec=1min
+          AccuracySec=15s
+          [Install]
+          WantedBy=timers.target
 EOF
 
 # ---------------------------------------------------------------- apply/delete
@@ -176,33 +207,41 @@ else
 fi
 
 # ---------------------------------------------------------------- wait: start
-# The update "starts" when the MCO renders a new config for the pool. Watching
-# the rendered name also disambiguates a no-op rerun (identical MC content ->
-# no new render -> no roll), which must not hang the step.
-echo "[$(ts)] waiting for mcp/${MCP} to start updating (new rendered config)"
+# The update "starts" when the MCO render controller writes the new target:
+# spec.configuration.name flips within seconds of the render, before any node
+# rolls. The Updating condition (flips at roll start) is kept as a secondary
+# signal. Neither firing within the deadline means an identical-content rerun
+# (no new render -> no roll), which must not hang the step.
+echo "[$(ts)] waiting for mcp/${MCP} to start updating (spec.configuration.name change)"
 started=""
+rendered=""
+updating=""
 deadline=$(( $(date +%s) + 300 ))
 while [ "$(date +%s)" -lt "${deadline}" ]; do
-  rendered=$(oc get "mcp/${MCP}" -o jsonpath='{.status.configuration.name}')
-  if [ "${rendered}" != "${RENDERED_BEFORE}" ]; then started=1; break; fi
+  rendered=$(oc get "mcp/${MCP}" -o jsonpath='{.spec.configuration.name}')
+  updating=$(oc get "mcp/${MCP}" -o jsonpath='{.status.conditions[?(@.type=="Updating")].status}')
+  if [ "${rendered}" != "${RENDERED_BEFORE}" ] || [ "${updating}" = "True" ]; then started=1; break; fi
   sleep 5
 done
 if [ -z "${started}" ]; then
-  if oc get "mcp/${MCP}" -o jsonpath='{.status.configuration.source}' | tr ' ' '\n' | grep -q "${MC_NAME}"; then
+  if oc get "mcp/${MCP}" -o jsonpath='{.spec.configuration.source}' | tr ' ' '\n' | grep -q "${MC_NAME}"; then
     echo "[$(ts)] MC already rendered with identical content (rerun); no roll needed"
   else
     fail "mcp/${MCP} did not pick up a new rendered config within 300s"
   fi
 else
-  echo "[$(ts)] update started: ${RENDERED_BEFORE} -> ${rendered}"
-  # Updating should flip within seconds of the new render; the roll itself
-  # keeps it True for the duration (masters drain one at a time).
-  if ! oc wait "mcp/${MCP}" --for=condition=Updating --timeout=600s; then
-    updated=$(oc get "mcp/${MCP}" -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}')
-    if [ "${updated}" = "True" ]; then
-      echo "[$(ts)] WARNING: missed the Updating window; pool already Updated"
-    else
-      fail "mcp/${MCP} never entered Updating"
+  echo "[$(ts)] update started: spec target ${RENDERED_BEFORE} -> ${rendered} (Updating=${updating})"
+  if [ "${updating}" != "True" ]; then
+    # render landed but the roll hasn't begun yet: confirm Updating goes True
+    # before waiting on Updated, or a stale Updated=True would return
+    # immediately (the classic mislabeled-run race).
+    if ! oc wait "mcp/${MCP}" --for=condition=Updating --timeout=600s; then
+      updated=$(oc get "mcp/${MCP}" -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}')
+      if [ "${updated}" = "True" ]; then
+        echo "[$(ts)] WARNING: missed the Updating window; pool already Updated"
+      else
+        fail "mcp/${MCP} never entered Updating"
+      fi
     fi
   fi
 fi
@@ -211,38 +250,48 @@ fi
 echo "[$(ts)] waiting for mcp/${MCP} to finish updating (timeout ${TIMEOUT}s)"
 oc wait "mcp/${MCP}" --for=condition=Updated --timeout="${TIMEOUT}s" \
   || fail "mcp/${MCP} did not finish updating within ${TIMEOUT}s"
-echo "[$(ts)] mcp/${MCP} Updated: $(oc get "mcp/${MCP}" -o jsonpath='{.status.configuration.name}')"
+echo "[$(ts)] mcp/${MCP} Updated: converged on $(oc get "mcp/${MCP}" -o jsonpath='{.status.configuration.name}')"
 
 DEGRADED=$(oc get "mcp/${MCP}" -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')
 [ "${DEGRADED}" = "True" ] && fail "mcp/${MCP} is Degraded after the roll"
 [ "${MODE}" = "delete" ] && { echo "[$(ts)] done (MC removed)"; exit 0; }
 
 # ---------------------------------------------------------------- verify
-# The roll rebooted every master; the oneshot ran at boot. Prove the knob on
-# each node live (nsenter into the host mount namespace: /sys must be the
-# host's sysfs).
-echo "[$(ts)] verifying knob on every master"
+# The roll rebooted every master and the tuned pod has since re-applied its
+# 4096 default (tuned is an NTO DaemonSet pod — it schedules after
+# node-Ready, always after the boot oneshot). So this pass RE-APPLIES the
+# cap via oc debug — at this point tuned has already run, so the write
+# sticks — and only then verifies. The in-node timer (etcd-bdi-readahead.timer)
+# is the belt to this braces: it re-asserts every minute for the rest of the
+# node's life, covering any mid-run NTO profile push.
+echo "[$(ts)] re-applying + verifying knob on every master"
 RC=0
 for node in $(oc get nodes -l node-role.kubernetes.io/master= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
-  out=$(oc debug "node/${node}" -- nsenter -t 1 -m -- bash -c '
-    trim() { tr -d "[:space:]"; }
-    src=$(findmnt -no SOURCE -T /var/lib/etcd 2>/dev/null) || src=""
-    [ -n "${src}" ] || src=$(findmnt -no SOURCE -T /)
-    case "${src}" in /dev/*) ;; *) src="/dev/${src}" ;; esac
-    src="${src%%\[*}"
-    mm=$(lsblk -no MAJ:MIN "${src}" 2>/dev/null | head -1 | trim)
-    if [ -e "/sys/class/bdi/${mm}" ]; then bdi="${mm}"
+  out=$(oc debug "node/${node}" -- nsenter -t 1 -m -- bash -c "
+    trim() { tr -d '[:space:]'; }
+    src=\$(findmnt -no SOURCE -T /var/lib/etcd 2>/dev/null) || src=''
+    [ -n \"\${src}\" ] || src=\$(findmnt -no SOURCE -T /)
+    case \"\${src}\" in /dev/*) ;; *) src=\"/dev/\${src}\" ;; esac
+    src=\"\${src%%\[*}\"
+    mm=\$(lsblk -no MAJ:MIN \"\${src}\" 2>/dev/null | head -1 | trim)
+    if [ -e \"/sys/class/bdi/\${mm}\" ]; then bdi=\"\${mm}\"
     else
-      parent=$(lsblk -no PKNAME "${src}" 2>/dev/null | head -1 | trim)
-      [ -n "${parent}" ] && [ -e "/sys/block/${parent}" ] \
-        && bdi=$(cat "/sys/block/${parent}/dev" 2>/dev/null | trim) || bdi="${mm}"
+      parent=\$(lsblk -no PKNAME \"\${src}\" 2>/dev/null | head -1 | trim)
+      [ -n \"\${parent}\" ] && [ -e \"/sys/block/\${parent}\" ] \
+        && bdi=\$(cat \"/sys/block/\${parent}/dev\" 2>/dev/null | trim) || bdi=\"\${mm}\"
     fi
-    knob=$(ls "/sys/class/bdi/${bdi}" 2>/dev/null | grep -xE "read_ahead_kb|readahead_kb" | head -1)
-    unit=$(systemctl is-active etcd-bdi-readahead.service 2>/dev/null || echo unknown)
-    echo "${bdi} ${knob} $(cat "/sys/class/bdi/${bdi}/${knob}" 2>/dev/null || echo "?") unit=${unit}"
-  ' 2>/dev/null | grep -E '^[0-9]+:[0-9]+ (read_ahead_kb|readahead_kb) [0-9]+ unit=' | tail -1)
-  val=$(echo "${out}" | awk '{print $3}')
-  if [ "${val}" = "${READAHEAD_KB}" ]; then
+    knob=''
+    for k in \"/sys/class/bdi/\${bdi}\"/read*head*kb; do
+      [ -e \"\${k}\" ] && knob=\"\${k##*/}\" && break
+    done
+    before=\$(cat \"/sys/class/bdi/\${bdi}/\${knob}\" 2>/dev/null || echo '?')
+    [ \"\${before}\" = '${READAHEAD_KB}' ] || echo '${READAHEAD_KB}' > \"/sys/class/bdi/\${bdi}/\${knob}\"
+    after=\$(cat \"/sys/class/bdi/\${bdi}/\${knob}\" 2>/dev/null || echo '?')
+    timer=\$(systemctl is-active etcd-bdi-readahead.timer 2>/dev/null || echo unknown)
+    echo \"\${bdi} \${knob} \${before} -> \${after} timer=\${timer}\"
+  " 2>/dev/null | grep -E '^[0-9]+:[0-9]+ read.*head.*kb [0-9]+ -> [0-9]+ timer=' | tail -1)
+  after=$(echo "${out}" | awk '{print $5}')
+  if [ "${after}" = "${READAHEAD_KB}" ]; then
     echo "  ${node}: ${out}  OK"
   else
     echo "  ${node}: got '${out:-<no output>}', expected read_ahead_kb=${READAHEAD_KB}" >&2
