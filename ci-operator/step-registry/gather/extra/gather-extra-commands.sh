@@ -247,47 +247,75 @@ done
 echo "INFO: done attempting to fetch etcd debug info"
 
 
+function gather_network_snapshot() {
+  local target=$1
+  shift
+  local status=0
+  timeout --kill-after=5s 30s "${@}" > "${target}.tmp" 2> "${target}.error" || status=$?
+  if [[ "${status}" != 0 || ! -s "${target}.tmp" ]]; then
+    echo "ERROR: Network snapshot ${target} failed (exit ${status}, or empty output)" | tee -a "${target}.error" >&2
+    rm -f "${target}" "${target}.tmp"
+    return 0
+  fi
+  cat "${target}.tmp"
+  rm -f "${target}.tmp"
+  if [[ ! -s "${target}.error" ]]; then
+    rm -f "${target}.error"
+  fi
+}
+
 function gather_network() {
   local namespace=$1
   local selector=$2
   local container=$3
-  local netfilter=$4
 
   if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
     echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
     return
   fi
 
-  local podlist="/tmp/${namespace}-pods"
-
-  # Snapshot iptables/nftables rules on each node
-  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist} || true
-  while IFS= read -r i; do
-    queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
-    if [[ ${netfilter} == "nftables" ]]; then
-      queue ${ARTIFACT_DIR}/network/nft-list-ruleset-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i nft list ruleset
+  local podlist
+  if ! podlist=$(mktemp); then
+    echo "ERROR: Unable to create ${namespace} network pod list" >&2
+    return 0
+  fi
+  if ! oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{range .items}}{{.metadata.name}}{{"\t"}}{{if .spec.nodeName}}{{.spec.nodeName}}{{else}}<none>{{end}}{{"\t"}}{{.spec.hostNetwork}}{{"\t"}}{{range .spec.containers}}{{.name}},{{end}}{{"\n"}}{{end}}' > "${podlist}"; then
+    echo "ERROR: Unable to list ${namespace} network pods" >&2
+    rm -f "${podlist}"
+    return 0
+  fi
+  if [[ ! -s "${podlist}" ]]; then
+    echo "ERROR: No ${namespace} network pods found" >&2
+  fi
+  local pod node host_network containers selected_container netfilter
+  while IFS=$'\t' read -r pod node host_network containers; do
+    selected_container=${container}
+    netfilter=iptables
+    if [[ "${container}" == ovn ]]; then
+      if [[ ",${containers}," == *,ovnkube-controller,* ]]; then
+        selected_container=ovnkube-controller
+        netfilter=nftables
+      else
+        selected_container=ovnkube-node
+      fi
     fi
-  done < ${podlist}
-  # Snapshot all used ports on each node.
-  while IFS= read -r i; do
-    queue ${ARTIFACT_DIR}/network/ss-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i ss -apn
-  done < ${podlist}
+    if [[ -z "${node}" || "${node}" == "<none>" || "${host_network}" != true || ",${containers}," != *,"${selected_container}",* ]]; then
+      echo "ERROR: No supported host-network container for ${namespace}/${pod} on ${node}" | tee "${ARTIFACT_DIR}/network/target-${pod}.error" >&2
+      continue
+    fi
+    echo "INFO: Gathering network snapshots from ${namespace}/${pod} on ${node} using ${selected_container} (${netfilter})"
+    queue "${ARTIFACT_DIR}/network/iptables-save-${pod}" gather_network_snapshot "${ARTIFACT_DIR}/network/iptables-save-${pod}" oc --insecure-skip-tls-verify --request-timeout=20s rsh -n "${namespace}" -c "${selected_container}" "${pod}" iptables-save -c
+    if [[ "${netfilter}" == nftables ]]; then
+      queue "${ARTIFACT_DIR}/network/nft-list-ruleset-${pod}" gather_network_snapshot "${ARTIFACT_DIR}/network/nft-list-ruleset-${pod}" oc --insecure-skip-tls-verify --request-timeout=20s rsh -n "${namespace}" -c "${selected_container}" "${pod}" nft list ruleset
+    fi
+    queue "${ARTIFACT_DIR}/network/ss-${pod}" gather_network_snapshot "${ARTIFACT_DIR}/network/ss-${pod}" oc --insecure-skip-tls-verify --request-timeout=20s rsh -n "${namespace}" -c "${selected_container}" "${pod}" ss -apn
+  done < "${podlist}"
+  rm -f "${podlist}"
 }
 
 # Gather network details both from SDN and OVN. One of them should succeed.
-gather_network openshift-sdn app=sdn sdn iptables
-sample_node=$(retry 3 5 oc --request-timeout=10s get no -o jsonpath='{.items[0].metadata.name}') || true
-sample_node_zone=$(retry 3 5 oc --request-timeout=10s get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}') || true
-if [ "${sample_node}" = "${sample_node_zone}" ]; then
-  echo "INFO: INTERCONNECT MODE"
-  ovnkube_container=ovnkube-controller
-  ovnkube_netfilter=nftables
-else
-  echo "INFO: LEGACY MODE"
-  ovnkube_container=ovnkube-node
-  ovnkube_netfilter=iptables
-fi
-gather_network openshift-ovn-kubernetes app=ovnkube-node ${ovnkube_container} ${ovnkube_netfilter}
+gather_network openshift-sdn app=sdn sdn
+gather_network openshift-ovn-kubernetes app=ovnkube-node ovn
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
