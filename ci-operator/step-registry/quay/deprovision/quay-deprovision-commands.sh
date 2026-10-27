@@ -120,6 +120,9 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'ibmcloud' ]]; then
+    if [[ ! -s "${SHARED_DIR}/terraform.tgz" || ! -s "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET" || ! -s "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE" ]]; then
+        echo "No IBM Cloud COS deploy state found in SHARED_DIR; skipping cleanup." >&2
+    else
     # The IBM Cloud Terraform provider authenticates via the IBMCLOUD_API_KEY
     # environment variable. Restore it from the cluster profile (the same key
     # the deploy step used). This script does not enable command tracing.
@@ -159,6 +162,7 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'ibmcloud' ]]; then
     done
     if [[ "${cos_destroy_rc}" -ne 0 ]]; then
         echo "WARNING: IBM Cloud COS terraform destroy failed after 3 attempts (rc=${cos_destroy_rc}). Resources may be leaked." >&2
+    fi
     fi
 fi
 
