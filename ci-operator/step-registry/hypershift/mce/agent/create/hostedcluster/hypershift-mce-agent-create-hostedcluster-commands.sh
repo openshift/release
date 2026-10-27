@@ -167,10 +167,15 @@ if [[ "${HYPERSHIFT_USE_PROXY:-false}" == "true" ]]; then
   no_proxy=$(
     {
       printf '%s\n' localhost 127.0.0.1 ::1 .svc .cluster.local
-      oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
-        -o go-template='{{range .spec.networking.clusterNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
+      if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+        oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+          -o go-template='{{range .spec.networking.machineNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}'
+      else
+        oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+          -o go-template='{{range .spec.networking.clusterNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
 {{range .spec.networking.serviceNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
 {{range .spec.networking.machineNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}'
+      fi
     } | sed '/^$/d' | LC_ALL=C sort -u | paste -sd, -
   )
   cat > "${SHARED_DIR}/hostedcluster-proxy.yaml" <<EOF
