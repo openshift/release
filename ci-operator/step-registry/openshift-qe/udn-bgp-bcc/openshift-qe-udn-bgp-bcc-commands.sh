@@ -121,7 +121,7 @@ export ITERATIONS
 export AWS_REGION="${REGION}"
 export ROUTE_SERVER_ID
 export VPC_ID
-export EXTRA_FLAGS="--aws-region=${REGION} --route-server-id=${ROUTE_SERVER_ID} --vpc-id=${VPC_ID}"
+export EXTRA_FLAGS="--iterations=${ITERATIONS} --aws-region=${REGION} --route-server-id=${ROUTE_SERVER_ID} --vpc-id=${VPC_ID}"
 
 if [[ -n "${PIN_SERVER}" ]]; then
   export PIN_SERVER
