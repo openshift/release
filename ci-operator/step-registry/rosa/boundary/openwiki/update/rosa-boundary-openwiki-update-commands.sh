@@ -47,14 +47,18 @@ jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${S
 printf '%s\n' "$OPENWIKI_MODEL_ID" > "${SHARED_DIR}/openwiki-model-id"
 printf '%s\n' "$OPENWIKI_PROVIDER" > "${SHARED_DIR}/openwiki-provider"
 
-# Clone the prepared bundle so private source is available without passing
-# GitHub App credentials to the model container.
+# The public Boundary repository needs no source bundle or GitHub credentials
+# in the model container. Private targets still use the prepared bundle.
 base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
 if [[ "$base_branch" != "$base" && "$base_branch" != "$branch" ]]; then
   echo 'Unexpected OpenWiki base branch.' >&2
   exit 1
 fi
-git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+if [[ "$repo" == 'openshift-online/rosa-boundary' ]]; then
+  git clone --branch "$base" "https://github.com/${repo}.git" "$workdir/repo"
+else
+  git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+fi
 cd "$workdir/repo"
 git remote set-url origin "https://github.com/${repo}.git"
 git config user.name 'OpenShift CI Bot'

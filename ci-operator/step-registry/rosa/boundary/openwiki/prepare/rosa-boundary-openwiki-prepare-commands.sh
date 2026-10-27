@@ -34,21 +34,30 @@ GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
   "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
   | jq -er '.token')
 
-# Use the existing App token for private Git access. SHARED_DIR accepts flat
-# files, so pass repository history as a bundle rather than a checkout.
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
-git -c credential.helper='!gh auth git-credential' clone --bare --branch "$base" \
-  "https://github.com/${repo}.git" "$workdir/repo.git"
+# The public Boundary source can be cloned anonymously by the update step.
+# Only private targets need a bundle; the full Boundary bundle exceeds the
+# 1 MiB limit on the Secret backing SHARED_DIR.
+if [[ "$repo" != 'openshift-online/rosa-boundary' ]]; then
+  workdir=$(mktemp -d)
+  trap 'rm -rf "$workdir"' EXIT
+  git -c credential.helper='!gh auth git-credential' clone --bare --branch "$base" \
+    "https://github.com/${repo}.git" "$workdir/repo.git"
+fi
 
 existing_pr=$(gh pr list --repo "$repo" --base "$base" --head "$branch" \
   --state open --json number --jq '.[0].number // empty')
 if [[ -n "$existing_pr" ]]; then
-  git -C "$workdir/repo.git" show-ref --verify --quiet "refs/heads/${branch}"
+  if [[ "$repo" == 'openshift-online/rosa-boundary' ]]; then
+    git ls-remote --exit-code "https://github.com/${repo}.git" "refs/heads/${branch}" >/dev/null
+  else
+    git -C "$workdir/repo.git" show-ref --verify --quiet "refs/heads/${branch}"
+  fi
   printf '%s\n' "$branch" > "${SHARED_DIR}/openwiki-base-branch"
 else
   # A closed PR may leave the bot branch behind. Start a fresh update from the
   # target base instead; publish replaces the stale branch only on a real run.
   printf '%s\n' "$base" > "${SHARED_DIR}/openwiki-base-branch"
 fi
-git -C "$workdir/repo.git" bundle create "${SHARED_DIR}/openwiki-source.bundle" --all
+if [[ "$repo" != 'openshift-online/rosa-boundary' ]]; then
+  git -C "$workdir/repo.git" bundle create "${SHARED_DIR}/openwiki-source.bundle" --all
+fi

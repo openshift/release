@@ -68,7 +68,11 @@ fi
 # Do not reuse the worktree the model was allowed to modify. Only apply its
 # generated docs patch to a clean clone with no agent-controlled git hooks.
 if [[ "$dry_run" == true ]]; then
-  git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+  if [[ "$repo" == 'openshift-online/rosa-boundary' ]]; then
+    git clone --branch "$base" "https://github.com/${repo}.git" "$workdir/repo"
+  else
+    git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
+  fi
 else
   git clone "https://github.com/${repo}.git" "$workdir/repo"
 fi
