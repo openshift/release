@@ -17,6 +17,7 @@ echo "=== DPTP Review Responder ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/dptp-telemetry.sh"
+initialize_agent
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
@@ -52,9 +53,7 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
 
-    echo "Installing Claude Code..."
-    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-    export PATH="${HOME}/.local/bin:${PATH}"
+    setup_agent
 fi
 
 mkdir -p "${WORKDIR}/artifacts"
@@ -62,8 +61,8 @@ mkdir -p "${WORKDIR}/artifacts"
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
-        if [[ -d "${HOME}/.claude/projects" ]]; then
+        copy_agent_artifacts
+        if [[ "${AGENT_HARNESS}" == claude-code && -d "${HOME}/.claude/projects" ]]; then
             echo "Archiving Claude session logs..."
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
@@ -126,6 +125,9 @@ append_pipeline_constraints() {
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
 - Do not amend commits. Create new commits so the pipeline can fast-forward push.
 EOF
+    if [[ "${AGENT_HARNESS}" == codex ]]; then
+        echo '- Codex isolation overrides the commit instructions: edit and test files only. The pipeline commits and pushes after you finish. Git metadata is read-only.' >> "$1"
+    fi
 }
 
 append_security() {
@@ -245,7 +247,7 @@ if [[ ! -f "${GATE_SKILL}" ]]; then
     exit 1
 fi
 
-GATE_MODEL="${GATE_MODEL:-claude-haiku-4-5}"
+export CODEX_DENY_PUSH=true
 
 GATE_PROMPT="/tmp/agentic-review-gate-prompt-$(basename "${WORKDIR}").md"
 cat > "${GATE_PROMPT}" <<'GATE_HDR'
@@ -270,7 +272,7 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
 
 # --- Poll: small-model gate, then worker ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
-echo "Gate model: ${GATE_MODEL} | Worker model: ${CLAUDE_MODEL}"
+echo "Gate model: ${AGENT_GATE_MODEL} | Worker model: ${AGENT_MODEL}"
 
 extract_failing_checks() {
     python3 -c '
@@ -512,30 +514,21 @@ while true; do
         continue
     fi
 
-    echo "Running gate (${GATE_MODEL})..."
+    echo "Running gate (${AGENT_GATE_MODEL})..."
     GATE_LOG="${WORKDIR}/artifacts/gate-${iteration}.log"
-    # Direct claude, not agentic_ci: the gate needs --output-format text so we
-    # can grep COMMENT_WORK=/CI_WORK=/FAILING_CHECKS=. agentic-ci injects
-    # --include-partial-messages, which requires stream-json.
     set +e
-    timeout 120 claude \
-        --model "${GATE_MODEL}" \
-        --allowedTools "Bash" \
-        --disallowedTools "${DISALLOWED_TOOLS[@]}" \
-        --max-turns 20 \
-        --output-format text \
-        --append-system-prompt-file "${GATE_PROMPT}" \
-        -p "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Execute the Gate Process Implementation steps with Bash. Do not invoke Skill or slash commands. This is CI mode (--ci).
+    agent_gate "Decide if PR #${PR_NUM} in ${UPSTREAM_REPO} has review work. Execute the Gate Process Implementation steps with Bash. Do not invoke Skill or slash commands. This is CI mode (--ci).
 
 Our GitHub login is ${BOT_LOGIN}. Ignore comments from this login.
 Previous FAILING_CHECKS JSON array: ${PREV_FAILING}
 Previous HEAD_REF_OID: ${PREV_HEAD:-<none>}
-Current HEAD_REF_OID: ${current_head:-<none>}" \
-        --verbose 2>&1 | tee "${GATE_LOG}"
+Current HEAD_REF_OID: ${current_head:-<none>}" 2>&1 | tee "${GATE_LOG}"
     gate_rc=${PIPESTATUS[0]}
     set -e
     echo "Gate exit status: ${gate_rc}"
-    cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
+    if [[ "${AGENT_HARNESS}" == claude-code ]]; then
+        cat "${GATE_LOG}" >> "${WORKDIR}/artifacts/claude-output.log" 2>/dev/null || true
+    fi
 
     if [[ "${gate_rc}" -ne 0 ]]; then
         gate_failures=$(( gate_failures + 1 ))
@@ -620,6 +613,9 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 
         if [[ "${has_ci}" == "true" ]]; then
             CHECKS_FILE="${WORKDIR}/artifacts/failing-checks-${iteration}.json"
+            if [[ "${AGENT_HARNESS}" == codex ]]; then
+                CHECKS_FILE="${CODEX_HOME}/inputs/failing-checks-${iteration}.json"
+            fi
             printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
             if agentic_ci --timeout 1800 \
@@ -639,6 +635,11 @@ Your GitHub login is ${BOT_LOGIN}." \
             fi
         fi
 
+        if [[ "${workers_succeeded}" == true ]] && ! commit_codex_changes; then
+            workers_succeeded=false
+            REVIEW_EXIT=1
+            echo 'ERROR: Pipeline could not commit worker changes.'
+        fi
         if [[ "${workers_succeeded}" != "true" ]]; then
             echo "WARNING: at least one worker failed; leaving the branch unpushed."
         elif push_current_branch; then
@@ -675,6 +676,8 @@ REVIEW_RESULT="success"
 
 jq -n \
     --arg agent "dptp-review-responder" \
+    --arg harness "${AGENT_HARNESS}" \
+    --arg model "${AGENT_MODEL}" \
     --arg phase "review" \
     --arg issue_key "${JIRA_ISSUE_KEY}" \
     --arg result "${REVIEW_RESULT}" \
@@ -686,6 +689,8 @@ jq -n \
     --argjson phase_durations "$(jq -n --argjson review "${PHASE_REVIEW_DURATION}" '{review: $review}')" \
     '{
       agent: $agent,
+      harness: $harness,
+      model: $model,
       phase: $phase,
       issue_key: $issue_key,
       result: $result,
