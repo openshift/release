@@ -1,14 +1,16 @@
 chain:
   as: rosa-e2e-ocm-fvt-validate-customer-idp
   env:
-  - name: FVT_GINKGO_FOCUS
-    default: "IDP|Identity Provider|identity provider"
+  - name: FVT_CASE_LABEL_FILTER
+    default: "config-idp"
     documentation: |-
-      Ginkgo focus selecting the FVT IDP variant cases (the specs from
-      cluster_idp_test.go and hcp_identity_providers_test.go in
-      rosa-backend-tests cases/cms/). DRAFT: the exact spec-description
-      spelling must be confirmed with CS/OCM QE; override at the workflow or
-      job level to correct the selection without touching this chain.
+      Ginkgo label filter selecting the FVT IDP variant cases: both
+      cases/cms/cluster_idp_test.go (classic) and
+      cases/cms/hcp_identity_providers_test.go (HCP) in rosa-backend-tests
+      carry the config-idp label (pkg/label/config_labels.go), so this
+      selects exactly those specs. Composed with the profile's own label
+      filters via && by ocmtest (cmd/ocmtest/test/exec.go). Override at the
+      workflow or job level to widen or narrow the selection.
   steps:
   - ref: rosa-e2e-ocm-fvt-validate-customer
   documentation: |-
@@ -20,15 +22,16 @@ chain:
     Pure composition over rosa-e2e-ocm-fvt-validate-customer (ROSAENG-67586):
     the same SHARED_DIR contract (cluster-id + customer-plane kubeconfig), the
     same ocmtest test-phase-only invocation with deferred clean, and the same
-    cs-qe-credentials handling. This chain only pins the Ginkgo focus to the
-    IDP specs; everything else is inherited from the wrapped ref. The FVT
-    suite and its harness stay owned by CS/OCM QE.
+    cs-qe-credentials handling. This chain only pins the case-selection label
+    filter to config-idp; everything else is inherited from the wrapped ref.
+    The FVT suite and its harness stay owned by CS/OCM QE.
 
     The consuming workflow or job must still provide OCM_FVT_JOB_NAME
     selecting an FVT profile whose case set includes the IDP variants
-    (DRAFT: profile name to be confirmed with CS/OCM QE). Whether the IDP
-    cases self-configure their identity providers against the composed
-    cluster or expect them pre-configured — and which credentials beyond the
-    existing cs-qe-credentials collection the LDAP/GitHub/Google/OIDC variants
-    need — is part of the same harness contract; the focus default above may
-    need an accompanying GINKGO_SKIP for variants that cannot run in CI yet.
+    (DRAFT: profile name to be confirmed with CS/OCM QE). The IDP cases
+    self-configure their identity providers against the composed cluster via
+    the OCM API (CreateClusterIDP et al. in cluster_idp_test.go /
+    hcp_identity_providers_test.go), so no pre-configuration steps are
+    needed; the remaining open question for CS/OCM QE is whether any variant
+    (e.g. the Google/GitHub action cases) needs credentials beyond the
+    existing cs-qe-credentials collection or a GINKGO_SKIP for now.
