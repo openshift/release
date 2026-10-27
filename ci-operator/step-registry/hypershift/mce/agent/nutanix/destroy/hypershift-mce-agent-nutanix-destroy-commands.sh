@@ -152,6 +152,10 @@ if [[ -s "$SHARED_DIR/vm_uuids.txt" || -s "$SHARED_DIR/image_uuid.txt" ]]; then
     echo "Cannot delete recorded Nutanix UUIDs without the agent-qe-infra extra ref."
     exit 1
   fi
+  cleanup_vars=$(jq -Rs --arg image_uuid "$(cat "$SHARED_DIR/image_uuid.txt")" \
+    '{vm_uuids: split("\n") | map(select(length > 0)), image_uuid: $image_uuid}' "$SHARED_DIR/vm_uuids.txt")
+  WORK_DIR=/tmp/hcp-agent-nutanix
+  mkdir -p "$WORK_DIR"
   cleanup_playbook=/tmp/hcp-agent-nutanix-cleanup.yml
   cat > "$cleanup_playbook" <<EOF
 - name: Delete only run-recorded Nutanix resources
@@ -183,7 +187,10 @@ if [[ -s "$SHARED_DIR/vm_uuids.txt" || -s "$SHARED_DIR/image_uuid.txt" ]]; then
       register: image_deletion
       ignore_errors: true
 EOF
-  ANSIBLE_ROLES_PATH="$ANSIBLE_FILES_DIR/roles" ansible-playbook -i localhost, "$cleanup_playbook"
+  ANSIBLE_COLLECTIONS_PATH="/output/.ansible/collections:/usr/share/ansible/collections${ANSIBLE_COLLECTIONS_PATH:+:$ANSIBLE_COLLECTIONS_PATH}" \
+    HOME="$WORK_DIR" ANSIBLE_LOCAL_TEMP=/tmp ANSIBLE_REMOTE_TEMP=/tmp \
+    ANSIBLE_ROLES_PATH="$ANSIBLE_FILES_DIR/roles" \
+    ansible-playbook -i localhost, --extra-vars "$cleanup_vars" "$cleanup_playbook"
 fi
 
 function wait_for_uuid_absent() {
