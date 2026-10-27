@@ -195,12 +195,8 @@ chain:
         # Get KMS credentials secret name
         if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
           KMS_SECRET_INFO_FILE="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
-          while IFS= read -r line; do
-            if [[ $line == *"aks-kms-credentials-secret"* ]]; then
-              KMS_CREDENTIALS_SECRET_NAME=$(echo "$line" | awk -F'"' '{print $4}')
-              break
-            fi
-          done < "$AKS_KMS_INFO_LOCATION"
+          # Using awk instead of jq (jq not available in hypershift-operator image)
+          KMS_CREDENTIALS_SECRET_NAME=$(awk -F'"' '/aks-kms-credentials-secret/ {print $4; exit}' "$KMS_SECRET_INFO_FILE")
         else
           KMS_CREDENTIALS_SECRET_NAME="$(cat "/etc/hypershift-aro-azurecreds/kms-credentials-secret-name")"
         fi
