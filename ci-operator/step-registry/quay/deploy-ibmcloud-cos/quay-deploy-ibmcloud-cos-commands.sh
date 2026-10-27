@@ -61,9 +61,22 @@ function write_quay_install_junit() {
   mv "${tmp}" "${ARTIFACT_DIR}/junit_quay_install.xml"
 }
 
+function save_cos_terraform_state() {
+  [[ -d /tmp/QUAY_IBMCLOUD_COS ]] || return 0
+  (
+    cd /tmp/QUAY_IBMCLOUD_COS || exit 0
+    [[ -n "${QUAY_COS_BUCKET:-}" ]] && printf '%s' "${QUAY_COS_BUCKET}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET"
+    [[ -n "${COS_INSTANCE_NAME:-}" ]] && printf '%s' "${COS_INSTANCE_NAME}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE"
+    [[ -n "${COS_REGION:-}" ]] && printf '%s' "${COS_REGION}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION"
+    tar -czf terraform.tgz --exclude=".terraform" --exclude="terraform.tgz" -- * &&
+      cp terraform.tgz "${SHARED_DIR}/terraform.tgz"
+  ) || true
+}
+
 # shellcheck disable=SC2329
 function on_exit() {
   local ec=$?
+  save_cos_terraform_state
   if [ "${MAP_TESTS}" = "true" ]; then
     LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-ibmcloud-cos__quay-tests-deploy-quay-ibmcloud-cos.xml || true
@@ -254,11 +267,7 @@ for _ in 1 2 3 4 5; do
   terraform destroy -auto-approve || true
 done
 
-printf '%s' "${QUAY_COS_BUCKET}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET"
-printf '%s' "${COS_INSTANCE_NAME}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE"
-printf '%s' "${COS_REGION}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION"
-tar -czf terraform.tgz --exclude=".terraform" *
-cp terraform.tgz "${SHARED_DIR}/terraform.tgz"
+save_cos_terraform_state
 
 if [[ "${tf_apply_rc}" -ne 0 ]]; then
   echo "terraform apply failed with exit code ${tf_apply_rc}" >&2
@@ -563,7 +572,6 @@ for i in $(seq 1 90); do
   status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
   if [[ "$status" == "True" ]]; then
     echo "Quay is ready (after $((i * 10))s)" >&2
-    QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
@@ -594,6 +602,7 @@ for i in $(seq 1 90); do
       echo "Failed to initialize the Quay user or obtain an access token" >&2
       exit 1
     fi
+    QL_INSTALL_STATUS="passed"
     chmod 600 "${SHARED_DIR}/quay_oauth2_token"
     rm -f "${initialize_payload}" "${quay_ca_bundle}"
     archive_pod_info
