@@ -1,0 +1,37 @@
+# promtool unit tests for ProbeFailing.
+# Verifies the keep_firing_for resolve-side hysteresis: a brief probe recovery
+# must NOT resolve the alert (it should hold firing), instead of flapping.
+rule_files:
+  - .rendered-rules.yaml
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="blackbox", instance="https://svc"}'
+        values: "1 1 1 1 1 1 1 1 1 1 1 1"
+      - series: 'probe_success{job="blackbox", instance="https://svc"}'
+        values: "1 1 0 0 0 0 1 1 1 1 1 1"
+    alert_rule_test:
+      # probe_success==0 from t=2m; for:1m -> fires at t=3m
+      - eval_time: 3m
+        alertname: ProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox
+              instance: "https://svc"
+            exp_annotations:
+              message: 'Blackbox probe is failing for service https://svc for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.'
+      # probe recovers at t=6m, but keep_firing_for:3m holds it firing through t=8m
+      - eval_time: 8m
+        alertname: ProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox
+              instance: "https://svc"
+            exp_annotations:
+              message: 'Blackbox probe is failing for service https://svc for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.'
+      # keep_firing_for window ends at t=9m (recovered 6m + 3m) -> resolved by t=11m
+      - eval_time: 11m
+        alertname: ProbeFailing
+        exp_alerts: []

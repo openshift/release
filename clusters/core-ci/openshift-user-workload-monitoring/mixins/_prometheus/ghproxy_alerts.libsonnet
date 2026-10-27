@@ -75,7 +75,7 @@
             },
           },
           {
-            alert: 'ghproxy-running-out-github-tokens-in-a-hour',
+            alert: 'ghproxy-running-out-github-tokens-in-a-hour-by-token-hash',
             expr: |||
               min_over_time(
                 (github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9)[5m:1m]
