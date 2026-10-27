@@ -33,8 +33,9 @@ ref:
     default: /var/run/rosa-boundary-vertex/gcp-vertex-sa-key
     documentation: Existing rosa-boundary/ci/gcp-vertex-sa-key JSON key for the rosa-boundary service account in rosa-general.
   credentials:
-  # No GitHub App credentials in the agent container. Only the Vertex key is
-  # mounted for generating documentation; publishing happens in another step.
+  # No GitHub App private key in the agent container. The short-lived scoped
+  # read token arrives via SHARED_DIR, is revoked before OpenWiki runs, and
+  # publishing uses a separate token in another step.
   - collection: rosa-boundary
     group: ci
     field: gcp-vertex-sa-key
@@ -44,7 +45,7 @@ ref:
       cpu: 500m
       memory: 4Gi
   documentation: |-
-    Install pinned Node/OpenWiki into a temporary directory and run OpenWiki
-    on a full-history clone of the prepared Git bundle. Mounts only the Vertex
-    key from rosa-boundary/ci. Passes only openwiki/ changes and the update
-    exit code to the publish step, even if OpenWiki only completes some pages.
+    Clone the private repository with a temporary askpass helper, revoke the
+    read token and remove its SHARED_DIR file, then install pinned Node/OpenWiki
+    and run the model. Pass only openwiki/ changes and the update exit code to
+    publish, including partial updates. Mounts only the Vertex key directly.
