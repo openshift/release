@@ -271,20 +271,20 @@ def get_oc_prepare_container(context):
             git config --global user.email test@test.com
             oc registry login --to ${{XDG_RUNTIME_DIR}}/containers/auth.json
 
-            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{{http_code}}' {streams_url})
+            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I --connect-timeout 10 --max-time 60 -w '%{{http_code}}' {streams_url} || true)
             if [[ "$RC_SERVICE_AVAILABLE" -ne 200 ]]
             then
                 FROM=""
                 TO=""
             else
-                FROM=$(curl -s {streams_url} | jq -r '.["{stable_stream}"][0] // empty')
-                TO=$(curl -s {streams_url} | jq -r '.["{preview_stream}"][0] // empty')
+                FROM=$(curl -s --connect-timeout 10 --max-time 60 {streams_url} | jq -r '.["{stable_stream}"][0] // empty' || true)
+                TO=$(curl -s --connect-timeout 10 --max-time 60 {streams_url} | jq -r '.["{preview_stream}"][0] // empty' || true)
             fi
 
             if [[ -n "$FROM" && -n "$TO" ]]
             then
                 echo "Pre-populating the git cache..."
-                oc adm release info --changelog=/tmp/git {release_image}:$FROM{tag_suffix} {release_image}:$TO{tag_suffix}
+                oc adm release info --changelog=/tmp/git {release_image}:$FROM{tag_suffix} {release_image}:$TO{tag_suffix} || echo "Unable to Pre-populate the git cache!"
             else
                 echo "Unable to Pre-populate the git cache!"
             fi
