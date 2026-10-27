@@ -148,7 +148,18 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'ibmcloud' ]]; then
         export TF_VAR_cos_region
     fi
     terraform init
-    terraform destroy -auto-approve || true
+    cos_destroy_rc=1
+    for attempt in 1 2 3; do
+        echo "terraform destroy attempt ${attempt}/3 ..." >&2
+        cos_destroy_rc=0
+        terraform destroy -auto-approve || cos_destroy_rc=$?
+        [[ "${cos_destroy_rc}" -eq 0 ]] && break
+        echo "terraform destroy attempt ${attempt} failed (rc=${cos_destroy_rc})" >&2
+        sleep 10
+    done
+    if [[ "${cos_destroy_rc}" -ne 0 ]]; then
+        echo "WARNING: IBM Cloud COS terraform destroy failed after 3 attempts (rc=${cos_destroy_rc}). Resources may be leaked." >&2
+    fi
 fi
 
 if [[ "$QUAY_STORAGE_PROVIDER" == 'S3CloudFront' ]]; then
