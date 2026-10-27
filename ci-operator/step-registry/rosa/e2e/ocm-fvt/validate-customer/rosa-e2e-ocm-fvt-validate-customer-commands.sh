@@ -77,10 +77,13 @@ if [[ -n "${OCM_FVT_OCM_ENV:-}" ]]; then
   echo "OCM_ENV=${OCM_FVT_OCM_ENV}" >> "${podman_env_file}"
 fi
 
-# Customer-facing case selection: Ginkgo filters the harness already honours
-# (see the GINKGO_SKIP handling in rosa-e2e-ocm-fvt).
-if [[ -n "${FVT_GINKGO_FOCUS:-}" ]]; then
-  echo "GINKGO_FOCUS=${FVT_GINKGO_FOCUS}" >> "${podman_env_file}"
+# Customer-facing case selection: filters the ocmtest harness honours
+# (cmd/ocmtest/test/exec.go in rosa-backend-tests). CASE_LABEL_FILTER narrows
+# the profile's case set via --ginkgo.label-filter (e.g. config-idp for the
+# FVT IDP variants; composed with the profile's own filters via &&). ocmtest
+# does not read GINKGO_FOCUS.
+if [[ -n "${FVT_CASE_LABEL_FILTER:-}" ]]; then
+  echo "CASE_LABEL_FILTER=${FVT_CASE_LABEL_FILTER}" >> "${podman_env_file}"
 fi
 if [[ -n "${FVT_GINKGO_SKIP:-}" ]]; then
   echo "GINKGO_SKIP=${FVT_GINKGO_SKIP}" >> "${podman_env_file}"
