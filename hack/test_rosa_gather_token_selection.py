@@ -26,6 +26,7 @@ TOKENS = ("FAKE_OCM_TOKEN_NOT_REAL", "FAKE_MEMBER_TOKEN_NOT_REAL", "FAKE_FILE_TO
 
 
 def mock_command(command, arguments):
+    """Emulate downloads and CLI calls locally without recording token values."""
     base = Path(os.environ["FIXTURE_DIR"])
     with (base / "calls").open("a", encoding="utf-8") as calls:
         calls.write(command + "\n")
@@ -59,7 +60,10 @@ def mock_command(command, arguments):
 
 
 class GatherTokenSelectionTests(unittest.TestCase):
+    """Verify credential selection and secret-safe behavior with offline fixtures."""
+
     def run_fixture(self, tracing, credentials=(None, None), expected="", fail=False):
+        """Run the full step with fake inputs and assert selection, tracing and redaction."""
         sourced, individual = credentials
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -123,6 +127,7 @@ class GatherTokenSelectionTests(unittest.TestCase):
                 self.assertNotIn("oc", calls)
 
     def test_selection_and_secret_safe_tracing(self):
+        """Cover token precedence and graceful skips with tracing enabled and disabled."""
         cases = (
             ("ocm", f'export OCM_TOKEN={TOKENS[0]}\n', None, TOKENS[0]),
             ("member", f'export ORG_MEMBER_TOKEN={TOKENS[1]}\n', None, TOKENS[1]),
@@ -148,6 +153,7 @@ class GatherTokenSelectionTests(unittest.TestCase):
                     self.run_fixture(tracing, (sourced, individual), expected)
 
     def test_authentication_failure_is_best_effort(self):
+        """Ensure failed login exits successfully without leaking tokens or accessing a cluster."""
         for tracing in (False, True):
             with self.subTest(tracing=tracing):
                 self.run_fixture(tracing, (f'ORG_MEMBER_TOKEN={TOKENS[1]}\n', None),
