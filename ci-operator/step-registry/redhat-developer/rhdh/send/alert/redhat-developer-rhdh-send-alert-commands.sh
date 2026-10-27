@@ -38,36 +38,42 @@ get_artifacts_url() {
   fi
 
   local artifacts_base_url="https://gcs.ci.openshift.org/gcs/test-platform-results-public"
-  local artifacts_complete_url
+  local job_prefix
+  local artifacts_path
   if [ -n "${PULL_NUMBER:-}" ]; then
-    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"
-    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-e2e-}" # e.g. "ocp-operator-nightly"
-    local part_2="redhat-developer-rhdh-${suite_name}"                      # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
-    # Override part_2 based for specific cases that do not follow the standard naming convention.
-    case "$JOB_NAME" in
-      *osd-gcp*)
-        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
-        ;;
-      *ocp-v*helm*-nightly*)
-        part_2="redhat-developer-rhdh-ocp-helm-nightly"
-        ;;
-    esac
-    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+    job_prefix="pull-ci-redhat-developer-rhdh-${RELEASE_BRANCH_NAME}"
+    artifacts_path="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
   else
-    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"         # e.g. "e2e-aks-helm-nightly"
-    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-}" # e.g. "aks-helm-nightly"
-    local part_2="redhat-developer-rhdh-${suite_name}"                                              # e.g. "redhat-developer-rhdh-aks-helm-nightly"
-    # Override part_2 based for specific cases that do not follow the standard naming convention.
-    case "$JOB_NAME" in
-      *osd-gcp*)
-        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
-        ;;
-      *ocp-v*helm*-nightly*)
-        part_2="redhat-developer-rhdh-ocp-helm-nightly"
-        ;;
-    esac
-    artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+    job_prefix="periodic-ci-redhat-developer-rhdh-${RELEASE_BRANCH_NAME}"
+    artifacts_path="logs/${JOB_NAME}/${BUILD_ID}"
   fi
+
+  local part_1="${JOB_NAME#"${job_prefix}"-}"        # e.g. "e2e-ocp-operator-nightly"
+  local suite_name="${part_1#e2e-}"                  # e.g. "ocp-operator-nightly"
+  local part_2="redhat-developer-rhdh-${suite_name}" # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
+  # Match the test step ref when its name differs from the job's suite name.
+  case "$JOB_NAME" in
+    *osd-gcp*)
+      part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+      ;;
+    *ocp*disconnected*helm*nightly*)
+      part_2="redhat-developer-rhdh-ocp-helm-disconnected-nightly"
+      ;;
+    *ocp*disconnected*operator*nightly*)
+      part_2="redhat-developer-rhdh-ocp-operator-disconnected-nightly"
+      ;;
+    *ocp*helm*upgrade*nightly*)
+      part_2="redhat-developer-rhdh-ocp-helm-upgrade-nightly"
+      ;;
+    *ocp*helm*nightly*)
+      part_2="redhat-developer-rhdh-ocp-helm-nightly"
+      ;;
+    *ocp*operator*nightly*)
+      part_2="redhat-developer-rhdh-ocp-operator-nightly"
+      ;;
+  esac
+
+  local artifacts_complete_url="${artifacts_base_url}/${artifacts_path}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
   echo "${artifacts_complete_url}"
 }
 
