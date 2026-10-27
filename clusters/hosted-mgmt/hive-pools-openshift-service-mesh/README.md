@@ -1,20 +1,18 @@
-# OpenShift Observability Cluster Pool
+# OpenShift Service Mesh Cluster Pool
 
-This folder contains the manifests for OpenShift Observability cluster pools created by Hive. [Hive](https://github.com/openshift/hive) is used as ClusterPool API to manage clusters for CI tests.
+This folder contains the manifests for OpenShift Service Mesh cluster pools created by Hive. [Hive](https://github.com/openshift/hive) is used as ClusterPool API to manage clusters for CI tests.
 
-## How to create a new Cluster Pool for your observability team?
+## How to create a new Cluster Pool for your service mesh team?
 Docs: https://docs.ci.openshift.org/docs/how-tos/cluster-claim/#create-a-manifest-for-your-cluster-pool
 
-> Note:  The logging team has already implemented their pools and added installer credentials, meaning new teams can skip the steps: `Prepare Your Cloud Platform Credentials` and `Create a Directory...`
-
 The cluster pools all live under the openshift-observability directory in hive config:  
-https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive/pools/openshift-observability
+https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive-pools-openshift-service-mesh
 
 **1. Add a new ClusterPool manifest to the directory:** 
 
 > Note:  
 `spec.imageSetRef`: A reference to an existing ClusterImageSet in the cluster that determines the exact version of clusters created in the pool.
-'ClusterImageSets' are cluster-scoped resources and their manifests are present in [clusters/hosted-mgmt/hive/pools](https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive/pools) directory and are regularly bumped to most recent released OCP versions.
+'ClusterImageSets' are cluster-scoped resources and their manifests are present in [clusters/hosted-mgmt/hive-pools-clusterimagesets](https://github.com/openshift/release/tree/master/clusters/hosted-mgmt/hive-pools-clusterimagesets) directory and are regularly bumped to most recent released OCP versions.
 The value will be updated automatically if `version_*` labels are set.
 
 Example ClusterPool manifest:
@@ -27,7 +25,6 @@ metadata:
     cloud: aws    # set according to the imageRef used
     owner: obs-myteamname  # create your team name and add it here, ex: obs-logging
     product: ocp    # set according to the imageRef used
-    variant: fips   # optinal setting: set according to a specific requirement (ex. fips, gpu, etc)
     region: us-east-1   # match install-config file
     version: "4.15"   # set according to the imageRef used
     version_lower: "4.15.0-0" # lower bound for automatically updated imageset
@@ -44,11 +41,11 @@ spec:
   installConfigSecretTemplateRef:
     name: install-config-aws-us-east-1  # ref install-config file located in this directory
   labels:
-    tp.openshift.io/owner: obs-teamname  # match team name above?
+    tp.openshift.io/owner: ossm-team 
   platform:
     aws:
       credentialsSecretRef:
-        name: aws-installer-credentials  # already configured in this namespace, use `aws-installer-credentials`
+        name: aws-installer-credentials  # should match the secret in the Vault for the given namespace
       region: us-east-1   # should match your label from above and match the region from the install config
   pullSecretRef:
     name: pull-secret   # set to `pull-secret`
@@ -57,7 +54,7 @@ spec:
   maxSize: 10     # the maximum number of clusters that can exist at the same time.
 ```
 
-**2. Create any necessary install-config file** or use an existing
+**2. Create any necessary install-config file or use an existing**
 https://docs.ci.openshift.org/docs/how-tos/cluster-claim/#create-a-manifest-for-your-install-config-template-secret
 
 **3. Submit a PR to openshift/release**
