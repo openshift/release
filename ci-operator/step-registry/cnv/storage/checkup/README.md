@@ -92,6 +92,14 @@ versions, result ConfigMap, validation details, JUnit, workload state, checkup
 logs, and events. The gather step runs before platform teardown, including on
 failure.
 
+Storage diagnostics also include PVs, PVCs, DataVolumes, CDI clone/import sources,
+CSI snapshots and snapshot contents, and VM snapshot contents. The golden-image
+namespace is collected as well as the checkup namespace because cross-namespace
+clones create their source snapshots there. These storage objects are written as
+JSON with managed fields and credential-related annotations removed before they
+reach the artifact directory. In particular, CDI clone tokens must be removed so
+Prow does not discard the whole PVC or DataVolume artifact.
+
 `junit_storage_checkup.xml` reports execution, result validity, each core
 operation, and each configured expectation separately. A reported migration
 outcome without migration completion is shown as skipped with the original
