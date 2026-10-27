@@ -1,0 +1,39 @@
+ref:
+  as: hypershift-wait-for-nodes
+  from: cli
+  commands: hypershift-wait-for-nodes-commands.sh
+  timeout: 45m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: HYPERSHIFT_NAMESPACE
+    default: "clusters"
+    documentation: The namespace holding the HostedCluster and its NodePools.
+  - name: NODEPOOL_READY_TIMEOUT
+    default: "30m"
+    documentation: How long to wait for every NodePool to report condition Ready=True.
+  - name: NODE_JOIN_TIMEOUT
+    default: "600"
+    documentation: |-
+      How long, in seconds, to wait for the expected guest cluster nodes to join
+      and become Ready once the NodePools are Ready.
+  documentation: |-
+    Waits for every NodePool of a HostedCluster to report Ready, then waits until
+    the matching number of guest cluster nodes have joined and are Ready.
+
+    Steps that inspect the guest cluster per node typically enumerate nodes with
+    "oc get nodes" and loop over the result. If no nodes have joined yet, that
+    loop body never runs and the step passes without having checked anything.
+    Running this step first turns that silent pass into an explicit failure, and
+    guarantees the per-node steps see the full set of nodes rather than whichever
+    subset happened to have joined.
+
+    Assumptions:
+    1. $KUBECONFIG points to the management cluster.
+    2. ${SHARED_DIR}/nested_kubeconfig contains the kubeconfig of the hosted cluster.
+
+    The expected node count is taken from the NodePools' status.replicas, so this
+    step is not suitable for NodePools that are scaled to zero.
