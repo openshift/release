@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1beta1
 kind: ArgoCD
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: openshift-gitops
   namespace: openshift-gitops
 spec:
@@ -44,6 +46,11 @@ spec:
   extraConfig:
     accounts.cluster-manifest-verifier: apiKey
     resource.sensitive.mask.annotations: openshift.io/token-secret.value, api-key, token
+    # Global cache filter (#27995 / #29423): only watch labeled GitOps objects.
+    resource.selectors: |
+      - clusters:
+        - '*'
+        selector: ci.openshift.io/gitops-managed=true
   grafana:
     enabled: false
     ingress:
