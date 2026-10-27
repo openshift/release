@@ -1,0 +1,34 @@
+ref:
+  as: kubernetes-nmstate-e2e-handler-cloud
+  from: src-with-oc-and-kubectl
+  commands: kubernetes-nmstate-e2e-handler-cloud-commands.sh
+  dependencies:
+  - env: OPERATOR_IMAGE
+    name: pipeline:kubernetes-nmstate-operator
+  - env: HANDLER_IMAGE
+    name: pipeline:kubernetes-nmstate-handler
+  env:
+  - name: SKIP_IMAGE_BUILD
+  - name: IMAGE_BUILDER
+  - name: HANDLER_NAMESPACE
+    default: "openshift-nmstate"
+  - name: OPERATOR_NAMESPACE
+    default: "openshift-nmstate"
+  - name: MONITORING_NAMESPACE
+    default: "openshift-monitoring"
+  - name: PRIMARY_NIC
+    default: ""
+    documentation: |-
+      Override the primary uplink NIC used by the handler e2e. When empty, the runner
+      auto-detects it (Azure eth0, AWS ens5, GCP ens4).
+  timeout: 3h0m0s
+  resources:
+    requests:
+      cpu: "2"
+      memory: 1Gi
+  documentation: |-
+    Run the kubernetes-nmstate handler e2e tests on a cloud (AWS/Azure/GCP) cluster,
+    connected or disconnected, via `make test-e2e-handler-cloud-ocp`. Unlike the
+    bare-metal handler ref, this uses `oc debug node` for node access (no bastion),
+    runs in single-NIC mode, and executes the single-NIC/OVN-safe subset. It sources
+    ${SHARED_DIR}/proxy-conf.sh when present so it can reach an Internal/disconnected API.
