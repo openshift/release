@@ -30,7 +30,7 @@ get_idms_manifest() {
   # Disable xtrace: curl requests use QUAY_ACCESS_TOKEN in Authorization header
   set +x
   DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
-  OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag and (.name | test("[0-9]{8}T[0-9]{6}"))) | .name' | sort -u)
   set -x
   if [[ -z "${OPERATOR_PREGA_VERSION}" ]]; then
     echo "OPERATOR_PREGA_VERSION could not be resolved from Quay; falling back to OCP_VERSION: ${OCP_VERSION}"

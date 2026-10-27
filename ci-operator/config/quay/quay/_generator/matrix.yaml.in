@@ -13,6 +13,7 @@ managed_files:
     - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
     - quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml
+    - quay-quay-redhat-3.18__baremetal-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-arm64-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__libvirt-s390x-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml
@@ -28,6 +29,14 @@ managed_files:
     - quay-quay-operator-redhat-5.0__aws-ocp50-e2e-chainsaw.yaml
     - quay-quay-redhat-3.16__aws-ocp421-e2e-install.yaml
   retired: []
+  # Hand-written configs in this directory, with the `as` of each test they
+  # hold. --check fails on any other config here, or on a test added to these.
+  hand_maintained:
+    quay-quay-master__claim.yaml: [claim-cluster]
+    quay-quay-master__deploy-tools.yaml: []
+    quay-quay-master__omr-v2-upgrade-v3.yaml: [disconnected-install]
+    quay-quay-master__omr-v3.yaml: [disconnected-install]
+    quay-quay-mirror-registry-3.0__omr-v3.yaml: [disconnected-install]
 
 quay:
   - branch: redhat-3.18
@@ -35,6 +44,16 @@ quay:
       - cron: daily
         source: nightly
         clouds: [aws,gcp,azure]
+        ocp: ["4.22"]
+        test: e2e-install
+      # Bare metal runs the full dev-scripts + LVMS + Quay stack on a single
+      # shared Equinix host (~2h end to end) and holds an ofcir lease for the
+      # whole time; weekly keeps the pool pressure and host churn reasonable.
+      # The -nightly job suffix refers to the payload source, not the cadence
+      # (same convention as the weekly libvirt s390x lane).
+      - cron: weekly
+        source: nightly
+        clouds: [baremetal]
         ocp: ["4.22"]
         test: e2e-install
       # Sibling of the daily row: same files, distinct as (e.g. aws-s3-rds-nightly).

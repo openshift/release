@@ -18,14 +18,15 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
 fi
 
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+IFS=. read -r CLUSTER_VERSION_MAJOR CLUSTER_VERSION_MINOR <<< "${CLUSTER_VERSION}"
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
-# LVMS product images (operator, must-gather, topolvm) carry a RHEL suffix that
-# tracks the cluster's RHCOS base: rhel8 through 4.13, rhel9 from 4.14 on.
+# LVMS product images (operator, must-gather, topolvm) carry a RHEL suffix:
+# rhel8 through OpenShift 4.13, rhel9 from 4.14 on.
 # The operator bundle image is unsuffixed.
 LVMS_RHEL_SUFFIX="rhel9"
-if [[ "$(echo "${CLUSTER_VERSION}" | cut -d. -f2)" -le 13 ]]; then
+if [[ "${CLUSTER_VERSION_MAJOR}" -eq 4 && "${CLUSTER_VERSION_MINOR}" -le 13 ]]; then
 	LVMS_RHEL_SUFFIX="rhel8"
 fi
 echo "Using LVMS product image RHEL suffix: ${LVMS_RHEL_SUFFIX}"
@@ -35,7 +36,7 @@ echo "Using LVMS product image RHEL suffix: ${LVMS_RHEL_SUFFIX}"
 MIRROR_API_VERSION="config.openshift.io/v1"
 MIRROR_KIND="ImageDigestMirrorSet"
 MIRROR_SPEC_FIELD="imageDigestMirrors"
-if [[ "$(echo "${CLUSTER_VERSION}" | cut -d. -f2)" -le 12 ]]; then
+if [[ "${CLUSTER_VERSION_MAJOR}" -eq 4 && "${CLUSTER_VERSION_MINOR}" -le 12 ]]; then
 	MIRROR_API_VERSION="operator.openshift.io/v1alpha1"
 	MIRROR_KIND="ImageContentSourcePolicy"
 	MIRROR_SPEC_FIELD="repositoryDigestMirrors"

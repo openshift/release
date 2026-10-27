@@ -32,8 +32,13 @@ case "${ADDITIONAL_WORKER_ARCHITECTURE:-}" in
     EXPECTED_NODE_ARCH="amd64"
     TEMPLATE_ARCH="amd64"
     ;;
+  arm64|aarch64)
+    STREAM_ARCH="aarch64"
+    EXPECTED_NODE_ARCH="arm64"
+    TEMPLATE_ARCH="arm64"
+    ;;
   *)
-    echo "ERROR: upi-install-libvirt-heterogeneous currently supports amd64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
+    echo "ERROR: upi-install-libvirt-heterogeneous currently supports amd64 or arm64 as additional worker architecture; found '${ADDITIONAL_WORKER_ARCHITECTURE:-}'"
     exit 1
     ;;
 esac
@@ -157,7 +162,7 @@ HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
 # Additional-host libvirt network — attach to the infra VXLAN bridge rather
 # than pointing guests at the primary NAT network (which only exists on Z).
 # Bridge name is published by the network step (SHARED_DIR/additional-bridge-name).
-# AMD leases use ocp1-amd / ocp3-amd.
+# AMD leases use ocp1-amd / ocp3-amd; ARM leases use ocp2-arm.
 # ---------------------------------------------------------------------------
 ADDITIONAL_BRIDGE_FILE="${SHARED_DIR}/additional-bridge-name"
 if [[ ! -f "${ADDITIONAL_BRIDGE_FILE}" ]]; then
@@ -254,8 +259,7 @@ trap cleanup_heterogeneous_step EXIT TERM INT
 
 function wait_for_domain_deletion() {
   local domain="$1"
-  # From PR 87254 successful rehearsals, install-domain wait averaged ~6.3m
-  # (upper bound wait→node created: 4.9–7.5m). Allow avg + 5m ≈ 12m.
+  # RHCOS live install over VXLAN typically finishes in ~5–7.5m; allow 12m (avg + buffer).
   local wait_until=$(($(date +%s) + 720))
 
   echo "[$(date -Is)] waiting for install domain ${domain} to complete and power off..."
@@ -569,7 +573,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   export DISK_SOURCE_PATH="${domain_qcow2_image_host_path}"
   export MAC_ADDRESS="${node_mac}"
   export NETWORK_NAME="${ADDITIONAL_NETWORK_NAME}"
-  # amd64 VPN domain templates use ${ADDITIONAL_NETWORK_NAME}.
+  # VPN domain templates use ${ADDITIONAL_NETWORK_NAME} / ${NETWORK_NAME}.
   export ADDITIONAL_NETWORK_NAME
   export DOMAIN_MAC="${node_mac}"
   export LEASED_RESOURCE

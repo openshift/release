@@ -251,15 +251,18 @@ spec:
 YAML
 set -x
 
-# --- LoadBalancer workload the verify step curls
-oc create deployment lb-echo -n default --image=registry.k8s.io/e2e-test-images/agnhost:2.53 \
+# --- LoadBalancer workload the verify step curls. Its own namespace rather
+# than default/: origin's "[sig-arch] Managed cluster should set requests but
+# not limits" audits default/ as a platform namespace and would flag the pod.
+oc create namespace bgp-vip-e2e --dry-run=client -o yaml | oc apply -f -
+oc create deployment lb-echo -n bgp-vip-e2e --image=registry.k8s.io/e2e-test-images/agnhost:2.53 \
   --replicas=2 --dry-run=client -o yaml -- /agnhost netexec --http-port=8080 | oc apply -f -
 oc apply -f - <<'YAML'
 apiVersion: v1
 kind: Service
 metadata:
   name: lb-echo
-  namespace: default
+  namespace: bgp-vip-e2e
 spec:
   type: LoadBalancer
   # dual-stack when the cluster supports it, single-stack otherwise
@@ -271,5 +274,5 @@ spec:
     targetPort: 8080
 YAML
 # the verify step curls the service; do not hand it an LB with no Ready backend
-oc rollout status -n default deploy/lb-echo --timeout=5m
+oc rollout status -n bgp-vip-e2e deploy/lb-echo --timeout=5m
 EOF
