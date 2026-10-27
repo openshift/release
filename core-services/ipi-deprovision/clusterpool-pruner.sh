@@ -25,7 +25,7 @@ if [[ -z "$CLUSTERS_PATH" ]]; then
 fi
 
 echo "Discovering configured ClusterPools..."
-find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' | xargs grep 'kind: ClusterPool' | awk -F: '{print $1}' | xargs /tmp/yq e '[.metadata.namespace, .metadata.name] | join(" ")' | sort > /tmp/clusterpools.configured
+find $CLUSTERS_PATH/hosted-mgmt -type f -name '*.yaml' | xargs grep 'kind: ClusterPool' | awk -F: '{print $1}' | xargs /tmp/yq e '[.metadata.namespace, .metadata.name] | join(" ")' | sort > /tmp/clusterpools.configured
 
 if ! [[ -s /tmp/clusterpools.configured ]]; then
   echo "ERROR: Discovered no configured ClusterPools. This probably means something is wrong. Aborting."
@@ -33,14 +33,14 @@ if ! [[ -s /tmp/clusterpools.configured ]]; then
 fi
 
 echo "Discovering configured ClusterImageSet names (ClusterImageSet manifests + ClusterPool imageSetRef in git)..."
-find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' | xargs grep 'kind: ClusterImageSet' | awk -F: '{print $1}' | xargs /tmp/yq -N e '.metadata.name' > /tmp/imgsets.from_manifests
+find $CLUSTERS_PATH/hosted-mgmt -type f -name '*.yaml' | xargs grep 'kind: ClusterImageSet' | awk -F: '{print $1}' | xargs /tmp/yq -N e '.metadata.name' > /tmp/imgsets.from_manifests
 
 : > /tmp/imgsets.from_pools
 while IFS= read -r -d '' f; do
   if grep -q 'kind: ClusterPool' "$f"; then
     /tmp/yq -N e '.spec.imageSetRef.name | select(. != null)' "$f" >> /tmp/imgsets.from_pools
   fi
-done < <(find $CLUSTERS_PATH/hosted-mgmt/hive/pools -type f -name '*.yaml' -print0)
+done < <(find $CLUSTERS_PATH/hosted-mgmt -type f -name '*.yaml' -print0)
 
 cat /tmp/imgsets.from_manifests /tmp/imgsets.from_pools | grep -v '^$' | sort -u > /tmp/imgsets.configured
 
