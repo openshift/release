@@ -76,7 +76,8 @@ if [ ! -z "$RHCS_VERSION" ]; then
     export RHCS_VERSION=$RHCS_VERSION
 fi
 
-make tools
+go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
+export PATH="${GOBIN:-$(go env GOPATH)/bin}:${PATH}"
 make install
 
 # Below step will skip gcc checking
