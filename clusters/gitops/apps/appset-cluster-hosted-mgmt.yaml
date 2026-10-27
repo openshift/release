@@ -10,6 +10,7 @@ spec:
   - git:
       directories:
       - path: clusters/hosted-mgmt/*
+      - path: clusters/hosted-mgmt/hive/pools/*
       - path: clusters/build-clusters/build-shared/managed
       - path: clusters/build-clusters/build-shared/ocp
       repoURL: https://github.com/openshift/release.git
@@ -58,6 +59,22 @@ spec:
           - ServerSideApply=true
   templatePatch: |
     {{- if eq .path.basename "hive" }}
+    metadata:
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=false
+    spec:
+      source:
+        directory:
+          exclude: '{OWNERS,*.md,pools/*/**}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+      syncPolicy:
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+    {{- else if hasPrefix .path.path "clusters/hosted-mgmt/hive/pools/" }}
     metadata:
       annotations:
         argocd.argoproj.io/compare-options: ServerSideDiff=false
