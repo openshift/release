@@ -413,7 +413,7 @@ extract_container_logs || true
 
 # Required: check plugin results gate.
 # Capture the return value directly to preserve the 0/1/2 contract.
-if [[ -f "${ARTIFACT_DIR}/opct-report/opct-report.json" ]]; then
+if [[ -n "${RESULT_FILE:-}" ]]; then
   local_gate_rc=0
   check_plugin_gate || local_gate_rc=$?
   plugin_gate_rc=${local_gate_rc}
@@ -424,11 +424,6 @@ if [[ -f "${ARTIFACT_DIR}/opct-report/opct-report.json" ]]; then
     *) exit_class=$((exit_class | 2))  # processing/parse error
        show_msg "ERROR: Plugin gate encountered a processing error." ;;
   esac
-elif [[ -n "${RESULT_FILE:-}" ]]; then
-  show_msg "ERROR: opct-report.json missing after results generation."
-  plugin_gate_rc=2
-  plugin_gate_reason="opct-report.json not generated"
-  exit_class=$((exit_class | 2))
 else
   plugin_gate_rc="NOT_RUN"
   plugin_gate_reason="no archive available"
@@ -497,7 +492,8 @@ if [[ ${local_publish_rc} -ne 0 ]]; then
   # a rejected baseline is OPCT correctly declining a bad conformance
   # result, not a CI/processing failure, and must not fail the job;
   # a processing error must.
-  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null &&
+     ! grep -qE 'error (processing results|populating report|saving consolidated summary results|saving report results):' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
     publish_reason="rejected"
     show_msg "WARNING: '${OPCT_CLI} adm baseline publish' rejected the baseline (not an infra/processing failure, not failing the job): see log-publish.txt"
   else
