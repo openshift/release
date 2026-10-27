@@ -51,7 +51,12 @@ fi
 old_umask=$(umask)
 umask 077
 podman_env_file="$(mktemp /tmp/podman.env.XXXXXX)"
-cleanup() { rm -f "${podman_env_file}"; }
+cleanup() {
+  rm -f "${podman_env_file}"
+  if [[ -n "${ocm_fvt_output:-}" ]]; then
+    rm -rf -- "${ocm_fvt_output}"
+  fi
+}
 trap cleanup EXIT
 umask "${old_umask}"
 
@@ -117,11 +122,11 @@ echo "=========================="
 # .datainfo/kube-configs/<cluster-id>.kubeconfig; rosa-e2e-ocm-fvt-clean already
 # consumes exactly this layout via --justClean. Seed the same shape so the test
 # phase targets the composed cluster instead of provisioning its own. The state
-# dir lives under ARTIFACT_DIR (uploaded for post-mortem) but the seeded
-# kubeconfig is world-unreadable outside the container mount.
-ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-validate-results"
-mkdir -p "${ocm_fvt_output}"
-chmod 1777 "${ocm_fvt_output}"
+# dir stays outside ARTIFACT_DIR (which bypasses sidecar censoring and would
+# upload the seeded customer-plane kubeconfig); only the reports are copied
+# into ARTIFACT_DIR at the end. Removed on exit by the cleanup trap.
+ocm_fvt_output="$(mktemp -d /tmp/ocm-fvt-validate-results.XXXXXX)"
+chmod 0777 "${ocm_fvt_output}"
 state_dir="${ocm_fvt_output}/${OCM_FVT_JOB_NAME}"
 mkdir -p "${state_dir}/.datainfo/kube-configs"
 {
