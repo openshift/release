@@ -7,6 +7,8 @@ images:
     to: zoa-lambda
   - dockerfile_path: Containerfile.runner
     to: zoa-runner
+  - dockerfile_path: Containerfile.boundary
+    to: zoa-boundary
 resources:
   '*':
     limits:
@@ -33,6 +35,7 @@ tests:
     dependencies:
       CI_IMAGE_1: zoa-lambda
       CI_IMAGE_2: zoa-runner
+      CI_IMAGE_3: zoa-boundary
     env:
       ROSA_REGIONAL_COMPONENTS: |
         - image: CI_IMAGE_1
@@ -49,6 +52,13 @@ tests:
             regional_cluster:
               zoa_runner_image_tag: IMAGE_TAG
               zoa_runner_source_image: IMAGE_REPO
+        - image: CI_IMAGE_3
+          repo: quay.io/rrp-dev-ci/zoa-boundary
+          target: config/defaults.yaml
+          override:
+            regional_cluster:
+              zoa_boundary_image_tag: IMAGE_TAG
+              zoa_boundary_source_image: IMAGE_REPO
     workflow: rosa-seaplane-ephemeral-e2e
 zz_generated_metadata:
   branch: main
