@@ -224,6 +224,10 @@ def get_oc_env_vars():
     ]
 
 
+# Upper bound for the best-effort changelog cache pre-population, so a stalled registry or git
+# clone cannot keep the release-controller from starting.
+PREPOPULATE_TIMEOUT_SECONDS = 900
+
 # Release source used to pre-populate the changelog git cache, selected by the product the
 # release-controller belongs to.
 RELEASE_SOURCES = {
@@ -284,7 +288,7 @@ def get_oc_prepare_container(context):
             if [[ -n "$FROM" && -n "$TO" ]]
             then
                 echo "Pre-populating the git cache..."
-                oc adm release info --changelog=/tmp/git {release_image}:$FROM{tag_suffix} {release_image}:$TO{tag_suffix} || echo "Unable to Pre-populate the git cache!"
+                timeout {PREPOPULATE_TIMEOUT_SECONDS} oc adm release info --changelog=/tmp/git {release_image}:$FROM{tag_suffix} {release_image}:$TO{tag_suffix} || echo "Unable to Pre-populate the git cache!"
             else
                 echo "Unable to Pre-populate the git cache!"
             fi
