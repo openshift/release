@@ -17,10 +17,10 @@ if [[ "${JOB_TYPE:-}" != periodic ]]; then
   dry_run=true
 fi
 
-/tmp/cleanup-sweeper ci-certificates \
+/tmp/cleanup-sweeper --workflow=certificates \
+  --policy="${CERTIFICATE_CLEANUP_POLICY}" \
   --dry-run="${dry_run}" \
-  --min-age="${CERTIFICATE_CLEANUP_MIN_AGE}" \
   --max-deletions="${CERTIFICATE_CLEANUP_MAX_DELETIONS}" \
   --max-purges="${CERTIFICATE_CLEANUP_MAX_PURGES}" \
-  --workers="${CERTIFICATE_CLEANUP_WORKERS}" \
+  --parallelism="${CERTIFICATE_CLEANUP_PARALLELISM}" \
   --timeout="${CERTIFICATE_CLEANUP_TIMEOUT}"
