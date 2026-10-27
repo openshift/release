@@ -10,6 +10,7 @@
               absent(up{job="%s"} == 1)
             ||| % name,
             'for': '5m',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
             },
@@ -25,6 +26,7 @@
               absent(up{job="%s"} == 1)
             ||| % name,
             'for': '10m',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
             },

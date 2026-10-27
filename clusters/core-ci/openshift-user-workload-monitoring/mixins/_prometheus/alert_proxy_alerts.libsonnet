@@ -36,6 +36,8 @@
               and on()
               (max_over_time(alert_proxy_end_to_end_deliveries_total[7d]) > 0)
             |||,
+            'for': '2m',
+            'keep_firing_for': '3m',
             labels: {
               severity: 'critical',
             },
@@ -48,6 +50,7 @@
             expr: |||
               sum(increase(alert_proxy_webhook_requests_total{status="4xx"}[5m])) > 0
             |||,
+            'keep_firing_for': '1h',
             labels: {
               severity: 'critical',
             },
@@ -60,6 +63,7 @@
             expr: |||
               sum(alert_proxy_slack_outbox_depth{phase="failed"}) > 0
             |||,
+            'keep_firing_for': '2m',
             labels: {
               severity: 'critical',
             },

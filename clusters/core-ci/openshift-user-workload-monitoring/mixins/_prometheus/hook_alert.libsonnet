@@ -12,6 +12,7 @@
               and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
             |||,
             'for': '5m',
+            'keep_firing_for': '15m',
             labels: {
               severity: 'critical',
             },
