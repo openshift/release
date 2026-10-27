@@ -1,0 +1,36 @@
+# promtool unit tests for "Controller backlog is not being drained".
+# Verifies the two-threshold hysteresis: fire when depth > HIGH (100), stay
+# firing while depth sits in the 80..100 dead-band after a recent >100 peak,
+# and resolve promptly once depth drops below LOW (80).
+rule_files:
+  - .rendered-rules.yaml
+tests:
+  - interval: 1m
+    input_series:
+      # >100 through t=25m, then dead-band (90) t=26..35m, then <80 (50) t=36..45m
+      - series: 'workqueue_depth{name="plank"}'
+        values: "120x25 90x9 50x9"
+    alert_rule_test:
+      # depth 120 (>100) sustained; for:20m -> fires at t=20m
+      - eval_time: 20m
+        alertname: Controller backlog is not being drained
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              name: plank
+            exp_annotations:
+              message: 'The backlog for plank is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>'
+      # depth now 90 (in the 80..100 dead-band) but a >100 peak is still within the
+      # 20m window -> hysteresis holds it FIRING (the key behavior)
+      - eval_time: 30m
+        alertname: Controller backlog is not being drained
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              name: plank
+            exp_annotations:
+              message: 'The backlog for plank is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>'
+      # depth 50 (< LOW 80) -> resolves promptly, no fixed hold
+      - eval_time: 40m
+        alertname: Controller backlog is not being drained
+        exp_alerts: []

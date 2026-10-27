@@ -339,6 +339,11 @@ mixins:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_dashboards-validation_latest make -C /release/clusters/core-ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 
+validate-prometheus-rules:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/prometheus/prometheus:v2.53.5
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" --entrypoint=/bin/sh quay.io/prometheus/prometheus:v2.53.5 /release/hack/validate-prometheus-rules.sh /release
+.PHONY: validate-prometheus-rules
+
 # Runs e2e secrets generation and sync to clusters.
 #
 # Example:
