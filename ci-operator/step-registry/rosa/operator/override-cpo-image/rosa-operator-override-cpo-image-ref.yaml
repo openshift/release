@@ -1,0 +1,34 @@
+ref:
+  as: rosa-operator-override-cpo-image
+  from: rosa-aws-cli
+  commands: rosa-operator-override-cpo-image-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - collection: rosa-e2e
+    group: quay-io-rosa-ci
+    mount_path: /var/run/quay-credentials
+  env:
+  - name: OCM_LOGIN_ENV
+    default: staging
+    documentation: The OCM environment to log into. Supported values are production, staging, and integration.
+  - name: HC_APPEAR_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the HostedCluster CR after the cluster-create step.
+  - name: CPO_ROLLOUT_TIMEOUT
+    default: "900"
+    documentation: Seconds to wait for the control-plane-operator to switch to the PR image and roll out.
+  documentation: |-
+    Applies the PR-built control-plane-operator image to the HostedCluster under test through the
+    hypershift.openshift.io/control-plane-operator-image annotation. The annotation takes precedence
+    over the CPO in the OCP release payload, unlike the HyperShift operator's fallback
+    --control-plane-operator-image argument.
+
+    The step must run immediately after rosa-cluster-provision and before the cluster readiness
+    checks. It consumes the private digest pullspec written to ${SHARED_DIR}/cpo-image by
+    rosa-operator-push-cpo-image, adds the repository-scoped Quay credential to the HostedCluster
+    pull secret, annotates the HostedCluster, and verifies that the control-plane-operator
+    Deployment uses that exact image and rolls out successfully.
