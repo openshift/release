@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Exercise the shared network collector with synthetic pods and isolated commands."""
+
 import json
 import os
 from pathlib import Path
@@ -57,6 +59,7 @@ wait
 
 
 def pod(name, node, container='ovnkube-controller', host_network=True):
+    """Build a minimal pod specification for container and host-network selection."""
     return {'metadata': {'name': name}, 'spec': {
         'nodeName': node, 'hostNetwork': host_network,
         'containers': [{'name': container}],
@@ -64,7 +67,10 @@ def pod(name, node, container='ovnkube-controller', host_network=True):
 
 
 class NetworkTests(unittest.TestCase):
+    """Verify production selection, dispatch and best-effort snapshot handling."""
+
     def test_production_template_locally(self):
+        """Render the production Go template locally, including an unscheduled pod."""
         if not shutil.which('oc'):
             self.skipTest('oc is required to check its local template formatter')
         command = shlex.split(next(line for line in NETWORK.splitlines() if ' pods --template ' in line))
@@ -82,6 +88,7 @@ class NetworkTests(unittest.TestCase):
         self.assertEqual(result.stdout, 'pod-a\tnode-a\ttrue\tovnkube-controller,\npod-b\t<none>\tfalse\tovnkube-node,\n')
 
     def run_gather(self, pods, scenario='', namespace='openshift-ovn-kubernetes', zone=None):
+        """Run extracted production functions with isolated fixtures and capture artifacts."""
         directory = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, directory)
         artifacts = directory / 'network'
@@ -111,17 +118,19 @@ class NetworkTests(unittest.TestCase):
         return result, artifacts, calls.read_text().splitlines() if calls.exists() else []
 
     def test_modern_annotations_do_not_select_container(self):
+        """Select the modern container from its pod regardless of zone annotations."""
         for zone in (None, 'node-a', 'different-zone'):
             with self.subTest(zone=zone):
                 result, artifacts, calls = self.run_gather([pod('pod-a', 'node-a')], zone=zone)
                 self.assertEqual(len(calls), 3)
                 self.assertTrue(all('-c ovnkube-controller pod-a ' in call for call in calls))
                 self.assertTrue(any('nft list ruleset' in call for call in calls))
-                self.assertIn('on node-a using ovnkube-controller', result.stdout)
+                self.assertIn('openshift-ovn-kubernetes/pod-a using ovnkube-controller', result.stdout)
                 self.assertEqual(len(list(artifacts.iterdir())), 3)
                 self.assertTrue(all(path.stat().st_size for path in artifacts.iterdir()))
 
     def test_mixed_nodes_and_layouts(self):
+        """Keep each pod's container and firewall backend associated with that pod."""
         for zone in (None, 'node-b'):
             with self.subTest(zone=zone):
                 result, artifacts, calls = self.run_gather([
@@ -131,15 +140,17 @@ class NetworkTests(unittest.TestCase):
                 self.assertTrue(all('-c ovnkube-controller pod-a ' in call for call in calls if 'pod-a ' in call))
                 self.assertTrue(all('-c ovnkube-node pod-b ' in call for call in calls if 'pod-b ' in call))
                 self.assertFalse(any('pod-b nft' in call for call in calls))
-                self.assertIn('on node-b using ovnkube-node (iptables)', result.stdout)
+                self.assertIn('openshift-ovn-kubernetes/pod-b using ovnkube-node (iptables)', result.stdout)
                 self.assertTrue((artifacts / 'iptables-save-pod-b').is_file())
 
     def test_sdn(self):
+        """Collect iptables and socket snapshots from the supported SDN container."""
         _, _, calls = self.run_gather([pod('sdn-pod', 'node-a', 'sdn')], namespace='openshift-sdn')
         self.assertEqual(len(calls), 2)
         self.assertTrue(all('-c sdn sdn-pod ' in call for call in calls))
 
     def test_unsupported_targets_do_not_prevent_valid_pod_collection(self):
+        """Reject unsafe targets without preventing snapshots from a valid sibling."""
         result, artifacts, calls = self.run_gather([
             pod('unknown', 'node-a', 'other'), pod('not-host', 'node-b', host_network=False),
             pod('unscheduled', None), pod('valid', 'node-c'),
@@ -150,6 +161,7 @@ class NetworkTests(unittest.TestCase):
         self.assertIn('No supported host-network container', result.stderr)
 
     def test_no_pods_and_api_errors(self):
+        """Keep empty lists and namespace or pod-list API failures best-effort."""
         for scenario in ('', 'namespace-error', 'list-error'):
             with self.subTest(scenario=scenario):
                 result, _, calls = self.run_gather([], scenario)
@@ -157,6 +169,7 @@ class NetworkTests(unittest.TestCase):
                 self.assertTrue(result.stdout or result.stderr)
 
     def test_command_errors_and_empty_output(self):
+        """Retain actionable errors instead of empty snapshots on failure or timeout."""
         for scenario in ('command-error', 'empty-output', 'hanging'):
             with self.subTest(scenario=scenario):
                 result, artifacts, calls = self.run_gather([pod('pod-a', 'node-a')], scenario)
@@ -170,24 +183,46 @@ class NetworkTests(unittest.TestCase):
                     self.assertTrue(all('exit 124' in path.read_text() for path in artifacts.iterdir()))
 
     def test_missing_nft_does_not_discard_other_snapshots(self):
+        """Report missing nft while retaining successful iptables and socket snapshots."""
         _, artifacts, _ = self.run_gather([pod('pod-a', 'node-a')], 'missing-nft')
         self.assertIn('exit 127', (artifacts / 'nft-list-ruleset-pod-a.error').read_text())
         self.assertTrue((artifacts / 'iptables-save-pod-a').is_file())
         self.assertTrue((artifacts / 'ss-pod-a').is_file())
 
     def test_no_valid_target(self):
+        """Write a correlated target error without executing an unsupported container."""
         result, artifacts, calls = self.run_gather([pod('unknown', 'node-a', 'other')])
         self.assertEqual(calls, [])
         self.assertTrue((artifacts / 'target-unknown.error').is_file())
         self.assertIn('No supported host-network container', result.stderr)
 
     def test_production_dispatch(self):
+        """Exercise the actual SDN and OVN calls and their namespace-specific targets."""
         _, artifacts, calls = self.run_gather([pod('pod-a', 'node-a')], namespace='dispatch')
         all_calls = (artifacts.parent / 'all-calls').read_text()
         self.assertIn('get -n openshift-sdn -l app=sdn pods --template', all_calls)
         self.assertIn('get -n openshift-ovn-kubernetes -l app=ovnkube-node pods --template', all_calls)
         self.assertTrue(all('-n openshift-ovn-kubernetes -c ovnkube-controller pod-a ' in call for call in calls))
         self.assertTrue((artifacts / 'target-pod-a.error').is_file())
+
+    def test_status_and_target_errors_do_not_expose_node_names(self):
+        """Correlate status and target errors by pod without logging raw node names."""
+        result, artifacts, calls = self.run_gather([
+            pod('valid', 'synthetic-private-node-valid'),
+            pod('unsupported', 'synthetic-private-node-unsupported', 'other'),
+            pod('not-host', 'synthetic-private-node-not-host', host_network=False),
+            pod('unscheduled', None),
+        ])
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all('-c ovnkube-controller valid ' in call for call in calls))
+        self.assertIn('openshift-ovn-kubernetes/valid using ovnkube-controller (nftables)', result.stdout)
+        self.assertNotIn('synthetic-private-node-', result.stdout + result.stderr)
+        self.assertEqual(len(list(artifacts.glob('target-*.error'))), 3)
+        for target in ('unsupported', 'not-host', 'unscheduled'):
+            with self.subTest(target=target):
+                error = (artifacts / f'target-{target}.error').read_text()
+                self.assertIn(f'No supported host-network container for openshift-ovn-kubernetes/{target}', error)
+                self.assertNotIn('synthetic-private-node-', error)
 
 
 if __name__ == '__main__':

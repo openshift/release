@@ -300,10 +300,10 @@ function gather_network() {
       fi
     fi
     if [[ -z "${node}" || "${node}" == "<none>" || "${host_network}" != true || ",${containers}," != *,"${selected_container}",* ]]; then
-      echo "ERROR: No supported host-network container for ${namespace}/${pod} on ${node}" | tee "${ARTIFACT_DIR}/network/target-${pod}.error" >&2
+      echo "ERROR: No supported host-network container for ${namespace}/${pod}" | tee "${ARTIFACT_DIR}/network/target-${pod}.error" >&2
       continue
     fi
-    echo "INFO: Gathering network snapshots from ${namespace}/${pod} on ${node} using ${selected_container} (${netfilter})"
+    echo "INFO: Gathering network snapshots from ${namespace}/${pod} using ${selected_container} (${netfilter})"
     queue "${ARTIFACT_DIR}/network/iptables-save-${pod}" gather_network_snapshot "${ARTIFACT_DIR}/network/iptables-save-${pod}" oc --insecure-skip-tls-verify --request-timeout=20s rsh -n "${namespace}" -c "${selected_container}" "${pod}" iptables-save -c
     if [[ "${netfilter}" == nftables ]]; then
       queue "${ARTIFACT_DIR}/network/nft-list-ruleset-${pod}" gather_network_snapshot "${ARTIFACT_DIR}/network/nft-list-ruleset-${pod}" oc --insecure-skip-tls-verify --request-timeout=20s rsh -n "${namespace}" -c "${selected_container}" "${pod}" nft list ruleset
