@@ -5,6 +5,20 @@ export PATH="/cli:${PATH}"
 
 export HOME="/root/dpf-ci"
 
+# --- DEBUG: diagnose newuidmap/podman state in CI pod ---
+echo "=== DEBUG: newuidmap diagnostics ==="
+echo "id: $(id)"
+echo "whoami: $(whoami 2>/dev/null || echo 'whoami failed')"
+ls -la /usr/bin/newuidmap /usr/bin/newgidmap 2>&1
+getcap /usr/bin/newuidmap /usr/bin/newgidmap 2>&1 || true
+getfattr -d -m security /usr/bin/newuidmap 2>&1 || true
+echo "passwd entry: $(getent passwd "$(id -u)" 2>/dev/null || echo 'none')"
+echo "subuid: $(cat /etc/subuid 2>/dev/null || echo 'empty')"
+echo "subgid: $(cat /etc/subgid 2>/dev/null || echo 'empty')"
+echo "BASH_ENV=${BASH_ENV:-unset}"
+cat /proc/self/status | grep -E "Uid|Gid|Cap|NoNewPrivs|Seccomp" 2>/dev/null || true
+echo "=== END DEBUG ==="
+
 # Podman storage/subuid are configured by the container entrypoint
 # (ci/podman-entrypoint.sh). Nothing to do here.
 
