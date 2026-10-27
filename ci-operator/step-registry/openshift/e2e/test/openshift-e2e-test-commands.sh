@@ -407,10 +407,15 @@ function upgrade_paused() {
 # Returns 0 when the suite's only failure was a MonitorTest failure and the job
 # opted in with SKIP_MONITOR_TEST=true. openshift-tests only returns that error
 # when there are no blocking test failures, so no extra guard is needed.
+#
+# Match the runner's final result line as a whole line, not a substring anywhere
+# in the output: openshift-tests reports the outcome as `error: <err>` on stderr
+# (cmd/openshift-tests/openshift-tests.go), so a whole-line match cannot be
+# satisfied by a test that happens to print the phrase in its own diagnostics.
 function tolerate_monitor_test_failure() {
     local exit_code="$1"
     if [[ "${exit_code}" -ne 0 && "${SKIP_MONITOR_TEST:-false}" == "true" ]] &&
-        grep -q 'failed due to a MonitorTest failure' /tmp/openshift-tests.log; then
+        grep -qx 'error: failed due to a MonitorTest failure' /tmp/openshift-tests.log; then
         echo "SKIP_MONITOR_TEST=true: ignoring MonitorTest-only failure (exit code ${exit_code})"
         return 0
     fi
