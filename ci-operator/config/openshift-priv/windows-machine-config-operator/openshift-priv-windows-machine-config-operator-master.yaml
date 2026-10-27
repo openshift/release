@@ -106,7 +106,7 @@ tests:
 - always_run: false
   as: aws-e2e-ote
   optional: true
-  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  pipeline_run_if_changed: ^ote/
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
@@ -117,7 +117,7 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]
+      TEST_SKIPS: \[node-proxy\]|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test
@@ -139,16 +139,16 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
-  as: aws-e2e-ote-techpreview
+  as: aws-e2e-ote-tls
   optional: true
-  pipeline_skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/proxy\.go$
+  pipeline_run_if_changed: ^ote/
   steps:
     cluster_profile: openshift-org-aws
     dependencies:
       EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
       COMPUTE_NODE_REPLICAS: "1"
-      CONTROL_PLANE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "3"
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
@@ -254,12 +254,6 @@ tests:
               CustomNoUpgrade|TechPreviewNoUpgrade|DevPreviewNoUpgrade) feature_set=${raw_value} ;;
             esac
           fi
-          if raw_value=$(oc --request-timeout=10s get featuregate cluster \
-               -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' \
-               2>/dev/null) \
-            && grep -Fxq TLSAdherence <<< "${raw_value}"; then
-            tls_adherence_enabled=true
-          fi
           if raw_value=$(oc --request-timeout=10s get apiserver cluster \
                -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
             case "${raw_value}" in
@@ -273,6 +267,7 @@ tests:
             diagnostic_revision=${raw_value}
           fi
           if operator_observed_tls_adherence; then
+            tls_adherence_enabled=true
             observed_gate=true
           fi
           if [[ "${diagnostic_revision}" =~ ^[1-9][0-9]*$ ]] \
@@ -370,13 +365,7 @@ tests:
           dump_diagnostics
           exit 1
         fi
-        if ! baseline_feature_set=$(oc --request-timeout=10s get featuregate cluster \
-             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
-          || ! baseline_enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
-            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
-          || ! baseline_disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
-            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
-          || ! baseline_adherence=$(oc --request-timeout=10s get apiserver cluster \
+        if ! baseline_adherence=$(oc --request-timeout=10s get apiserver cluster \
             -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null) \
           || ! baseline_observed_feature_gates=$(oc --request-timeout=10s get "${kas_resource}" \
             -o jsonpath='{range .spec.observedConfig.apiServerArguments.feature-gates[*]}{@}{"\n"}{end}' \
@@ -387,10 +376,7 @@ tests:
         fi
 
         baseline_is_noop=false
-        if [[ "${baseline_feature_set}" == CustomNoUpgrade ]] \
-          && [[ "${baseline_enabled_gates}" == TLSAdherence ]] \
-          && ! grep -Fxq TLSAdherence <<< "${baseline_disabled_gates}" \
-          && [[ "${baseline_adherence}" == StrictAllComponents ]] \
+        if [[ "${baseline_adherence}" == StrictAllComponents ]] \
           && grep -Fxq 'TLSAdherence=true' <<< "${baseline_observed_feature_gates}" \
           && ! grep -Fxq 'TLSAdherence=false' <<< "${baseline_observed_feature_gates}" \
           && grep -Fq '"TLSAdherence=true"' <<< "${baseline_config}" \
@@ -399,11 +385,11 @@ tests:
         fi
         echo "Baseline kube-apiserver revision: ${baseline_revision}; exact desired state already active: ${baseline_is_noop}"
 
-        echo "Enabling TLSAdherence feature gate via CustomNoUpgrade..."
-        if ! oc --request-timeout=10s patch featuregate cluster --type=merge \
-             -p '{"spec":{"featureSet":"CustomNoUpgrade","customNoUpgrade":{"enabled":["TLSAdherence"]}}}' \
-             >/dev/null 2>&1; then
-          echo "ERROR: failed to enable TLSAdherence via CustomNoUpgrade"
+        if ! grep -Fq '"TLSAdherence=true"' <<< "${baseline_config}" \
+          || grep -Fq '"TLSAdherence=false"' <<< "${baseline_config}" \
+          || ! grep -Fxq 'TLSAdherence=true' <<< "${baseline_observed_feature_gates}" \
+          || grep -Fxq 'TLSAdherence=false' <<< "${baseline_observed_feature_gates}"; then
+          echo "ERROR: the baseline kube-apiserver payload does not enable TLSAdherence"
           dump_diagnostics
           exit 1
         fi
@@ -475,22 +461,14 @@ tests:
           exit 1
         fi
 
-        if ! feature_set=$(oc --request-timeout=10s get featuregate cluster \
-             -o jsonpath='{.spec.featureSet}' 2>/dev/null) \
-          || ! enabled_gates=$(oc --request-timeout=10s get featuregate cluster \
-            -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
-          || ! disabled_gates=$(oc --request-timeout=10s get featuregate cluster \
-            -o jsonpath='{range .spec.customNoUpgrade.disabled[*]}{@}{"\n"}{end}' 2>/dev/null) \
-          || ! adherence=$(oc --request-timeout=10s get apiserver cluster \
+        if ! adherence=$(oc --request-timeout=10s get apiserver cluster \
             -o jsonpath='{.spec.tlsAdherence}' 2>/dev/null); then
           echo "ERROR: failed to read final TLS adherence settings"
           dump_diagnostics
           exit 1
         fi
-        if [[ "${feature_set}" != CustomNoUpgrade ]] \
-          || [[ "${enabled_gates}" != TLSAdherence ]] \
-          || grep -Fxq TLSAdherence <<< "${disabled_gates}" \
-          || [[ "${adherence}" != StrictAllComponents ]]; then
+        if [[ "${adherence}" != StrictAllComponents ]] \
+          || ! operator_observed_tls_adherence; then
           echo "ERROR: final TLS adherence settings do not match the requested configuration"
           dump_diagnostics
           exit 1
@@ -677,7 +655,7 @@ tests:
 - always_run: false
   as: vsphere-proxy-e2e-ote
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$|^ote/test/e2e/winc\.go$
+  run_if_changed: ^ote/
   steps:
     cluster_profile: vsphere-elastic
     dependencies:
@@ -735,7 +713,7 @@ tests:
   as: nutanix-e2e-ote
   cluster: build01
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  run_if_changed: ^ote/
   steps:
     cluster_profile: nutanix
     dependencies:
@@ -744,7 +722,7 @@ tests:
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]
+      TEST_SKIPS: \[node-proxy\]|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup

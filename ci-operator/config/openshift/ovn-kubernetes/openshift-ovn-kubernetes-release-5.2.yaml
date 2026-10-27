@@ -192,6 +192,21 @@ tests:
       TEST_SUITE: ovn-kubernetes/conformance/parallel
     workflow: baremetalds-e2e-core-networking-dualstack-ote
 - always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote-tp
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-metal-ipi-core-networking-dualstack-serial-ote
   capabilities:
   - intranet
@@ -199,6 +214,21 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote-tp
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        FEATURE_SET=TechPreviewNoUpgrade
       EXTRA_MG_ARGS: --host-network
       TEST_SUITE: ovn-kubernetes/conformance/serial
     workflow: baremetalds-e2e-core-networking-dualstack-ote
@@ -717,6 +747,30 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - always_run: false
+  as: cudn-density-single-ns-1000-24nodes-ibmcloud
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "24"
+      BASE_DOMAIN: ibmcloud-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: bxf-16x64
+      CONTROL_PLANE_INSTANCE_TYPE: bx3d-96x480
+      DISK_NAME: vdb
+      ENABLE_LAYER_3: "false"
+      KB_FLAGS: --set=metricsEndpoints.0.step=2m --set=metricsEndpoints.1.step=2m
+        --local-indexing
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: bxf-64x256
+      RESOURCE_GROUP: ocp-cpt
+      RUN_ORION: "false"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cudn-density
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- always_run: false
   as: cudn-incremental-1000-24nodes
   optional: true
   steps:
@@ -772,6 +826,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-gcp-ovn-techpreview
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     cluster_profile: openshift-org-gcp
     env:

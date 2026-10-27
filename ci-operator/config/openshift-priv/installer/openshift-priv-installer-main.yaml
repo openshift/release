@@ -729,6 +729,16 @@ tests:
         keyC valueC
     workflow: openshift-e2e-azure
 - always_run: false
+  as: e2e-azure-capacity-reservation
+  optional: true
+  pipeline_run_if_changed: azure
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      COMPUTE_NODE_TYPE: Standard_D4as_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D8as_v5
+    workflow: openshift-e2e-azure-capacity-reservation
+- always_run: false
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
@@ -802,6 +812,7 @@ tests:
       AZURE_MULTIDISK_CONTROL_PLANE_DISKS: |
         etcd:etcddisk:64:0:Premium_LRS:
         user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
+      COMPUTE_NODE_TYPE: Standard_D4as_v6
       FEATURE_SET: TechPreviewNoUpgrade
       USER_TAGS: |
         keyA valueA
@@ -958,6 +969,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-bgp-vip-ovn-bgp-metallb
+- always_run: false
+  as: e2e-metal-ipi-bgp-vip-ovn-bgp-evpn
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-bgp-vip-ovn-bgp-evpn
 - always_run: false
   as: e2e-metal-ipi-ovn-swapped-hosts
   capabilities:
@@ -1203,8 +1222,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
 - always_run: false
@@ -1727,8 +1744,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-1-cicluster-1
-        vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
 - always_run: false
