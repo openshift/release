@@ -71,14 +71,14 @@ echo "Route Server ID: ${ROUTE_SERVER_ID}"
 set +x
 
 # Read ES credentials from mounted secret files
-if [[ -f /secret/server ]]; then
-  ES_SERVER=$(cat /secret/server)
-  export ES_SERVER
+ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
+ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
+ES_PASSWORD=$(cat "${ES_SECRETS_PATH}/password")
+ES_USERNAME=$(cat "${ES_SECRETS_PATH}/username")
+if [ -e "${ES_SECRETS_PATH}/host" ]; then
+    ES_HOST=$(cat "${ES_SECRETS_PATH}/host")
 fi
-if [[ -f /secret/index ]]; then
-  ES_INDEX=$(cat /secret/index)
-  export ES_INDEX
-fi
+export ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
 
 $WAS_TRACING && set -x
 
@@ -122,8 +122,6 @@ export AWS_REGION="${REGION}"
 export ROUTE_SERVER_ID
 export VPC_ID
 export EXTRA_FLAGS="--aws-region=${REGION} --route-server-id=${ROUTE_SERVER_ID} --vpc-id=${VPC_ID}"
-export ES_SERVER
-export ES_INDEX
 
 if [[ -n "${PIN_SERVER}" ]]; then
   export PIN_SERVER
