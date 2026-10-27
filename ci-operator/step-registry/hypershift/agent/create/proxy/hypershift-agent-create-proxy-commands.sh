@@ -29,7 +29,7 @@ if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
     echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
     exit 1
   fi
-  hosts=$(printf '%s\n' "${hosts}" registry.redhat.io .quay.io | sort -u)
+  hosts=$(printf '%s\n' "${hosts}" registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
 
   printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"
@@ -83,6 +83,12 @@ if [[ "${NUTANIX_PROXY}" == "true" ]]; then
     fi
   done < /tmp/nutanix_squid_allowed_hosts
   rm -f /tmp/nutanix_squid_allowed_hosts
+  if ! grep -Fq 'acl s3_blob_storage dstdom_regex' "$HOME/squid.conf"; then
+    sed -i \
+      -e '/^http_access allow CONNECT cluster$/i acl s3_blob_storage dstdom_regex -i (^|\\.)s3([.-][a-z0-9-]+)*\\.amazonaws\\.com$' \
+      -e '/^http_access allow CONNECT cluster$/a http_access allow CONNECT s3_blob_storage' \
+      "$HOME/squid.conf"
+  fi
 fi
 cat $HOME/squid.conf
 
