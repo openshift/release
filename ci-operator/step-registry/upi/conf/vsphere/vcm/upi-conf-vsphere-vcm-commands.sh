@@ -235,7 +235,9 @@ echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
 export HOME=/tmp
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
+# Injected via the release:latest dependency, which upgrade jobs redirect to
+# release:initial so the baseline is installed rather than the upgrade target.
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 

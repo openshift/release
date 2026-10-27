@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.17"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
   vsphere-ci-python:
@@ -12,21 +12,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.17
+    tag: rhel-9-release-golang-1.25-openshift-5.0
 releases:
   initial:
     release:
-      channel: fast
-      version: "4.17"
-  initial-minor:
-    release:
-      channel: fast
-      version: "4.16"
+      channel: stable
+      version: "4.22"
   latest:
     release:
-      architecture: amd64
-      channel: fast
-      version: "4.17"
+      channel: candidate
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -39,20 +34,8 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
-- as: platform-none-vsphere
-  cron: 0 0 1,15 * 3
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: opct-test-platform-none-vsphere
 - as: platform-none-vsphere-upgrade
-  cron: '@yearly'
+  cron: 0 9 1,15 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -62,27 +45,15 @@ tests:
       :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
   steps:
     cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
+      COMPUTE_NODE_REPLICAS: "3"
       OPCT_RUN_MODE: upgrade
-      UPGRADE_TO_CHANNEL_TYPE: candidate
     workflow: opct-test-platform-none-vsphere
   timeout: 8h0m0s
-- as: platform-external-vsphere
-  cron: 0 12 1,15 * 3
-  reporter_config:
-    channel: '#forum-opct-updates'
-    job_states_to_report:
-    - failure
-    - error
-    report_template: |
-      :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      PLATFORM_NAME: vsphere
-    workflow: opct-test-platform-external-vsphere
 - as: platform-external-vsphere-upgrade
-  cron: 0 16 1,15 * 3
+  cron: 0 11 1,15 * *
   reporter_config:
     channel: '#forum-opct-updates'
     job_states_to_report:
@@ -95,11 +66,10 @@ tests:
     env:
       OPCT_RUN_MODE: upgrade
       PLATFORM_NAME: vsphere
-      UPGRADE_TO_CHANNEL_TYPE: candidate
     workflow: opct-test-platform-external-vsphere
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem
   repo: opct
-  variant: "4.17"
+  variant: 5.0-upgrade-from-4.22

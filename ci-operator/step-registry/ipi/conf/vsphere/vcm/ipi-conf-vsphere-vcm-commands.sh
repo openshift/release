@@ -137,9 +137,16 @@ fi
 # COMPUTE_NODE_REPLICAS zones.  This ensures each node lands in a distinct failure domain
 # without over- or under-specifying zones relative to the replica count.
 # Zones are sliced from the head of the failureDomains list (the order written by check-vcm).
+#
+# Below OCP_VERSION 413, this script renders install-config with the legacy top-level
+# platform.vsphere fields (see the OCP_VERSION -lt 413 branch below) and never emits
+# platform.vsphere.failureDomains. Those installs predate failure-domain support and
+# rely on the installer defaulting to a single implicit failure domain, so pool zones
+# must be omitted there -- setting them without a matching failureDomains list fails
+# install-config validation.
 CP_ZONES_BLOCK=""
 W_ZONES_BLOCK=""
-if [[ -f "${SHARED_DIR}/platform.json" ]]; then
+if [[ -f "${SHARED_DIR}/platform.json" && "${OCP_VERSION}" -ge 413 ]]; then
   fd_count=$(jq '.failureDomains | length' "${SHARED_DIR}/platform.json")
   if [[ "${fd_count}" -gt 0 ]]; then
     echo "$(date -u --rfc-3339=seconds) - found ${fd_count} failure domain(s) in platform.json, generating per-pool zones blocks"

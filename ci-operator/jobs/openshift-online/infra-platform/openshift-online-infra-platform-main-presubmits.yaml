@@ -1,84 +1,26 @@
 presubmits:
-  openshift/openshift-mcp-server:
+  openshift-online/infra-platform:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.5$
-    - ^release-0\.5-
-    cluster: build11
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.5-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-0\.5$
-    - ^release-0\.5-
-    cluster: build11
+    - ^main$
+    - ^main-
+    cluster: build01
     context: ci/prow/lint
     decorate: true
     decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.5-lint
+    name: pull-ci-openshift-online-infra-platform-main-lint
     rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
         command:
@@ -101,6 +43,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -112,6 +57,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -123,25 +71,21 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-0\.5$
-    - ^release-0\.5-
-    cluster: build07
-    context: ci/prow/mcpchecker-eval-google
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/terraform-plan
     decorate: true
     decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.5-mcpchecker-eval-google
-    optional: true
-    rerun_command: /test mcpchecker-eval-google
+    name: pull-ci-openshift-online-infra-platform-main-terraform-plan
+    rerun_command: /test terraform-plan
+    run_if_changed: ^hcp-terraform/
     spec:
       containers:
       - args:
@@ -152,9 +96,9 @@ presubmits:
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=mcpchecker-eval-google
+        - --target=terraform-plan
         command:
         - ci-operator
         env:
@@ -175,11 +119,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/gsm-config
           name: gsm-config
@@ -204,9 +148,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
-          secretName: ci-pull-credentials
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -225,26 +169,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )mcpchecker-eval-google,?($|\s.*)
+    trigger: (?m)^/test( | .* )terraform-plan,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-0\.5$
-    - ^release-0\.5-
-    cluster: build11
-    context: ci/prow/security
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/validate
     decorate: true
     decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.5-security
-    optional: true
-    rerun_command: /test security
-    skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+    name: pull-ci-openshift-online-infra-platform-main-validate
+    rerun_command: /test validate
+    run_if_changed: ^hcp-terraform/
     spec:
       containers:
       - args:
@@ -255,9 +196,9 @@ presubmits:
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=validate
         command:
         - ci-operator
         env:
@@ -278,11 +219,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/gsm-config
           name: gsm-config
@@ -307,9 +248,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
-          secretName: ci-pull-credentials
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -328,69 +269,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-0\.5$
-    - ^release-0\.5-
-    cluster: build11
-    context: ci/prow/test
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.ci
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.5-test
-    rerun_command: /test test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate,?($|\s.*)
