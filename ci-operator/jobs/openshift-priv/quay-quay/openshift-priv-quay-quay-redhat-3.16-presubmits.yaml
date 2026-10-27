@@ -1,34 +1,36 @@
-postsubmits:
-  openshift-priv/node-problem-detector-operator:
+presubmits:
+  openshift-priv/quay-quay:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.12$
-    cluster: build11
+    - ^redhat-3\.16$
+    - ^redhat-3\.16-
+    context: ci/prow/aws-ocp421-e2e-install-images
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.rhel7
+      - web/Containerfile.playwright
     hidden: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: aws-ocp421-e2e-install
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-priv-node-problem-detector-operator-release-4.12-images
-    path_alias: github.com/openshift/node-problem-detector-operator
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-quay-quay-redhat-3.16-aws-ocp421-e2e-install-images
+    path_alias: github.com/quay/quay
+    rerun_command: /test aws-ocp421-e2e-install-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=aws-ocp421-e2e-install
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -50,9 +52,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -64,9 +63,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aws-ocp421-e2e-install-images,?($|\s.*)

@@ -1,26 +1,27 @@
 presubmits:
-  openshift-priv/node-problem-detector-operator:
+  openshift-priv/quay-quay-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.16$
-    - ^release-4\.16-
-    cluster: build12
-    context: ci/prow/images
+    - ^redhat-5\.0$
+    - ^redhat-5\.0-
+    context: ci/prow/aws-ocp50-e2e-chainsaw-images
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.rhel7
+      - .ci-operator.yaml
     hidden: true
     labels:
+      ci-operator.openshift.io/variant: aws-ocp50-e2e-chainsaw
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-node-problem-detector-operator-release-4.16-images
-    path_alias: github.com/openshift/node-problem-detector-operator
-    rerun_command: /test images
+    name: pull-ci-openshift-priv-quay-quay-operator-redhat-5.0-aws-ocp50-e2e-chainsaw-images
+    path_alias: github.com/quay/quay-operator
+    rerun_command: /test aws-ocp50-e2e-chainsaw-images
     spec:
       containers:
       - args:
@@ -29,6 +30,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=aws-ocp50-e2e-chainsaw
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -64,4 +66,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )aws-ocp50-e2e-chainsaw-images,?($|\s.*)

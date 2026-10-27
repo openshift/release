@@ -5,8 +5,7 @@ presubmits:
     branches:
     - ^rhosdt-0\.158$
     - ^rhosdt-0\.158-
-    cluster: build01
-    context: ci/prow/art-build-ocp-4.22-ci-bundle-opentelemetry-bundle
+    context: ci/prow/art-build-ci-bundle-opentelemetry-bundle
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -18,13 +17,13 @@ presubmits:
       - tests/e2e-openshift/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: art-build-ocp-4.22
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-ocp-4.22-ci-bundle-opentelemetry-bundle
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-ci-bundle-opentelemetry-bundle
     path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test art-build-ocp-4.22-ci-bundle-opentelemetry-bundle
+    rerun_command: /test art-build-ci-bundle-opentelemetry-bundle
     spec:
       containers:
       - args:
@@ -33,7 +32,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=opentelemetry-bundle
-        - --variant=art-build-ocp-4.22
+        - --variant=art-build
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -69,14 +68,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )art-build-ocp-4.22-ci-bundle-opentelemetry-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-ci-bundle-opentelemetry-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^rhosdt-0\.158$
     - ^rhosdt-0\.158-
-    cluster: build01
-    context: ci/prow/art-build-ocp-4.22-e2e-pre-merge
+    context: ci/prow/art-build-e2e-ocp-4-12
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -88,13 +86,15 @@ presubmits:
       - tests/e2e-openshift/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: art-build-ocp-4.22
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-ocp-4.22-e2e-pre-merge
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-12
+    optional: true
     path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test art-build-ocp-4.22-e2e-pre-merge
+    rerun_command: /test art-build-e2e-ocp-4-12
     spec:
       containers:
       - args:
@@ -109,8 +109,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-pre-merge
-        - --variant=art-build-ocp-4.22
+        - --target=e2e-ocp-4-12
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -190,14 +190,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )art-build-ocp-4.22-e2e-pre-merge,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-12,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^rhosdt-0\.158$
     - ^rhosdt-0\.158-
-    cluster: build01
-    context: ci/prow/art-build-ocp-4.22-images
+    context: ci/prow/art-build-e2e-ocp-4-16
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -209,13 +208,1066 @@ presubmits:
       - tests/e2e-openshift/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: art-build-ocp-4.22
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-ocp-4.22-images
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-16
+    optional: true
     path_alias: github.com/open-telemetry/opentelemetry-operator
-    rerun_command: /test art-build-ocp-4.22-images
+    rerun_command: /test art-build-e2e-ocp-4-16
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-4-16
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-16,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ocp-4-18-arm64
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-18-arm64
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-18-arm64
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-4-18-arm64
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-18-arm64,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ocp-4-20-fips
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-20-fips
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-20-fips
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-4-20-fips
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-20-fips,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ocp-4-21
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-21
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-21
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-4-21
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-21,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ocp-4-23
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-4-23
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-23
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-4-23
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-23,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ocp-5-0
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ocp-5-0
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-5-0
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp-5-0
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-5-0,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-pre-merge
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-pre-merge
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-pre-merge
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-pre-merge
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-pre-merge,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-e2e-ui-ocp-4-22
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-e2e-ui-ocp-4-22
+    optional: true
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ui-ocp-4-22
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ui-ocp-4-22
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-e2e-ui-ocp-4-22,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-fips-check
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-fips-check
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-fips-check
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=fips-check
+        - --variant=art-build
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-fips-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^rhosdt-0\.158$
+    - ^rhosdt-0\.158-
+    context: ci/prow/art-build-images
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
+    hidden: true
+    labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
+      ci.openshift.io/generator: prowgen
+      job-release: "4.22"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-open-telemetry-opentelemetry-operator-rhosdt-0.158-art-build-images
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-images
     spec:
       containers:
       - args:
@@ -224,7 +1276,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=art-build-ocp-4.22
+        - --variant=art-build
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -260,4 +1312,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )art-build-ocp-4.22-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-images,?($|\s.*)
