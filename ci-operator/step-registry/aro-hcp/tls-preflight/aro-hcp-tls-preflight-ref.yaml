@@ -1,0 +1,38 @@
+ref:
+  as: aro-hcp-tls-preflight
+  from: src
+  commands: aro-hcp-tls-preflight-commands.sh
+  grace_period: 30s
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+  - name: TLS_PREFLIGHT_COMPONENTS
+    default: aksCommandRuntime
+    documentation: |-
+      Space-separated config components (under defaults: in config/config.yaml)
+      whose images ship an executable kubectl and must pass the TLS 1.3
+      handshake check. Each component needs a flat
+      defaults.<component>.image {registry, repository, digest} entry. Add the
+      first-party kubectl image component (AROSLSRE-2528) here once it lands
+      in the ARO-HCP config; land the config change first, because a listed
+      component missing from config fails the job on purpose.
+  documentation: |-
+    TLS 1.3 preflight for ARO-HCP image bumps: runs the kubectl shipped in
+    the candidate image (config component aksCommandRuntime today) against a
+    local TLS-1.3-only openssl s_server, so a kubectl that panics on any TLS
+    1.3 handshake (AROSLSRE-2021, AROSLSRE-2481) fails the bump PR itself
+    instead of surfacing days later as e2e-parallel provision failures.
+
+    The check runs kubectl inside the image with nested podman because the
+    binary dynamically links the image's own OpenSSL (msft-golang); running
+    it outside the image does not reproduce the failure. Requires src to be
+    built from aro-hcp-nested-podman-ci so Podman is inherited.
+
+    In presubmits each component is only checked when its digest changed
+    relative to PULL_BASE_SHA; the job is wired with
+    run_if_changed: ^config/config\.yaml$ on the podman variant. The check
+    fails closed: panics fail immediately, and images that cannot be
+    verified after three attempts also fail.
