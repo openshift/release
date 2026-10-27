@@ -5,6 +5,11 @@ set -u
 set -o pipefail
 set -x
 
+if [[ "${SKIP_QE_APP_REGISTRY:-false}" == "true" ]]; then
+  echo "SKIP_QE_APP_REGISTRY=true, skipping hosted cluster QE CatalogSource creation"
+  exit 0
+fi
+
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"

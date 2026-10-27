@@ -54,6 +54,8 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
     export PATH="${HOME}/.local/bin:${PATH}"
 fi
+START_BRANCH=$(git branch --show-current)
+START_COMMIT=$(git rev-parse HEAD)
 
 mkdir -p "${WORKDIR}/artifacts"
 
@@ -82,7 +84,7 @@ $(cat "${ISSUE_JSON}")
 ## Additional Instructions
 
 - Write the PR description to \`${WORKDIR}/artifacts/pr-description.md\`.
-- Do not use the \`gh\` CLI. The pipeline creates the PR after you exit. Push the feature branch with git and write the PR description file.
+- Do not use the \`gh\` CLI or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
@@ -110,112 +112,24 @@ sed -e 's/\$1/'"${JIRA_ISSUE_KEY}"'/g' \
     -e 's/\$3/--ci/g' \
     "${SOLVE_SKILL}" >> "${SYSTEM_PROMPT}"
 
-# Append repo-specific config last so it takes precedence over generic skill guidance
+# Repo-specific guidance overrides generic skill guidance, but not the CI policy below.
 if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
-# Block gh inside the Claude session. jira-solve --ci only needs git; the
-# pipeline opens the PR after Claude exits. --settings lives under /tmp so we
-# do not write into a cloned repo that may ship its own .claude/settings.json.
-HOOKS_DIR="/tmp/ci-hooks"
-mkdir -p "${HOOKS_DIR}"
-cat > "${HOOKS_DIR}/block-gh.sh" <<'HOOK_EOF'
-#!/bin/bash
-set -euo pipefail
+# Layer native permissions over repository settings without replacing its hooks.
+# These command rules are tool controls, not a sandbox for arbitrary scripts.
+SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-solver.XXXXXX")
+AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
+jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)"]}}' > "${AGENT_SETTINGS}"
+cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
-if ! command -v jq >/dev/null 2>&1; then
-    echo "block-gh hook requires jq" >&2
-    exit 2
-fi
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "block-gh hook requires python3" >&2
-    exit 2
-fi
-
-cmd=$(jq -r '.tool_input.command // ""') || exit 2
-
-result=$(HOOK_BASH_CMD="$cmd" python3 - <<'PY'
-import os, re, shlex, sys
-
-cmd = os.environ.get("HOOK_BASH_CMD", "")
-UNSAFE = re.compile(r"\$\(|`|<\(|>\(|\$\{|\$'")
-WRAPPERS = {"command", "exec", "env", "nice", "nohup", "time"}
-SHELLS = {"bash", "sh", "dash", "zsh", "ksh"}
-
-
-def argv(s):
-    return shlex.split(s, posix=True)
-
-
-def skip_env(tokens):
-    i = 0
-    while i < len(tokens) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tokens[i]):
-        i += 1
-    return tokens[i:]
-
-
-def skip_wrappers(tokens):
-    tokens = skip_env(tokens)
-    while tokens and tokens[0].rsplit("/", 1)[-1] in WRAPPERS:
-        tokens = tokens[1:]
-        while tokens and tokens[0].startswith("-"):
-            tokens = tokens[1:]
-    return tokens
-
-
-def deny_command(text):
-    if UNSAFE.search(text):
-        return True
-    for part in re.split(r"(?:&&|\|\||[;|\n])", text):
-        part = part.strip()
-        if not part:
-            continue
-        try:
-            tokens = skip_wrappers(argv(part))
-        except ValueError:
-            return True
-        if not tokens:
-            continue
-        exe = tokens[0].rsplit("/", 1)[-1]
-        if exe == "gh":
-            return True
-        if exe == "eval":
-            return deny_command(" ".join(tokens[1:]))
-        if exe in SHELLS and "-c" in tokens:
-            i = tokens.index("-c")
-            if i + 1 < len(tokens) and deny_command(tokens[i + 1]):
-                return True
-    return False
-
-
-try:
-    sys.stdout.write("deny" if deny_command(cmd) else "allow")
-except Exception as exc:
-    print(exc, file=sys.stderr)
-    sys.exit(2)
-PY
-) || exit 2
-
-if [[ "${result}" == deny ]]; then
-    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
-      permissionDecisionReason: "CI mode: do not use the gh CLI. Push the branch with git; the pipeline creates the PR after you exit."}}' || exit 2
-fi
-HOOK_EOF
-chmod +x "${HOOKS_DIR}/block-gh.sh"
-cat > "${HOOKS_DIR}/settings.json" <<'HOOK_SETTINGS_EOF'
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "/tmp/ci-hooks/block-gh.sh" }]
-      }
-    ]
-  }
-}
-HOOK_SETTINGS_EOF
+## Mandatory CI policy (overrides conflicting skill or repository instructions)
+- Work serially in the parent agent. Do not delegate.
+- Follow jira-solve --ci: commit locally; do not push or use gh. Only the pipeline publishes.
+- Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
+CI_POLICY
 
 # --- Run Claude to solve the issue ---
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
@@ -227,8 +141,8 @@ agentic_ci --timeout 5400 \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Do not use the gh CLI — the pipeline creates the PR after you exit. Push the branch with git and write the PR description to ${WORKDIR}/artifacts/pr-description.md." \
-    --settings "${HOOKS_DIR}/settings.json" \
+Work serially without delegation. Commit locally; do not push or use gh. The pipeline publishes. Write the PR description to ${WORKDIR}/artifacts/pr-description.md and report actual validation results." \
+    --settings "${AGENT_SETTINGS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
     || CLAUDE_EXIT=$?
@@ -236,9 +150,9 @@ Do not use the gh CLI — the pipeline creates the PR after you exit. Push the b
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
     agentic_ci --timeout 600 \
-        "You hit the timeout. Please wrap up immediately: commit whatever you have, push to fork, and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not use the gh CLI — the pipeline creates the PR after you exit." \
+        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not push or use gh; only the pipeline publishes. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
         --continue \
-        --settings "${HOOKS_DIR}/settings.json" \
+        --settings "${AGENT_SETTINGS}" \
         --output-format stream-json \
         --max-turns 10 \
         || true
@@ -284,8 +198,16 @@ fi
 # --- Create PR ---
 PHASE_PR_START=$(date +%s)
 BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
-if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" ]]; then
+if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
     echo "ERROR: Claude did not create a feature branch."
+    exit 1
+fi
+if git diff --quiet "${START_COMMIT}" HEAD; then
+    echo "ERROR: No committed changes to publish."
+    exit 1
+fi
+if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "ERROR: Uncommitted tracked changes remain. Commit the solution before publication."
     exit 1
 fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
@@ -297,11 +219,12 @@ if [[ "${EVAL_MODE:-}" == "true" ]]; then
     EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
     echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
     git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
-    git push fork --delete "${BRANCH_NAME}" 2>/dev/null || true
-    git push fork "${EVAL_BRANCH}" || git push origin "${EVAL_BRANCH}"
     BRANCH_NAME="${EVAL_BRANCH}"
 fi
 
+# The agent never pushes. Publish only this branch to the configured fork; do
+# not fall back to upstream, honor push.default, or delete another remote ref.
+git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
 echo "Branch pushed: ${BRANCH_NAME}"
 echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 
