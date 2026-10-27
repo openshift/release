@@ -28,20 +28,55 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
   if [[ "${current_fwd}" != "Global" ]]; then
     echo ""
     echo "Enabling global IP forwarding (current: ${current_fwd:-Restricted})..."
+    echo "Pre-patch state:"
+    oc get mcp -o wide
+    oc get nodes -o wide
+    
     oc patch network.operator cluster --type=merge \
       -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
-    echo "Waiting for API to stabilize after MCP rollout (nodes may reboot)..."
+    echo "Network patch applied. Waiting for API to stabilize after MCP rollout..."
     sleep 30
-    for _api_attempt in $(seq 1 90); do
+    
+    # Wait for API with better diagnostics
+    api_ready=false
+    for _api_attempt in $(seq 1 120); do  # Allow up to 120 attempts (40 minutes)
       if oc get nodes --request-timeout=10s &>/dev/null; then
+        api_ready=true
         break
       fi
-      echo "  API not ready (attempt ${_api_attempt}/90), waiting 20s..."
+      # Log MCP status every 3 attempts for diagnostics
+      if [[ $((_api_attempt % 3)) == 0 ]]; then
+        mcp_status=$(oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}{":"}{.status.conditions[?(@.type=="Updated")].status}{" "}{end}' 2>/dev/null || echo "unknown")
+        echo "  API not ready (attempt ${_api_attempt}/120), MCP status: ${mcp_status}, waiting 20s..."
+      else
+        echo "  API not ready (attempt ${_api_attempt}/120), waiting 20s..."
+      fi
       sleep 20
     done
+    
+    if [[ "${api_ready}" != "true" ]]; then
+      echo "WARNING: API did not recover after 40 minutes. Collecting diagnostics..."
+      echo "MCP Status:"
+      oc get mcp -o wide || true
+      echo ""
+      echo "Node Status:"
+      oc get nodes -o wide || true
+      echo ""
+      echo "etcd health:"
+      oc -n openshift-etcd logs -l app=etcd -c etcd --tail=20 || true
+      echo ""
+      echo "API Server logs:"
+      oc -n openshift-apiserver logs -l app=openshift-apiserver --tail=20 || true
+      echo ""
+      echo "Machine Config Controller logs:"
+      oc -n openshift-machine-config-operator logs -l k8s-app=machine-config-controller --tail=20 || true
+      exit 1
+    fi
+    
+    echo "API recovered after ${_api_attempt} attempts"
     echo "Waiting for machine config pools to finish rolling out..."
-    oc wait mcp master worker --for condition=Updating=False --timeout=30m
-    oc wait mcp master worker --for condition=Updated --timeout=30m
+    oc wait mcp master worker --for condition=Updating=False --timeout=40m
+    oc wait mcp master worker --for condition=Updated --timeout=40m
     echo "Global IP forwarding enabled"
   else
     echo "Global IP forwarding already enabled"
