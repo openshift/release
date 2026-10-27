@@ -21,10 +21,10 @@ for i in $(seq 1 60); do
     sleep 10
 done
 
-echo "Reducing cacheMaxFlows to 50K..."
-oc patch flowcollector cluster --type=merge -p '{"spec":{"agent":{"ebpf":{"cacheMaxFlows":50000}}}}'
+# echo "Reducing cacheMaxFlows to 50K..."
+# oc patch flowcollector cluster --type=merge -p '{"spec":{"agent":{"ebpf":{"cacheMaxFlows":50000}}}}'
 
-sleep 300
+# sleep 300
 
 echo "Waiting for FlowCollector/cluster Ready condition..."
 oc wait flowcollector/cluster --for=condition=Ready --timeout="${WAIT_TIMEOUT}"
