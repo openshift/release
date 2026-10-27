@@ -38,6 +38,34 @@ if [[ ! -s "${SHARED_DIR}/cluster-id" ]]; then
 fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+# ---- AWS credentials and rosa login (cluster profile) ----
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+else
+  log "ERROR: no ${AWSCRED} in the cluster profile; cannot configure the AWS CLI"
+  exit 1
+fi
+
+# Do not trace credential reads / rosa login.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  log "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  log "Logging into ${OCM_LOGIN_ENV} with an offline token"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+else
+  $WAS_TRACING && set -x
+  log "ERROR: no rosa/OCM credentials found in cluster profile (sso-client-id/secret or ocm-token)"
+  exit 1
+fi
+$WAS_TRACING && set -x
+
 # The cluster is not functional yet (nodes NotReady), so use the breakglass
 # admin kubeconfig rather than the customer kubeconfig.
 if [[ -z "${KUBECONFIG:-}" ]]; then
@@ -60,6 +88,7 @@ if [[ -z "${REGION}" ]]; then
   log "ERROR: no AWS region available (cluster-metadata.json or REGION env)"
   exit 1
 fi
+export AWS_DEFAULT_REGION="${REGION}"
 
 # ---- IAM role for the VPC CNI (IRSA) ----
 CLUSTER_JSON=$(rosa describe cluster -c "${CLUSTER_ID}" -o json)
@@ -74,7 +103,8 @@ IAM_ROLE_NAME="${CLUSTER_ID}-vpc-cni"
 # The AWS-managed policy is required: custom policies with tag conditions do
 # not work because the VPC CNI tags ENIs with node.k8s.amazonaws.com/* and the
 # primary ENI (created by AWS) carries no CNI-managed tags.
-cat > /tmp/vpc-cni-trust-policy.json <<EOF
+TRUST_POLICY=$(mktemp)
+cat > "${TRUST_POLICY}" <<EOF
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -94,22 +124,24 @@ cat > /tmp/vpc-cni-trust-policy.json <<EOF
 }
 EOF
 
+# Remember the role for the post steps before creating it: if create-role or
+# attach-role-policy fails, rosa-conf-vpc-cni-role-delete must still be able
+# to find and remove it. rosa-aws-sts-hcp-deprovision does not know about it
+# and would leak it.
+echo -n "${IAM_ROLE_NAME}" > "${SHARED_DIR}/aws-vpc-cni-role-name"
+
 if aws iam get-role --role-name "${IAM_ROLE_NAME}" >/dev/null 2>&1; then
   log "IAM role ${IAM_ROLE_NAME} already exists, reusing it"
 else
   aws iam create-role \
     --role-name "${IAM_ROLE_NAME}" \
-    --assume-role-policy-document file:///tmp/vpc-cni-trust-policy.json \
+    --assume-role-policy-document "file://${TRUST_POLICY}" \
     --description "IAM Role for AWS VPC CNI on ROSA (CI cluster ${CLUSTER_ID})"
 fi
 aws iam attach-role-policy \
   --role-name "${IAM_ROLE_NAME}" \
   --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-rm -f /tmp/vpc-cni-trust-policy.json
-
-# Remember the role for the post steps: rosa-aws-sts-hcp-deprovision does not
-# know about it and would leak it.
-echo -n "${IAM_ROLE_NAME}" > "${SHARED_DIR}/aws-vpc-cni-role-name"
+rm -f "${TRUST_POLICY}"
 
 # ---- SCCs for the aws-node service account ----
 oc adm policy add-scc-to-user hostaccess -z aws-node -n kube-system
@@ -119,7 +151,8 @@ oc adm policy add-scc-to-user privileged -z aws-node -n kube-system
 # RHCOS nodes disable IP forwarding by default. On HCP, Tuned CRs applied with
 # oc are reconciled away by the hosted Node Tuning Operator, so the rosa CLI
 # tuning-config must be used instead.
-cat > /tmp/ip-forward-spec.json <<'EOF'
+IP_FORWARD_SPEC=$(mktemp)
+cat > "${IP_FORWARD_SPEC}" <<'EOF'
 {
   "profile": [
     {
@@ -135,9 +168,9 @@ cat > /tmp/ip-forward-spec.json <<'EOF'
   ]
 }
 EOF
-rosa create tuning-config -c "${CLUSTER_ID}" --name ip-forward --spec-path /tmp/ip-forward-spec.json
+rosa create tuning-config -c "${CLUSTER_ID}" --name ip-forward --spec-path "${IP_FORWARD_SPEC}"
 rosa edit machinepool -c "${CLUSTER_ID}" workers --tuning-configs ip-forward
-rm -f /tmp/ip-forward-spec.json
+rm -f "${IP_FORWARD_SPEC}"
 
 # ---- Install the AWS VPC CNI helm chart ----
 # ROSA uses CRI-O, which keeps CNI binaries and configs in different host
@@ -154,7 +187,8 @@ if ! command -v helm >/dev/null 2>&1; then
   rm -rf /tmp/helm.tgz /tmp/linux-amd64
 fi
 
-cat > /tmp/aws-vpc-cni-values.yaml <<EOF
+VALUES_FILE=$(mktemp)
+cat > "${VALUES_FILE}" <<EOF
 init:
   image:
     region: ${REGION}
@@ -201,19 +235,27 @@ helm upgrade --install aws-vpc-cni \
   --namespace kube-system \
   eks/aws-vpc-cni \
   --version "${VPC_CNI_CHART_VERSION}" \
-  --values /tmp/aws-vpc-cni-values.yaml
-rm -f /tmp/aws-vpc-cni-values.yaml
+  --values "${VALUES_FILE}"
+rm -f "${VALUES_FILE}"
 
-# ---- Wait for the aws-node pods and the nodes ----
-log "Waiting for aws-node pods to be running"
-oc wait --for=condition=Ready pod -l app.kubernetes.io/name=aws-node -n kube-system --timeout=15m
+# ---- Wait for the aws-node DaemonSet and the nodes ----
+# Rollout wait rather than waiting on pods: right after helm install the
+# DaemonSet controller may not have created any pods yet, and oc wait on pods
+# would fail with "no matching resources found".
+log "Waiting for the aws-node DaemonSet rollout"
+oc rollout status daemonset/aws-node -n kube-system --timeout=15m
 
 log "Waiting for nodes to become Ready"
 oc wait --for=condition=Ready node --all --timeout=30m
 
 # ---- Record the CNI in the SHARED_DIR contract ----
-# Additive to the ROSAENG-67580 schema: validators ignore unknown fields, so
-# heads that do not run this step are unaffected.
+# Write the marker first: rosa-e2e-rosa-cli-publish-contract (which may run
+# after this step and rebuild cluster-metadata.json) includes it as the
+# contract's cni field. If cluster-metadata.json already exists (a workflow
+# that published the contract before swapping the CNI), update it in place
+# too. Additive to the ROSAENG-67580 schema: validators ignore unknown fields,
+# so heads that do not run this step are unaffected.
+echo -n "aws-vpc-cni" > "${SHARED_DIR}/cni"
 if [[ -s "${SHARED_DIR}/cluster-metadata.json" ]]; then
   jq '. + {cni: "aws-vpc-cni"}' "${SHARED_DIR}/cluster-metadata.json" > "${SHARED_DIR}/cluster-metadata.json.tmp" \
     && mv "${SHARED_DIR}/cluster-metadata.json.tmp" "${SHARED_DIR}/cluster-metadata.json"

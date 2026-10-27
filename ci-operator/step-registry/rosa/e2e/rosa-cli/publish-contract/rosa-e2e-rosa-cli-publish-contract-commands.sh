@@ -97,6 +97,23 @@ if [[ -z "${resolved_name}" || -z "${resolved_region:-${REGION}}" ]]; then
 fi
 if [[ "${HOSTED_CP}" == "true" ]]; then topology="hcp"; else topology="classic"; fi
 
+# Optional cni marker: a CNI-swap step that ran earlier (e.g. rosa-conf-vpc-cni,
+# ROSAENG-67432) writes ${SHARED_DIR}/cni. Include it so the rebuilt contract
+# does not drop it; heads without a marker publish no cni field.
+cni_marker=""
+if [[ -s "${SHARED_DIR}/cni" ]]; then
+  cni_marker=$(head -n 1 "${SHARED_DIR}/cni")
+elif [[ -s "${SHARED_DIR}/cluster-metadata.json" ]]; then
+  cni_marker=$(jq -r '.cni // empty' "${SHARED_DIR}/cluster-metadata.json" 2>/dev/null || true)
+fi
+if [[ -n "${cni_marker}" ]]; then
+  cni_arg=(--arg cni "${cni_marker}")
+  cni_field='cni: $cni,'
+else
+  cni_arg=()
+  cni_field=''
+fi
+
 jq -n \
   --arg schema_version "1.0.0" \
   --arg provisioner "rosa-e2e-cli" \
@@ -116,6 +133,7 @@ jq -n \
   --argjson sharedvpc "$(bool "${ENABLE_SHARED_VPC}")" \
   --argjson zero_egress "$(bool "${ZERO_EGRESS}")" \
   --argjson multi_az "$(bool "${MULTI_AZ}")" \
+  "${cni_arg[@]}" \
   '{
     schema_version: $schema_version,
     provisioner: $provisioner,
@@ -125,6 +143,7 @@ jq -n \
     region: $region,
     channel_group: $channel_group,
     openshift_version: $openshift_version,
+    '"${cni_field}"'
     feature_flags: {
       privatelink: $privatelink,
       private: $private,
