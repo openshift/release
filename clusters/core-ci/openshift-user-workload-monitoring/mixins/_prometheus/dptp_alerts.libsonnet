@@ -1,3 +1,18 @@
+// Aggregate infrastructure alerts retain the catalog classification of the failing
+// job. Keep these catalog families explicit; unknown jobs remain orange/ci_platform.
+local cleanupJobPattern = '^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$';
+local cloudJobPattern = '^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$';
+local fleetJobPattern = '^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$';
+local repoJobPattern = '^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$';
+local infraJobAnnotations = {
+  ops_color: '{{ if match %s $labels.job_name }}yellow{{ else }}orange{{ end }}' % std.manifestJson(cleanupJobPattern),
+  ops_category: '{{ if match %s $labels.job_name }}repo_automation{{ else if match %s $labels.job_name }}cluster_fleet{{ else if match %s $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}' % [
+    std.manifestJson(repoJobPattern),
+    std.manifestJson(fleetJobPattern),
+    std.manifestJson(cleanupJobPattern + '|' + cloudJobPattern),
+  ],
+};
+
 {
   prometheusAlerts+:: {
     groups+: [
@@ -32,6 +47,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'ci-tools postsubmit {{ $labels.job_name }} has failures. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.',
             },
           },
@@ -63,6 +80,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: infraJobAnnotations.ops_color,
+              ops_category: infraJobAnnotations.ops_category,
               message: 'Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).' % $._config.grafanaDashboardIDs['dptp.json'],
             },
           },
@@ -94,6 +113,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: infraJobAnnotations.ops_color,
+              ops_category: infraJobAnnotations.ops_category,
               message: 'plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>.',
             },
           }
@@ -116,6 +137,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Many mirroring tasks to quay.io have failed in the last 10 minutes. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures',
             },
@@ -134,6 +157,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Component {{ $labels.service }} failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.',
             },
           },
@@ -174,6 +199,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md',
             },
@@ -197,6 +224,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'yellow',
+              ops_category: 'ci_platform',
               message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.',
             },
           }
@@ -215,6 +244,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Jobs on provider {{ $labels.provider }} fail because they were unable to acquire a lease.',
             },
           }
@@ -233,6 +264,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'The SSL certificates for instance {{ $labels.instance }} are expiring in 28 days.',
             },
           },
@@ -247,6 +280,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
@@ -261,6 +296,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.',
             },
           },
@@ -309,6 +346,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'repo_automation',
               message: 'The priv image-building job branch-ci-openshift-priv-{{ $labels.job_tail }} is failing while the corresponding public job branch-ci-openshift-{{ $labels.job_tail }} remains healthy. See priv <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-openshift-priv-{{ $labels.job_tail }}|deck-internal> and public <https://prow.ci.openshift.org/?job=branch-ci-openshift-{{ $labels.job_tail }}|deck>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
             },
           }
@@ -352,6 +391,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'OpenShift image mirroring jobs have had no successful run in the last 6 hours. The primary recovery target is to restore at least one successful run after repeated failures. Check <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/openshift-mirroring-failures.md|SOP>.',
             },
           }

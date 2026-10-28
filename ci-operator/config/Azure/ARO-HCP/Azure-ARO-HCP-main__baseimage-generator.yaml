@@ -24,7 +24,7 @@ images:
         - destination_dir: src
           source_path: /go/src/github.com/Azure/ARO-HCP
     to: nested-podman-src
-  run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile(\.nested-podman)?$|\.bingo/|\.ci-operator\.yaml$)
+  run_if_changed: ^(dev-infrastructure/openshift-ci/(Dockerfile(\.nested-podman)?|Makefile|smoke-test\.sh|versions\.mk)$|\.bingo/|\.ci-operator\.yaml$|go\.work$)
 promotion:
   to:
   - excluded_images:
@@ -49,6 +49,11 @@ tests:
   commands: |
     set -euo pipefail
     d=$(mktemp -d)
+    trap 'rm -rf "$d"' EXIT
+    # Version checks need writable state for Azure CLI and bundled .NET tools.
+    export HOME="$d"
+    export AZURE_CONFIG_DIR="$d/azure"
+    make -C dev-infrastructure/openshift-ci verify test IN_CONTAINER=true
     cd "$d"
     go mod init smoke.example.com/nonroot
     printf '%s\n' 'package main' 'func main() {}' > main.go
@@ -57,7 +62,7 @@ tests:
     echo "Go GOMODCACHE=$(go env GOMODCACHE) GOCACHE=$(go env GOCACHE) OK"
   container:
     from: aro-hcp-e2e-base-ci
-  run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.ci-operator\.yaml$)
+  run_if_changed: ^(dev-infrastructure/openshift-ci/(Dockerfile|Makefile|smoke-test\.sh|versions\.mk)$|\.bingo/|\.ci-operator\.yaml$|go\.work$)
 - as: nested-podman-smoke-test
   capabilities:
   - nested-podman

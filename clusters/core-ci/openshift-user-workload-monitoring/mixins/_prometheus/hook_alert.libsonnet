@@ -17,6 +17,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'There have been no webhook calls on working hours for 5 minutes',
             },
           },

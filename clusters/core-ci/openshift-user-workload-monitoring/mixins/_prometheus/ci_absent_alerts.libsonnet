@@ -15,6 +15,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: if name == 'hook-apps' then 'red' else 'orange',
+              ops_category: 'ci_platform',
               message: 'The service %s has been down for 5 minutes.' % name,
             },
           }
@@ -31,6 +33,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: if std.member(['crier', 'ghproxy', 'tide'], name) then 'red' else 'orange',
+              ops_category: 'ci_platform',
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
