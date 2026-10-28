@@ -402,7 +402,7 @@ vmi_guest_agent_ready() {
   local ga_status
 
   ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
-    -o jsonpath='{.status.conditions[?(@.type=="GuestAgentConnected")].status}' 2>/dev/null || true)
+    -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
   [[ "${ga_status}" == "True" ]]
 }
 
@@ -411,7 +411,7 @@ wait_for_vmi_guest_agent() {
   local vmi="$2"
   local attempt
 
-  for attempt in $(seq 1 30); do
+  for attempt in $(seq 1 45); do
     if vmi_guest_agent_ready "${multi_ns}" "${vmi}"; then
       return 0
     fi
@@ -772,7 +772,7 @@ spec:
       defaultMode: 384
   containers:
   - name: renew
-    image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    image: registry.redhat.io/ubi9/ubi-minimal:latest
     env:
     - name: VMI_IP
       value: "${vmi_ip}"
