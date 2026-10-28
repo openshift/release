@@ -5,10 +5,9 @@ set -o errexit
 set -o pipefail
 
 # Cleans up after rosa-conf-vpc-cni: removes the IRSA IAM role the standard
-# deprovision chain does not know about, and undoes the in-cluster changes
-# (SCCs for the aws-node service account) while the cluster is still up. Run
-# it before rosa-cluster-deprovision. The helm release and the tuning config
-# are in-cluster only and are removed with the cluster itself.
+# deprovision chain does not know about. All in-cluster changes (the SCCs, the
+# helm release and the tuning config) are removed with the cluster by
+# rosa-cluster-deprovision.
 
 log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
@@ -22,30 +21,6 @@ if [[ -f "${AWSCRED}" ]]; then
 else
   log "ERROR: no ${AWSCRED} in the cluster profile; cannot configure the AWS CLI"
   exit 1
-fi
-
-# ---- Remove the SCCs granted to the aws-node service account ----
-# In-cluster only, but undo it here so the step is symmetric with
-# rosa-conf-vpc-cni and the pattern is reusable on a cluster that survives.
-# Best-effort: the cluster may already be unreachable (e.g. an earlier post
-# step failed hard), and this must not block the IAM cleanup below.
-if [[ -z "${KUBECONFIG:-}" ]]; then
-  if [[ -s "${SHARED_DIR}/kubeconfig.kubeadmin" ]]; then
-    export KUBECONFIG="${SHARED_DIR}/kubeconfig.kubeadmin"
-  elif [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
-    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-  fi
-fi
-if [[ -n "${KUBECONFIG:-}" ]]; then
-  for scc in hostaccess privileged; do
-    if oc adm policy remove-scc-from-user "${scc}" -z aws-node -n kube-system; then
-      log "Removed SCC ${scc} from the aws-node service account"
-    else
-      log "WARN: could not remove SCC ${scc} (cluster unreachable or already cleaned up)"
-    fi
-  done
-else
-  log "No kubeconfig in ${SHARED_DIR}; skipping the SCC cleanup"
 fi
 
 # ---- Delete the IRSA role ----
