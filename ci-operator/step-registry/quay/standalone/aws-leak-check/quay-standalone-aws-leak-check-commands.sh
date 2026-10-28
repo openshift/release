@@ -15,10 +15,12 @@ job_tag=$(<"${SHARED_DIR}/quay_standalone_job_tag")
 stack_name=$(<"${SHARED_DIR}/quay_standalone_stack_name")
 db_identifier=$(<"${SHARED_DIR}/quay_standalone_db_identifier")
 bucket=$(<"${SHARED_DIR}/quay_standalone_s3_bucket")
-hostname=""
-if [[ -s "${SHARED_DIR}/quay_standalone_hostname" ]]; then
-    hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
-fi
+hostnames=()
+for name in quay_standalone_hostname quay_standalone_clair_hostname; do
+    if [[ -s "${SHARED_DIR}/${name}" ]]; then
+        hostnames+=("$(<"${SHARED_DIR}/${name}")")
+    fi
+done
 
 err_file=$(mktemp)
 trap 'rm -f -- "${err_file}"' EXIT
@@ -76,16 +78,16 @@ elif ! grep -q -- '(404)' "${err_file}"; then
     report "could not check S3 bucket ${bucket}"
 fi
 
-# The NLB ARN is not published; its DNS name is, once the stack was created.
-# Without it the stack check above covers the NLB.
-if [[ -n "${hostname}" ]]; then
+# The NLB ARNs are not published; their DNS names are, once the stack was
+# created. Without them the stack check above covers the NLBs.
+for hostname in "${hostnames[@]}"; do
     if ! nlb=$(lookup '' aws --region "${region}" elbv2 describe-load-balancers \
         --query "LoadBalancers[?DNSName=='${hostname}'].LoadBalancerArn" --output text); then
         report "could not list load balancers for ${hostname}"
     elif [[ -n "${nlb}" ]]; then
         report "NLB ${nlb}"
     fi
-fi
+done
 
 if (( failures > 0 )); then
     echo "Quay standalone job ${job_tag} left ${failures} AWS resource(s) or unchecked lookups behind." >&2
