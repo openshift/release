@@ -1,0 +1,28 @@
+ref:
+  as: quay-standalone-gather
+  from: upi-installer
+  cli: latest
+  commands: quay-standalone-gather-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 20m0s
+  grace_period: 2m0s
+  documentation: |-
+    Best-effort diagnostics for Quay standalone HA into
+    ${ARTIFACT_DIR}/quay-standalone; always exits 0. Over SSH, per Quay node:
+    podman ps -a, the last 5000 lines of podman logs quay and the cloud-final
+    journal; on the Redis host: redis status, its journal and the cloud-final
+    journal. Unreachable hosts (such as the node failover stopped) are
+    recorded and skipped. From AWS: NLB target health, the RDS instance
+    description and the CloudFormation stack events. Never collects the
+    config bundle, keys, passwords, tokens or the pull auth; the database
+    password is masked should a log quote it.
+
+    Reads from SHARED_DIR when present, tolerating any missing file:
+    quay_standalone_region, quay_standalone_ssh_user, quay_standalone_nodes,
+    quay_standalone_redis, quay_standalone_target_group_arn,
+    quay_standalone_db_identifier, quay_standalone_stack_name,
+    quay_standalone_db_password (only to mask it). Writes nothing to
+    SHARED_DIR.
