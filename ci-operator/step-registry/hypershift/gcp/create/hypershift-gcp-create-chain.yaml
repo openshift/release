@@ -53,6 +53,8 @@ chain:
       HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
       echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
 
+      # --pods-labels and --toleration are asserted by the e2e-v2
+      # ControlPlaneWorkloads "Custom labels" / "Custom tolerations" tests.
       bin/hypershift create cluster gcp \
         --name "${HC_NAME}" \
         --namespace clusters \
@@ -80,6 +82,8 @@ chain:
         --oidc-issuer-url "${OIDC_ISSUER_URL}" \
         --boot-image "${GCP_BOOT_IMAGE}" \
         --annotations "hypershift.openshift.io/pod-security-admission-label-override=baseline" \
+        --pods-labels "hypershift-e2e-test-label=test" \
+        --toleration "key=hypershift-e2e-test-toleration,operator=Equal,value=true,effect=NoSchedule" \
         --disable-cluster-capabilities Console \
         --disable-cluster-capabilities Ingress \
         --feature-set TechPreviewNoUpgrade
