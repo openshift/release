@@ -251,6 +251,26 @@ oc() {
 
 echo ">>> PHASE: Deploy ACS Operator (channel: ${ACS_CHANNEL}, csv-name wait: ${ACS_CSV_WAIT_TIMEOUT}s, install wait: ${ACS_INSTALL_TIMEOUT}s)"
 
+if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
+  # Detection, not gating: report object states and exit 0. Runs before the
+  # packagemanifest precondition on purpose — detection must work when the
+  # catalog is absent or erroring. It also runs before the self-disable
+  # check so the full property set is recorded even when an OperatorPolicy
+  # owns the install. Subscription presence is queried independently of
+  # spec.channel (OLM permits an omitted channel).
+  _subname=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.name}' 2>/dev/null) || _subname=""
+  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
+  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
+  _pm=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o name 2>/dev/null) || _pm=""
+  _prop "report_only" "true"
+  _prop "acs_subscription" "$([[ -n "${_subname}" ]] && echo adopted || echo absent)"
+  _prop "channel_observed" "$([[ -n "${_subname}" ]] && echo "${_sub:-empty}" || echo absent)"
+  _prop "csv_phase" "${_csvp:-absent}"
+  _prop "packagemanifest" "${_pm:-absent}"
+  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
+  exit 0
+fi
+
 # --- Self-disable: if the OperatorPolicy already owns a healthy install,
 #     the workaround is redundant — report and exit 0 without installing.
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
@@ -286,21 +306,6 @@ except Exception:
   fi
 fi
 _prop "workaround_removal_ready" "false"
-if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
-  # Detection, not gating: report object states and exit 0. Runs before the
-  # packagemanifest precondition on purpose — detection must work when the
-  # catalog is absent or erroring too.
-  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
-  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
-  _pm=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o name 2>/dev/null) || _pm=""
-  _prop "report_only" "true"
-  _prop "acs_subscription" "$([[ -n "${_sub}" ]] && echo adopted || echo absent)"
-  _prop "channel_observed" "${_sub:-absent}"
-  _prop "csv_phase" "${_csvp:-absent}"
-  _prop "packagemanifest" "${_pm:-absent}"
-  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
-  exit 0
-fi
 
 # --- Fail-fast precondition: packagemanifest must exist and list the
 #     requested channel. Three-way classify with bounded retry; a query
