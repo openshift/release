@@ -1,0 +1,49 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  project_image:
+    dockerfile_path: Containerfile.buildroot
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: scale-test
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-azure
+    env:
+      AZURE_REGION_OVERRIDE: eastus
+    post:
+    - ref: confidential-clusters-ref-azure-cleanup
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: confidential-clusters-ref-azure-region-override
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    test:
+    - ref: confidential-clusters-ref-azure-provision
+    - ref: confidential-clusters-ref-azure-scale-test
+zz_generated_metadata:
+  branch: main
+  org: confidential-clusters
+  repo: operator
+  variant: azure
