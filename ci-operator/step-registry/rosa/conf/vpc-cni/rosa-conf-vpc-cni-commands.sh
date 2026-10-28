@@ -200,7 +200,17 @@ cat > "${IP_FORWARD_SPEC}" <<'EOF'
 }
 EOF
 rosa create tuning-config -c "${CLUSTER_ID}" --name ip-forward --spec-path "${IP_FORWARD_SPEC}"
-rosa edit machinepool -c "${CLUSTER_ID}" workers --tuning-configs ip-forward
+# Apply the tuning config to every machine pool (the default pool name is not
+# stable across environments; on HCP clusters provisioned without a custom
+# pool it is not necessarily "workers").
+MP_IDS=$(rosa list machinepools -c "${CLUSTER_ID}" -o json | jq -r '.[].id')
+if [[ -z "${MP_IDS}" ]]; then
+  log "ERROR: no machine pools found for cluster ${CLUSTER_ID}"
+  exit 1
+fi
+for mp in ${MP_IDS}; do
+  rosa edit machinepool -c "${CLUSTER_ID}" "${mp}" --tuning-configs ip-forward
+done
 rm -f "${IP_FORWARD_SPEC}"
 
 # ---- Install the AWS VPC CNI helm chart ----
