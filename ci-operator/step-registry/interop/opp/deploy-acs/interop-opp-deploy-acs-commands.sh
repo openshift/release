@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 shopt -s inherit_errexit
+# bash >= 5.2: '&' in ${var//pat/repl} expands to the match; we need literal
+# ampersands in the XML escapes below.
+shopt -u patsub_replacement 2>/dev/null || true
 
 # INTEROP-9525 workaround: install the RHACS operator directly via OLM on
 # OCP 5.x lanes, where ACM 2.17's governance-policy-addon-controller gates
@@ -46,7 +49,9 @@ set -x
 # shellcheck disable=SC2154
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
-  _exit_code=$?
+  # Takes the recorded exit status explicitly: $? here is unreliable (callers
+  # run other commands first).
+  local _exit_code="${1:-0}"
   set +x 2>/dev/null
   sed -i -E \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
@@ -97,6 +102,19 @@ JUNITEOF
 }
 
 # _junit_emit <exit-code> — replace the seeded case IN PLACE (same
+# _xml_escape <string> — escape XML special characters for attribute/body
+# interpolation (raw oc error output can contain quotes and ampersands).
+_xml_escape() {
+  local s="$1"
+  local _q=\'
+  s="${s//&/&amp;}"
+  s="${s//</&lt;}"
+  s="${s//>/&gt;}"
+  s="${s//\"/&quot;}"
+  s="${s//${_q}/&apos;}"
+  printf '%s' "${s}"
+}
+
 # testcase id, never appended). tests>=1 always; exit!=0 implies >=1
 # failure/error. Atomic write; sha256 and byte count logged.
 _junit_emit() {
@@ -108,7 +126,7 @@ _junit_emit() {
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
   local _fc=0 _ec=0 _fx=""
-  local _type _msg
+  local _type _msg _edetail
   if [[ -n "${_signal}" ]]; then
     _type="StepTerminated"
     _msg="step terminated by signal ${_signal} after ${_jd}s"
@@ -116,13 +134,14 @@ _junit_emit() {
     _fx="<failure message=\"${_msg}\" type=\"${_type}\">${_msg}; classification at termination: ${_class}</failure>"
   elif (( _jr != 0 )); then
     _type="${_class}"
-    _msg="${_jn} failed: ${_class_detail}"
+    _msg=$(_xml_escape "${_jn} failed: ${_class_detail}")
+    _edetail=$(_xml_escape "${_class_detail}")
     if [[ "${_class}" == acs-unclassified:* ]]; then
       _ec=1
-      _fx="<error message=\"${_msg}\" type=\"${_type}\">${_class_detail}</error>"
+      _fx="<error message=\"${_msg}\" type=\"${_type}\">${_edetail}</error>"
     else
       _fc=1
-      _fx="<failure message=\"${_msg}\" type=\"${_type}\">${_class_detail}</failure>"
+      _fx="<failure message=\"${_msg}\" type=\"${_type}\">${_edetail}</failure>"
     fi
   else
     _fx=""
@@ -169,7 +188,7 @@ _on_exit() {
   local _rc="${1:-0}"
   set +e
   _junit_emit "${_rc}" "${2:-}" || true
-  _opp_cleanup
+  _opp_cleanup "${_rc}"
   exit "${_rc}"
 }
 trap '_on_exit $? ""' EXIT
@@ -234,8 +253,8 @@ echo ">>> PHASE: Deploy ACS Operator (channel: ${ACS_CHANNEL}, csv-name wait: ${
 
 # --- Self-disable: if the OperatorPolicy already owns a healthy install,
 #     the workaround is redundant — report and exit 0 without installing.
-if oc get crd operatorpolicies.operator.management.openshift.io >/dev/null 2>&1; then
-  _op_status=$(oc get operatorpolicy operatorpolicy-rhacs-operator -A -o json 2>/dev/null) || _op_status=""
+if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
+  _op_status=$(oc get operatorpolicy -A -o json 2>/dev/null) || _op_status=""
   if [[ -n "${_op_status}" ]]; then
     _self_disable=$(python3 -c '
 import json, sys
@@ -267,6 +286,21 @@ except Exception:
   fi
 fi
 _prop "workaround_removal_ready" "false"
+if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
+  # Detection, not gating: report object states and exit 0. Runs before the
+  # packagemanifest precondition on purpose — detection must work when the
+  # catalog is absent or erroring too.
+  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
+  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
+  _pm=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o name 2>/dev/null) || _pm=""
+  _prop "report_only" "true"
+  _prop "acs_subscription" "$([[ -n "${_sub}" ]] && echo adopted || echo absent)"
+  _prop "channel_observed" "${_sub:-absent}"
+  _prop "csv_phase" "${_csvp:-absent}"
+  _prop "packagemanifest" "${_pm:-absent}"
+  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
+  exit 0
+fi
 
 # --- Fail-fast precondition: packagemanifest must exist and list the
 #     requested channel. Three-way classify with bounded retry; a query
@@ -315,35 +349,25 @@ if [[ "${_channel_ok}" == "error" ]]; then
 fi
 echo ">>> precondition: rhacs-operator present; channel ${ACS_CHANNEL} head: ${_channel_ok#ok }"
 
-if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
-  # Detection, not gating: report object states and exit 0.
-  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
-  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
-  _prop "report_only" "true"
-  _prop "acs_subscription" "$([[ -n "${_sub}" ]] && echo adopted || echo absent)"
-  _prop "channel_observed" "${_sub:-absent}"
-  _prop "csv_phase" "${_csvp:-absent}"
-  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent}"
-  exit 0
-fi
+
 
 # --- Create-if-absent: namespace ---
 if oc get namespace "${ACS_NAMESPACE}" >/dev/null 2>&1; then
   _prop "acs_namespace" "adopted"
 else
-  oc create namespace "${ACS_NAMESPACE}" 2>&1 || {
-    if oc get namespace "${ACS_NAMESPACE}" >/dev/null 2>&1; then
-      _prop "acs_namespace" "race-tolerated"
-    else
-      _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE}"
-      exit 1
-    fi
-  }
-  _prop "acs_namespace" "created"
+  if oc create namespace "${ACS_NAMESPACE}" 2>&1; then
+    _prop "acs_namespace" "created"
+  elif oc get namespace "${ACS_NAMESPACE}" >/dev/null 2>&1; then
+    _prop "acs_namespace" "race-tolerated"
+  else
+    _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE}"
+    exit 1
+  fi
 fi
 
-# --- Create-if-absent: OperatorGroup ---
-if oc get operatorgroup rhacs-operator-group -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
+# --- Create-if-absent: OperatorGroup (any existing group is adopted; a
+# second group in one namespace puts CSVs into TooManyOperatorGroups) ---
+if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ACS_NAMESPACE}" -o name 2>/dev/null)" ]]; then
   _prop "acs_operatorgroup" "adopted"
 else
   cat <<EOF | oc apply -f - 2>&1
