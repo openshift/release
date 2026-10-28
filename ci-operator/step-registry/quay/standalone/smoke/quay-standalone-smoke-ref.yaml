@@ -1,0 +1,29 @@
+ref:
+  as: quay-standalone-smoke
+  from: quay-playwright-runner
+  cli: latest
+  commands: quay-standalone-smoke-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 30m0s
+  grace_period: 2m0s
+  credentials:
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  documentation: |-
+    Smoke-test Quay standalone HA over TLS verified against the job CA:
+    /health/instance through the NLB and on each node, the OAuth token
+    authenticating as the initialized user, repository creation through the
+    API, and a push of quay.io/libpod/busybox:latest through the NLB pulled
+    back with an equal manifest digest. Each check is a testcase in
+    ${ARTIFACT_DIR}/junit_quay_standalone_smoke.xml; any failure fails the
+    step.
+
+    Reads from SHARED_DIR: quay_standalone_hostname, quay_standalone_nodes,
+    quay_standalone_ca.crt, quay_oauth2_token.
+
+    Writes to SHARED_DIR: quay_standalone_smoke_image, the pushed
+    "<namespace>/<repository>:<tag>", only when the push succeeded.
