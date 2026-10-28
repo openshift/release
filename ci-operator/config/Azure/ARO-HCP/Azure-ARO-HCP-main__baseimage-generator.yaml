@@ -50,8 +50,8 @@ tests:
     set -euo pipefail
     d=$(mktemp -d)
     trap 'rm -rf "$d"' EXIT
-    # Azure CLI initializes its config directory even for version checks.
-    export AZURE_CONFIG_DIR="$d/azure"
+    # Version checks need writable state for Azure CLI and bundled .NET tools.
+    export HOME="$d"
     make -C dev-infrastructure/openshift-ci verify test IN_CONTAINER=true
     cd "$d"
     go mod init smoke.example.com/nonroot
