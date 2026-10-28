@@ -12,7 +12,8 @@ mkdir -p "${ARTIFACT_DIR}"
 oc version || true
 {
   echo "ready_status:"
-  oc get nodes -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+  oc get nodes \
+    -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status'
 } > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
 
 set +e
@@ -27,7 +28,7 @@ oc get modules.kmm.sigs.x-k8s.io --all-namespaces \
   -o custom-columns='MODULE_LOADER_AVAILABLE:.status.moduleLoader.availableNumber,MODULE_LOADER_DESIRED:.status.moduleLoader.desiredNumber,DEVICE_PLUGIN_AVAILABLE:.status.devicePlugin.availableNumber,DEVICE_PLUGIN_DESIRED:.status.devicePlugin.desiredNumber' \
   > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
 oc get pods --namespace openshift-kmm \
-  -o custom-columns='PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount' \
+  -o custom-columns='NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount' \
   > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
 oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
   -o custom-columns='TYPE:.type,REASON:.reason,COUNT:.count,LAST:.lastTimestamp' \
