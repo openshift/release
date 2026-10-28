@@ -91,9 +91,19 @@ if ! whoami &> /dev/null; then
 fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+# Cloud bastion provisioners write both addresses. Baremetal lab only writes
+# bastion_public_address (AUX_HOST). Prefer public, then private.
 if [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
     BASTION_IP=$(<"${SHARED_DIR}/bastion_public_address")
+elif [[ -s "${SHARED_DIR}/bastion_private_address" ]]; then
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+else
+    echo "Neither bastion_public_address nor bastion_private_address exists in SHARED_DIR."
+    exit 1
+fi
+if [[ ! -s "${SHARED_DIR}/bastion_ssh_user" ]]; then
+    echo "File ${SHARED_DIR}/bastion_ssh_user does not exist."
+    exit 1
 fi
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
