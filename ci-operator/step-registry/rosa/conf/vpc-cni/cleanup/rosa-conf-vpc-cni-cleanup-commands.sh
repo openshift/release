@@ -45,4 +45,3 @@ else
   log "ERROR: cannot query IAM role ${IAM_ROLE_NAME}: ${err}"
   exit 1
 fi
-rm -f "${SHARED_DIR}/aws-vpc-cni-role-name"
