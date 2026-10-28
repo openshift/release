@@ -31,6 +31,7 @@ _opp_cleanup() {
 _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
+_acs_refusal=""  # set by the version-transition guard; surfaced in the JUnit failure message
 _junit_emit() {
   # Emit a JUnit XML result for the ACS upgrade step and propagate
   # it to SHARED_DIR/junit so downstream steps can aggregate results.
@@ -45,7 +46,14 @@ _junit_emit() {
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
     _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+    local _jmsg="${_jn} exited with code ${_jr}"
+    if [[ -n "${_acs_refusal}" ]]; then
+      # Note: _xml_escape is defined later in this file; that is safe because
+      # this function only runs from the EXIT trap, after the whole script
+      # (including _xml_escape) has been sourced.
+      _jmsg="${_jmsg}: $(_xml_escape "${_acs_refusal}")"
+    fi
+    _fx="<failure message=\"${_jmsg}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
   fi
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
@@ -208,6 +216,92 @@ function ResolveTargetChannel () {
     fi
 
     echo "${nextChannel}"
+    true
+}
+
+function GetChannelVersion () {
+    # Return the catalog version for the named channel from the packagemanifest.
+    typeset channelName="$1"
+    typeset packageName catalogNamespace jsonPath
+    catalogNamespace="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.sourceNamespace}' || true)"
+    packageName="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.name}' || true)"
+    jsonPath="{.status.channels[?(@.name==\"${channelName}\")].version}"
+    oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath="${jsonPath}" || true
+}
+
+function CompareVersionTuples () {
+    # Numerically compare two dotted version strings; echoes -1, 0, or 1.
+    # Reference implementation: opp_interop.junit.compare_version_tuples
+    # (the OPP interop evidence tooling). Semantics mirrored here: strip
+    # leading non-digits, take leading digits per dot-separated piece,
+    # missing components count as 0 (so 4.10 == 4.10.0), compare numerically
+    # so 4.9 < 4.10.
+    typeset left="$1" right="$2"
+    typeset -a lparts rparts
+    typeset piece digits i l r n
+    while [[ -n "${left}" && ! "${left:0:1}" =~ [0-9] ]]; do left="${left:1}"; done
+    while [[ -n "${right}" && ! "${right:0:1}" =~ [0-9] ]]; do right="${right:1}"; done
+    IFS='.' read -ra lparts <<< "${left}"
+    IFS='.' read -ra rparts <<< "${right}"
+    n=$(( ${#lparts[@]} > ${#rparts[@]} ? ${#lparts[@]} : ${#rparts[@]} ))
+    for (( i=0; i<n; i++ )); do
+        l=0; r=0
+        if (( i < ${#lparts[@]} )); then
+            piece="${lparts[$i]}"; digits="${piece%%[!0-9]*}"; l=$((10#${digits:-0}))
+        fi
+        if (( i < ${#rparts[@]} )); then
+            piece="${rparts[$i]}"; digits="${piece%%[!0-9]*}"; r=$((10#${digits:-0}))
+        fi
+        if (( l < r )); then echo -1; return 0; fi
+        if (( l > r )); then echo 1; return 0; fi
+    done
+    echo 0
+    true
+}
+
+function AssertVerifiedForwardTransition () {
+    # Reject an unverifiable, downgrading, or non-forward version transition
+    # before the subscription is patched (INTEROP-9606). Fails closed with
+    # exit 3: a downgrade, a target channel head not above the installed
+    # version, or a version that cannot be determined must never pass.
+    typeset installedVersion="$1" targetChannel="$2"
+    typeset targetVersion cmp
+
+    if [[ -z "${installedVersion}" || ! "${installedVersion}" =~ [0-9] ]]; then
+        _acs_refusal="cannot verify version transition: installed version is missing or has no numeric component ('${installedVersion}')"
+        echo >&2 "ERROR: ${_acs_refusal}"
+        return 3
+    fi
+
+    targetVersion="$(GetChannelVersion "${targetChannel}")"
+    # A duplicated channel name in the packagemanifest would make the
+    # jsonpath emit multiple versions; treat any whitespace as unverifiable
+    # rather than silently comparing a mangled tuple.
+    if [[ -z "${targetVersion}" || "${targetVersion}" =~ [[:space:]] || ! "${targetVersion}" =~ [0-9] ]]; then
+        _acs_refusal="cannot verify version transition: target channel ${targetChannel} has no numeric version in the packagemanifest"
+        echo >&2 "ERROR: ${_acs_refusal}"
+        return 3
+    fi
+
+    cmp="$(CompareVersionTuples "${targetVersion}" "${installedVersion}")"
+    if (( cmp < 0 )); then
+        _acs_refusal="downgrade refused: installed ${installedVersion} -> target channel ${targetChannel} resolves to ${targetVersion}"
+        echo >&2 "ERROR: ${_acs_refusal} (INTEROP-9606)"
+        return 3
+    fi
+    if (( cmp == 0 )); then
+        _acs_refusal="no forward path: channel head ${targetVersion} is not above installed ${installedVersion}"
+        echo >&2 "ERROR: ${_acs_refusal} (INTEROP-9606)"
+        return 3
+    fi
+
+    echo "Verified forward transition: ${installedVersion} -> ${targetVersion} (channel ${targetChannel})"
     true
 }
 
@@ -426,6 +520,8 @@ function Main () {
     targetChannel="$(ResolveTargetChannel)"
     echo "Target channel: ${targetChannel}"
 
+    AssertVerifiedForwardTransition "${currentVersion}" "${targetChannel}"
+
     prePatchPlan=""
     if ! prePatchPlan="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
@@ -493,6 +589,11 @@ function Main () {
     WaitForCsvSucceeded "${currentCsv}"
     newCsv="$(GetCurrentCsv)"
     newVersion="$(GetInstalledVersion)"
+    if [[ "$(CompareVersionTuples "${newVersion}" "${currentVersion}")" -le 0 ]]; then
+        _acs_refusal="upgrade completed without a version increase (${currentVersion} -> ${newVersion})"
+        echo >&2 "ERROR: ${_acs_refusal} (INTEROP-9606)"
+        exit 3
+    fi
     echo "Upgrade complete: ${currentVersion} -> ${newVersion} (CSV: ${newCsv})"
 
     typeset _acs_upgrade_output=""
