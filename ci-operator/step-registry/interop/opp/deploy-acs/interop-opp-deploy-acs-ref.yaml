@@ -2,26 +2,74 @@ ref:
   as: interop-opp-deploy-acs
   commands: interop-opp-deploy-acs-commands.sh
   documentation: |-
-    Deploys the Red Hat Advanced Cluster Security (ACS/RHACS) operator via OLM
-    subscription. Creates the namespace, OperatorGroup, and Subscription, then
+    Deploys the Red Hat Advanced Cluster Security (ACS/RHACS) operator via a
+    direct OLM Subscription (namespace, OperatorGroup, Subscription), then
     waits for the CSV to reach Succeeded phase.
+
+    INTEROP-9525 workaround: on OCP 5.x, ACM 2.17's governance-policy-addon-
+    controller gates OperatorPolicy on openshiftVersion-major == "4", so the
+    policy path never installs the operator. This step restores the operator
+    precondition; ACM's ConfigurationPolicy (not gated) then creates the
+    Central/SecuredCluster CRs in a later step. Remove this step when an ACM
+    2.17.z carrying stolostron/governance-policy-addon-controller#1397 ships
+    in release-2.17 — the step self-disables (workaround_removal_ready=true)
+    when the OperatorPolicy is Compliant with a matching channel and the CSV
+    is Succeeded.
+
+    Contract: single JUnit testcase (acs-deploy / lp-interop--OPP--acs-deploy)
+    with classification in the failure type/message only; a default-failing
+    case is pre-seeded on disk before any work (a SIGKILL still leaves a
+    failing case; missing JUnit reads as unknown, never green). Failure
+    classes, in precedence order: acs-subscription-query-failed (3
+    consecutive query failures — an error is never classified as absence or
+    timeout), acs-catalog-missing, acs-catalog-query-failed (non-reverting),
+    acs-subscription-unsatisfiable, acs-installplan-missing/-failed,
+    acs-csv-failed, acs-csv-timeout, default acs-unclassified:* (JUnit
+    error). Existing objects are adopted, never overwritten (oc create, not
+    apply; channel mismatches recorded as properties). Provenance properties
+    (created|adopted, channel_requested/observed, csv_name) are written to
+    acs-deploy-properties.txt. Durable authority: opp-interop-testing
+    docs/design/acs-deploy-evidence.md.
+
+    Timeout budget (must multiply out when checked): timeout 30m (1800s) −
+    grace 150s = 1680s work; overhead 180s + precondition ≤120s (3 × 20s
+    request-timeout + 50s backoff) + CSV-name wait 600s + CSV-Succeeded wait
+    600s + diagnostics ≤120s (bounded: last 50 events, ≤256KiB/object) =
+    1620s ≤ 1680s, margin 60s. TERM path: JUnit emitted first (≤10s).
+    Every oc call carries --request-timeout=20s.
   env:
     - default: stable
-      documentation: OLM channel for the ACS operator subscription
+      documentation: |-
+        OLM channel for the ACS operator subscription. The default `stable`
+        matches policy-acs-operator-central's enforced channel (one channel
+        owner by construction; resolved to rhacs-operator.v4.11.6 on the
+        OCP 5.0 catalog, rehearsal build 2115229706075770880). Must match
+        ^[A-Za-z0-9][A-Za-z0-9._-]*$ or the step fails fast (exit 2).
       name: ACS_CHANNEL
-    - default: 15m
-      documentation: Timeout for the ACS operator CSV to reach Succeeded
+    - default: "600"
+      documentation: |-
+        Timeout in integer seconds (1..900) for the CSV to reach Succeeded
+        phase. Integer seconds only — no duration strings.
       name: ACS_INSTALL_TIMEOUT
+    - default: "600"
+      documentation: |-
+        Timeout in integer seconds (1..900) for the Subscription to resolve
+        a currentCSV name. Integer seconds only.
+      name: ACS_CSV_WAIT_TIMEOUT
     - default: rhacs-operator
       documentation: Namespace for the ACS operator
       name: ACS_NAMESPACE
-    - default: stackrox
-      documentation: Namespace for ACS Central
-      name: ACS_CENTRAL_NAMESPACE
+    - default: "0"
+      documentation: |-
+        Set to "1" for detection-only mode: report object states
+        (subscription present/absent, channel, CSV phase) as properties and
+        exit 0 without installing. Used when the workaround is retired but
+        the detection surface is retained.
+      name: ACS_REPORT_ONLY
   from: cli
-  grace_period: 1m
+  grace_period: 150s
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
-  timeout: 20m
+  timeout: 30m
