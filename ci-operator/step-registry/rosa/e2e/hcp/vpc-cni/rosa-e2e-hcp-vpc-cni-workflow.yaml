@@ -21,13 +21,14 @@ workflow:
     - chain: rosa-sts-oidc-config-create
     - ref: rosa-cluster-provision
     - ref: rosa-cluster-wait-ready-cluster
-    # Breakglass kubeconfig: the customer kubeconfig (rosa-conf-idp-htpasswd)
-    # only becomes usable after the CNI is in place.
-    - ref: osd-ccs-cluster-provision-admin-kubeconfig
     # The VPC-CNI variant step (ROSAENG-67432): IRSA role, SCCs, ip-forward
     # tuning config and the eks/aws-vpc-cni helm release with the ROSA/CRI-O
     # host-path overrides, per https://github.com/phbergsmann/rosa-vpc-cni.
-    # Also records cni=aws-vpc-cni in cluster-metadata.json.
+    # It also fetches the breakglass kubeconfig from the OCM credentials API
+    # (the customer kubeconfig only becomes usable after the CNI is in place;
+    # the osd-ccs admin-kubeconfig step is not usable here because it requires
+    # an ocm-token in the cluster profile, while the rosa profiles carry SSO
+    # client credentials) and records cni=aws-vpc-cni in cluster-metadata.json.
     - ref: rosa-conf-vpc-cni
     - ref: rosa-cluster-notify-error
     - ref: rosa-cluster-wait-ready-operators

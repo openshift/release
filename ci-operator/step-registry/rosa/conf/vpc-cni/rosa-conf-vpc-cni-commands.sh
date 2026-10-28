@@ -67,8 +67,32 @@ fi
 $WAS_TRACING && set -x
 
 # The cluster is not functional yet (nodes NotReady), so use the breakglass
-# admin kubeconfig rather than the customer kubeconfig.
+# admin kubeconfig rather than the customer kubeconfig. If no kubeconfig was
+# produced yet, fetch one from the OCM credentials API (the osd-ccs
+# admin-kubeconfig step is not usable here: it requires an ocm-token in the
+# cluster profile, while the rosa profiles carry SSO client credentials).
 if [[ -z "${KUBECONFIG:-}" ]]; then
+  if [[ ! -s "${SHARED_DIR}/kubeconfig.kubeadmin" && ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+    # Do not trace the OCM login.
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+      log "Logging into OCM (${OCM_LOGIN_ENV}) with SSO credentials"
+      ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    elif [[ -n "${ROSA_TOKEN}" ]]; then
+      log "Logging into OCM (${OCM_LOGIN_ENV}) with an offline token"
+      ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+    else
+      $WAS_TRACING && set -x
+      log "ERROR: no OCM credentials found in cluster profile (sso-client-id/secret or ocm-token)"
+      exit 1
+    fi
+    $WAS_TRACING && set -x
+    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" \
+      | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig.kubeadmin"
+    chmod 0600 "${SHARED_DIR}/kubeconfig.kubeadmin"
+    log "Fetched the breakglass admin kubeconfig from OCM"
+  fi
   if [[ -s "${SHARED_DIR}/kubeconfig.kubeadmin" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig.kubeadmin"
   elif [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
