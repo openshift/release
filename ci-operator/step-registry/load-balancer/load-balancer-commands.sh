@@ -85,7 +85,7 @@ configs:
   lb:
     services:
       - name: api
-$( if [ -n "${API_IP}" ] && [ ! -f "${SHARED_DIR}/LB_PRIVATE_IPS" ];
+$( if [ -n "${API_IP}" ];
   then
     echo "        vips:"
     echo "          - ${API_IP}"
@@ -142,7 +142,7 @@ $( if [ -n "${INGRESS_IP}" ];
         backend_port: 443
         backend_hosts: *worker_hosts
       - name: mcs
-$( if [ -n "${API_IP}" ] && [ ! -f "${SHARED_DIR}/LB_PRIVATE_IPS" ];
+$( if [ -n "${API_IP}" ];
   then
     echo "        vips:"
     echo "          - ${API_IP}"
