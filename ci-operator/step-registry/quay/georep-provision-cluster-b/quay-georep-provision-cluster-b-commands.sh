@@ -1,17 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-# Provision a HyperShift hosted cluster in the secondary region for
-# geo-replication testing. This script does not enable set -x to avoid
-# leaking credentials.
+# Provision a second IPI OCP cluster in the secondary region for Quay
+# geo-replication testing. Extracts openshift-install from the release
+# payload used by cluster A, generates an install-config for the
+# secondary region, and runs the installer.
+#
+# This script does not enable set -x to avoid leaking credentials.
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-georep-provision-cluster-b"
 mkdir -p "${ARTIFACT_DIR}"
 
 REGION_SECONDARY="${QUAY_GEOREP_REGION_SECONDARY:-us-west-2}"
 NODE_COUNT="${QUAY_GEOREP_CLUSTER_B_NODE_COUNT:-3}"
-CLUSTER_NAME="quay-georep-b-${NAMESPACE:-ns}-${UNIQUE_HASH:-$(date +%s)}"
-CLUSTER_NAME="$(printf '%s' "${CLUSTER_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-' | cut -c1-30)"
 
 QUAY_AWS_ACCESS_KEY="$(cat /var/run/quay-qe-aws-secret/access_key)"
 QUAY_AWS_SECRET_KEY="$(cat /var/run/quay-qe-aws-secret/secret_key)"
@@ -19,29 +20,98 @@ export AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}"
 export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
 
 PULL_SECRET="${CLUSTER_PROFILE_DIR}/pull-secret"
+SSH_PUB_KEY_FILE="${CLUSTER_PROFILE_DIR}/ssh-publickey"
+BASE_DOMAIN="${QUAY_GEOREP_BASE_DOMAIN:-quayqe.devcluster.openshift.com}"
 
-echo "Provisioning HyperShift hosted cluster '${CLUSTER_NAME}' in ${REGION_SECONDARY}..." >&2
+CLUSTER_NAME="georep-b-${NAMESPACE:-ns}-${UNIQUE_HASH:-$(date +%s)}"
+CLUSTER_NAME="$(printf '%s' "${CLUSTER_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-' | cut -c1-27)"
 
-# TODO: Replace with actual hypershift CLI invocation once the HyperShift
-# operator is available on the management cluster. This is a placeholder
-# that will be filled in during Phase 2 implementation.
-#
-# Expected flow:
-#   1. Install HyperShift operator on management cluster (cluster A)
-#   2. Create a HostedCluster CR targeting the secondary region
-#   3. Wait for the hosted cluster to become available
-#   4. Extract kubeconfig and write to SHARED_DIR
-#
-# hypershift create cluster aws \
-#   --name "${CLUSTER_NAME}" \
-#   --region "${REGION_SECONDARY}" \
-#   --node-pool-replicas "${NODE_COUNT}" \
-#   --pull-secret "${PULL_SECRET}" \
-#   --release-image "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" \
-#   --aws-creds /var/run/quay-qe-aws-secret/credentials
+INSTALL_DIR="${SHARED_DIR}/cluster-b-install"
+mkdir -p "${INSTALL_DIR}"
 
-echo "PLACEHOLDER: HyperShift cluster provisioning not yet implemented" >&2
+RELEASE_IMAGE="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}"
+if [[ -z "${RELEASE_IMAGE}" ]]; then
+    echo "ERROR: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is not set" >&2
+    exit 1
+fi
+
+echo "Extracting openshift-install from release image..." >&2
+oc adm release extract -a "${PULL_SECRET}" "${RELEASE_IMAGE}" \
+    --command=openshift-install --to="${INSTALL_DIR}"
+INSTALLER="${INSTALL_DIR}/openshift-install"
+chmod +x "${INSTALLER}"
+echo "Installer version:" >&2
+"${INSTALLER}" version >&2
+
+SSH_PUB_KEY=""
+if [[ -r "${SSH_PUB_KEY_FILE}" ]]; then
+    SSH_PUB_KEY="$(cat "${SSH_PUB_KEY_FILE}")"
+fi
+
+PULL_SECRET_CONTENT="$(cat "${PULL_SECRET}")"
+
+cat >"${INSTALL_DIR}/install-config.yaml" <<EOF
+apiVersion: v1
+baseDomain: ${BASE_DOMAIN}
+metadata:
+  name: ${CLUSTER_NAME}
+platform:
+  aws:
+    region: ${REGION_SECONDARY}
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    aws:
+      type: m5.2xlarge
+  replicas: ${NODE_COUNT}
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    aws:
+      type: m5.xlarge
+  replicas: 3
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+publish: External
+pullSecret: '${PULL_SECRET_CONTENT}'
+sshKey: |
+  ${SSH_PUB_KEY}
+EOF
+
+cp "${INSTALL_DIR}/install-config.yaml" "${ARTIFACT_DIR}/install-config.yaml.bak"
+
+echo "Creating cluster '${CLUSTER_NAME}' in ${REGION_SECONDARY}..." >&2
+if ! "${INSTALLER}" create cluster --dir="${INSTALL_DIR}" --log-level=info 2>&1 | tee "${ARTIFACT_DIR}/install.log"; then
+    echo "ERROR: openshift-install create cluster failed" >&2
+    cp "${INSTALL_DIR}"/.openshift_install_state.json "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "${INSTALL_DIR}"/terraform.tfstate "${ARTIFACT_DIR}/" 2>/dev/null || true
+    exit 1
+fi
+
+echo "Cluster B provisioned successfully in ${REGION_SECONDARY}" >&2
+
+cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-cluster-b"
+chmod 600 "${SHARED_DIR}/kubeconfig-cluster-b"
+
 printf '%s' "${CLUSTER_NAME}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_NAME"
+printf '%s' "${REGION_SECONDARY}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_REGION"
+
+cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/cluster-b-metadata.json"
+tar -czf "${SHARED_DIR}/cluster-b-install.tgz" -C "${INSTALL_DIR}" .
 
 echo "Cluster B name: ${CLUSTER_NAME}" >&2
 echo "Region: ${REGION_SECONDARY}" >&2
+echo "Kubeconfig: \${SHARED_DIR}/kubeconfig-cluster-b" >&2
+
+KUBECONFIG="${SHARED_DIR}/kubeconfig-cluster-b" oc get nodes >&2 || true
