@@ -19,8 +19,12 @@ echo "BASH_ENV=${BASH_ENV:-unset}"
 cat /proc/self/status | grep -E "Uid|Gid|Cap|NoNewPrivs|Seccomp" 2>/dev/null || true
 echo "=== END DEBUG ==="
 
-# Podman storage/subuid are configured by the container entrypoint
-# (ci/podman-entrypoint.sh). Nothing to do here.
+# aicli forces --storage-driver vfs inside Kubernetes. The base image
+# entrypoint may have configured overlay (fuse-overlayfs). Overwrite
+# before any podman command runs to avoid a driver mismatch.
+if [ -f "${HOME}/.config/containers/storage.conf" ]; then
+  printf '[storage]\ndriver = "vfs"\n' > "${HOME}/.config/containers/storage.conf"
+fi
 
 # A workflow can require an exact version handoff. Validate it before touching
 # the hypervisor, independently of the workflow that supplied the request.
