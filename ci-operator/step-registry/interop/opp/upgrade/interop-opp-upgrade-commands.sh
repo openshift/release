@@ -58,39 +58,39 @@ typeset isForceUpdate="false"
 
 function DebugOnExit () {
     if (( exitCode != 0 )); then
-        : "### DEBUG: Upgrade failure diagnostics ###"
+        echo "### DEBUG: Upgrade failure diagnostics ###"
         if [[ -n "${targetMinorVersion:-}" ]] && (( targetMinorVersion >= 16 )); then
-            : "# oc adm upgrade status"
+            echo "# oc adm upgrade status"
             env OC_ENABLE_CMD_UPGRADE_STATUS='true' oc adm upgrade status --details=all || true
         fi
-        : "# ClusterVersion YAML"
-        oc get clusterversion/version -oyaml || : "unavailable"
-        : "# MachineConfigs"
-        oc get machineconfig || : "unavailable"
+        echo "# ClusterVersion YAML"
+        oc get clusterversion/version -oyaml || echo "unavailable"
+        echo "# MachineConfigs"
+        oc get machineconfig || echo "unavailable"
 
-        : "# Abnormal nodes"
+        echo "# Abnormal nodes"
         typeset node=""
         for node in $(oc get node -o go-template='{{range .items}}{{$ready := ""}}{{range .status.conditions}}{{if eq .type "Ready"}}{{$ready = .status}}{{end}}{{end}}{{if ne $ready "True"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' || true); do
-            : "### oc describe node ${node} ###"
+            echo "### oc describe node ${node} ###"
             oc describe node "${node}" || true
         done
 
-        : "# Abnormal ClusterOperators"
+        echo "# Abnormal ClusterOperators"
         typeset co=""
         for co in $(oc get co -o go-template='{{range .items}}{{$avail := ""}}{{$prog := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Available"}}{{$avail = .status}}{{end}}{{if eq .type "Progressing"}}{{$prog = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $avail "True") (ne $prog "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' || true); do
-            : "### oc describe co ${co} ###"
+            echo "### oc describe co ${co} ###"
             oc describe co "${co}" || true
         done
 
-        : "# Abnormal MachineConfigPools"
+        echo "# Abnormal MachineConfigPools"
         typeset mcp=""
         for mcp in $(oc get machineconfigpools -o go-template='{{range .items}}{{$upd := ""}}{{$upting := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Updated"}}{{$upd = .status}}{{end}}{{if eq .type "Updating"}}{{$upting = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $upd "True") (ne $upting "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' || true); do
-            : "### oc describe mcp ${mcp} ###"
+            echo "### oc describe mcp ${mcp} ###"
             oc describe mcp "${mcp}" || true
         done
 
-        : "# OPP Operator CSVs"
-        oc get csv -A || : "unavailable"
+        echo "# OPP Operator CSVs"
+        oc get csv -A || echo "unavailable"
     fi
     true
 }
@@ -344,41 +344,50 @@ function StabilizeCluster () {
 
 function ValidatePlatformHealth () {
     echo ">>> PHASE: Validating platform health"
-    : "Validating platform health"
+    echo "Validating platform health"
 
-    typeset avail="" progressing="" degraded=""
+    typeset avail="" progressing="" degraded="" failing=""
     avail="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')"
     progressing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')"
     degraded="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Degraded")].status}')"
-    if [[ "${avail}" != "True" || "${progressing}" != "False" || "${degraded}" != "False" ]]; then
-        : "CVO health check failed: Available=${avail} Progressing=${progressing} Degraded=${degraded}"
+    failing="$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Failing")].status}')"
+    if [[ "${avail}" != "True" || "${progressing}" != "False" ]]; then
+        echo "CVO health check failed: Available=${avail} Progressing=${progressing}"
         return 1
     fi
-    : "CVO: Available=True, Progressing=False, Degraded=False"
+    if [[ -n "${degraded}" && "${degraded}" != "False" ]] || [[ -n "${failing}" && "${failing}" != "False" ]]; then
+        echo "CVO health check failed: Degraded=${degraded} Failing=${failing}"
+        return 1
+    fi
+    if [[ -z "${degraded}" && -z "${failing}" ]]; then
+        echo "CVO health check unjudgeable: neither Degraded nor Failing condition is published"
+        return 1
+    fi
+    echo "CVO healthy: Available=${avail} Progressing=${progressing} Degraded=${degraded:-<absent>} Failing=${failing:-<absent>}"
 
     typeset unhealthyCo=""
     unhealthyCo="$(oc get co -o go-template='{{range .items}}{{$avail := ""}}{{$prog := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Available"}}{{$avail = .status}}{{end}}{{if eq .type "Progressing"}}{{$prog = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $avail "True") (ne $prog "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${unhealthyCo}" ]]; then
-        : "Unhealthy ClusterOperators: ${unhealthyCo}"
+        echo "Unhealthy ClusterOperators: ${unhealthyCo}"
         return 1
     fi
-    : "All ClusterOperators healthy"
+    echo "All ClusterOperators healthy"
 
     typeset unreadyNodes=""
     unreadyNodes="$(oc get node -o go-template='{{range .items}}{{$ready := ""}}{{range .status.conditions}}{{if eq .type "Ready"}}{{$ready = .status}}{{end}}{{end}}{{if ne $ready "True"}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${unreadyNodes}" ]]; then
-        : "Not-Ready nodes: ${unreadyNodes}"
+        echo "Not-Ready nodes: ${unreadyNodes}"
         return 1
     fi
-    : "All nodes Ready"
+    echo "All nodes Ready"
 
     typeset mcpIssues=""
     mcpIssues="$(oc get machineconfigpools -o go-template='{{range .items}}{{$upd := ""}}{{$upting := ""}}{{$deg := ""}}{{range .status.conditions}}{{if eq .type "Updated"}}{{$upd = .status}}{{end}}{{if eq .type "Updating"}}{{$upting = .status}}{{end}}{{if eq .type "Degraded"}}{{$deg = .status}}{{end}}{{end}}{{if or (ne $upd "True") (ne $upting "False") (ne $deg "False")}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}')"
     if [[ -n "${mcpIssues}" ]]; then
-        : "Unhealthy MachineConfigPools: ${mcpIssues}"
+        echo "Unhealthy MachineConfigPools: ${mcpIssues}"
         return 1
     fi
-    : "All MachineConfigPools updated"
+    echo "All MachineConfigPools updated"
     true
 }
 
