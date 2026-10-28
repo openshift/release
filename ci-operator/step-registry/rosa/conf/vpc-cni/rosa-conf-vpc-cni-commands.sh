@@ -284,9 +284,24 @@ helm upgrade --install aws-vpc-cni \
 rm -f "${VALUES_FILE}"
 
 # ---- Wait for the aws-node DaemonSet and the nodes ----
-# Rollout wait rather than waiting on pods: right after helm install the
-# DaemonSet controller may not have created any pods yet, and oc wait on pods
-# would fail with "no matching resources found".
+# The tuning-config machine pool edits above replace every node (on a 3-AZ HCP
+# cluster the replicas are spread one per pool as workers-0/1/2), so right
+# after the edits the cluster can briefly have zero Node objects while the
+# replacement machines boot. Both oc wait and oc rollout status fail
+# immediately (not after the timeout) when no resources match: oc wait exits
+# with "no matching resources found" and the DaemonSet rollout wait succeeds
+# vacuously with 0 desired pods. Wait for the new nodes to register first.
+log "Waiting for nodes to register after the machine pool updates"
+NODE_REGISTER_DEADLINE=$(( SECONDS + NODE_REGISTER_TIMEOUT ))
+until [[ -n "$(oc get nodes -o name 2>/dev/null)" ]]; do
+  if (( SECONDS > NODE_REGISTER_DEADLINE )); then
+    log "ERROR: no nodes registered after ${NODE_REGISTER_TIMEOUT} seconds"
+    rosa list machinepools -c "${CLUSTER_ID}" || true
+    exit 1
+  fi
+  sleep 15
+done
+
 log "Waiting for the aws-node DaemonSet rollout"
 oc rollout status daemonset/aws-node -n kube-system --timeout=15m
 
