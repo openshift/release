@@ -8,16 +8,11 @@ ref:
       cpu: 100m
       memory: 200Mi
   documentation: |-
-    Cleans up after rosa-conf-vpc-cni:
-    - removes the hostaccess and privileged SCCs from the aws-node service
-      account (best-effort, using ${SHARED_DIR}/kubeconfig.kubeadmin or
-      ${SHARED_DIR}/kubeconfig while the cluster is still up)
-    - deletes the IRSA role created by rosa-conf-vpc-cni
-      (${SHARED_DIR}/aws-vpc-cni-role-name); the standard
-      rosa-aws-sts-hcp-deprovision chain does not know about the extra role and
-      would leak it
+    Cleans up after rosa-conf-vpc-cni: deletes the IRSA role created by that
+    step (${SHARED_DIR}/aws-vpc-cni-role-name). The standard deprovision chain
+    does not know about the extra role and would leak it.
 
-    The helm release and the ip-forward tuning config are in-cluster only and
-    are removed with the cluster by rosa-cluster-deprovision. A no-op when the
-    marker file is absent, so it is safe as a best-effort post step on any job.
-    Run it before rosa-cluster-deprovision.
+    All in-cluster changes (the SCCs, the helm release and the ip-forward
+    tuning config) are removed with the cluster by rosa-cluster-deprovision.
+    A no-op when the marker file is absent, so it is safe as a best-effort
+    post step on any job.
