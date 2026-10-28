@@ -67,11 +67,29 @@ if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
         echo "api DNS records include ${expected} LB endpoint(s)"
     fi
 
-    if [[ -f "${SHARED_DIR}/API_IP" ]]; then
-        api_ip="$(<"${SHARED_DIR}/API_IP")"
-        api_int_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords[].Value' \
+    api_int_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords[].Value' \
+        "${SHARED_DIR}/dns_up.json")"
+    echo "api-int DNS address(es): ${api_int_values}"
+
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+        api_int_expected=0
+        while IFS= read -r ip || [[ -n "${ip}" ]]; do
+            [[ -z "${ip}" ]] && continue
+            api_int_expected=$((api_int_expected + 1))
+            if ! grep -Fxq "${ip}" <<<"${api_int_values}"; then
+                echo "ERROR: expected api-int to include LB private IP ${ip}"
+                exit 1
+            fi
+        done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+        api_int_count="$(jq '[.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords | length] | first // 0' \
             "${SHARED_DIR}/dns_up.json")"
-        echo "api-int DNS address(es): ${api_int_values}"
+        if [[ "${api_int_count}" -lt "${api_int_expected}" ]]; then
+            echo "ERROR: expected at least ${api_int_expected} addresses for api-int, got ${api_int_count}"
+            exit 1
+        fi
+        echo "api-int DNS includes ${api_int_expected} LB private IP(s)"
+    elif [[ -f "${SHARED_DIR}/API_IP" ]]; then
+        api_ip="$(<"${SHARED_DIR}/API_IP")"
         if ! grep -Fxq "${api_ip}" <<<"${api_int_values}"; then
             echo "ERROR: expected api-int to include API VIP ${api_ip}"
             exit 1

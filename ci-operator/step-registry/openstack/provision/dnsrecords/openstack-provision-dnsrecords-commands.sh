@@ -70,16 +70,29 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
     "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
   cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
-    if [[ "${API_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    API_INT_VALUES=()
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+      while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        API_INT_VALUES+=("${ip}")
+      done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+    fi
+    if [[ "${#API_INT_VALUES[@]}" -eq 0 ]]; then
+      API_INT_VALUES+=("${API_IP}")
+    fi
+
+    if [[ "${API_INT_VALUES[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       API_INT_RECORD_TYPE="A"
     else
       API_INT_RECORD_TYPE="AAAA"
     fi
-    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_IP}"
+    API_INT_RESOURCE_RECORDS="$(printf '%s\n' "${API_INT_VALUES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({"Value": .})')"
+
+    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_INT_VALUES[*]}"
     jq --arg name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." \
       --arg type "${API_INT_RECORD_TYPE}" \
-      --arg ip "${API_IP}" \
-      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": [{"Value": $ip}]}}]' \
+      --argjson rr "${API_INT_RESOURCE_RECORDS}" \
+      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
       "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
     cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
   fi
