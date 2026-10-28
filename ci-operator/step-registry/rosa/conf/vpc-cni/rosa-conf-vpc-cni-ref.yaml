@@ -46,8 +46,13 @@ ref:
     ROSAENG-67580) so the validation tail can condition on the CNI type. The
     field is additive; heads that do not run this step are unaffected.
 
-    Requires ${SHARED_DIR}/cluster-id, a kubeconfig (kubeconfig.kubeadmin or
-    kubeconfig), cluster-metadata.json, and the rosa / oc / aws / jq binaries
-    provided by the rosa-aws-cli image. Run it between
-    rosa-cluster-wait-ready-cluster and rosa-cluster-wait-ready-operators:
-    nodes stay NotReady until the CNI is installed.
+    Requires ${SHARED_DIR}/cluster-id, cluster-metadata.json (for the region),
+    and OCM credentials in the cluster profile (SSO client credentials
+    preferred, ocm-token fallback) for the rosa/ocm login. If no kubeconfig is
+    present in ${SHARED_DIR} (kubeconfig.kubeadmin or kubeconfig), the step
+    fetches the breakglass admin kubeconfig from the OCM credentials API — the
+    osd-ccs-cluster-provision-admin-kubeconfig step cannot be used for this
+    because it requires an ocm-token, while the rosa cluster profiles carry SSO
+    client credentials. Run it between rosa-cluster-wait-ready-cluster and
+    rosa-cluster-wait-ready-operators: nodes stay NotReady until the CNI is
+    installed.
