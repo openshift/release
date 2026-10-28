@@ -545,18 +545,29 @@ EOF
     # those zones currently have spare capacity for this instance type, fall
     # back to any other zone in the region that supports it rather than
     # failing the job outright.
-    CANDIDATE_ZONES="${WORKER_ZONES}"
+    declare -a ZONE_QUEUE=()
+    for z in ${WORKER_ZONES}; do
+      ZONE_QUEUE+=("${z}")
+    done
     for fallback_zone in "${ELIGIBLE_ZONES[@]}"; do
       if ! echo "${WORKER_ZONES}" | grep -qw "${fallback_zone}"; then
-        CANDIDATE_ZONES="${CANDIDATE_ZONES} ${fallback_zone}"
+        ZONE_QUEUE+=("${fallback_zone}")
       fi
     done
 
     echo "No available existing hosts found. Attempting to allocate new host..."
     HOST_ID=""
     zone=""
+    declare -A TRIED_ZONES=()
 
-    for candidate_zone in ${CANDIDATE_ZONES}; do
+    while [[ ${#ZONE_QUEUE[@]} -gt 0 ]]; do
+      candidate_zone="${ZONE_QUEUE[0]}"
+      ZONE_QUEUE=("${ZONE_QUEUE[@]:1}")
+      if [[ -n "${TRIED_ZONES[${candidate_zone}]:-}" ]]; then
+        continue
+      fi
+      TRIED_ZONES[${candidate_zone}]=1
+
       echo "Attempting to allocate dedicated host in zone '${candidate_zone}'..."
 
       EXPIRATION_DATE=$(date -d '6 hours' --iso=minutes --utc)
@@ -579,6 +590,20 @@ EOF
         break
       else
         echo "Failed to allocate host in zone ${candidate_zone}: ${HOST_RESULT}"
+
+        # AWS's InsufficientHostCapacity error names other zones that
+        # currently have capacity for this instance type (e.g. "You can
+        # currently get m6a.xlarge capacity by specifying us-west-2a,
+        # us-west-2b in your request."). That's a live capacity signal more
+        # authoritative than our static candidate list, so try those zones
+        # next instead of working through the rest of the list blindly.
+        SUGGESTED_ZONES=$(echo "${HOST_RESULT}" | sed -n 's/.*specifying \(.*\) in your request\..*/\1/p' | tr -d ',')
+        for suggested_zone in ${SUGGESTED_ZONES}; do
+          if [[ -z "${TRIED_ZONES[${suggested_zone}]:-}" ]]; then
+            echo "AWS suggested zone '${suggested_zone}' has capacity; trying it next"
+            ZONE_QUEUE=("${suggested_zone}" "${ZONE_QUEUE[@]}")
+          fi
+        done
       fi
     done
 
