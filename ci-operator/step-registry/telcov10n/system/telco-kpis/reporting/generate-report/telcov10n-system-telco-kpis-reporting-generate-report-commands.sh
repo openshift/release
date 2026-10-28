@@ -68,7 +68,8 @@ main() {
     # If rotating splunk_hec_token or git_repo_token, also update the
     # hypervisor vaults (teams/telco-kpis/hypervisors/) to keep Jenkins in sync.
     SENSITIVE_VARS_FILE=$(mktemp /tmp/sensitive-vars-XXXXXX.yml)
-    trap 'rm -f "${SENSITIVE_VARS_FILE}"' EXIT
+    _cleanup_sensitive_vars() { rm -f "${SENSITIVE_VARS_FILE}"; }
+    add_exit_handler _cleanup_sensitive_vars
     echo "---" > "${SENSITIVE_VARS_FILE}"
 
     SPLUNK_FLAG=()
