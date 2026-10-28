@@ -125,6 +125,23 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
   merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+DATABASE_CONFIG_FRAGMENT=""
+for candidate in \
+  "${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
+  "${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
+do
+  if [[ -s "${candidate}" ]]; then
+    DATABASE_CONFIG_FRAGMENT="${candidate}"
+    break
+  fi
+done
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+  echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..." >&2
+  merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+  POSTGRES_MANAGED="false"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
   echo "Merging extra Quay config into defaults..." >&2
   echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -148,13 +165,14 @@ yq -i '
     .REPO_MIRROR_TLS_VERIFY,
     .BUILDLOGS_REDIS,
     .USER_EVENTS_REDIS,
-    .DB_URI,
-    .DB_CONNECTION_ARGS,
     .SERVER_HOSTNAME,
     .PREFERRED_URL_SCHEME,
     .EXTERNAL_TLS_TERMINATION
   )
 ' config.yaml
+if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+  yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
+fi
 
 oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
@@ -224,6 +242,8 @@ spec:
     managed: false
   - kind: monitoring
     managed: false
+  - kind: postgres
+    managed: ${POSTGRES_MANAGED}
   - kind: horizontalpodautoscaler
     managed: false
   - kind: quay
