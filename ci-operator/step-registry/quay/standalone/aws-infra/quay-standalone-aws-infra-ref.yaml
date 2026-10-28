@@ -1,0 +1,60 @@
+ref:
+  as: quay-standalone-aws-infra
+  from: upi-installer
+  cli: latest
+  commands: quay-standalone-aws-infra-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 1h30m0s
+  grace_period: 2m0s
+  env:
+  - name: QUAY_STANDALONE_INSTANCE_TYPE
+    default: m6i.large
+    documentation: EC2 instance type of the three Quay nodes.
+  - name: QUAY_STANDALONE_REDIS_INSTANCE_TYPE
+    default: t3.small
+    documentation: EC2 instance type of the Redis host.
+  - name: QUAY_STANDALONE_DB_ENGINE_VERSION
+    default: "17"
+    documentation: RDS PostgreSQL engine version.
+  - name: QUAY_STANDALONE_DB_INSTANCE_CLASS
+    default: db.t3.medium
+    documentation: RDS DB instance class.
+  documentation: |-
+    Provision AWS infrastructure for a Quay standalone HA deployment in the VPC
+    from aws-provision-vpc-shared (ZONES_COUNT=3). No OpenShift cluster.
+
+    One CloudFormation stack "${NAMESPACE}-${UNIQUE_HASH}-qsha", tagged
+    expirationDate and quay-standalone-job=${NAMESPACE}-${UNIQUE_HASH}, holds:
+    - three RHEL 9 Quay nodes, one per public subnet and AZ, with podman,
+      openssl, curl, jq and the postgresql client
+    - one RHEL 9 Redis host in the first public subnet (SSH only; Redis is
+      configured by the deploy step)
+    - a private, encrypted Multi-AZ RDS PostgreSQL instance with no backups,
+      deleted with the stack (no final snapshot)
+    - an internet-facing NLB: TCP 443 to instance targets on TCP 8443, HTTPS
+      health check on /health/instance
+    - security groups: Quay 22 and 8443 open, Redis 6379 and PostgreSQL 5432
+      from the Quay nodes only
+    The step also creates S3 bucket "${NAMESPACE}-${UNIQUE_HASH}-qsha" outside
+    the stack, so post can empty and delete it, and registers the stack and
+    bucket in to_be_removed_cf_stack_list and to_be_removed_s3_bucket_list
+    before creating them. It waits for the stack, instance status checks, SSH
+    and cloud-init on every host.
+
+    Writes to SHARED_DIR, one value per file:
+    - quay_standalone_region, quay_standalone_stack_name,
+      quay_standalone_job_tag (value of tag quay-standalone-job),
+      quay_standalone_s3_bucket (bare bucket name), quay_standalone_ssh_user
+      (ec2-user), quay_standalone_db_identifier: written before anything is
+      created
+    - quay_standalone_hostname (NLB DNS name), quay_standalone_target_group_arn
+    - quay_standalone_nodes: three lines "<instance-id> <public-ip> <private-ip>"
+      in AZ order
+    - quay_standalone_redis: one line "<instance-id> <public-ip> <private-ip>"
+    - quay_standalone_db_endpoint (host), quay_standalone_db_port,
+      quay_standalone_db_name, quay_standalone_db_user
+    - quay_standalone_db_password: mode 0600, generated per job, never logged
+    SSH uses ${CLUSTER_PROFILE_DIR}/ssh-privatekey as ec2-user.
