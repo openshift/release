@@ -1,0 +1,34 @@
+workflow:
+  as: quay-standalone-aws-ha
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay
+      PLAYWRIGHT_GREP: API Smoke|CLI Interoperability|About Page
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@webhook|OCP-81036'
+      PLAYWRIGHT_REF_MODE: strict
+      PLAYWRIGHT_STANDALONE: "true"
+      PLAYWRIGHT_WORKERS: "2"
+      ZONES_COUNT: "3"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: quay-standalone-aws-infra
+    - ref: quay-standalone-deploy
+    test:
+    - ref: quay-standalone-smoke
+    - ref: quay-standalone-failover
+    - ref: quay-test-e2e
+    post:
+    - ref: quay-standalone-gather
+      best_effort: true
+    - ref: aws-deprovision-s3buckets
+    - ref: aws-deprovision-stacks
+    - ref: quay-standalone-aws-leak-check
+  documentation: |-
+    Quay standalone HA on AWS, with no OpenShift cluster: three RHEL 9 Quay
+    nodes behind an NLB across three AZs, a Redis host, Multi-AZ RDS
+    PostgreSQL and S3 storage. Tests run the smoke checks, then node failover,
+    then a Playwright subset with the suite pinned to the deployed image's
+    commit. Failover runs before Playwright because the OAuth token from
+    quay-standalone-deploy expires 9000s after the deploy. Post gathers
+    diagnostics, deletes the bucket and stacks, and fails on leaked resources.
