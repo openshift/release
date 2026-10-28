@@ -1,13 +1,20 @@
 build_root:
   from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: openshift-mcp-server
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.0"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 200Mi
-tag_specification:
-  name: "5.1"
-  namespace: ocp
 tests:
 - as: lint
   commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
@@ -73,12 +80,14 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       ANTHROPIC_USE_VERTEX: "1"
+      ASSERTION_PASS_RATE: "0.8"
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       EVAL_CONFIG: evals/core-eval-testing/builtin-anthropic/eval-core.yaml
       EVAL_LABEL_SELECTOR: suite=core
       GEMINI_USE_VERTEX: ""
       GOOGLE_CLOUD_LOCATION: us-east5
       GOOGLE_CLOUD_PROJECT: ocp-mcp-server-team
+      TASK_PASS_RATE: "0.8"
     test:
     - chain: openshift-mcp-server-mcpchecker-eval-vertex
     workflow: ipi-aws

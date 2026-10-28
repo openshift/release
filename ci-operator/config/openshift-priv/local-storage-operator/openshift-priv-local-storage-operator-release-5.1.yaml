@@ -124,6 +124,29 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-groups-scanner-local-storage
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-local-storage
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
 - as: verify-deps
   steps:
     test:

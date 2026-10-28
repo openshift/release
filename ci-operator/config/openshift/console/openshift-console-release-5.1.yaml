@@ -43,6 +43,8 @@ images:
       RUN cd frontend && \
           yarn install --immutable && \
           yarn playwright install chromium
+      RUN dnf install -y python3 git jq && dnf clean all
+      RUN npm install -g @anthropic-ai/claude-code@2.1.273 && claude --version
     from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
     inputs:
       src:
@@ -119,7 +121,17 @@ tests:
   as: e2e-gcp-console
   pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
+    allow_skip_on_success: true
     cluster_profile: openshift-org-gcp
+    env:
+      CONSOLE_FLAKE_AGENT_ENABLED: "true"
+      CONSOLE_FLAKE_DRIVER_SHA256: 9d0a79ca0a5ab3e9847c830822b8383afd7661e931235856ccc22c9e68115a3e
+      CONSOLE_FLAKE_SKILL_REVISION: main
+      CONSOLE_FLAKE_SKILL_SHA256: 8dea3696de872902b10dd642a330dc6eb13aa4477fb2108db4cd5acbc85a8ef0
+    post:
+    - ref: openshift-console-qe-agent
+    - chain: ipi-gcp-post
+    - ref: send-results-to-reportportal
     test:
     - as: test
       cli: latest

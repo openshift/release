@@ -135,6 +135,18 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
 - always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aescbc-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aescbc
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-rotation
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp
+- always_run: false
   as: e2e-gcp-operator-encryption-rotation-aesgcm
   optional: true
   pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
@@ -152,6 +164,19 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aesgcm-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aesgcm
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-rotation
+    test:
+    - ref: openshift-e2e-test
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-operator-encryption-perf-aescbc
@@ -212,6 +237,18 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-aws-single-node
 - always_run: false
+  as: e2e-aws-operator-disruptive-single-node-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants,legacy-kube-apiserver-invariants,legacy-etcd-invariants
+        --cluster-stability=Disruptive
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/disruptive-single-node
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-single-node
+- always_run: false
   as: e2e-gcp-operator-single-node
   optional: true
   steps:
@@ -257,6 +294,20 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
+    workflow: openshift-e2e-gcp-single-node
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-single-node-ote
+  optional: true
+  pipeline_run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      ENCRYPTION_PROVIDER: aescbc
+      TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants
+        --cluster-stability=Disruptive
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-rotation
+    test:
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-single-node
 - always_run: false
   as: e2e-gcp-operator-encryption-perf-single-node
@@ -418,7 +469,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
       VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
@@ -433,7 +483,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-2
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
       VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
@@ -448,7 +497,6 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-rotation
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
       VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
@@ -462,7 +510,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-node-invariants,legacy-test-framework-invariants,legacy-kube-apiserver-invariants,legacy-etcd-invariants
         --cluster-stability=Disruptive
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
@@ -479,7 +526,6 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants-pathological,kubelet-container-restarts
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms-3
       VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent

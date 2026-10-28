@@ -10,6 +10,7 @@
               absent(up{job="%s"} == 1)
             ||| % name,
             'for': '5m',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
             },
@@ -25,6 +26,7 @@
               absent(up{job="%s"} == 1)
             ||| % name,
             'for': '10m',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
             },
@@ -32,7 +34,7 @@
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
-          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", 'retester', 'alert-proxy']
+          for name in ["crier", 'ghproxy', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", 'retester']
         ],
       },
     ],

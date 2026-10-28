@@ -86,7 +86,7 @@ fi
 echo "Bot login: ${BOT_LOGIN}"
 
 # Hard blocks for credential-dumping commands. Prompt text is not enough
-# against injection from review comments (same approach as hypershift review-agent).
+# against injection from review comments in CI agent workflows.
 DISALLOWED_TOOLS=(
     "Bash(git config*credential*)"
     "Bash(git config*--list*)"
