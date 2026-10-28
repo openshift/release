@@ -5,7 +5,7 @@ for the proposed Slack-fed operations dashboard. It is configuration data, not a
 Kubernetes manifest. It is not yet loaded or mounted by the deployed DPTP-bot;
 the dashboard backend must implement that integration.
 
-Our Prometheus rules carry `ops_color` and `ops_category` in their alert
+Our managed Prometheus rules carry `ops_color` and `ops_category` in their alert
 annotations. Their Alertmanager Slack templates publish the values as
 `[ops_color=red ops_category=ci_platform]`. Direct Prow Slack reports publish the
 same marker from their job or ci-operator source configuration. Alert names,
@@ -32,6 +32,8 @@ and `other`. Apply source policy before accepting a message-supplied marker.
 
 Do not add a full duplicate list of source-owned rules to this file. Platform
 definitions stay untouched; there is no `AlertRelabelConfig` in this change.
-The single legacy Hive exception preserves its agreed classification until its
-source owner is identified. Historical-only notifications without a current
-definition use the default.
+The exact-name legacy exceptions preserve classification for the Hive alert
+whose owning definition has not been located and the three hosted-management
+alerts whose manifest is outside every Argo CD Application source path. Keep
+these exceptions until their managed source definitions are established.
+Historical-only notifications without a current definition use the default.
