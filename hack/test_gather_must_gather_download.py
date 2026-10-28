@@ -59,11 +59,10 @@ class SanitizerDownloadTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             shared = base / "shared"
-            shared.mkdir()
             artifacts = base / "artifacts"
-            artifacts.mkdir()
             binaries = base / "bin"
-            binaries.mkdir()
+            for directory in (shared, artifacts, binaries):
+                directory.mkdir()
             kubeconfig = base / "kubeconfig"
             kubeconfig.touch()
             (shared / "proxy-conf.sh").write_text(f"export https_proxy='{PROXY}'\n")
@@ -87,7 +86,7 @@ class SanitizerDownloadTest(unittest.TestCase):
                 "FIXTURE_SANITIZER_STATUS": str(sanitizer_status),
             }
             result = subprocess.run(["bash", "-c", script], env=environment,
-                                    text=True, capture_output=True, timeout=10)
+                                    text=True, capture_output=True, timeout=10, check=False)
             calls = [json.loads(line) for line in (base / "calls.jsonl").read_text().splitlines()]
             downloads = [arguments for command, arguments in calls if command == "curl"]
             expected_attempts = next((index + 1 for index, status in enumerate(statuses)
