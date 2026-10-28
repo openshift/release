@@ -259,8 +259,8 @@ latest_preceding_attempt() {
     # latest_preceding_attempt [job-name]: prints the greatest run id of that job (default: this job) in GCS
     # that is strictly below the current build, or nothing. A listing that fails is discarded entirely
     # (partial output must never select a run).
-    local job="${1:-${JOB_NAME:-}}" listing
-    local prefix="$(history_url "${job}")/"
+    local job="${1:-${JOB_NAME:-}}" listing prefix
+    prefix="$(history_url "${job}")/"
     if ! listing="$(gcloud storage ls "${prefix}" 2>/dev/null)"; then
         return 0
     fi
