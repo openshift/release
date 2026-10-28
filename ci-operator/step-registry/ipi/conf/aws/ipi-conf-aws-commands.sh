@@ -544,14 +544,19 @@ EOF
     # host capacity is zone-specific and shifts over time, so if none of
     # those zones currently have spare capacity for this instance type, fall
     # back to any other zone in the region that supports it rather than
-    # failing the job outright.
-    declare -a ZONE_QUEUE=()
+    # failing the job outright. Worker zones and fallback zones are tracked
+    # in separate queues, and the fallback queue is only drained once the
+    # worker queue is empty, so a fallback zone (which pins the worker pool
+    # outside its originally configured zones) is never tried ahead of an
+    # untried, already-configured worker zone.
+    declare -a WORKER_ZONE_QUEUE=()
     for z in ${WORKER_ZONES}; do
-      ZONE_QUEUE+=("${z}")
+      WORKER_ZONE_QUEUE+=("${z}")
     done
+    declare -a FALLBACK_ZONE_QUEUE=()
     for fallback_zone in "${ELIGIBLE_ZONES[@]}"; do
       if ! echo "${WORKER_ZONES}" | grep -qw "${fallback_zone}"; then
-        ZONE_QUEUE+=("${fallback_zone}")
+        FALLBACK_ZONE_QUEUE+=("${fallback_zone}")
       fi
     done
 
@@ -560,9 +565,14 @@ EOF
     zone=""
     declare -A TRIED_ZONES=()
 
-    while [[ ${#ZONE_QUEUE[@]} -gt 0 ]]; do
-      candidate_zone="${ZONE_QUEUE[0]}"
-      ZONE_QUEUE=("${ZONE_QUEUE[@]:1}")
+    while [[ ${#WORKER_ZONE_QUEUE[@]} -gt 0 || ${#FALLBACK_ZONE_QUEUE[@]} -gt 0 ]]; do
+      if [[ ${#WORKER_ZONE_QUEUE[@]} -gt 0 ]]; then
+        candidate_zone="${WORKER_ZONE_QUEUE[0]}"
+        WORKER_ZONE_QUEUE=("${WORKER_ZONE_QUEUE[@]:1}")
+      else
+        candidate_zone="${FALLBACK_ZONE_QUEUE[0]}"
+        FALLBACK_ZONE_QUEUE=("${FALLBACK_ZONE_QUEUE[@]:1}")
+      fi
       if [[ -n "${TRIED_ZONES[${candidate_zone}]:-}" ]]; then
         continue
       fi
@@ -599,9 +609,15 @@ EOF
         # next instead of working through the rest of the list blindly.
         SUGGESTED_ZONES=$(echo "${HOST_RESULT}" | sed -n 's/.*specifying \(.*\) in your request\..*/\1/p' | tr -d ',')
         for suggested_zone in ${SUGGESTED_ZONES}; do
-          if [[ -z "${TRIED_ZONES[${suggested_zone}]:-}" ]]; then
-            echo "AWS suggested zone '${suggested_zone}' has capacity; trying it next"
-            ZONE_QUEUE=("${suggested_zone}" "${ZONE_QUEUE[@]}")
+          if [[ -n "${TRIED_ZONES[${suggested_zone}]:-}" ]]; then
+            continue
+          fi
+          if echo "${WORKER_ZONES}" | grep -qw "${suggested_zone}"; then
+            echo "AWS suggested worker zone '${suggested_zone}' has capacity; trying it next"
+            WORKER_ZONE_QUEUE=("${suggested_zone}" "${WORKER_ZONE_QUEUE[@]}")
+          else
+            echo "AWS suggested fallback zone '${suggested_zone}' has capacity; trying it after remaining worker zones"
+            FALLBACK_ZONE_QUEUE=("${suggested_zone}" "${FALLBACK_ZONE_QUEUE[@]}")
           fi
         done
       fi
