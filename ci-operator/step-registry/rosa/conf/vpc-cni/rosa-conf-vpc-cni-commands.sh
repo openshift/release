@@ -121,7 +121,13 @@ if [[ -z "${OIDC_PROVIDER}" || "${OIDC_PROVIDER}" == "null" ]]; then
   log "ERROR: cluster ${CLUSTER_ID} has no OIDC endpoint; AWS VPC CNI needs an STS cluster"
   exit 1
 fi
-AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+# Prefer the account id from the cluster profile; fall back to the logged-in
+# rosa user (profiles without an aws-account-id file).
+if [[ -s "${CLUSTER_PROFILE_DIR}/aws-account-id" ]]; then
+  AWS_ACCOUNT_ID=$(head -n 1 "${CLUSTER_PROFILE_DIR}/aws-account-id")
+else
+  AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
+fi
 IAM_ROLE_NAME="${CLUSTER_ID}-vpc-cni"
 
 # The AWS-managed policy is required: custom policies with tag conditions do
