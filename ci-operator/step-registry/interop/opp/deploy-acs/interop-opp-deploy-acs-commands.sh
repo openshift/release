@@ -276,10 +276,10 @@ fi
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
   _op_status=$(oc get operatorpolicy -A -o json 2>/dev/null) || _op_status=""
   if [[ -n "${_op_status}" ]]; then
-    _self_disable=$(python3 -c '
+    _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
 try:
-    d = json.loads(sys.argv[1])
+    d = json.load(sys.stdin)
     items = d.get("items", [d])
     out = "false"
     for i in items:
@@ -293,7 +293,7 @@ try:
     print(out)
 except Exception:
     print("false")
-' "${_op_status}" 2>/dev/null || echo "false")
+' 2>/dev/null || echo "false")
     if [[ "${_self_disable}" == "true" ]]; then
       _existing_csv=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
@@ -331,17 +331,17 @@ if [[ "${_precondition_ok}" != "true" ]]; then
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
-_channel_ok=$(python3 -c '
+_channel_ok=$(printf '%s' "${_pm_raw}" | python3 -c '
 import json, sys
 try:
     ch = sys.argv[1]
-    d = json.loads(sys.argv[2])
+    d = json.load(sys.stdin)
     names = [c.get("name") for c in d.get("status", {}).get("channels", [])]
     head = next((c.get("currentCSV") for c in d.get("status", {}).get("channels", []) if c.get("name") == ch), None)
     print("ok " + str(head) if ch in names else "absent " + ",".join(names[:8]))
 except Exception:
     print("error")
-' "${ACS_CHANNEL}" "${_pm_raw}" 2>/dev/null || echo "error")
+' "${ACS_CHANNEL}" 2>/dev/null || echo "error")
 if [[ "${_channel_ok}" == absent* ]]; then
   _classify "acs-catalog-missing" "channel '${ACS_CHANNEL}' not listed for rhacs-operator (${_channel_ok#absent })"
   echo "ERROR: ${_class_detail}"
