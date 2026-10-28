@@ -206,6 +206,9 @@ elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TY
 fi
 # Generate availability zones based on these 2 criteria
 mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
+# ZONES is truncated below to ZONES_COUNT entries for the install-config; keep
+# the full eligible-zone list around for dedicated-host fallback allocation.
+ELIGIBLE_ZONES=("${ZONES[@]}")
 # Calculate the maximum number of availability zones from the region
 MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
@@ -537,7 +540,7 @@ EOF
     # back to any other zone in the region that supports it rather than
     # failing the job outright.
     CANDIDATE_ZONES="${WORKER_ZONES}"
-    for fallback_zone in "${ZONES[@]}"; do
+    for fallback_zone in "${ELIGIBLE_ZONES[@]}"; do
       if ! echo "${WORKER_ZONES}" | grep -qw "${fallback_zone}"; then
         CANDIDATE_ZONES="${CANDIDATE_ZONES} ${fallback_zone}"
       fi
@@ -582,15 +585,6 @@ EOF
   # We need to pass in the vars since YQ doesnt see the loop variables
   HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID) } ])' "${patch_dedicated_host}"
 
-  # Only one dedicated host is allocated/claimed above, and it only exists in
-  # a single zone. Pin the worker pool's zones to that zone: the compute pool
-  # may currently list additional zones (from the generic multi-AZ selection
-  # earlier in this script, or because the chosen host required falling back
-  # to a zone outside that selection), and leaving them would let the
-  # installer schedule worker machines into a zone where the dedicated host
-  # doesn't exist.
-  zone="${zone}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.zones = [ strenv(zone) ])' "${patch_dedicated_host}"
-
   # Save the usage tag key for deprovision step
   echo "${USAGE_TAG_KEY}" > "${SHARED_DIR}/dedicated-host-usage-tag"
 
@@ -598,6 +592,14 @@ EOF
   echo "Patching install-config.yaml for dedicated hosts."
   yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
   cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
+
+  # Only one dedicated host is allocated/claimed above, and it only exists in
+  # a single zone. Pin the worker pool's zones to that zone directly on
+  # ${CONFIG} (rather than via the yq-go merge above): "yq-go m -x" merges
+  # arrays by index, so a one-element zones patch only overwrites index 0 of
+  # an existing multi-zone list, leaving stale zones (without the dedicated
+  # host) in place for the installer to schedule workers into.
+  zone="${zone}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.zones = [ strenv(zone) ])' "${CONFIG}"
 fi
 
 # Configure dual-stack networking if IP_FAMILY is set
