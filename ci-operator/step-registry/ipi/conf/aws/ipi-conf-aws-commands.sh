@@ -530,12 +530,24 @@ EOF
       --resources "${HOST_ID}" \
       --tags "Key=${USAGE_TAG_KEY},Value=${JOB_NAME_SAFE}"
   else
-    # No available host found, try to allocate a new one in the first available zone
+    # No available host found, try to allocate a new one.
+    # Prefer the zones already configured for the worker pool, but dedicated
+    # host capacity is zone-specific and shifts over time, so if none of
+    # those zones currently have spare capacity for this instance type, fall
+    # back to any other zone in the region that supports it rather than
+    # failing the job outright.
+    CANDIDATE_ZONES="${WORKER_ZONES}"
+    for fallback_zone in "${ZONES[@]}"; do
+      if ! echo "${WORKER_ZONES}" | grep -qw "${fallback_zone}"; then
+        CANDIDATE_ZONES="${CANDIDATE_ZONES} ${fallback_zone}"
+      fi
+    done
+
     echo "No available existing hosts found. Attempting to allocate new host..."
     HOST_ID=""
     zone=""
 
-    for candidate_zone in ${WORKER_ZONES}; do
+    for candidate_zone in ${CANDIDATE_ZONES}; do
       echo "Attempting to allocate dedicated host in zone '${candidate_zone}'..."
 
       EXPIRATION_DATE=$(date -d '6 hours' --iso=minutes --utc)
@@ -562,13 +574,22 @@ EOF
     done
 
     if [[ -z "${HOST_ID}" ]]; then
-      echo "ERROR: Failed to allocate dedicated host in any zone"
+      echo "ERROR: Failed to allocate dedicated host in any zone in region ${aws_source_region}"
       exit 1
     fi
   fi
 
   # We need to pass in the vars since YQ doesnt see the loop variables
   HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID) } ])' "${patch_dedicated_host}"
+
+  # Only one dedicated host is allocated/claimed above, and it only exists in
+  # a single zone. Pin the worker pool's zones to that zone: the compute pool
+  # may currently list additional zones (from the generic multi-AZ selection
+  # earlier in this script, or because the chosen host required falling back
+  # to a zone outside that selection), and leaving them would let the
+  # installer schedule worker machines into a zone where the dedicated host
+  # doesn't exist.
+  zone="${zone}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.zones = [ strenv(zone) ])' "${patch_dedicated_host}"
 
   # Save the usage tag key for deprovision step
   echo "${USAGE_TAG_KEY}" > "${SHARED_DIR}/dedicated-host-usage-tag"
