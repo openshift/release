@@ -21,14 +21,22 @@ ssh_user=$(shared quay_standalone_ssh_user)
 ssh_user="${ssh_user:-ec2-user}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-# Masks the database password should a log quote DB_URI. It is hex, so it is
-# safe as a sed pattern; anything else is not used as one. Tracing stays off
-# for the rest of the step, since every redact call expands the password.
+# Masks the database passwords and the Clair PSK should a log quote DB_URI,
+# a Clair connstring or the PSK. They are hex, so they are safe as sed
+# patterns; anything else is not used as one. Tracing stays off for the rest
+# of the step, since every redact call expands them.
 set +x
-db_password=$(shared quay_standalone_db_password)
+redactions=()
+for secret_file in quay_standalone_db_password quay_standalone_clair_db_password quay_standalone_clair_psk; do
+    secret=$(shared "${secret_file}")
+    if [[ "${secret}" =~ ^[A-Za-z0-9]+$ ]]; then
+        redactions+=(-e "s/${secret}/REDACTED/g")
+    fi
+done
+unset secret
 redact() {
-    if [[ "${db_password}" =~ ^[A-Za-z0-9]+$ ]]; then
-        sed "s/${db_password}/REDACTED/g"
+    if (( ${#redactions[@]} > 0 )); then
+        sed "${redactions[@]}"
     else
         cat
     fi
@@ -72,9 +80,14 @@ if [[ -s "${SHARED_DIR}/quay_standalone_nodes" ]]; then
     for index in "${!nodes[@]}"; do
         read -r instance_id public_ip _ <<< "${nodes[${index}]}"
         echo "Gathering Quay node $((index + 1)) (${instance_id})..."
+        clair=()
+        if (( index < 2 )); then
+            clair=(podman-logs-clair 'sudo podman logs --tail 5000 clair')
+        fi
         gather_host "${out}/quay-$((index + 1))-${instance_id}" "${public_ip}" \
             podman-ps 'sudo podman ps -a' \
             podman-logs-quay 'sudo podman logs --tail 5000 quay' \
+            "${clair[@]}" \
             journal-cloud-final 'sudo journalctl -u cloud-final --no-pager'
     done
 fi

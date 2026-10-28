@@ -227,10 +227,11 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   a 4h timeout. Uses `templates/repos/quay-operator/base.yaml.j2` and the
   `aws-quay-qe` cluster profile.
 - **`standalone-ha`**: runs workflow `quay-standalone-aws-ha` (three RHEL 9
-  Quay nodes behind an NLB, Redis, Multi-AZ RDS, S3; smoke, node failover, then
-  a Playwright subset) under an 8h timeout. Builds only `quay-playwright-runner`;
-  `ocp` picks the step images, and the deploy step resolves the ART nightly Quay
-  image. Takes no `source`, `storage`, `fips`, `database`, `sts` or `arches`.
+  Quay nodes behind an NLB, Redis, Multi-AZ RDS, S3, and Clair on nodes 1 and 2
+  behind an internal NLB; smoke with a Clair scan, node and scanner failover,
+  then a Playwright subset) under an 8h timeout. Builds only
+  `quay-playwright-runner`; `ocp` picks the step images, and the deploy step
+  resolves the ART nightly Quay and Clair images. Takes no `source`, `storage`, `fips`, `database`, `sts` or `arches`.
 - **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
   `quay-deploy-odf`; the operator manages object storage, and
   `quay-deprovision` skips bucket teardown.

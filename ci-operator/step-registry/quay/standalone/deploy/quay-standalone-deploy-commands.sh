@@ -53,6 +53,8 @@ for required_file in \
     "${SHARED_DIR}/quay_standalone_region" \
     "${SHARED_DIR}/quay_standalone_hostname" \
     "${SHARED_DIR}/quay_standalone_target_group_arn" \
+    "${SHARED_DIR}/quay_standalone_clair_endpoint" \
+    "${SHARED_DIR}/quay_standalone_clair_target_group_arn" \
     "${SHARED_DIR}/quay_standalone_nodes" \
     "${SHARED_DIR}/quay_standalone_redis" \
     "${SHARED_DIR}/quay_standalone_ssh_user" \
@@ -72,6 +74,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 region=$(<"${SHARED_DIR}/quay_standalone_region")
 hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
 target_group_arn=$(<"${SHARED_DIR}/quay_standalone_target_group_arn")
+clair_endpoint=$(<"${SHARED_DIR}/quay_standalone_clair_endpoint")
+clair_target_group_arn=$(<"${SHARED_DIR}/quay_standalone_clair_target_group_arn")
 ssh_user=$(<"${SHARED_DIR}/quay_standalone_ssh_user")
 db_endpoint=$(<"${SHARED_DIR}/quay_standalone_db_endpoint")
 db_port=$(<"${SHARED_DIR}/quay_standalone_db_port")
@@ -95,11 +99,8 @@ fi
 umask 077
 workdir=$(mktemp -d /tmp/quay-standalone-deploy.XXXXXX)
 
-# a. The Quay image and the stage pull auth that reads it.
-if [[ -n "${QUAY_STANDALONE_IMAGE}" ]]; then
-    app_image="${QUAY_STANDALONE_IMAGE}"
-    echo "Using QUAY_STANDALONE_IMAGE ${app_image}"
-else
+# a. The Quay and Clair images and the stage pull auth that reads them.
+if [[ -z "${QUAY_STANDALONE_IMAGE}" || -z "${QUAY_STANDALONE_CLAIR_IMAGE}" ]]; then
     index_ref="${QUAY_INDEX_IMAGE_REPO}:${QUAY_INDEX_IMAGE_TAG}"
     echo "Resolving ART FBC ${index_ref} to a digest..."
     index_digest=$(oc image info --show-multiarch "${index_ref}" -o json \
@@ -112,7 +113,7 @@ else
     echo "Resolved ${index_ref} -> ${index_image}"
 
     # ART labels each FBC with the bundle it was built for; older bundles in
-    # the same catalog also carry a quay-rhel9 relatedImage.
+    # the same catalog also carry quay-rhel9 and clair-rhel9 relatedImages.
     bundle=$(oc image info "${index_image}" --filter-by-os linux/amd64 -o json \
         | jq -r '.config.config.Labels["com.redhat.art.bundle.pullspec"] // empty')
     if [[ -z "${bundle}" ]]; then
@@ -122,29 +123,49 @@ else
     mkdir -p "${workdir}/catalog"
     oc image extract "${index_image}" --filter-by-os linux/amd64 \
         --path "/configs/:${workdir}/catalog" --confirm
-    mapfile -t related < <(
-        find "${workdir}/catalog" -type f \( -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) -print0 \
-            | while IFS= read -r -d '' file; do
-                case "${file}" in
-                    *.json) cat "${file}" ;;
-                    *) yq-v4 -o=json -I=0 '.' "${file}" ;;
-                esac
-            done \
-            | jq -r --arg bundle "${bundle}" \
-                'select(.schema == "olm.bundle" and .image == $bundle)
-                 | .relatedImages[]? | select(.name == "quay-rhel9") | .image' \
-            | sort -u
-    )
-    if [[ "${#related[@]}" -ne 1 ]] ||
-       [[ ! "${related[0]}" =~ ^registry\.redhat\.io/quay/quay-rhel9@sha256:[a-f0-9]{64}$ ]]; then
-        echo "Bundle ${bundle} in ${index_image} has no single quay-rhel9 relatedImage digest (found: ${related[*]:-none})." >&2
-        exit 1
+    find "${workdir}/catalog" -type f \( -name '*.json' -o -name '*.yaml' -o -name '*.yml' \) -print0 \
+        | while IFS= read -r -d '' file; do
+            case "${file}" in
+                *.json) cat "${file}" ;;
+                *) yq-v4 -o=json -I=0 '.' "${file}" ;;
+            esac
+        done \
+        | jq -c --arg bundle "${bundle}" \
+            'select(.schema == "olm.bundle" and .image == $bundle) | .relatedImages[]?' \
+        > "${workdir}/related.json"
+fi
+
+# stage_image FILTER REPOSITORY: the bundle's single registry.redhat.io/quay/
+# REPOSITORY digest among relatedImages matching the jq FILTER, rewritten to
+# the stage registry, where ART publishes pre-release digests.
+stage_image() {
+    local filter=$1 repository=$2 images
+
+    mapfile -t images < <(jq -r "select(${filter}) | .image" "${workdir}/related.json" | sort -u)
+    if [[ "${#images[@]}" -ne 1 ]] ||
+       [[ ! "${images[0]}" =~ ^registry\.redhat\.io/quay/${repository}@sha256:[a-f0-9]{64}$ ]]; then
+        echo "Bundle ${bundle} in ${index_image} has no single ${repository} relatedImage digest (found: ${images[*]:-none})." >&2
+        return 1
     fi
-    # ART publishes pre-release digests to the stage registry only.
-    app_image="registry.stage.redhat.io/quay/${related[0]#registry.redhat.io/quay/}"
+    printf 'registry.stage.redhat.io/quay/%s\n' "${images[0]#registry.redhat.io/quay/}"
+}
+
+if [[ -n "${QUAY_STANDALONE_IMAGE}" ]]; then
+    app_image="${QUAY_STANDALONE_IMAGE}"
+    echo "Using QUAY_STANDALONE_IMAGE ${app_image}"
+else
+    app_image=$(stage_image '.name == "quay-rhel9"' quay-rhel9)
     echo "Quay image for bundle ${bundle}: ${app_image}"
 fi
 publish quay_app_image "${app_image}"
+if [[ -n "${QUAY_STANDALONE_CLAIR_IMAGE}" ]]; then
+    clair_image="${QUAY_STANDALONE_CLAIR_IMAGE}"
+    echo "Using QUAY_STANDALONE_CLAIR_IMAGE ${clair_image}"
+else
+    clair_image=$(stage_image '.name | contains("clair")' clair-rhel9)
+    echo "Clair image for bundle ${bundle}: ${clair_image}"
+fi
+publish quay_clair_image "${clair_image}"
 
 # Disable tracing while registry credentials are in scope.
 [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
@@ -250,8 +271,120 @@ create_trgm='read -r PGPASSWORD; export PGPASSWORD; psql "host=$1 port=$2 dbname
 on_host "${node1_public_ip}" "bash -c $(printf '%q' "${create_trgm}") _ ${db_endpoint} ${db_port} ${db_name} ${db_user}" \
     < "${SHARED_DIR}/quay_standalone_db_password"
 
-# e. One config bundle for all nodes. JSON is YAML, and jq keeps every value
-# quoted; secrets reach jq through the environment, not its arguments.
+# e. Clair's own role and database on the same RDS instance. The master user
+# must be a member of clair to create a database it owns (PostgreSQL 16+).
+# Both passwords and the SQL that holds the new one go over stdin. The
+# password and the PSK are hex: safe in SQL and sed, and valid base64 for
+# auth.psk.key.
+# shellcheck disable=SC2016 # expanded on the node
+create_clair_db='read -r PGPASSWORD; export PGPASSWORD; psql "host=$1 port=$2 dbname=$3 user=$4 sslmode=require" -v ON_ERROR_STOP=1 -q -f -'
+set +x
+clair_db_password=$(openssl rand -hex 24)
+clair_psk=$(openssl rand -hex 32)
+publish quay_standalone_clair_db_password "${clair_db_password}" 0600
+publish quay_standalone_clair_psk "${clair_psk}" 0600
+{
+    cat "${SHARED_DIR}/quay_standalone_db_password"
+    printf '%s\n' \
+        "SELECT 'CREATE ROLE clair' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'clair')" '\gexec' \
+        "ALTER ROLE clair WITH LOGIN PASSWORD '${clair_db_password}';" \
+        'GRANT clair TO CURRENT_USER;' \
+        "SELECT 'CREATE DATABASE clair OWNER clair' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'clair')" '\gexec'
+} | on_host "${node1_public_ip}" "bash -c $(printf '%q' "${create_clair_db}") _ ${db_endpoint} ${db_port} ${db_name} ${db_user}"
+
+# f. One Clair config for both nodes, shaped like the sample in
+# https://docs.redhat.com/en/documentation/red_hat_quay/3.18/html/vulnerability_reporting_with_clair_on_red_hat_quay/clair-standalone-configure
+# The notifier has no delivery mechanism, so Clair disables it.
+CLAIR_DB_PASSWORD="${clair_db_password}" CLAIR_PSK="${clair_psk}" \
+jq -n --arg db_host "${db_endpoint}" --arg db_port "${db_port}" \
+    '"host=\($db_host) port=\($db_port) dbname=clair user=clair password=\(env.CLAIR_DB_PASSWORD) sslmode=require" as $conn
+    | {
+        http_listen_addr: ":8081",
+        introspection_addr: ":8089",
+        log_level: "info",
+        indexer: {connstring: $conn, scanlock_retry: 10, layer_scan_concurrency: 5, migrations: true},
+        matcher: {connstring: $conn, max_conn_pool: 100, migrations: true},
+        notifier: {connstring: $conn, delivery_interval: "1m", poll_interval: "5m", migrations: true},
+        auth: {psk: {key: env.CLAIR_PSK, iss: ["quay"]}},
+        metrics: {name: "prometheus"}
+    }' > "${workdir}/clair-config.yaml"
+unset clair_db_password
+$WAS_TRACING && set -x
+
+# The image runs as nobody, so the config is world-readable; only ec2-user,
+# who has sudo anyway, logs in to the node. With FEATURE_PROXY_STORAGE, Clair
+# fetches layers from https://<NLB>/_storage_proxy/, so it needs the job CA;
+# SSL_CERT_DIR adds it and keeps the system roots the updaters use.
+clair_dir=/etc/clair
+start_clair() {
+    local public_ip=$1
+
+    on_host "${public_ip}" "sudo install -d -m 0755 ${clair_dir} ${clair_dir}/certs"
+    on_host "${public_ip}" "sudo install -m 0644 /dev/stdin ${clair_dir}/config.yaml" \
+        < "${workdir}/clair-config.yaml"
+    on_host "${public_ip}" "sudo install -m 0644 /dev/stdin ${clair_dir}/certs/ca.crt" \
+        < "${workdir}/ca.crt"
+    on_host "${public_ip}" 'sudo install -D -m 0600 /dev/stdin /etc/quay-standalone/pull-auth.json' \
+        < "${workdir}/pull-auth.json"
+    on_host "${public_ip}" "sudo podman pull -q --authfile /etc/quay-standalone/pull-auth.json $(printf '%q' "${clair_image}"); \
+        pulled=\$?; sudo rm -f /etc/quay-standalone/pull-auth.json; [ \$pulled -eq 0 ] \
+        && sudo podman run -d --name clair -p 8081:8081 -p 8089:8089 \
+            -e CLAIR_MODE=combo -e CLAIR_CONF=/clair/config.yaml \
+            -e SSL_CERT_DIR=/clair/certs:/etc/pki/tls/certs \
+            -v ${clair_dir}:/clair:Z $(printf '%q' "${clair_image}")"
+}
+
+# /readyz turns 200 once Clair has run its migrations; /healthz does not wait.
+wait_clair_ready() {
+    local name=$1 public_ip=$2 attempt
+
+    for attempt in $(seq 1 90); do
+        if on_host "${public_ip}" 'curl -fsS -o /dev/null --max-time 5 http://127.0.0.1:8089/readyz' 2>/dev/null; then
+            echo "Clair on ${name} is ready."
+            return 0
+        fi
+        if (( attempt % 6 == 0 )); then
+            echo "Waiting for Clair /readyz on ${name} (${attempt}/90)."
+        fi
+        sleep 10
+    done
+    echo "Clair on ${name} did not report /readyz 200 within 15 minutes; see the gather step's podman logs." >&2
+    on_host "${public_ip}" 'sudo podman ps -a' >&2 || true
+    return 1
+}
+
+# wait_targets ARN COUNT NAME: waits for COUNT healthy targets in a target group.
+wait_targets() {
+    local arn=$1 count=$2 name=$3 healthy=0 attempt
+
+    for attempt in $(seq 1 60); do
+        healthy=$(aws --region "${region}" elbv2 describe-target-health --target-group-arn "${arn}" \
+            --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+        if [[ "${healthy}" == "${count}" ]]; then
+            return 0
+        fi
+        echo "Waiting for ${count} healthy ${name} targets (${healthy} healthy, ${attempt}/60)."
+        sleep 10
+    done
+    echo "Only ${healthy} of ${count} ${name} targets became healthy." >&2
+    aws --region "${region}" elbv2 describe-target-health --target-group-arn "${arn}" >&2 || true
+    return 1
+}
+
+# Node 1 first, so it alone runs the migrations.
+for index in 0 1; do
+    read -r instance_id public_ip _ <<< "${nodes[${index}]}"
+    echo "Starting Clair on node $((index + 1)) (${instance_id})..."
+    start_clair "${public_ip}"
+    wait_clair_ready "node $((index + 1)) (${instance_id})" "${public_ip}"
+done
+wait_targets "${clair_target_group_arn}" 2 "Clair NLB"
+echo "Clair serves ${clair_endpoint} from nodes 1 and 2."
+
+# g. One config bundle for all nodes. JSON is YAML, and jq keeps every value
+# quoted; secrets reach jq through the environment, not its arguments. The
+# default model cache keeps a security report for 300s, which would answer
+# failover's security reads without asking Clair.
 set +x
 QUAY_S3_ACCESS_KEY=$(</var/run/quay-qe-aws-secret/access_key)
 QUAY_S3_SECRET_KEY=$(</var/run/quay-qe-aws-secret/secret_key)
@@ -266,12 +399,14 @@ QUAY_SECRET_KEY=$(openssl rand -hex 32) \
 QUAY_DATABASE_SECRET_KEY=$(openssl rand -hex 32) \
 QUAY_S3_ACCESS_KEY="${QUAY_S3_ACCESS_KEY}" \
 QUAY_S3_SECRET_KEY="${QUAY_S3_SECRET_KEY}" \
+QUAY_CLAIR_PSK="${clair_psk}" \
 jq -n \
     --arg hostname "${hostname}" \
     --arg db_host "${db_endpoint}" --arg db_port "${db_port}" \
     --arg db_name "${db_name}" --arg db_user "${db_user}" \
     --arg redis_host "${redis_private_ip}" \
     --arg bucket "${bucket}" --arg region "${region}" \
+    --arg clair_endpoint "${clair_endpoint}" \
     '{host: $redis_host, port: 6379, password: env.QUAY_REDIS_PASSWORD} as $redis
     | {
         SETUP_COMPLETE: true,
@@ -326,12 +461,17 @@ jq -n \
         REDIS_FLUSH_INTERVAL_SECONDS: 30,
         FEATURE_IMAGE_PULL_STATS: true,
         FEATURE_ORG_MIRROR: true,
-        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_IMMUTABLE_TAGS: true,
+        FEATURE_SECURITY_SCANNER: true,
+        SECURITY_SCANNER_V4_ENDPOINT: $clair_endpoint,
+        SECURITY_SCANNER_V4_PSK: env.QUAY_CLAIR_PSK,
+        SECURITY_SCANNER_INDEXING_INTERVAL: 30,
+        DATA_MODEL_CACHE_CONFIG: {engine: "inmemory", security_report_cache_ttl: "1s"}
     }' > "${workdir}/config.yaml"
-unset QUAY_S3_ACCESS_KEY QUAY_S3_SECRET_KEY redis_password
+unset QUAY_S3_ACCESS_KEY QUAY_S3_SECRET_KEY redis_password clair_psk
 $WAS_TRACING && set -x
 
-# f. Same bundle, certificate and key on every node, readable by the Quay
+# h. Same bundle, certificate and key on every node, readable by the Quay
 # container's UID 1001 only. Node 1 starts first so it alone runs migrations.
 config_dir=/etc/quay-standalone/config
 start_node() {
@@ -383,24 +523,9 @@ for index in 1 2; do
     wait_node_healthy "node $((index + 1)) (${instance_id})" "${public_ip}"
 done
 
-healthy=0
-for attempt in $(seq 1 60); do
-    healthy=$(aws --region "${region}" elbv2 describe-target-health \
-        --target-group-arn "${target_group_arn}" \
-        --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
-    if [[ "${healthy}" == 3 ]]; then
-        break
-    fi
-    echo "Waiting for 3 healthy NLB targets (${healthy} healthy, ${attempt}/60)."
-    sleep 10
-done
-if [[ "${healthy}" != 3 ]]; then
-    echo "Only ${healthy} of 3 NLB targets became healthy." >&2
-    aws --region "${region}" elbv2 describe-target-health --target-group-arn "${target_group_arn}" >&2 || true
-    exit 1
-fi
+wait_targets "${target_group_arn}" 3 NLB
 
-# g. The first user, through the NLB.
+# i. The first user, through the NLB.
 set +x
 http_code=$(QUAY_USERNAME=$(</var/run/quay-qe-quay-secret/username) \
     QUAY_PASSWORD=$(</var/run/quay-qe-quay-secret/password) \

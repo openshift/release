@@ -56,7 +56,7 @@ terminate() {
 trap cleanup EXIT
 trap terminate TERM
 
-for command in aws base64 curl jq; do
+for command in aws base64 curl jq ssh; do
     if ! command -v "${command}" >/dev/null 2>&1; then
         echo "Required command ${command} is unavailable in the failover step image." >&2
         exit 1
@@ -65,9 +65,12 @@ done
 
 for required_file in \
     "${CLUSTER_PROFILE_DIR}/.awscred" \
+    "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
     "${SHARED_DIR}/quay_standalone_region" \
+    "${SHARED_DIR}/quay_standalone_ssh_user" \
     "${SHARED_DIR}/quay_standalone_hostname" \
     "${SHARED_DIR}/quay_standalone_target_group_arn" \
+    "${SHARED_DIR}/quay_standalone_clair_target_group_arn" \
     "${SHARED_DIR}/quay_standalone_nodes" \
     "${SHARED_DIR}/quay_standalone_ca.crt" \
     "${SHARED_DIR}/quay_oauth2_token" \
@@ -83,9 +86,11 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 region=$(<"${SHARED_DIR}/quay_standalone_region")
 hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
 target_group_arn=$(<"${SHARED_DIR}/quay_standalone_target_group_arn")
+clair_target_group_arn=$(<"${SHARED_DIR}/quay_standalone_clair_target_group_arn")
+ssh_user=$(<"${SHARED_DIR}/quay_standalone_ssh_user")
 mapfile -t nodes < "${SHARED_DIR}/quay_standalone_nodes"
 read -r stop_id _ <<< "${nodes[2]}"
-read -r keep_id_1 _ <<< "${nodes[0]}"
+read -r keep_id_1 node1_public_ip _ <<< "${nodes[0]}"
 read -r keep_id_2 _ <<< "${nodes[1]}"
 smoke_image=$(<"${SHARED_DIR}/quay_standalone_smoke_image")
 repository="${smoke_image%:*}"
@@ -241,6 +246,84 @@ if [[ "${healthy}" == 2 ]]; then
     record "remaining 2 NLB targets healthy after failover" ""
 else
     record "remaining 2 NLB targets healthy after failover" "${healthy} of 2 remaining targets healthy"
+fi
+
+# Scanner failover: stop Clair on node 1 and read security reports through
+# node 2's Clair. Quay keeps security reports for 1s, so reads reach Clair
+# rather than a 300s cache.
+if ! whoami >/dev/null 2>&1 && [[ -w /etc/passwd ]]; then
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+fi
+ssh_options=(
+    -n
+    -o UserKnownHostsFile=/dev/null
+    -o StrictHostKeyChecking=no
+    -o LogLevel=ERROR
+    -o "IdentityFile=${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+    -o ConnectTimeout=10
+    -o ConnectionAttempts=3
+)
+
+clair_stop_time=$(date +%s)
+if ssh "${ssh_options[@]}" "${ssh_user}@${node1_public_ip}" 'sudo podman stop clair' >/dev/null; then
+    echo "Stopped Clair on node 1 (${keep_id_1})."
+    echo "$(date -u +%FT%TZ) stopped clair on ${keep_id_1}" >> "${oplog}"
+    clair_left=false
+    while (( $(date +%s) - clair_stop_time < 300 )); do
+        state=$(aws --region "${region}" elbv2 describe-target-health --target-group-arn "${clair_target_group_arn}" \
+            --targets "Id=${keep_id_1}" --query 'TargetHealthDescriptions[0].TargetHealth.State' \
+            --output text 2>/dev/null || true)
+        if [[ "${state}" =~ ^(unhealthy|unused|draining|unavailable)$ ]]; then
+            clair_left=true
+            break
+        fi
+        sleep 5
+    done
+    if [[ "${clair_left}" == true ]]; then
+        record "stopped scanner's Clair target leaves healthy within 5m" "" "$(( $(date +%s) - clair_stop_time ))s after the stop"
+    else
+        record "stopped scanner's Clair target leaves healthy within 5m" "target ${keep_id_1} still healthy 300s after the stop"
+    fi
+else
+    record "stopped scanner's Clair target leaves healthy within 5m" "sudo podman stop clair failed on node 1"
+fi
+
+scan_name="security reports survive one scanner stop"
+if [[ ! -s "${SHARED_DIR}/quay_standalone_scan_target" ]]; then
+    record "${scan_name}" "no quay_standalone_scan_target: quay-standalone-smoke did not push the scan image"
+else
+    scan_target=$(<"${SHARED_DIR}/quay_standalone_scan_target")
+    scan_url="https://${hostname}/api/v1/repository/${scan_target%@*}/manifest/${scan_target##*@}/security?vulnerabilities=true"
+    scan_failures=0
+    scan_attempt_failures=0
+    for operation in $(seq 1 10); do
+        status=""
+        for attempt in 1 2 3 4 5; do
+            status=$(curl "${curl_options[@]}" -H "@${workdir}/api.header" "${scan_url}" 2>/dev/null \
+                | jq -r '.status // empty' 2>/dev/null || true)
+            if [[ "${status}" == scanned ]]; then
+                break
+            fi
+            scan_attempt_failures=$(( scan_attempt_failures + 1 ))
+            echo "$(date -u +%FT%TZ) security GET ${operation} attempt ${attempt}: status ${status:-unavailable}" >> "${oplog}"
+            sleep 2
+        done
+        if [[ "${status}" != scanned ]]; then
+            scan_failures=$(( scan_failures + 1 ))
+        fi
+    done
+    scan_summary="10 security GETs of ${scan_target}, ${scan_failures} failed after 5 attempts, ${scan_attempt_failures} failed attempts."
+    if (( scan_failures == 0 )); then
+        record "${scan_name}" "" "${scan_summary}"
+    else
+        record "${scan_name}" "${scan_failures} of 10 security GETs did not return status scanned" "${scan_summary}"
+    fi
+fi
+
+if ssh "${ssh_options[@]}" "${ssh_user}@${node1_public_ip}" 'sudo podman start clair' >/dev/null; then
+    echo "Restarted Clair on node 1."
+else
+    echo "Could not restart Clair on node 1; continuing."
 fi
 
 echo "${failures} of ${tests} failover checks failed."

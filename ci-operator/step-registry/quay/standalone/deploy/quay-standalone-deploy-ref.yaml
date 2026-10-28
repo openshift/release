@@ -7,7 +7,7 @@ ref:
     requests:
       cpu: 100m
       memory: 256Mi
-  timeout: 1h0m0s
+  timeout: 2h0m0s
   grace_period: 2m0s
   credentials:
   - collection: quay-tests
@@ -27,6 +27,13 @@ ref:
       with the registry.stage.redhat.io credentials. Empty (default) resolves
       the ART nightly quay-rhel9 image from QUAY_INDEX_IMAGE_REPO and
       QUAY_INDEX_IMAGE_TAG.
+  - name: QUAY_STANDALONE_CLAIR_IMAGE
+    default: ""
+    documentation: |-
+      Clair image to deploy, used verbatim; give a digest pullspec readable
+      with the registry.stage.redhat.io credentials. Empty (default) resolves
+      the clair-rhel9 relatedImage of the bundle named by
+      QUAY_INDEX_IMAGE_REPO:QUAY_INDEX_IMAGE_TAG.
   - name: QUAY_INDEX_IMAGE_REPO
     default: "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
     documentation: ART FBC catalog repository (public), as in quay-enable-catalogsource-art.
@@ -34,23 +41,37 @@ ref:
     default: "quay-3.18__v4.22__quay-rhel9-operator"
     documentation: |-
       Floating ART FBC tag, resolved to a digest. The step takes the
-      quay-rhel9 relatedImage of the bundle named by the FBC's
-      com.redhat.art.bundle.pullspec label and pulls it from
+      quay-rhel9 and clair-rhel9 relatedImages of the bundle named by the
+      FBC's com.redhat.art.bundle.pullspec label and pulls them from
       registry.stage.redhat.io.
   documentation: |-
     Deploy Quay standalone HA on the three RHEL 9 nodes from
     quay-standalone-aws-infra: Redis on its own VM, pg_trgm in the RDS
-    database, one config bundle (Database auth, superuser quay, user
-    initialize, S3Storage in the job bucket with the quay-tests/aws keys,
-    shared SECRET_KEY and DATABASE_SECRET_KEY) and a per-job CA and server
-    certificate for the NLB DNS name on every node. Quay runs as a rootful
-    podman container "quay" publishing 8443; node 1 starts first and runs the
-    migrations. The step waits for /health/instance on each node and for 3
-    healthy NLB targets, then creates the first user through the NLB.
-    Secrets are never traced, printed or written to artifacts.
+    database, Clair on nodes 1 and 2, one config bundle (Database auth,
+    superuser quay, user initialize, S3Storage in the job bucket with the
+    quay-tests/aws keys, shared SECRET_KEY and DATABASE_SECRET_KEY, the
+    security scanner at the internal Clair NLB, an in-memory model cache
+    that keeps security reports for 1s, so reads reach Clair rather than a
+    300s cache) and a per-job CA and server certificate for the NLB DNS name
+    on every node.
+
+    Clair gets its own role and database "clair" on the RDS instance, with a
+    per-job password, and runs in combo mode as a rootful podman container
+    "clair" publishing 8081 (API) and 8089 (introspection) on nodes 1 and 2,
+    sharing one config and a per-job PSK with Quay, and trusting the job CA
+    to fetch layers through the NLB. Node 1 starts first and runs the
+    migrations; the step waits for /readyz on each node and for 2 healthy
+    Clair NLB targets before starting Quay.
+
+    Quay runs as a rootful podman container "quay" publishing 8443; node 1
+    starts first and runs the migrations. The step waits for
+    /health/instance on each node and for 3 healthy NLB targets, then
+    creates the first user through the NLB. Secrets are never traced,
+    printed or written to artifacts.
 
     Reads from SHARED_DIR: quay_standalone_region, quay_standalone_hostname,
-    quay_standalone_target_group_arn, quay_standalone_nodes,
+    quay_standalone_target_group_arn, quay_standalone_clair_endpoint,
+    quay_standalone_clair_target_group_arn, quay_standalone_nodes,
     quay_standalone_redis, quay_standalone_ssh_user,
     quay_standalone_db_endpoint, quay_standalone_db_port,
     quay_standalone_db_name, quay_standalone_db_user,
@@ -58,6 +79,10 @@ ref:
 
     Writes to SHARED_DIR:
     - quay_app_image: the deployed image pullspec
+    - quay_clair_image: the deployed Clair image pullspec
+    - quay_standalone_clair_db_password, quay_standalone_clair_psk: mode
+      0600, the per-job Clair database password and PSK (hex), so gather can
+      mask them
     - quay-pull-auth.json: mode 0600, docker auth for registry.stage.redhat.io only
     - quay_standalone_ca.crt: the job CA certificate (PEM, no key)
     - quay_oauth2_token: mode 0600, the first user's OAuth token, valid 9000s

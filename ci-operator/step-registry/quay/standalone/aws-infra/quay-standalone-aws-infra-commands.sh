@@ -95,6 +95,12 @@ for subnet in "${public_subnets[@]}" "${private_subnets[@]}"; do
         exit 1
     fi
 done
+vpc_cidr=$(aws --region "${region}" ec2 describe-vpcs --vpc-ids "${vpc_id}" \
+    --query 'Vpcs[0].CidrBlock' --output text)
+if [[ ! "${vpc_cidr}" =~ ^[0-9.]+/[0-9]+$ ]]; then
+    echo "Could not resolve the CIDR of ${vpc_id}." >&2
+    exit 1
+fi
 
 ami_id=$(aws --region "${region}" ec2 describe-images \
     --owners 309956199498 \
@@ -163,7 +169,7 @@ aws --region "${region}" s3api put-bucket-tagging --bucket "${bucket}" \
 template_file=$(mktemp /tmp/quay-standalone-aws-infra.XXXXXX.yaml)
 cat > "${template_file}" <<'EOF'
 AWSTemplateFormatVersion: 2010-09-09
-Description: Quay standalone HA nodes, Redis host, Multi-AZ RDS PostgreSQL and NLB
+Description: Quay standalone HA nodes, Redis host, Multi-AZ RDS PostgreSQL, NLB and internal Clair NLB
 Parameters:
   AmiId:
     Type: AWS::EC2::Image::Id
@@ -171,6 +177,8 @@ Parameters:
     Type: String
   VpcId:
     Type: AWS::EC2::VPC::Id
+  VpcCidr:
+    Type: String
   PublicSubnet1:
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2:
@@ -221,6 +229,15 @@ Resources:
         FromPort: 8443
         ToPort: 8443
         CidrIp: 0.0.0.0/0
+      # Clair API and introspection, for the internal NLB and its health checks.
+      - IpProtocol: tcp
+        FromPort: 8081
+        ToPort: 8081
+        CidrIp: !Ref VpcCidr
+      - IpProtocol: tcp
+        FromPort: 8089
+        ToPort: 8089
+        CidrIp: !Ref VpcCidr
   RedisSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -404,11 +421,61 @@ Resources:
       DefaultActions:
       - Type: forward
         TargetGroupArn: !Ref TargetGroup
+  ClairLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Type: network
+      Scheme: internal
+      Subnets:
+      - !Ref PublicSubnet1
+      - !Ref PublicSubnet2
+      - !Ref PublicSubnet3
+      # Clair runs in AZs 1 and 2 only, so AZ 3's address needs cross-zone, and
+      # so does an AZ whose scanner failover stopped.
+      LoadBalancerAttributes:
+      - Key: load_balancing.cross_zone.enabled
+        Value: "true"
+  ClairTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Protocol: TCP
+      Port: 8081
+      TargetType: instance
+      # Quay nodes 1 and 2 are also targets: with the client IP preserved, a
+      # target calling its own NLB hairpins and times out.
+      TargetGroupAttributes:
+      - Key: preserve_client_ip.enabled
+        Value: "false"
+      # /readyz turns 200 once migrations are done; /healthz is 200 from start.
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: "8089"
+      HealthCheckPath: /readyz
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+      Targets:
+      - Id: !Ref Quay1
+      - Id: !Ref Quay2
+  ClairListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ClairLoadBalancer
+      Protocol: TCP
+      Port: 8081
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref ClairTargetGroup
 Outputs:
   Hostname:
     Value: !GetAtt LoadBalancer.DNSName
   TargetGroupArn:
     Value: !Ref TargetGroup
+  ClairHostname:
+    Value: !GetAtt ClairLoadBalancer.DNSName
+  ClairTargetGroupArn:
+    Value: !Ref ClairTargetGroup
   Quay1InstanceId:
     Value: !Ref Quay1
   Quay1PublicIp:
@@ -459,6 +526,7 @@ aws --region "${region}" cloudformation create-stack \
         "ParameterKey=AmiId,ParameterValue=${ami_id}" \
         "ParameterKey=RootDeviceName,ParameterValue=${root_device_name}" \
         "ParameterKey=VpcId,ParameterValue=${vpc_id}" \
+        "ParameterKey=VpcCidr,ParameterValue=${vpc_cidr}" \
         "ParameterKey=PublicSubnet1,ParameterValue=${public_subnets[0]}" \
         "ParameterKey=PublicSubnet2,ParameterValue=${public_subnets[1]}" \
         "ParameterKey=PublicSubnet3,ParameterValue=${public_subnets[2]}" \
@@ -509,6 +577,8 @@ done
 declare -A shared_outputs=(
     [quay_standalone_hostname]=Hostname
     [quay_standalone_target_group_arn]=TargetGroupArn
+    [quay_standalone_clair_hostname]=ClairHostname
+    [quay_standalone_clair_target_group_arn]=ClairTargetGroupArn
     [quay_standalone_db_endpoint]=DbEndpoint
     [quay_standalone_db_port]=DbPort
     [quay_standalone_db_name]=DbName
@@ -519,6 +589,7 @@ for name in "${!shared_outputs[@]}"; do
     value=$(output "${shared_outputs[${name}]}")
     publish "${name}" "${value}"
 done
+publish quay_standalone_clair_endpoint "http://$(output ClairHostname):8081"
 publish quay_standalone_nodes "$(printf '%s\n' "${nodes[@]:0:3}")"
 publish quay_standalone_redis "${nodes[3]}"
 

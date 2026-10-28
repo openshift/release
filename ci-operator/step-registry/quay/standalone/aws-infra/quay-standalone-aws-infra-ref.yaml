@@ -36,8 +36,10 @@ ref:
       deleted with the stack (no final snapshot)
     - an internet-facing NLB: TCP 443 to instance targets on TCP 8443, HTTPS
       health check on /health/instance
-    - security groups: Quay 22 and 8443 open, Redis 6379 and PostgreSQL 5432
-      from the Quay nodes only
+    - an internal NLB for Clair: TCP 8081 to Quay nodes 1 and 2 on TCP 8081,
+      client IP preservation off, HTTP health check on 8089 /readyz
+    - security groups: Quay 22 and 8443 open, Clair 8081 and 8089 from the VPC
+      CIDR, Redis 6379 and PostgreSQL 5432 from the Quay nodes only
     The step also creates S3 bucket "${NAMESPACE}-${UNIQUE_HASH}-qsha" outside
     the stack, so post can empty and delete it, and registers the stack and
     bucket in to_be_removed_cf_stack_list and to_be_removed_s3_bucket_list
@@ -51,6 +53,9 @@ ref:
       (ec2-user), quay_standalone_db_identifier: written before anything is
       created
     - quay_standalone_hostname (NLB DNS name), quay_standalone_target_group_arn
+    - quay_standalone_clair_hostname (internal Clair NLB DNS name),
+      quay_standalone_clair_endpoint (http://<that name>:8081),
+      quay_standalone_clair_target_group_arn
     - quay_standalone_nodes: three lines "<instance-id> <public-ip> <private-ip>"
       in AZ order
     - quay_standalone_redis: one line "<instance-id> <public-ip> <private-ip>"

@@ -27,8 +27,12 @@ workflow:
   documentation: |-
     Quay standalone HA on AWS, with no OpenShift cluster: three RHEL 9 Quay
     nodes behind an NLB across three AZs, a Redis host, Multi-AZ RDS
-    PostgreSQL and S3 storage. Tests run the smoke checks, then node failover,
-    then a Playwright subset with the suite pinned to the deployed image's
-    commit. Failover runs before Playwright because the OAuth token from
-    quay-standalone-deploy expires 9000s after the deploy. Post gathers
-    diagnostics, deletes the bucket and stacks, and fails on leaked resources.
+    PostgreSQL, S3 storage, and redundant Clair in combo mode on Quay nodes 1
+    and 2 behind an internal NLB, with its own database on the RDS instance.
+    Tests run the smoke checks (including a Clair scan of a pushed image),
+    then node and scanner failover, then a Playwright subset with the suite
+    pinned to the deployed image's commit; it skips OCP-81036 until
+    quay/quay's regctl uses TLS. Failover runs before Playwright because the
+    OAuth token from quay-standalone-deploy expires 9000s after the deploy.
+    Post gathers diagnostics, deletes the bucket and stacks, and fails on
+    leaked resources.

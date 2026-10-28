@@ -12,17 +12,19 @@ ref:
   documentation: |-
     Best-effort diagnostics for Quay standalone HA into
     ${ARTIFACT_DIR}/quay-standalone; always exits 0. Over SSH, per Quay node:
-    podman ps -a, the last 5000 lines of podman logs quay and the cloud-final
-    journal; on the Redis host: redis status, its journal and the cloud-final
-    journal. Unreachable hosts (such as the node failover stopped) are
-    recorded and skipped. From AWS: NLB target health, the RDS instance
-    description and the CloudFormation stack events. Never collects the
-    config bundle, keys, passwords, tokens or the pull auth; the database
-    password is masked should a log quote it.
+    podman ps -a, the last 5000 lines of podman logs quay (and of podman logs
+    clair on nodes 1 and 2) and the cloud-final journal; on the Redis host:
+    redis status, its journal and the cloud-final journal. Unreachable hosts
+    (such as the node failover stopped) are recorded and skipped. From AWS:
+    NLB target health, the RDS instance description and the CloudFormation
+    stack events. Never collects the config bundle, keys, passwords, tokens
+    or the pull auth; the database passwords and the Clair PSK are masked
+    should a log quote them.
 
     Reads from SHARED_DIR when present, tolerating any missing file:
     quay_standalone_region, quay_standalone_ssh_user, quay_standalone_nodes,
     quay_standalone_redis, quay_standalone_target_group_arn,
     quay_standalone_db_identifier, quay_standalone_stack_name,
-    quay_standalone_db_password (only to mask it). Writes nothing to
+    quay_standalone_db_password, quay_standalone_clair_db_password and
+    quay_standalone_clair_psk (only to mask them). Writes nothing to
     SHARED_DIR.

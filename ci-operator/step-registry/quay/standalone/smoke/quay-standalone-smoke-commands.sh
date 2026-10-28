@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 source_image=docker://quay.io/libpod/busybox:latest
+scan_source_image=docker://registry.access.redhat.com/ubi9/ubi-micro:latest
 junit="${ARTIFACT_DIR}/junit_quay_standalone_smoke.xml"
 workdir=""
 testcases=""
@@ -102,6 +103,7 @@ cp "${ca}" "${workdir}/certs/ca.crt"
 authfile="${workdir}/auth.json"
 repository="${username}/standalone-smoke"
 image="${hostname}/${repository}:smoke"
+scan_repository="${username}/standalone-scan"
 
 health_nlb() {
     curl -fsS --max-time 30 --cacert "${ca}" -o /dev/null "https://${hostname}/health/instance"
@@ -163,6 +165,40 @@ digest_matches() {
     echo "Pulled digest equals pushed digest ${pushed}."
 }
 
+push_scan_image() {
+    skopeo copy --retry-times 3 --dest-cert-dir "${workdir}/certs" --authfile "${authfile}" \
+        --digestfile "${workdir}/scan.digest" "${scan_source_image}" "docker://${hostname}/${scan_repository}:ubi-micro"
+    echo "Pushed ${scan_repository}@$(<"${workdir}/scan.digest")"
+}
+
+# Polls the security report every 15s for up to 15 minutes; "unsupported" or
+# "failed" are final.
+scanned() {
+    local digest status="" start attempt=0
+
+    digest=$(<"${workdir}/scan.digest")
+    start=$(date +%s)
+    while (( $(date +%s) - start < 900 )); do
+        attempt=$((attempt + 1))
+        status=$(api "https://${hostname}/api/v1/repository/${scan_repository}/manifest/${digest}/security?vulnerabilities=true" \
+            | json_field status) || status=""
+        case "${status}" in
+            scanned)
+                echo "${scan_repository}@${digest} is scanned."
+                return 0
+                ;;
+            unsupported|failed)
+                echo "Clair reported ${scan_repository}@${digest} as ${status}."
+                return 1
+                ;;
+        esac
+        echo "Security status ${status:-unavailable} (attempt ${attempt}, $(( $(date +%s) - start ))s)."
+        sleep 15
+    done
+    echo "${scan_repository}@${digest} was not scanned within 15 minutes (last status ${status:-unavailable})."
+    return 1
+}
+
 check "NLB /health/instance over verified TLS" health_nlb
 for index in 0 1 2; do
     read -r instance_id public_ip _ <<< "${nodes[${index}]}"
@@ -173,9 +209,14 @@ check "API creates repository ${repository}" api_create_repository
 check "registry push through the NLB" push
 check "registry pull through the NLB" pull
 check "pulled manifest digest equals pushed digest" digest_matches
+check "registry push of ubi9/ubi-micro for scanning" push_scan_image
+check "pushed image is scanned by Clair" scanned
 
 if [[ -s "${workdir}/pushed.digest" ]]; then
     printf '%s' "${repository}:smoke" > "${SHARED_DIR}/quay_standalone_smoke_image"
+fi
+if [[ -s "${workdir}/scan.digest" ]]; then
+    printf '%s' "${scan_repository}@$(<"${workdir}/scan.digest")" > "${SHARED_DIR}/quay_standalone_scan_target"
 fi
 
 echo "${failures} of ${tests} smoke checks failed."
