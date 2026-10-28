@@ -97,7 +97,7 @@ if [[ -z "${OIDC_PROVIDER}" || "${OIDC_PROVIDER}" == "null" ]]; then
   log "ERROR: cluster ${CLUSTER_ID} has no OIDC endpoint; AWS VPC CNI needs an STS cluster"
   exit 1
 fi
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
+AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 IAM_ROLE_NAME="${CLUSTER_ID}-vpc-cni"
 
 # The AWS-managed policy is required: custom policies with tag conditions do
