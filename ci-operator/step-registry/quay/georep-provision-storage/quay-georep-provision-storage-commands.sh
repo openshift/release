@@ -107,6 +107,8 @@ done
 
 printf '%s' "${BUCKET_PRIMARY}" > "${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_PRIMARY"
 printf '%s' "${BUCKET_SECONDARY}" > "${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_SECONDARY"
+printf '%s' "${REGION_PRIMARY}" > "${SHARED_DIR}/QUAY_GEOREP_REGION_PRIMARY"
+printf '%s' "${REGION_SECONDARY}" > "${SHARED_DIR}/QUAY_GEOREP_REGION_SECONDARY"
 tar -czf "${SHARED_DIR}/terraform-georep-storage.tgz" --exclude=".terraform" *
 
 if [[ "${tf_apply_rc}" -ne 0 ]]; then

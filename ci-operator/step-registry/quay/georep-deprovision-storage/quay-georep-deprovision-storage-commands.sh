@@ -18,7 +18,14 @@ tar -xzf terraform-georep-storage.tgz
 
 BUCKET_PRIMARY="$(cat "${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_PRIMARY" 2>/dev/null || true)"
 BUCKET_SECONDARY="$(cat "${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_SECONDARY" 2>/dev/null || true)"
-echo "Destroying geo-rep S3 buckets: primary=${BUCKET_PRIMARY:-unknown} secondary=${BUCKET_SECONDARY:-unknown}" >&2
+REGION_PRIMARY="$(cat "${SHARED_DIR}/QUAY_GEOREP_REGION_PRIMARY" 2>/dev/null || true)"
+REGION_SECONDARY="$(cat "${SHARED_DIR}/QUAY_GEOREP_REGION_SECONDARY" 2>/dev/null || true)"
+echo "Destroying geo-rep S3 buckets: primary=${BUCKET_PRIMARY:-unknown} (${REGION_PRIMARY:-unknown}) secondary=${BUCKET_SECONDARY:-unknown} (${REGION_SECONDARY:-unknown})" >&2
+
+export TF_VAR_region_primary="${REGION_PRIMARY}"
+export TF_VAR_region_secondary="${REGION_SECONDARY}"
+export TF_VAR_bucket_primary="${BUCKET_PRIMARY}"
+export TF_VAR_bucket_secondary="${BUCKET_SECONDARY}"
 
 terraform init
 destroy_rc=1
