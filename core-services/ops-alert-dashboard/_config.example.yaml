@@ -1,0 +1,36 @@
+# Reference only: provision as Secret ops-alert-dashboard-config, key config.yaml.
+# Verify every REPLACE value, the channel, and a fixed cutover before activation.
+slack:
+  workspace_id: T_REPLACE_WORKSPACE
+  channel_id: C_REPLACE_OPS_CHANNEL
+  workspace_url: https://redhat-internal.slack.com
+  cutover: "REPLACE_WITH_FIXED_RFC3339_CUTOVER"
+  writer:
+    user_id: U_REPLACE_DPTP_BOT
+    bot_id: B_REPLACE_DPTP_BOT
+  sources:
+  - name: Prometheus
+    kind: alertmanager
+    bot_ids: [B_REPLACE_ALERTMANAGER]
+  - name: Prow
+    kind: prow
+    bot_ids: [B_REPLACE_CRIER]
+  # SHIP uses the same DPTP bot as workflow writes. Other DPTP notifications
+  # remain Orange / Other unless their supported SHIP envelope matches.
+  - name: DPTP Bot
+    kind: ship
+    user_ids: [U_REPLACE_DPTP_BOT]
+    bot_ids: [B_REPLACE_DPTP_BOT]
+  - name: Chai
+    kind: chai
+    user_ids: [U_REPLACE_CHAI]
+access:
+  external_url: https://ops-alerts.apps.core.ci.devcluster.openshift.com
+  user_header: X-Forwarded-Email
+  # Use the exact OAuth proxy-generated email identity, verified after SSO.
+  operators: [REPLACE_WITH_VERIFIED_PROXY_EMAIL_IDENTITY]
+  trusted_proxies: [127.0.0.1/32, "::1/128"]
+monitoring:
+  enabled: true
+  rules_namespace: ci-monitoring
+  query_url: http://thanos-query-frontend-ci-query.ci-monitoring.svc.cluster.local:9090

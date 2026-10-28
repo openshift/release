@@ -1,0 +1,126 @@
+# Ops alert dashboard on core-ci
+
+This change stages the deployment with **zero replicas**. Merging it creates no
+process that can read or write Slack. Activation is a separate reviewed change
+to `replicas: 1`, after every prerequisite below has been verified. Keep the
+single writer at exactly one replica and keep `strategy: Recreate`; never use a
+rolling update or run a second live copy with the same channel/cutover.
+
+The backend and image Dockerfile come from `openshift/ci-tools-standalone`.
+[Source PR #58](https://github.com/openshift/ci-tools-standalone/pull/58) must
+merge and its image-publishing postsubmit must succeed before activation.
+The image is `quay-proxy.ci.openshift.org/openshift/ci:ci_ops-alert-dashboard_latest`
+(amd64 and arm64). This change publishes the production binary from the existing
+`make production-install` image build. Confirm the published image contains the
+reviewed source revision before using it; keep an immutable rollback digest.
+
+## Resources and trust boundary
+
+The core-ci ApplicationSet discovers `clusters/core-ci/*` and recursively loads
+YAML. It will discover this directory without another ApplicationSet edit.
+Configuration examples live at
+[`core-services/ops-alert-dashboard/_config.example.yaml`](../../../core-services/ops-alert-dashboard/_config.example.yaml),
+outside that discovery path: an underscore filename alone does not exclude YAML
+from Argo CD.
+
+The only Service port is HTTPS to OpenShift OAuth proxy. The Route uses reencrypt
+TLS and redirects HTTP to HTTPS; the service CA provisions
+`ops-alert-dashboard-tls`. The proxy connects over loopback, replaces forwarded
+identity headers, and passes its authenticated email identity as
+`X-Forwarded-Email`. For an email-shaped OpenShift username, this preserves the
+full value; a plain username maps to `username@cluster.local`. The backend
+allowlist and durable Slack action actors use exactly this proxy-generated email
+identity. The proxy requires the user's permission to get the specific
+`ci/ops-alert-dashboard` Service. The view RoleBinding uses the existing
+`test-platform-ci-admins` group; the backend separately checks its explicit email
+identity allowlist. Verify group membership and the actual proxy-generated
+identity for every intended operator before activation. No anonymous access or bearer-token delegation is
+configured. Browser OAuth evaluates the SAR using the user's identity; the
+ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
+
+The backend listens on port 8080 for pod health probes. `/healthz` is process
+liveness; `/readyz` requires complete Slack replay. All application routes still
+require a trusted loopback proxy and an allowlisted user; direct pod requests
+with forged identity headers must fail. The Service does not expose this port.
+The monitoring Role grants the ServiceAccount only `get`/`list` PrometheusRules in
+`ci-monitoring`. Metrics use the fixed internal Thanos Query frontend already
+used by Grafana, independently of Kubernetes API credentials. No PVC or database
+is needed; Slack threads are the durable action record.
+
+## Provisioning prerequisites
+
+Do not commit credentials or populated private configuration. Authorized operators
+must provision the following objects in **core-ci, namespace ci** through the
+normal secret-management process:
+
+- `ops-alert-dashboard-config`, required key `config.yaml`: copy the example
+  outside the Git checkout and replace all placeholders. Verify workspace ID,
+  ops channel ID, workspace URL, DPTP writer user and bot IDs, each producer ID,
+  exact proxy-generated operator email identities, and public HTTPS origin. Keep trusted proxy
+  CIDRs restricted to loopback. Chai needs its verified user ID for explicit
+  mentions. The `DPTP Bot` SHIP source uses the same user/bot IDs as the writer;
+  unrelated DPTP notifications remain Orange / Other. Never trust display names.
+- `ops-alert-dashboard-session`, required key `session_secret`: provision a
+  fresh cryptographically random OAuth cookie secret dedicated to this app
+  (32 random bytes, base64 encoded). Do not reuse another app's cookie secret.
+- `slack-credentials-dptp-bot`, required key `oauth_token`: this existing Secret
+  is publicly declared in `core-services/ci-secret-bootstrap/gsm-config.yaml`
+  for core-ci/ci and is used by `clusters/core-ci/slack-bot/slack-bot.yaml`.
+  Confirm its identity and required history/replies, `chat:write` and
+  `reactions:write` permissions without printing the token. Confirm bot membership
+  in the target channel. No new token or secret value is present in this PR.
+
+Choose and record a fixed RFC3339 `slack.cutover` before activation. Verify Slack
+retention covers that time and all action threads. Do not move the cutover forward
+on restart to conceal missing history. Validate the completed files with the
+published binary's `--validate-only --config=... --classification=...` command;
+that command requires no Slack token and performs no Slack calls. Validation of
+placeholders is not a substitute for verifying the live identities and scopes.
+
+The classification catalog remains the single canonical file
+`core-services/slack-bot/_ops-alerts.yaml`. Prow config-updater distributes it to
+`ci/ops-alert-dashboard-classification` on core-ci, key `_ops-alerts.yaml`. Adding
+a map does not guarantee an unchanged source file triggers an initial copy.
+Before activation, an authorized operator must seed that ConfigMap from the exact
+merged catalog (or trigger and verify config-updater), then compare its contents
+to the canonical file. Do not create another classification catalog in this
+application directory. Catalog/config changes require a process restart.
+
+## Activation checklist (separate reviewed change)
+
+1. Merge the source PR and verify successful image publishing for both
+   architectures. Record the image digest/source revision and rollback digest.
+2. Provision and verify all three required Secrets, the service-generated TLS
+   Secret and the classification ConfigMap. Verify exact Slack identities,
+   channel membership, token permissions, fixed cutover and retention.
+3. Validate the completed configuration against the canonical catalog. Verify
+   the final Route host matches `access.external_url`, OAuth redirect reference,
+   trusted proxies, intended group membership and explicit operator allowlist.
+   Verify the actual `X-Forwarded-Email` generated after authenticated SSO for
+   each operator, including any `@cluster.local` mapping; do not derive the
+   allowlist or durable actor from client-supplied identity headers.
+   Confirm required network access to Slack, the Kubernetes API, internal Thanos
+   frontend and public GitHub SOP Markdown.
+4. Review a change from zero to **one** replica, retaining `Recreate`. Only after
+   that change is approved and merged should GitOps start the writer. There is
+   no automatic activation or live smoke test in this staging PR.
+5. Verify complete archive replay and readiness, authenticated SSO access for
+   allowed operators, rejection for other users, rejection of spoofed direct-pod
+   identity, secure proxy/header behavior, and the HTTPS route/certificate chain.
+   Check known Alertmanager/Prow/SHIP classifications, Chai report behavior,
+   SOP preview, and the optional core-ci metrics source.
+6. With an operator-approved occurrence, verify one acknowledge/undo cycle and
+   one Ask Chai request in its Slack thread; confirm the actor, durable record,
+   explicit Chai mention and no duplicate write on retry. Restart once and
+   verify retained workflow state replays before enabling wider use. This step
+   intentionally writes Slack and requires a deliberate live rollout window.
+
+If replay is incomplete or identity/authorization checks fail, keep or restore
+`replicas: 0` in Git and investigate before resuming. Preserve the Secret config,
+fixed cutover and Slack history. Reverting the image to the recorded digest also
+uses `Recreate` and one replica; a rollback must never introduce concurrent
+writers. Do not delete durable Slack action records as a rollback mechanism.
+
+No cluster resources have been applied and no live Slack checks are claimed by
+this PR. Remaining deployment values and the activation evidence belong in the
+follow-up activation review.
