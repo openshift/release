@@ -1,10 +1,9 @@
 # Ops alert dashboard on core-ci
 
-This change stages the deployment with **zero replicas**. Merging it creates no
-process that can read or write Slack. Activation is a separate reviewed change
-to `replicas: 1`, after every prerequisite below has been verified. Keep the
-single writer at exactly one replica and keep `strategy: Recreate`; never use a
-rolling update or run a second live copy for the same ops channel.
+Run the dashboard with **one replica** and `strategy: Recreate`, after verifying
+the provisioning prerequisites below. Set `replicas: 0` to stop the writer.
+Keep exactly one live writer for the ops channel; never use a rolling update or
+run a second live copy.
 
 The backend and image Dockerfile come from `openshift/ci-tools-standalone`.
 [Source PR #58](https://github.com/openshift/ci-tools-standalone/pull/58) must
