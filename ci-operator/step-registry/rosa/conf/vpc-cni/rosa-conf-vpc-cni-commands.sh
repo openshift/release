@@ -220,12 +220,16 @@ rm -f "${IP_FORWARD_SPEC}"
 #   config:   /run/multus/cni/net.d (EKS: /etc/cni/net.d)
 # The values below mount those host paths and point the init and node agent
 # containers at them via HOST_CNI_BIN_PATH / HOST_CNI_CONFDIR_PATH.
+# The step container runs as a non-root user, so helm is unpacked into a
+# writable directory and put on PATH (installing to /usr/local/bin fails with
+# Permission denied).
 if ! command -v helm >/dev/null 2>&1; then
   log "Installing helm ${HELM_VERSION}"
-  curl -sSfL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o /tmp/helm.tgz
-  tar -C /tmp -xzf /tmp/helm.tgz
-  install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
-  rm -rf /tmp/helm.tgz /tmp/linux-amd64
+  HELM_DIR=$(mktemp -d)
+  curl -sSfL "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" -o "${HELM_DIR}/helm.tgz"
+  tar -C "${HELM_DIR}" -xzf "${HELM_DIR}/helm.tgz"
+  install -m 0755 "${HELM_DIR}/linux-amd64/helm" "${HELM_DIR}/helm"
+  export PATH="${HELM_DIR}:${PATH}"
 fi
 
 VALUES_FILE=$(mktemp)
