@@ -223,8 +223,8 @@ Resources:
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
-      # NLB instance targets see the client IP, so 8443 must be open to clients
-      # as well as to the NLB health checks.
+      # deploy and smoke check each node's public IP on 8443 from the CI pod,
+      # so 8443 is open to all; NLB traffic and health checks come from the VPC.
       - IpProtocol: tcp
         FromPort: 8443
         ToPort: 8443
@@ -403,7 +403,7 @@ Resources:
       Port: 8443
       TargetType: instance
       # Clair on Quay nodes 1 and 2 fetches layers through this NLB: with the
-      # client IP preserved, a target calling its own NLB hairpins and times out.
+      # client IP preserved, a target calling its own NLB can hairpin and time out.
       TargetGroupAttributes:
       - Key: preserve_client_ip.enabled
         Value: "false"
