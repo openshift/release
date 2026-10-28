@@ -16,6 +16,9 @@ libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*|power-s2s*)
     ;;
 esac
 
+
+
+
 function upgrade() {
     set -x
     openshift-tests run-upgrade all \
