@@ -83,9 +83,6 @@ TFEOF
 
 terraform init
 
-BUCKET_PRIMARY="$(new_s3_bucket_name)"
-BUCKET_SECONDARY="$(new_s3_bucket_name)"
-
 tf_apply_rc=1
 for _ in 1 2 3 4 5; do
   BUCKET_PRIMARY="$(new_s3_bucket_name)"

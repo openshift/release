@@ -51,6 +51,9 @@ EOF
         [[ "${state}" == "READY" ]] && break
         sleep 10
     done
+    if [[ "${state}" != "READY" ]]; then
+        echo "WARNING: CatalogSource ${QUAY_OPERATOR_SOURCE} not READY after 5m (state: ${state:-unknown})" >&2
+    fi
 fi
 
 cat <<EOF | oc apply -f -
@@ -133,7 +136,7 @@ FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
 SUPER_USERS:
-  - quay
+  - admin
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 FEATURE_ANONYMOUS_ACCESS: true
@@ -151,9 +154,24 @@ EOF
 
 cat "${STORAGE_CONFIG}" >> config.yaml
 
+merge_config_fragment() {
+    local fragment="$1"
+    if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
+        echo "ERROR: ${fragment} is not valid YAML" >&2
+        exit 1
+    fi
+    yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+}
+
 if [[ -s "${SHARED_DIR}/quay-database-aws-rds-config.yaml" ]]; then
     echo "Merging shared RDS database config..." >&2
-    yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${SHARED_DIR}/quay-database-aws-rds-config.yaml"
+    merge_config_fragment "${SHARED_DIR}/quay-database-aws-rds-config.yaml"
+fi
+
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+    echo "Merging extra Quay config into defaults..." >&2
+    echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+    merge_config_fragment extra_config.yaml
 fi
 
 yq -i '

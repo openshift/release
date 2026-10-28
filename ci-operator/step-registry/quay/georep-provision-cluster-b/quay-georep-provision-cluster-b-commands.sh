@@ -91,7 +91,8 @@ sshKey: |
   ${SSH_PUB_KEY}
 EOF
 
-cp "${INSTALL_DIR}/install-config.yaml" "${ARTIFACT_DIR}/install-config.yaml.bak"
+grep -v "password\|username\|pullSecret\|auth" "${INSTALL_DIR}/install-config.yaml" \
+    > "${ARTIFACT_DIR}/install-config.yaml.bak"
 
 # Save metadata early so the deprovision step can clean up partial installs.
 # metadata.json is created by the installer before provisioning starts.
