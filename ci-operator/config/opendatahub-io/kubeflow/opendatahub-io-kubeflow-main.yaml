@@ -1,0 +1,101 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - context_dir: components
+    dockerfile_path: notebook-controller/Dockerfile
+    from: ubi_minimal
+    to: kf-notebook-controller
+  - context_dir: components
+    dockerfile_path: odh-notebook-controller/Dockerfile
+    from: ubi_minimal
+    to: odh-notebook-controller
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 200Mi
+tests:
+- as: odh-notebook-controller-tls-scanner
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*|components/odh-notebook-controller/.*)
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: odh-notebook-controller-system
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_REQUEST: 1Gi
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        set -euo pipefail
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        export K8S_NAMESPACE=odh-notebook-controller-system
+        if test -n "${ODH_NOTEBOOK_CONTROLLER_IMAGE:-}"; then
+          IFS=':' read -r -a CTRL_IMG <<< "${ODH_NOTEBOOK_CONTROLLER_IMAGE}"
+          export IMG="${CTRL_IMG[0]}"
+          export TAG="${CTRL_IMG[1]}"
+        fi
+        if test -n "${KF_NOTEBOOK_CONTROLLER:-}"; then
+          IFS=':' read -r -a KF_NBC_IMG <<< "${KF_NOTEBOOK_CONTROLLER}"
+          export KF_IMG="${KF_NBC_IMG[0]}"
+          export KF_TAG="${KF_NBC_IMG[1]}"
+        fi
+        oc new-project "${K8S_NAMESPACE}" || true
+        make deploy
+        # make deploy applies both the ODH notebook controller and the KF notebook
+        # controller (Deployment named 'notebook-controller-deployment' after the
+        # kustomize namePrefix) into ${K8S_NAMESPACE}
+        oc wait --for=condition=Available --timeout=180s \
+          -n "${K8S_NAMESPACE}" deployment/odh-notebook-controller-manager
+        oc wait --for=condition=Available --timeout=180s \
+          -n "${K8S_NAMESPACE}" deployment/notebook-controller-deployment
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      timeout: 15m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: kubeflow
