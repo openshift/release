@@ -45,9 +45,10 @@ workflow:
     - ref: rosa-e2e-validate-customer
     - ref: rosa-e2e-validate-platform
     post:
-    # The IRSA role created by rosa-conf-vpc-cni is not known to the standard
-    # deprovision chain and would leak without this.
-    - ref: rosa-conf-vpc-cni-role-delete
+    # Undo the rosa-conf-vpc-cni changes while the cluster is still up: the
+    # SCCs and the IRSA role the standard deprovision chain does not know
+    # about and would leak.
+    - ref: rosa-conf-vpc-cni-cleanup
       best_effort: true
     - ref: rosa-gap-analysis-api-resources-and-crd
       best_effort: true
@@ -81,7 +82,7 @@ workflow:
     host-path overrides: /var/lib/cni/bin and /run/multus/cni/net.d). The step
     also records cni=aws-vpc-cni in the SHARED_DIR contract
     (cluster-metadata.json) so the validation tail can condition on the CNI
-    type. Its IRSA role is removed post-test by rosa-conf-vpc-cni-role-delete.
+    type. Its IRSA role is removed post-test by rosa-conf-vpc-cni-cleanup.
 
     The platform plane requires corp-network reachability: run this workflow
     only where backplane is reachable (capabilities: [intranet],
