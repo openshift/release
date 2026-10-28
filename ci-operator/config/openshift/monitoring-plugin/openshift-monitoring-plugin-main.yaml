@@ -133,7 +133,7 @@ tests:
     - ref: monitoring-plugin-tests-coo-ui
     workflow: ipi-aws
 - always_run: false
-  as: e2e-incidents
+  as: e2e-integration
   optional: true
   reporter_config:
     channel: '#observability-ui-qe'
@@ -149,8 +149,17 @@ tests:
       0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
   steps:
     cluster_profile: openshift-org-aws
+    env:
+      OPERATORS: |
+        [
+          {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group": "coo-og"},
+          {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+          {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+          {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
+        ]
     test:
-    - ref: monitoring-plugin-tests-incidents-ui
+    - ref: install-operators
+    - ref: monitoring-plugin-tests-integration-ui
     workflow: ipi-aws
 - always_run: false
   as: e2e-alerts
