@@ -1,0 +1,31 @@
+ref:
+  as: quay-georep-provision-cluster-b
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-provision-cluster-b-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  env:
+  - name: QUAY_GEOREP_REGION_SECONDARY
+    default: "us-west-2"
+    documentation: AWS region for the secondary HyperShift hosted cluster.
+  - name: QUAY_GEOREP_CLUSTER_B_NODE_COUNT
+    default: "3"
+    documentation: Number of worker nodes for the secondary cluster.
+  documentation: |-
+    Provision a HyperShift hosted cluster in the secondary region to serve
+    as the geo-replication secondary site. The hosted cluster uses the
+    management cluster (cluster A) as its HyperShift control plane. Writes
+    ${SHARED_DIR}/kubeconfig-cluster-b for subsequent steps to deploy Quay
+    on cluster B.

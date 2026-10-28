@@ -1,0 +1,37 @@
+ref:
+  as: quay-georep-provision-storage
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-provision-storage-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  env:
+  - name: QUAY_GEOREP_REGION_PRIMARY
+    default: "us-east-1"
+    documentation: AWS region for the primary S3 bucket.
+  - name: QUAY_GEOREP_REGION_SECONDARY
+    default: "us-west-2"
+    documentation: AWS region for the secondary S3 bucket.
+  - name: QUAY_S3_STORAGE_PATH
+    default: "/quay"
+    documentation: Object storage path prefix Quay writes blobs under.
+  documentation: |-
+    Provision two AWS S3 buckets in two distinct regions for Quay
+    geo-replication testing. Writes a multi-location
+    DISTRIBUTED_STORAGE_CONFIG contract with FEATURE_STORAGE_REPLICATION
+    enabled to ${SHARED_DIR}/quay-storage-config.yaml. Terraform
+    state is saved to ${SHARED_DIR}/terraform-georep-storage.tgz and
+    bucket names to ${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_PRIMARY and
+    ${SHARED_DIR}/QUAY_GEOREP_S3_BUCKET_SECONDARY for
+    quay-georep-deprovision-storage to destroy.
