@@ -101,6 +101,7 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 | Step | Ref YAML | Script | Inputs | Outputs |
 |------|----------|--------|--------|---------|
 | **github-app-auth** | [`github-app-auth-ref.yaml`][auth-ref] | [`github-app-auth-commands.sh`][auth-sh] | `trt-agent-gh-app` credential (app-id, private-key, installation IDs) | `gh-fork-token`, `gh-upstream-token`, `gh-app-bot-login` |
+| **init-model** | [`init-model-ref.yaml`][model-ref] | [`init-model-commands.sh`][model-sh] | None | `trt-init-model.sh`, `trt-telemetry.sh` |
 | **init** | [`init-ref.yaml`][init-ref] | [`init-commands.sh`][init-sh] | `JIRA_ISSUE_KEY`, tokens from SHARED_DIR | `jira-issue-key`, `jira-issue.json` |
 | **jira-solver** | [`jira-solver-ref.yaml`][solver-ref] | [`jira-solver-commands.sh`][solver-sh] | JIRA JSON, tokens, `SETUP_SCRIPT`, `ALLOWED_TOOLS` | `pr-number`, `claude-output.log`, PR on fork |
 | **pr-followup** | [`pr-followup-ref.yaml`][followup-ref] | [`pr-followup-commands.sh`][followup-sh] | JIRA key, tokens | `pr-number` |
@@ -109,6 +110,8 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 [registry]: https://github.com/openshift/release/tree/main/ci-operator/step-registry/openshift/agentic/trt
 [auth-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/github-app-auth/openshift-agentic-trt-github-app-auth-ref.yaml
 [auth-sh]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/github-app-auth/openshift-agentic-trt-github-app-auth-commands.sh
+[model-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/init-model/openshift-agentic-trt-init-model-ref.yaml
+[model-sh]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/init-model/openshift-agentic-trt-init-model-commands.sh
 [init-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/init/openshift-agentic-trt-init-ref.yaml
 [init-sh]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/init/openshift-agentic-trt-init-commands.sh
 [solver-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/jira-solver/openshift-agentic-trt-jira-solver-ref.yaml
@@ -164,6 +167,12 @@ The repo provides the runtime environment:
 [solve-cfg]: https://github.com/openshift/sippy/blob/main/.agentic/solve-config.md
 [review-md]: https://github.com/openshift/sippy/blob/main/REVIEW.md
 [claude-md]: https://github.com/openshift/sippy/blob/main/CLAUDE.md
+
+## Model
+
+TRT jira-solver, review-responder, review-responder-eval, and eval-solve default `AGENT_MODEL` to `claude-opus-4-6`. `openshift-agentic-trt-init-model` writes the shared model selector and telemetry helper those steps source. A model whose name starts with `gpt-` runs on the Codex harness. Any other model runs on Claude Code. `GATE_MODEL` stays `claude-haiku-4-5` and is not the solve model.
+
+Change the default by editing `AGENT_MODEL` on those refs. Supply a per-job override through Gangway as `pod_spec_options.envs.MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL`. When that variable is unset, the step uses `AGENT_MODEL`. DPTP steps are unchanged and do not read this override.
 
 ## State Machine
 

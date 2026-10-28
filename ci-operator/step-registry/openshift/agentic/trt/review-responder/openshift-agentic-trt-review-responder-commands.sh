@@ -12,7 +12,7 @@ echo "=== TRT Review Responder ==="
     exit 1
 }
 [[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — openshift-agentic-trt-init-model step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
@@ -85,8 +85,9 @@ if [[ -z "${BOT_LOGIN}" ]]; then
 fi
 echo "Bot login: ${BOT_LOGIN}"
 
-# Hard blocks for credential-dumping commands. Prompt text is not enough
-# against injection from review comments in CI agent workflows.
+# Credential command denies are non-exhaustive and best effort. They do not
+# cover every reader or path spelling. The prompt also tells the agent not
+# to reveal credentials.
 DISALLOWED_TOOLS=(
     "Bash(git config*credential*)"
     "Bash(git config*--list*)"
@@ -117,12 +118,14 @@ DISALLOWED_TOOLS=(
     "Bash(od*github-app-auth.sh*)"
     "Bash(od*google-token*)"
     "Bash(git push*)"
+    "Bash(git send-pack*)"
     "Bash(head*/var/run/github-token*)"
     "Bash(sed*/var/run/github-token*)"
     "Bash(od*/var/run/github-token*)"
     # Read(path) covers all file-reading tools (Grep/Glob path denials are ignored).
     "Read(//var/run/github-token/**)"
     "Read(//var/run/claude-code-service-account/**)"
+    "Read(//var/run/codex-openai-api-key/**)"
 )
 
 append_pipeline_constraints() {
@@ -286,7 +289,7 @@ done
 
 # --- Poll: small-model gate, then worker ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
-echo "Gate model: ${GATE_MODEL} | Worker model: ${CLAUDE_MODEL}"
+echo "Gate model: ${GATE_MODEL} | Worker model: $(select_agent_model)"
 
 extract_failing_checks() {
     python3 -c '
