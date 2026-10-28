@@ -352,10 +352,15 @@ function downloadSanitizer() {
         destination=$(mktemp /tmp/mco-sanitize.XXXXXX)
         if curl --silent --show-error --fail --location --connect-timeout 30 --max-time 60 \
             --output "${destination}" "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize"; then
-            chmod +x "${destination}"
-            mv "${destination}" /tmp/mco-sanitize
-            echo "Required mco-sanitize download complete."
-            return 0
+            if chmod +x "${destination}" && mv -T "${destination}" /tmp/mco-sanitize; then
+                echo "Required mco-sanitize download complete."
+                return 0
+            else
+                status=$?
+            fi
+            rm -f "${destination}"
+            echo "ERROR: required mco-sanitize installation failed (exit ${status}); must-gather will not run." >&2
+            return "${status}"
         else
             status=$?
         fi

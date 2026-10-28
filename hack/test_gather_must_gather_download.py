@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Offline sanitizer fixtures: python3 hack/test_gather_must_gather_download.py -v."""
 
 import json
 import os
@@ -15,18 +16,23 @@ PROXY = "http://fixture-user:fixture-password@proxy.invalid:8080"
 
 
 def mock_command(command, arguments):
+    """Record subprocesses, stub downloads, and inject installation failures."""
     base = Path(os.environ["FIXTURE_DIR"])
     with (base / "calls.jsonl").open("a", encoding="utf-8") as calls:
         calls.write(json.dumps([command, arguments]) + "\n")
     if command == "sleep":
         return 0
+    if command in ("chmod", "mv"):
+        if command == os.environ["FIXTURE_INSTALLATION"]:
+            return 73
+        os.execv("/usr/bin/" + command, [command, *arguments])
     if command == "curl":
         assert os.environ.get("https_proxy", "") == (
             "" if os.environ["CLUSTER_TYPE"] in ("aws-c2s", "aws-sc2s") else PROXY)
         destination = Path(arguments[arguments.index("--output") + 1])
         assert destination.exists() and destination.stat().st_size == 0
         assert not os.access(destination, os.X_OK)
-        assert not (base / "mco-sanitize").exists()
+        assert not (base / "mco-sanitize").is_file()
         count_file = base / "count"
         count = int(count_file.read_text()) if count_file.exists() else 0
         count_file.write_text(str(count + 1))
@@ -54,26 +60,56 @@ def mock_command(command, arguments):
     raise AssertionError(f"Unexpected command: {command}")
 
 
+def prepare_fixture(base, installation):
+    """Create isolated paths, proxy configuration, and PATH-based command stubs."""
+    for directory in ("shared", "artifacts", "bin"):
+        (base / directory).mkdir()
+    (base / "kubeconfig").touch()
+    (base / "shared/proxy-conf.sh").write_text(f"export https_proxy='{PROXY}'\n")
+    (base / "shared/unset-proxy.sh").write_text("unset https_proxy\n")
+    (base / "shared/install-status.txt").write_text("0\n")
+    if installation in ("directory", "symlink"):
+        (base / "existing-directory").mkdir()
+        if installation == "directory":
+            (base / "mco-sanitize").mkdir()
+        else:
+            (base / "mco-sanitize").symlink_to(base / "existing-directory", target_is_directory=True)
+    for command in ("curl", "oc", "sleep", "chmod", "mv"):
+        wrapper = base / "bin" / command
+        wrapper.write_text(
+            f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
+            f'--mock {command} "$@"\n')
+        wrapper.chmod(0o755)
+
+
 class SanitizerDownloadTest(unittest.TestCase):
-    def run_case(self, statuses, cluster_type="aws", sanitizer_status=0):
+    """Exercise the delivered shell path through sanitizer execution or fail-closed exit."""
+
+    def assert_install_failure(self, base, result, calls, installation):
+        """Require failed promotion to clean downloads and stop before collection."""
+        self.assertEqual(result.returncode, 1 if installation == "directory" else 73,
+                         result.stderr)
+        self.assertFalse([command for command, _ in calls if command == "oc"])
+        self.assertFalse((base / "sanitized").exists())
+        self.assertFalse((base / "artifacts/must-gather").exists())
+        self.assertNotIn("Required mco-sanitize download complete.", result.stdout)
+        self.assertIn("required mco-sanitize installation failed", result.stderr)
+        if installation == "directory":
+            self.assertTrue((base / "mco-sanitize").is_dir())
+            self.assertFalse((base / "mco-sanitize").is_symlink())
+            self.assertFalse(list((base / "mco-sanitize").iterdir()))
+        else:
+            self.assertFalse((base / "mco-sanitize").exists())
+
+    def run_case(self, statuses, cluster_type="aws", sanitizer_status=0, installation=""):
+        """Run real prerequisite and redaction code with deterministic offline commands."""
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             shared = base / "shared"
             artifacts = base / "artifacts"
             binaries = base / "bin"
-            for directory in (shared, artifacts, binaries):
-                directory.mkdir()
             kubeconfig = base / "kubeconfig"
-            kubeconfig.touch()
-            (shared / "proxy-conf.sh").write_text(f"export https_proxy='{PROXY}'\n")
-            (shared / "unset-proxy.sh").write_text("unset https_proxy\n")
-            (shared / "install-status.txt").write_text("0\n")
-            for command in ("curl", "oc", "sleep"):
-                wrapper = binaries / command
-                wrapper.write_text(
-                    f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
-                    f'--mock {command} "$@"\n')
-                wrapper.chmod(0o755)
+            prepare_fixture(base, installation)
             script = SCRIPT.read_text().split(
                 '[ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ]', 1)[0]
             script = script.replace("/tmp/mco-sanitize", str(base / "mco-sanitize"))
@@ -84,6 +120,7 @@ class SanitizerDownloadTest(unittest.TestCase):
                 "EXTRA_MG_ARGS": "--fixture-extra", "MUST_GATHER_TIMEOUT": "35m",
                 "FIXTURE_DIR": str(base), "FIXTURE_STATUSES": json.dumps(statuses),
                 "FIXTURE_SANITIZER_STATUS": str(sanitizer_status),
+                "FIXTURE_INSTALLATION": installation,
             }
             result = subprocess.run(["bash", "-c", script], env=environment,
                                     text=True, capture_output=True, timeout=10, check=False)
@@ -109,7 +146,9 @@ class SanitizerDownloadTest(unittest.TestCase):
             self.assertIn("Downloading required mco-sanitize (attempt 1/3)", result.stdout)
             self.assertTrue((artifacts / "junit_install.xml").exists())
             oc_calls = [arguments for command, arguments in calls if command == "oc"]
-            if 0 in statuses:
+            if installation in ("directory", "chmod", "mv"):
+                self.assert_install_failure(base, result, calls, installation)
+            elif 0 in statuses:
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(len(oc_calls), 2)
                 self.assertIn("--timeout=35m", oc_calls[-1])
@@ -117,6 +156,9 @@ class SanitizerDownloadTest(unittest.TestCase):
                 self.assertIn("--volume-percentage=100", oc_calls[-1])
                 self.assertTrue((base / "sanitized").exists())
                 self.assertTrue(os.access(base / "mco-sanitize", os.X_OK))
+                self.assertFalse((base / "mco-sanitize").is_symlink())
+                if installation == "symlink":
+                    self.assertFalse(list((base / "existing-directory").iterdir()))
                 self.assertIn("Required mco-sanitize download complete.", result.stdout)
                 resource = artifacts / "must-gather/cluster-scoped-resources/machineconfiguration.openshift.io"
                 if sanitizer_status:
@@ -138,27 +180,48 @@ class SanitizerDownloadTest(unittest.TestCase):
                     self.assertIn(f"curl: ({status}) fixture download failure", result.stderr)
 
     def test_success(self):
+        """A completed prerequisite permits must-gather and sanitizer execution."""
         self.run_case([0])
 
     def test_partial_transfer_retry(self):
+        """Curl exit 18 retries into a fresh file and can recover."""
         self.run_case([18, 0])
 
     def test_exhausted_partial_transfers(self):
+        """Three partial transfers fail closed with exit 18 and no executable."""
         self.run_case([18])
 
     def test_http_failure(self):
+        """HTTP failures exhaust the finite retry budget without collection."""
         self.run_case([22])
 
     def test_preserves_final_failure_status(self):
+        """Different transfer failures preserve the final curl exit status."""
         self.run_case([18, 22, 28])
 
     def test_proxy_restored(self):
+        """C2S and SC2S downloads bypass the proxy and restore it before oc."""
         for cluster_type in ("aws-c2s", "aws-sc2s"):
             with self.subTest(cluster_type=cluster_type):
                 self.run_case([18, 0], cluster_type=cluster_type)
 
     def test_manual_redaction_preserved(self):
+        """Sanitizer execution failure retains the existing manual-redaction fallback."""
         self.run_case([0], sanitizer_status=1)
+
+    def test_destination_directory(self):
+        """A destination directory must not accept a nested executable."""
+        self.run_case([0], installation="directory")
+
+    def test_destination_symlink_to_directory(self):
+        """A destination symlink must not redirect installation into its target."""
+        self.run_case([0], installation="symlink")
+
+    def test_install_command_failure(self):
+        """Failed chmod or mv removes the temporary binary and preserves its status."""
+        for command in ("chmod", "mv"):
+            with self.subTest(command=command):
+                self.run_case([0], installation=command)
 
 
 if __name__ == "__main__":
