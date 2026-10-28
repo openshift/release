@@ -1,0 +1,49 @@
+ref:
+  as: tls-scanner-run-with-profile-switching
+  from: src
+  cli: latest
+  commands: tls-scanner-run-with-profile-switching-commands.sh
+  env:
+  - name: SCAN_NAMESPACE
+    default: ""
+    documentation: "Comma-separated list of namespaces to scan. Empty means scan all namespaces."
+  dependencies:
+  - env: RELEASE_IMAGE_LATEST
+    name: release:latest
+  - env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+    name: release:latest
+  - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    name: release:latest
+  - env: PULL_SPEC_TLS_SCANNER_TOOL
+    name: tls-scanner-tool
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 6h0m0s
+  grace_period: 10m0s
+  documentation: |-
+    Runs the TLS scanner with dynamic profile switching to test operator TLS configuration reload behavior.
+
+    This step performs the following:
+    1. Scans all endpoints with the initial TLS profile (Intermediate/default)
+    2. Switches to Modern profile, waits for operators to reload, and re-scans
+    3. Switches to Old profile, waits for operators to reload, and re-scans
+    4. Restores to Intermediate profile and performs final scan
+
+    The scanner runs with cluster-admin privileges and full host access.
+
+    Environment Variables:
+    - SCAN_NAMESPACE: Optional. If set, only scan pods in the specified namespace.
+                      If not set, scan all pods in the cluster.
+
+    Artifacts:
+    - intermediate/: Scan results with Intermediate profile (initial)
+    - modern/: Scan results with Modern profile
+    - old/: Scan results with Old profile
+    - intermediate-final/: Scan results with Intermediate profile (restored)
+    - summary.txt: Summary of the test execution
+    - JUnit XML files for each scan (copied to artifact root for CI)
+
+    This test validates that operators correctly respond to centralized TLS
+    configuration changes and reload their TLS settings accordingly.
