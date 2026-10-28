@@ -1,0 +1,37 @@
+workflow:
+  as: openshift-e2e-aws-nested-virtualization
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FEATURE_GATES: "['ClusterAPIMachineManagementAWS=true']"
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-nested-virtualization
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-aws-nested-virtualization
+    post:
+    - chain: ipi-aws-post
+  documentation: |-
+    The openshift-e2e-aws-nested-virtualization workflow provisions an AWS IPI
+    cluster with nested virtualization enabled via install-config.yaml, then
+    validates the configuration.
+
+    This workflow enables nested virtualization by setting
+    compute[*].platform.aws.cpuOptions.nestedVirtualization=Enabled during cluster
+    provisioning.
+
+    Steps:
+    1. Configure AWS IPI cluster parameters (ipi-conf-aws)
+    2. Add cpuOptions.nestedVirtualization=Enabled to install-config.yaml
+    3. Provision the cluster with nested virtualization enabled (ipi-install)
+    4. Validate nested virtualization is working (four checks):
+       - AWS EC2 CpuOptions.NestedVirtualization is enabled
+       - CPU flags (vmx/svm) are present
+       - KVM module is loaded and /dev/kvm exists
+    5. Cleanup (ipi-aws-post)
+
+    Environment variables:
+    - COMPUTE_NODE_TYPE: m8i/c8i/r8i instance type (e.g., "m8i.2xlarge")
+    - COMPUTE_NODE_REPLICAS: Number of worker nodes (default: 3)
