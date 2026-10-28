@@ -1,0 +1,39 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_path: web/Containerfile.playwright
+    to: quay-playwright-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-quay-qe
+    workflow: quay-standalone-aws-ha
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: redhat-3.18
+  org: quay
+  repo: quay
+  variant: aws-standalone-ha
