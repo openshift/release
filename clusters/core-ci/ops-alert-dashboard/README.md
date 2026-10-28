@@ -4,7 +4,7 @@ This change stages the deployment with **zero replicas**. Merging it creates no
 process that can read or write Slack. Activation is a separate reviewed change
 to `replicas: 1`, after every prerequisite below has been verified. Keep the
 single writer at exactly one replica and keep `strategy: Recreate`; never use a
-rolling update or run a second live copy with the same channel/cutover.
+rolling update or run a second live copy for the same ops channel.
 
 The backend and image Dockerfile come from `openshift/ci-tools-standalone`.
 [Source PR #58](https://github.com/openshift/ci-tools-standalone/pull/58) must
@@ -86,12 +86,18 @@ normal secret-management process:
   `reactions:write` permissions without printing the token. Confirm bot membership
   in the target channel. No new token or secret value is present in this PR.
 
-Choose and record a fixed RFC3339 `slack.cutover` before activation. Verify Slack
-retention covers that time and all action threads. Do not move the cutover forward
-on restart to conceal missing history. Validate the completed files with the
-published binary's `--validate-only --config=... --classification=...` command;
-that command requires no Slack token and performs no Slack calls. Validation of
-placeholders is not a substitute for verifying the live identities and scopes.
+The Deployment uses a rolling **48-hour** history window via
+`--history-window=48h`. Older alerts and Chai reports leave the dashboard as the
+window advances. Recovery reads up to 24 extra hours of parent messages so active
+snoozes survive their original occurrence aging out and process restarts; these
+buffer occurrences are hidden and cannot receive new actions. Verify Slack
+retention covers at least 72 hours with the default settings. An optional fixed
+RFC3339 `slack.cutover` can set an earliest go-live floor within that window.
+
+Validate the completed files with the published binary's
+`--validate-only --config=... --classification=...` command; it requires no Slack
+token and performs no Slack calls. Validation of placeholders is not a substitute
+for verifying the live identities and scopes.
 
 The classification catalog remains the single canonical file
 `core-services/slack-bot/_ops-alerts.yaml`. Prow config-updater distributes it to
@@ -108,7 +114,7 @@ application directory. Catalog/config changes require a process restart.
    architectures. Record the image digest/source revision and rollback digest.
 2. Provision and verify all three required Secrets, the service-generated TLS
    Secret and the classification ConfigMap. Verify exact Slack identities,
-   channel membership, token permissions, fixed cutover and retention.
+   channel membership, token permissions, history window and retention coverage.
 3. Validate the completed configuration against the canonical catalog. Verify
    the final Route host matches `access.external_url`, OAuth redirect reference,
    trusted proxies, intended group membership and explicit operator allowlist.
@@ -138,7 +144,7 @@ application directory. Catalog/config changes require a process restart.
 
 If replay is incomplete or identity/authorization checks fail, keep or restore
 `replicas: 0` in Git and investigate before resuming. Preserve the Secret config,
-fixed cutover and Slack history. Reverting the image to the recorded digest also
+configured history window and Slack history. Reverting the image to the recorded digest also
 uses `Recreate` and one replica; a rollback must never introduce concurrent
 writers. Do not delete durable Slack action records as a rollback mechanism.
 
