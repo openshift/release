@@ -1,0 +1,49 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+binary_build_commands: go test -c -o examples.test ./examples
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY examples.test /opt/component-tests/examples.test
+      COPY scenarios/ /opt/component-tests/scenarios/
+      WORKDIR /opt/component-tests
+    from: nested-podman
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift-splat-team/vcenter-test-profiles/examples.test
+        - destination_dir: scenarios
+          source_path: /go/src/github.com/openshift-splat-team/vcenter-test-profiles/examples/scenarios/.
+    to: vcenter-test-profiles-verify-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tests:
+- as: verify-vcenter-test-profiles
+  capabilities:
+  - nested-podman
+  commands: |
+    export VCENTER_TEST_PROFILES_IMAGE=quay.io/ocp-splat/vcenter-test-profiles:latest
+    /opt/component-tests/examples.test -test.v -test.run '^TestInstallerPrivileges$'
+  container:
+    from: vcenter-test-profiles-verify-runner
+  nested_podman: true
+  timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-splat-team
+  repo: vcenter-test-profiles
