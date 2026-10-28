@@ -509,20 +509,27 @@ oc get ingresscontroller default -n openshift-ingress-operator \
 echo "$(date) --- Step 5c: Override *.apps DNS in hosted cluster CoreDNS ---"
 echo "$(date) Overriding *.${APPS_DOMAIN} → ${LB_IP}"
 
-# 1. Scale down the dns-operator so it doesn't revert our Corefile patch.
-#    In HyperShift the dns-operator runs in the control-plane namespace on
-#    the management cluster. The HC pause stops CPO from re-scaling it.
-echo "$(date) Scaling down dns-operator to prevent Corefile reconciliation"
-oc scale deployment dns-operator -n "${CP_NS}" --replicas=0 --timeout=60s || true
+# API Guard: verify hosted cluster API is reachable before attempting CoreDNS modifications
+if ! oc --kubeconfig "${VIRT_KC}" get ns openshift-dns --request-timeout=15s &>/dev/null; then
+  echo "$(date) WARNING: Hosted cluster API is not reachable; skipping CoreDNS override"
+else
+  # 1. Scale down the dns-operator so it doesn't revert our Corefile patch.
+  #    In HyperShift the dns-operator runs in the control-plane namespace on
+  #    the management cluster. The HC pause stops CPO from re-scaling it.
+  echo "$(date) Scaling down dns-operator to prevent Corefile reconciliation"
+  oc scale deployment dns-operator -n "${CP_NS}" --replicas=0 --timeout=60s || true
 
-# 2. Get the current Corefile from the hosted cluster
-COREFILE_ORIG=$(oc --kubeconfig "${VIRT_KC}" get configmap dns-default \
-  -n openshift-dns -o jsonpath='{.data.Corefile}')
+  # 2. Get the current Corefile from the hosted cluster
+  COREFILE_ORIG=$(oc --kubeconfig "${VIRT_KC}" get configmap dns-default \
+    -n openshift-dns -o jsonpath='{.data.Corefile}' --request-timeout=15s 2>/dev/null || true)
 
-# 3. Append a template server block for the apps zone.
-#    CoreDNS routes queries matching this zone to the template block before
-#    the catch-all .:5353, so every *.apps.<HC>... name resolves to $LB_IP.
-cat > /tmp/Corefile <<DNSEOF
+  if [[ -z "${COREFILE_ORIG}" ]]; then
+    echo "$(date) WARNING: Failed to retrieve dns-default Corefile; skipping CoreDNS override"
+  else
+    # 3. Append a template server block for the apps zone.
+    #    CoreDNS routes queries matching this zone to the template block before
+    #    the catch-all .:5353, so every *.apps.<HC>... name resolves to $LB_IP.
+    cat > /tmp/Corefile <<DNSEOF
 ${COREFILE_ORIG}
 
 ${APPS_DOMAIN}:5353 {
@@ -532,29 +539,31 @@ ${APPS_DOMAIN}:5353 {
 }
 DNSEOF
 
-# 4. Apply the patched ConfigMap
-oc --kubeconfig "${VIRT_KC}" create configmap dns-default \
-  -n openshift-dns \
-  --from-file=Corefile=/tmp/Corefile \
-  --dry-run=client -o yaml | \
-  oc --kubeconfig "${VIRT_KC}" apply -f -
+    # 4. Apply the patched ConfigMap
+    oc --kubeconfig "${VIRT_KC}" create configmap dns-default \
+      -n openshift-dns \
+      --from-file=Corefile=/tmp/Corefile \
+      --dry-run=client -o yaml | \
+      oc --kubeconfig "${VIRT_KC}" apply -f - || true
 
-# 5. Restart CoreDNS pods to force immediate config pickup
-#    (the reload plugin would pick it up in ~60s, but restarting is faster)
-oc --kubeconfig "${VIRT_KC}" delete pods -n openshift-dns \
-  -l dns.operator.openshift.io/daemonset-dns=default --wait=false
-echo "$(date) Waiting for CoreDNS pods to restart"
-sleep 15
-oc --kubeconfig "${VIRT_KC}" wait pods -n openshift-dns \
-  -l dns.operator.openshift.io/daemonset-dns=default \
-  --for=condition=Ready --timeout=120s
+    # 5. Restart CoreDNS pods to force immediate config pickup
+    #    (the reload plugin would pick it up in ~60s, but restarting is faster)
+    oc --kubeconfig "${VIRT_KC}" delete pods -n openshift-dns \
+      -l dns.operator.openshift.io/daemonset-dns=default --wait=false || true
+    echo "$(date) Waiting for CoreDNS pods to restart"
+    sleep 15
+    oc --kubeconfig "${VIRT_KC}" wait pods -n openshift-dns \
+      -l dns.operator.openshift.io/daemonset-dns=default \
+      --for=condition=Ready --timeout=120s || true
 
-# 6. Verify the Corefile was applied correctly
-echo "$(date) Verifying CoreDNS Corefile contains apps override:"
-oc --kubeconfig "${VIRT_KC}" get configmap dns-default -n openshift-dns \
-  -o jsonpath='{.data.Corefile}' | grep -A3 "template IN A" || true
+    # 6. Verify the Corefile was applied correctly
+    echo "$(date) Verifying CoreDNS Corefile contains apps override:"
+    oc --kubeconfig "${VIRT_KC}" get configmap dns-default -n openshift-dns \
+      -o jsonpath='{.data.Corefile}' 2>/dev/null | grep -A3 "template IN A" || true
 
-echo "$(date) DNS override complete — *.${APPS_DOMAIN} now resolves to ${LB_IP}"
+    echo "$(date) DNS override complete — *.${APPS_DOMAIN} now resolves to ${LB_IP}"
+  fi
+fi
 
 # --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
 echo "$(date) Waiting for all ClusterOperators to be Available"
