@@ -10,7 +10,10 @@ export ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE="${ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAG
 
 mkdir -p "${ARTIFACT_DIR}"
 oc version || true
-oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+{
+  echo "ready_status:"
+  oc get nodes -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+} > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
 
 set +e
 ginkgo --label-filter="${ECO_TEST_LABELS}" \
@@ -23,13 +26,17 @@ ginkgo --label-filter="${ECO_TEST_LABELS}" \
   ./tests/hw-accel/kmm/modules/...
 test_rc="$?"
 
-oc get modules.kmm.sigs.x-k8s.io --all-namespaces -o yaml \
+oc get modules.kmm.sigs.x-k8s.io --all-namespaces \
+  -o custom-columns='NAMESPACE:.metadata.namespace,STATE:.status.state,AVAILABLE:.status.conditions[?(@.type=="Available")].status' \
   > "${ARTIFACT_DIR}/kmm-modules.yaml" 2>&1 || true
-oc get pods --namespace openshift-kmm -o wide \
+oc get pods --namespace openshift-kmm \
+  -o custom-columns='PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount' \
   > "${ARTIFACT_DIR}/kmm-pods.txt" 2>&1 || true
 oc get events --namespace openshift-kmm --sort-by=.lastTimestamp \
+  -o custom-columns='TYPE:.type,REASON:.reason,COUNT:.count,LAST:.lastTimestamp' \
   > "${ARTIFACT_DIR}/kmm-events.txt" 2>&1 || true
-oc get csv --namespace openshift-kmm -o yaml \
+oc get csv --namespace openshift-kmm \
+  -o custom-columns='PHASE:.status.phase,REASON:.status.reason,AVAILABLE:.status.conditions[?(@.type=="Available")].status' \
   > "${ARTIFACT_DIR}/kmm-csvs.yaml" 2>&1 || true
 
 exit "${test_rc}"
