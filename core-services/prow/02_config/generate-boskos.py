@@ -693,6 +693,9 @@ CONFIG = {
         'us-west-1': 25,
         'us-west-2': 25,
     },
+    'odf-ibmcloud-quota-slice': {
+        'us-east': 25,
+    },
     'aws-ip-pools-us-east-1': {
         'default': 256,
     },
