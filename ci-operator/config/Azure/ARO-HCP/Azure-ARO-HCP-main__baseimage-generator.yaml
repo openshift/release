@@ -48,8 +48,11 @@ tests:
 - as: go-smoke-test
   commands: |
     set -euo pipefail
-    make -C dev-infrastructure/openshift-ci verify test IN_CONTAINER=true
     d=$(mktemp -d)
+    trap 'rm -rf "$d"' EXIT
+    # Azure CLI initializes its config directory even for version checks.
+    export AZURE_CONFIG_DIR="$d/azure"
+    make -C dev-infrastructure/openshift-ci verify test IN_CONTAINER=true
     cd "$d"
     go mod init smoke.example.com/nonroot
     printf '%s\n' 'package main' 'func main() {}' > main.go
