@@ -91,7 +91,7 @@ sshKey: |
   ${SSH_PUB_KEY}
 EOF
 
-grep -v "password\|username\|pullSecret\|auth" "${INSTALL_DIR}/install-config.yaml" \
+grep -v "password\|username\|pullSecret\|auth\|httpProxy\|httpsProxy" "${INSTALL_DIR}/install-config.yaml" \
     > "${ARTIFACT_DIR}/install-config.yaml.bak"
 
 # Save metadata early so the deprovision step can clean up partial installs.
