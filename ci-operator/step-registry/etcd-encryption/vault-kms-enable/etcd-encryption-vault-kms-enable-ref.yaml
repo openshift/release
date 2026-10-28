@@ -1,0 +1,51 @@
+ref:
+  as: etcd-encryption-vault-kms-enable
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: etcd-encryption-vault-kms-enable-commands.sh
+  timeout: 130m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: VAULT_KMS_CONFIG_NAME
+    default: "vault-kms"
+    documentation: |-
+      Name of the cluster-scoped VaultKMSConfig CR referenced by the APIServer
+      encryption configuration. Must match the CR created by
+      etcd-encryption-vault-configure for the primary Vault instance (named after
+      the Vault install namespace, "vault-kms" by default).
+  documentation: |-
+    Enables KMS etcd encryption on the cluster by patching the APIServer
+    config, and waits for the encryption migration to complete. This is the
+    KMS counterpart of the etcd-encryption step used for aescbc/aesgcm.
+
+    Run this step after etcd-encryption-vault-setup: the vault-configure step
+    in that chain creates the VaultKMSConfig CR that the APIServer encryption
+    config references.
+
+    What this step does:
+    1. Applies the VaultKMSConfig CRD referenced by the APIServer encryption
+       config (same manifest as etcd-encryption-vault-configure, idempotent)
+    2. Waits for the cluster to settle after installation (oc adm
+       wait-for-stable-cluster, up to 20 minutes), so the APIServer config
+       patch does not need a retry loop
+    3. Patches APIServer/cluster spec.encryption to type KMS, referencing the
+       VaultKMSConfig via kms.pluginConfig
+    4. Waits for the Encrypted condition with reason EncryptionCompleted on the
+       same operators the kas-o encryption e2e suites cover: kube-apiserver,
+       openshift-apiserver and authentication
+    5. Waits for the cluster to settle again (oc adm wait-for-stable-cluster,
+       up to 20 minutes)
+
+    Prerequisites:
+    - etcd-encryption-vault-setup chain completed (Vault installed and the
+      VaultKMSConfig CR present)
+    - The KMSEncryption feature gate must be enabled on the cluster
+
+    Intended for jobs that enable KMS encryption before performing another
+    action on the encrypted cluster, for example a minor upgrade
+    (e2e-aws-encryption-kms-upgrade).
