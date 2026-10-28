@@ -16,14 +16,11 @@ oc version || true
 } > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
 
 set +e
-ginkgo --label-filter="${ECO_TEST_LABELS}" \
-  --timeout="${ECO_TEST_TIMEOUT}" \
-  --keep-going \
-  --require-suite \
+./scripts/test-runner.sh \
   --junit-report=junit-kmm.xml \
   --json-report=ginkgo-kmm.json \
-  --output-dir="${ARTIFACT_DIR}" \
-  ./tests/hw-accel/kmm/modules/...
+  --output-dir="${ARTIFACT_DIR}"
+
 test_rc="$?"
 
 oc get modules.kmm.sigs.x-k8s.io --all-namespaces \
