@@ -11,6 +11,16 @@ import pathlib
 # files when first making the transition.
 SORT_ONLY = False
 
+# Label required by Argo CD resource.selectors (clusters/core-ci/argocd).
+GITOPS_MANAGED_LABEL = 'ci.openshift.io/gitops-managed'
+
+
+def ensure_gitops_managed_label(resource):
+    """ensure_gitops_managed_label adds the Argo CD resource.selectors label to resource metadata."""
+    metadata = resource.setdefault('metadata', {})
+    labels = metadata.setdefault('labels', {})
+    labels[GITOPS_MANAGED_LABEL] = 'true'
+
 
 class GenDoc():
 
@@ -77,6 +87,7 @@ class GenDoc():
             raise IOError('Only expecting dict; received: ' + type(resource))
         if comment:
             self.add_comments(comment)
+        ensure_gitops_managed_label(resource)
         self.who[len(self.resources)] = f'{os.path.basename(caller.filename)}'
         self.resources.append(resource)
 
