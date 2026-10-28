@@ -25,12 +25,6 @@ fi
 export KUBECONFIG="${KUBECONFIG_B}"
 
 QUAY_NS="quay-enterprise"
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
-QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
-QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
 echo "Deploying Quay on cluster B..." >&2
 echo "Nodes on cluster B:" >&2
