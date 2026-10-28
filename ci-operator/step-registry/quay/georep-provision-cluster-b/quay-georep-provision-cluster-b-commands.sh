@@ -26,7 +26,9 @@ BASE_DOMAIN="${QUAY_GEOREP_BASE_DOMAIN:-quayqe.devcluster.openshift.com}"
 CLUSTER_NAME="georep-b-${NAMESPACE:-ns}-${UNIQUE_HASH:-$(date +%s)}"
 CLUSTER_NAME="$(printf '%s' "${CLUSTER_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-' | cut -c1-27)"
 
-INSTALL_DIR="${SHARED_DIR}/cluster-b-install"
+# Use /tmp for the install directory — SHARED_DIR is backed by a
+# Kubernetes Secret (~1 MiB limit) and the install state is too large.
+INSTALL_DIR="/tmp/cluster-b-install"
 mkdir -p "${INSTALL_DIR}"
 
 RELEASE_IMAGE="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}"
@@ -91,24 +93,31 @@ EOF
 
 cp "${INSTALL_DIR}/install-config.yaml" "${ARTIFACT_DIR}/install-config.yaml.bak"
 
+# Save metadata early so the deprovision step can clean up partial installs.
+# metadata.json is created by the installer before provisioning starts.
+function save_metadata() {
+    if [[ -s "${INSTALL_DIR}/metadata.json" ]]; then
+        cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/cluster-b-metadata.json"
+    fi
+}
+
+printf '%s' "${CLUSTER_NAME}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_NAME"
+printf '%s' "${REGION_SECONDARY}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_REGION"
+printf '%s' "${RELEASE_IMAGE}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_RELEASE_IMAGE"
+
 echo "Creating cluster '${CLUSTER_NAME}' in ${REGION_SECONDARY}..." >&2
 if ! "${INSTALLER}" create cluster --dir="${INSTALL_DIR}" --log-level=info 2>&1 | tee "${ARTIFACT_DIR}/install.log"; then
     echo "ERROR: openshift-install create cluster failed" >&2
+    save_metadata
     cp "${INSTALL_DIR}"/.openshift_install_state.json "${ARTIFACT_DIR}/" 2>/dev/null || true
-    cp "${INSTALL_DIR}"/terraform.tfstate "${ARTIFACT_DIR}/" 2>/dev/null || true
     exit 1
 fi
 
 echo "Cluster B provisioned successfully in ${REGION_SECONDARY}" >&2
 
+save_metadata
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-cluster-b"
 chmod 600 "${SHARED_DIR}/kubeconfig-cluster-b"
-
-printf '%s' "${CLUSTER_NAME}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_NAME"
-printf '%s' "${REGION_SECONDARY}" > "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_REGION"
-
-cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/cluster-b-metadata.json"
-tar -czf "${SHARED_DIR}/cluster-b-install.tgz" -C "${INSTALL_DIR}" .
 
 echo "Cluster B name: ${CLUSTER_NAME}" >&2
 echo "Region: ${REGION_SECONDARY}" >&2

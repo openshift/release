@@ -2,13 +2,15 @@
 set -euo pipefail
 
 # Destroy the second IPI cluster provisioned by quay-georep-provision-cluster-b.
-# This script does not enable set -x to avoid leaking credentials.
+# Uses metadata.json (small, fits in SHARED_DIR) and re-extracts the installer
+# from the release image. This script does not enable set -x to avoid leaking
+# credentials.
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-georep-deprovision-cluster-b"
 mkdir -p "${ARTIFACT_DIR}"
 
-if [[ ! -s "${SHARED_DIR}/cluster-b-install.tgz" ]]; then
-    echo "No cluster B install state found in SHARED_DIR; skipping cleanup." >&2
+if [[ ! -s "${SHARED_DIR}/cluster-b-metadata.json" ]]; then
+    echo "No cluster B metadata found in SHARED_DIR; skipping cleanup." >&2
     exit 0
 fi
 
@@ -20,23 +22,22 @@ export AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}"
 PULL_SECRET="${CLUSTER_PROFILE_DIR}/pull-secret"
 
 INSTALL_DIR="$(mktemp -d)"
-tar -xzf "${SHARED_DIR}/cluster-b-install.tgz" -C "${INSTALL_DIR}"
+cp "${SHARED_DIR}/cluster-b-metadata.json" "${INSTALL_DIR}/metadata.json"
 
 CLUSTER_NAME="$(cat "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_NAME" 2>/dev/null || echo "unknown")"
 echo "Destroying cluster B '${CLUSTER_NAME}'..." >&2
 
-INSTALLER="${INSTALL_DIR}/openshift-install"
-if [[ ! -x "${INSTALLER}" ]]; then
-    RELEASE_IMAGE="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}"
-    if [[ -z "${RELEASE_IMAGE}" ]]; then
-        echo "ERROR: installer binary not found and OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is not set" >&2
-        exit 1
-    fi
-    echo "Re-extracting openshift-install from release image..." >&2
-    oc adm release extract -a "${PULL_SECRET}" "${RELEASE_IMAGE}" \
-        --command=openshift-install --to="${INSTALL_DIR}"
-    chmod +x "${INSTALLER}"
+RELEASE_IMAGE="$(cat "${SHARED_DIR}/QUAY_GEOREP_CLUSTER_B_RELEASE_IMAGE" 2>/dev/null || echo "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}")"
+if [[ -z "${RELEASE_IMAGE}" ]]; then
+    echo "ERROR: no release image available to extract openshift-install" >&2
+    exit 1
 fi
+
+echo "Extracting openshift-install from release image..." >&2
+oc adm release extract -a "${PULL_SECRET}" "${RELEASE_IMAGE}" \
+    --command=openshift-install --to="${INSTALL_DIR}"
+INSTALLER="${INSTALL_DIR}/openshift-install"
+chmod +x "${INSTALLER}"
 
 destroy_rc=1
 for attempt in 1 2 3; do

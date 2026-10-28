@@ -30,6 +30,29 @@ echo "Deploying Quay on cluster B..." >&2
 echo "Nodes on cluster B:" >&2
 oc get nodes >&2 || true
 
+if [[ -s "${SHARED_DIR}/quay_index_image" ]]; then
+    QUAY_INDEX_IMAGE="$(cat "${SHARED_DIR}/quay_index_image")"
+    echo "Creating CatalogSource on cluster B with image: ${QUAY_INDEX_IMAGE}" >&2
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${QUAY_OPERATOR_SOURCE}
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: ${QUAY_INDEX_IMAGE}
+  displayName: Quay ART FBC Operator Catalog
+  publisher: grpc
+EOF
+    echo "Waiting for CatalogSource to be ready..." >&2
+    for _ in {1..30}; do
+        state=$(oc -n openshift-marketplace get catalogsource "${QUAY_OPERATOR_SOURCE}" -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+        [[ "${state}" == "READY" ]] && break
+        sleep 10
+    done
+fi
+
 cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
@@ -156,8 +179,9 @@ yq -i '
 
 POSTGRES_MANAGED="true"
 if [[ -s "${SHARED_DIR}/quay-database-aws-rds-config.yaml" ]]; then
-    yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
     POSTGRES_MANAGED="false"
+else
+    yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
 fi
 
 oc create secret generic -n "${QUAY_NS}" config-bundle-secret \
