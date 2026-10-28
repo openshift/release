@@ -40,6 +40,9 @@ chain:
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
       default: "419.6.20250523"
       documentation: "The Azure Marketplace image version for Azure management clusters"
+    - name: ENABLE_AWS_NESTED_VIRT
+      default: "false"
+      documentation: "Enable AWS nested virtualization on NodePools (requires M8i, C8i, or R8i instance types)"
     commands: |-
       # Set cloud-specific defaults
       if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
@@ -113,28 +116,116 @@ chain:
           --etcd-storage-class=managed-csi-premium-v2
       else
         echo "Creating AWS management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
-        bin/hypershift create cluster aws \
-          --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --name=${CLUSTER_NAME} \
-          --region=us-east-1 \
-          --infra-id=${CLUSTER_NAME} \
-          --base-domain=${DOMAIN} \
-          --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
-          --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
-          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-          --zones=${HYPERSHIFT_ZONES} \
-          --service-cidr=172.29.0.0/16 \
-          --cluster-cidr=10.124.0.0/14 \
-          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-          --node-selector=hypershift.openshift.io/control-plane=true \
-          --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-          --release-stream=${DEFAULT_RELEASE_STREAM} \
-          --public-only \
-          --shared-role \
-          --namespace=${HYPERSHIFT_NAMESPACE}
+
+        # Check if AWS nested virtualization should be enabled
+        if [[ "${ENABLE_AWS_NESTED_VIRT}" == "true" ]]; then
+          echo "Enabling AWS nested virtualization on NodePool"
+
+          # Render the cluster resources to YAML
+          bin/hypershift create cluster aws \
+            --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
+            --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+            --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+            --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+            --name=${CLUSTER_NAME} \
+            --region=us-east-1 \
+            --infra-id=${CLUSTER_NAME} \
+            --base-domain=${DOMAIN} \
+            --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
+            --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
+            --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+            --zones=${HYPERSHIFT_ZONES} \
+            --service-cidr=172.29.0.0/16 \
+            --cluster-cidr=10.124.0.0/14 \
+            --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+            --node-selector=hypershift.openshift.io/control-plane=true \
+            --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+            --release-stream=${DEFAULT_RELEASE_STREAM} \
+            --public-only \
+            --shared-role \
+            --namespace=${HYPERSHIFT_NAMESPACE} \
+            --render \
+            --render-sensitive > /tmp/cluster.yaml
+
+          # Get yq tool for YAML manipulation
+          YQ="/tmp/yq"
+          curl -sL -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x ${YQ}
+
+          # Create a working directory for split files
+          WORK_DIR="/tmp/cluster-resources-$$"
+          mkdir -p ${WORK_DIR}
+          cd ${WORK_DIR}
+
+          # Split multi-document YAML into separate files
+          ${YQ} -s '.kind + "-" + .metadata.name' /tmp/cluster.yaml
+
+          # Find and patch the NodePool (file may have zone suffix like NodePool-NAME-us-east-1a.yml)
+          NODEPOOL_FILE=$(ls NodePool-${CLUSTER_NAME}*.yml 2>/dev/null | head -1)
+          if [[ -n "${NODEPOOL_FILE}" ]]; then
+            echo "Found NodePool file: ${NODEPOOL_FILE}"
+            ${YQ} eval '.spec.platform.aws.cpuOptions.nestedVirtualizationPolicy = "Enabled"' -i "${NODEPOOL_FILE}"
+            echo "✓ Added nested virtualization to NodePool"
+          else
+            echo "ERROR: NodePool file not found"
+            echo "Looking for: NodePool-${CLUSTER_NAME}*.yml"
+            echo "Files in directory:"
+            ls -la
+            exit 1
+          fi
+
+          # Apply all resources in order
+          # Apply HostedCluster first
+          HOSTEDCLUSTER_FILE=$(ls HostedCluster-${CLUSTER_NAME}.yml 2>/dev/null | head -1)
+          if [[ -n "${HOSTEDCLUSTER_FILE}" ]]; then
+            echo "Applying HostedCluster: ${HOSTEDCLUSTER_FILE}"
+            oc apply -f "${HOSTEDCLUSTER_FILE}"
+          fi
+
+          # Apply NodePool with nested virt enabled (may have zone suffix)
+          if [[ -n "${NODEPOOL_FILE}" && -f "${NODEPOOL_FILE}" ]]; then
+            echo "Applying NodePool: ${NODEPOOL_FILE}"
+            oc apply -f "${NODEPOOL_FILE}"
+          fi
+
+          # Apply any other resources (Secrets, ConfigMaps, etc.)
+          for f in *.yml; do
+            # Skip HostedCluster and NodePool files (already applied)
+            if [[ "$f" == HostedCluster-*.yml || "$f" == NodePool-*.yml ]]; then
+              continue
+            fi
+            echo "Applying additional resource: $f"
+            oc apply -f "$f" || true
+          done
+
+          # Cleanup
+          cd -
+          rm -rf ${WORK_DIR}
+        else
+          # Standard cluster creation without nested virtualization
+          bin/hypershift create cluster aws \
+            --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
+            --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+            --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+            --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+            --name=${CLUSTER_NAME} \
+            --region=us-east-1 \
+            --infra-id=${CLUSTER_NAME} \
+            --base-domain=${DOMAIN} \
+            --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
+            --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
+            --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+            --zones=${HYPERSHIFT_ZONES} \
+            --service-cidr=172.29.0.0/16 \
+            --cluster-cidr=10.124.0.0/14 \
+            --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+            --node-selector=hypershift.openshift.io/control-plane=true \
+            --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+            --release-stream=${DEFAULT_RELEASE_STREAM} \
+            --public-only \
+            --shared-role \
+            --namespace=${HYPERSHIFT_NAMESPACE}
+        fi
       fi
 
       echo "Waiting for cluster to become available"
