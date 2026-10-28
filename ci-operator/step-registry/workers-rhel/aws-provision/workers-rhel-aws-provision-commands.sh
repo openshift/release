@@ -84,9 +84,14 @@ cat > create-machines.yaml <<-'EOF'
       filters: "{{ platform_type_dict[platform_type].filters }}"
     register: ec2_ami_facts_results
 
+  - name: Fail if no AMI found
+    fail:
+      msg: "No AMI found matching RHEL-{{ platform_version }}*Hourly* in {{ aws_region }} — verify PLATFORM_VERSION is set to a current RHEL minor version"
+    when: rhel_image == '' and ec2_ami_facts_results.images | length == 0
+
   - name: Set aws_ami to most recent image
     set_fact:
-      aws_ami: "{{ rhel_image if rhel_image != '' else ec2_ami_facts_results.images[-1].image_id }}"
+      aws_ami: "{{ rhel_image if rhel_image != '' else (ec2_ami_facts_results.images | sort(attribute='creation_date') | last).image_id }}"
 
   - name: Get existing worker machinesets
     command: >
