@@ -38,10 +38,26 @@ identity for every intended operator before activation. No anonymous access or b
 configured. Browser OAuth evaluates the SAR using the user's identity; the
 ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
 
+The proxy session expires after one hour, requiring a new login and Service SAR.
+Service access is checked at login, not on every request, so revoking that
+permission can leave an existing session usable for up to one hour. Cookie refresh
+stays disabled to keep that limit fixed. Removing an identity from the backend allowlist and
+restarting the dashboard denies that identity independently of the proxy session.
+
 The backend listens on port 8080 for pod health probes. `/healthz` is process
 liveness; `/readyz` requires complete Slack replay. All application routes still
 require a trusted loopback proxy and an allowlisted user; direct pod requests
 with forged identity headers must fail. The Service does not expose this port.
+
+The ingress NetworkPolicy selects only dashboard pods and permits router traffic
+to the OAuth proxy on TCP 8443. It adds no pod ingress rule for backend port 8080.
+Kubelet probes from the pod's resident node remain allowed by Kubernetes network
+policy semantics; the loopback identity check still protects application routes.
+The policy leaves egress unchanged so DNS, Slack, GitHub, the Kubernetes/OAuth API
+and Thanos remain reachable. It does not introduce external-IP allowlists.
+See the [OpenShift router policy](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/network_security/network-policy)
+and [Kubernetes network policy semantics](https://kubernetes.io/docs/concepts/services-networking/network-policies/).
+
 The monitoring Role grants the ServiceAccount only `get`/`list` PrometheusRules in
 `ci-monitoring`. Metrics use the fixed internal Thanos Query frontend already
 used by Grafana, independently of Kubernetes API credentials. No PVC or database
@@ -107,6 +123,11 @@ application directory. Catalog/config changes require a process restart.
 5. Verify complete archive replay and readiness, authenticated SSO access for
    allowed operators, rejection for other users, rejection of spoofed direct-pod
    identity, secure proxy/header behavior, and the HTTPS route/certificate chain.
+   Confirm the router namespace has the ingress selector label, route traffic
+   reaches 8443, peer pods cannot reach backend 8080, and kubelet probes succeed.
+   Check effective policies together because NetworkPolicy allow rules are
+   additive; another policy must not reopen backend ingress. Verify revoking
+   Service access denies a new login after the one-hour session expires.
    Check known Alertmanager/Prow/SHIP classifications, Chai report behavior,
    SOP preview, and the optional core-ci metrics source.
 6. With an operator-approved occurrence, verify one acknowledge/undo cycle and
