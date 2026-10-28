@@ -22,11 +22,21 @@ ref:
     Failed attempts and the recovery time (last failed attempt after the
     stop) are in the JUnit output and ${ARTIFACT_DIR}/failover-operations.log.
 
-    The node stays stopped. This covers losing one Quay node, not database or
-    availability-zone failover. Run it before long steps: the OAuth token from
-    quay-standalone-deploy expires 9000s after the deploy.
+    Then it stops the Clair container on node 1, checks that node 1's Clair
+    NLB target leaves healthy within 5 minutes, and makes 10 security report
+    GETs (vulnerabilities=true, up to 5 attempts each) of
+    quay_standalone_scan_target through the NLB, all of which must return
+    status "scanned"; a missing scan target is a failure. Clair on node 1 is
+    started again, best effort.
+
+    Quay node 3 stays stopped. This covers losing one Quay node and one
+    Clair instance, not database or availability-zone failover. Run it
+    before long steps: the OAuth token from quay-standalone-deploy expires
+    9000s after the deploy.
 
     Reads from SHARED_DIR: quay_standalone_region, quay_standalone_hostname,
-    quay_standalone_target_group_arn, quay_standalone_nodes,
-    quay_standalone_ca.crt, quay_oauth2_token, quay_standalone_smoke_image.
+    quay_standalone_target_group_arn, quay_standalone_clair_target_group_arn,
+    quay_standalone_nodes, quay_standalone_ssh_user, quay_standalone_ca.crt,
+    quay_oauth2_token, quay_standalone_smoke_image,
+    quay_standalone_scan_target.
     Writes nothing to SHARED_DIR.

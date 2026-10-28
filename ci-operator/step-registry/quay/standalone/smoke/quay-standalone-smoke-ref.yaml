@@ -17,13 +17,19 @@ ref:
     Smoke-test Quay standalone HA over TLS verified against the job CA:
     /health/instance through the NLB and on each node, the OAuth token
     authenticating as the initialized user, repository creation through the
-    API, and a push of quay.io/libpod/busybox:latest through the NLB pulled
-    back with an equal manifest digest. Each check is a testcase in
+    API, a push of quay.io/libpod/busybox:latest through the NLB pulled
+    back with an equal manifest digest, and a push of
+    registry.access.redhat.com/ubi9/ubi-micro:latest to
+    <namespace>/standalone-scan whose security report must reach status
+    "scanned" within 15 minutes (polled every 15s; "unsupported" or "failed"
+    fail at once). Each check is a testcase in
     ${ARTIFACT_DIR}/junit_quay_standalone_smoke.xml; any failure fails the
     step.
 
     Reads from SHARED_DIR: quay_standalone_hostname, quay_standalone_nodes,
     quay_standalone_ca.crt, quay_oauth2_token.
 
-    Writes to SHARED_DIR: quay_standalone_smoke_image, the pushed
-    "<namespace>/<repository>:<tag>", only when the push succeeded.
+    Writes to SHARED_DIR, each only when its push succeeded:
+    - quay_standalone_smoke_image: the pushed "<namespace>/<repository>:<tag>"
+    - quay_standalone_scan_target: the image pushed for scanning,
+      "<namespace>/<repository>@<digest>"
