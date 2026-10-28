@@ -1,0 +1,91 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - context_dir: maas-api
+    dockerfile_path: Dockerfile
+    to: maas-api
+  - dockerfile_path: maas-controller/Dockerfile
+    to: maas-controller
+  - context_dir: maas-discovery
+    dockerfile_path: Dockerfile
+    to: maas-discovery
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rhoai-e2e-tls-scan
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.22"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^\.tekton/
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      COMPONENT_FILTER: maas-api,maas-controller,ai-gateway-operator,ai-gateway-controller
+      PQC_CHECK: "true"
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: "500m"
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+      SCANNER_POD_MODE: "true"
+      SCAN_NAMESPACE: redhat-ods-applications,redhat-ai-gateway-infra
+    post:
+    - chain: gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # Match Konflux group-test image wiring (RHOAIENG-95827).
+        export MAAS_API_IMAGE="${MAAS_API_IMAGE}"
+        export MAAS_CONTROLLER_IMAGE="${MAAS_CONTROLLER_IMAGE}"
+        export MAAS_DISCOVERY_IMAGE="${MAAS_DISCOVERY_IMAGE}"
+        source ./test/e2e/scripts/ensure_e2e_python.sh
+        cd test/e2e && "${E2E_PYTHON}" -m pip install -q -r requirements.txt && cd ../..
+        ./test/e2e/scripts/prow_run_smoke_test.sh
+      dependencies:
+      - env: MAAS_API_IMAGE
+        name: maas-api
+      - env: MAAS_CONTROLLER_IMAGE
+        name: maas-controller
+      - env: MAAS_DISCOVERY_IMAGE
+        name: maas-discovery
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 3Gi
+      timeout: 3h0m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: models-as-a-service
