@@ -72,11 +72,78 @@ function verify_installed_operators() {
     return 1
 }
 
+function rendered_mc_fips() {
+    local pool="$1"
+    local rendered
+    local fips
+
+    if ! rendered="$(oc get mcp "$pool" -o jsonpath='{.status.configuration.name}' 2>/dev/null)" || [ -z "$rendered" ]; then
+        echo "ERROR: ${pool} MachineConfigPool has no rendered configuration" >&2
+        return 1
+    fi
+
+    if ! fips="$(oc get mc "$rendered" -o jsonpath='{.spec.fips}' 2>/dev/null)"; then
+        echo "ERROR: failed to read rendered MachineConfig ${rendered} for the ${pool} pool" >&2
+        return 1
+    fi
+
+    echo "${fips:-false}"
+}
+
+function verify_fips() {
+    local expected="${FIPS_MODE:-false}"
+    local install_config
+    local requested
+    local pool
+    local actual
+
+    echo "Checking FIPS state (job requested FIPS: ${expected})..."
+
+    # An unreadable install-config is an error rather than a missing fips
+    # setting, which would let a FIPS cluster pass unverified.
+    if ! install_config="$(oc get cm -n kube-system cluster-config-v1 -o jsonpath='{.data.install-config}' 2>/dev/null)" ||
+        [ -z "$install_config" ]; then
+        echo "ERROR: could not read install-config from the cluster-config-v1 ConfigMap"
+        return 1
+    fi
+
+    # install-config omits fips entirely when it is false.
+    if grep -qE '^[[:space:]]*"?fips"?:[[:space:]]*true' <<<"$install_config"; then
+        requested=true
+    else
+        requested=false
+    fi
+
+    if [ "$requested" != "$expected" ]; then
+        echo "ERROR: the job requested FIPS=${expected} but the cluster was installed with fips=${requested}"
+        echo "The FIPS setting did not reach install-config."
+        return 1
+    fi
+
+    # Rendered MachineConfig per pool, the same check openshift/installer#10348
+    # performs after an agent install.
+    for pool in master worker; do
+        if ! actual="$(rendered_mc_fips "$pool")"; then
+            return 1
+        fi
+
+        if [ "$actual" != "$expected" ]; then
+            echo "ERROR: rendered MachineConfig for the ${pool} pool has fips=${actual}, expected ${expected}"
+            return 1
+        fi
+
+        echo "  ${pool} pool: fips=${actual}"
+    done
+
+    echo "FIPS state matches the job configuration!"
+}
+
 if ! command -v oc >/dev/null 2>&1 && [ -x /cli/oc ]; then
   export PATH="/cli:${PATH}"
 fi
 
 wait_for_cluster_available
 verify_installed_operators
+verify_fips
 
 echo "Cluster and operators installed successfully!"

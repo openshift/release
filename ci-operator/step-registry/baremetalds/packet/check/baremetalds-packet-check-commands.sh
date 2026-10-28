@@ -8,7 +8,10 @@ set +x
 
 PACKET_PROJECT_ID=$(cat "${CLUSTER_PROFILE_DIR}/packet-project-id")
 PACKET_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/packet-auth-token")
-SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/slackhook")
+SLACK_AUTH_TOKEN=""
+if [[ -f "${CLUSTER_PROFILE_DIR}/slackhook" ]]; then
+    SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/slackhook")
+fi
 
 # Initial check
 if [[ ! "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]] ; then
@@ -45,15 +48,17 @@ echo "New Packet.net server leaks total: $leak_num."
 set +x
 if [[ -n "$leaks" ]]
 then
-    #send slack notification and delete e2e-metal-ipi leaked servers 
-    curl -X POST --data-urlencode\
-     "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leak_report\"}]}"\
-     "https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}"
+    #send slack notification and delete e2e-metal-ipi leaked servers
+    if [[ -n "${SLACK_AUTH_TOKEN}" ]]; then
+        curl -X POST --data-urlencode\
+         "payload={\"text\":\"New Packet.net server leaks total: $leak_num. Deleting the following:\n\",\"attachments\":[{\"color\":\"warning\",\"text\":\"$leak_report\"}]}"\
+         "https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}"
+    fi
 
     #delete leaks
     for leak in $leak_ids
     do
-        #echo $leak    
+        #echo $leak
         curl -X DELETE --header 'Accept: application/json' --header "X-Auth-Token: ${PACKET_AUTH_TOKEN}"\
          "https://api.packet.net/devices/$leak"
     done

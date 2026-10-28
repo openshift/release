@@ -1,6 +1,141 @@
 presubmits:
   openshift-hyperfleet/hyperfleet-infra:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/images-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ci/tools/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: images
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hyperfleet-hyperfleet-infra-main-images-images
+    reporter_config:
+      slack:
+        channel: '#hyperfleet-e2e-status'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: |-
+          {{if eq .Spec.Type "postsubmit"}}:rotating_light: *{{.Spec.Job}}* ended with *{{.Status.State}}*. Promotion did not complete; infra jobs may still use the previous tools. Inspect `ci/hyperfleet-infra-tools:latest` and rerun only the newest main postsubmit. An older rerun can replace newer tools.{{else}}:x: *{{.Spec.Job}}* ended with *{{.Status.State}}*{{range .Spec.Refs.Pulls}} on PR #{{.Number}}{{end}}. The promoted image is not affected.{{end}}
+          Details: <{{.Status.URL}}|View logs>
+    rerun_command: /test images-images
+    run_if_changed: ^ci/tools/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=images
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/images-tools-validate
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ci/tools/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: images
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hyperfleet-hyperfleet-infra-main-images-tools-validate
+    rerun_command: /test images-tools-validate
+    run_if_changed: ^ci/tools/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=tools-validate
+        - --variant=images
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images-tools-validate,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$

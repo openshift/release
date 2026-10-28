@@ -147,9 +147,16 @@ function new_gcs_bucket_name() {
   printf 'quayprowci-gcp-%s\n' "${suffix}"
 }
 
-#Copy GCP auth.json from mounted secret to the terraform working directory
+#Use the GCP service-account credential and project from the gcp-quay-qe cluster
+#profile (${CLUSTER_PROFILE_DIR}/gce.json + openshift_gcp_project) so the storage
+#bucket is created with the same credentials/project as the cluster. This replaces
+#the previously mounted quay-tests/gcp auth.json.
 mkdir -p /tmp/QUAY_GCP && cd /tmp/QUAY_GCP
-cp /var/run/quay-qe-gcp-secret/auth.json .
+cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
+GCP_PROJECT="$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")"
+# Region comes from the Boskos lease (same value ipi-conf-gcp uses for the cluster),
+# so the storage bucket is created in the same region as the deployed cluster.
+GCP_REGION="${LEASED_RESOURCE}"
 
 cat >>variables.tf <<EOF
 variable "gcp_storage_bucket" {
@@ -161,14 +168,14 @@ cat >>create_gcp_storage_bucket.tf <<EOF
 provider "google" {
   credentials = file("auth.json")
 
-  project = "openshift-qe"
-  region  = "us-central1"
-  zone    = "us-central1-c"
+  project = "${GCP_PROJECT}"
+  region  = "${GCP_REGION}"
+  zone    = "${GCP_REGION}-c"
 }
 
 resource "google_storage_bucket" "quaygcp" {
   name          = var.gcp_storage_bucket
-  location      = "US"
+  location      = "${GCP_REGION}"
   force_destroy = true
 }
 EOF

@@ -23,6 +23,7 @@ images:
         paths:
         - destination_dir: src
           source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-sentinel
+    optional: true
     to: podman-test
 prowgen:
   expose: true
@@ -43,8 +44,6 @@ tests:
     test:
     - ref: hyperfleet-risk-scorer
 - as: lint
-  capabilities:
-  - nested-podman
   commands: |
     export HOME=/tmp
     export GOCACHE=/tmp/go-build
@@ -53,16 +52,16 @@ tests:
     unset GOFLAGS
     make lint
   container:
-    from: podman-test
-  nested_podman: true
+    from: src
 - as: unit
-  capabilities:
-  - nested-podman
   commands: |
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    unset GOFLAGS
     make test-unit
   container:
-    from: podman-test
-  nested_podman: true
+    from: src
 - as: helm-test
   commands: |
     curl -fsSL https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz | tar xz

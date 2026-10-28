@@ -15,6 +15,7 @@ spec:
       expr: |
         absent(up{job="deck"} == 1)
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: deck-internal-Down
@@ -23,6 +24,7 @@ spec:
       expr: |
         absent(up{job="deck-internal"} == 1)
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: qe-private-deck-Down
@@ -31,6 +33,7 @@ spec:
       expr: |
         absent(up{job="qe-private-deck"} == 1)
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: hook-apps-Down
@@ -39,6 +42,7 @@ spec:
       expr: |
         absent(up{job="hook-apps"} == 1)
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: pj-rehearse-plugin-Down
@@ -47,6 +51,7 @@ spec:
       expr: |
         absent(up{job="pj-rehearse-plugin"} == 1)
       for: 5m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: crier-Singleton-Down
@@ -55,6 +60,7 @@ spec:
       expr: |
         absent(up{job="crier"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: ghproxy-Singleton-Down
@@ -63,6 +69,7 @@ spec:
       expr: |
         absent(up{job="ghproxy"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: prow-controller-manager-Singleton-Down
@@ -71,6 +78,7 @@ spec:
       expr: |
         absent(up{job="prow-controller-manager"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: sinker-Singleton-Down
@@ -79,6 +87,7 @@ spec:
       expr: |
         absent(up{job="sinker"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: tide-Singleton-Down
@@ -87,6 +96,7 @@ spec:
       expr: |
         absent(up{job="tide"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: dptp-controller-manager-Singleton-Down
@@ -95,6 +105,7 @@ spec:
       expr: |
         absent(up{job="dptp-controller-manager"} == 1)
       for: 10m
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: retester-Singleton-Down
@@ -103,53 +114,7 @@ spec:
       expr: |
         absent(up{job="retester"} == 1)
       for: 10m
-      labels:
-        severity: critical
-    - alert: alert-proxy-Singleton-Down
-      annotations:
-        message: The service alert-proxy has been down for 10 minutes.
-      expr: |
-        absent(up{job="alert-proxy"} == 1)
-      for: 10m
-      labels:
-        severity: critical
-  - name: alert-proxy
-    rules:
-    - alert: alert-proxy-EndToEndProbe
-      annotations:
-        message: Synthetic alert-proxy end-to-end delivery probe.
-      expr: vector(1)
-      labels:
-        alert_proxy_probe: "true"
-        severity: info
-    - alert: alert-proxy-EndToEndDelivery-Down
-      annotations:
-        message: Alert proxy has not completed an end-to-end probe delivery to Slack in 45 minutes.
-      expr: |
-        (
-          sum(increase(alert_proxy_end_to_end_deliveries_total[45m])) < 1
-          or absent(alert_proxy_end_to_end_deliveries_total)
-        )
-        and on()
-        (up{job="alert-proxy"} offset 45m == 1)
-        and on()
-        (up{job="alert-proxy"} == 1)
-        and on()
-        (max_over_time(alert_proxy_end_to_end_deliveries_total[7d]) > 0)
-      labels:
-        severity: critical
-    - alert: alert-proxy-Webhook4xx
-      annotations:
-        message: Alert proxy returned a webhook 4xx in the last 5 minutes; Alertmanager does not retry these notifications.
-      expr: |
-        sum(increase(alert_proxy_webhook_requests_total{status="4xx"}[5m])) > 0
-      labels:
-        severity: critical
-    - alert: alert-proxy-SlackOutboxFailed
-      annotations:
-        message: Alert proxy retains permanently failed Slack outbox work that requires operator intervention.
-      expr: |
-        sum(alert_proxy_slack_outbox_depth{phase="failed"}) > 0
+      keep_firing_for: 10m
       labels:
         severity: critical
   - name: abnormal webhook behaviors
@@ -161,6 +126,7 @@ spec:
         (sum(increase(prow_webhook_counter[1m])) == 0 or absent(prow_webhook_counter))
         and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
       for: 5m
+      keep_firing_for: 15m
       labels:
         severity: critical
   - name: configmap-full
@@ -171,7 +137,7 @@ spec:
       expr: |
         100 * ((1048576 - prow_configmap_size_bytes) / 1048576) < 15
         and
-        predict_linear(prow_configmap_size_bytes[12h], 7 * 24 * 3600) > 1048576
+        predict_linear(prow_configmap_size_bytes[2d], 7 * 24 * 3600) > 1048576
       for: 5m
       labels:
         severity: critical
@@ -259,9 +225,14 @@ spec:
     rules:
     - alert: quay-io-image-mirroring-failures
       annotations:
-        message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.'
+        message: 'Many mirroring tasks to quay.io have failed in the last 10 minutes. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.'
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures
-      expr: sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])) > 0.5
+      expr: |
+        max_over_time(
+          (sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])))[15m:1m]
+        ) > 0.5
+        and
+        sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])) > 0.2
       for: 1m
       labels:
         severity: critical
@@ -271,6 +242,8 @@ spec:
       annotations:
         message: Component {{ $labels.service }} failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.
       expr: kubernetes_failed_client_creations > 0
+      for: 5m
+      keep_firing_for: 15m
       labels:
         severity: critical
   - name: ci-operator-infra-error
@@ -281,15 +254,27 @@ spec:
         runbook_url: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md
       expr: |
         (
-          sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+          max_over_time(
+            (sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason))[15m:1m]
+          ) > 0.02
+          and
+          sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.01
         )
         and on (reason)
         (
+          max_over_time(
+            (count by (reason) (
+              sum by (reason, job_name) (
+                rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
+              ) > 0
+            ))[15m:1m]
+          ) >= 3
+          and
           count by (reason) (
             sum by (reason, job_name) (
               rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
             ) > 0
-          ) >= 3
+          ) >= 2
         )
       for: 5m
       labels:
@@ -300,7 +285,11 @@ spec:
       annotations:
         message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.
       expr: |
-        sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
+        max_over_time(
+          (sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason))[15m:1m]
+        ) > 0.08
+        and
+        sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.04
       for: 1m
       labels:
         severity: critical
@@ -310,7 +299,7 @@ spec:
       annotations:
         message: Jobs on provider {{ $labels.provider }} fail because they were unable to acquire a lease.
       expr: |
-        label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[15m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
+        label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[30m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
       for: 1m
       labels:
         severity: critical
@@ -330,6 +319,7 @@ spec:
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
+      keep_firing_for: 3m
       labels:
         severity: critical
     - alert: ProbeFailing-Lenient
@@ -338,6 +328,7 @@ spec:
       expr: |
         up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
       for: 5m
+      keep_firing_for: 3m
       labels:
         severity: critical
   - name: openshift-priv-image-building-jobs-failing
@@ -388,6 +379,7 @@ spec:
       expr: |
         sum by (workload_name, workload_type, determined_amount, configured_amount, resource_type) (increase(pod_scaler_admission_high_determined_resource{workload_type!~"undefined|build"}[5m])) > 0
       for: 1m
+      keep_firing_for: 10m
       labels:
         severity: warning
   - name: openshift-mirroring-failures
@@ -412,36 +404,63 @@ spec:
       annotations:
         message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 10 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/ghproxy-too-many-pending-alerts.md|SOP>.
       expr: |
-        sum_over_time(pending_outbound_requests{container="ghproxy"}[10m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[10m]) > 150
+        sum_over_time(pending_outbound_requests{container="ghproxy"}[10m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[10m]) > 100
+        and
+        max_over_time(
+          (sum_over_time(pending_outbound_requests{container="ghproxy"}[10m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[10m]))[10m:1m]
+        ) > 150
+      for: 5m
       labels:
         severity: critical
     - alert: ghproxy-specific-status-code-abnormal
       annotations:
         message: '{{ $value | humanize }}% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
       expr: |
-        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
+        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 5
+        and
+        max_over_time(
+          (sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100)[10m:1m]
+        ) > 10
+      for: 2m
       labels:
         severity: warning
     - alert: ghproxy-global-status-code-abnormal
       annotations:
         message: '{{ $value | humanize }}% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
       expr: |
-        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 3
+        sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 1.5
+        and
+        max_over_time(
+          (sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100)[10m:1m]
+        ) > 3
+      for: 2m
       labels:
         severity: warning
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
         message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
-        github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
+        min_over_time(
+          (github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9)[5m:1m]
+        ) < 150
+        and
+        min_over_time(
+          (github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9)[15m:1m]
+        ) < 100
       for: 5m
       labels:
         severity: critical
-    - alert: ghproxy-running-out-github-tokens-in-a-hour
+    - alert: ghproxy-running-out-github-tokens-in-a-hour-by-token-hash
       annotations:
         message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
-        github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9 < 100
+        min_over_time(
+          (github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9)[5m:1m]
+        ) < 150
+        and
+        min_over_time(
+          (github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9)[15m:1m]
+        ) < 100
       for: 5m
       labels:
         severity: critical
@@ -547,7 +566,12 @@ spec:
     - alert: prow-pod-crashlooping
       annotations:
         message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 1 hour.
-      expr: increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 20
+      expr: |
+        increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 10
+        and
+        max_over_time(
+          increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h])[30m:]
+        ) > 20
       for: 10m
       labels:
         severity: critical
@@ -557,19 +581,23 @@ spec:
         summary: Pod container waiting longer than 1 hour
       expr: max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics",clusterName="core-ci"} > 0)
       for: 1h
+      keep_firing_for: 15m
       labels:
         severity: warning
     - alert: prow-job-backlog-growing
       annotations:
-        message: The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.
-      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0
+        message: The number of triggered Prow jobs that have not yet started running has been growing (net positive) over the past 30 minutes.
+      expr: sum(rate(prowjob_state_transitions{state="triggered"}[30m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[30m])) > 0
       for: 10m
       labels:
         severity: critical
     - alert: Controller backlog is not being drained
       annotations:
         message: The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>
-      expr: workqueue_depth{name=~"crier.*|plank"} > 100
+      expr: |
+        workqueue_depth{name=~"crier.*|plank"} > 80
+        and
+        max_over_time(workqueue_depth{name=~"crier.*|plank"}[20m:]) > 100
       for: 20m
       labels:
         severity: critical
@@ -577,9 +605,15 @@ spec:
       annotations:
         message: There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.
       expr: |
-        sum by (job_name) (
-          increase(prowjob_state_transitions{state="triggered"}[15m])
-          - increase(prowjob_state_transitions{state="pending"}[15m])
+        sum by (job_name) (increase(prowjob_state_transitions{state="triggered"}[15m]))
+        - sum by (job_name) (increase(prowjob_state_transitions{state="pending"}[15m]))
+        > 10
+        and
+        max_over_time(
+          (
+            sum by (job_name) (increase(prowjob_state_transitions{state="triggered"}[15m]))
+            - sum by (job_name) (increase(prowjob_state_transitions{state="pending"}[15m]))
+          )[20m:]
         ) > 20
       for: 10m
       labels:
@@ -589,6 +623,7 @@ spec:
         message: Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak
       expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
+      keep_firing_for: 10m
       labels:
         severity: critical
     - alert: SchedulingProwJobsPileup
@@ -596,6 +631,7 @@ spec:
         message: Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak
       expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
+      keep_firing_for: 10m
       labels:
         severity: warning
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
@@ -615,7 +651,7 @@ spec:
     - alert: ciChatBotError
       annotations:
         message: Cluster Bot has reported an error.
-      expr: rate(cluster_bot_error_rate[5m]) > 0
+      expr: rate(cluster_bot_error_rate[30m]) > 0
       labels:
         severity: critical
         team: crt
@@ -634,7 +670,7 @@ spec:
     - alert: releaseControllerBugzillaError
       annotations:
         message: Release-controller has reported errors in bugzilla verification.
-      expr: rate(release_controller_bugzilla_errors_total[5m]) > 0
+      expr: rate(release_controller_bugzilla_errors_total[30m]) > 0
       labels:
         severity: critical
         team: crt
@@ -643,7 +679,7 @@ spec:
     - alert: releaseControllerJiraError
       annotations:
         message: Release-controller has reported errors in jira verification.
-      expr: rate(release_controller_jira_errors_total[5m]) > 0
+      expr: rate(release_controller_jira_errors_total[30m]) > 0
       labels:
         severity: critical
         team: crt

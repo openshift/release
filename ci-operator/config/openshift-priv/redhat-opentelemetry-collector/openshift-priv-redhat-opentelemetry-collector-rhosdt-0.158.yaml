@@ -6,7 +6,9 @@ build_root:
 canonical_go_repository: github.com/openshift/redhat-opentelemetry-collector
 images:
   items:
-  - context_dir: .
+  - additional_architectures:
+    - arm64
+    context_dir: .
     dockerfile_path: Dockerfile.art
     to: redhat-opentelemetry-collector
 promotion:
@@ -22,6 +24,10 @@ resources:
       cpu: 100m
       memory: 200Mi
   build:
+    requests:
+      cpu: "2"
+      memory: 6Gi
+  fips-check:
     requests:
       cpu: "2"
       memory: 6Gi
@@ -44,6 +50,15 @@ tests:
     # Dockerfile.art builds with -mod=mod as well.
     export GOFLAGS=-mod=mod
     make generate-schemas
+  container:
+    from: src
+- as: fips-check
+  commands: |
+    export GOFLAGS=-mod=mod
+    make generate-obi
+    cd _build && CGO_ENABLED=0 GOFIPS140=certified go build -o opentelemetry-collector -trimpath -ldflags "-w" . && cd ..
+    GOFLAGS= go install github.com/os-observability/konflux-opentelemetry/tools/fips-check@latest
+    fips-check --binary ./_build/opentelemetry-collector --module ./_build --allowlist ./fips-allowlist.yaml
   container:
     from: src
 zz_generated_metadata:

@@ -4,15 +4,22 @@ set -euo pipefail
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly targets_path="${SHARED_DIR}/gcp-hcp-environment-status-targets.json"
 readonly skip_path="${SHARED_DIR}/gcp-hcp-environment-status-skipped"
+readonly tests_started_path="${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
+readonly cleanup_verified_path="${SHARED_DIR}/gcp-hcp-cleanup-verified"
 readonly api="https://api.github.com/repos/openshift-online/gcp-hcp-infra"
 
 if [[ -e "${skip_path}" ]]; then
-  echo "No deployed-commit status to finalize for this non-periodic job"
+  if [[ -e "${tests_started_path}" && ! -e "${cleanup_verified_path}" ]]; then
+    echo "ERROR: HostedCluster cleanup was not verified" >&2
+    exit 1
+  fi
+  echo "Status publication was skipped; nothing to finalize"
   exit 0
 fi
 if [[ ! -s "${targets_path}" ]] || ! jq -e '
   (.context | type) == "string" and
+  (.target_url // "" | startswith("https://prow.ci.openshift.org/view/gs/test-platform-results-public/")) and
   (.targets | type) == "array" and
   (.targets | length) > 0 and
   all(.targets[]; (.branch | type) == "string" and
@@ -22,10 +29,6 @@ if [[ ! -s "${targets_path}" ]] || ! jq -e '
     ((.contexts | length) + (.check_runs | length) > 0))
 ' "${targets_path}" >/dev/null; then
   echo "ERROR: captured environment status targets are missing or invalid" >&2
-  exit 1
-fi
-if [[ ! "${PROW_JOB_ID:-}" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  echo "ERROR: PROW_JOB_ID is missing or invalid" >&2
   exit 1
 fi
 if [[ ! -s "${token_path}" ]]; then
@@ -44,13 +47,18 @@ github_get() {
 branch_sha() {
   local encoded_branch response
   encoded_branch="$(jq -nr --arg branch "$1" '$branch | @uri')"
-  response="$(github_get "${api}/branches/${encoded_branch}")"
+  response="$(github_get "${api}/branches/${encoded_branch}")" || return
   jq -er '.commit.sha | select(test("^[0-9a-f]{40}$"))' <<<"${response}"
 }
 
 state=failure
-if [[ -e "${tests_passed_path}" ]]; then
+description="HostedCluster lifecycle did not pass"
+if [[ ! -e "${tests_started_path}" ]]; then
+  description="HostedCluster lifecycle did not run"
+fi
+if [[ -e "${tests_passed_path}" && -e "${cleanup_verified_path}" ]]; then
   state=success
+  description="HostedCluster lifecycle passed on deployed revision"
   # A successful test only counts for the exact revisions captured before it
   # started, while their Terraform and ArgoCD deployment checks remain green.
   while IFS= read -r target; do
@@ -58,8 +66,15 @@ if [[ -e "${tests_passed_path}" ]]; then
     sha="$(jq -r '.sha' <<<"${target}")"
     contexts="$(jq -c '.contexts' <<<"${target}")"
     check_runs="$(jq -c '.check_runs' <<<"${target}")"
-    if ! current_sha="$(branch_sha "${branch}")" || [[ "${current_sha}" != "${sha}" ]]; then
+    if ! current_sha="$(branch_sha "${branch}")"; then
+      echo "Could not verify deployment branch ${branch} after the lifecycle test" >&2
+      description="Could not verify promotion branch after lifecycle"
+      state=failure
+      break
+    fi
+    if [[ "${current_sha}" != "${sha}" ]]; then
       echo "Deployment branch ${branch} changed during the lifecycle test" >&2
+      description="Promotion branch changed during lifecycle"
       state=failure
       break
     fi
@@ -67,6 +82,7 @@ if [[ -e "${tests_passed_path}" ]]; then
     if [[ "${contexts}" != "[]" ]]; then
       if ! status_response="$(github_get "${api}/commits/${sha}/status?per_page=100")"; then
         echo "Could not verify deployment statuses on ${branch}@${sha}" >&2
+        description="Could not verify deployment checks after lifecycle"
         state=failure
         break
       fi
@@ -83,6 +99,7 @@ if [[ -e "${tests_passed_path}" ]]; then
         encoded_check_name="$(jq -nr --arg name "${check_name}" '$name | @uri')"
         if ! checks_response="$(github_get "${api}/commits/${sha}/check-runs?check_name=${encoded_check_name}&per_page=100")"; then
           echo "Could not verify ${check_name} on ${branch}@${sha}" >&2
+          description="Could not verify deployment checks after lifecycle"
           state=failure
           break
         fi
@@ -103,18 +120,19 @@ if [[ -e "${tests_passed_path}" ]]; then
     if [[ -n "${missing}" ]]; then
       echo "Deployment checks changed during the lifecycle test on ${branch}@${sha}:" >&2
       echo "${missing}" >&2
+      description="Deployment checks changed during lifecycle"
       state=failure
       break
     fi
   done < <(jq -c '.targets[]' "${targets_path}")
 fi
-
-if [[ "${state}" == "success" ]]; then
-  description="HostedCluster lifecycle passed on deployed revision"
-else
-  description="HostedCluster lifecycle failed or deployment changed"
+if [[ -e "${tests_started_path}" && ! -e "${cleanup_verified_path}" ]]; then
+  state=failure
+  description="HostedCluster cleanup did not complete"
 fi
-readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
+
+target_url="$(jq -r '.target_url' "${targets_path}")"
+readonly target_url
 context="$(jq -r '.context' "${targets_path}")"
 payload="$(jq -cn --arg state "${state}" --arg context "${context}" \
   --arg description "${description}" --arg target_url "${target_url}" '{
@@ -123,16 +141,23 @@ payload="$(jq -cn --arg state "${state}" --arg context "${context}" \
 }')"
 
 post_error=0
+# If the lifecycle passed but promotion validation failed, the Prow job must
+# fail as well as publishing a failed status on the captured commit.
+if [[ -e "${tests_passed_path}" && "${state}" != "success" ]]; then
+  post_error=1
+fi
 while IFS= read -r target; do
   branch="$(jq -r '.branch' <<<"${target}")"
   sha="$(jq -r '.sha' <<<"${target}")"
   echo "Posting ${state} ${context} to ${branch}@${sha}"
-  if ! curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+  if ! post_response="$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
     --retry 3 --retry-all-errors --retry-delay 2 --request POST \
     --header "Accept: application/vnd.github+json" \
     --header "Authorization: Bearer $(<"${token_path}")" \
     --header "X-GitHub-Api-Version: 2022-11-28" \
-    --data "${payload}" "${api}/statuses/${sha}" >/dev/null; then
+    --data "${payload}" "${api}/statuses/${sha}")"; then
+    post_message="$(jq -r '.message // empty' <<<"${post_response}" 2>/dev/null || true)"
+    echo "ERROR: Could not post ${state} ${context} to ${branch}@${sha}: ${post_message:-no GitHub error message}" >&2
     post_error=1
   fi
 done < <(jq -c '.targets[]' "${targets_path}")

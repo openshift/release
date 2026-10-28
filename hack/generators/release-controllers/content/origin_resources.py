@@ -1,5 +1,5 @@
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 from content.osd_rc_deployments import get_oc_env_vars, get_oc_prepare_container
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
 def add_legacy_origin_deployments_scaled_down(gendoc):
@@ -171,31 +171,31 @@ def add_okd_deployments(gendoc):
                     },
                     "spec": {
                         "initContainers": [
-                            {
-                                "name": "git-sync-init",
-                                "command": ["/git-sync"],
-                                "args": [
-                                    "--repo=https://github.com/openshift/release.git",
-                                    "--ref=main",
-                                    "--root=/tmp/git-sync",
-                                    "--one-time=true",
-                                    "--depth=1"
-                                ],
-                                "env": [
-                                    {
-                                        "name": "GIT_SYNC_DEST",
-                                        "value": "release"
-                                    }
-                                ],
-                                "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
-                                "volumeMounts": [
-                                    {
-                                        "name": "release",
-                                        "mountPath": "/tmp/git-sync"
-                                    }
-                                ]
-                            }
-                        ],
+                                              {
+                                                  "name": "git-sync-init",
+                                                  "command": ["/git-sync"],
+                                                  "args": [
+                                                      "--repo=https://github.com/openshift/release.git",
+                                                      "--ref=main",
+                                                      "--root=/tmp/git-sync",
+                                                      "--one-time=true",
+                                                      "--depth=1"
+                                                  ],
+                                                  "env": [
+                                                      {
+                                                          "name": "GIT_SYNC_DEST",
+                                                          "value": "release"
+                                                      }
+                                                  ],
+                                                  "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
+                                                  "volumeMounts": [
+                                                      {
+                                                          "name": "release",
+                                                          "mountPath": "/tmp/git-sync"
+                                                      }
+                                                  ]
+                                              }
+                                          ] + get_oc_prepare_container(context),
                         "containers": [
                             {
                                 "name": "git-sync",
@@ -250,6 +250,7 @@ def add_okd_deployments(gendoc):
                                 'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(),
+                                "env": get_oc_env_vars(),
                                 'livenessProbe': {
                                     'httpGet': {
                                         'path': '/healthz',
@@ -301,7 +302,7 @@ def add_okd_deployments(gendoc):
                         }
                     },
                     "spec": {
-                        "initContainers": get_oc_prepare_container(),
+                        "initContainers": get_oc_prepare_container(context),
                         "containers": [
                             {
                                 "resources": {

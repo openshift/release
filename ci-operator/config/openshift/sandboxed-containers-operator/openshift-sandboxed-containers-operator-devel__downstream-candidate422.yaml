@@ -1,4 +1,8 @@
 base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -46,16 +50,17 @@ tests:
       ENABLE_MUST_GATHER: "false"
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_BUILD_TASK: "72047990"
       KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
+      RUNTIMECLASS: kata
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
       TESTS_KATA_UPSTREAM_ENABLE: "true"
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
+      WORKLOAD_TO_TEST: kata
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 - as: azure-ipi-peerpods
@@ -83,7 +88,6 @@ tests:
       ENABLEPEERPODS: "true"
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_BUILD_TASK: "72047990"
       KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -100,7 +104,7 @@ tests:
 - as: azure-ipi-coco
   capabilities:
   - intranet
-  cron: 0 0 31 2 1
+  cron: 5 1 * * 1-5
   reporter_config:
     channel: '#kata-ocp-ci-reports'
     job_states_to_report:
@@ -121,7 +125,6 @@ tests:
       ENABLE_MUST_GATHER: "false"
       ENABLEPEERPODS: "true"
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_BUILD_TASK: "72047990"
       KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -131,6 +134,7 @@ tests:
       TEST_RELEASE_TYPE: Pre-GA
       TESTS_CAA_ENABLE: "true"
       TESTS_CAA_PROFILE: coco
+      TESTS_SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
       TRUSTEE_INSTALL: "true"
       WORKLOAD_TO_TEST: coco
@@ -139,7 +143,7 @@ tests:
 - as: azure-ipi-kata-disconnected
   capabilities:
   - intranet
-  cron: 0 0 31 2 *
+  cron: 40 6 * * 1-5
   reporter_config:
     channel: '#kata-ocp-ci-reports'
     job_states_to_report:
@@ -161,10 +165,13 @@ tests:
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
       OSC_INSTALL: "true"
+      RUNTIMECLASS: kata
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: GA
       TESTS_KATA_UPSTREAM_ENABLE: "true"
       TESTS_KATA_UPSTREAM_PROFILE: k8s-configmap.bats
+      TESTS_SANITY_ENABLE: "false"
+      WORKLOAD_TO_TEST: kata
     workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
   timeout: 24h0m0s
 - as: aro-ipi-peerpods
@@ -192,7 +199,7 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: eastus
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       LOCATION: eastus
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -229,7 +236,7 @@ tests:
       ENABLEPEERPODS: "true"
       HYPERSHIFT_AZURE_LOCATION: eastus
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       LOCATION: eastus
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -237,6 +244,7 @@ tests:
       RUNTIMECLASS: kata-remote
       SLEEP_DURATION: 0h
       TEST_RELEASE_TYPE: Pre-GA
+      TESTS_SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
       TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
       TRUSTEE_INSTALL: "true"
       WORKLOAD_TO_TEST: coco
@@ -266,7 +274,6 @@ tests:
       ENABLEPEERPODS: "true"
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
-      KATA_RPM_BUILD_TASK: "72047990"
       KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
@@ -305,7 +312,7 @@ tests:
       ENABLEPEERPODS: "true"
       INITDATA: ""
       INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OSC_INSTALL: "true"
@@ -341,7 +348,7 @@ tests:
       ENABLEPEERPODS: "true"
       INITDATA: ""
       INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: 3.31.0-2.rhaos4.22.el9
+      KATA_RPM_VERSION: 4.2.0-1.rhaos4.22.el9
       MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OSC_INSTALL: "true"

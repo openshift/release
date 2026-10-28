@@ -11,11 +11,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: validate-commits
+  steps:
+    test:
+    - ref: hyperfleet-commitlint
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     unset GOFLAGS
     make lint
+  container:
+    from: src
+- as: unit
+  commands: |
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    unset GOFLAGS
+    make test
   container:
     from: src
 zz_generated_metadata:

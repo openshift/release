@@ -5,6 +5,9 @@ metadata:
   namespace: openshift-gitops
 spec:
   applicationSet:
+    env:
+      - name: ARGOCD_APPLICATIONSET_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS
+        value: "600"
     resources:
       limits:
         cpu: "4"
@@ -21,6 +24,8 @@ spec:
     controller.profile.enabled: "true"
   controller:
     env:
+      - name: ARGOCD_APPLICATION_CONTROLLER_REPO_SERVER_TIMEOUT_SECONDS
+        value: "600"
       - name: ARGOCD_CONTROLLER_SHARDING_ALGORITHM
         value: round-robin
       - name: GOMEMLIMIT
@@ -38,9 +43,7 @@ spec:
       replicas: 3
   extraConfig:
     accounts.cluster-manifest-verifier: apiKey
-    controller.repo.server.timeout.seconds: "300"
     resource.sensitive.mask.annotations: openshift.io/token-secret.value, api-key, token
-    server.repo.server.timeout.seconds: "300"
   grafana:
     enabled: false
     ingress:
@@ -63,6 +66,7 @@ spec:
       requests:
         cpu: 250m
         memory: 128Mi
+  image: quay.io/argoproj/argocd
   imageUpdater:
     enabled: false
   initialSSHKnownHosts: {}
@@ -101,6 +105,8 @@ spec:
     env:
       - name: ARGOCD_REPO_SERVER_PLUGIN_USE_MANIFEST_GENERATE_PATHS
         value: "true"
+    replicas: 3
+    execTimeout: 300
     resources:
       limits:
         cpu: "8"
@@ -199,6 +205,9 @@ spec:
   server:
     autoscale:
       enabled: false
+    env:
+      - name: ARGOCD_SERVER_REPO_SERVER_TIMEOUT_SECONDS
+        value: "600"
     grpc:
       ingress:
         enabled: false
@@ -228,3 +237,4 @@ spec:
     provider: dex
   tls:
     ca: {}
+  version: v3.6.0-rc4

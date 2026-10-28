@@ -3,6 +3,30 @@
 set -euo pipefail
 set -x
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Quay/Mailpit route calls (and the
+# Playwright run) can connect; cloud jobs have no such file and skip this.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace while sourcing: proxy-conf.sh exports proxy URLs that may
+  # carry credentials, which `set -x` would echo into the Prow logs.
+  set +x
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
+  # The bastion squid proxy only allows the cluster's own domains. npm, the
+  # Playwright browser CDN, and the public registries/CDNs the suite's container
+  # specs use (registry.access.redhat.com for the ubi test images and
+  # access.redhat.com, which serves their container signatures during skopeo
+  # copy; quay.io is already in the base NO_PROXY) must bypass it and use the CI
+  # pod's direct egress, or `npm ci` / `npx playwright install` / `skopeo copy`
+  # get HTTP 403 Forbidden from squid. The Quay/Mailpit routes stay on the
+  # proxy (they are *.metalkube.org hosts that squid allows); github.com is
+  # already in NO_PROXY for the suite clone.
+  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}registry.npmjs.org,cdn.playwright.dev,playwright.azureedge.net,playwright.download.prss.microsoft.com,registry.access.redhat.com,access.redhat.com"
+  export no_proxy="${no_proxy:+${no_proxy},}registry.npmjs.org,cdn.playwright.dev,playwright.azureedge.net,playwright.download.prss.microsoft.com,registry.access.redhat.com,access.redhat.com"
+fi
+
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 PLAYWRIGHT_ARTIFACT_SUBDIR="${PLAYWRIGHT_ARTIFACT_SUBDIR:-}"
 if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
@@ -47,6 +71,8 @@ export CI=true
 # process.env.MAILPIT_API_URL (NOT MAILPIT_API), so the var name must match or the
 # suite falls back to http://localhost:8025 and reports "Mailpit NOT available".
 # Written by the quay-deploy-mailpit step. Left unset when mailing is off.
+# On proxied (bare-metal) runs this Route URL is later replaced with a local
+# port-forward by startMailpitPortForward; see its comment for why.
 if [[ -s "${SHARED_DIR}/mailpit_api" ]]; then
   MAILPIT_API_URL=$(cat "${SHARED_DIR}/mailpit_api")
   export MAILPIT_API_URL
@@ -431,6 +457,71 @@ function stopJaegerPortForward {
   JAEGER_PF_PID=""
 }
 
+# Same idea as the Jaeger forward, but for Mailpit, and only on proxied runs:
+# the Route URL in SHARED_DIR/mailpit_api is a private *.apps host that only the
+# bastion proxy can resolve and reach. global-setup's calls go through a
+# proxy-aware Playwright request context (quay/quay#7765), but the mailpit
+# helpers invoked from inside the tests use Node's native fetch, which ignores
+# HTTP(S)_PROXY entirely and cannot even resolve the host -- every
+# email-dependent spec then fails with getaddrinfo ENOTFOUND. Port-forward the
+# in-cluster Service to 127.0.0.1 and point MAILPIT_API_URL there instead:
+# native fetch connects directly, and the proxy-aware contexts bypass 127.0.0.1
+# through NO_PROXY. Unproxied (cloud) runs keep the Route URL, which native
+# fetch reaches directly, so this is a no-op there.
+function startMailpitPortForward {
+  MAILPIT_PF_PID=""
+  # Empty MAILPIT_API_URL means the deploy step ran with mailing off.
+  if [[ -z "${MAILPIT_API_URL:-}" ]]; then
+    return 0
+  fi
+  if [[ ! -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    echo "No proxy configured; keeping MAILPIT_API_URL=${MAILPIT_API_URL}"
+    return 0
+  fi
+
+  local ns="${QUAYNAMESPACE:-quay-enterprise}"
+  # Supervise the forward like the Jaeger one: the suite runs for hours and a
+  # single forward does not survive a Mailpit pod restart or an idle drop.
+  (
+    pf=""
+    trap '[[ -n "${pf}" ]] && kill "${pf}" 2>/dev/null; exit 0' TERM
+    while true; do
+      oc port-forward -n "${ns}" svc/mailpit 8025:8025 >> "${ARTIFACT_DIR}/mailpit-port-forward.log" 2>&1 &
+      pf=$!
+      wait "${pf}" || true
+      sleep 5
+    done
+  ) &
+  MAILPIT_PF_PID=$!
+
+  # Prove the forward answers the exact request mailpit.getEmails() makes
+  # before pointing the suite at it. curl honors NO_PROXY (127.0.0.1 is in the
+  # bastion proxy's list), so this stays direct.
+  for _ in $(seq 1 12); do
+    if curl -sf --connect-timeout 5 --max-time 10 "http://127.0.0.1:8025/api/v1/messages" -o /dev/null; then
+      export MAILPIT_API_URL="http://127.0.0.1:8025/api/v1"
+      echo "MAILPIT_API_URL=${MAILPIT_API_URL} (local port-forward)"
+      return 0
+    fi
+    sleep 5
+  done
+
+  # Fail loudly rather than hand the suite a URL native fetch cannot reach:
+  # on a proxied run every email-dependent spec would later fail with
+  # getaddrinfo ENOTFOUND, far from the cause. Same stance as
+  # quay-deploy-mailpit, which exits 1 when the Route is unreachable.
+  echo "ERROR: Mailpit port-forward never became reachable on a proxied run; native fetch cannot use the Route URL ${MAILPIT_API_URL}" >&2
+  stopMailpitPortForward
+  exit 1
+}
+
+function stopMailpitPortForward {
+  [[ -n "${MAILPIT_PF_PID:-}" ]] || return 0
+  kill "${MAILPIT_PF_PID}" 2>/dev/null || true
+  wait "${MAILPIT_PF_PID}" 2>/dev/null || true
+  MAILPIT_PF_PID=""
+}
+
 # Public GCS prefix under which this job's per-step artifacts land once the job
 # finishes (Prow's gcsuploader pushes the whole artifact tree at job end, not
 # per step). Used to compose artifact URLs for custom-link cards and pointer
@@ -784,7 +875,7 @@ EOF
   fi
   gatherBuilderDiagnostics || true
 }
-trap 'copyArtifacts; stopJaegerPortForward' EXIT
+trap 'copyArtifacts; stopJaegerPortForward; stopMailpitPortForward' EXIT
 
 # Test users (admin/testuser/readonly) are created by Playwright's global-setup.ts,
 # exactly as in upstream Quay CI (.github/workflows/ci-web.yaml). With FEATURE_MAILING
@@ -859,9 +950,19 @@ function probe_route() {
     "${DISCOVERY_URL}" 2>/dev/null)" || curl_exit=$?
   read -r http_code t_dns t_conn t_tls t_ttfb <<<"${metrics:-000 0 0 0 0}"
 
-  if [[ -z "${dns}" || "${curl_exit}" -eq 6 ]]; then
+  # The DNS gate is based on curl's own resolution, not local getent. On baremetal
+  # the route is a private *.apps.<cluster> name that only the cluster's bastion
+  # proxy can resolve, so getent (the pod's local resolver) returns empty even
+  # though curl via HTTPS_PROXY reaches it (curl exit 0). curl exit 6 = could not
+  # resolve host, 5 = could not resolve proxy -- on unproxied (cloud) runs those
+  # capture the fresh-cluster DNS warmup window. On proxied runs squid resolves
+  # the target itself, so an unresolvable host surfaces as a failed CONNECT
+  # (curl exit 56 or a proxy error) and is labelled `transport` below; exit 5
+  # never fires there because the proxy is an IP literal. The label differs, the
+  # retry behaviour does not. getent stays in the log as evidence.
+  if [[ "${curl_exit}" -eq 5 || "${curl_exit}" -eq 6 ]]; then
     PROBE_CLASS=dns
-    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit})"
+    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit}, local getent='${dns:-empty}')"
   elif [[ "${curl_exit}" -ne 0 ]]; then
     PROBE_CLASS=transport
     PROBE_DETAIL="curl exit ${curl_exit} talking to ${DISCOVERY_URL}"
@@ -1007,6 +1108,7 @@ if [[ -n "${PLAYWRIGHT_MAX_FAILURES:-}" ]]; then
 fi
 
 startJaegerPortForward
+startMailpitPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"

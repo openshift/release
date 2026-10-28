@@ -1,0 +1,150 @@
+postsubmits:
+  openshift-online/gcp-hcp-infra:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^environment/sector-stage-main$
+    cluster: build07
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      ci-operator.openshift.io/cloud: platform-gcp
+      ci-operator.openshift.io/cloud-cluster-profile: platform-gcp
+    max_concurrency: 1
+    name: branch-ci-openshift-online-gcp-hcp-infra-environmentsector-stage-main-e2e-hostedcluster-stg
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-hostedcluster-stg
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: UNRESOLVED_CONFIG
+          value: |
+            # Hand maintained: promotion branches contain manifests only.
+            # Keep workflow and env in sync with the main HostedCluster presubmits.
+            # No image builds, promotion, or prowgen label; use the published e2e image.
+            # pj-rehearse skips postsubmits; the main presubmits test lifecycle only.
+            base_images:
+              gcp-hcp-e2e-tests:
+                name: gcp-hcp-e2e-tests
+                namespace: ci
+                tag: latest
+            build_root:
+              image_stream_tag:
+                name: gcp-hcp-infra-base
+                namespace: ci
+                tag: latest
+            releases:
+              latest:
+                release:
+                  channel: stable
+                  version: "4.22"
+            resources:
+              '*':
+                limits:
+                  memory: 4Gi
+                requests:
+                  cpu: '8'
+                  memory: 4Gi
+            tests:
+            - as: e2e-hostedcluster-stg
+              steps:
+                cluster_profile: platform-gcp
+                env:
+                  E2E_STATUS_CONTEXT: e2e/hostedcluster-stg
+                  E2E_STATUS_TARGETS: '[{"branch":"environment/sector-stage-main","contexts":["Terraform Cloud/hp-platform-engineering/repo-id-ZPRY7TkFRLq4VMVP","ArgoCD/root-app-stg-reg-us-w1-cvxu-gke","ArgoCD/root-app-stg-mgt-us-w1-zkpf-gke"]}]'
+                  E2E_TARGET_API_ENDPOINT: https://platform-api-us-west1-cvxu.stg.gcp-hcp.devshift.net
+                  E2E_TARGET_CUSTOMER_PROJECT_ID: stg-ci-cust-us-w1
+                  E2E_TARGET_ENV: stage
+                  E2E_TARGET_OIDC_ENDPOINT: https://oidc.stg-reg-us-w1-cvxu.stg.gcp-hcp.devshift.net
+                  E2E_TARGET_REGION: us-west1
+                  GCPHCPCTL_AUTHZ_BOOTSTRAP: 'false'
+                  # Lift the 4.22 pin after candidate 5.x is advertised in STAGE and a lifecycle run passes.
+                  HC_CHANNEL_GROUP: stable
+                  HC_CLEANUP_ON_FAILURE: 'true'
+                  HC_VERSION: 4.22.14
+                workflow: gcp-hcp-e2e-on-demand
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

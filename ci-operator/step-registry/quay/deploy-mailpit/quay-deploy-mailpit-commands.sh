@@ -9,6 +9,15 @@ set -o pipefail
 # (external) reads delivered mail over the HTTP API exposed via an edge Route.
 # No credentials are handled here, so tracing (set -x) is safe to omit anyway.
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Mailpit route reachability check below can
+# connect; cloud jobs have no such file and skip this (no-op).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p "${ARTIFACT_DIR}"
 

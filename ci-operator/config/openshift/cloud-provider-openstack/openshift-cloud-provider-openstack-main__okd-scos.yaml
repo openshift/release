@@ -44,9 +44,21 @@ images:
         as:
         - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0
     to: openstack-cloud-controller-manager
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: images/osbrick-sidecar/Dockerfile
+    from: origin_scos-5.1_base-stream10
+    inputs:
+      origin_scos-5.1_base-stream10:
+        as:
+        - registry.ci.openshift.org/ocp/5.1:base-rhel10
+    to: openstack-cinder-csi-driver-osbrick-sidecar
 promotion:
   to:
-  - name: scos-5.1
+  - excluded_images:
+    - openstack-cinder-csi-driver-osbrick-sidecar
+    name: scos-5.1
     namespace: origin
 releases:
   latest:

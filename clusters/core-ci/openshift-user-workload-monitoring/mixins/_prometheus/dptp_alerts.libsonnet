@@ -104,13 +104,19 @@
         rules: [
           {
             alert: 'quay-io-image-mirroring-failures',
-            expr: 'sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])) > 0.5',
+            expr: |||
+              max_over_time(
+                (sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])))[15m:1m]
+              ) > 0.5
+              and
+              sum(rate(quay_io_ci_images_distributor_image_mirroring_duration_seconds_count{state="failure"}[10m])) > 0.2
+            |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Many mirroring tasks to quay.io have been failed in the last minute. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
+              message: 'Many mirroring tasks to quay.io have failed in the last 10 minutes. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures',
             },
           },
@@ -122,6 +128,8 @@
           {
             alert: 'component-failed-to-construct-a-client',
             expr: 'kubernetes_failed_client_creations > 0',
+            'for': '5m',
+            'keep_firing_for': '15m',
             labels: {
               severity: 'critical',
             },
@@ -138,15 +146,27 @@
             alert: 'high-ci-operator-infra-error-rate',
             expr: |||
               (
-                sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+                max_over_time(
+                  (sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason))[15m:1m]
+                ) > 0.02
+                and
+                sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.01
               )
               and on (reason)
               (
+                max_over_time(
+                  (count by (reason) (
+                    sum by (reason, job_name) (
+                      rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
+                    ) > 0
+                  ))[15m:1m]
+                ) >= 3
+                and
                 count by (reason) (
                   sum by (reason, job_name) (
                     rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])
                   ) > 0
-                ) >= 3
+                ) >= 2
               )
             |||,
             'for': '5m',
@@ -166,7 +186,11 @@
           {
             alert: 'high-ci-operator-error-rate',
             expr: |||
-              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.08
+              max_over_time(
+                (sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason))[15m:1m]
+              ) > 0.08
+              and
+              sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.04
             |||,
             'for': '1m',
             labels: {
@@ -184,7 +208,7 @@
           {
             alert: 'jobs-failing-with-lease-acquire-timeout',
             expr: |||
-             label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[15m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
+             label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[30m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
             |||,
             'for': '1m',
             labels: {
@@ -218,6 +242,7 @@
               up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
             |||,
             'for': '1m',
+            'keep_firing_for': '3m',
             labels: {
               severity: 'critical',
             },
@@ -231,6 +256,7 @@
               up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
             |||,
             'for': '5m',
+            'keep_firing_for': '3m',
             labels: {
               severity: 'critical',
             },
@@ -297,6 +323,7 @@
              sum by (workload_name, workload_type, determined_amount, configured_amount, resource_type) (increase(pod_scaler_admission_high_determined_resource{workload_type!~"undefined|build"}[5m])) > 0
             |||,
             'for': '1m',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'warning',
             },

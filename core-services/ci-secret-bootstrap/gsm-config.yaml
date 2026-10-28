@@ -10617,7 +10617,20 @@ bundles:
         registry_url: registry.redhat.io
     gsm_secrets:
     - collection: quay-tests
+      group: ccm-apikey
+    - collection: quay-tests
+      group: csi-apikey
+    - collection: quay-tests
+      fields:
+      - as: ibmcloud-api-key
+        name: api-key
       group: ibmcloud
+    - collection: quay-tests
+      group: ingress-apikey
+    - collection: quay-tests
+      group: iro-apikey
+    - collection: quay-tests
+      group: mao-apikey
     - collection: quay-tests
       group: ssh
     name: cluster-secrets-ibmcloud-quay
@@ -13011,40 +13024,6 @@ bundles:
       - cluster: core-ci
         namespace: ci
 
-  - name: alert-proxy-alertmanager-webhook
-    gsm_secrets:
-      - collection: test-platform-infra
-        group: alert-proxy-alertmanager-webhook
-        fields:
-          - url
-          - token
-    sync_to_cluster: true
-    targets:
-      - cluster: app.ci
-        namespace: ci
-      - cluster: core-ci
-        namespace: ci
-      # Alertmanager reads the bearer token from this secret via
-      # http_config.authorization.credentials_file, so it must also exist in the
-      # namespace the Alertmanager pods run in.
-      - cluster: app.ci
-        namespace: openshift-user-workload-monitoring
-      - cluster: core-ci
-        namespace: ci-monitoring
-
-  - name: alert-proxy-forwarder
-    gsm_secrets:
-      - collection: test-platform-infra
-        group: alert-proxy-forwarder
-        fields:
-          - hmac_secret
-    sync_to_cluster: true
-    targets:
-      - cluster: app.ci
-        namespace: ci
-      - cluster: core-ci
-        namespace: ci
-
   - name: github-app-credentials
     gsm_secrets:
       - collection: test-platform-infra
@@ -13923,6 +13902,18 @@ bundles:
       - cluster: core-ci
         namespace: ci
 
+  - name: dispatcher-dashboard-oauth
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dispatcher-dashboard-oauth
+        fields:
+          - name: session-secret
+            as: session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
   - name: prowjob-dispatcher-control
     gsm_secrets:
       - collection: test-platform-infra
@@ -13933,6 +13924,8 @@ bundles:
     sync_to_cluster: true
     targets:
       - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
         namespace: ci
 
   - name: slack-credentials-dptp-bot
@@ -14421,8 +14414,6 @@ bundles:
           - github-redirect-uri
     sync_to_cluster: true
     targets:
-      - cluster: app.ci
-        namespace: ci
       - cluster: core-ci
         namespace: ci
 
@@ -15135,7 +15126,6 @@ bundles:
         group: dex
         fields:
           - gsm-cli-id
-          - gsm-cli-secret
     sync_to_cluster: true
     targets:
       - cluster: app.ci
