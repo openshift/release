@@ -1,0 +1,42 @@
+# Classification data for the proposed Slack-fed ops dashboard.
+# The underscore prevents applyconfig from treating this as a Kubernetes manifest.
+# Source-owned Prometheus and Prow classifications live beside their definitions.
+version: 1
+defaults:
+  color: orange
+  category: other
+source_policies:
+  chai_reports:
+    kind: report
+    color: green
+    category: chai_reports
+    view: chai_reports
+  ship_outages:
+    kind: alert
+    color: yellow
+    category: other
+    component_categories:
+    - component: Build Farm
+      category: cluster_fleet
+    - component: Downstream CI
+      subcomponent: CI-Config
+      category: repo_automation
+platform_alerts:
+- alertname_glob: '*etcd*'
+  color: red
+  category: cluster_fleet
+- alertname_glob: '*ETCD*'
+  color: red
+  category: cluster_fleet
+- alertname: MachineWithNoRunningPhase
+  color: red
+  category: cluster_fleet
+- alertname: KubeSchedulerDown
+  color: orange
+  category: cluster_fleet
+# This existing UWM rule's owning definition has not been located. Keep its
+# agreed classification here until the producer can supply it directly.
+legacy_alerts:
+- alertname: hive-blocked-deprovision
+  color: orange
+  category: cloud_cleanup

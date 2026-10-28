@@ -18,6 +18,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'yellow',
+              ops_category: 'ci_platform',
               message: 'The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 10 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/ghproxy-too-many-pending-alerts.md|SOP>.',
             },
           },
@@ -71,6 +73,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           },
@@ -90,6 +94,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           },
@@ -103,6 +109,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'red',
+              ops_category: 'ci_platform',
               message: |||
                 {{ $labels.token_hash }} uses 90% of the available inode (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
 

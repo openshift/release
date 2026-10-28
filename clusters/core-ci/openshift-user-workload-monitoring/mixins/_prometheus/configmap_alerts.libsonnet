@@ -16,6 +16,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace {{ $labels.namespace }} is expected to fill up within a week. Currently {{ printf "%0.2f" $value }}% is available.',
             },
           }
