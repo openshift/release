@@ -374,9 +374,10 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit -> OTel -> unmanaged database -> QUAY_EXTRA_CONFIG,
-# so an explicit override still wins over the service-owned fragments. A
-# missing fragment is a silent no-op, leaving the disabled default above.
+# Merge order: Mailpit -> OTel -> IdP auth -> unmanaged database ->
+# QUAY_EXTRA_CONFIG, so an explicit override still wins over the
+# service-owned fragments. A missing fragment is a silent no-op, leaving
+# the disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
 	echo "Merging Mailpit config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-mail-config.yaml"
@@ -385,6 +386,12 @@ fi
 if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	echo "Merging Jaeger/OTel config fragment into defaults..."
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
+fi
+
+# Never print this fragment: an IdP fragment may carry credentials.
+if [[ -s "${SHARED_DIR}/quay-auth-config.yaml" ]]; then
+	echo "Merging IdP auth config fragment into defaults..."
+	merge_config_fragment "${SHARED_DIR}/quay-auth-config.yaml"
 fi
 
 # Unmanaged DB fragments from quay-database-intg-* steps. At most one should
@@ -490,6 +497,11 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   )
 else
   secret_args=(--from-file config.yaml=./config.yaml)
+fi
+
+# Quay must trust the IdP's CA to reach its discovery/token endpoints.
+if [[ -s "${SHARED_DIR}/quay-auth-ca.crt" ]]; then
+  secret_args+=(--from-file extra_ca_cert_quay_auth.crt="${SHARED_DIR}/quay-auth-ca.crt")
 fi
 
 # configBundleSecret name. The GCP SQL handling (client certs in the bundle
