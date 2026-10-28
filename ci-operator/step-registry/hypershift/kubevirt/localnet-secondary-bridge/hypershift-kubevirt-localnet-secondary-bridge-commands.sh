@@ -28,6 +28,53 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
   if [[ "${current_fwd}" != "Global" ]]; then
     echo ""
     echo "Enabling global IP forwarding (current: ${current_fwd:-Restricted})..."
+
+    # -----------------------------------------------------------------------
+    # Fix squid proxy DNS before triggering MCP rollout.
+    #
+    # The CI squid proxy runs in a podman container on the bare-metal host.
+    # It resolves API hostnames (*.metalkube.org) via /etc/resolv.conf, which
+    # typically points to 127.0.0.1.  On OFCIR hosts, nothing may listen on
+    # 127.0.0.1:53 — the libvirt dnsmasq that knows .metalkube.org only
+    # listens on the bridge IP (e.g. 192.168.111.1).  If DNS fails, squid
+    # returns ERR_CANNOT_FORWARD and all oc commands through the proxy hang
+    # after nodes reboot during MCP rollout.
+    #
+    # Fix: ensure the libvirt dnsmasq IP is in the container's resolv.conf.
+    # -----------------------------------------------------------------------
+    if [[ -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+      # shellcheck source=/dev/null
+      source "${SHARED_DIR}/packet-conf.sh"
+      BM_IP=$(cat "${SHARED_DIR}/server-ip")
+      api_vip=$(oc get infrastructure cluster -o jsonpath='{.status.apiServerURL}' 2>/dev/null | sed 's|https://||;s|:.*||' || true)
+      dns_ip=""
+      if [[ -n "${api_vip}" ]]; then
+        dns_ip=$(ssh "${SSHOPTS[@]}" "root@${BM_IP}" \
+          "dig +short @192.168.111.1 ${api_vip} >/dev/null 2>&1 && echo 192.168.111.1 || true" 2>/dev/null || true)
+      fi
+      if [[ -z "${dns_ip}" ]]; then
+        dns_ip="192.168.111.1"
+      fi
+      echo "Ensuring squid proxy container can resolve cluster DNS via ${dns_ip}..."
+      ssh "${SSHOPTS[@]}" "root@${BM_IP}" bash -c "'
+        squid_cid=\$(podman ps -q --filter name=squid 2>/dev/null | head -1)
+        if [[ -n \"\${squid_cid}\" ]]; then
+          current_dns=\$(podman exec \${squid_cid} cat /etc/resolv.conf 2>/dev/null || true)
+          if ! echo \"\${current_dns}\" | grep -q \"${dns_ip}\"; then
+            podman exec \${squid_cid} sh -c \"echo nameserver ${dns_ip} >> /etc/resolv.conf\"
+            echo \"Added nameserver ${dns_ip} to squid container resolv.conf\"
+            podman restart \${squid_cid} 2>/dev/null || true
+            sleep 3
+            echo \"Squid proxy restarted\"
+          else
+            echo \"Squid container already has nameserver ${dns_ip}\"
+          fi
+        else
+          echo \"WARNING: no squid container found, skipping DNS fix\"
+        fi
+      '" 2>/dev/null || echo "WARNING: could not fix squid DNS (non-fatal)"
+    fi
+
     echo "Pre-patch state:"
     oc get mcp -o wide
     oc get nodes -o wide
