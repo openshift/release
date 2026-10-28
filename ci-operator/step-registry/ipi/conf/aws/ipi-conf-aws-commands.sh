@@ -206,9 +206,6 @@ elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TY
 fi
 # Generate availability zones based on these 2 criteria
 mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
-# ZONES is truncated below to ZONES_COUNT entries for the install-config; keep
-# the full eligible-zone list around for dedicated-host fallback allocation.
-ELIGIBLE_ZONES=("${ZONES[@]}")
 # Calculate the maximum number of availability zones from the region
 MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
@@ -467,6 +464,15 @@ if [[ "${DEDICATED_HOST}" == "yes" ]]; then
     echo "No zones configured,  Unable to determine where to create dedicated hosts."
     exit
   fi
+
+  # Candidate zones for dedicated-host fallback allocation: the install-config's
+  # ZONES (computed earlier) requires a zone to offer the bootstrap,
+  # control-plane, AND compute instance types together, and is truncated to
+  # ZONES_COUNT entries -- neither constraint is appropriate here, since
+  # bootstrap and control-plane machines stay in their originally configured
+  # zones and only the compute instance type matters for a fallback zone.
+  mapfile -t COMPUTE_TYPE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort -u)
+  mapfile -t ELIGIBLE_ZONES < <(comm -12 <(printf '%s\n' "${AVAILABILITY_ZONES[@]}") <(printf '%s\n' "${COMPUTE_TYPE_ZONES[@]}"))
 
   cat > "${patch_dedicated_host}" << EOF
 compute:
