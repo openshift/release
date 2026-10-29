@@ -78,9 +78,10 @@ tests:
         ./preflight --version | tee ${ARTIFACT_DIR}/preflight-version.txt
         git log --oneline | head > ${ARTIFACT_DIR}/git-log-last-ten.txt
         git rev-parse HEAD > ${ARTIFACT_DIR}/git-rev-parse-head.txt
+        trap 'mv --verbose "${PREFLIGHT_E2E_ARTIFACTS}"/* ${ARTIFACT_DIR}/ || true' EXIT
         make test-e2e ARTIFACTS_DIR=${PREFLIGHT_E2E_ARTIFACTS}
-        mv --verbose "${PREFLIGHT_E2E_ARTIFACTS}"/* ${ARTIFACT_DIR}/
       from: preflight-bin
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m

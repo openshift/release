@@ -54,11 +54,15 @@ tests:
     from: src
 - as: fips-check
   commands: |
+    # The --binary check is disabled because the ocp/builder:rhel-9-golang-1.26-openshift-5.0
+    # image wraps the go binary with a compliance shim (/usr/bin/go is a shell script that
+    # delegates to go.real). When OPENSHIFT_CI is set, the shim enforces the OpenSSL FIPS
+    # backend: it overrides GOFIPS140=certified to GOFIPS140=off and forces CGO_ENABLED=1,
+    # because the built-in Go FIPS module is only auto-enabled for OCP 5.1+.
     export GOFLAGS=-mod=mod
     make generate-obi
-    cd _build && CGO_ENABLED=0 GOFIPS140=certified go build -o opentelemetry-collector -trimpath -ldflags "-w" . && cd ..
     GOFLAGS= go install github.com/os-observability/konflux-opentelemetry/tools/fips-check@latest
-    fips-check --binary ./_build/opentelemetry-collector --module ./_build --allowlist ./fips-allowlist.yaml
+    fips-check --module ./_build --allowlist ./fips-allowlist.yaml
   container:
     from: src
 zz_generated_metadata:
