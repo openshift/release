@@ -34,6 +34,15 @@ function leaseLookup () {
   echo "$lookup"
 }
 
+if [[ "${LEASED_RESOURCE}" == *"s390x"* ]]; then
+  HOSTNAME="$(leaseLookup 'hostname')"
+  HYPERVISOR_IP="$(getent ahostsv4 "${HOSTNAME}" | awk '{print $1; exit}')"
+  if [[ -z "${HYPERVISOR_IP}" ]]; then
+    echo "Failed to resolve IP for host ${HOSTNAME}"
+    exit 1
+  fi
+fi
+
 if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
   BASE_DOMAIN="phc-cicd.cis.ibm.net"
   CLUSTER_NAME="${LEASED_RESOURCE}"
@@ -60,6 +69,16 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
+EOF
+if [[ "${LEASED_RESOURCE}" == *"s390x"* ]]; then
+  cat >> "${SHARED_DIR}/network.xml" << EOF
+    <host ip='${HYPERVISOR_IP}'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+EOF
+else
+  cat >> "${SHARED_DIR}/network.xml" << EOF
     <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
@@ -72,6 +91,9 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
+EOF
+fi
+cat >> "${SHARED_DIR}/network.xml" << EOF
   </dns>
   <ip family='ipv4' address='192.168.$(leaseLookup "subnet").1' prefix='24'>
     <dhcp>
@@ -101,6 +123,16 @@ else
   <bridge name='ocp$(leaseLookup "subnet")' stp='on' delay='0'/>
   <domain name='${BASE_URL}' localOnly='yes'/>
   <dns enable='yes'>
+EOF
+if [[ "${LEASED_RESOURCE}" == *"s390x"* ]]; then
+  cat >> "${SHARED_DIR}/network.xml" << EOF
+    <host ip='${HYPERVISOR_IP}'>
+      <hostname>api.${BASE_URL}</hostname>
+      <hostname>api-int.${BASE_URL}</hostname>
+    </host>
+EOF
+else
+  cat >> "${SHARED_DIR}/network.xml" << EOF
     <host ip='$(leaseLookup '"bootstrap"[0].ip')'>
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
@@ -117,6 +149,9 @@ else
       <hostname>api.${BASE_URL}</hostname>
       <hostname>api-int.${BASE_URL}</hostname>
     </host>
+EOF
+fi
+cat >> "${SHARED_DIR}/network.xml" << EOF
   </dns>
   <ip family='ipv4' address='192.168.$(leaseLookup "subnet").1' prefix='24'>
     <dhcp>
