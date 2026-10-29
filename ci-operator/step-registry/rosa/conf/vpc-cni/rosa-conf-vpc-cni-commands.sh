@@ -196,6 +196,34 @@ aws iam attach-role-policy \
   --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
 log "Attached AmazonEC2ContainerRegistryReadOnly to ${WORKER_ROLE_ARN}"
 
+# ---- Worker security group: allow node-to-node traffic ----
+# With the AWS VPC CNI, pod-to-pod and pod-to-service traffic between nodes is
+# native VPC traffic (pod IPs live on the node ENIs). The worker security group
+# ROSA creates (<cluster-id>-default-sg) only allows the OVN port set (geneve
+# 6081, VXLAN 4789, hostsubnet 9000-9999, kubelet 10250, nodeports, ICMP from
+# the machine CIDR), so cross-node pod TCP is silently dropped and e.g. the
+# rosa-e2e pod-to-service spec times out. Like EKS node groups, allow all
+# traffic between the group's own members (self-referencing rule);
+# rosa-conf-vpc-cni-cleanup revokes it again after the test.
+WORKER_SG_ID=$(aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=${CLUSTER_ID}-default-sg" \
+  --query 'SecurityGroups[0].GroupId' --output text)
+if [[ -z "${WORKER_SG_ID}" || "${WORKER_SG_ID}" == "None" ]]; then
+  log "ERROR: cannot find the worker security group ${CLUSTER_ID}-default-sg"
+  exit 1
+fi
+echo -n "${WORKER_SG_ID}" > "${SHARED_DIR}/aws-vpc-cni-worker-sg-id"
+if err=$(aws ec2 authorize-security-group-ingress \
+  --group-id "${WORKER_SG_ID}" --protocol all --port -1 \
+  --source-group "${WORKER_SG_ID}" 2>&1); then
+  log "Allowed node-to-node traffic in ${WORKER_SG_ID}"
+elif grep -q 'InvalidPermission.Duplicate' <<<"${err}"; then
+  log "Node-to-node traffic already allowed in ${WORKER_SG_ID}"
+else
+  log "ERROR: cannot update security group ${WORKER_SG_ID}: ${err}"
+  exit 1
+fi
+
 # ---- SCCs for the aws-node service account ----
 oc adm policy add-scc-to-user hostaccess -z aws-node -n kube-system
 oc adm policy add-scc-to-user privileged -z aws-node -n kube-system

@@ -23,6 +23,26 @@ else
   exit 1
 fi
 
+# ---- Revoke the node-to-node worker SG rule ----
+# Authorized by rosa-conf-vpc-cni so the VPC CNI's native pod traffic can
+# cross nodes. The worker SG itself is created and deleted with the cluster,
+# but revoke anyway in case it outlives the job: the self-referencing
+# all-protocols rule grants far more than the OVN port set the group was
+# provisioned with.
+if [[ -s "${SHARED_DIR}/aws-vpc-cni-worker-sg-id" ]]; then
+  WORKER_SG_ID=$(cat "${SHARED_DIR}/aws-vpc-cni-worker-sg-id")
+  if err=$(aws ec2 revoke-security-group-ingress \
+    --group-id "${WORKER_SG_ID}" --protocol all --port -1 \
+    --source-group "${WORKER_SG_ID}" 2>&1); then
+    log "Revoked the node-to-node rule from ${WORKER_SG_ID}"
+  elif grep -qE 'InvalidPermission.NotFound|InvalidGroup.NotFound' <<<"${err}"; then
+    log "Node-to-node rule already gone from ${WORKER_SG_ID}"
+  else
+    log "ERROR: cannot revoke the node-to-node rule from ${WORKER_SG_ID}: ${err}"
+    exit 1
+  fi
+fi
+
 # ---- Detach the ECR read-only policy from the worker role ----
 # Attached by rosa-conf-vpc-cni so the nodes can pull the CNI images from
 # Amazon's private ECR. The worker role itself is created and deleted by

@@ -12,8 +12,11 @@ ref:
     step (${SHARED_DIR}/aws-vpc-cni-role-name) and detaches the
     AmazonEC2ContainerRegistryReadOnly policy it attached to the worker
     instance role (${SHARED_DIR}/aws-vpc-cni-worker-role-arn) so the nodes
-    could pull the CNI images from Amazon's private ECR. The standard
-    deprovision chain knows about neither and would leak both.
+    could pull the CNI images from Amazon's private ECR, and revokes the
+    self-referencing node-to-node rule it authorized in the worker security
+    group (${SHARED_DIR}/aws-vpc-cni-worker-sg-id) so the VPC CNI's native
+    pod traffic could cross nodes. The standard deprovision chain knows about
+    none of these and would leak all three.
 
     All in-cluster changes (the SCCs, the helm release and the ip-forward
     tuning config) are removed with the cluster by rosa-cluster-deprovision.
