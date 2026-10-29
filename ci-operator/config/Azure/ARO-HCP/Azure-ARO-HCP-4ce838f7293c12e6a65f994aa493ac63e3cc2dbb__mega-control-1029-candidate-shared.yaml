@@ -1,0 +1,70 @@
+raw_steps:
+- input_image_tag_step:
+    external_image:
+      pull_spec: quay-proxy.ci.openshift.org/openshift/ci@sha256:093180ee24988c957735ab97c3af3dc7cecae09d09451760fd6828f752b2ee53
+    to: root
+- source_step:
+    from: root
+    to: src-benchmark
+    ref: Azure.ARO-HCP
+    pull_spec: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs@sha256:e121ed7aecbfe88a5ebbfdc5518635d7680d1ce0a91574e627f4b5088656c2de
+    clonerefs_path: /ko-app/clonerefs
+resources:
+  '*':
+    requests:
+      cpu: '4'
+      memory: 4Gi
+    limits:
+      memory: 4Gi
+tests:
+- as: integration
+  cron: 0 0 1 1 *
+  cluster: build11
+  node_architecture: amd64
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  disable_pod_scaler: true
+  literal_steps:
+    test:
+    - as: aro-hcp-integration-seed
+      from: src-benchmark
+      nested_podman: true
+      resources:
+        requests:
+          cpu: '6'
+          memory: 4Gi
+      commands: |
+        #!/bin/bash
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        set -o xtrace
+        test "$(git rev-parse HEAD)" = '4ce838f7293c12e6a65f994aa493ac63e3cc2dbb'
+        test "$(git rev-parse 'HEAD^{tree}')" = 'cfcaa53d8891a7454fad7bdc31cda36a2a150ef9'
+        git diff --exit-code HEAD --
+        printf 'MEGA_BENCHMARK_INTEGRATION_START=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+        export GOPATH=/opt/app-root
+        go install gotest.tools/gotestsum@latest
+        export PATH=${PATH}:"${GOPATH}/bin"
+        export AZURE_TOKEN_CREDENTIALS=prod
+        test-integration/hack/start-cosmos-emulator.sh
+        test-integration/hack/test-integration.sh
+        test-integration/hack/stop-cosmos-emulator.sh
+        printf 'MEGA_BENCHMARK_INTEGRATION_END=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
+- as: mega-linter
+  cron: 0 0 1 1 *
+  cluster: build11
+  node_architecture: amd64
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  disable_pod_scaler: true
+  steps:
+    test:
+    - ref: aro-hcp-mega-benchmark
+zz_generated_metadata:
+  org: Azure
+  repo: ARO-HCP
+  branch: 4ce838f7293c12e6a65f994aa493ac63e3cc2dbb
+  variant: mega-control-1029-candidate-shared
