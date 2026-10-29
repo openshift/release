@@ -136,7 +136,7 @@ application directory. Catalog/config changes require a process restart.
    reaches 8443, peer pods cannot reach backend 8080, and kubelet probes succeed.
    Check effective policies together because NetworkPolicy allow rules are
    additive; another policy must not reopen backend ingress. Verify revoking
-   Service access denies a new login after the one-hour session expires.
+   Service access denies a new login after the twelve-hour session expires.
    Check known Alertmanager/Prow/SHIP classifications, Chai report behavior,
    SOP preview, and the optional core-ci metrics source.
 6. With an operator-approved occurrence, verify one acknowledge/undo cycle and
