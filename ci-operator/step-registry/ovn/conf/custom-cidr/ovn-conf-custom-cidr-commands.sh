@@ -26,6 +26,10 @@ networking:
   - $SERVICE_NETWORK_CIDR
 EOF
 
-yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+if yq --version | grep -q 'version v4'; then
+  yq eval-all --inplace 'select(fileIndex == 0) * select(fileIndex == 1)' "${CONFIG}" "${CONFIG_PATCH}"
+else
+  yq m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+fi
 
 cat "${CONFIG}"
