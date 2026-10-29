@@ -4,46 +4,69 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Detect the node IP subnet from the infra cluster kubeconfig and write
-# METALLB_MGMT_IPS and METALLB_MGMT_IPS_INFRA into SHARED_DIR so the
-# subsequent metallb-oz and metallb-oz-infra steps can consume them.
+# Detect node IP subnets from mgmt cluster ($SHARED_DIR/kubeconfig) and infra
+# cluster ($SHARED_DIR/infra-kubeconfig), and write METALLB_MGMT_IPS and
+# METALLB_MGMT_IPS_INFRA into SHARED_DIR so the subsequent metallb-oz and
+# metallb-oz-infra steps can consume them.
 #
-# Subnet → IP mapping (OZ libvirt environments):
-#   192.168.2.x  →  METALLB_MGMT_IPS=192.168.2.53-192.168.2.53
-#                   METALLB_MGMT_IPS_INFRA=192.168.2.54-192.168.2.54
-#   192.168.3.x  →  METALLB_MGMT_IPS=192.168.3.53-192.168.3.53
-#                   METALLB_MGMT_IPS_INFRA=192.168.3.54-192.168.3.54
+# MGMT_IPS is in the range of mgmt cluster node IPs (.53).
+# INFRA_IPS is in the range of infra cluster node IPs (.54).
 
 MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
 if [[ ! -f "${MGMT_KUBECONFIG}" ]]; then
-  echo "ERROR: infra kubeconfig not found at ${MGMT_KUBECONFIG}"
+  echo "ERROR: mgmt kubeconfig not found at ${MGMT_KUBECONFIG}"
   exit 1
 fi
 
-NODE_IP=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get nodes -o wide --no-headers 2>/dev/null \
+MGMT_NODE_IP=$(KUBECONFIG="${MGMT_KUBECONFIG}" oc get nodes -o wide --no-headers 2>/dev/null \
   | awk '{print $6}' | grep -v '^$' | head -1)
 
-if [[ -z "${NODE_IP}" ]]; then
-  echo "ERROR: could not detect any node IP from infra-kubeconfig"
+if [[ -z "${MGMT_NODE_IP}" ]]; then
+  echo "ERROR: could not detect any node IP from mgmt kubeconfig"
   exit 1
 fi
 
-echo "Detected mgmt node IP: ${NODE_IP}"
+echo "Detected mgmt node IP: ${MGMT_NODE_IP}"
 
-if [[ "${NODE_IP}" == 192.168.126.* ]]; then
+if [[ "${MGMT_NODE_IP}" == 192.168.126.* ]]; then
   MGMT_IPS="192.168.126.53-192.168.126.53"
-  INFRA_IPS="192.168.126.54-192.168.126.54"
-elif [[ "${NODE_IP}" == 192.168.1.* ]]; then
+elif [[ "${MGMT_NODE_IP}" == 192.168.1.* ]]; then
   MGMT_IPS="192.168.1.53-192.168.1.53"
-  INFRA_IPS="192.168.1.54-192.168.1.54"
-elif [[ "${NODE_IP}" == 192.168.2.* ]]; then
+elif [[ "${MGMT_NODE_IP}" == 192.168.2.* ]]; then
   MGMT_IPS="192.168.2.53-192.168.2.53"
-  INFRA_IPS="192.168.2.54-192.168.2.54"
-elif [[ "${NODE_IP}" == 192.168.3.* ]]; then
+elif [[ "${MGMT_NODE_IP}" == 192.168.3.* ]]; then
   MGMT_IPS="192.168.3.53-192.168.3.53"
+else
+  echo "ERROR: unrecognised mgmt node IP subnet '${MGMT_NODE_IP}' — add a mapping for this environment"
+  exit 1
+fi
+
+INFRA_KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
+if [[ ! -f "${INFRA_KUBECONFIG}" ]]; then
+  echo "ERROR: infra kubeconfig not found at ${INFRA_KUBECONFIG}"
+  exit 1
+fi
+
+INFRA_NODE_IP=$(KUBECONFIG="${INFRA_KUBECONFIG}" oc get nodes -o wide --no-headers 2>/dev/null \
+  | awk '{print $6}' | grep -v '^$' | head -1)
+
+if [[ -z "${INFRA_NODE_IP}" ]]; then
+  echo "ERROR: could not detect any node IP from infra kubeconfig"
+  exit 1
+fi
+
+echo "Detected infra node IP: ${INFRA_NODE_IP}"
+
+if [[ "${INFRA_NODE_IP}" == 192.168.126.* ]]; then
+  INFRA_IPS="192.168.126.54-192.168.126.54"
+elif [[ "${INFRA_NODE_IP}" == 192.168.1.* ]]; then
+  INFRA_IPS="192.168.1.54-192.168.1.54"
+elif [[ "${INFRA_NODE_IP}" == 192.168.2.* ]]; then
+  INFRA_IPS="192.168.2.54-192.168.2.54"
+elif [[ "${INFRA_NODE_IP}" == 192.168.3.* ]]; then
   INFRA_IPS="192.168.3.54-192.168.3.54"
 else
-  echo "ERROR: unrecognised node IP subnet '${NODE_IP}' — add a mapping for this environment"
+  echo "ERROR: unrecognised infra node IP subnet '${INFRA_NODE_IP}' — add a mapping for this environment"
   exit 1
 fi
 
