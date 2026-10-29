@@ -1,0 +1,53 @@
+ref:
+  as: mirror-images-by-oc-mirror-from-disk
+  from: upi-installer
+  grace_period: 15m
+  commands: mirror-images-by-oc-mirror-from-disk-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: MIRROR_BIN
+    default: "oc-mirror"
+    documentation: "Mirror binary to use. Set to a value other than 'oc-mirror' to skip this step."
+  - name: ENABLE_IDMS
+    default: "no"
+    documentation: |-
+      Whether to use imageDigestSources (IDMS) instead of imageContentSources
+      (ICSP) when generating the install-config mirror patch. Set to 'yes' for
+      clusters >= 4.13. Passed through to mirror-images-by-oc-mirror-conf-mirror.
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Phase 2 of the two-phase oc-mirror mirror-to-disk/disk-to-mirror (m2d2m)
+    workflow. SSHes into the bastion host and runs 'oc-mirror --v2' in
+    disk-to-mirror mode, pushing from the archive staged by
+    mirror-images-by-oc-mirror-to-disk into the bastion's local mirror registry,
+    without any public internet access.
+
+    Before running disk-to-mirror, enforces network isolation on the bastion via
+    iptables: all outbound traffic is dropped except loopback, established
+    connections, VPC-internal traffic (10.0.0.0/8, which covers the AWS private
+    endpoints for EC2/ELB/STS/S3), and the instance metadata endpoint
+    (169.254.169.254). Runs an isolation acceptance test to confirm that public
+    internet is unreachable and the local registry is reachable before proceeding.
+    Restores the original iptables rules after the import completes so that
+    subsequent post-steps (deprovision, artifact gathering) work normally.
+
+    After disk-to-mirror completes, copies the generated IDMS/ITMS
+    cluster-resources from the bastion to SHARED_DIR so that the subsequent
+    mirror-images-by-oc-mirror-conf-mirror step can patch install-config.yaml.
+
+    Saves iptables evidence to ARTIFACT_DIR for audit/debugging.
+
+    Must run after mirror-images-by-oc-mirror-to-disk (which stages the archive
+    and the oc-mirror binary on the bastion) and before
+    mirror-images-by-oc-mirror-conf-mirror (which reads SHARED_DIR/idms-oc-mirror.yaml).
+
+    A no-op if MIRROR_BIN is not set to 'oc-mirror'.
