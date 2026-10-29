@@ -674,6 +674,84 @@ wait_for_localnet_multi_vmis_running() {
   return 1
 }
 
+# recover_stuck_localnet_multi_vmis re-rolls worker VMIs whose guest never
+# finished booting.
+#
+# The ignition fetch occasionally dies mid-transfer ("failed to fetch config:
+# unexpected EOF") during the narrow window in which the VM first comes up. The
+# guest then drops to emergency mode: KubeVirt still reports the VMI Running and
+# Ready, because the domain is up, but the OS never gets far enough to start the
+# qemu guest agent or kubelet, so no Node ever registers and the NodePool sits at
+# "Waiting for a Node with spec.providerID kubevirt://... to exist".
+#
+# The failure is transient — a re-rolled VM fetches the same payload without
+# trouble — so delete the VMI and let the VirtualMachine controller recreate it.
+# AgentConnected is the discriminator: it can only be True once the guest has
+# booted, which means ignition completed. VMs that are still early in boot are
+# protected by the grace period rather than being re-rolled underneath
+# themselves.
+recover_stuck_localnet_multi_vmis() {
+  local multi_ns="$1"
+  local grace_seconds="${2:-600}"
+  local vmi phase agent created age now rerolled=0
+
+  now=$(date -u +%s)
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vmi}" ]] && continue
+    phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    [[ "${phase}" == "Running" ]] || continue
+    agent=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
+    [[ "${agent}" == "True" ]] && continue
+
+    created=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
+    [[ -z "${created}" ]] && continue
+    age=$(( now - $(date -u -d "${created}" +%s 2>/dev/null || echo "${now}") ))
+    if (( age < grace_seconds )); then
+      echo "  VMI ${vmi}: no guest agent yet, ${age}s old — still within the ${grace_seconds}s grace period"
+      continue
+    fi
+
+    echo "  VMI ${vmi}: Running but no guest agent after ${age}s — re-rolling so ignition retries"
+    oc delete vmi "${vmi}" -n "${multi_ns}" --wait=false >/dev/null 2>&1 || true
+    rerolled=$((rerolled + 1))
+  done
+
+  [[ ${rerolled} -gt 0 ]] && echo "Re-rolled ${rerolled} stuck VMI(s)"
+  return 0
+}
+
+# wait_for_localnet_multi_vmis_booted waits for every worker VMI to report
+# AgentConnected, re-rolling any that get stuck, and gives up after a bounded
+# number of recovery rounds rather than looping forever.
+wait_for_localnet_multi_vmis_booted() {
+  local multi_ns="$1"
+  local max_rounds="${2:-3}"
+  local grace="${3:-600}"
+  local round attempt booted
+
+  for round in $(seq 1 "${max_rounds}"); do
+    for attempt in $(seq 1 60); do
+      booted=$(oc get vmi -n "${multi_ns}" \
+        -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="AgentConnected")].status}{"\n"}{end}' 2>/dev/null \
+        | grep -c '^True$' || true)
+      if [[ "${booted}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${booted} worker guests booted (guest agent connected)"
+        return 0
+      fi
+      if [[ $((attempt % 6)) -eq 0 ]]; then
+        echo "  ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted (round ${round}/${max_rounds}, attempt ${attempt}/60)"
+      fi
+      sleep 10
+    done
+    echo "Round ${round}: ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted; checking for stuck VMIs"
+    recover_stuck_localnet_multi_vmis "${multi_ns}" "${grace}"
+  done
+
+  echo "WARNING: only ${booted}/${HYPERSHIFT_NODE_COUNT} worker guests booted after ${max_rounds} recovery rounds"
+  return 1
+}
+
 renew_localnet_multi_dhcp_on_vmi() {
   local multi_ns="$1"
   local network_count="$2"
@@ -721,11 +799,18 @@ ensure_localnet_multi_worker_networking() {
   echo "Ensuring OVN DHCP on worker node(s):${vmi_nodes}"
   configure_localnet_multi_dhcp_on_nodes "${multi_ns}" "${network_count}" "${vmi_nodes}" || true
 
-  if ! renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}"; then
-    echo "WARNING: DHCP renewal failed on one or more worker VMIs"
-    return 1
-  fi
-  if ! verify_localnet_multi_worker_routes "${multi_ns}"; then
+  # DHCP renewal is best effort: a guest that already has the right lease needs
+  # nothing, and a guest that is wedged is handled by the boot wait below.
+  renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}" \
+    || echo "WARNING: DHCP renewal reported a failure on one or more worker VMIs"
+
+  # Wait for the guests to actually boot, re-rolling any that got stuck. This
+  # replaces verify_localnet_multi_worker_routes, which shelled out to
+  # "virtctl guest-exec" — not a virtctl subcommand, so it grepped the resulting
+  # error string for a route, found none and reported default_route=MISSING for
+  # every VMI whether or not anything was wrong. AgentConnected is a real signal:
+  # it requires the guest to have completed ignition and booted.
+  if ! wait_for_localnet_multi_vmis_booted "${multi_ns}"; then
     return 1
   fi
   return 0
@@ -1508,12 +1593,14 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
     exit 1
   }
 elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "external" ]]; then
-  # With external DHCP, VMs should already have correct networking. Verify routes.
+  # With external DHCP the VMs should already have correct networking, so just
+  # confirm the guests booted, re-rolling any left in emergency mode by a
+  # transient ignition failure.
   MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   echo "Verifying worker VMI networking (external DHCP mode)..."
   if [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]]; then
-    verify_localnet_multi_worker_routes "${MULTI_NAMESPACE}" || {
-      echo "WARNING: Some worker VMIs may lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY} (external DHCP)" >&2
+    wait_for_localnet_multi_vmis_booted "${MULTI_NAMESPACE}" || {
+      echo "WARNING: not all worker guests booted; the NodePool will be short of nodes" >&2
     }
   fi
 fi
