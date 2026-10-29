@@ -280,6 +280,18 @@ checkout_system_tests() {
   git -C /tmp/system-tests checkout --detach FETCH_HEAD
   git -C /tmp/system-tests show --no-patch --format=fuller HEAD
   git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
+
+  if make -C /tmp/system-tests -n deps-download > /dev/null 2>&1; then
+    export GOFLAGS=-mod=readonly
+    make -C /tmp/system-tests deps-download ginkgo
+  else
+    # Older refs lack deps-download; retain their existing build mode and tool setup.
+    (
+      cd /tmp/system-tests
+      go mod download
+      go mod verify
+    )
+  fi
 }
 
 print_run_config() {
