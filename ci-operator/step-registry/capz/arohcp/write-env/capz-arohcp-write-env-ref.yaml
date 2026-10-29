@@ -17,6 +17,32 @@ ref:
       cpu: 100m
       memory: 100Mi
   env:
+  - name: QUAY_DIAGNOSTIC_IMAGES
+    default: >-
+      quay.io/acm-d/ose-cluster-api-rhel9:v5.0
+      quay.io/acm-d/mce-capi-webhook-config-rhel9:5.0-dev
+      quay.io/acm-d/cluster-api-provider-azure-rhel9:5.0-dev
+      quay.io/acm-d/azure-service-operator-rhel9:5.0-dev
+    documentation: |-
+      Space-separated exact image references to check using the mounted Quay
+      credential from the Prow pod. Each manifest request has a 25-second limit.
+      Reference mismatches are informational; failed manifest access stops pre.
+  - name: QUAY_USERNAME_EXPECTED_SHA256
+    default: "ffc8c1dc08ef12b4099c94fb29aa07b86138f00ddc561d7ee8721d1cb85e4983"
+    documentation: |-
+      Optional SHA-256 of the known-good decoded Quay username. Used only to
+      classify a credential mismatch without logging the value or fingerprint.
+  - name: QUAY_TOKEN_EXPECTED_SHA256
+    default: "f286300ae493d595fe5a7e66bd3dfd515607d1d98c2193bd2a329f133aef6c8c"
+    documentation: |-
+      Optional SHA-256 of the known-good decoded Quay token. Used only to
+      classify a credential mismatch without logging the value or fingerprint.
+  - name: QUAY_AUTH_EXPECTED_SHA256
+    default: "b6d23fb6c95c997cd74f67d23173931da20a14a140e8d1795e69e5c3d7e24623"
+    documentation: |-
+      Optional SHA-256 of decoded quay.io username:token from a known-good
+      Docker config. This diagnostic PR uses the Vault download validated on
+      2026-10-26 as its reference. Only match/mismatch is logged.
   - name: VAULT_SECRET_PROFILE
     default: "prod-rh"
     documentation: |-
@@ -35,7 +61,7 @@ ref:
   - name: ARO_REPO_DIR
     default: "/tmp/cluster-api-installer-pro"
     documentation: Directory to clone the cluster-api-installer repository into.
-  timeout: 1m0s
+  timeout: 4m0s
   documentation: |-
     Resolves Azure credentials from mounted secrets and writes all CAPZ
     environment variables to ${SHARED_DIR}/capz-test-env.sh. Subsequent
