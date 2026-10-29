@@ -74,7 +74,9 @@ ETCD_BACKUP_SA_SUBJECT="system:serviceaccount:hypershift:etcd-backup-job"
 VELERO_SA_SUBJECT="system:serviceaccount:openshift-adp:velero"
 
 OADP_MI_NAME="oadp-workload-identity-${CLUSTER_NAME}"
-OADP_MI_RESOURCEGROUP="os4-common"
+# Keep the identity in this job's management cluster resource group so a failed
+# OADP cleanup leaves it within per-job infrastructure.
+OADP_MI_RESOURCEGROUP="${RESOURCEGROUP}"
 OADP_MI_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-centralus}"
 
 echo "Creating managed identity ${OADP_MI_NAME} in resource group ${OADP_MI_RESOURCEGROUP}..."
@@ -276,32 +278,5 @@ EOF
 echo "Waiting for BackupStorageLocation ${CLUSTER_NAME} to be available..."
 oc wait --for=jsonpath='{.status.phase}'=Available \
   "backupstoragelocation/${CLUSTER_NAME}" -n openshift-adp --timeout=300s
-
-# Create VolumeSnapshotLocation
-# NOTE (open risk, unverified): this reuses the same Workload-Identity-shaped
-# cloud-credentials Secret, but the identity currently only holds "Storage
-# Blob Data Contributor" on the storage account. If Velero's Azure
-# volumesnapshotter plugin (as opposed to the "csi" plugin's
-# VolumeSnapshotClass path) performs ARM disk-snapshot calls with this
-# identity, it will likely need a separate role (e.g. "Disk Snapshot
-# Contributor" or "Contributor") scoped to the resource group holding the
-# guest cluster's managed disks. Verify against an actual backup/restore run;
-# add the role assignment above if AuthorizationFailed errors appear on VSL
-# snapshot operations.
-echo "Creating VolumeSnapshotLocation..."
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: VolumeSnapshotLocation
-metadata:
-  name: ${CLUSTER_NAME}
-  namespace: openshift-adp
-spec:
-  provider: azure
-  credential:
-    name: cloud-credentials
-    key: cloud
-  config:
-    resourceGroup: ${RESOURCEGROUP}
-EOF
 
 echo "OADP setup complete"

@@ -17,20 +17,24 @@ ref:
       The image to use for the hypershift OADP plugin in the DataProtectionApplication.
     default: quay.io/konveyor/hypershift-oadp-plugin:latest
   documentation: |-
-    Sets up self-managed-Azure-specific OADP prerequisites for HyperShift backup/restore
-    tests: discovers the public self-managed-Azure guest cluster, creates an Azure Storage
-    Account and Blob container in the management cluster's resource group, a
-    DataProtectionApplication, BackupStorageLocation, and VolumeSnapshotLocation.
+    Sets up OADP prerequisites on the nested management cluster for backup/restore
+    tests of a self-managed Azure hosted cluster. It reads the hosted cluster name
+    from ${SHARED_DIR}/cluster-name, creates an Azure Storage Account and Blob
+    container in the resource group recorded in ${SHARED_DIR}/azure_pls_resource_group,
+    and creates a DataProtectionApplication and BackupStorageLocation in
+    openshift-adp on the management cluster. The DPA includes the CSI plugin for
+    volume snapshots; this step does not configure an Azure VolumeSnapshotLocation.
 
-    Also provisions a single dedicated Azure User-Assigned Managed Identity used for all
-    runtime Azure Blob access, federated to both ServiceAccounts that need it:
+    Also provisions a single dedicated Azure User-Assigned Managed Identity in the
+    management cluster's per-job resource group for all runtime Azure Blob access,
+    federated to both ServiceAccounts that need it:
     system:serviceaccount:openshift-adp:velero (used by Velero's Deployment and its
     NodeAgent DaemonSet) and system:serviceaccount:hypershift:etcd-backup-job (used by the
     HyperShift Operator's HCPEtcdBackup controller, which derives its own credential by
     copying the BackupStorageLocation's credential Secret). The identity is granted
     Storage Blob Data Contributor on the backup storage account, and the
-    cloud-credentials Secret referenced by the BackupStorageLocation/VolumeSnapshotLocation
-    contains only its client ID (no client secret), so both Velero and etcd-backup
+    cloud-credentials Secret referenced by the BackupStorageLocation contains only
+    its client ID (no client secret), so both Velero and etcd-backup
     authenticate via Azure Workload Identity instead of the shared root Service Principal.
     The root Service Principal is still used, unchanged, purely for this step's own `az`
     CLI calls to provision these Azure resources.
