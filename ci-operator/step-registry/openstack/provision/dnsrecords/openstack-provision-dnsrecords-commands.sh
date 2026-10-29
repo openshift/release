@@ -43,7 +43,8 @@ EOF
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # LB_HOSTS present => multi-value api RR; else API_IP. api-int always API_IP.
+  # LB_HOSTS present => multi-value api RR; else API_IP.
+  # api-int uses LB_PRIVATE_IPS when present, else API_IP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
