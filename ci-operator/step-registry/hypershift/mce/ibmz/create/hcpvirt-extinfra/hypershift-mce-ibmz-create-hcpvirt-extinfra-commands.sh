@@ -390,14 +390,18 @@ HTTPS_PORT=$(oc --kubeconfig "${VIRT_KC}" get services -n openshift-ingress rout
 
 echo "$(date) HTTP NodePort: ${HTTP_PORT}, HTTPS NodePort: ${HTTPS_PORT}"
 
-# --- Step 6: Create LoadBalancer Service on the infra cluster ---
-echo "$(date) Creating LoadBalancer Service on infra cluster (ext-infra-vms-ns)"
+# --- Step 6: Create LoadBalancer Services on the infra cluster ---
+# Service 1 ("test-apps"): allocated from mgmt-range (matches CIS DNS *.apps for mgmt canary/console)
+# Service 2 ("test-apps-internal"): allocated from infra-range (for guest VM conformance test route access)
+echo "$(date) Creating LoadBalancer Services on infra cluster (ext-infra-vms-ns)"
 export KUBECONFIG="${SHARED_DIR}/infra-kubeconfig"
 
 oc apply -f - <<SVCEOF
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    metallb.universe.tf/address-pool: mgmt-range
   labels:
     app: test-apps
   name: test-apps
@@ -415,18 +419,33 @@ spec:
   selector:
     kubevirt.io: virt-launcher
   type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    metallb.universe.tf/address-pool: infra-range
+  labels:
+    app: test-apps-internal
+  name: test-apps-internal
+  namespace: ext-infra-vms-ns
+spec:
+  ports:
+  - name: https-443
+    port: 443
+    protocol: TCP
+    targetPort: ${HTTPS_PORT}
+  - name: http-80
+    port: 80
+    protocol: TCP
+    targetPort: ${HTTP_PORT}
+  selector:
+    kubevirt.io: virt-launcher
+  type: LoadBalancer
 SVCEOF
 
-# --- Step 5b: Wait for MetalLB EXTERNAL-IP and bypass konnectivity for ingress canary ---
-# Ingress-operator (CP on mgmt) health-checks *.apps via HTTPS_PROXY=127.0.0.1:8090
-# (konnectivity). On this OZ/libvirt+MetalLB topology, guest CoreDNS cannot reliably
-# resolve external *.apps names for the konnectivity CONNECT path, so canary times out
-# even though direct curls from mgmt CP pods succeed. Extending NO_PROXY makes canary
-# dial the LB directly and clears CanaryChecksSucceeding / ingress Degraded.
-# CPO owns deploy/ingress-operator and resets NO_PROXY to kube-apiserver only, so we
-# pause the HostedCluster afterwards to keep the workaround stable through conformance.
-# Do NOT set guest Proxy noProxy-only — that invalidates proxy.config.openshift.io.
-echo "$(date) Waiting for test-apps LoadBalancer EXTERNAL-IP"
+# --- Step 5b: Wait for MetalLB EXTERNAL-IPs and bypass konnectivity for ingress canary ---
+echo "$(date) Waiting for test-apps LoadBalancer EXTERNAL-IP (mgmt-range)"
 LB_IP=""
 for i in {1..60}; do
   LB_IP=$(oc get svc test-apps -n ext-infra-vms-ns \
@@ -443,6 +462,24 @@ if [[ -z "${LB_IP}" || "${LB_IP}" == "<pending>" ]]; then
   exit 1
 fi
 echo "$(date) test-apps EXTERNAL-IP: ${LB_IP}"
+
+echo "$(date) Waiting for test-apps-internal LoadBalancer EXTERNAL-IP (infra-range)"
+INTERNAL_LB_IP=""
+for i in {1..60}; do
+  INTERNAL_LB_IP=$(oc get svc test-apps-internal -n ext-infra-vms-ns \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+  if [[ -n "${INTERNAL_LB_IP}" && "${INTERNAL_LB_IP}" != "<pending>" ]]; then
+    break
+  fi
+  echo "$(date) test-apps-internal EXTERNAL-IP not ready yet, retrying... ($i/60)"
+  sleep 5
+done
+if [[ -z "${INTERNAL_LB_IP}" || "${INTERNAL_LB_IP}" == "<pending>" ]]; then
+  echo "$(date) ERROR: test-apps-internal never received an EXTERNAL-IP"
+  oc get svc test-apps-internal -n ext-infra-vms-ns -o yaml || true
+  exit 1
+fi
+echo "$(date) test-apps-internal EXTERNAL-IP: ${INTERNAL_LB_IP}"
 
 APPS_DOMAIN="apps.${HC_NAME}.phc-cicd.cis.ibm.net"
 CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
@@ -494,6 +531,58 @@ oc get co ingress --kubeconfig "${VIRT_KC}" || true
 oc get ingresscontroller default -n openshift-ingress-operator \
   --kubeconfig "${VIRT_KC}" \
   -o jsonpath='{.status.conditions[?(@.type=="CanaryChecksSucceeding")]}{"\n"}' || true
+
+# --- Step 5c: Override *.apps DNS in the hosted cluster CoreDNS ---
+#
+# Directs in-cluster traffic from KubeVirt guest pods to the infra-range
+# LoadBalancer ($INTERNAL_LB_IP), allowing conformance test pods to access
+# guest cluster routes directly within the infra network without crossing subnets.
+echo "$(date) --- Step 5c: Override *.apps DNS in hosted cluster CoreDNS ---"
+echo "$(date) Overriding *.${APPS_DOMAIN} → ${INTERNAL_LB_IP}"
+
+if ! oc --kubeconfig "${VIRT_KC}" get ns openshift-dns --request-timeout=15s &>/dev/null; then
+  echo "$(date) WARNING: Hosted cluster API is not reachable; skipping CoreDNS override"
+else
+  echo "$(date) Scaling down dns-operator to prevent Corefile reconciliation"
+  oc scale deployment dns-operator -n "${CP_NS}" --replicas=0 --timeout=60s || true
+
+  COREFILE_ORIG=$(oc --kubeconfig "${VIRT_KC}" get configmap dns-default \
+    -n openshift-dns -o jsonpath='{.data.Corefile}' --request-timeout=15s 2>/dev/null || true)
+
+  if [[ -z "${COREFILE_ORIG}" ]]; then
+    echo "$(date) WARNING: Failed to retrieve dns-default Corefile; skipping CoreDNS override"
+  else
+    cat > /tmp/Corefile <<DNSEOF
+${COREFILE_ORIG}
+
+${APPS_DOMAIN}:5353 {
+    template IN A ${APPS_DOMAIN} {
+        answer "{{ .Name }} 60 IN A ${INTERNAL_LB_IP}"
+    }
+}
+DNSEOF
+
+    oc --kubeconfig "${VIRT_KC}" create configmap dns-default \
+      -n openshift-dns \
+      --from-file=Corefile=/tmp/Corefile \
+      --dry-run=client -o yaml | \
+      oc --kubeconfig "${VIRT_KC}" apply -f - || true
+
+    oc --kubeconfig "${VIRT_KC}" delete pods -n openshift-dns \
+      -l dns.operator.openshift.io/daemonset-dns=default --wait=false || true
+    echo "$(date) Waiting for CoreDNS pods to restart"
+    sleep 15
+    oc --kubeconfig "${VIRT_KC}" wait pods -n openshift-dns \
+      -l dns.operator.openshift.io/daemonset-dns=default \
+      --for=condition=Ready --timeout=120s || true
+
+    echo "$(date) Verifying CoreDNS Corefile contains apps override:"
+    oc --kubeconfig "${VIRT_KC}" get configmap dns-default -n openshift-dns \
+      -o jsonpath='{.data.Corefile}' 2>/dev/null | grep -A3 "template IN A" || true
+
+    echo "$(date) DNS override complete — *.${APPS_DOMAIN} now resolves to ${INTERNAL_LB_IP}"
+  fi
+fi
 
 # --- Step 6: Wait for all guest cluster ClusterOperators to be Available ---
 echo "$(date) Waiting for all ClusterOperators to be Available"

@@ -204,44 +204,57 @@ metadata:
   namespace: metallb-system
 EOF
 
-echo "Configure IPAddressPool"
+echo "Configure IPAddressPools"
 
-# Resolve the IP address pool range.
-# Priority:
-#   1. METALLB_MGMT_IPS env var, if explicitly set by the caller.
-#   2. A default derived from the cluster/environment (extend this if-block
-#      as new environments are added).
+# Resolve mgmt-range IP address pool (for management cluster access)
 if [[ -n "${METALLB_MGMT_IPS_INFRA:-}" ]]; then
-  IP_POOL="${METALLB_MGMT_IPS_INFRA}"
+  MGMT_IP_POOL="${METALLB_MGMT_IPS_INFRA}"
 elif [[ -f "${SHARED_DIR}/METALLB_MGMT_IPS_INFRA" ]]; then
-  IP_POOL="$(cat "${SHARED_DIR}/METALLB_MGMT_IPS_INFRA")"
-  echo "  Loaded IP pool from SHARED_DIR: ${IP_POOL}"
+  MGMT_IP_POOL="$(cat "${SHARED_DIR}/METALLB_MGMT_IPS_INFRA")"
+  echo "  Loaded mgmt IP pool from SHARED_DIR: ${MGMT_IP_POOL}"
 else
-  # Auto-detect the IP subnet from the first node's INTERNAL-IP reported by
-  # 'oc get no -o wide', then pick the matching pool range.
+  MGMT_IP_POOL="192.168.2.54-192.168.2.54"
+fi
+
+# Resolve infra-range IP address pool (for KubeVirt VM / intra-infra access)
+if [[ -n "${METALLB_INFRA_IPS_INFRA:-}" ]]; then
+  INFRA_IP_POOL="${METALLB_INFRA_IPS_INFRA}"
+elif [[ -f "${SHARED_DIR}/METALLB_INFRA_IPS_INFRA" ]]; then
+  INFRA_IP_POOL="$(cat "${SHARED_DIR}/METALLB_INFRA_IPS_INFRA")"
+  echo "  Loaded infra IP pool from SHARED_DIR: ${INFRA_IP_POOL}"
+else
   NODE_IP=$(oc get nodes -o wide --no-headers 2>/dev/null \
     | awk '{print $6}' | grep -v '^$' | head -1)
   echo "  Detected node IP: ${NODE_IP}"
   if [[ "${NODE_IP}" == 192.168.2.* ]]; then
-    IP_POOL="192.168.2.54-192.168.2.54"
+    INFRA_IP_POOL="192.168.2.54-192.168.2.54"
   else
-    IP_POOL="192.168.3.54-192.168.3.54"
+    INFRA_IP_POOL="192.168.3.54-192.168.3.54"
   fi
 fi
-echo "  IPAddressPool range: ${IP_POOL}"
+
+echo "  mgmt-range IPAddressPool:  ${MGMT_IP_POOL}"
+echo "  infra-range IPAddressPool: ${INFRA_IP_POOL}"
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-  name: metallb
+  name: mgmt-range
   namespace: metallb-system
 spec:
   addresses:
-  - ${IP_POOL}
-EOF
-
-oc create -f - <<EOF
+  - ${MGMT_IP_POOL}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: infra-range
+  namespace: metallb-system
+spec:
+  addresses:
+  - ${INFRA_IP_POOL}
+---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
@@ -249,7 +262,8 @@ metadata:
   namespace: metallb-system
 spec:
   ipAddressPools:
-   - metallb
+  - mgmt-range
+  - infra-range
 EOF
 
 # ── Wait up to 2 minutes for all pods in metallb-system to be Running/Ready ──
