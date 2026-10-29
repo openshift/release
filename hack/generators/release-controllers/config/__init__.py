@@ -41,6 +41,8 @@ class RCPaths:
         self.path_rc_rpms = [
             self.path_base.joinpath('clusters/build-clusters/build-shared/release-controller'),
             self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
+            # ART's sync-ci-images BuildConfigs run in the ci namespace on app.ci and fetch repos from base-X-Y-rhelN.ocp.svc
+            self.path_base.joinpath('clusters/app.ci/rpm-mirrors'),
         ]
 
         # CRT Resources
