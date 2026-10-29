@@ -731,6 +731,24 @@ ensure_localnet_multi_worker_networking() {
   return 0
 }
 
+# Block until the SCC controller has annotated a freshly created namespace.
+# Applying a pod before openshift.io/sa.scc.uid-range exists is rejected by
+# admission with "unable to find annotation openshift.io/sa.scc.uid-range",
+# which under set -e kills the step.
+wait_for_ns_scc_annotations() {
+  local ns="$1" i
+  echo "Waiting for SCC annotations on namespace ${ns}..."
+  for i in $(seq 1 60); do
+    if [[ -n "$(oc get ns "${ns}" \
+         -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null)" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "WARNING: namespace ${ns} still has no openshift.io/sa.scc.uid-range after 120s; continuing"
+  return 0
+}
+
 # patch_localnet_multi_vm_dns_policy patches VMs with dnsPolicy=None and explicit
 # nameservers so KubeVirt's bridge DHCP serves correct DNS to guest VMs.
 #
@@ -772,6 +790,80 @@ patch_localnet_multi_vm_dns_policy() {
     fi
   done
   return $(( patched >= expected_count ? 0 : 1 ))
+}
+
+# Is CNV's l2bridge network binding plugin registered on this cluster?
+localnet_multi_l2bridge_available() {
+  [[ -n "$(oc get kubevirt -n openshift-cnv \
+      -o jsonpath='{.items[0].spec.configuration.network.binding.l2bridge}' 2>/dev/null)" ]]
+}
+
+# patch_localnet_multi_vm_l2bridge switches VM interfaces from KubeVirt's default
+# "bridge" binding to the l2bridge plugin, and re-rolls any VMI still running on
+# the old binding.
+#
+# With bridge binding KubeVirt moves the pod interface's address onto a bridge it
+# owns and runs its own DHCP server inside virt-launcher on a link-local address.
+# That server always beats OVN's (it is local to the pod) and it builds its reply
+# from the pod's own configuration: the address and, since the dnsPolicy=None
+# patch above, the DNS come out right, but the pod interface carries no default
+# route, so the lease has no routers option. The guest then comes up with no
+# gateway, nodeip-configuration cannot determine a node IP, kubelet never starts
+# and the node never joins.
+#
+# l2bridge (domainAttachmentType=managedTap) attaches the VM at layer 2 without
+# taking over addressing, so no DHCP server is started in the pod and the guest
+# leases directly from OVN, whose options do include router. Verified on a live
+# cluster: with bridge the guest gets server_identifier=169.254.75.10 and no
+# routers; with l2bridge it gets server_identifier=192.168.111.1 and
+# routers=192.168.111.1.
+#
+# HyperShift's KubevirtNetwork API exposes only a NAD name, so the binding cannot
+# be requested at VM-creation time and has to be patched in afterwards. Re-rolling
+# costs one extra boot per VM and must happen before OVN DHCP options are attached
+# to the logical switch ports, since a re-roll creates fresh ports.
+patch_localnet_multi_vm_l2bridge() {
+  local ns="$1"
+  local expected_count="$2"
+  local vm new_ifaces converted=0
+
+  for vm in $(oc get vm -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vm}" ]] && continue
+
+    # Already converted? No interface left carrying a "bridge" binding.
+    if [[ -z "$(oc get vm "${vm}" -n "${ns}" \
+         -o jsonpath='{.spec.template.spec.domain.devices.interfaces[?(@.bridge)].name}' 2>/dev/null)" ]]; then
+      converted=$((converted + 1))
+    else
+      new_ifaces=$(oc get vm "${vm}" -n "${ns}" -o json 2>/dev/null | python3 -c "
+import json, sys
+vm = json.load(sys.stdin)
+ifaces = vm['spec']['template']['spec']['domain']['devices']['interfaces']
+for i in ifaces:
+    i.pop('bridge', None)
+    i['binding'] = {'name': 'l2bridge'}
+print(json.dumps(ifaces))
+" 2>/dev/null) || continue
+      [[ -z "${new_ifaces}" ]] && continue
+      if oc patch vm "${vm}" -n "${ns}" --type=merge \
+           -p "{\"spec\":{\"template\":{\"spec\":{\"domain\":{\"devices\":{\"interfaces\":${new_ifaces}}}}}}}" >/dev/null 2>&1; then
+        echo "  Patched VM ${vm} interfaces to the l2bridge binding"
+        converted=$((converted + 1))
+      else
+        echo "  WARNING: failed to patch VM ${vm} to l2bridge"
+        continue
+      fi
+    fi
+
+    # Re-roll a VMI still running on the old binding so it picks up the new one.
+    if [[ -n "$(oc get vmi "${vm}" -n "${ns}" \
+         -o jsonpath='{.spec.domain.devices.interfaces[?(@.bridge)].name}' 2>/dev/null)" ]]; then
+      echo "  Re-rolling VMI ${vm} (still running with the bridge binding)"
+      oc delete vmi "${vm}" -n "${ns}" --wait=false >/dev/null 2>&1 || true
+    fi
+  done
+
+  return $(( converted >= expected_count ? 0 : 1 ))
 }
 
 if [[ ! -f $HCP_CLI ]]; then
@@ -1217,6 +1309,28 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
     sleep 5
   done
 
+  # Switch the VMs off KubeVirt's bridge binding so OVN's DHCP — which does carry
+  # a router option — is the only DHCP server the guests can see. This has to run
+  # before the DHCP options are attached to the logical switch ports below,
+  # because re-rolling a VMI creates fresh ports with no options on them.
+  if localnet_multi_l2bridge_available; then
+    echo "Switching VM interfaces to the l2bridge binding (suppresses KubeVirt's in-pod DHCP server)..."
+    for l2b_attempt in $(seq 1 60); do
+      if patch_localnet_multi_vm_l2bridge "${MULTI_NAMESPACE}" "${HYPERSHIFT_NODE_COUNT}"; then
+        echo "All VMs on the l2bridge binding (attempt ${l2b_attempt})"
+        break
+      fi
+      if [[ $((l2b_attempt % 12)) -eq 0 ]]; then
+        echo "  l2bridge patching: waiting for VMs... (attempt ${l2b_attempt}/60)"
+      fi
+      sleep 5
+    done
+  else
+    echo "WARNING: CNV l2bridge network binding not registered on this cluster;"
+    echo "         leaving the default bridge binding. KubeVirt's in-pod DHCP server"
+    echo "         will answer the guests and its lease carries no router option."
+  fi
+
   # Poll for virt-launcher pods and configure OVN DHCP on those worker nodes before
   # the VM's first DHCP request. Per-node ovn-nbctl works on standalone and INTERCONNECT modes.
   echo "Waiting for virt-launcher pods so we can configure OVN DHCP before VM first boot..."
@@ -1514,6 +1628,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
   oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
   oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  wait_for_ns_scc_annotations "${IPECHO_NAMESPACE}"
 
   # Create a localnet NAD in the ip-echo namespace (same config as the hosted cluster namespace)
   oc apply -f - <<IPECHO_NAD_EOF
@@ -1571,6 +1686,7 @@ elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
   echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
   oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
   oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
+  wait_for_ns_scc_annotations "${IPECHO_NAMESPACE}"
 
   # Create a primary localnet NAD in the ip-echo namespace
   IPECHO_EXCLUDE=""
