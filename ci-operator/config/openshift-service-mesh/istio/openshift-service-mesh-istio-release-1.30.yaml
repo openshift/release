@@ -30,6 +30,27 @@ tests:
     export XDG_CACHE_HOME="/tmp/cache"
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
+    # istio.deps is merged semantically: take upstream's file but keep our own
+    # proxy and ztunnel pins. Everything else, agentgateway included, follows
+    # upstream. Scoped to istio.deps so every other file merges normally.
+    cat > /tmp/merge-istio-deps.sh <<'EOF'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    merged=$(mktemp)
+    trap 'rm -f "${merged}"' EXIT
+    jq -e --slurpfile ours "$1" '
+      ($ours[0] | map(select(.name == "PROXY_REPO_SHA" or .name == "ZTUNNEL_REPO_SHA"))
+        | map({key: .name, value: .lastStableSHA}) | from_entries) as $pins
+      | map(if $pins[.name] then .lastStableSHA = $pins[.name] else . end)
+    ' "$2" > "${merged}"
+    cat "${merged}" > "$1"
+    EOF
+    chmod +x /tmp/merge-istio-deps.sh
+    echo 'istio.deps merge=istio-deps' > /tmp/gitattributes
+    export GIT_CONFIG_GLOBAL=/tmp/gitconfig
+    git config --global core.attributesFile /tmp/gitattributes
+    git config --global merge.istio-deps.name 'keep downstream proxy and ztunnel pins'
+    git config --global merge.istio-deps.driver '/tmp/merge-istio-deps.sh %A %B'
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=istio \
@@ -40,7 +61,8 @@ tests:
     --modifier=merge_upstream_istio_1.30 \
     --merge-repository=https://github.com/istio/istio \
     --merge-branch=release-1.30 \
-    --merge-strategy=merge
+    --merge-strategy=merge \
+    --merge-failure-pr
   container:
     from: src
   cron: 00 05 * * 1-5
