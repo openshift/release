@@ -11,8 +11,6 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 export_env_vars_from_json 'generate_report' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 export_env_vars_from_json 'splunk' "${REPORTING_SETTINGS:-}" "${REPORTING_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
-setup_continue_on_fail
-setup_debug_on_fail
 
 # Generate a telco-kpis Markdown report for a spoke cluster.
 # Aggregates test artifacts, optionally publishes to a git repo
@@ -21,6 +19,9 @@ setup_debug_on_fail
 _yaml_quote() { local v="${1//\\/\\\\}"; v="${v//\"/\\\"}"; printf '%s' "$v"; }
 
 main() {
+    # Install unified exit handler (handles CONTINUE_ON_FAIL, DEBUG_ON_FAIL, and cleanup)
+    setup_telco_kpis_exit_handler
+
     [[ $- == *x* ]] && _was_tracing=true || _was_tracing=false
 
     # Normalize and validate the publication mode early. Assigning the default
@@ -68,8 +69,12 @@ main() {
     # If rotating splunk_hec_token or git_repo_token, also update the
     # hypervisor vaults (teams/telco-kpis/hypervisors/) to keep Jenkins in sync.
     SENSITIVE_VARS_FILE=$(mktemp /tmp/sensitive-vars-XXXXXX.yml)
-    _cleanup_sensitive_vars() { rm -f "${SENSITIVE_VARS_FILE}"; }
-    add_exit_handler _cleanup_sensitive_vars
+    _cleanup_sensitive_vars() {
+        if [[ -f "${SENSITIVE_VARS_FILE}" ]]; then
+            rm -f "${SENSITIVE_VARS_FILE}"
+        fi
+    }
+    add_cleanup_handler _cleanup_sensitive_vars
     echo "---" > "${SENSITIVE_VARS_FILE}"
 
     SPLUNK_FLAG=()
