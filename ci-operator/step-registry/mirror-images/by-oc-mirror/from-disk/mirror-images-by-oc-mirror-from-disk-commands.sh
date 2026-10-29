@@ -510,34 +510,38 @@ ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
 # environment variables that are not inherited by the bash heredoc.
 # ---------------------------------------------------------------------------
 echo "=== Post-cleanup proxy-path check ==="
+# Disable tracing before reading proxy_public_url — the file contains credentials
+# (http://user:password@host:port).  Capture state once and reuse it on all paths.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 BASTION_PROXY_URL=""
 if [[ -f "${SHARED_DIR}/proxy_public_url" ]]; then
     BASTION_PROXY_URL=$(cat "${SHARED_DIR}/proxy_public_url")
 fi
 if [[ -z "${BASTION_PROXY_URL}" ]]; then
+    $WAS_TRACING && set -x
     echo "WARNING: SHARED_DIR/proxy_public_url not found — skipping proxy-path check"
 else
     ENDPOINT="https://servicequotas.us-west-2.amazonaws.com"
-    # Disable tracing before logging the proxy URL — it contains credentials.
-    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-    set +x
     # Log a redacted form: strip user:password@ from http(s)://user:pass@host:port
     PROXY_REDACTED=$(sed -E 's|^(https?://)([^@]+@)?|\1<redacted>@|' <<<"${BASTION_PROXY_URL}")
+    $WAS_TRACING && set -x
     echo "Proxy: ${PROXY_REDACTED}"
     echo "Endpoint: ${ENDPOINT}"
+    set +x
     if ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
             "curl --proxy '${BASTION_PROXY_URL}' --noproxy '' \
              -m 15 --silent --output /dev/null --write-out 'HTTP %{http_code}\n' \
              '${ENDPOINT}'"; then
+        $WAS_TRACING && set -x
         echo "PASS: ${ENDPOINT} reachable through bastion proxy"
     else
+        $WAS_TRACING && set -x
         echo "FAIL: ${ENDPOINT} not reachable — isolation rules may still be active"
         ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
             "sudo iptables -L OUTPUT -n -v; sudo ip6tables -L OUTPUT -n -v" || true
-        $WAS_TRACING && set -x
         exit 1
     fi
-    $WAS_TRACING && set -x
 fi
 echo "Post-cleanup proxy-path check passed."
 
