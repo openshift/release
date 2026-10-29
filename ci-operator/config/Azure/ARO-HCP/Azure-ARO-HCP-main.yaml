@@ -96,8 +96,7 @@ images:
   - build_args:
     - name: PLATFORM
       value: linux/amd64
-    context_dir: tooling
-    dockerfile_path: aro-hcp-exporter/Dockerfile
+    dockerfile_path: tooling/aro-hcp-exporter/Dockerfile
     to: aro-hcp-exporter
   - build_args:
     - name: PLATFORM
@@ -113,7 +112,7 @@ images:
       USER root
       COPY /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-      ENV GOFLAGS='-mod=readonly'
+      ENV GOFLAGS='-mod=vendor'
       ENV GOSUMDB=off
       RUN make -C tooling/templatize templatize && \
           go clean -cache -modcache && rm -f go.work.sum
@@ -131,7 +130,7 @@ images:
   - dockerfile_literal: |
       FROM src
       USER root
-      ENV GOFLAGS='-mod=readonly'
+      ENV GOFLAGS='-mod=vendor'
       # Install official Node.js binary from nodejs.org (pinned version)
       RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
           tar -xJ -C /usr/local --strip-components=1 && \
