@@ -12,9 +12,8 @@ build_root:
 images:
   items:
   # The gcp-hcp-infra checkout (src) as a named image for the gcp-hcp e2e steps.
-  # Not promoted: component repository jobs (e.g. gecko) map gcp-hcp-infra-src to
-  # the gcp-hcp-infra-base tools image and clone gcp-hcp-infra at runtime, so no
-  # gcp-hcp-infra source is published.
+  # Promoted only to the gcp-hcp namespace, which only the team can pull from, for
+  # component repository jobs (e.g. gecko) that run the gcp-hcp e2e workflow.
   - dockerfile_literal: FROM src
     from: src
     to: gcp-hcp-infra-src
@@ -32,6 +31,14 @@ promotion:
     excluded_images:
     - '*'
     namespace: ci
+    tag: latest
+  - additional_images:
+      gcp-hcp-e2e-tests: gcp-hcp-e2e-tests
+      gcp-hcp-firestore-tests: gcp-hcp-firestore-tests
+      gcp-hcp-infra-src: gcp-hcp-infra-src
+    excluded_images:
+    - '*'
+    namespace: gcp-hcp
     tag: latest
 prowgen:
   disable_sparse_checkout: true
