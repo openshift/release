@@ -1,0 +1,42 @@
+# this is the Namespace in which GCP HCP CI images live. They are built from
+# private repositories (e.g. openshift-online/gcp-hcp-infra), so unlike most
+# team namespaces, pulling is limited to the GCP HCP team; ci-operator imports
+# them into jobs without these bindings.
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Published CI images for GCP HCP
+    openshift.io/display-name: GCP HCP CI
+  name: gcp-hcp
+---
+# this adds the team as viewers of the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcp-hcp-viewer-binding
+  namespace: gcp-hcp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: gcp-hcp-eng # an existing Rover group
+---
+# this grants the team rights to pull images, e.g. to debug a job locally.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcp-hcp-image-puller-binding
+  namespace: gcp-hcp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: gcp-hcp-eng # an existing Rover group
