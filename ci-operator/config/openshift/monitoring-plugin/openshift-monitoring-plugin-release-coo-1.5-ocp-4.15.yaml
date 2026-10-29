@@ -40,6 +40,26 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- always_run: false
+  as: e2e-perses-coo15
+  optional: true
+  reporter_config:
+    channel: '#observability-ui-qe'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> | <https://github.com/openshift/monitoring-plugin/pull/{{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}|View PR> :rainbow: {{else}} :volcano:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      | <https://github.com/openshift/monitoring-plugin/pull/{{with index .Spec.Refs.Pulls
+      0}}{{.Number}}{{end}}|View PR> :volcano: {{end}}'
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - ref: monitoring-plugin-tests-perses-ui-coo15
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-coo-1.5-ocp-4.15
   org: openshift
