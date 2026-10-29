@@ -1,0 +1,42 @@
+ref:
+  as: openshift-kubernetes-e2e-node-test
+  from: src
+  commands: openshift-kubernetes-e2e-node-test-commands.sh
+  timeout: 4h0m0s
+  grace_period: 15m
+  env:
+  - name: NODE_E2E_FOCUS
+    default: '\[NodeConformance\]'
+    documentation: |-
+      Ginkgo focus regexp selecting the test/e2e_node tests to run (FOCUS for `make test-e2e-node`).
+  - name: NODE_E2E_SKIP
+    default: '\[Flaky\]|\[Slow\]|\[Serial\]'
+    documentation: |-
+      Ginkgo skip regexp (SKIP for `make test-e2e-node`). Defaults to the upstream skip list.
+  - name: NODE_E2E_PARALLELISM
+    default: "8"
+    documentation: |-
+      Number of ginkgo processes. Use 1 when focusing on [Serial] tests.
+  - name: NODE_E2E_TIMEOUT
+    default: "3h"
+    documentation: |-
+      Overall test timeout on the remote host, as a Go duration.
+  - name: NODE_E2E_TEST_ARGS
+    default: "--kubelet-flags=\"--cgroup-driver=systemd --cgroup-root=/ --cgroups-per-qos=true --runtime-cgroups=/system.slice/crio.service\""
+    documentation: |-
+      Extra arguments passed to e2e_node.test (TEST_ARGS for `make test-e2e-node`).
+  - name: CRIO_REF
+    default: main
+    documentation: |-
+      Branch or tag of github.com/cri-o/cri-o to build and install on the test host.
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
+    limits:
+      memory: 12Gi
+  documentation: |-
+    Installs CRI-O on the VM created by gcp-crio-provision-buildhost, then runs
+    `make test-e2e-node REMOTE=true REMOTE_MODE=ssh` from the openshift/kubernetes source under test.
+    The upstream remote runner builds kubelet and e2e_node.test locally, copies them to the VM, runs the
+    suite there and copies JUnit results and logs back into the step artifacts.

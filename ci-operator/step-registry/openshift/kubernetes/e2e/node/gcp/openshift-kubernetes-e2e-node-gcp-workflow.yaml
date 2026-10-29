@@ -1,0 +1,17 @@
+workflow:
+  as: openshift-kubernetes-e2e-node-gcp
+  steps:
+    pre:
+      - ref: gcp-crio-provision-vpc
+      - ref: gcp-crio-provision-buildhost
+    test:
+      - ref: openshift-kubernetes-e2e-node-test
+    post:
+      - ref: gcp-crio-deprovision-buildhost
+      - ref: gcp-crio-deprovision-vpc
+    env:
+      IMAGE_FAMILY: "crio-setup"
+      IMAGE_PROJECT: "openshift-node-devel"
+  documentation: |-
+    The Kubernetes node E2E workflow provisions a single GCP VM (no OpenShift cluster), installs CRI-O on
+    it, and runs test/e2e_node built from the openshift/kubernetes fork against it over SSH.
