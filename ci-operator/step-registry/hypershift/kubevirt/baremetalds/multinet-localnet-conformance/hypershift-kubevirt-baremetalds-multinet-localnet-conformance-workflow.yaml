@@ -25,7 +25,14 @@ workflow:
       CLOUD_PROVIDER: "kubevirt"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.20
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      # IP_STACK describes the management cluster, which DEVSCRIPTS_CONFIG installs
+      # as dual-stack.  The hosted cluster is IPv4-only: the localnet NADs carry no
+      # IPv6 subnet, so a guest never receives a second address family.  Without
+      # HOSTED_IP_STACK the guest is given dual-stack CIDRs and nodeip-configuration
+      # blocks forever on "Dual-stack cluster: still waiting for both address
+      # families", so kubelet never starts and no node joins.
       IP_STACK: v4v6
+      HOSTED_IP_STACK: v4
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
