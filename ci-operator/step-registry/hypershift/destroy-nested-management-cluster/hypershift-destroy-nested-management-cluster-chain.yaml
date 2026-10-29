@@ -1,49 +1,7 @@
 chain:
   as: hypershift-destroy-nested-management-cluster
   steps:
-  - as: dump-management-cluster
-    optional_on_success: true
-    cli: latest
-    env:
-    - name: HYPERSHIFT_NAMESPACE
-      default: "clusters"
-      documentation: "The Namespace where to create the HostedCluster and NodePools"
-    - name: CLOUD_PROVIDER
-      default: "AWS"
-      documentation: "The cloud provider of the cluster."
-    commands: |-
-      # Set cloud-specific kubeconfig
-      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
-        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
-      else
-        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      fi
-
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-10)-mgmt"
-      mkdir -p "${ARTIFACT_DIR}/output"
-      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
-
-      # Azure dump logs trigger leaktk/gcs-filter censoring of tarballs; skip tarring for Azure
-      # so individual files upload directly and only the sensitive ones get censored
-      if [[ "${CLOUD_PROVIDER}" != "Azure" ]]; then
-        tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
-        rm -rf "${ARTIFACT_DIR}/output"
-      fi
-    credentials:
-    - mount_path: /etc/hypershift-kubeconfig
-      group: ops/clusters/hypershift-ci-2
-      collection: hypershift-team
-    - mount_path: /etc/hypershift-kubeconfig-azure
-      group: ops/clusters/azure-hypershift-ci
-      collection: hypershift-team
-    from_image:
-      namespace: hypershift
-      name: hypershift-operator
-      tag: latest
-    grace_period: 15m0s
-    resources:
-      requests:
-        cpu: 100m
+  - ref: hypershift-destroy-nested-management-cluster-dump-management-cluster
   - ref: hypershift-dump-extra
   - as: destroy-management-cluster
     cli: latest
