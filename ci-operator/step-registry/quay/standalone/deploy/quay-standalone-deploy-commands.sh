@@ -507,7 +507,7 @@ start_node() {
         < "${workdir}/pull-auth.json"
     on_host "${public_ip}" "sudo podman pull -q --authfile /etc/quay-standalone/pull-auth.json $(printf '%q' "${app_image}"); \
         pulled=\$?; sudo rm -f /etc/quay-standalone/pull-auth.json; [ \$pulled -eq 0 ] \
-        && sudo podman run -d --name quay -p 8443:8443 -v ${config_dir}:/conf/stack:Z $(printf '%q' "${app_image}")"
+        && sudo podman run -d --name quay -p 8443:8443 -v ${config_dir}:/conf/stack:z $(printf '%q' "${app_image}")"
 }
 
 wait_node_healthy() {
@@ -544,13 +544,12 @@ for index in 1 2; do
     wait_node_healthy "node $((index + 1)) (${instance_id})" "${public_ip}"
 done
 
-# The registry container runs no mirror worker. Mirror mode runs the
-# migrations too, so it starts once Quay has run them; the workers share the
-# DB, and one per node outlives failover stopping a node. The image is local.
+# The registry container runs no mirror worker; one per node so a worker
+# outlives failover stopping a node.
 for index in 0 1 2; do
     read -r instance_id public_ip _ <<< "${nodes[${index}]}"
     echo "Starting the Quay mirror worker on node $((index + 1)) (${instance_id})..."
-    on_host "${public_ip}" "sudo podman run -d --name quay-mirror -v ${config_dir}:/conf/stack:Z $(printf '%q' "${app_image}") repomirror"
+    on_host "${public_ip}" "sudo podman run -d --name quay-mirror -v ${config_dir}:/conf/stack:z $(printf '%q' "${app_image}") repomirror-nomigrate"
 done
 
 wait_targets "${target_group_arn}" 3 NLB
