@@ -1,0 +1,34 @@
+chain:
+  as: hypershift-etcd-perf
+  steps:
+  - ref: hypershift-enable-user-workload-monitoring
+  - ref: hypershift-hcp-metrics-endpoint
+  - ref: openshift-qe-etcd-density-annotation-churn
+  documentation: |-
+    Runs a kube-burner-ocp "etcd-density" workload against a HyperShift hosted
+    cluster and collects the hosted control plane's etcd and kube-apiserver
+    metrics from the management cluster.
+
+    The chain is three steps because each of them is useful on its own:
+
+    - hypershift-enable-user-workload-monitoring turns on the monitoring the
+      hosted control plane namespace needs to be scraped at all.
+    - hypershift-hcp-metrics-endpoint points kube-burner at the management
+      cluster's Thanos, with the query set taken from e2e-benchmarking.
+    - openshift-qe-etcd-density-annotation-churn is the perf and scale team's
+      own workload step, used unmodified, so the HCP numbers and the standalone
+      OpenShift numbers come from the same workload definition.
+
+    Shard topologies are not compared by the chain. Comparison is done by
+    running it twice, once against a hosted cluster created with
+    HYPERSHIFT_ETCD_SHARDS and once without, and diffing the two result sets.
+
+    Other etcd-density variants (crashloop-flood, db-quota-pressure,
+    event-storm) are added by swapping the last ref, one variant per pull
+    request. db-quota-pressure already has an openshift-qe step; the other two
+    do not yet.
+
+    Requires a hosted cluster to already exist, i.e. the hypershift-aws-create
+    chain or an equivalent must have run and written
+    ${SHARED_DIR}/cluster-name, ${SHARED_DIR}/nested_kubeconfig and
+    ${SHARED_DIR}/management_cluster_kubeconfig.
