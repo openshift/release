@@ -28,7 +28,7 @@ if [[ -z "${NODE_IP}" ]]; then
   exit 1
 fi
 
-echo "Detected infra node IP: ${NODE_IP}"
+echo "Detected mgmt node IP: ${NODE_IP}"
 
 if [[ "${NODE_IP}" == 192.168.126.* ]]; then
   MGMT_IPS="192.168.126.53-192.168.126.53"
