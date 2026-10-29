@@ -38,11 +38,11 @@ group membership and the proxy-generated identity before activation. No anonymou
 access or bearer-token delegation is configured. Browser OAuth evaluates the SAR
 using the user's identity; the ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
 
-The proxy session expires after one hour, requiring a new login and Service SAR.
-Service access is checked at login, not on every request, so revoking that
-permission can leave an existing session usable for up to one hour. Cookie refresh
-stays disabled to keep that limit fixed. Group and Service-permission changes
-govern operator access. Verify revocation with a new login after the existing
+The proxy session expires after twelve hours, covering an operator shift before
+requiring a new login and Service SAR. Service access is checked at login, not on
+every request, so revoking that permission can leave an existing session usable
+for up to twelve hours. Cookie refresh stays disabled to keep that limit fixed.
+Group and Service-permission changes govern operator access. Verify revocation with a new login after the existing
 session expires.
 
 The backend listens on port 8080 for pod health probes. `/healthz` is process
