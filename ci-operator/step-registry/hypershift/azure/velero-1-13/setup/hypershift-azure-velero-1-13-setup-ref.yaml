@@ -1,0 +1,37 @@
+ref:
+  as: hypershift-azure-velero-1-13-setup
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  commands: hypershift-azure-velero-1-13-setup-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    group: ops/hypershift-ci-jobs-azurecreds
+    collection: hypershift-team
+  env:
+  - name: KUBECONFIG
+    default: ${SHARED_DIR}/management_cluster_kubeconfig
+    documentation: Management cluster kubeconfig. ARO jobs override this with the ARO kubeconfig.
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: Use the HyperShift Azure service principal instead of the cluster profile credentials.
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: eastus
+    documentation: Azure region of the management cluster and backup storage account.
+  - name: OADP_HYPERSHIFT_PLUGIN_IMAGE
+    default: quay.io/konveyor/hypershift-oadp-plugin:latest
+    documentation: HyperShift plugin image to install into standalone Velero.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  timeout: 30m
+  grace_period: 5m
+  documentation: |-
+    Creates an Azure Blob backup location and installs standalone Velero 1.13
+    with Azure Blob and disk snapshot support and the HyperShift plugin on an
+    AKS or ARO management cluster. The workflow deletes the resource group after use.

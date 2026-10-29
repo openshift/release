@@ -1,0 +1,33 @@
+workflow:
+  as: hypershift-azure-aro-velero-1-13
+  documentation: |-
+    Creates an ARO OpenShift management cluster, installs HyperShift, creates
+    an Azure hosted cluster, and verifies full HostedCluster backup and restore
+    with standalone Velero 1.13, including Azure volume snapshots.
+  steps:
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - ref: aro-provision-cluster
+    - ref: hypershift-azure-aro-save-management-name
+    - ref: hypershift-install
+    - chain: hypershift-azure-create
+    test:
+    - ref: hypershift-azure-velero-1-13-setup
+    - chain: hypershift-e2e-velero-1-13
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-azure-destroy
+    - ref: hypershift-azure-aro-restore-management-name
+    - ref: aro-deprovision
+    env:
+      CLOUD_PROVIDER: Azure
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      LOCATION: centralus
+      KUBECONFIG: ${SHARED_DIR}/kubeconfig
+      HYPERSHIFT_BASE_DOMAIN: ci.azure.devcluster.openshift.com
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: sm.hcp-sm-azure.azure.devcluster.openshift.com
+      USE_HYPERSHIFT_AZURE_CREDS: "false"
+      HYPERSHIFT_NODE_COUNT: "3"

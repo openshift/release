@@ -1,0 +1,32 @@
+chain:
+  as: hypershift-e2e-velero-1-13
+  steps:
+  - as: tests
+    cli: latest
+    from: hypershift-tests
+    commands: |-
+      set -euo pipefail
+      if [[ ! -f "${KUBECONFIG}" && -f "${SHARED_DIR}/kubeconfig" ]]; then
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+      fi
+      export PATH="/hypershift/bin:${PATH}"
+      export E2E_HOSTED_CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+      export E2E_HOSTED_CLUSTER_NAMESPACE=${E2E_HOSTED_CLUSTER_NAMESPACE:-clusters}
+      export E2E_HYPERSHIFT_OADP_PLUGIN_IMAGE=${OADP_HYPERSHIFT_PLUGIN_IMAGE}
+      test-backuprestore --ginkgo.v --e2e.junit-report="${ARTIFACT_DIR}/junit_velero_1_13_report.xml" --ginkgo.label-filter="velero-1-13" --ginkgo.fail-on-empty=true --ginkgo.fail-fast=true --ginkgo.timeout=2h --ginkgo.no-color=true
+    env:
+    - name: KUBECONFIG
+      default: ${SHARED_DIR}/management_cluster_kubeconfig
+      documentation: Management cluster kubeconfig; ARO jobs override it.
+    - name: E2E_HOSTED_CLUSTER_NAMESPACE
+      default: clusters
+      documentation: Namespace of the hosted cluster under test.
+    - name: OADP_HYPERSHIFT_PLUGIN_IMAGE
+      default: quay.io/konveyor/hypershift-oadp-plugin:latest
+      documentation: Expected HyperShift plugin image in the Velero pod.
+    timeout: 2h30m
+    grace_period: 5m
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
