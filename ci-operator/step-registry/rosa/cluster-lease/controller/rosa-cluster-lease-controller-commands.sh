@@ -9,58 +9,24 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
-initialize_reports() {
-    REPORT="${ARTIFACT_DIR}/controller-report.txt"
-    AUTH_REPORT="${ARTIFACT_DIR}/controller-auth.jsonl"
-    echo "Lease Controller Report - $(date -u)" > "${REPORT}"
-    echo "======================================" >> "${REPORT}"
-    : > "${AUTH_REPORT}"
-}
-
-auth_diagnostic() {
-    local operation="$1" environment="$2" attempt="$3" exit_code="$4" failure_class="$5"
-    case "${environment}" in
-        production|prod|staging|stage|integration) ;;
-        *) environment=other ;;
-    esac
-    printf '{"time":"%s","operation":"%s","environment":"%s","attempt":%d,"max_attempts":3,"exit_code":%s,"class":"%s","http_status":"unknown","endpoint":"unknown"}\n' \
-        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${operation}" "${environment}" "${attempt}" "${exit_code}" "${failure_class}" \
-        | tee -a "${AUTH_REPORT}" "${REPORT}" >&2
-}
-
 ocm_login() {
-    local target_env="$1" operation="$2" attempt output exit_code failure_class
+    local target_env="$1" attempt exit_code
     local -a credentials
     if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
         credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
     elif [[ -n "${OCM_TOKEN}" ]]; then
         credentials=(--token "${OCM_TOKEN}")
     else
-        auth_diagnostic "${operation}" "${target_env}" 0 1 missing_credentials
         return 1
     fi
 
     for attempt in 1 2 3; do
-        auth_diagnostic "${operation}" "${target_env}" "${attempt}" null started
-        if output=$(ocm login --url "${target_env}" "${credentials[@]}" 2>&1); then
+        if ocm login --url "${target_env}" "${credentials[@]}" > /dev/null 2>&1; then
             CURRENT_OCM_ENV="${target_env}"
-            auth_diagnostic "${operation}" "${target_env}" "${attempt}" 0 success
             return 0
         else
             exit_code=$?
         fi
-        output="${output,,}"
-        case "${output}" in
-            *invalid_grant*|*invalid_client*|*unauthorized_client*|*access_denied*|*unauthorized*|*forbidden*|*invalid\ token*|*invalid\ refresh\ token*|*invalid\ credentials*|*authentication\ failed*)
-                failure_class=permanent_auth ;;
-            *"expected response content type 'application/json' but received 'text/html'"*)
-                failure_class=retryable_html ;;
-            *i/o\ timeout*|*tls\ handshake\ timeout*|*connection\ reset\ by\ peer*|*unexpected\ eof*|*temporary\ failure\ in\ name\ resolution*|*context\ deadline\ exceeded*)
-                failure_class=retryable_transport ;;
-            *) failure_class=unclassified ;;
-        esac
-        unset output
-        auth_diagnostic "${operation}" "${target_env}" "${attempt}" "${exit_code}" "${failure_class}"
         if [[ "${attempt}" -eq 3 ]]; then
             return "${exit_code}"
         fi
@@ -73,7 +39,7 @@ ocm_authenticate() {
     SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
     OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
     CURRENT_OCM_ENV=""
-    ocm_login "${OCM_LOGIN_ENV}" initial-login
+    ocm_login "${OCM_LOGIN_ENV}"
 }
 
 ocm_ensure_env() {
@@ -81,7 +47,7 @@ ocm_ensure_env() {
     if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
         return 0
     fi
-    ocm_login "${target_env}" environment-switch
+    ocm_login "${target_env}"
 }
 
 if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
@@ -97,8 +63,6 @@ MAX_CLUSTER_AGE_HOURS="${MAX_CLUSTER_AGE_HOURS:-0}"
 REFRESH_DAY="${REFRESH_DAY:-6}"
 MAX_REFRESH_PER_RUN="${MAX_REFRESH_PER_RUN:-2}"
 DRY_RUN="${DRY_RUN:-false}"
-
-initialize_reports
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
     log "ERROR: Lease host kubeconfig not found at ${LEASE_HOST_KUBECONFIG}"
@@ -448,6 +412,9 @@ ocm_authenticate || exit $?
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
+REPORT="${ARTIFACT_DIR}/controller-report.txt"
+echo "Lease Controller Report - $(date -u)" > "${REPORT}"
+echo "======================================" >> "${REPORT}"
 
 # ---------------------------------------------------------------
 # Phase 1: Read desired state

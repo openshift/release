@@ -8,7 +8,7 @@ if [[ "${1:-}" != --case ]]; then
     trap 'rm -rf "${results}"' EXIT
     count=0
     for credential in client token partial partial-missing missing; do
-        for scenario in success html-recovery third-recovery exhaustion final-exit varying-failures transport-recovery transport-tls transport-reset transport-eof transport-dns transport-deadline permanent mixed unknown near-miss same-env switch-success switch-recovery switch-third-recovery switch-exhaustion switch-final-exit switch-permanent switch-unknown switch-mixed unsafe-env initial-errexit switch-errexit inline-success inline-exhaustion inline-switch-exhaustion inline-permanent inline-switch-permanent inline-final-exit; do
+        for scenario in success html-recovery third-recovery exhaustion final-exit varying-failures transport-recovery transport-tls transport-reset transport-eof transport-dns transport-deadline permanent mixed unknown near-miss same-env switch-success switch-recovery switch-third-recovery switch-exhaustion switch-final-exit switch-permanent switch-unknown switch-mixed unsafe-env initial-errexit switch-errexit inline-success inline-exhaustion inline-switch-exhaustion inline-permanent inline-switch-permanent inline-final-exit inline-missing; do
             case "${credential}:${scenario}" in
                 missing:success|partial:success|partial-missing:success) ;;
                 missing:*|partial:*|partial-missing:*) continue ;;
@@ -21,6 +21,7 @@ if [[ "${1:-}" != --case ]]; then
             case "${scenario}" in
                 initial-errexit|switch-errexit|inline-exhaustion|inline-switch-exhaustion) expected=42 ;;
                 inline-permanent|inline-switch-permanent|inline-final-exit) expected=43 ;;
+                inline-missing) expected=1 ;;
             esac
             if [[ "${actual}" != "${expected}" ]]; then
                 printf 'FAIL: %s/%s: exit %s, expected %s\n' "${credential}" "${scenario}" "${actual}" "${expected}" >&2
@@ -30,22 +31,40 @@ if [[ "${1:-}" != --case ]]; then
                 printf 'FAIL: unsafe output in %s/%s\n' "${credential}" "${scenario}" >&2
                 exit 1
             fi
-            if [[ "${scenario}" == *errexit || "${scenario}" == inline-* ]]; then
+            if [[ "${scenario}" == inline-success || "${scenario}" == inline-switch-* ]]; then
                 test -s "${case_dir}/artifacts/controller-report.txt"
-                test -s "${case_dir}/artifacts/controller-auth.jsonl"
+                test "$(find "${case_dir}/artifacts" -type f | wc -l)" -eq 1
+            else
+                test -z "$(find "${case_dir}/artifacts" -type f -print -quit)"
+            fi
+            if [[ "${scenario}" == *errexit || "${scenario}" == inline-* ]]; then
                 expected_calls=3
                 case "${scenario}" in
                     switch-errexit|inline-switch-*) expected_calls=4 ;;
                     inline-success) expected_calls=1 ;;
+                    inline-missing) expected_calls=0 ;;
                 esac
                 test "$(wc -l < "${case_dir}/calls")" -eq "${expected_calls}"
-                if [[ "${scenario}" == inline-success ]]; then
+                if [[ "${scenario}" == inline-success || "${scenario}" == inline-missing ]]; then
                     test ! -s "${case_dir}/sleeps"
                 else
                     test "$(cat "${case_dir}/sleeps")" = $'10\n10'
-                    jq -se --argjson status "${expected}" '.[-1].attempt == 3 and .[-1].exit_code == $status' "${case_dir}/artifacts/controller-auth.jsonl" > /dev/null
                 fi
             fi
+            expected_events=$(
+                remaining_calls=$(wc -l < "${case_dir}/calls")
+                case "${scenario}" in
+                    unsafe-env) printf 'login\nsleep 10\nlogin\nsleep 10\nlogin\n'; remaining_calls=$((remaining_calls - 3)) ;;
+                    switch-*|inline-switch-*) printf 'login\n'; remaining_calls=$((remaining_calls - 1)) ;;
+                esac
+                for ((attempt_index=1; attempt_index<=remaining_calls; attempt_index++)); do
+                    if [[ "${attempt_index}" -gt 1 ]]; then
+                        printf 'sleep 10\n'
+                    fi
+                    printf 'login\n'
+                done
+            )
+            test "$(cat "${case_dir}/events")" = "${expected_events}"
             printf 'PASS: %s/%s\n' "${credential}" "${scenario}"
             count=$((count + 1))
         done
@@ -70,21 +89,28 @@ case "${credential}" in
     partial-missing) printf fixture-client > "${CLUSTER_PROFILE_DIR}/sso-client-id" ;;
 esac
 source "$(dirname "$0")/../ci-operator/step-registry/rosa/cluster-lease/controller/rosa-cluster-lease-controller-commands.sh"
-test ! -e "${ARTIFACT_DIR}/controller-report.txt"
+test -z "$(find "${ARTIFACT_DIR}" -type f -print -quit)"
 export OCM_LOGIN_ENV=staging
-initialize_reports
 : > "${case_dir}/calls"
 : > "${case_dir}/sleeps"
+: > "${case_dir}/events"
 
-sleep() { printf '%s\n' "$1" >> "${case_dir}/sleeps"; }
+sleep() {
+    printf '%s\n' "$1" >> "${case_dir}/sleeps"
+    printf 'sleep %s\n' "$1" >> "${case_dir}/events"
+}
 ocm() {
     [[ "$1" == login && "$2" == --url ]] || return 98
+    if [[ "${scenario}" != inline-* || "$3" == staging ]]; then
+        test -z "$(find "${ARTIFACT_DIR}" -type f -print -quit)" || return 95
+    fi
     if [[ "${credential}" == client ]]; then
         [[ "$4" == --client-id && "$5" == fixture-client && "$6" == --client-secret && "$7" == fixture-secret ]] || return 97
     else
         [[ "$4" == --token && "$5" == fixture-token ]] || return 97
     fi
     printf '%s\n' called >> "${case_dir}/calls"
+    printf 'login\n' >> "${case_dir}/events"
     local calls
     calls=$(wc -l < "${case_dir}/calls")
     printf '%s\n' 'fixture-body fixture-client fixture-secret fixture-token fixture-header' >&2
@@ -134,8 +160,13 @@ ocm() {
 }
 
 if [[ "${scenario}" == inline-* ]]; then
+    if [[ "${scenario}" == inline-missing ]]; then
+        rm -f "${CLUSTER_PROFILE_DIR}/sso-client-id" "${CLUSTER_PROFILE_DIR}/sso-client-secret" "${CLUSTER_PROFILE_DIR}/ocm-token"
+    fi
     oc() {
         [[ "$*" == *'get configmap'* ]] || return 96
+        grep -q '^Lease Controller Report - ' "${ARTIFACT_DIR}/controller-report.txt" || return 95
+        grep -q '^======================================$' "${ARTIFACT_DIR}/controller-report.txt" || return 95
         printf '%s\n' read >> "${case_dir}/reads"
         if [[ "$*" == *rosa-cluster-lease-config* ]]; then
             local environment=staging
@@ -151,14 +182,13 @@ if [[ "${scenario}" == inline-* ]]; then
     script=$(< "${script_path}")
     fixture_script="${script/LEASE_HOST_KUBECONFIG=\"\/etc\/rosa-cluster-lease-manager\/kubeconfig\"/LEASE_HOST_KUBECONFIG=\"${case_dir}\/lease-kubeconfig\"}"
     test "${fixture_script}" != "${script}"
-    rm "${REPORT}" "${AUTH_REPORT}"
     actual=0
     continuation=$'\necho continued-after-auth-failure'
     [[ "${scenario}" == inline-success ]] && continuation=''
     bash -x -c $'#!/bin/bash\nset -eu\n'"${fixture_script}${continuation}" || actual=$?
     if [[ "${scenario}" == inline-success ]]; then
         test "${actual}" -eq 0
-        grep -q 'Summary' "${REPORT}"
+        grep -q 'Summary' "${ARTIFACT_DIR}/controller-report.txt"
     elif [[ "${scenario}" == inline-switch-* ]]; then
         test "$(wc -l < "${case_dir}/calls")" -eq 4
         test "$(wc -l < "${case_dir}/reads")" -eq 2
@@ -176,13 +206,13 @@ fi
 
 actual=0
 ocm_authenticate || actual=$?
-expected_calls=1 expected_class=success
+expected_calls=1
 case "${credential}:${scenario}" in
-    missing:*|partial-missing:*) test "${actual}" -eq 1; expected_calls=0; expected_class=missing_credentials ;;
-    *:exhaustion|*:unsafe-env) test "${actual}" -eq 42; expected_calls=3; expected_class=retryable_html ;;
-    *:permanent|*:mixed) test "${actual}" -eq 43; expected_calls=3; expected_class=permanent_auth ;;
-    *:final-exit) test "${actual}" -eq 43; expected_calls=3; expected_class=retryable_html ;;
-    *:unknown|*:near-miss|*:varying-failures) test "${actual}" -eq 44; expected_calls=3; expected_class=unclassified ;;
+    missing:*|partial-missing:*) test "${actual}" -eq 1; expected_calls=0 ;;
+    *:exhaustion|*:unsafe-env) test "${actual}" -eq 42; expected_calls=3 ;;
+    *:permanent|*:mixed) test "${actual}" -eq 43; expected_calls=3 ;;
+    *:final-exit) test "${actual}" -eq 43; expected_calls=3 ;;
+    *:unknown|*:near-miss|*:varying-failures) test "${actual}" -eq 44; expected_calls=3 ;;
     *:html-recovery|*:transport-*) test "${actual}" -eq 0; expected_calls=2 ;;
     *:third-recovery) test "${actual}" -eq 0; expected_calls=3 ;;
     *) test "${actual}" -eq 0 ;;
@@ -198,10 +228,10 @@ if [[ "${scenario}" == switch-* || "${scenario}" == same-env ]]; then
     [[ "${scenario}" == same-env ]] && target_env=staging
     ocm_ensure_env "${target_env}" || actual=$?
     case "${scenario}" in
-        switch-exhaustion) test "${actual}" -eq 42; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=retryable_html ;;
-        switch-permanent|switch-mixed) test "${actual}" -eq 43; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=permanent_auth ;;
-        switch-unknown) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=unclassified ;;
-        switch-final-exit) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=retryable_html ;;
+        switch-exhaustion) test "${actual}" -eq 42; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4 ;;
+        switch-permanent|switch-mixed) test "${actual}" -eq 43; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4 ;;
+        switch-unknown) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4 ;;
+        switch-final-exit) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4 ;;
         switch-recovery) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = production; expected_calls=3 ;;
         switch-third-recovery) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = production; expected_calls=4 ;;
         same-env) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = staging ;;
@@ -213,16 +243,8 @@ if [[ "${scenario}" == unsafe-env ]]; then
     ocm_ensure_env 'https://fixture-token@fixture-private-host/"injected' || actual=$?
     test "${actual}" -eq 42
     expected_calls=6
-    jq -se '.[-1].environment == "other"' "${AUTH_REPORT}" > /dev/null
 fi
 test "$(wc -l < "${case_dir}/calls")" -eq "${expected_calls}"
-jq -se --arg class "${expected_class}" '.[-1].class == $class and all(.[]; .http_status == "unknown" and .endpoint == "unknown" and .max_attempts == 3)' "${AUTH_REPORT}" > /dev/null
-case "${scenario}" in
-    html-recovery|switch-recovery) jq -se 'any(.[]; .class == "retryable_html" and .exit_code == 42)' "${AUTH_REPORT}" > /dev/null ;;
-    transport-*) jq -se 'any(.[]; .class == "retryable_transport" and .exit_code == 42)' "${AUTH_REPORT}" > /dev/null ;;
-    third-recovery|switch-third-recovery) jq -se 'any(.[]; .class == "permanent_auth" and .exit_code == 43)' "${AUTH_REPORT}" > /dev/null ;;
-    varying-failures) jq -se '[.[] | select(.class != "started") | .exit_code] == [42,43,44]' "${AUTH_REPORT}" > /dev/null ;;
-esac
 case "${scenario}" in
     exhaustion|switch-exhaustion|final-exit|switch-final-exit|permanent|mixed|unknown|near-miss|varying-failures|third-recovery|switch-third-recovery|switch-permanent|switch-unknown|switch-mixed) test "$(cat "${case_dir}/sleeps")" = $'10\n10' ;;
     html-recovery|transport-*|switch-recovery) test "$(cat "${case_dir}/sleeps")" = 10 ;;
