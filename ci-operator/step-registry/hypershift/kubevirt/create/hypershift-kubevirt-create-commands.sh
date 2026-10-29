@@ -392,7 +392,47 @@ resolve_virtctl_cmd() {
     echo "/usr/bin/virtctl"
     return 0
   fi
-  echo "WARNING: virtctl not found; guest-exec renewal unavailable" >&2
+  if [[ -x /tmp/virtctl ]]; then
+    echo "/tmp/virtctl"
+    return 0
+  fi
+
+  # Download virtctl from the cluster's KubeVirt/HCO deployment
+  local dl_url=""
+
+  # Method 1: ConsoleCLIDownload resource (standard HCO deployment)
+  dl_url=$(oc get ConsoleCLIDownload virtctl-clidownloads-kubevirt-hyperconverged \
+    -o jsonpath='{.spec.links[?(@.text=="Download virtctl for Linux for x86_64")].href}' 2>/dev/null) || true
+
+  # Method 2: Construct URL from the HCO CLI download route
+  if [[ -z "${dl_url}" ]]; then
+    local route_host
+    route_host=$(oc get route -n openshift-cnv hyperconverged-cluster-cli-download \
+      -o jsonpath='{.spec.host}' 2>/dev/null) || true
+    if [[ -n "${route_host}" ]]; then
+      dl_url="https://${route_host}/amd64/linux/virtctl.tar.gz"
+    fi
+  fi
+
+  if [[ -n "${dl_url}" ]]; then
+    echo "Downloading virtctl from ${dl_url}..." >&2
+    if curl -sSLk "${dl_url}" --output /tmp/virtctl.tar.gz 2>/dev/null \
+       && tar xzf /tmp/virtctl.tar.gz -C /tmp/ 2>/dev/null; then
+      local virtctl_path
+      virtctl_path=$(find /tmp -name virtctl -type f -executable 2>/dev/null | head -1)
+      if [[ -n "${virtctl_path}" && "${virtctl_path}" != "/tmp/virtctl" ]]; then
+        mv "${virtctl_path}" /tmp/virtctl
+      fi
+      rm -f /tmp/virtctl.tar.gz
+      if [[ -x /tmp/virtctl ]]; then
+        echo "/tmp/virtctl"
+        return 0
+      fi
+    fi
+    rm -f /tmp/virtctl.tar.gz
+  fi
+
+  echo "WARNING: virtctl not found and download failed; guest-exec renewal unavailable" >&2
   return 1
 }
 
@@ -684,6 +724,20 @@ renew_localnet_multi_dhcp_on_vmi_via_ssh() {
   local vmi="$3"
   local vmi_ip vmi_node renew_pod
 
+  # Resolve the SSH renewal pod image once (lazy-init). Use the tools image
+  # from the release payload — it is CI-authenticated and already pullable on
+  # the management cluster nodes via ICSP.
+  if [[ -z "${RENEWAL_POD_IMAGE:-}" ]]; then
+    RENEWAL_POD_IMAGE=$(oc adm release info "${RELEASE_IMAGE}" --image-for=tools 2>/dev/null) || true
+    if [[ -z "${RENEWAL_POD_IMAGE}" ]]; then
+      RENEWAL_POD_IMAGE=$(oc adm release info "${RELEASE_IMAGE}" --image-for=cli 2>/dev/null) || true
+    fi
+    if [[ -z "${RENEWAL_POD_IMAGE}" ]]; then
+      RENEWAL_POD_IMAGE="registry.redhat.io/ubi9/ubi-minimal:latest"
+    fi
+    echo "SSH renewal pod image: ${RENEWAL_POD_IMAGE}"
+  fi
+
   vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
   vmi_node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
   if [[ -z "${vmi_ip}" || -z "${vmi_node}" ]]; then
@@ -772,7 +826,7 @@ spec:
       defaultMode: 384
   containers:
   - name: renew
-    image: registry.redhat.io/ubi9/ubi-minimal:latest
+    image: ${RENEWAL_POD_IMAGE}
     env:
     - name: VMI_IP
       value: "${vmi_ip}"
@@ -785,7 +839,7 @@ spec:
     - sh
     - -c
     - |
-      microdnf install -y openssh-clients 2>/dev/null
+      command -v ssh >/dev/null 2>&1 || microdnf install -y openssh-clients 2>/dev/null || dnf install -y openssh-clients -q 2>/dev/null
       if [ -f /ssh/id_rsa ]; then
         cp /ssh/id_rsa /tmp/key
       else
