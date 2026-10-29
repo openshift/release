@@ -1,0 +1,87 @@
+base_images:
+  cli:
+    name: "5.1"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "5.1"
+    namespace: ocp
+    tag: upi-installer
+  wmco-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.1
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.1"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-ovn-winc-ote
+  cron: 14 11 7,14,21,28 * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_SUITE: windows-machine-config-operator/smokerun
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: gcp-ipi-ovn-winc-ote
+  cron: 23 14 3,10,17,26 * *
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_SUITE: windows-machine-config-operator/smokerun
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: azure-ipi-ovn-winc-ote
+  cron: 23 15 3,12,19,26 * *
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --disable-monitor=pod-network-avalibility,required-scc-annotation-checker,termination-message-policy,kubelet-log-collector
+      TEST_SUITE: windows-machine-config-operator/smokerun
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: windows-machine-config-operator-fbc
+  variant: periodics
