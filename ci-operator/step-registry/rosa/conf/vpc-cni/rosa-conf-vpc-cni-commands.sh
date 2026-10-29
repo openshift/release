@@ -355,4 +355,16 @@ if [[ -s "${SHARED_DIR}/cluster-metadata.json" ]]; then
   log "Recorded cni=aws-vpc-cni in cluster-metadata.json"
 fi
 
+# ---- Publish the kubeconfig for the following steps ----
+# ci-operator points every step's KUBECONFIG at ${SHARED_DIR}/kubeconfig, and
+# the steps between this one and rosa-conf-idp-htpasswd (notably
+# rosa-cluster-wait-ready-operators) run bare oc commands. Publish the
+# breakglass admin kubeconfig so they can reach the cluster; the IDP step
+# later overwrites it with the customer kubeconfig.
+if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
+  cp "${KUBECONFIG}" "${SHARED_DIR}/kubeconfig"
+  chmod 0600 "${SHARED_DIR}/kubeconfig"
+  log "Published the breakglass kubeconfig as ${SHARED_DIR}/kubeconfig"
+fi
+
 log "AWS VPC CNI installed successfully"
