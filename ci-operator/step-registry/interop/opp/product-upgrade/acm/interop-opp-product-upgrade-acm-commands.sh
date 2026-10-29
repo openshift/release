@@ -33,24 +33,35 @@ _opp_cleanup() {
 }
 
 # --- Atomic JUnit Writer (INTEROP-9527) ---
+# Suite naming (INTEROP-9601): emit the canonical Component Readiness suite
+# name. LP_IO__ET_PPP__NEW_TS_NAME is a printf-style template whose %s
+# placeholder is replaced by this step's raw suite name; the step-ref
+# default pins the canonical 'lp-interop--ACM--OPP--interop-opp-product-upgrade-acm'
+# (docs/opp-suite-name-inventory.md, producer row for this step).
+_JUNIT_RAW_TS_NAME="interop-opp-product-upgrade-acm"
+_junit_ts_name="${LP_IO__ET_PPP__NEW_TS_NAME:-lp-interop--ACM--OPP--${_JUNIT_RAW_TS_NAME}}"
+_junit_ts_name="${_junit_ts_name//%s/${_JUNIT_RAW_TS_NAME}}"
+# '/' cannot appear in an artifact filename; sanitize defensively.
+_junit_fn="junit_${_junit_ts_name//\//_}.xml"
+
 _junit_emit_safe() {
   local kind="$1" message="$2" rc="${3:-0}"
   local tmpf
-  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  tmpf="${ARTIFACT_DIR}/.${_junit_fn}.tmp.$$"
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="${_junit_ts_name}" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
 </testsuite>
 XMLEOF
   } > "${tmpf}"
-  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/${_junit_fn}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/${_junit_fn}" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
 }
 
