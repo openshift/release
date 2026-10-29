@@ -35,21 +35,26 @@ target_ref="$(jq -cr --arg org "${target_org}" --arg repo "${target_repo}" '
 ' <<<"${JOB_SPEC}")"
 
 # Jobs from component repositories (e.g. a gecko e2e-platform presubmit) do not
-# include gcp-hcp-infra in JOB_SPEC. They run from the promoted gcp-hcp-infra-src
-# image, so test that image's checkout (latest main) and leave gcp-hcp-infra's
-# commit statuses alone: the run tests the component pull request, not that commit.
+# include gcp-hcp-infra in JOB_SPEC and have no gcp-hcp-infra checkout: their
+# gcp-hcp-infra-src is the gcp-hcp-infra-base tools image. Test the current
+# gcp-hcp-infra main (gcp-hcp-tf-provision clones exactly this commit) and leave
+# gcp-hcp-infra's commit statuses alone: the run tests the component pull
+# request, not that commit.
 if [[ "${target_ref}" == "null" ]]; then
-  if [[ ! -x scripts/e2e-render.sh || ! -f terraform/metadata/defaults.yaml ]]; then
-    echo "ERROR: ${target_org}/${target_repo} is not in JOB_SPEC and the working directory is not a ${target_repo} checkout" >&2
+  if [[ ! -s "${token_path}" ]]; then
+    echo "ERROR: GitHub credential is missing or empty" >&2
     exit 1
   fi
-  if ! tested_sha="$(git rev-parse HEAD 2>/dev/null)" || [[ ! "${tested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "ERROR: ${target_org}/${target_repo} is not in JOB_SPEC and the image checkout has no commit" >&2
+  auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$(<"${token_path}")" | base64 | tr -d '\n')"
+  if ! tested_sha="$(git -c http.extraHeader="${auth_header}" ls-remote \
+      "https://github.com/${target_org}/${target_repo}.git" refs/heads/main | cut -f1)" ||
+    [[ ! "${tested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ERROR: unable to resolve ${target_org}/${target_repo} main" >&2
     exit 1
   fi
   printf '%s\n' "${tested_sha}" >"${tested_sha_path}"
   touch "${skip_status_path}"
-  echo "${target_org}/${target_repo} is not under test; using its checkout ${tested_sha} and skipping the ${status_context} commit status"
+  echo "${target_org}/${target_repo} is not under test; testing its main (${tested_sha}) and skipping the ${status_context} commit status"
   exit 0
 fi
 

@@ -53,11 +53,33 @@ tfc_api_call() {
 
 # --- Install Terraform ---
 
-# The gcp-hcp-infra-src image contains the gcp-hcp-infra repo at the working directory
-# (the code under test in gcp-hcp-infra jobs, the promoted latest main in component
-# repository jobs, where 'src' is the component's own checkout).
-# Read terraform version from .tool-versions to ensure consistency with local dev.
+# In gcp-hcp-infra jobs, gcp-hcp-infra-src is the code under test, checked out at
+# the working directory. In component repository jobs (e.g. gecko) it is the
+# gcp-hcp-infra-base tools image with no checkout ('src' is the component's own
+# code), so clone the gcp-hcp-infra commit gcp-hcp-update-commit-status recorded.
 REPO_ROOT="$(pwd)"
+if [[ ! -x "${REPO_ROOT}/scripts/e2e-render.sh" ]]; then
+  CLONE_SHA="$(<"${SHARED_DIR}/gcp-hcp-tested-sha")"
+  if [[ ! "${CLONE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+    log "ERROR: no gcp-hcp-infra checkout and no valid tested SHA to clone"
+    exit 1
+  fi
+  if [[ ! -s "${GITHUB_TOKEN_PATH}" ]]; then
+    log "ERROR: GitHub credential is missing or empty: ${GITHUB_TOKEN_PATH}"
+    exit 1
+  fi
+  log "Cloning openshift-online/gcp-hcp-infra at ${CLONE_SHA}..."
+  REPO_ROOT="/tmp/gcp-hcp-infra"
+  git init -q "${REPO_ROOT}"
+  # Authenticate with a header so the token never appears in a URL or git config
+  git -C "${REPO_ROOT}" \
+    -c http.extraHeader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$(<"${GITHUB_TOKEN_PATH}")" | base64 | tr -d '\n')" \
+    fetch -q --depth 1 https://github.com/openshift-online/gcp-hcp-infra.git "${CLONE_SHA}"
+  git -C "${REPO_ROOT}" checkout -q --detach FETCH_HEAD
+  cd "${REPO_ROOT}"
+fi
+
+# Read terraform version from .tool-versions to ensure consistency with local dev.
 TERRAFORM_VERSION="$(awk '$1 == "terraform" { print $2; exit }' "${REPO_ROOT}/.tool-versions")"
 
 if [[ -z "${TERRAFORM_VERSION}" ]]; then

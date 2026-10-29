@@ -8,10 +8,16 @@ ref:
     mount_path: /etc/terraform-cloud
     group: tfcloud-token
     collection: gcp-hcp-infra-terraform-cloud
+  - namespace: ci
+    bundle: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /etc/github-private
   env:
   - name: TF_CLI_CONFIG_FILE
     default: /etc/terraform-cloud/credentials.tfrc.json
     documentation: "Mounted HCP Terraform CLI credentials file"
+  - name: GITHUB_TOKEN_PATH
+    default: /etc/github-private/oauth
+    documentation: "GitHub token used to clone gcp-hcp-infra in component repository jobs"
   - name: GCP_REGION
     default: "northamerica-northeast2"
     documentation: "GCP region for e2e infrastructure deployment"
@@ -35,7 +41,10 @@ ref:
       to deploy that component's pull request build. Empty or absent means none.
 
     Runs from gcp-hcp-infra-src: the gcp-hcp-infra checkout under test in
-    gcp-hcp-infra jobs, or the promoted latest main in component repository jobs.
+    gcp-hcp-infra jobs. Component repository jobs (e.g. gecko) map that name
+    to the gcp-hcp-infra-base tools image instead; the step then clones
+    gcp-hcp-infra at the commit in gcp-hcp-tested-sha, so no gcp-hcp-infra
+    source is published as an image.
 
     Outputs to SHARED_DIR:
     - region (selected GCP region)
