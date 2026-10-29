@@ -19,6 +19,51 @@ echo "OVS bridge:        ${LOCALNET_SECONDARY_BRIDGE}"
 echo "OVN physnet:       ${LOCALNET_SECONDARY_PHYSNET}"
 echo "Global forwarding: ${ENABLE_FORWARDING}"
 
+# How long to wait for the API after the ipForwarding patch.  Must leave room
+# inside the ref's timeout for diagnostics and the bridge work that follows.
+API_WAIT_MINUTES=40
+
+# Report on an API outage without using the API.  Every oc-based check returns
+# nothing in exactly the situation that triggers this, so probe the
+# provisioning host first: a broken resolver or VIP there is invisible from
+# inside the CI pod and has taken this step out before.
+collect_api_outage_diagnostics() {
+  local server api_host
+  server=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+  api_host=${server#*://}
+  api_host=${api_host%%:*}
+  echo "=== API endpoint: ${server:-unknown} ==="
+
+  if [[ -n "${api_host}" && -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+    echo "=== provisioning host (API-independent) ==="
+    timeout 180 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${api_host}" "${server}" <<'HOSTDIAG' || echo "host-side diagnostics failed"
+api_host="${1}"; server="${2}"
+echo "--- resolve ${api_host}"
+getent hosts "${api_host}" || echo "does not resolve"
+echo "--- dnsmasq"
+systemctl is-active dnsmasq 2>/dev/null || true
+pgrep -a dnsmasq | head -5 || echo "no dnsmasq running"
+echo "--- NetworkManager dnsmasq config"
+cat /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf 2>/dev/null || echo "absent"
+echo "--- ${server}/readyz"
+curl -sk -m 10 -o /dev/null -w 'http_code=%{http_code}\n' "${server}/readyz" || echo "unreachable"
+echo "--- libvirt networks"
+virsh net-list --all 2>/dev/null || true
+HOSTDIAG
+  else
+    echo "packet-conf.sh unavailable; skipping host-side checks"
+  fi
+
+  echo "=== cluster-side (best effort, expected empty if the API is down) ==="
+  oc get mcp -o wide --request-timeout=15s || true
+  oc get nodes -o wide --request-timeout=15s || true
+  oc -n openshift-etcd logs -l app=etcd -c etcd --tail=20 --request-timeout=15s || true
+  oc -n openshift-apiserver logs -l app=openshift-apiserver --tail=20 --request-timeout=15s || true
+  oc -n openshift-machine-config-operator logs -l k8s-app=machine-config-controller --tail=20 --request-timeout=15s || true
+}
+
 # ---------------------------------------------------------------------------
 # Enable global IP forwarding so management nodes route between the secondary
 # network and the primary (management) network.
@@ -35,49 +80,46 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
     
     oc patch network.operator cluster --type=merge \
       -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
-    echo "Network patch applied. Waiting for API to stabilize after MCP rollout..."
+    echo "Network patch applied. Waiting for the API to stay reachable..."
     sleep 30
-    
-    # Wait for API with better diagnostics
+
+    # Budget against a wall-clock deadline rather than an attempt count.  Each
+    # probe costs its own request timeout on top of the sleep, so a fixed count
+    # drifts well past what it claims: 120 attempts measured ~33s each, i.e. 67
+    # minutes against this ref's 60m timeout, which meant the step was always
+    # SIGKILLed before it could report anything.  Leave enough of the timeout
+    # for the diagnostics below and the remaining work to run.
     api_ready=false
-    for _api_attempt in $(seq 1 120); do  # Allow up to 120 attempts (40 minutes)
+    _probe=0
+    api_deadline=$(( SECONDS + API_WAIT_MINUTES * 60 ))
+    while (( SECONDS < api_deadline )); do
       if oc get nodes --request-timeout=10s &>/dev/null; then
         api_ready=true
         break
       fi
-      # Log MCP status every 3 attempts for diagnostics
-      if [[ $((_api_attempt % 3)) == 0 ]]; then
-        mcp_status=$(oc get mcp -o jsonpath='{range .items[*]}{.metadata.name}{":"}{.status.conditions[?(@.type=="Updated")].status}{" "}{end}' 2>/dev/null || echo "unknown")
-        echo "  API not ready (attempt ${_api_attempt}/120), MCP status: ${mcp_status}, waiting 20s..."
+      _probe=$(( _probe + 1 ))
+      if (( _probe % 3 == 0 )); then
+        mcp_status=$(oc get mcp --request-timeout=10s -o jsonpath='{range .items[*]}{.metadata.name}{":"}{.status.conditions[?(@.type=="Updated")].status}{" "}{end}' 2>/dev/null || echo "unreachable")
+        echo "  API not ready, $(( (api_deadline - SECONDS) / 60 ))m of budget left, MCP: ${mcp_status}"
       else
-        echo "  API not ready (attempt ${_api_attempt}/120), waiting 20s..."
+        echo "  API not ready, $(( (api_deadline - SECONDS) / 60 ))m of budget left"
       fi
       sleep 20
     done
-    
+
     if [[ "${api_ready}" != "true" ]]; then
-      echo "WARNING: API did not recover after 40 minutes. Collecting diagnostics..."
-      echo "MCP Status:"
-      oc get mcp -o wide || true
-      echo ""
-      echo "Node Status:"
-      oc get nodes -o wide || true
-      echo ""
-      echo "etcd health:"
-      oc -n openshift-etcd logs -l app=etcd -c etcd --tail=20 || true
-      echo ""
-      echo "API Server logs:"
-      oc -n openshift-apiserver logs -l app=openshift-apiserver --tail=20 || true
-      echo ""
-      echo "Machine Config Controller logs:"
-      oc -n openshift-machine-config-operator logs -l k8s-app=machine-config-controller --tail=20 || true
+      echo "ERROR: API did not recover within ${API_WAIT_MINUTES} minutes of the ipForwarding patch."
+      collect_api_outage_diagnostics
       exit 1
     fi
-    
-    echo "API recovered after ${_api_attempt} attempts"
-    echo "Waiting for machine config pools to finish rolling out..."
-    oc wait mcp master worker --for condition=Updating=False --timeout=40m
-    oc wait mcp master worker --for condition=Updated --timeout=40m
+
+    echo "API reachable again after ${_probe} failed probes"
+    # ipForwarding is a CNO setting: it re-renders ovnkube-config and rolls the
+    # ovnkube-node DaemonSet, it does not generate a MachineConfig.  These waits
+    # therefore return immediately in practice and are kept only as a guard.
+    echo "Confirming machine config pools are settled..."
+    oc wait mcp master worker --for condition=Updating=False --timeout=5m
+    oc wait mcp master worker --for condition=Updated --timeout=5m
     echo "Global IP forwarding enabled"
   else
     echo "Global IP forwarding already enabled"
@@ -92,11 +134,12 @@ namespace="openshift-ovn-kubernetes"
 # Wait for ovnkube-node pods to stabilize after MCP rollout, then verify
 # at least one is ready before probing container names.
 echo "Waiting for ovnkube-node pods to be ready..."
-for _api_attempt in $(seq 1 30); do
+_ovn_deadline=$(( SECONDS + 10 * 60 ))
+while (( SECONDS < _ovn_deadline )); do
   if oc get nodes --request-timeout=10s &>/dev/null; then
     break
   fi
-  echo "  API not ready (attempt ${_api_attempt}/30), waiting 20s..."
+  echo "  API not ready, $(( (_ovn_deadline - SECONDS) / 60 ))m of budget left"
   sleep 20
 done
 oc wait pod -n "${namespace}" -l app=ovnkube-node --for=condition=Ready --timeout=5m
