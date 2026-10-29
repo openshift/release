@@ -24,12 +24,14 @@ ref:
     documentation: RDS DB instance class.
   documentation: |-
     Provision AWS infrastructure for a Quay standalone HA deployment in the VPC
-    from aws-provision-vpc-shared (ZONES_COUNT=3). No OpenShift cluster.
+    from aws-provision-vpc-shared (ZONES_COUNT=3, or 2 in a region with only 2
+    AZs). No OpenShift cluster.
 
     One CloudFormation stack "${NAMESPACE}-${UNIQUE_HASH}-qsha", tagged
     expirationDate and quay-standalone-job=${NAMESPACE}-${UNIQUE_HASH}, holds:
-    - three RHEL 9 Quay nodes, one per public subnet and AZ, with podman,
-      openssl, curl, jq and the postgresql client
+    - three RHEL 9 Quay nodes, one per public subnet and AZ (with 2 AZs, node
+      3 shares the first subnet), with podman, openssl, curl, jq and the
+      postgresql client
     - one RHEL 9 Redis host in the first public subnet (SSH only; Redis is
       configured by the deploy step)
     - a private, encrypted Multi-AZ RDS PostgreSQL instance with no backups,
@@ -57,7 +59,7 @@ ref:
       quay_standalone_clair_endpoint (http://<that name>:8081),
       quay_standalone_clair_target_group_arn
     - quay_standalone_nodes: three lines "<instance-id> <public-ip> <private-ip>"
-      in AZ order
+      for Quay nodes 1 to 3
     - quay_standalone_redis: one line "<instance-id> <public-ip> <private-ip>"
     - quay_standalone_db_endpoint (host), quay_standalone_db_port,
       quay_standalone_db_name, quay_standalone_db_user

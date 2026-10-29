@@ -84,9 +84,11 @@ vpc_id=$(<"${SHARED_DIR}/vpc_id")
 IFS=, read -r -a public_subnets <<< "$(tr -d "[]' " < "${SHARED_DIR}/public_subnet_ids")"
 IFS=, read -r -a private_subnets <<< "$(tr -d "[]' " < "${SHARED_DIR}/private_subnet_ids")"
 
+# aws-provision-vpc-shared clamps ZONES_COUNT=3 to 2 in regions with 2 AZs (us-west-1).
 if [[ ! "${vpc_id}" =~ ^vpc-[a-f0-9]+$ ]] ||
-   [[ "${#public_subnets[@]}" -ne 3 || "${#private_subnets[@]}" -ne 3 ]]; then
-    echo "Expected a VPC with 3 public and 3 private subnets (ZONES_COUNT=3)." >&2
+   [[ "${#public_subnets[@]}" -ne "${#private_subnets[@]}" ]] ||
+   (( ${#public_subnets[@]} < 2 || ${#public_subnets[@]} > 3 )); then
+    echo "Expected a VPC with 2 or 3 public subnets and as many private subnets." >&2
     exit 1
 fi
 for subnet in "${public_subnets[@]}" "${private_subnets[@]}"; do
@@ -183,14 +185,17 @@ Parameters:
     Type: AWS::EC2::Subnet::Id
   PublicSubnet2:
     Type: AWS::EC2::Subnet::Id
+  # Empty when the VPC has only 2 AZs.
   PublicSubnet3:
-    Type: AWS::EC2::Subnet::Id
+    Type: String
+    Default: ""
   PrivateSubnet1:
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet2:
     Type: AWS::EC2::Subnet::Id
   PrivateSubnet3:
-    Type: AWS::EC2::Subnet::Id
+    Type: String
+    Default: ""
   QuayInstanceType:
     Type: String
   QuayUserData:
@@ -212,6 +217,8 @@ Parameters:
   DbPassword:
     Type: String
     NoEcho: true
+Conditions:
+  HasThirdZone: !Not [!Equals [!Ref PublicSubnet3, ""]]
 Resources:
   QuaySecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -317,7 +324,8 @@ Resources:
         DeviceIndex: "0"
         GroupSet:
         - !GetAtt QuaySecurityGroup.GroupId
-        SubnetId: !Ref PublicSubnet3
+        # With 2 AZs the third node shares the first subnet.
+        SubnetId: !If [HasThirdZone, !Ref PublicSubnet3, !Ref PublicSubnet1]
       BlockDeviceMappings:
       - DeviceName: !Ref RootDeviceName
         Ebs:
@@ -356,7 +364,7 @@ Resources:
       SubnetIds:
       - !Ref PrivateSubnet1
       - !Ref PrivateSubnet2
-      - !Ref PrivateSubnet3
+      - !If [HasThirdZone, !Ref PrivateSubnet3, !Ref AWS::NoValue]
   Db:
     Type: AWS::RDS::DBInstance
     # The DBInstance default is Snapshot, which would outlive the job.
@@ -389,9 +397,9 @@ Resources:
       Subnets:
       - !Ref PublicSubnet1
       - !Ref PublicSubnet2
-      - !Ref PublicSubnet3
-      # One node per AZ: without cross-zone, a stopped node blackholes its AZ's
-      # NLB address until DNS failover catches up.
+      - !If [HasThirdZone, !Ref PublicSubnet3, !Ref AWS::NoValue]
+      # Without cross-zone, stopping an AZ's only node blackholes that AZ's NLB
+      # address until DNS failover catches up.
       LoadBalancerAttributes:
       - Key: load_balancing.cross_zone.enabled
         Value: "true"
@@ -434,9 +442,9 @@ Resources:
       Subnets:
       - !Ref PublicSubnet1
       - !Ref PublicSubnet2
-      - !Ref PublicSubnet3
-      # Clair runs in AZs 1 and 2 only, so AZ 3's address needs cross-zone, and
-      # so does an AZ whose scanner failover stopped.
+      - !If [HasThirdZone, !Ref PublicSubnet3, !Ref AWS::NoValue]
+      # Clair runs on Quay nodes 1 and 2 only, so a third AZ's address needs
+      # cross-zone, and so does an AZ whose scanner failover stopped.
       LoadBalancerAttributes:
       - Key: load_balancing.cross_zone.enabled
         Value: "true"
@@ -534,10 +542,10 @@ aws --region "${region}" cloudformation create-stack \
         "ParameterKey=VpcCidr,ParameterValue=${vpc_cidr}" \
         "ParameterKey=PublicSubnet1,ParameterValue=${public_subnets[0]}" \
         "ParameterKey=PublicSubnet2,ParameterValue=${public_subnets[1]}" \
-        "ParameterKey=PublicSubnet3,ParameterValue=${public_subnets[2]}" \
+        "ParameterKey=PublicSubnet3,ParameterValue=${public_subnets[2]:-}" \
         "ParameterKey=PrivateSubnet1,ParameterValue=${private_subnets[0]}" \
         "ParameterKey=PrivateSubnet2,ParameterValue=${private_subnets[1]}" \
-        "ParameterKey=PrivateSubnet3,ParameterValue=${private_subnets[2]}" \
+        "ParameterKey=PrivateSubnet3,ParameterValue=${private_subnets[2]:-}" \
         "ParameterKey=QuayInstanceType,ParameterValue=${QUAY_STANDALONE_INSTANCE_TYPE}" \
         "ParameterKey=QuayUserData,ParameterValue=${quay_user_data}" \
         "ParameterKey=RedisInstanceType,ParameterValue=${QUAY_STANDALONE_REDIS_INSTANCE_TYPE}" \
