@@ -34,12 +34,39 @@ build_root:
       install -m 0755 /tmp/jwt /usr/local/bin/jwt && \
       rm -f /tmp/jwt-linux.tar.gz /tmp/jwt
       ENV PATH=$PATH:/usr/local/go/bin
+images:
+  items:
+  - dockerfile_path: Dockerfile.bootstrap-provider
+    to: cluster-api-bootstrap-provider-openshift-assisted
+  - dockerfile_path: Dockerfile.controlplane-provider
+    to: cluster-api-controlplane-provider-openshift-assisted
+  - build_args:
+    - name: CAPK_REPOSITORY
+      value: https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt
+    - name: CAPK_REF
+      value: c5c530b33067c434304743a8376015352aec21d0
+    dockerfile_literal: |-
+      FROM src AS builder
+      ARG CAPK_REPOSITORY
+      ARG CAPK_REF
+      RUN mkdir -p /tmp/capk && \
+          curl -fsSL "${CAPK_REPOSITORY}/archive/${CAPK_REF}.tar.gz" | \
+          tar -xz --strip-components=1 -C /tmp/capk
+      WORKDIR /tmp/capk
+      RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=readonly -buildvcs=false -o /manager .
+      FROM gcr.io/distroless/static:nonroot
+      WORKDIR /
+      COPY --from=builder /manager .
+      USER 65532:65532
+      ENTRYPOINT ["/manager"]
+    from: src
+    to: capk-pinned-main
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -66,6 +93,21 @@ tests:
   container:
     from: src
   run_if_changed: ^(test/playbooks/.*|test/e2e/.*)$
+- always_run: false
+  as: e2e-capi-kubevirt-4-22
+  optional: true
+  steps:
+    cluster_profile: azure-virtualization
+    dependencies:
+      CAPOA_BOOTSTRAP_IMAGE: cluster-api-bootstrap-provider-openshift-assisted
+      CAPOA_CONTROLPLANE_IMAGE: cluster-api-controlplane-provider-openshift-assisted
+    env:
+      CAPI_VERSION: v1.13.4
+      CAPK_SOURCE_REF: c5c530b33067c434304743a8376015352aec21d0
+      CAPK_SOURCE_REPOSITORY: https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt
+      KUBEVIRT_STORAGE_CLASS: managed-csi
+      OPENSHIFT_VERSION: "4.22"
+    workflow: assisted-capi-kubevirt
 - always_run: false
   as: e2e-capi-sno-4-22
   capabilities:
