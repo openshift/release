@@ -16,8 +16,6 @@ echo "configuring a custom cluster-network CIDR and hostPrefix"
 echo "\nsee below for actual values used\n--------------------------------\n"
 
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
-networking:
-  networkType: OVNKubernetes
   clusterNetwork:
   - cidr: $CLUSTER_NETWORK_CIDR
     hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX
