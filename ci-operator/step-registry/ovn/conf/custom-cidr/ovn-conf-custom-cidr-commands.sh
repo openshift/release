@@ -4,11 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}
+if [[ -z "${CLUSTER_NETWORK_CIDR:-}" ]]; then
+  echo "CLUSTER_NETWORK_CIDR is not set; leaving the install configuration unchanged"
+  exit 0
+fi
+
 CLUSTER_NETWORK_HOST_PREFIX=${CLUSTER_NETWORK_HOST_PREFIX:-23}
 SERVICE_NETWORK_CIDR=${SERVICE_NETWORK_CIDR:-172.30.0.0/16}
 
-echo "default is to update cidr to 20 w/ hostPrefix of 23 so that max nodes num is 8"
+echo "configuring a custom cluster-network CIDR and hostPrefix"
 echo "\nsee below for actual values used\n--------------------------------\n"
 
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
