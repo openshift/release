@@ -4,7 +4,7 @@ workflow:
     allow_best_effort_post_steps: true
     env:
       PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay
-      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration|OCP-81036'
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration|OCP-81036|creates notifications for each event type'
       PLAYWRIGHT_MAX_FAILURES: "0"
       PLAYWRIGHT_REF_MODE: strict
       PLAYWRIGHT_STANDALONE: "true"
@@ -34,7 +34,9 @@ workflow:
     then node and scanner failover, then the full Playwright suite pinned to
     the deployed image's commit, minus the grep-invert exclusions, with every
     test run to completion; it skips OCP-81036 until quay/quay's regctl uses
-    TLS. Failover runs before Playwright because the OAuth token from
-    quay-standalone-deploy expires 9000s after the deploy.
+    TLS, and "creates notifications for each event type" until quay/quay's
+    test closes the notification drawer when an event is unavailable (build
+    support is off here). Failover runs before Playwright because the OAuth
+    token from quay-standalone-deploy expires 9000s after the deploy.
     Post gathers diagnostics, deletes the bucket and stacks, and fails on
     leaked resources.
