@@ -94,6 +94,7 @@ if [[ -s "${SHARED_DIR}/quay_standalone_nodes" ]]; then
         gather_host "${node_dir}" "${public_ip}" \
             podman-ps 'sudo podman ps -a' \
             podman-logs-quay 'sudo podman logs --tail 100000 quay' \
+            podman-logs-quay-mirror 'sudo podman logs --tail 100000 quay-mirror' \
             "${clair[@]}" \
             journal-cloud-final 'sudo journalctl -u cloud-final --no-pager'
     done
