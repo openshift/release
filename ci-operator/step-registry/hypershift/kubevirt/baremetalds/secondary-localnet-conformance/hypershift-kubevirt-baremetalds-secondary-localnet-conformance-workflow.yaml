@@ -43,7 +43,13 @@ workflow:
       CLOUD_PROVIDER: "kubevirt"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.20
       ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
-      IP_STACK: v4
+      # IP_STACK describes the management cluster, which DEVSCRIPTS_CONFIG below
+      # installs as dual-stack.  hypershift-agent-create-config-dns reads it to know
+      # how many addresses the worker has, and hypershift-kubevirt-create reads it to
+      # decide whether to block IPv6 during VM boot.  The hosted cluster is IPv4-only
+      # because the secondary bridge carries only IPv4; that is HOSTED_IP_STACK.
+      IP_STACK: v4v6
+      HOSTED_IP_STACK: v4
       EXTRA_NETWORK_CONFIG: |
         EXTRA_NETWORK_NAMES="extranet"
         EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
