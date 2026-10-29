@@ -2,18 +2,16 @@
 
 The controller initializes `controller-report.txt` and `controller-auth.jsonl`
 before checking the lease kubeconfig or logging into OCM. Initial login and
-environment switches share a maximum of three attempts per login, with 10 and
-20 seconds between attempts. Complete SSO client credentials take precedence
+environment switches each use a maximum of three total attempts per login, with
+exactly 10 seconds between failed attempts. There is no sleep after success or
+the final failure. Complete SSO client credentials take precedence
 over the offline token; an incomplete client pair still falls back to the token.
 A rejected client login does not fall back to a different credential.
 
-Only the observed `expected response content type 'application/json' but received
-'text/html'` mismatch and these explicitly selected transport signatures retry
-(case insensitive): `i/o timeout`, `TLS handshake timeout`, `connection reset by
-peer`, `unexpected EOF`, `temporary failure in name resolution`, and `context
-deadline exceeded`. Permanent authentication rejection takes precedence even
-when a retry signature is also present. Other errors fail immediately. The final
-OCM CLI exit code is preserved, and the remembered environment changes only
+Every failed OCM login is retried, including unrecognized errors and credential
+rejections. Missing credential inputs fail validation immediately without an OCM
+login attempt or sleep. Failure classifications are diagnostic only and never
+control retries. The final OCM CLI exit code is preserved, and the remembered environment changes only
 after successful login. Failed login stops reconciliation before using the
 wrong environment; retry exhaustion does not resolve the upstream dependency.
 
@@ -45,6 +43,9 @@ The fixture substitutes only the hardcoded lease kubeconfig path with a temporar
 empty file, and mocks desired-state reads while using the embedded Python YAML
 parser unchanged. It requires no
 live OCM, cloud, or Kubernetes access and performs no CI triggers or mutations.
+Cases verify first-attempt success, second- and third-attempt recovery, all
+failure classes retrying, fixed sleep counts, final CLI exit codes, environment
+switches, immediate missing-credential validation, and credential-safe output.
 
 This change is controller-only and independent of the health step in PR 87502.
 No registry definitions or generated metadata inputs change, so regeneration is

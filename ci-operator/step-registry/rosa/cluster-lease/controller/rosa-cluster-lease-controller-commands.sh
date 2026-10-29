@@ -61,10 +61,10 @@ ocm_login() {
         esac
         unset output
         auth_diagnostic "${operation}" "${target_env}" "${attempt}" "${exit_code}" "${failure_class}"
-        if [[ "${failure_class}" != retryable_* || "${attempt}" -eq 3 ]]; then
+        if [[ "${attempt}" -eq 3 ]]; then
             return "${exit_code}"
         fi
-        sleep "$((attempt * 10))"
+        sleep 10
     done
 }
 

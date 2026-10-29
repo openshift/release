@@ -8,7 +8,7 @@ if [[ "${1:-}" != --case ]]; then
     trap 'rm -rf "${results}"' EXIT
     count=0
     for credential in client token partial partial-missing missing; do
-        for scenario in success html-recovery exhaustion final-exit transport-recovery transport-tls transport-reset transport-eof transport-dns transport-deadline permanent mixed unknown near-miss same-env switch-success switch-recovery switch-exhaustion switch-permanent unsafe-env initial-errexit switch-errexit inline-success inline-exhaustion inline-switch-exhaustion inline-permanent; do
+        for scenario in success html-recovery third-recovery exhaustion final-exit varying-failures transport-recovery transport-tls transport-reset transport-eof transport-dns transport-deadline permanent mixed unknown near-miss same-env switch-success switch-recovery switch-third-recovery switch-exhaustion switch-final-exit switch-permanent switch-unknown switch-mixed unsafe-env initial-errexit switch-errexit inline-success inline-exhaustion inline-switch-exhaustion inline-permanent inline-switch-permanent inline-final-exit; do
             case "${credential}:${scenario}" in
                 missing:success|partial:success|partial-missing:success) ;;
                 missing:*|partial:*|partial-missing:*) continue ;;
@@ -20,7 +20,7 @@ if [[ "${1:-}" != --case ]]; then
             expected=0
             case "${scenario}" in
                 initial-errexit|switch-errexit|inline-exhaustion|inline-switch-exhaustion) expected=42 ;;
-                inline-permanent) expected=43 ;;
+                inline-permanent|inline-switch-permanent|inline-final-exit) expected=43 ;;
             esac
             if [[ "${actual}" != "${expected}" ]]; then
                 printf 'FAIL: %s/%s: exit %s, expected %s\n' "${credential}" "${scenario}" "${actual}" "${expected}" >&2
@@ -33,6 +33,18 @@ if [[ "${1:-}" != --case ]]; then
             if [[ "${scenario}" == *errexit || "${scenario}" == inline-* ]]; then
                 test -s "${case_dir}/artifacts/controller-report.txt"
                 test -s "${case_dir}/artifacts/controller-auth.jsonl"
+                expected_calls=3
+                case "${scenario}" in
+                    switch-errexit|inline-switch-*) expected_calls=4 ;;
+                    inline-success) expected_calls=1 ;;
+                esac
+                test "$(wc -l < "${case_dir}/calls")" -eq "${expected_calls}"
+                if [[ "${scenario}" == inline-success ]]; then
+                    test ! -s "${case_dir}/sleeps"
+                else
+                    test "$(cat "${case_dir}/sleeps")" = $'10\n10'
+                    jq -se --argjson status "${expected}" '.[-1].attempt == 3 and .[-1].exit_code == $status' "${case_dir}/artifacts/controller-auth.jsonl" > /dev/null
+                fi
             fi
             printf 'PASS: %s/%s\n' "${credential}" "${scenario}"
             count=$((count + 1))
@@ -84,16 +96,28 @@ ocm() {
     case "${scenario}" in
         html-recovery|transport-*) [[ "${calls}" -ge 2 ]] && return 0 ;;
         switch-recovery) [[ "${calls}" -ge 3 ]] && return 0 ;;
+        third-recovery) [[ "${calls}" -ge 3 ]] && return 0 ;;
+        switch-third-recovery) [[ "${calls}" -ge 4 ]] && return 0 ;;
     esac
     case "${scenario}" in
-        permanent|switch-permanent|inline-permanent)
+        third-recovery|switch-third-recovery|varying-failures)
+            if [[ "${calls}" -eq 1 ]]; then
+                echo "expected response content type 'application/json' but received 'text/html'" >&2
+                return 42
+            elif [[ "${calls}" -eq 2 ]]; then
+                echo 'invalid_client' >&2
+                return 43
+            fi
+            echo 'an unrecognized authentication error' >&2
+            return 44 ;;
+        permanent|switch-permanent|inline-permanent|inline-switch-permanent)
             echo 'invalid_client' >&2
             return 43 ;;
-        mixed)
+        mixed|switch-mixed)
             echo 'invalid_client: connection reset by peer' >&2
             echo "expected response content type 'application/json' but received 'text/html'" >&2
             return 43 ;;
-        unknown) echo 'an unrecognized authentication error' >&2; return 44 ;;
+        unknown|switch-unknown) echo 'an unrecognized authentication error' >&2; return 44 ;;
         near-miss) echo "expected response content type 'application/json' but received 'text/plain'" >&2; return 44 ;;
         transport-recovery) echo 'i/o timeout' >&2; return 42 ;;
         transport-tls) echo 'TLS handshake timeout' >&2; return 42 ;;
@@ -103,7 +127,9 @@ ocm() {
         transport-deadline) echo 'context deadline exceeded' >&2; return 42 ;;
     esac
     echo "expected response content type 'application/json' but received 'text/html'" >&2
-    [[ "${scenario}" == final-exit ]] && return "$((40 + calls))"
+    case "${scenario}" in
+        final-exit|switch-final-exit|inline-final-exit) return "$((40 + calls))" ;;
+    esac
     return 42
 }
 
@@ -113,7 +139,7 @@ if [[ "${scenario}" == inline-* ]]; then
         printf '%s\n' read >> "${case_dir}/reads"
         if [[ "$*" == *rosa-cluster-lease-config* ]]; then
             local environment=staging
-            [[ "${scenario}" == inline-switch-exhaustion ]] && environment=production
+            [[ "${scenario}" == inline-switch-* ]] && environment=production
             jq -n --arg desired "$(printf -- '- name: fixture-cluster\n  env: %s\n' "${environment}")" '{data:{"desired-clusters":$desired}}'
         else
             printf '%s\n' '{"items":[]}'
@@ -133,7 +159,7 @@ if [[ "${scenario}" == inline-* ]]; then
     if [[ "${scenario}" == inline-success ]]; then
         test "${actual}" -eq 0
         grep -q 'Summary' "${REPORT}"
-    elif [[ "${scenario}" == inline-switch-exhaustion ]]; then
+    elif [[ "${scenario}" == inline-switch-* ]]; then
         test "$(wc -l < "${case_dir}/calls")" -eq 4
         test "$(wc -l < "${case_dir}/reads")" -eq 2
     else
@@ -154,10 +180,11 @@ expected_calls=1 expected_class=success
 case "${credential}:${scenario}" in
     missing:*|partial-missing:*) test "${actual}" -eq 1; expected_calls=0; expected_class=missing_credentials ;;
     *:exhaustion|*:unsafe-env) test "${actual}" -eq 42; expected_calls=3; expected_class=retryable_html ;;
-    *:permanent|*:mixed) test "${actual}" -eq 43; expected_class=permanent_auth ;;
+    *:permanent|*:mixed) test "${actual}" -eq 43; expected_calls=3; expected_class=permanent_auth ;;
     *:final-exit) test "${actual}" -eq 43; expected_calls=3; expected_class=retryable_html ;;
-    *:unknown|*:near-miss) test "${actual}" -eq 44; expected_class=unclassified ;;
+    *:unknown|*:near-miss|*:varying-failures) test "${actual}" -eq 44; expected_calls=3; expected_class=unclassified ;;
     *:html-recovery|*:transport-*) test "${actual}" -eq 0; expected_calls=2 ;;
+    *:third-recovery) test "${actual}" -eq 0; expected_calls=3 ;;
     *) test "${actual}" -eq 0 ;;
 esac
 if [[ "${scenario}" == switch-* || "${scenario}" == same-env ]]; then
@@ -172,8 +199,11 @@ if [[ "${scenario}" == switch-* || "${scenario}" == same-env ]]; then
     ocm_ensure_env "${target_env}" || actual=$?
     case "${scenario}" in
         switch-exhaustion) test "${actual}" -eq 42; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=retryable_html ;;
-        switch-permanent) test "${actual}" -eq 43; test "${CURRENT_OCM_ENV}" = staging; expected_calls=2; expected_class=permanent_auth ;;
+        switch-permanent|switch-mixed) test "${actual}" -eq 43; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=permanent_auth ;;
+        switch-unknown) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=unclassified ;;
+        switch-final-exit) test "${actual}" -eq 44; test "${CURRENT_OCM_ENV}" = staging; expected_calls=4; expected_class=retryable_html ;;
         switch-recovery) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = production; expected_calls=3 ;;
+        switch-third-recovery) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = production; expected_calls=4 ;;
         same-env) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = staging ;;
         *) test "${actual}" -eq 0; test "${CURRENT_OCM_ENV}" = production; expected_calls=2 ;;
     esac
@@ -190,11 +220,13 @@ jq -se --arg class "${expected_class}" '.[-1].class == $class and all(.[]; .http
 case "${scenario}" in
     html-recovery|switch-recovery) jq -se 'any(.[]; .class == "retryable_html" and .exit_code == 42)' "${AUTH_REPORT}" > /dev/null ;;
     transport-*) jq -se 'any(.[]; .class == "retryable_transport" and .exit_code == 42)' "${AUTH_REPORT}" > /dev/null ;;
+    third-recovery|switch-third-recovery) jq -se 'any(.[]; .class == "permanent_auth" and .exit_code == 43)' "${AUTH_REPORT}" > /dev/null ;;
+    varying-failures) jq -se '[.[] | select(.class != "started") | .exit_code] == [42,43,44]' "${AUTH_REPORT}" > /dev/null ;;
 esac
 case "${scenario}" in
-    exhaustion|switch-exhaustion|final-exit) test "$(cat "${case_dir}/sleeps")" = $'10\n20' ;;
+    exhaustion|switch-exhaustion|final-exit|switch-final-exit|permanent|mixed|unknown|near-miss|varying-failures|third-recovery|switch-third-recovery|switch-permanent|switch-unknown|switch-mixed) test "$(cat "${case_dir}/sleeps")" = $'10\n10' ;;
     html-recovery|transport-*|switch-recovery) test "$(cat "${case_dir}/sleeps")" = 10 ;;
-    unsafe-env) test "$(cat "${case_dir}/sleeps")" = $'10\n20\n10\n20' ;;
+    unsafe-env) test "$(cat "${case_dir}/sleeps")" = $'10\n10\n10\n10' ;;
     *) test ! -s "${case_dir}/sleeps" ;;
 esac
 if [[ "${actual}" -ne 0 && "${scenario}" != switch-* ]]; then
