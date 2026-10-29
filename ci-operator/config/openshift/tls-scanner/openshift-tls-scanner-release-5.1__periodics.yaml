@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
@@ -174,6 +178,37 @@ tests:
     - ref: tls-groups-configure
     - ref: tls-scanner-run
     workflow: ipi-aws
+- as: periodic-tls-curves-groups-policy-hypershift
+  interval: 24h
+  reporter_config:
+    channel: '#forum-case'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :warning:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      PQC_CHECK: "true"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TLS_GROUPS: SecP384r1MLKEM1024
+      TLS_PROFILE_TYPE: Custom
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    - ref: hypershift-tls-groups
+    test:
+    - ref: tls-scanner-hypershift-run
+    workflow: tls-scanner-hypershift-aws
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
