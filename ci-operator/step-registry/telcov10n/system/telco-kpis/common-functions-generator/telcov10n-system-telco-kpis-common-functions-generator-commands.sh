@@ -42,6 +42,10 @@ MOUNTED_GROUP_INVENTORY="/var/group_variables"
 #   MULTISTAGE_PARAM_OVERRIDE_RDS_REFERENCE_BRANCH -> REFERENCE_BRANCH
 #   MULTISTAGE_PARAM_OVERRIDE_THRESHOLD_DURATION -> THRESHOLD_DURATION
 #   MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE -> REPORT_PUBLISH_MODE
+#   MULTISTAGE_PARAM_OVERRIDE_FORMAL_TEST -> FORMAL_TEST
+#
+# Step-specific overrides (handled in individual step scripts before calling this function):
+#   MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE (push-to-data-lake only)
 # ----------------------------------------------------------------------
 
 apply_gangway_overrides() {
@@ -115,6 +119,244 @@ apply_gangway_overrides() {
     if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE:-}" ]]; then
         export REPORT_PUBLISH_MODE="${MULTISTAGE_PARAM_OVERRIDE_REPORT_PUBLISH_MODE}"
         echo "Using Gangway override: REPORT_PUBLISH_MODE=${REPORT_PUBLISH_MODE}"
+    fi
+
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_FORMAL_TEST:-}" ]]; then
+        export FORMAL_TEST="${MULTISTAGE_PARAM_OVERRIDE_FORMAL_TEST}"
+        echo "Using Gangway override: FORMAL_TEST=${FORMAL_TEST}"
+    fi
+}
+
+# ----------------------------------------------------------------------
+# skip_via_gangway_overrides
+#
+# Checks step-specific MULTISTAGE_PARAM_OVERRIDE_*_SKIP_* variables and
+# handles skip behavior with absolute precedence over JSON config.
+#
+# This function MUST be called BEFORE export_env_vars_from_json.
+#
+# Currently supported overrides:
+#   - MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE (push-to-data-lake)
+#     - If "true": Skip step immediately (exit 0)
+#     - If "false": Force-enable by removing skip from REPORTING_SETTINGS JSON
+#     - If not defined: Continue (use skip from JSON)
+#
+# Future overrides can be added here for other steps.
+# ----------------------------------------------------------------------
+
+skip_via_gangway_overrides() {
+    # Check push-to-data-lake skip override
+    if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE:-}" ]]; then
+        if [[ "${MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE}" == "true" ]]; then
+            echo "SKIPPED: step — MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE=true"
+            exit 0
+        elif [[ "${MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE}" == "false" ]]; then
+            echo "MULTISTAGE_PARAM_OVERRIDE_SPOKE_SKIP_PUSH_TO_DATA_LAKE=false — forcing step to run"
+            REPORTING_SETTINGS=$(printf '%s' "${REPORTING_SETTINGS:-}" | python3 -c "
+import json, sys
+raw = sys.stdin.read().strip()
+settings = json.loads(raw) if raw else {}
+if 'push_to_data_lake' in settings and 'skip' in settings['push_to_data_lake']:
+    del settings['push_to_data_lake']['skip']
+print(json.dumps(settings))
+")
+            export REPORTING_SETTINGS
+        fi
+    fi
+
+    # Future MULTISTAGE skip overrides can be checked here
+}
+
+# ======================================================================
+# UNIFIED EXIT HANDLER FRAMEWORK
+# ======================================================================
+# Global state for cleanup handlers (per-script registration)
+_EXIT_CLEANUP_HANDLERS=()
+
+# ----------------------------------------------------------------------
+# add_cleanup_handler
+#
+# Registers a cleanup function to be executed on script exit (success or
+# failure). Cleanup handlers run in LIFO order (last registered, first
+# executed) before any exit logic (debug, continue_on_fail).
+#
+# Use cases:
+#   - Release distributed locks (deploy-vm-bastion)
+#   - Remove temporary credential files (generate-report, push-to-data-lake)
+#   - Collect artifacts from /artifacts/ to ARTIFACT_DIR/SHARED_DIR
+#
+# Parameters:
+#   1 - handler_function: Name of the function to call on EXIT
+#
+# Usage:
+#   _gather_artifacts() { cp /artifacts/*.json "${ARTIFACT_DIR}/" || true; }
+#   add_cleanup_handler _gather_artifacts
+# ----------------------------------------------------------------------
+
+add_cleanup_handler() {
+    local handler="$1"
+    _EXIT_CLEANUP_HANDLERS+=("${handler}")
+}
+
+# ----------------------------------------------------------------------
+# __telco_kpis_exit_handler (INTERNAL)
+#
+# Unified exit handler that runs ALL exit logic for telco-kpis steps.
+# This function should NEVER be called directly - it is installed by
+# setup_telco_kpis_exit_handler() as the EXIT trap.
+#
+# Execution phases:
+#   1. CLEANUP: Runs all registered cleanup handlers (always, regardless of exit code)
+#   2. EXIT LOGIC: Determines exit behavior based on priority:
+#      - Priority 1: CONTINUE_ON_FAIL (dev override: force exit 0 on error)
+#      - Priority 2: DEBUG_ON_FAIL (PR debugging: wait loop on error)
+#      - Priority 3: Natural exit (default: exit with original code)
+#
+# Critical: Preserves original exit code through all cleanup operations
+# so DEBUG_ON_FAIL and downstream tools get the correct exit status.
+# ----------------------------------------------------------------------
+
+__telco_kpis_exit_handler() {
+    # CRITICAL: Capture original exit code IMMEDIATELY before any operations
+    local original_exit_code=$?
+
+    # --- PHASE 1: CLEANUP (Always runs, regardless of exit code) ---
+    if [[ ${#_EXIT_CLEANUP_HANDLERS[@]} -gt 0 ]]; then
+        echo "=========================================="
+        echo "Running ${#_EXIT_CLEANUP_HANDLERS[@]} cleanup handler(s)..."
+        echo "=========================================="
+
+        # Run in reverse order (LIFO: last registered, first executed)
+        # This ensures artifacts are gathered before temp files are removed
+        for ((i=${#_EXIT_CLEANUP_HANDLERS[@]}-1; i>=0; i--)); do
+            local handler="${_EXIT_CLEANUP_HANDLERS[i]}"
+            echo "→ Running cleanup: ${handler}"
+            ${handler} || echo "  WARNING: Cleanup handler '${handler}' failed (continuing)"
+        done
+
+        echo "Cleanup phase complete"
+        echo "=========================================="
+    fi
+
+    # --- PHASE 2: EXIT LOGIC (Priority order) ---
+
+    # Priority 1: CONTINUE_ON_FAIL (development override - highest priority)
+    # When enabled, forces exit 0 on any error to continue the pipeline.
+    # Used for development/debugging - NOT for production runs.
+    if [[ "${CONTINUE_ON_FAIL:-false}" == "true" ]] && [[ ${original_exit_code} -ne 0 ]]; then
+        echo "CONTINUE_ON_FAIL enabled — test failed (exit code ${original_exit_code}) but forcing exit 0"
+        exit 0
+    fi
+
+    # Priority 2: DEBUG_ON_FAIL (interactive debugging in PRs)
+    # When enabled in PR runs, enters a wait loop on failure to allow
+    # interactive debugging in the pod terminal. Preserves original exit
+    # code so failure is still reported after debug timeout.
+    if [[ "${DEBUG_ON_FAIL:-false}" == "true" ]] && [[ -n "${PULL_NUMBER:-}" ]] && [[ ${original_exit_code} -ne 0 ]]; then
+        echo
+        echo "################################################################################"
+        echo "# PR ${PULL_NUMBER} — Step failed (exit code ${original_exit_code}). Entering debug mode..."
+        echo "################################################################################"
+
+        TZ=UTC
+        local end_time
+        end_time=$(date -d "${DEBUG_TIMEOUT:-+10 min}" +%s)
+        local debug_done=/tmp/debug.done
+        local keep_debugging=/tmp/keep.debugging
+
+        while sleep 1m; do
+            [[ -f "${debug_done}" ]] && break
+            echo
+            echo "-------------------------------------------------------------------"
+            echo "'${debug_done}' not found. Debugging can continue..."
+            local now
+            now=$(date +%s)
+            if [[ "${end_time}" -lt "${now}" ]]; then
+                if [[ -f "${keep_debugging}" ]]; then
+                    echo "To quit debugging: rm -f ${keep_debugging}"
+                    continue
+                else
+                    echo "Timeout reached. Exiting debug mode..."
+                    break
+                fi
+            else
+                echo "Now:     $(date -d "@${now}")"
+                echo "Timeout: $(date -d "@${end_time}")"
+            fi
+            echo "[Note]:"
+            echo "- To exit debug mode early: touch ${debug_done}"
+            echo "- To extend past timeout:   touch ${keep_debugging}"
+        done
+
+        echo
+        echo "Exiting debug mode with original exit code: ${original_exit_code}"
+        exit ${original_exit_code}
+    fi
+
+    # Priority 3: Natural exit (default)
+    # Exit with the original exit code from the script/playbook/test.
+    # No special behavior - standard Prow step exit.
+    exit ${original_exit_code}
+}
+
+# ----------------------------------------------------------------------
+# setup_telco_kpis_exit_handler
+#
+# Installs the unified exit handler for the current script. This function
+# should be called ONCE at the start of main() in each telco-kpis step.
+#
+# The unified handler provides:
+#   - Guaranteed cleanup execution (locks, credentials, artifacts)
+#   - CONTINUE_ON_FAIL support (development override)
+#   - DEBUG_ON_FAIL support (PR debugging)
+#   - Correct exit code preservation through all cleanup
+#
+# Usage:
+#   main() {
+#       setup_telco_kpis_exit_handler  # Install unified handler FIRST
+#
+#       # Register cleanup handlers (script-specific)
+#       add_cleanup_handler _cleanup_sensitive_vars
+#       add_cleanup_handler _gather_artifacts
+#
+#       # Do work...
+#   }
+# ----------------------------------------------------------------------
+
+setup_telco_kpis_exit_handler() {
+    trap '__telco_kpis_exit_handler' EXIT
+}
+
+# ======================================================================
+# DEPRECATED FUNCTIONS (Backwards Compatibility)
+# ======================================================================
+# The functions below are kept for backwards compatibility with existing
+# scripts. New scripts should use:
+#   - setup_telco_kpis_exit_handler() instead of setup_debug_on_fail/setup_continue_on_fail
+#   - add_cleanup_handler() instead of add_exit_handler()
+# ======================================================================
+
+# ----------------------------------------------------------------------
+# add_exit_handler (DEPRECATED)
+#
+# Legacy function - redirects to add_cleanup_handler for backwards compatibility.
+# Automatically installs the unified handler if not already installed.
+# Use add_cleanup_handler() in new code.
+# ----------------------------------------------------------------------
+
+add_exit_handler() {
+    _ensure_unified_handler_installed
+    add_cleanup_handler "$1"
+}
+
+# Internal helper to ensure unified handler is installed (for backwards compat)
+_ensure_unified_handler_installed() {
+    # Check if our unified handler is already installed
+    local current_trap
+    current_trap=$(trap -p EXIT | sed "s/trap -- '\(.*\)' EXIT/\1/")
+
+    if [[ "${current_trap}" != "__telco_kpis_exit_handler" ]]; then
+        setup_telco_kpis_exit_handler
     fi
 }
 
@@ -481,93 +723,46 @@ for key, value in merged.items():
 }
 
 # ----------------------------------------------------------------------
-# setup_continue_on_fail
+# setup_continue_on_fail (DEPRECATED)
 #
-# When CONTINUE_ON_FAIL=true, sets an ERR trap so that test failures
-# exit 0 instead of non-zero. Prow sees success and continues to the
-# next step. Intended for development/debugging, not production runs.
+# Legacy function for backwards compatibility with existing scripts.
+# Now handled by setup_telco_kpis_exit_handler() which checks CONTINUE_ON_FAIL.
 #
-# Uses set -E (errtrace) so the trap is inherited by functions like main().
+# Automatically installs the unified handler if not already installed.
+# New scripts should call setup_telco_kpis_exit_handler() directly.
 # ----------------------------------------------------------------------
 
 setup_continue_on_fail() {
+    _ensure_unified_handler_installed
+
     if [[ "${CONTINUE_ON_FAIL:-false}" == "true" ]]; then
         echo "CONTINUE_ON_FAIL enabled — test failures will not stop the pipeline"
+        # Still set -E for ERR trap inheritance (might be used elsewhere)
         set -E
-        trap 'echo "ERROR: Test failed (exit code $?) but CONTINUE_ON_FAIL=true — continuing"; exit 0' ERR
     fi
 }
 
 # ----------------------------------------------------------------------
-# setup_debug_on_fail
+# setup_debug_on_fail (DEPRECATED)
 #
-# When DEBUG_ON_FAIL=true AND running in a PR (PULL_NUMBER set),
-# sets an EXIT trap that enters a debug wait loop on non-zero exit.
-# Unlike continue_on_fail, this preserves the original exit code.
-# The step's full context (inventory, vaults, env) remains available
-# for interactive debugging via the pod terminal.
+# Legacy function for backwards compatibility with existing scripts.
+# Now handled by setup_telco_kpis_exit_handler() which checks DEBUG_ON_FAIL.
 #
-# Uses DEBUG_TIMEOUT from JSON settings (default: "+10 min") to control
-# how long to wait. Sentinel files /tmp/debug.done and /tmp/keep.debugging
-# control the loop.
+# Automatically installs the unified handler if not already installed.
+# New scripts should call setup_telco_kpis_exit_handler() directly.
 # ----------------------------------------------------------------------
 
 setup_debug_on_fail() {
+    _ensure_unified_handler_installed
+
     if [[ "${DEBUG_ON_FAIL:-false}" != "true" ]]; then
         return 0
     fi
     if [[ -z "${PULL_NUMBER:-}" ]]; then
-        echo "DEBUG_ON_FAIL enabled but not a PR run — skipping debug trap"
+        echo "DEBUG_ON_FAIL enabled but not a PR run — will be skipped"
         return 0
     fi
     echo "DEBUG_ON_FAIL enabled — will enter debug mode on failure (PR ${PULL_NUMBER})"
-    trap '__debug_on_fail_exit_handler' EXIT
-}
-
-__debug_on_fail_exit_handler() {
-    local exit_code=$?
-    if [[ ${exit_code} -eq 0 ]]; then
-        return 0
-    fi
-
-    echo
-    echo "################################################################################"
-    echo "# PR ${PULL_NUMBER:-} — Step failed (exit code ${exit_code}). Entering debug mode..."
-    echo "################################################################################"
-
-    TZ=UTC
-    local end_time
-    end_time=$(date -d "${DEBUG_TIMEOUT:-+10 min}" +%s)
-    local debug_done=/tmp/debug.done
-    local keep_debugging=/tmp/keep.debugging
-
-    while sleep 1m; do
-        [[ -f "${debug_done}" ]] && break
-        echo
-        echo "-------------------------------------------------------------------"
-        echo "'${debug_done}' not found. Debugging can continue..."
-        local now
-        now=$(date +%s)
-        if [[ "${end_time}" -lt "${now}" ]]; then
-            if [[ -f "${keep_debugging}" ]]; then
-                echo "To quit debugging: rm -f ${keep_debugging}"
-                continue
-            else
-                echo "Timeout reached. Exiting debug mode..."
-                break
-            fi
-        else
-            echo "Now:     $(date -d "@${now}")"
-            echo "Timeout: $(date -d "@${end_time}")"
-        fi
-        echo "[Note]:"
-        echo "- To exit debug mode early: touch ${debug_done}"
-        echo "- To extend past timeout:   touch ${keep_debugging}"
-    done
-
-    echo
-    echo "Exiting debug mode with original exit code: ${exit_code}"
-    exit ${exit_code}
 }
 
 # ----------------------------------------------------------------------

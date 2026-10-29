@@ -38,7 +38,7 @@ main() {
             rm -f "${UUID_FILE}"
         fi
     }
-    trap release_lock EXIT
+    add_exit_handler release_lock
 
     echo "Acquiring lock '${LOCK_NAME}' on hypervisor (BUILD_ID=${BUILD_ID:-unknown})..."
     ansible-playbook ./playbooks/telco-kpis/remote-flock-acquire.yml \
