@@ -9,8 +9,11 @@ ref:
       memory: 200Mi
   documentation: |-
     Cleans up after rosa-conf-vpc-cni: deletes the IRSA role created by that
-    step (${SHARED_DIR}/aws-vpc-cni-role-name). The standard deprovision chain
-    does not know about the extra role and would leak it.
+    step (${SHARED_DIR}/aws-vpc-cni-role-name) and detaches the
+    AmazonEC2ContainerRegistryReadOnly policy it attached to the worker
+    instance role (${SHARED_DIR}/aws-vpc-cni-worker-role-arn) so the nodes
+    could pull the CNI images from Amazon's private ECR. The standard
+    deprovision chain knows about neither and would leak both.
 
     All in-cluster changes (the SCCs, the helm release and the ip-forward
     tuning config) are removed with the cluster by rosa-cluster-deprovision.

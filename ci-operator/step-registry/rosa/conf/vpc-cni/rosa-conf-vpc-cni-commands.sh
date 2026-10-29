@@ -174,6 +174,25 @@ aws iam attach-role-policy \
   --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
 rm -f "${TRUST_POLICY}"
 
+# ---- ECR pull permission for the CNI images ----
+# The chart's images come from Amazon's EKS artifact account
+# (602401143452.dkr.ecr.<region>.amazonaws.com), a private cross-account
+# registry. The worker instance role created by rosa-sts-account-roles-create
+# only carries ROSAWorkerInstancePolicy (no ecr:*), so nodes cannot pull the
+# images and the aws-node pods stick in ImagePullBackOff. Attach the
+# AWS-managed read-only ECR policy to the job-scoped worker role;
+# rosa-conf-vpc-cni-cleanup detaches it again after the cluster is gone.
+WORKER_ROLE_ARN=$(jq -r '.aws.sts.worker_role_arn // empty' <<<"${CLUSTER_JSON}")
+if [[ -z "${WORKER_ROLE_ARN}" ]]; then
+  log "ERROR: cannot determine the worker instance role for cluster ${CLUSTER_ID}"
+  exit 1
+fi
+echo -n "${WORKER_ROLE_ARN}" > "${SHARED_DIR}/aws-vpc-cni-worker-role-arn"
+aws iam attach-role-policy \
+  --role-name "${WORKER_ROLE_ARN##*/}" \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+log "Attached AmazonEC2ContainerRegistryReadOnly to ${WORKER_ROLE_ARN}"
+
 # ---- SCCs for the aws-node service account ----
 oc adm policy add-scc-to-user hostaccess -z aws-node -n kube-system
 oc adm policy add-scc-to-user privileged -z aws-node -n kube-system
@@ -282,6 +301,40 @@ helm upgrade --install aws-vpc-cni \
   --version "${VPC_CNI_CHART_VERSION}" \
   --values "${VALUES_FILE}"
 rm -f "${VALUES_FILE}"
+
+# ---- Patch the chart's hardcoded cni-bin-dir hostPath ----
+# Chart versions up to at least v1.23.x hardcode the cni-bin-dir volume to
+# /opt/cni/bin with no values override. On RHCOS /opt/cni is an OSTree
+# symlink (/opt/cni -> /usr/lib/opt/cni), so kubelet cannot create
+# /opt/cni/bin and the init container fails with CreateContainerError
+# ("mkdir /opt/cni: file exists"). Point the volume at the ROSA/CRI-O path
+# the values already use for HOST_CNI_BIN_PATH. The volumes list merges by
+# name, so only cni-bin-dir is replaced.
+oc patch daemonset/aws-node -n kube-system --type=merge -p '
+  {"spec":{"template":{"spec":{"volumes":[
+    {"name":"cni-bin-dir","hostPath":{"path":"/var/lib/cni/bin"}}
+  ]}}}}'
+
+# ---- Wait for the aws-node DaemonSet and the nodes ----
+# The tuning-config machine pool edits replace the nodes, so first wait until
+# nodes register again (oc wait on nodes fails with "no matching resources
+# found" while the replacement nodes are still booting).
+log "Waiting for nodes to register after the machine pool updates"
+NODE_WAIT=0
+until oc get node -o name 2>/dev/null | grep -q .; do
+  NODE_WAIT=$((NODE_WAIT + 1))
+  if [[ ${NODE_WAIT} -gt 60 ]]; then
+    log "ERROR: no nodes registered within 15 minutes"
+    exit 1
+  fi
+  sleep 15
+done
+
+log "Waiting for the aws-node DaemonSet rollout"
+oc rollout status daemonset/aws-node -n kube-system --timeout=15m
+
+log "Waiting for nodes to become Ready"
+oc wait --for=condition=Ready node --all --timeout=30m
 
 # ---- Record the CNI in the SHARED_DIR contract ----
 # Write the marker first: rosa-e2e-rosa-cli-publish-contract (which may run

@@ -4,10 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Cleans up after rosa-conf-vpc-cni: removes the IRSA IAM role the standard
-# deprovision chain does not know about. All in-cluster changes (the SCCs, the
-# helm release and the tuning config) are removed with the cluster by
-# rosa-cluster-deprovision.
+# Cleans up after rosa-conf-vpc-cni: removes the IRSA IAM role and detaches
+# the ECR read-only policy the standard deprovision chain does not know
+# about. All in-cluster changes (the SCCs, the helm release and the tuning
+# config) are removed with the cluster by rosa-cluster-deprovision.
 
 log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
@@ -21,6 +21,26 @@ if [[ -f "${AWSCRED}" ]]; then
 else
   log "ERROR: no ${AWSCRED} in the cluster profile; cannot configure the AWS CLI"
   exit 1
+fi
+
+# ---- Detach the ECR read-only policy from the worker role ----
+# Attached by rosa-conf-vpc-cni so the nodes can pull the CNI images from
+# Amazon's private ECR. The worker role itself is created and deleted by
+# rosa-sts-account-roles-create/delete, but detach anyway in case the role
+# outlives the job (shared account roles): leaving the policy attached grants
+# the role ECR read access it was not provisioned with.
+if [[ -s "${SHARED_DIR}/aws-vpc-cni-worker-role-arn" ]]; then
+  WORKER_ROLE_ARN=$(cat "${SHARED_DIR}/aws-vpc-cni-worker-role-arn")
+  if err=$(aws iam detach-role-policy \
+    --role-name "${WORKER_ROLE_ARN##*/}" \
+    --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly 2>&1); then
+    log "Detached AmazonEC2ContainerRegistryReadOnly from ${WORKER_ROLE_ARN}"
+  elif grep -qE 'NoSuchEntity|PolicyAttachmentNotFound|was not found' <<<"${err}"; then
+    log "ECR policy already detached or role ${WORKER_ROLE_ARN##*/} gone"
+  else
+    log "ERROR: cannot detach ECR policy from ${WORKER_ROLE_ARN}: ${err}"
+    exit 1
+  fi
 fi
 
 # ---- Delete the IRSA role ----
