@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/ref
     # shellcheck disable=SC2154
     trap '
         typeset -i ec=$?
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+        LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX}--%s" \
             ExitTrap--PostProcessPrep junit--cnv__interop-tests__openshift-virtualization-tests.xml || true
         debug_on_exit "${ec}" "${start_time}"
     ' EXIT
