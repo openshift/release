@@ -549,7 +549,7 @@ function check_for_pr() {
     }
 
 # Check if we are running on a pull request and check commit message for Depends-On
-# If Depends-On is found, extract the pull request URL with org and repo from commit message
+# If Depends-On is found (DNM: rehearsal of cnf-features-deploy#5406), extract the pull request URL with org and repo from commit message
 # For example: Depends-On: https://github.com/openshift-kni/cnf-features-deploy/pull/1394
 function check_commit_message_for_prs {
     set -x
