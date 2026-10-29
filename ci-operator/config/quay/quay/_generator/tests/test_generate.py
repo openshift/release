@@ -485,11 +485,17 @@ def test_upgrade_nightlies() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     expected = {
-        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": ("from-316", "stable", "4.22", "3.16", "3.17"),
-        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": ("from-317", "stable", "4.22", "3.17", "3.18"),
-        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": ("from-318", "candidate", "5.0", "3.18", "5.0"),
+        "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": (
+            "from-316", "stable", "4.22", "3.16", "3.17", "quay-fbc-unified-4.22-20261028130132988045.ocp4.22"
+        ),
+        "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": (
+            "from-317", "stable", "4.22", "3.17", "3.18", "quay-fbc-unified-4.22-20261028130132988045.ocp4.22"
+        ),
+        "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": (
+            "from-318", "candidate", "5.0", "3.18", "5.0", "quay-5.0__v5.0__quay-rhel9-operator"
+        ),
     }
-    for filename, (as_name, channel, ocp, source, target) in expected.items():
+    for filename, (as_name, channel, ocp, source, target, index_tag) in expected.items():
         config = by_name[filename]
         assert config["releases"]["latest"] == {
             "release": {"architecture": "amd64", "channel": channel, "version": ocp}
@@ -500,7 +506,7 @@ def test_upgrade_nightlies() -> None:
         env = test["steps"]["env"]
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
-        assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+        assert env["QUAY_INDEX_IMAGE_TAG"] == index_tag
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
@@ -578,6 +584,27 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+@pytest.mark.parametrize(
+    ("filename", "uses_playwright"),
+    [
+        ("quay-quay-redhat-3.15__aws-ocp422-e2e-legacy.yaml", False),
+        ("quay-quay-redhat-3.16__aws-ocp422-e2e-install.yaml", True),
+        ("quay-quay-redhat-3.17__aws-ocp422-e2e-install.yaml", True),
+        ("quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml", True),
+        ("quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml", True),
+        ("quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml", True),
+    ],
+)
+def test_unified_fbc_422_rehearsals_use_the_shipment_catalog(filename: str, uses_playwright: bool) -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}[filename]
+    env = config["tests"][0]["steps"]["env"]
+    assert env["QUAY_INDEX_IMAGE_REPO"] == "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
+    assert env["QUAY_INDEX_IMAGE_TAG"] == "quay-fbc-unified-4.22-20261028130132988045.ocp4.22"
+    if uses_playwright:
+        assert env["PLAYWRIGHT_REF_MODE"] == "strict"
 
 
 def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
