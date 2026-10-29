@@ -80,11 +80,18 @@ if [[ -s "${SHARED_DIR}/quay_standalone_nodes" ]]; then
     for index in "${!nodes[@]}"; do
         read -r instance_id public_ip _ <<< "${nodes[${index}]}"
         echo "Gathering Quay node $((index + 1)) (${instance_id})..."
+        node_dir="${out}/quay-$((index + 1))-${instance_id}"
+        # The console can show an OOM kill or panic on a node SSH cannot reach.
+        if [[ -n "${region}" ]]; then
+            mkdir -p "${node_dir}"
+            aws --region "${region}" ec2 get-console-output --instance-id "${instance_id}" --latest \
+                --output text 2>&1 | redact > "${node_dir}/console-output.txt"
+        fi
         clair=()
         if (( index < 2 )); then
             clair=(podman-logs-clair 'sudo podman logs --tail 5000 clair')
         fi
-        gather_host "${out}/quay-$((index + 1))-${instance_id}" "${public_ip}" \
+        gather_host "${node_dir}" "${public_ip}" \
             podman-ps 'sudo podman ps -a' \
             podman-logs-quay 'sudo podman logs --tail 5000 quay' \
             "${clair[@]}" \
