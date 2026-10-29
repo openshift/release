@@ -99,11 +99,6 @@ promotion:
     - success-200-isvc
     namespace: opendatahub-io
     tag: latest
-raw_steps:
-- source_step:
-    from: root
-    ref: mholder6.kserve
-    to: kserve-pr
 releases:
   latest:
     release:
@@ -321,24 +316,35 @@ tests:
     - as: tls-scanner-workloads
       cli: latest
       commands: |-
+        KSERVE_SOURCE_DIR="/go/src/github.com/mholder6/kserve"
+        if ! grep -q '^deploy-tls-scanner-workloads-ocp:' "$KSERVE_SOURCE_DIR/Makefile.ocp.mk"; then
+          KSERVE_SOURCE_DIR="/go/src/github.com/opendatahub-io/kserve"
+        fi
+        cd "$KSERVE_SOURCE_DIR"
         make deploy-tls-scanner-workloads-ocp RUNNING_LOCAL=false \
+          TLS_SCANNER_READY_TIMEOUT=15m \
           TLS_SCANNER_NAMESPACE=kserve-tls-scanner
       dependencies:
       - env: SKLEARN_IMAGE
         name: sklearn-serving-runtime
-      from: kserve-pr
+      from: src
       resources:
         requests:
           cpu: 100m
-      timeout: 30m0s
+      timeout: 20m0s
     - ref: tls-scanner-run
     - as: tls-scanner-workloads-cleanup
       best_effort: true
       cli: latest
       commands: |-
+        KSERVE_SOURCE_DIR="/go/src/github.com/mholder6/kserve"
+        if ! grep -q '^cleanup-tls-scanner-workloads-ocp:' "$KSERVE_SOURCE_DIR/Makefile.ocp.mk"; then
+          KSERVE_SOURCE_DIR="/go/src/github.com/opendatahub-io/kserve"
+        fi
+        cd "$KSERVE_SOURCE_DIR"
         make cleanup-tls-scanner-workloads-ocp \
           TLS_SCANNER_NAMESPACE=kserve-tls-scanner
-      from: kserve-pr
+      from: src
       resources:
         requests:
           cpu: 100m

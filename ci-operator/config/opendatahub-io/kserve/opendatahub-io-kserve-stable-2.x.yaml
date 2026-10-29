@@ -1,8 +1,4 @@
 base_images:
-  tls-scanner-tool:
-    name: "4.22"
-    namespace: ocp
-    tag: tls-scanner-tool
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -157,9 +153,6 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
-      PQC_CHECK: "true"
-      SCAN_NAMESPACE: kserve-tls-scanner
-      SCANNER_POD_MODE: "true"
     post:
     - as: testlog-gather
       best_effort: true
@@ -190,31 +183,6 @@ tests:
         requests:
           cpu: 100m
       timeout: 20m0s
-    - as: tls-scanner-workloads
-      cli: latest
-      commands: |-
-        make deploy-tls-scanner-workloads-ocp RUNNING_LOCAL=false \
-          TLS_SCANNER_NAMESPACE=kserve-tls-scanner
-      dependencies:
-      - env: SKLEARN_IMAGE
-        name: sklearn-serving-runtime
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 30m0s
-    - ref: tls-scanner-run
-    - as: tls-scanner-workloads-cleanup
-      best_effort: true
-      cli: latest
-      commands: |-
-        make cleanup-tls-scanner-workloads-ocp \
-          TLS_SCANNER_NAMESPACE=kserve-tls-scanner
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
     - chain: hypershift-hostedcluster-destroy
     test:
     - as: e2e-predictor
