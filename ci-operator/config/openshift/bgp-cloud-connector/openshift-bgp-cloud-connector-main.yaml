@@ -659,6 +659,141 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- always_run: false
+  as: gcp-qe-ncc-probe
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - as: probe
+      commands: |
+        set -uo pipefail
+
+        # Proves what e2e-gcp-operator needs from the gcp-qe cluster
+        # profile without building a cluster: that its credential holds the
+        # permissions the GCP estate scripts and the operator use, and that
+        # it can create and delete a Network Connectivity Center hub, the
+        # pair the openshift-org-gcp projects deny. Every check runs whatever
+        # the earlier ones said; the summary at the end decides the exit
+        # status.
+
+        failures=()
+        fail() {
+          failures+=("$1")
+        }
+
+        # Every call runs as the cluster profile's key and nothing else: a
+        # fresh config directory, the key as the credential override, and no
+        # application-default credential to fall back on.
+        key="${CLUSTER_PROFILE_DIR}/gce.json"
+        CLOUDSDK_CONFIG="$(mktemp -d)"
+        CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="${key}"
+        export CLOUDSDK_CONFIG CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE
+        unset GOOGLE_APPLICATION_CREDENTIALS GOOGLE_CREDENTIALS
+        if ! token="$(gcloud auth print-access-token 2>&1)"; then
+          fail "authenticate with the cluster profile's service account: ${token}"
+          token=""
+        fi
+
+        # CI masks the project id, so name the project by fingerprint.
+        project="$(jq -r .project_id "${key}")"
+        fingerprint="$(printf %s "${project}" | sha256sum | cut -c1-8)"
+        echo "fingerprint: ${fingerprint}"
+
+        # hack/gcp/lib.sh gcp_estate_permissions, then the operator's
+        # CredentialsRequest (internal/platform/gcp/credentials.go).
+        estate=(
+          compute.firewalls.create compute.firewalls.delete compute.firewalls.list
+          compute.networks.list compute.networks.updatePolicy
+          compute.routers.create compute.routers.delete compute.routers.get
+          compute.routers.list compute.routers.update compute.subnetworks.list
+          networkconnectivity.hubs.create networkconnectivity.hubs.delete
+          networkconnectivity.hubs.list networkconnectivity.spokes.list
+        )
+        operator=(
+          compute.routers.get compute.routers.update compute.networks.updatePolicy
+          compute.networks.get compute.instances.get compute.instances.update
+          compute.zoneOperations.get compute.regionOperations.get
+          networkconnectivity.operations.get networkconnectivity.hubs.get
+          networkconnectivity.spokes.get networkconnectivity.spokes.list
+          networkconnectivity.spokes.create networkconnectivity.spokes.update
+          networkconnectivity.spokes.delete
+        )
+
+        # testIamPermissions answers per permission and needs no permission
+        # of its own, so one call reports the whole list.
+        held=""
+        if ! answer="$(curl -sS --fail -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -cn '{permissions: $ARGS.positional}' --args "${estate[@]}" "${operator[@]}")" \
+            "https://cloudresourcemanager.googleapis.com/v1/projects/${project}:testIamPermissions" 2>&1)"; then
+          fail "testIamPermissions: ${answer}"
+        else
+          held="$(jq -r '.permissions[]?' <<<"${answer}")"
+        fi
+
+        report() {
+          local group="$1" p
+          shift
+          echo "${group} permissions:"
+          for p in "$@"; do
+            if grep -qxF "${p}" <<<"${held}"; then
+              echo "  granted  ${p}"
+            else
+              echo "  DENIED   ${p}"
+              fail "${group}: ${p} denied"
+            fi
+          done
+        }
+        report estate "${estate[@]}"
+        report operator "${operator[@]}"
+
+        # The permissions above are GCP's answer; this is the hub pair done
+        # for real. NCC hubs are global, so the leased region plays no part.
+        # gcloud's progress lines name the project, so its output is shown
+        # only when a call fails.
+        hub="bgpcc-probe-${UNIQUE_HASH}"
+        hub_call() {
+          local what="$1" out line
+          shift
+          if out="$(gcloud network-connectivity hubs "$@" --project="${project}" --quiet 2>&1)"; then
+            echo "  ok       ${what}"
+            return 0
+          fi
+          echo "  FAILED   ${what}"
+          while IFS= read -r line; do
+            echo "           ${line}"
+          done <<<"${out}"
+          fail "hub ${what}"
+          return 1
+        }
+
+        echo "hub lifecycle (${hub}):"
+        created=false
+        hub_call create create "${hub}" --description="bgp-cloud-connector gcp-qe probe" && created=true
+        hub_call get describe "${hub}" --format='value(state)'
+        hub_call list list --filter="name~/${hub}\$" --format='value(name)'
+        hub_call "list spokes" list-spokes "${hub}" --format='value(name)'
+        hub_call delete delete "${hub}"
+        if [[ "${created}" == true ]] \
+            && gcloud network-connectivity hubs describe "${hub}" --project="${project}" >/dev/null 2>&1; then
+          echo "  FAILED   ${hub} still exists after delete"
+          fail "hub still exists after delete"
+        fi
+
+        echo
+        if (( ${#failures[@]} )); then
+          echo "FAILED: ${#failures[@]} check(s)"
+          printf '  %s\n' "${failures[@]}"
+          exit 1
+        fi
+        echo "OK   the gcp-qe credential can do everything e2e-gcp-operator needs"
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
