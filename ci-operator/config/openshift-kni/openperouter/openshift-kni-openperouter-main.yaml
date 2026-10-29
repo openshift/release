@@ -38,6 +38,8 @@ operator:
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
+  - pullspec: quay.io/openperouter/router:main-grout
+    with: pipeline:openperouter-operator
   - pullspec: quay.io/openperouter/router:main
     with: pipeline:openperouter-operator
 promotion:
@@ -78,6 +80,25 @@ tests:
         ENABLE_LOCAL_REGISTRY=true
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: openshift-openperouter
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: openperouter-e2e
+    workflow: baremetalds-e2e
+- as: openperouter-grout-e2e-metal
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OO_BUNDLE: operator-bundle
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=2
+        ENABLE_LOCAL_REGISTRY=true
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-openperouter
+      OPENPEROUTER_DATAPATH: grout
     test:
     - ref: optional-operators-operator-sdk
     - ref: openperouter-e2e
