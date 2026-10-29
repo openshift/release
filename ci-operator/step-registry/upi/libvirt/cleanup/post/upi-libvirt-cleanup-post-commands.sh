@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ensure LEASED_RESOURCE is set
+# ensure LEASED_RESOURCE is set 
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
   exit 1
