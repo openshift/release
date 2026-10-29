@@ -140,12 +140,15 @@ while (( retry < max_retries )); do
   fi
 done
 
-# Verify the bucket exists before proceeding
+# Verify the bucket exists before proceeding (terraform-native: the step
+# container has no aws CLI — rehearsal build 2115841047585099776 failed with
+# 'aws: command not found' at the original head-bucket check)
 echo "Verifying S3 bucket ${QUAY_AWS_S3_BUCKET} exists..."
-AWS_ACCESS_KEY_ID="${QUAY_AWS_ACCESS_KEY}" \
-  AWS_SECRET_ACCESS_KEY="${QUAY_AWS_SECRET_KEY}" \
-  aws s3api head-bucket --bucket "${QUAY_AWS_S3_BUCKET}" --region us-east-2
-echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully"
+if ! terraform state list | grep -q '^aws_s3_bucket\.quayaws$'; then
+  echo "S3 bucket ${QUAY_AWS_S3_BUCKET} not present in terraform state" >&2
+  exit 1
+fi
+echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully (terraform state)"
 
 #Share Terraform Var and Terraform Directory
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
