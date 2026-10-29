@@ -182,7 +182,10 @@ rm -f "${TRUST_POLICY}"
 # images and the aws-node pods stick in ImagePullBackOff. Attach the
 # AWS-managed read-only ECR policy to the job-scoped worker role;
 # rosa-conf-vpc-cni-cleanup detaches it again after the cluster is gone.
-WORKER_ROLE_ARN=$(jq -r '.aws.sts.worker_role_arn // empty' <<<"${CLUSTER_JSON}")
+# The worker role ARN is recorded by rosa-cluster-provision in the
+# ${SHARED_DIR}/cluster-config artifact (rosa describe cluster -o json does
+# not expose it).
+WORKER_ROLE_ARN=$(jq -r '.aws.sts.worker_role_arn // empty' "${SHARED_DIR}/cluster-config" 2>/dev/null || true)
 if [[ -z "${WORKER_ROLE_ARN}" ]]; then
   log "ERROR: cannot determine the worker instance role for cluster ${CLUSTER_ID}"
   exit 1
