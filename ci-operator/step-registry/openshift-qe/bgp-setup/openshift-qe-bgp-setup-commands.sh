@@ -455,6 +455,24 @@ VTEPEOF
 setup_bastion_ssh
 load_bastion_env_vars
 
+if [[ "${BGP_DIAGNOSTICS:-false}" == true ]]; then
+  if [[ "${BASTION_PLATFORM}" != aws || "${NETWORK_WORKLOAD}" != udn-bgp ]]; then
+    echo "ERROR: BGP diagnostics require the AWS UDN-BGP job" >&2
+    exit 1
+  fi
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/bgp-diagnostics.sh"
+  diag_init
+  # Capture setup failures too, while the bastion still exists.
+  diagnostics_on_exit() {
+    local status=$?
+    trap - EXIT
+    diag_snapshot setup-exit || true
+    exit "${status}"
+  }
+  trap diagnostics_on_exit EXIT
+fi
+
 if [[ "${NETWORK_WORKLOAD}" == "evpn" ]]; then
   setup_evpn_cluster_prereqs
 fi
@@ -477,5 +495,10 @@ case "${NETWORK_WORKLOAD}" in
     exit 1
     ;;
 esac
+
+if [[ "${BGP_DIAGNOSTICS:-false}" == true ]]; then
+  diag_snapshot after-bgp || echo "WARNING: Could not capture bastion routes; see diagnostic artifacts."
+  trap - EXIT
+fi
 
 echo "=== BGP setup complete for ${NETWORK_WORKLOAD} ==="
