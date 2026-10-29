@@ -14,6 +14,10 @@ if [[ ! -f "${STORAGE_ACCOUNT_MARKER}" && ! -f "${OADP_MI_MARKER}" ]]; then
   exit 0
 fi
 
+# Disable tracing due to credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
 echo "Reading Azure credentials..."
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
@@ -22,6 +26,9 @@ AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 echo "Logging into Azure..."
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+$WAS_TRACING && set -x
+
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
 OVERALL_RESULT=0
@@ -65,25 +72,30 @@ fi
 # `az identity federated-credential delete` call is required.
 if [[ -f "${OADP_MI_MARKER}" ]]; then
   OADP_MI_NAME="$(cat "${OADP_MI_MARKER}")"
-  OADP_MI_RESOURCEGROUP="$(cat "${OADP_MI_RG_MARKER}")"
-
-  echo "Deleting managed identity ${OADP_MI_NAME}..."
-  RETRIES=3
-  MI_DELETED=false
-  for attempt in $(seq "${RETRIES}"); do
-    if az identity delete \
-      --name "${OADP_MI_NAME}" \
-      --resource-group "${OADP_MI_RESOURCEGROUP}"; then
-      echo "Managed identity deleted successfully"
-      MI_DELETED=true
-      break
-    fi
-    echo "Attempt ${attempt}/${RETRIES}: Failed to delete managed identity. Retrying in 30s..."
-    sleep 30
-  done
-  if [[ "${MI_DELETED}" != "true" ]]; then
-    echo "Error: Failed to delete managed identity ${OADP_MI_NAME} after ${RETRIES} attempts"
+  if [[ ! -f "${OADP_MI_RG_MARKER}" ]]; then
+    echo "Error: ${OADP_MI_RG_MARKER} missing, cannot delete managed identity ${OADP_MI_NAME}"
     OVERALL_RESULT=1
+  else
+    OADP_MI_RESOURCEGROUP="$(cat "${OADP_MI_RG_MARKER}")"
+
+    echo "Deleting managed identity ${OADP_MI_NAME}..."
+    RETRIES=3
+    MI_DELETED=false
+    for attempt in $(seq "${RETRIES}"); do
+      if az identity delete \
+        --name "${OADP_MI_NAME}" \
+        --resource-group "${OADP_MI_RESOURCEGROUP}"; then
+        echo "Managed identity deleted successfully"
+        MI_DELETED=true
+        break
+      fi
+      echo "Attempt ${attempt}/${RETRIES}: Failed to delete managed identity. Retrying in 30s..."
+      sleep 30
+    done
+    if [[ "${MI_DELETED}" != "true" ]]; then
+      echo "Error: Failed to delete managed identity ${OADP_MI_NAME} after ${RETRIES} attempts"
+      OVERALL_RESULT=1
+    fi
   fi
 else
   echo "No oadp-workload-identity-name file found, skipping OADP workload identity cleanup"

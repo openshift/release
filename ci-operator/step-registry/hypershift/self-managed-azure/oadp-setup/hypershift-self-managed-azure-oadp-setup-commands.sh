@@ -6,7 +6,7 @@ export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 
 AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
-CLUSTER_NAME="$(echo -n "${PROW_JOB_ID:-unknown}" | sha256sum | cut -c1-20)"
+CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 RESOURCEGROUP="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
 CONTAINER_PREFIX="hypershift-oadp-"
 CONTAINER_NAME="${CONTAINER_PREFIX}${CLUSTER_NAME:0:$((63 - ${#CONTAINER_PREFIX}))}"
@@ -19,6 +19,10 @@ STORAGE_ACCOUNT_NAME="oadp${CLUSTER_STEM:0:12}${JOB_SUFFIX}"
 echo "Setting up OADP prerequisites for backup/restore tests"
 echo "Cluster: ${CLUSTER_NAME}, Resource Group: ${RESOURCEGROUP}, Storage Account: ${STORAGE_ACCOUNT_NAME}, Container: ${CONTAINER_NAME}"
 
+# Disable tracing due to credential handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
 echo "Reading Azure credentials..."
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
@@ -27,6 +31,9 @@ AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 echo "Logging into Azure..."
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+$WAS_TRACING && set -x
+
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
 
 echo "Creating storage account ${STORAGE_ACCOUNT_NAME} in resource group ${RESOURCEGROUP}..."
@@ -265,6 +272,10 @@ spec:
     storageAccount: ${STORAGE_ACCOUNT_NAME}
     useAAD: "true"
 EOF
+
+echo "Waiting for BackupStorageLocation ${CLUSTER_NAME} to be available..."
+oc wait --for=jsonpath='{.status.phase}'=Available \
+  "backupstoragelocation/${CLUSTER_NAME}" -n openshift-adp --timeout=300s
 
 # Create VolumeSnapshotLocation
 # NOTE (open risk, unverified): this reuses the same Workload-Identity-shaped

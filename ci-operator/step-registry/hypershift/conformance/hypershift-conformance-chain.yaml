@@ -132,12 +132,13 @@ chain:
         export KUBECONFIG=$KUBECONFIG_BAK
       fi
 
+      # The default "false" is nonempty, so keep the original OSD credential fallback.
       if [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" && "${HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS:-false}" == "true" ]]; then
         echo "USE_HYPERSHIFT_AZURE_CREDS and HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS cannot both be true" >&2
         exit 1
       elif [[ "${HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS:-false}" == "true" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-self-managed-azure/credentials.json
-      elif [[ "${USE_HYPERSHIFT_AZURE_CREDS:-false}" == "true" ]]; then
+      elif [[ -n "${USE_HYPERSHIFT_AZURE_CREDS:-}" ]]; then
         export AZURE_AUTH_LOCATION=/etc/hypershift-ci-jobs-azurecreds/credentials.json
       fi
 
