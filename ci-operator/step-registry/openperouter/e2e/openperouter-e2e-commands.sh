@@ -27,6 +27,7 @@ set -u
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
 export CONFIG=/root/dev-scripts/config_root.sh
+export OPENPEROUTER_DATAPATH=${OPENPEROUTER_DATAPATH:-"kernel"}
 
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"
