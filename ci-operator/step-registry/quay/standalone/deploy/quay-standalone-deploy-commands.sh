@@ -73,6 +73,9 @@ done
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 region=$(<"${SHARED_DIR}/quay_standalone_region")
 hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
+# The NLB DNS name is mixed case, clients send it lowercased, and Quay
+# compares the token audience against SERVER_HOSTNAME.
+hostname=${hostname,,}
 target_group_arn=$(<"${SHARED_DIR}/quay_standalone_target_group_arn")
 clair_endpoint=$(<"${SHARED_DIR}/quay_standalone_clair_endpoint")
 clair_target_group_arn=$(<"${SHARED_DIR}/quay_standalone_clair_target_group_arn")
@@ -539,6 +542,15 @@ done
 for index in 1 2; do
     read -r instance_id public_ip _ <<< "${nodes[${index}]}"
     wait_node_healthy "node $((index + 1)) (${instance_id})" "${public_ip}"
+done
+
+# The registry container runs no mirror worker. Mirror mode runs the
+# migrations too, so it starts once Quay has run them; the workers share the
+# DB, and one per node outlives failover stopping a node. The image is local.
+for index in 0 1 2; do
+    read -r instance_id public_ip _ <<< "${nodes[${index}]}"
+    echo "Starting the Quay mirror worker on node $((index + 1)) (${instance_id})..."
+    on_host "${public_ip}" "sudo podman run -d --name quay-mirror -v ${config_dir}:/conf/stack:Z $(printf '%q' "${app_image}") repomirror"
 done
 
 wait_targets "${target_group_arn}" 3 NLB
