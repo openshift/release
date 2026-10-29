@@ -3,6 +3,10 @@
 set -o nounset
 set -o pipefail
 
+# Reconnect instead of failing the play when SSH to the lab hosts drops for a while
+export ANSIBLE_SSH_RETRIES=15
+export ANSIBLE_TIMEOUT=30
+
 echo "************ telco5g diagnose step ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
