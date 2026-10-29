@@ -5,6 +5,7 @@ workflow:
     pre:
     - ref: gcp-hcp-update-commit-status
     - ref: hypershift-gcp-wif-auth
+    - ref: gcp-hcp-component-refs
     - ref: gcp-hcp-tf-provision
     - ref: gcp-hcp-generate-kubeconfigs
     test:
@@ -18,11 +19,17 @@ workflow:
     E2E workflow for gcp-hcp-infra. Provisions full platform infrastructure
     (region + management cluster + customer project) using Terraform Cloud
     ephemeral workspaces, runs validation tests, and normally cleans up resources.
+
+    Also used by component repositories (openshift-online/gecko) to test a pull
+    request: the component is deployed from its pull request build (images from
+    the commons-dev gcp-hcp-pr-images repo) on the latest gcp-hcp-infra main,
+    taken from the promoted gcp-hcp-infra-src image. /testwith adds pull
+    requests from other component repositories to the same run.
     
     Phase breakdown:
     - Pre: Record the tested commit and post a pending GitHub status, authenticate
-      via WIF, provision infrastructure with ArgoCD pinned to that commit, and
-      generate kubeconfigs
+      via WIF, resolve component pull request builds to deploy, provision
+      infrastructure with ArgoCD pinned to that commit, and generate kubeconfigs
     - Test: Validate ArgoCD application sync, then run HC lifecycle test
       (create cluster, verify, deploy workload). Failed hosted resources are
       preserved for diagnostics.

@@ -11,6 +11,12 @@ build_root:
     tag: latest
 images:
   items:
+  # The gcp-hcp-infra checkout (src) as a named image, so gcp-hcp e2e steps can
+  # run from it. Promoted for component repository e2e jobs (e.g. gecko), which
+  # use the latest main.
+  - dockerfile_literal: FROM src
+    from: src
+    to: gcp-hcp-infra-src
   - context_dir: test
     dockerfile_path: Dockerfile.e2e
     to: gcp-hcp-e2e-tests
@@ -22,6 +28,7 @@ promotion:
   - additional_images:
       gcp-hcp-e2e-tests: gcp-hcp-e2e-tests
       gcp-hcp-firestore-tests: gcp-hcp-firestore-tests
+      gcp-hcp-infra-src: gcp-hcp-infra-src
     excluded_images:
     - '*'
     namespace: ci
