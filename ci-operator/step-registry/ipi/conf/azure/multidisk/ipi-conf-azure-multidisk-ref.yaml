@@ -1,0 +1,84 @@
+ref:
+  as: ipi-conf-azure-multidisk
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: ipi-conf-azure-multidisk-commands.sh
+  env:
+  - name: AZURE_MULTIDISK_CONTROL_PLANE_DISKS
+    default: ""
+    documentation: |-
+      Data disks to attach to control plane machines, one per line, with colon-separated
+      fields: type:name:sizeGB:lun:storageAccountType:mountPath
+
+      type is etcd, swap or user-defined. storageAccountType may be left empty to let the
+      platform choose. mountPath is only read for user-defined disks and must be empty
+      otherwise, since the installer fixes the mount path for the other types.
+
+      The name of a user-defined disk becomes its platformDiskID, which the installer
+      rejects beyond 12 characters.
+
+      Disks are emitted in the order given, because the installer pairs the Nth diskSetup
+      entry with the Nth dataDisks entry on Azure. etcd disk setup is only valid on the
+      control plane.
+
+      When this or AZURE_MULTIDISK_COMPUTE_DISKS is set it fully describes the disk layout
+      and the single-disk AZURE_CONTROL_PLANE_MULTIDISK_* and AZURE_COMPUTE_MULTIDISK_*
+      variables below are ignored. Example:
+
+        etcd:etcddisk:64:0:Premium_LRS:
+        user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
+  - name: AZURE_MULTIDISK_COMPUTE_DISKS
+    default: ""
+    documentation: |-
+      Data disks to attach to compute machines, in the same format as
+      AZURE_MULTIDISK_CONTROL_PLANE_DISKS. Swap disk setup is only valid on compute.
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_TYPE
+    default: ""
+    documentation: Using custom azure disk type for controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_DISK_SIZE
+    default: "64"
+    documentation: Specify disk size of custom azure disk for controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_LUN_ID
+    default: "0"
+    documentation: Specify lun id of custom azure disk for controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_CATCHING_TYPE
+    default: ""
+    documentation: Specify catching type of custom azure disk for controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_STORAGE_ACCOUNT_TYPE
+    default: ""
+    documentation: Specify storage account type of custom azure disk for controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_SECURITY_ENCRYPTION_TYPE
+    default: ""
+    documentation: Specify security encryption type for custom azure disk on controlplane machines
+  - name: AZURE_CONTROL_PLANE_MULTIDISK_MOUNT_PATH
+    default: ""
+    documentation: Specify mount path for custom azure disk on controlplane machines
+  - name: AZURE_COMPUTE_MULTIDISK_TYPE
+    default: ""
+    documentation: Using custom azure disk type for compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_DISK_SIZE
+    default: "64"
+    documentation: Specify disk size of custom azure disk for compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_LUN_ID
+    default: "9"
+    documentation: Specify lun id of custom azure disk for compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_CATCHING_TYPE
+    default: ""
+    documentation: Specify catching type of custom azure disk for compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_STORAGE_ACCOUNT_TYPE
+    default: ""
+    documentation: Specify storage account type of custom azure disk for compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_SECURITY_ENCRYPTION_TYPE
+    default: ""
+    documentation: Specify security encryption type for custom azure disk on compute machines
+  - name: AZURE_COMPUTE_MULTIDISK_MOUNT_PATH
+    default: ""
+    documentation: Specify mount path for custom azure disk on compute machines
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    The IPI configure step updates install-config.yaml with custom disk type for controlplane and compute machines in azure

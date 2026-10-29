@@ -1,0 +1,32 @@
+workflow:
+  as: hypershift-optional-operators
+  documentation: |-
+    The HyperShift aws e2e cluster optional operators workflow provides pre- and post- steps that provision and
+    deprovision a new ephemeral HyperShift cluster.
+    In addition, it uses the optional-operators-operator-sdk step for an optional operator installation.
+    In order to install the operator on the hosted-cluster, one should the `USE_HOSTED_KUBECONFIG = true`
+    under the step test.
+    Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    - ref: optional-operators-operator-sdk
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster

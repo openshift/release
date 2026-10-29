@@ -1,0 +1,35 @@
+# Keep SA + ocp-priv RBAC: core-ci configresolver uses this SA's app.ci kubeconfig
+# for /integratedStream (LoadClusterConfig + KUBECONFIG).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-operator-configresolver
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-operator-configresolver
+  namespace: ocp-priv
+rules:
+  - apiGroups:
+      - image.openshift.io
+    resources:
+      - imagestreams
+    verbs:
+      - get
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-operator-configresolver
+  namespace: ocp-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-operator-configresolver
+subjects:
+- kind: ServiceAccount
+  name: ci-operator-configresolver
+  namespace: ci

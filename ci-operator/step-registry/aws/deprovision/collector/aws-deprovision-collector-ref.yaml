@@ -1,0 +1,32 @@
+ref:
+  as: aws-deprovision-collector
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  timeout: 4h0m0s
+  commands: aws-deprovision-collector-commands.sh
+  env:
+  - name: CLUSTER_TTL
+    default: "30 minutes ago"
+    documentation: |-
+      Clusters whose expirationDate tag is older than
+      `date --date="${CLUSTER_TTL}"` are deprovisioned.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 600Mi
+  documentation: |-
+    Garbage-collects leaked AWS clusters (identified by an expired
+    expirationDate tag) and stale ci-op-* IAM users in the AWS account
+    selected by the test's cluster_profile. Load balancers left in a
+    cluster's VPC are removed first, then `openshift-install destroy cluster`
+    is run per leaked cluster.
+
+    Credentials come from ci-operator's STS setup for the cluster_profile
+    (AWS_CONFIG_FILE=/var/run/secrets/aws/config/config), so the pod runs as a
+    trusted ci-op-* identity. Intended for periodic use, one invocation per CI
+    AWS account (cluster_profile aws, aws-2 ... aws-5). This is the ci-operator
+    replacement for the raw periodic-ipi-deprovision-aws[-N] jobs that ran
+    core-services/ipi-deprovision/aws.sh with static credentials.

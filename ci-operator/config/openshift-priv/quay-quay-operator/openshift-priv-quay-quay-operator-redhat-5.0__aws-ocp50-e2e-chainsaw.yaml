@@ -1,0 +1,43 @@
+base_images:
+  cli:
+    name: "5.0"
+    namespace: ocp-priv
+    tag: cli
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/quay/quay-operator
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      COPY oc /usr/bin/oc
+    from: src
+    inputs:
+      cli:
+        paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    to: src-oc
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-311:1
+      RUN pip install --no-cache-dir boto3==1.35.99
+    to: quay-sts-tools
+prowgen:
+  private: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: redhat-5.0
+  org: openshift-priv
+  repo: quay-quay-operator
+  variant: aws-ocp50-e2e-chainsaw

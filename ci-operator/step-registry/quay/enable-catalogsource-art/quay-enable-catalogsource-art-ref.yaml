@@ -1,0 +1,57 @@
+ref:
+  as: quay-enable-catalogsource-art
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-enable-catalogsource-art-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Enables the Quay operator CatalogSource using an ART-built FBC image
+    (quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc, public).
+
+    The ART FBC references bundle/component images at registry.redhat.io by digest,
+    but pre-release digests are only published to registry.stage.redhat.io. This step
+    applies an ImageDigestMirrorSet (registry.redhat.io/quay ->
+    registry.stage.redhat.io/quay), waits for the MachineConfigPool rollout, then
+    creates the CatalogSource.
+
+    registry.stage.redhat.io pull credentials must already be in the cluster global
+    pull secret. Run the shared `merge-stage-registry-credentials` step BEFORE this
+    step in the ci-operator config.
+
+    Floating tag convention: <group>__v<ocp_version>__<component_name>
+    Example: quay-3.18__v4.22__quay-rhel9-operator
+    For other OCP versions, override QUAY_INDEX_IMAGE_TAG in the ci-operator config.
+  env:
+  - name: MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      Optional explicit override for the ART FBC index image. When set (e.g. a
+      specific "…@sha256:…" digest) it is used verbatim, letting a run be
+      hard-pinned to a known ART build. When empty (the default), the step resolves
+      QUAY_INDEX_IMAGE_REPO:QUAY_INDEX_IMAGE_TAG to an immutable digest.
+  - name: QUAY_INDEX_IMAGE_REPO
+    default: "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
+    documentation: |-
+      ART FBC catalog index image repository (no tag). Public, so no auth is needed
+      for the catalog image itself. Combined with QUAY_INDEX_IMAGE_TAG and resolved
+      to a pinned @sha256 digest unless MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
+      is set.
+  - name: QUAY_INDEX_IMAGE_TAG
+    default: "quay-3.18__v4.22__quay-rhel9-operator"
+    documentation: |-
+      Floating tag on QUAY_INDEX_IMAGE_REPO to resolve to a digest. ART FBC images
+      use the tag naming convention <group>__v<ocp_version>__<component_name>
+      (e.g. quay-3.18__v4.22__quay-rhel9-operator). The floating tag (i.e. without a
+      trailing __g<sha> commit suffix) always points to the latest successful build,
+      so each run picks up the newest FBC automatically. Note the shared art-fbc repo
+      has NO ":latest" tag. Ignored when MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE
+      is set.
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The Quay operator source, redhat-operators or fbc-operator-catalog
+    default: "fbc-operator-catalog"

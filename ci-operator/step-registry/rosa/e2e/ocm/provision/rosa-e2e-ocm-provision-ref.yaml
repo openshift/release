@@ -1,0 +1,82 @@
+ref:
+  as: rosa-e2e-ocm-provision
+  from: rosa-e2e
+  grace_period: 10m
+  commands: rosa-e2e-ocm-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The OCM environment to log into and provision in. Supported values are [production, staging, integration].
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: Name of the ROSA cluster to create. Must be unique for the account, lowercase, and no more than 15 characters. A unique name is generated when empty.
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Provision a Hosted Control Plane (HCP) cluster. Written into cluster-metadata.json as topology=hcp when true, classic otherwise.
+  - name: STS
+    default: "true"
+    documentation: Provision the cluster with AWS Security Token Service (STS).
+  - name: REGION
+    default: ""
+    documentation: AWS region to provision in. Falls back to LEASED_RESOURCE when empty.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: OpenShift version to install (e.g. "4.19" or "4.19.2"). Resolved by the provisioner when empty.
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: Release channel group for the OpenShift version. Supported values are [stable, candidate, nightly].
+  - name: REPLICAS
+    default: "2"
+    documentation: Number of compute nodes to provision.
+  - name: COMPUTE_MACHINE_TYPE
+    default: ""
+    documentation: Instance type for compute nodes. A profile-appropriate default is chosen when empty.
+  - name: MULTI_AZ
+    default: "false"
+    documentation: Deploy the cluster across multiple availability zones.
+  - name: ENABLE_BYOVPC
+    default: "true"
+    documentation: Install into a pre-provisioned (BYO) VPC. Subnet ids are read from SHARED_DIR (aws-provision-vpc-shared).
+  - name: PRIVATE
+    default: "false"
+    documentation: Restrict the API endpoint and application routes to private connectivity.
+  - name: PRIVATE_LINK
+    default: "false"
+    documentation: Provision the cluster with AWS PrivateLink. Recorded as feature_flags.privatelink in cluster-metadata.json.
+  - name: ETCD_ENCRYPTION
+    default: "false"
+    documentation: Enable etcd encryption. Recorded as feature_flags.etcd_encryption.
+  - name: STORAGE_ENCRYPTION
+    default: "false"
+    documentation: Encrypt EBS volumes with a KMS key. Recorded as feature_flags.kms.
+  - name: FIPS
+    default: "false"
+    documentation: Provision a FIPS-enabled cluster. Recorded as feature_flags.fips.
+  - name: ENABLE_SHARED_VPC
+    default: "false"
+    documentation: Provision a Shared VPC (cross-account) cluster. Recorded as feature_flags.sharedvpc.
+  - name: ZERO_EGRESS
+    default: "false"
+    documentation: Provision a zero-egress cluster. Recorded as feature_flags.zero_egress.
+  - name: PROVISION_ENTRYPOINT
+    default: ""
+    documentation: |-
+      Command that invokes the rosa-e2e OCM Go SDK provisioner shipped in the
+      `rosa-e2e` image. It must create the cluster and write its OCM id to
+      ${SHARED_DIR}/cluster-id. This is the integration seam with the rosa-e2e
+      repo's provisioning code; it must be set for the ref to provision a cluster.
+  dependencies:
+  - name: rosa-e2e
+    env: ROSA_E2E_IMAGE
+  documentation: |-
+    Provisions a ROSA cluster using the rosa-e2e OCM Go SDK provisioner and
+    publishes the SHARED_DIR provisioner-to-validator contract defined in
+    ROSAENG-67580: ${SHARED_DIR}/cluster-id, ${SHARED_DIR}/kubeconfig (customer
+    plane, when reachable), and ${SHARED_DIR}/cluster-metadata.json (cluster type,
+    region, channel, feature flags). Management/service cluster kubeconfigs are
+    written separately by rosa-backplane-login. Requires the `rosa-e2e` image to
+    provide `ocm` and `jq`, and OCM credentials in the cluster profile.

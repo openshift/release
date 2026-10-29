@@ -1,0 +1,18 @@
+ref:
+  as: enable-node-coredumps
+  from_image:
+   namespace: origin
+   name: centos
+   tag: '8'
+  commands: enable-node-coredumps-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    The coredump service configures nodes to save all generated coredumps. This is useful for debugging failures of
+    components running in privileged pods, such as router pods.
+    The service is deployed by injecting an installer manifest containing a MachineConfig. This contains one systemd
+    unit, which sets the sysctl variable fs.suid_dumpable to 1, instructing systemd-coredump to save any coredumps it
+    encounters into /var/lib/systemd/coredump/ . Those coredump files can then be collected using the gather-core-dump
+    chain.

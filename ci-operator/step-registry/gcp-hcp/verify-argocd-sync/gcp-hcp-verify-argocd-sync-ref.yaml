@@ -1,0 +1,29 @@
+ref:
+  as: gcp-hcp-verify-argocd-sync
+  from: gcp-hcp-e2e-tests
+  commands: gcp-hcp-verify-argocd-sync-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 90m0s
+  documentation: |-
+    Validates that ArgoCD applications have synced successfully on the region
+    and management clusters after infrastructure provisioning.
+    
+    Uses Ginkgo v2 tests to:
+    - Wait for ArgoCD namespace to be bootstrapped by Fleet Config Sync
+    - Wait for ArgoCD server deployment to become ready
+    - Poll all ArgoCD Application CRs for Synced status
+    - Auto-retry stuck applications every 2 minutes
+    - Report detailed status and failures
+    
+    Depends on:
+    - gcp-hcp-generate-kubeconfigs (must run first to generate kubeconfigs)
+    
+    Environment variables (optional):
+    - REGION_SYNC_TIMEOUT: Timeout for region cluster sync (default: 30m)
+    - MC_SYNC_TIMEOUT: Timeout for MC cluster sync (default: 30m)
+    
+    Outputs:
+    - ${ARTIFACT_DIR}/junit_argocd_sync.xml: JUnit test results for Prow

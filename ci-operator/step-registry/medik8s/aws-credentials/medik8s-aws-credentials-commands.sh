@@ -1,0 +1,121 @@
+#!/bin/bash
+set -eu -o pipefail
+
+declare INSTALL_NAMESPACE="${INSTALL_NAMESPACE:-openshift-workload-availability}"
+declare CREDENTIALS_SECRET_NAME="${CREDENTIALS_SECRET_NAME:-aws-cloud-fencing-credentials-secret}"
+
+log() { echo "[$(date --utc +%FT%T.%3NZ)] $*"; }
+
+collect_artifacts() {
+    log "Collecting debug artifacts..."
+    {
+        oc get credentialsrequest medik8s-aws-fencing \
+            -n openshift-cloud-credential-operator -o yaml \
+            > "${ARTIFACT_DIR}/credentialsrequest.yaml" 2>/dev/null
+        oc describe secret "${CREDENTIALS_SECRET_NAME}" \
+            -n "${INSTALL_NAMESPACE}" \
+            > "${ARTIFACT_DIR}/aws-credentials-secret.txt" 2>/dev/null
+        oc get events -n openshift-cloud-credential-operator \
+            --sort-by='.lastTimestamp' \
+            > "${ARTIFACT_DIR}/cco-events.txt" 2>/dev/null
+    } || true
+}
+
+set_proxy() {
+    # shellcheck disable=SC1090
+    [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
+        log "setting proxy"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    }
+    return 0
+}
+
+# Disconnected/air-gapped clusters cannot use CCO CredentialsRequest (no AWS IAM API access).
+# This path creates the fencing Secret directly from cluster profile credentials. Unlike the
+# CCO path (ec2:Describe/Start/Stop/RebootInstances only), profile credentials may be
+# installer-scoped with broader permissions. Prefer .awscred when available for a dedicated
+# least-privilege fencing credential; credentials is the installer fallback.
+create_secret_from_profile() {
+    local cred_file="${CLUSTER_PROFILE_DIR}/.awscred"
+    [[ ! -f "$cred_file" ]] && cred_file="${CLUSTER_PROFILE_DIR}/credentials"
+    if [[ ! -f "$cred_file" ]]; then
+        log "ERROR: No AWS credentials file found in cluster profile"
+        ls -la "${CLUSTER_PROFILE_DIR}/" > "${ARTIFACT_DIR}/cluster-profile-listing.txt" 2>&1 || true
+        return 1
+    fi
+
+    local access_key secret_key
+    access_key=$(grep -m1 'aws_access_key_id' "$cred_file" | cut -d= -f2 | tr -d ' ')
+    secret_key=$(grep -m1 'aws_secret_access_key' "$cred_file" | cut -d= -f2 | tr -d ' ')
+
+    if [[ -z "$access_key" || -z "$secret_key" ]]; then
+        log "ERROR: Could not parse AWS credentials from ${cred_file}"
+        return 1
+    fi
+
+    log "Creating Secret ${CREDENTIALS_SECRET_NAME} from cluster profile credentials..."
+    oc create secret generic "${CREDENTIALS_SECRET_NAME}" \
+        -n "${INSTALL_NAMESPACE}" \
+        --from-literal=aws_access_key_id="${access_key}" \
+        --from-literal=aws_secret_access_key="${secret_key}"
+
+    log "=== AWS credentials created from cluster profile (disconnected mode) ==="
+}
+
+main() {
+    log "=== medik8s AWS Credentials ==="
+    trap 'collect_artifacts' EXIT
+    set_proxy
+
+    if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+        log "Disconnected environment detected — bypassing CCO CredentialsRequest"
+        create_secret_from_profile
+        return $?
+    fi
+
+    log "Creating CredentialsRequest for AWS EC2 fencing..."
+    cat <<EOF | oc apply -f -
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: medik8s-aws-fencing
+  namespace: openshift-cloud-credential-operator
+spec:
+  serviceAccountNames:
+  - fence-agents-remediation-controller-manager
+  secretRef:
+    name: ${CREDENTIALS_SECRET_NAME}
+    namespace: ${INSTALL_NAMESPACE}
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AWSProviderSpec
+    statementEntries:
+    - action:
+      - ec2:DescribeInstances
+      - ec2:StartInstances
+      - ec2:StopInstances
+      - ec2:RebootInstances
+      effect: Allow
+      resource: "*"
+EOF
+
+    log "Waiting for CCO to provision Secret ${CREDENTIALS_SECRET_NAME} in ${INSTALL_NAMESPACE}..."
+    for i in $(seq 1 60); do
+        if oc get secret "${CREDENTIALS_SECRET_NAME}" -n "${INSTALL_NAMESPACE}" -o name &>/dev/null; then
+            log "Secret ${CREDENTIALS_SECRET_NAME} found after ${i} attempts"
+            oc get secret "${CREDENTIALS_SECRET_NAME}" -n "${INSTALL_NAMESPACE}" \
+                -o jsonpath='{.data}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Keys: {list(d.keys())}')" 2>/dev/null || true
+            log "=== AWS credentials provisioned successfully ==="
+            return 0
+        fi
+        log "  attempt ${i}/60 — secret not found yet, waiting 5s..."
+        sleep 5
+    done
+
+    log "ERROR: Secret ${CREDENTIALS_SECRET_NAME} not provisioned after 5 minutes"
+    log "--- Debug info ---"
+    oc get credentialsrequest medik8s-aws-fencing -n openshift-cloud-credential-operator -o yaml 2>/dev/null || true
+    oc get events -n openshift-cloud-credential-operator --sort-by='.lastTimestamp' 2>/dev/null | tail -10 || true
+    return 1
+}
+main

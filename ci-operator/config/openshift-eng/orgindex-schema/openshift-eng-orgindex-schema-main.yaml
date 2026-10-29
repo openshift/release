@@ -1,0 +1,50 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+
+      RUN dnf install -y python3.12 python3.12-pip && dnf clean all
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      RUN python3.12 -m pip install '.[dev]'
+    from: src
+    to: tests-image
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tests:
+- as: lint
+  commands: python3.12 -m ruff check .
+  container:
+    from: tests-image
+- as: format
+  commands: python3.12 -m ruff format --check .
+  container:
+    from: tests-image
+- as: typing
+  commands: |
+    export HOME=/tmp
+    python3.12 -m mypy
+  container:
+    from: tests-image
+- as: unit
+  commands: |
+    export HOME=/tmp
+    python3.12 -m pytest
+  container:
+    from: tests-image
+- as: schema-check
+  commands: |
+    export HOME=/tmp
+    python3.12 -m orgindex_schema > /tmp/schema.generated.json
+    diff -u index.schema.json /tmp/schema.generated.json
+  container:
+    from: tests-image
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: orgindex-schema

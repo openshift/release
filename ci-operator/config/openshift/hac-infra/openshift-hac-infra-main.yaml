@@ -1,0 +1,27 @@
+build_root:
+  image_stream_tag:
+    name: releaser
+    namespace: rh-cloud-services
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    ./test.sh
+  container:
+    from: src
+  secret:
+    collection: hac-infra-secrets
+    group: hac-infra-codecov-token
+    mount_path: /tmp/secret
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hac-infra

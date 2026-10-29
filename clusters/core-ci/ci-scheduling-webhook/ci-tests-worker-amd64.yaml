@@ -1,0 +1,251 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: master-64cvr
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: master-64cvr
+      machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: master-64cvr
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1a
+    spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      providerSpec:
+        value:
+          ami:
+            id: ami-01095d1967818437c
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 400
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: master-64cvr-worker-profile
+          instanceType: m6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-node
+          subnet:
+            id: subnet-0dd19cee000bc8598
+          tags:
+          - name: kubernetes.io/cluster/master-64cvr
+            value: owned
+          userDataSecret:
+            name: worker-user-data-managed
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+        value: ci-tests-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 20
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: master-64cvr-ci-tests-worker-amd64-us-east-1a
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: master-64cvr
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: master-64cvr
+      machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1b
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: master-64cvr
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1b
+    spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      providerSpec:
+        value:
+          ami:
+            id: ami-01095d1967818437c
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 400
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: master-64cvr-worker-profile
+          instanceType: m6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1b
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-node
+          subnet:
+            id: subnet-0c20cd95ea710e60f
+          tags:
+          - name: kubernetes.io/cluster/master-64cvr
+            value: owned
+          userDataSecret:
+            name: worker-user-data-managed
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+        value: ci-tests-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1b
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 20
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: master-64cvr-ci-tests-worker-amd64-us-east-1b
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: master-64cvr
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1c
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: master-64cvr
+      machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1c
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: master-64cvr
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: master-64cvr-ci-tests-worker-amd64-us-east-1c
+    spec:
+      metadata:
+        labels:
+          ci-workload: tests
+      providerSpec:
+        value:
+          ami:
+            id: ami-01095d1967818437c
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 400
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: master-64cvr-worker-profile
+          instanceType: m6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1c
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - master-64cvr-node
+          subnet:
+            id: subnet-0fe9afcf52bc34327
+          tags:
+          - name: kubernetes.io/cluster/master-64cvr
+            value: owned
+          userDataSecret:
+            name: worker-user-data-managed
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-tests-worker
+        value: ci-tests-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: master-64cvr-ci-tests-worker-amd64-us-east-1c
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 20
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: master-64cvr-ci-tests-worker-amd64-us-east-1c

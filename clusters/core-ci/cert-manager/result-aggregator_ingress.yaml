@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+  name: result-aggregator
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: result-aggregator-tls
+      hosts:
+        - result-aggregator.ci.openshift.org
+  rules:
+  - host: result-aggregator.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: result-aggregator
+            port:
+              number: 80
+        pathType: ImplementationSpecific

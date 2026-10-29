@@ -1,0 +1,43 @@
+ref:
+  as: cucushift-installer-check-compact
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: cucushift-installer-check-compact-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      The number of control plane nodes to create for the cluster.
+
+      This variable should only be supplied in consultation with the etcd team. The
+      etcd operator has to explicitly support the specified number of control plane
+      nodes and values not documented below will result in unhealthy and/or
+      unsupportable clusters.
+
+      Valid values include:
+      * "" (default) - 3 control plane nodes. The standard for stand-alone clusters.
+      * "1" - Supportable for single-node OpenShift (SNO).
+      * "5" - Supportable only for select customers.
+  - name: SIZE_VARIANT
+    default: ""
+    documentation: |-
+      The size of the cluster in one of our supported t-shirt values that is standard across all CI environments.
+
+      The sizes are:
+      * "" (default) - 4 vCPU, 16GB control plane nodes, default workers
+      * "compact" - 8 vCPU, 32GB control plane nodes, no workers
+      * "large" - 16 vCPU, 64GB+ control plane nodes, default workers, suitable for clusters up to 250 nodes
+      * "xlarge" - 32 vCPU, 128GB+ control plane nodes, default workers, suitable for clusters up to 1000 nodes
+
+      These sizes are roughly consistent across all cloud providers, but we may not be able to instantiate some sizes
+      in some regions or accounts due to quota issues.
+      Do not change the default family type without consulting with cloud financial operations as their may
+      be active savings plans targeting this machine class.
+  documentation: >-
+    The step checks if it's a compact (3-node) OpenShift cluster.

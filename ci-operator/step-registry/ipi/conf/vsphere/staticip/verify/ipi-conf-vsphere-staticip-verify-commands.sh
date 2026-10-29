@@ -1,0 +1,135 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+    echo "Failed to acquire lease"
+    exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+# shellcheck disable=SC2034
+declare dns_server
+declare vlanid
+declare primaryrouterhostname
+declare gateway
+declare cidr
+declare image_version
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].cidr' "${SUBNETS_CONFIG}")
+machine_network_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+
+image_version="latest"
+if [[ -n "${IPAM_VERSION}" ]]; then
+    echo "Detected IPAM image override ${IPAM_VERSION}"
+    image_version="${IPAM_VERSION}"
+fi
+
+echo "$(date -u --rfc-3339=seconds) - installing IPPools CRD..."
+curl -k https://raw.githubusercontent.com/openshift-splat-team/machine-ipam-controller/main/hack/ippools.crd.yaml | oc create -f -
+
+echo "$(date -u --rfc-3339=seconds) - allowing time for CRD to be picked up by the API..."
+sleep 30
+
+echo "$(date -u --rfc-3339=seconds) - retrieving IPAM controller CI configuration"
+oc project openshift-machine-api
+
+# Generate the address-cidr to not use the same range as the api and ingress vips
+# start at the 24th ip address entry to generate a /29 address pool
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    address_cidr=$(python -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[24])")
+else
+    address_cidr=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[24]' "${SUBNETS_CONFIG}")
+fi
+
+# We are ignoring unknown parameters for now due to sync between repo and ci
+curl -k https://raw.githubusercontent.com/openshift-splat-team/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p GATEWAY="${gateway}" -p PREFIX="${cidr}" -p ADDRESS_CIDR="${address_cidr}/29" -p IPAM_VERSION="${image_version}" --local=true --ignore-unknown-parameters=true -f - | oc create -f -
+
+echo "$(date -u --rfc-3339=seconds) - applying ippool configuration to compute machineset"
+oc get machineset.machine.openshift.io -n openshift-machine-api -o jsonpath='{.items[0]}' | jq -r '.spec.template.spec.providerSpec.value.network.devices[0] +=
+{
+    addressesFromPools:
+        [
+            {
+                group: "ipamcontroller.openshift.io",
+                name: "static-ci-pool",
+                resource: "IPPool"
+            }
+        ],
+    nameservers:
+        [ "$dns_server" ]
+}' | jq '.spec.template.metadata.labels +=
+{
+    ipam: "true"
+}' | sed 's/$dns_server/'"${dns_server}"'/g' | oc apply -f -
+
+echo "$(date -u --rfc-3339=seconds) - scaling up machineset with ippool configuration"
+MACHINESET_NAME=$(oc get machineset.machine.openshift.io -n openshift-machine-api -o json | jq -r '.items[0].metadata.name')
+oc scale machineset.machine.openshift.io --replicas=2 ${MACHINESET_NAME} -n openshift-machine-api
+
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+    readarray -t  VALID_STATIC_IP < <(python -c "import ipaddress;print(*[str(ip) for ip in ipaddress.IPv4Network('${machine_network_cidr}')], sep='\n')")
+else
+    readarray -t VALID_STATIC_IP < <(jq -r -c --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[]' "${SUBNETS_CONFIG}")
+fi
+
+echo "$(date -u --rfc-3339=seconds) - validating static IPs are applied to applicable nodes"
+for retries in {1..40}; do
+    NODES_VALIDATED=0
+    readarray NODEREF_ARRAY <<<"$(oc get machines.machine.openshift.io -n openshift-machine-api -l ipam=true -o=json | jq -r .items[].status.nodeRef.name)"
+    if [[ ${#NODEREF_ARRAY[@]} -lt 2 ]]; then
+        echo "$(date -u --rfc-3339=seconds) - ${#NODEREF_ARRAY[@]} of 2 node refs available"
+        NODES_VALIDATED=$((${NODES_VALIDATED} - 1))
+    else
+        for NODE in "${NODEREF_ARRAY[@]}"; do
+            NODE=$(echo ${NODE} | tr -d '\n')
+            if [[ ${NODE} = "null" ]]; then
+                echo "$(date -u --rfc-3339=seconds) - not all machines have nodeRefs. Will recheck in 15 seconds."
+                NODES_VALIDATED=$((${NODES_VALIDATED} - 1))
+                break
+            fi
+            echo "$(date -u --rfc-3339=seconds) - verifying static IP for node ${NODE}"
+            ADDRESS=$(oc get node "${NODE}" -o=jsonpath='{.status.addresses}' | jq -r '.[] | select(.type=="InternalIP") | .address')
+            if [ -z "${ADDRESS}" ]; then
+                echo "$(date -u --rfc-3339=seconds) - no address available for node ${NODE}"
+                break
+            fi
+            MATCH=0
+            for VALID_IP in "${VALID_STATIC_IP[@]}"; do
+                if [[ ${VALID_IP} = "${ADDRESS}" ]]; then
+                    MATCH=1
+                fi
+            done
+            if [[ ${MATCH} -eq 0 ]]; then
+                echo "$(date -u --rfc-3339=seconds) - node ${NODE} does not have an expected address. InternalIP ${ADDRESS}"
+                NODES_VALIDATED=$((${NODES_VALIDATED} - 1))
+            fi
+        done
+    fi
+    if [[ ${NODES_VALIDATED} -eq 0 ]]; then
+        echo "$(date -u --rfc-3339=seconds) - all nodes validated"
+        exit 0
+    else
+        echo "$(date -u --rfc-3339=seconds) - attempt ${retries} - not all nodes have been validated. Will recheck in 15 seconds."
+        sleep 15
+    fi
+done
+
+echo "$(date -u --rfc-3339=seconds) - unable to verify applicable nodes received static IPs"
+exit 1

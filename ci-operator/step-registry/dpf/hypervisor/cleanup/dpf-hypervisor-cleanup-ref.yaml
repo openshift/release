@@ -1,0 +1,32 @@
+ref:
+  as: dpf-hypervisor-cleanup
+  commands: dpf-hypervisor-cleanup-commands.sh
+  dependencies:
+  - env: SHARED_DIR
+    name: shared-tmp
+  documentation: |-
+    Clean up the DPF cluster and temporary files on the hypervisor
+    after testing completes. This step runs in the 'post' phase
+    and executes regardless of test success or failure.
+    
+    This step:
+    1. Destroys the OpenShift cluster and VMs (make clean-all)
+    2. Removes temporary working directory
+    3. Cleans up any remaining resources
+    4. Preserves logs for artifact collection
+    5. Ensures hypervisor is ready for next test run
+    
+    The cleanup includes:
+    - Cluster deletion via aicli
+    - VM destruction via libvirt
+    - Working directory cleanup
+    - Resource verification
+    
+    Cleanup is designed to be thorough but non-blocking,
+    continuing even if some cleanup steps fail.
+  from: dpf-ci
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  timeout: 45m0s

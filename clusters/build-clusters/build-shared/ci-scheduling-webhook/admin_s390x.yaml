@@ -1,0 +1,32 @@
+---
+# Arch-specific RuntimeClasses for build clusters with non-amd64 nodes that
+# must serve more than one workload class from the same bare-metal node
+# (e.g. the s390x node on build11). The ci-scheduling-webhook routes a pod
+# here instead of the generic RuntimeClass in admin.yaml when one exists for
+# the pod's target architecture, and auto-taints matching nodes with
+# node-role.kubernetes.io/ci-worker so non-CI workloads stay off them.
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-builds-s390x
+handler: crun
+scheduling:
+  nodeSelector:
+    kubernetes.io/arch: s390x
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-worker
+      operator: Exists
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: ci-scheduler-runtime-tests-s390x
+handler: crun
+scheduling:
+  nodeSelector:
+    kubernetes.io/arch: s390x
+  tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/ci-worker
+      operator: Exists

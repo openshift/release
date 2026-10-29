@@ -1,0 +1,33 @@
+ref:
+  as: openshift-powervc-cleanup-vm-error
+  from: openstack-installer
+  commands: openshift-powervc-cleanup-vm-error-commands.sh
+  grace_period: 60m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: powervc-ipi-cicd-secrets
+    group: powervs-creds
+    mount_path: /var/run/powervc-ipi-cicd-secrets/powervc-creds
+  env:
+  - name: CLOUD
+    default: "ocp-ci"
+    documentation: |-
+      The name of the cloud in the clouds.yaml file.
+  - name: MAX_CLEANUP_ATTEMPTS
+    default: "10"
+    documentation: |-
+      Maximum number of polling/deletion attempts before giving up.
+  - name: CLEANUP_RETRY_DELAY
+    default: "15"
+    documentation: |-
+      Delay in seconds between polling/deletion attempts.
+  documentation: >-
+    Finds and cleans up virtual machines in ERROR state in PowerVC.
+    The step installs the OpenStack credentials (clouds.yaml and
+    ocp-ci-ca.pem) from the mounted powervc-creds secret, patches the CA
+    path in clouds.yaml to match the runtime HOME directory, and repeatedly
+    queries and deletes any virtual machines in ERROR status until none
+    remain or until maximum attempts are reached.

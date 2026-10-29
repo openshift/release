@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: images/Dockerfile.search
+    from: base
+    to: ci-search
+  - dockerfile_path: images/Dockerfile.jira-watcher-controller
+    from: base
+    to: jira-watcher-controller
+promotion:
+  to:
+  - excluded_images:
+    - jira-watcher-controller
+    namespace: ci
+    tag: latest
+  - excluded_images:
+    - ci-search
+    namespace: continuous-release-jobs
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: openshift/ci-search
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ci-search

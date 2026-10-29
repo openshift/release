@@ -1,0 +1,146 @@
+ref:
+  as: openshift-extended-olm-test-burner-pkg-ins
+  from: tests-private-burner
+  grace_period: 10m
+  cli: latest
+  env:
+  - name: JOB_ITERATIONS
+    default: "150"
+    # it take 30~40m
+    # it could be caculated by iterations. will enhance it.
+    documentation: |-
+      How many times to execute the job
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: CHURN
+    default: "true"
+    documentation: |-
+      Default is true, which means the workload with delete and recreate a set number of namespaces
+  - name: CHURN_CYCLES
+    default: "15"
+    # each cycles take 13m for 15 installation
+    documentation: |-
+      Number of churn cycles to execute. 0 means it will churn till the CHURN_DURATION reaches
+  - name: CHURN_DURATION
+    default: "6h"
+    documentation: |-
+      Length of time that the job is churned for
+  - name: CHURN_PERCENT
+    default: "10"
+    # it could be caculated by iterations. will enhance it.
+    documentation: |-
+      Percentage of the jobIterations to churn each period
+  - name: CHURN_DELAY
+    default: "1m"
+    documentation: |-
+      Length of time to wait between each churn period
+  - name: CHURN_DELETIOIN_STRATEGY
+    default: "default"
+    documentation: |-
+      Churn deletion strategy to apply, default or gvr (where default churns namespaces and gvr churns objects within namespaces)
+  - name: PKG_NAME
+    default: "mtc-operator"
+    documentation: |-
+      the name of the operator to be installed
+  - name: CHANNEL_NAME
+    default: "release-v1.8"
+    # it should be got for default channel dynamically per pkg and catalogsource. will enhance it.
+    documentation: |-
+      the channel of the operator to be installed
+  - name: CATALOGSOURCE_NAME
+    default: "redhat-operators"
+    documentation: |-
+      the catalogsource of the operator to be installed
+  - name: CATALOGSOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: |-
+      the catalogsource namespace of the operator to be installed
+  - name: BURNER_TIMEOUT
+    default: "8h0m0s"
+    documentation: |-
+      the timeout for one kube burner
+  - name: MAX_WAIT_TIMEOUT
+    default: "2h"
+    documentation: |-
+      Maximum wait timeout per namespace
+  - name: JOB_ITERATION_DELAY
+    default: "2s"
+    documentation: |-
+      How long to wait between each job iteration. This is also the wait interval between each delete operation
+  - name: JOB_PAUSE
+    default: "20s"
+    documentation: |-
+      How long to pause after finishing the job
+  - name: KUBE_BURNER_VERSION
+    default: "1.6.3"
+    documentation: |-
+      Override the kube burner version
+  - name: LOG_LEVEL
+    default: "info"
+    documentation: |-
+      kube-burner log level
+  - name: GC_METRICS
+    default: "false"
+    documentation: |-
+      Default is false, which means not collecting metrics during GC
+  - name: CHECK_HEALTH
+    default: "true"
+    documentation: |-
+      Default is true, check the cluster health before starting burnering
+  - name: BURST
+    default: "20"
+    documentation: |-
+      Maximum burst for throttle
+  - name: QPS
+    default: "20"
+    documentation: |-
+      Limit object creation queries per second
+  - name: METRICS_ENDPOINT
+    default: "metrics-endpoint.yml"
+    documentation: |-
+      Path to a valid metrics endpoint file
+  - name: ENABLE_LOCAL_INDEX
+    default: "true"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ZSCORE_THRESHOLD
+    default: "4"
+    documentation: |-
+      the threshold for z-score
+  - name: WINDOW_THRESHOLD
+    default: "4"
+    documentation: |-
+      the threshold for moving window
+  - name: WINDOW_SIZE
+    default: "18"
+    documentation: |-
+      the size of window for moving window
+  - name: WATERMARK
+    default: "30"
+    documentation: |-
+      the abnoarm cpu usage calucalted by 100
+  - name: CID
+    default: "80230"
+    documentation: |-
+      It is ID to track kube burner job
+  - name: CTITLE
+    default: "olm create and delete operator repeatedly to check cpu of catalogsource"
+    documentation: |-
+      It is title to track kube burner job
+  - name: BURNER_FORCE_SUCCESS_EXIT
+    default: "yes"
+    documentation: |-
+      Setting this to 'yes' will allow some statements in the scripts not to let the step fail, and further steps can
+      run. Setting it to 'no' will disable this behavior, letting any of those optional to succeed statements
+      to stop the job and trigger the deprovisioning steps. Default: yes.
+      See https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  commands: openshift-extended-olm-test-burner-pkg-ins-commands.sh
+  timeout: 10h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the OLM-scale workload in the deployed cluster

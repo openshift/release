@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: validate-commits
+  steps:
+    test:
+    - ref: hyperfleet-commitlint
+- as: lint
+  commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    unset GOFLAGS
+    make lint
+  container:
+    from: src
+- as: unit
+  commands: |
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    unset GOFLAGS
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e

@@ -1,0 +1,22 @@
+ref:
+  as: gcp-hcp-update-commit-status
+  from: src
+  commands: gcp-hcp-update-commit-status-commands.sh
+  env:
+  - name: E2E_STATUS_CONTEXT
+    default: e2e/platform
+    documentation: "GitHub commit status context for this platform lifecycle leg"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  timeout: 3m0s
+  credentials:
+  - namespace: ci
+    bundle: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /etc/github-private
+  documentation: |-
+    Posts a pending E2E_STATUS_CONTEXT commit status (default: e2e/platform)
+    to the exact gcp-hcp-infra SHA selected by Prow or resolved from its verified
+    active checkout. Records that SHA in the shared directory for Terraform and
+    the post-phase finalizer.

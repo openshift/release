@@ -1,0 +1,74 @@
+workflow:
+  as: stackrox-automation-flavors-ocp-4-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: stackrox-stackrox-begin
+    - as: ocp-4-create
+      commands: |
+        # Test Pod DNS config override:
+        # - log effective config from /etc/resolv.conf
+        # - sanity resolve quay.io
+        echo "=== pod-dns: effective /etc/resolv.conf ==="
+        cat /etc/resolv.conf 2>/dev/null || true
+        if getent hosts quay.io >/dev/null 2>&1; then
+            echo "=== pod-dns: sanity OK (quay.io -> $(getent hosts quay.io | head -1 | awk '{print $1}')) ==="
+        else
+            echo "=== pod-dns: sanity WARN (quay.io not resolvable) ==="
+        fi
+        echo "Running openshift-4 ${OCP_VERSION} automation"
+        /usr/bin/openshift-ci.sh create openshift-4 "${OCP_VERSION}"
+      # Override the flaky default nameservers
+      dnsConfig:
+        nameservers:
+        - 8.8.8.8  # ROX-37043 - workaround for recurring cluster-DNS flakes (2026-09)
+      credentials:
+      - mount_path: /tmp/vault/stackrox-automation-flavors
+        group: credentials
+        collection: stackrox-automation-flavors
+      env:
+      - name: OCP_VERSION
+        default: 'ocp/stable-4.13'
+      - name: FIPS_ENABLED
+        default: 'false'
+      - name: OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION
+        default: 'true'
+      - name: CREDENTIALS_MODE
+        default: 'Passthrough'
+      - name: SSD_STORAGE_CLASS
+        default: 'true'
+      - name: MASTER_NODE_SERVICE_ACCOUNT
+        default: 'openshift-master-node@acs-san-stackroxci.iam.gserviceaccount.com'
+      - name: WORKER_NODE_SERVICE_ACCOUNT
+        default: 'openshift-worker-node@acs-san-stackroxci.iam.gserviceaccount.com'
+      - name: OS_IMAGE_STREAM
+        default: ''
+      from: ocp-4
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    test:
+    - ref: stackrox-stackrox-e2e-test
+    post:
+    - as: ocp-4-destroy
+      best_effort: true
+      commands: |
+        echo "Running openshift-4 ${OCP_VERSION} automation"
+        /usr/bin/openshift-ci.sh destroy openshift-4 "${OCP_VERSION}"
+      env:
+      - name: OCP_VERSION
+        default: 'ocp/stable-4.13'
+      credentials:
+      - mount_path: /tmp/vault/stackrox-automation-flavors
+        group: credentials
+        collection: stackrox-automation-flavors
+      from: ocp-4
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+      timeout: 30m0s
+    - ref: stackrox-stackrox-end
+  documentation: |-
+    A stackrox workflow to execute e2e QA tests in an OCP 4 cluster.

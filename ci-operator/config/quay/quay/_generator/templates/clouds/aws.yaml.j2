@@ -1,0 +1,21 @@
+tests:
+- steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+{%- if database_deprovision_ref %}
+    - ref: "{{ database_deprovision_ref }}"
+{%- endif %}
+{% if sts %}
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+{% else %}
+    - chain: ipi-aws-post
+{% endif %}
+    workflow: ipi-aws

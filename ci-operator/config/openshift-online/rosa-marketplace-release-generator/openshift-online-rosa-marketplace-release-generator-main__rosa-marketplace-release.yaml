@@ -1,0 +1,29 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: monitor
+  interval: 4h
+  steps:
+    env:
+      MARKETPLACE_DRY_RUN: "true"
+      OCM_LOGIN_ENV: production
+    test:
+    - ref: rosa-marketplace-release-detect
+    - ref: rosa-marketplace-release-publish
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-marketplace-release-generator
+  variant: rosa-marketplace-release

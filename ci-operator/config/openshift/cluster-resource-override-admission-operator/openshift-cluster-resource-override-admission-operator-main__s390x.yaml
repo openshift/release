@@ -1,0 +1,65 @@
+base_images:
+  cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.0"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      CRO_ART_IMAGE_SHARE: quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share
+      CRO_CATALOG_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__5.0__ose-clusterresourceoverride-rhel9-operator
+      CRO_CATALOG_SOURCE: cro-art-fbc
+      ETCD_DISK_SPEED: slow
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+    workflow: cluster-resource-override-s390x
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cluster-resource-override-admission-operator
+  variant: s390x

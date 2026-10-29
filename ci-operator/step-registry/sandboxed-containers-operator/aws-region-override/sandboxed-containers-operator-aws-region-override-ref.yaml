@@ -1,0 +1,79 @@
+ref:
+  as: sandboxed-containers-operator-aws-region-override
+  from_image:
+    namespace: ocp
+    name: "cli-yq"
+    tag: latest
+  commands: sandboxed-containers-operator-aws-region-override-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: AWS_REGION_OVERRIDE
+    default: ""
+    documentation: |-
+      Explicitly override the AWS region for sandboxed containers operator cluster installation.
+      If specified, this region will be used regardless of the leased resource region.
+      Takes highest priority over other region selection methods.
+      Example: "eu-west-1"
+  - name: AWS_ALLOWED_REGIONS
+    default: ""
+    documentation: |-
+      Space-separated list of allowed AWS regions for sandboxed containers operator cluster installation.
+      If AWS_REGION_OVERRIDE is not specified:
+      - If the leased region is in this list, it will be used
+      - If the leased region is NOT in this list, a random region from this list will be selected
+      If AWS_REGION_OVERRIDE is specified, it will be validated against this list (if provided).
+      Example: "us-east-1 us-west-2 eu-west-1 ap-southeast-1"
+  documentation: |-
+    Override the AWS region for sandboxed containers operator IPI cluster installation.
+
+    This step allows the sandboxed containers operator to override the AWS region that would
+    normally be determined by the LEASED_RESOURCE from the cluster profile lease system.
+    It provides flexible region selection with multiple configuration options for testing
+    sandboxed containers operator in specific AWS regions.
+
+    PREREQUISITES:
+    - Must run AFTER a base IPI configuration step (e.g., ipi-conf-aws)
+    - The install-config.yaml file must already exist in ${SHARED_DIR}
+    - AWS credentials must have permissions in the target region
+    - Target region should support the required instance types for sandboxed containers
+
+    REGION SELECTION PRIORITY (highest to lowest):
+    1. AWS_REGION_OVERRIDE - Explicit region override
+    2. AWS_ALLOWED_REGIONS - Region validation/selection from allowed list
+    3. LEASED_RESOURCE - Use original leased region (no override)
+
+    USAGE EXAMPLES:
+
+    1. Force specific region for sandboxed containers testing:
+       env:
+         AWS_REGION_OVERRIDE: "eu-west-1"
+
+    2. Restrict to regions with good sandboxed containers support:
+       env:
+         AWS_ALLOWED_REGIONS: "us-east-1 us-west-2 eu-west-1"
+
+    3. Force specific region with validation:
+       env:
+         AWS_REGION_OVERRIDE: "eu-west-1"
+         AWS_ALLOWED_REGIONS: "eu-west-1 eu-central-1 eu-north-1"
+
+    OUTPUTS:
+    - Modifies install-config.yaml with the target region
+    - Creates ${SHARED_DIR}/aws-region file with the final region
+    - Removes region-specific availability zones to let installer choose appropriate ones
+    - Sets AWS_DEFAULT_REGION environment variable for subsequent steps
+
+    SANDBOXED CONTAINERS SPECIFIC CONSIDERATIONS:
+    - Ensures testing happens in regions where required EC2 instance types are available
+    - Supports testing sandboxed containers operator across multiple AWS regions
+    - Validates region compatibility for confidential computing workloads
+
+    LIMITATIONS:
+    - AWS credentials must be valid for the target region
+    - Target region must have sufficient quotas for the cluster size
+    - Target region should support required instance types for sandboxed containers
+    - If using existing VPC/subnets, they must exist in the target region
+    - Base domain DNS configuration may need to be region-appropriate

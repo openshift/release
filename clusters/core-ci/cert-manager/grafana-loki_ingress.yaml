@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: 120s
+  name: grafana-loki
+  namespace: grafana-loki
+spec:
+  ingressClassName: openshift-default
+  tls:
+    - secretName: grafana-loki-tls
+      hosts:
+        - grafana-loki.ci.openshift.org
+  rules:
+  - host: grafana-loki.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+        pathType: ImplementationSpecific

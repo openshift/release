@@ -1,0 +1,62 @@
+chain:
+  as: rosa-e2e-hcp-rosa-cli-external-oidc-provision
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: ENABLE_BYOVPC
+    default: "true"
+  - name: STS
+    default: "true"
+  - name: EXTERNAL_AUTH_PROVIDERS_ENABLED
+    default: "true"
+    documentation: |-
+      Provision the HCP cluster with external authentication (external OIDC) enabled.
+      HCP-only, day-1 immutable feature: wired to `rosa create cluster
+      --external-auth-providers-enabled`.
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - ref: rosa-cluster-provision
+  # OCM-state based readiness: external-auth clusters have no built-in OAuth
+  # stack, so there is no guest login yet.
+  - ref: rosa-cluster-wait-ready-cluster
+  - ref: rosa-cluster-notify-error
+  # External-auth (external OIDC) HCP clusters have no built-in OAuth, so the
+  # public rosa-e2e-hcp-rosa-cli-provision chain cannot be reused as-is: it bakes
+  # in HTPasswd IDP creation and a guest `oc get clusteroperators` wait
+  # (rosa-conf-idp-htpasswd / rosa-cluster-wait-ready-operators), both of which
+  # require the OAuth stack these clusters do not have. Configure the external
+  # auth provider instead and wait for it to be reconciled via OCM and the
+  # management cluster.
+  - ref: rosa-conf-external-oidc-create
+  - ref: rosa-cluster-wait-ready-external-oidc
+  # Mint an elevated (backplane-cluster-admin) customer-plane kubeconfig.
+  # External-auth clusters have no OAuth stack, so there is no oc login path;
+  # the raw bp-kubeconfig from rosa-backplane-login authenticates as the
+  # backplane SREP service account, which lacks RBAC to create the namespaces
+  # and workloads the customer-plane specs need (403 Forbidden). The elevated
+  # kubeconfig written here is what rosa-e2e-validate-customer consumes, and
+  # rosa-cluster-credentials-backplane also writes proxy-conf.sh for the
+  # oc-based steps below.
+  - ref: rosa-cluster-credentials-backplane
+  # Publish the SHARED_DIR contract (cluster-id, kubeconfig,
+  # cluster-metadata.json).
+  - ref: rosa-e2e-rosa-cli-publish-contract
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    External-OIDC variant of the rosa-CLI provisioner head: provisions a ROSA HCP
+    cluster with external authentication (external OIDC) enabled and publishes the
+    SHARED_DIR provisioner-to-validator contract (cluster-id,
+    cluster-metadata.json) defined in ROSAENG-67580. Sibling of
+    rosa-e2e-hcp-rosa-cli-provision; the validation tail is provisioner-agnostic.
+    It differs from the public chain in the guest-access steps: external-auth
+    clusters have no built-in OAuth stack, so rosa-conf-idp-htpasswd and
+    rosa-cluster-wait-ready-operators are replaced by rosa-conf-external-oidc-create
+    and rosa-cluster-wait-ready-external-oidc. The customer-plane kubeconfig is
+    minted by rosa-cluster-credentials-backplane (elevated backplane-cluster-admin):
+    the raw bp-kubeconfig from rosa-backplane-login authenticates as the backplane
+    SREP service account, which cannot create the namespaces/workloads the
+    customer-plane specs require. Consumers must still run rosa-backplane-login
+    between this chain and the validation tail so rosa-e2e-validate-platform gets
+    mc-kubeconfig (and sc-kubeconfig best-effort).

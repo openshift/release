@@ -1,0 +1,54 @@
+chain:
+  as: rosa-e2e-hcp-rosa-cli-private-provision
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: ENABLE_BYOVPC
+    default: "true"
+  - name: STS
+    default: "true"
+  - name: PRIVATE
+    default: "true"
+    documentation: |-
+      Private API endpoint: rosa-cluster-provision maps this to
+      `rosa create cluster --private` for HCP clusters.
+  - name: PRIVATE_DEFAULT_INGRESS
+    default: "true"
+    documentation: |-
+      HCP-only: make the default apps ingress (router) listen internally
+      (`rosa create cluster --default-ingress-private`). Per the rosa CLI,
+      PrivateLink is a Classic-only concept: "For Hosted Control Plane clusters,
+      use the '--private' and '--default-ingress-private' flags instead." Together
+      PRIVATE and PRIVATE_DEFAULT_INGRESS give a fully private HCP cluster; PRIVATE
+      alone leaves the default ingress public.
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - ref: rosa-cluster-provision
+  - ref: rosa-cluster-wait-ready-cluster
+  - ref: rosa-cluster-notify-error
+  # The cluster API is only reachable via backplane from here on. This step
+  # writes ${SHARED_DIR}/kubeconfig and ${SHARED_DIR}/proxy-conf.sh, which the
+  # subsequent oc-based steps consume. It replaces the rosa-conf-idp-htpasswd
+  # step of the public rosa-e2e-hcp-rosa-cli-provision chain, which cannot
+  # reach a private API.
+  - ref: rosa-cluster-credentials-backplane
+  - ref: rosa-cluster-wait-ready-operators
+  # Publish the SHARED_DIR contract (cluster-metadata.json); cluster-id and
+  # kubeconfig were written by the steps above.
+  - ref: rosa-e2e-rosa-cli-publish-contract
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    PrivateLink variant of the rosa-CLI provisioner head: provisions a private
+    ROSA HCP cluster (private API, private default ingress, BYO VPC, STS) with
+    the rosa CLI and publishes the SHARED_DIR provisioner-to-validator contract
+    (cluster-id, kubeconfig, cluster-metadata.json) defined in ROSAENG-67580.
+    Sibling of rosa-e2e-hcp-rosa-cli-provision; the validation tail is
+    provisioner-agnostic. It differs from the public chain in one step: the
+    cluster API is not reachable from the build farm, so
+    rosa-cluster-credentials-backplane replaces the rosa-conf-idp-htpasswd login
+    (it also writes proxy-conf.sh so downstream steps route through the corp
+    proxy). Consumers must run rosa-backplane-login between this chain and the
+    validation tail so rosa-e2e-validate-customer can fall back to bp-kubeconfig
+    and rosa-e2e-validate-platform gets mc-kubeconfig.

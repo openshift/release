@@ -1,0 +1,124 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.18
+images:
+  items:
+  - context_dir: .
+    dockerfile_path: Dockerfile
+    to: e2e-test-runner
+promotion:
+  to:
+  - name: redhat-appstudio
+    namespace: ci
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: redhat-appstudio-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-west-2
+    owner: konflux
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-dump-external-resources
+  cron: 0 */12 * * *
+  steps:
+    test:
+    - ref: redhat-appstudio-clean-external-resources
+- always_run: false
+  as: load-test-ci-100u
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-100u
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: load-test-ci-50u
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-50u
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: load-test-ci-10u
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-10u
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: load-test-ci-1u
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-1u
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: load-test-ci-daily-10u
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-daily
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: max-concurrency
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: max-concurrency
+    workflow: redhat-appstudio-load-test-max-concurrency
+- always_run: false
+  as: load-test-ci-50u-realworld
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: ci-50u-realworld
+    workflow: redhat-appstudio-load-test
+- always_run: false
+  as: load-test-max-concurrency-realworld
+  steps:
+    cluster_profile: aws-rhtap-performance
+    env:
+      SCENARIO: max-concurrency-realworld
+    workflow: redhat-appstudio-load-test-max-concurrency
+- as: rosa-old-clusters-cleanup
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - ref: konflux-ci-rosa-cleanup
+- as: mapt-clusters-resources-cleanup
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - ref: konflux-ci-mapt-cleanup
+zz_generated_metadata:
+  branch: main
+  org: konflux-ci
+  repo: e2e-tests

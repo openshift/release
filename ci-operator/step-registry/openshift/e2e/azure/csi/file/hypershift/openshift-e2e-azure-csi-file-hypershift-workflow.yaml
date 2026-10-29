@@ -1,0 +1,26 @@
+workflow:
+  as: openshift-e2e-azure-csi-file-hypershift
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-azure-hypershift-provision
+      - ref: cucushift-hypershift-extended-enable-guest
+      - ref: storage-conf-csi-azure-file
+      - ref: storage-conf-wait-for-csi-driver
+      - ref: storage-obj-save
+    test:
+      - ref: storage-run-csi-hypershift
+    post:
+      - ref: storage-obj-check
+      - ref: cucushift-hypershift-extended-disable-guest
+      - chain: cucushift-installer-rehearse-azure-hypershift-deprovision
+    env:
+      SKIP_MONITOR_TEST: "true"
+      CLUSTERCSIDRIVER: file.csi.azure.com
+      TRUECONDITIONS: AzureFileDriverControllerServiceControllerAvailable AzureFileDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-file.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-azure-file.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    Installs the HyperShift Operator and creates a hosted cluster in Azure, then runs the openshift/csi
+    end-to-end test suite for Azure File CSI driver on the guest cluster, and finally destroys the hosted
+    cluster and management cluster.

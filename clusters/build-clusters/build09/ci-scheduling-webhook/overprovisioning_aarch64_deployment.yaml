@@ -1,0 +1,162 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+  name: overprovisioning-builds-workers-aarch64
+  namespace: ci-scheduling-webhook
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      run: overprovisioning
+      workload: builds
+  template:
+    metadata:
+      labels:
+        run: overprovisioning
+        workload: builds
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      priorityClassName: overprovisioning
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        ci-workload: builds
+        kubernetes.io/arch: arm64
+      tolerations:
+        - key: node-role.kubernetes.io/ci-builds-worker
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: reserve-resources
+          image: registry.k8s.io/pause:3.9
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65535
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "7000m"
+              memory: "16Mi"
+            limits:
+              cpu: "7000m"
+              memory: "16Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+  name: overprovisioning-tests-workers-aarch64
+  namespace: ci-scheduling-webhook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      run: overprovisioning
+      workload: tests
+  template:
+    metadata:
+      labels:
+        run: overprovisioning
+        workload: tests
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      priorityClassName: overprovisioning
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        ci-workload: tests
+        kubernetes.io/arch: arm64
+      tolerations:
+        - key: node-role.kubernetes.io/ci-tests-worker
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: reserve-resources
+          image: registry.k8s.io/pause:3.9
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65535
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "4000m"
+              memory: "16Mi"
+            limits:
+              cpu: "4000m"
+              memory: "16Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+  name: overprovisioning-prowjobs-workers-aarch64
+  namespace: ci-scheduling-webhook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      run: overprovisioning
+      workload: prowjobs
+  template:
+    metadata:
+      labels:
+        run: overprovisioning
+        workload: prowjobs
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      priorityClassName: overprovisioning
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        ci-workload: prowjobs
+        kubernetes.io/arch: arm64
+      tolerations:
+        - key: node-role.kubernetes.io/ci-prowjobs-worker
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: reserve-resources
+          image: registry.k8s.io/pause:3.9
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65535
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "4000m"
+              memory: "16Mi"
+            limits:
+              cpu: "4000m"
+              memory: "16Mi"

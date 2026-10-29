@@ -1,0 +1,61 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/dra-driver-sriov
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    to: dra-driver-sriov
+promotion:
+  to:
+  - disabled: true
+    name: sriov-5.1
+    namespace: origin
+  - disabled: true
+    name: "5.1"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp-priv
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: GOFLAGS="-mod=mod" HOME=/tmp make test
+  container:
+    from: src
+- as: lint
+  commands: GOFLAGS="-mod=mod" HOME=/tmp make lint
+  container:
+    from: src
+- as: fmt
+  commands: GOFLAGS="-mod=mod" make assert-fmt
+  container:
+    from: src
+- as: vet
+  commands: GOFLAGS="-mod=mod" make vet
+  container:
+    from: src
+- as: generate
+  commands: |
+    export GOFLAGS="-mod=mod"
+    make generate
+    make fmt
+    git diff --exit-code
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: dra-driver-sriov

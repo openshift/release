@@ -1,0 +1,34 @@
+ref:
+  as: aws-neuron-operator-rosa-cluster-deprovision
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: aws-neuron-operator-rosa-cluster-deprovision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 70m
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging, integration].
+  - name: DESTROY_TIMEOUT
+    default: "3600"
+    documentation: Set to number of seconds for the cluster to timeout if it's not destroyed.
+  - name: STS_PROPAGATION_DELAY
+    default: "60"
+    documentation: Seconds to wait after cluster destruction before attempting STS resource deletion. Allows the OCM backend to propagate the uninstalled state.
+  - name: STS_DELETE_RETRIES
+    default: "5"
+    documentation: Number of retry attempts for operator-roles and OIDC provider deletion.
+  - name: STS_RETRY_INTERVAL
+    default: "30"
+    documentation: Seconds to wait between STS deletion retry attempts.
+  documentation: |-
+    Custom ROSA cluster deprovision step for AWS Neuron CI that adds retry
+    logic for STS resource (operator-roles, OIDC provider) deletion.
+
+    The standard rosa-cluster-deprovision step has a race condition: after the
+    cluster object disappears from the OCM API, the backend may still report it
+    as "uninstalling" when operator-roles deletion is attempted. This step adds
+    a propagation delay and retries to handle the race reliably.

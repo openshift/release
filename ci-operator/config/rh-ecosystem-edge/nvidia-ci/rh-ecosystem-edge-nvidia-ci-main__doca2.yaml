@@ -1,0 +1,66 @@
+base_images:
+  dpf-ci:
+    name: openshift-dpf
+    namespace: ci
+    tag: dpf-ci
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  run_if_changed: x^
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- always_run: false
+  as: nno-e2e
+  capabilities:
+  - intranet
+  cron: 30 20 * * *
+  optional: true
+  presubmit: true
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-nno-doca2
+    env:
+      NNO_SUBSCRIPTION_CHANNEL: latest-ga
+    workflow: nno-e2e
+  timeout: 8h0m0s
+- always_run: false
+  as: nno-signed
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-nno-doca2
+    workflow: nno-signed-e2e
+  timeout: 8h0m0s
+- as: nno-signed-auto
+  capabilities:
+  - intranet
+  cron: 30 8,16 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-nno-doca2
+    workflow: nno-signed-periodic
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: doca2

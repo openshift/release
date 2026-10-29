@@ -1,0 +1,21 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+      RUN pip install --no-cache-dir yamllint
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: yamllint
+  commands: find . -name '*.yaml' -o -name '*.yml' | xargs yamllint --strict
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: chai-bot-config

@@ -1,0 +1,230 @@
+---
+########
+#
+# Template for auth (service accounts, roles, bindings) to deploy the cluster operator.
+#
+# These objects are in a separate template to allow a cluster admin to set them up one time,
+# while users with lesser permissions can continue to maintain the Cluster Operator deployment
+# itself.
+#
+########
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: cluster-operator-auth-template
+
+parameters:
+# Namespace to use for cluster-operator
+- name: CLUSTER_OPERATOR_NAMESPACE
+  value: openshift-cluster-operator
+# Namespace of kube-system. Do not change. Required due to oc process behavior.
+- name: KUBE_SYSTEM_NAMESPACE
+  value: kube-system
+
+objects:
+# Service account for the API Server
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: cluster-operator-apiserver
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+
+# Service account for the Controller Manager
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: cluster-operator-controller-manager
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+
+# API Server gets the auth-delegator role to delegate auth decisions to
+# the core API Server
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: "clusteroperator.openshift.io:apiserver-auth-delegator"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:auth-delegator
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cluster-operator-apiserver
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+
+# We have to create our openshift-cluster-operator namespace outside of "oc new-project"
+# due to restrictions on project names starting with "openshift-". This results in the default
+# service accounts (namely "deployer") being unable to view ReplicationControllers in the
+# namespace, and thus unable to actually deploy. A controller is incoming to monitor for this.
+#
+# NOTE: may not be required in 3.10, a controller was added to maintain these bindings.
+#
+# Until then we manually bind the deployer/builder service accounts to appropriate roles:
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: "system:deployers"
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:deployer
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: deployer
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+  #userNames:
+  #- system:serviceaccount:${CLUSTER_OPERATOR_NAMESPACE}:deployer
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: "system:image-builders"
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-builder
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: builder
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+  #userNames:
+  #- system:serviceaccount:${CLUSTER_OPERATOR_NAMESPACE}:builder
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: "system:image-pullers"
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: system:image-puller
+  subjects:
+  - apiGroup: ""
+    kind: Group
+    name: system:serviceaccounts:${CLUSTER_OPERATOR_NAMESPACE}
+  #userNames:
+  #- system:serviceaccount:${CLUSTER_OPERATOR_NAMESPACE}:deployer
+
+# API Server gets the ability to read authentication. This allows it to
+# read the specific configmap that has the requestheader-* entries to
+# enable api aggregation
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: "clusteroperator.openshift.io:apiserver-authentication-reader"
+    namespace: ${KUBE_SYSTEM_NAMESPACE}
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: extension-apiserver-authentication-reader
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cluster-operator-apiserver
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+
+# Create a role for the Controller Manager to give it permissions to manage
+# the resources of the clusteroperator
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: "clusteroperator.openshift.io:controller-manager"
+  rules:
+  # configmaps for leader election
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs:     ["create"]
+  - apiGroups:     [""]
+    resources:     ["configmaps"]
+    resourceNames: ["cluster-operator-controller-manager"]
+    verbs: ["get","update"]
+  # events for recording events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs:     ["create","patch","update"]
+  # allow all operations on all resources in our API group
+  - apiGroups: ["clusteroperator.openshift.io"]
+    resources: ["*"]
+    verbs:     ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # allow all operations on all resources in the cluster-api API group
+  - apiGroups: ["cluster.k8s.io"]
+    resources: ["*"]
+    verbs:     ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # allow operations on required resources in any namespace a cluster is created
+  - apiGroups:     [""]
+    resources:     ["configmaps", "pods", "secrets", "serviceaccounts"]
+    verbs: ["*"]
+  - apiGroups:     ["batch"]
+    resources:     ["jobs"]
+    verbs: ["*"]
+  # allow reading and creating rolebindings
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["*"]
+
+# Bind the Controller Manager service account to the role created for it
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: "clusteroperator.openshift.io:controller-manager"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "clusteroperator.openshift.io:controller-manager"
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cluster-operator-controller-manager
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}
+
+# Create a role for the master installer to save a kubeconfig
+# from a managed cluster
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: "clusteroperator.openshift.io:master-controller"
+  rules:
+  # CRUD secrets with kubeconfig data
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs:     ["create", "delete", "get", "list", "update"]
+
+# Role for upstream cluster api controllers
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: "clusterapi.openshift.io:controller-manager"
+  rules:
+  # events for recording events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  # allow all operations on all resources in our API group
+  - apiGroups: ["cluster.k8s.io"]
+    resources: ["*"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  # allow operations on required resources in any namespace a cluster is created
+  - apiGroups: [""]
+    resources: ["configmaps", "pods", "secrets", "nodes"]
+    verbs: ["*"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["*"]
+
+# Bind the upstream cluster api controllers role to its ServiceAccount
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: "clusterapi.openshift.io:controller-manager"
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: "clusterapi.openshift.io:controller-manager"
+  subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cluster-api-controller-manager
+    namespace: ${CLUSTER_OPERATOR_NAMESPACE}

@@ -1,0 +1,91 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: test/Dockerfile.integration
+    optional: true
+    to: hyperfleet-integration-test
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/hyperfleet-adapter
+      USER root
+      RUN dnf install -y go make
+      RUN dnf clean all
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-adapter
+    optional: true
+    to: golang-test
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: integration
+  capabilities:
+  - nested-podman
+  steps:
+    test:
+    - as: test
+      commands: |
+        set -euo pipefail
+        export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+        PODMAN_PID=""
+        cleanup() {
+            if [[ -n "$PODMAN_PID" ]]; then
+                kill "$PODMAN_PID" 2>/dev/null || true
+                wait "$PODMAN_PID" 2>/dev/null || true
+            fi
+        }
+        trap cleanup EXIT
+
+        podman system service --time=0 &
+        PODMAN_PID=$!
+
+        # Wait for the podman socket to be available
+        SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+        for i in $(seq 1 30); do
+            [ -S "$SOCKET_PATH" ] && break
+            sleep 1
+        done
+
+        export TESTCONTAINERS_RYUK_DISABLED=true
+        mkdir -p "$HOME/.docker"
+        cp /var/secrets/registry-pull-secret/.dockerconfigjson "$HOME/.docker/config.json"
+        export DOCKER_CONFIG="$HOME/.docker"
+        make test-integration
+      credentials:
+      - bundle: registry-pull-credentials
+        mount_path: /var/secrets/registry-pull-secret
+        namespace: test-credentials
+      dependencies:
+      - env: INTEGRATION_ENVTEST_IMAGE
+        name: hyperfleet-integration-test
+      from: golang-test
+      grace_period: 1m0s
+      nested_podman: true
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-adapter
+  variant: presubmits

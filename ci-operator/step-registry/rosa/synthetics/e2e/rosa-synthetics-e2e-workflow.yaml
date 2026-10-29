@@ -1,0 +1,28 @@
+workflow:
+  as: rosa-synthetics-e2e
+  steps:
+    env:
+      OCM_LOGIN_ENV: production
+      RHOBS_CLUSTER_ID: 2j86vnk0b06v43684hhsdkmkt7aln933
+      COMPONENT: agent
+    pre:
+    - ref: rosa-synthetics-e2e-setup
+    test:
+    - ref: rosa-synthetics-e2e-test
+    post:
+    - ref: rosa-synthetics-e2e-teardown
+  documentation: |-
+    Deploys a synthetics component (agent or api) to an ephemeral namespace
+    on the RHOBS integration cell (rhobsi01uw2) and verifies it works
+    correctly against a mock synthetics-api.
+
+    The workflow creates a namespace, deploys a mock API serving test
+    probes, deploys the component under test, runs verification checks,
+    then cleans up by deleting the namespace.
+
+    Set COMPONENT=agent to test the synthetics-agent (Probe CRD creation,
+    blackbox exporter deployment, metrics). Set COMPONENT=api to test the
+    synthetics-api (endpoint responses, metrics).
+
+    Requires capabilities: [intranet] for backplane access to the RHOBS
+    cluster. Uses OCM CI service account credentials from cs-qe-credentials.

@@ -1,0 +1,17 @@
+workflow:
+  as: medik8s-sbr-hypershift-persistent
+  documentation: |-
+    HyperShift AWS cluster lifecycle for medik8s SBR e2e tests using the
+    shared persistent management cluster (hypershift-aws cluster profile).
+    Skips management cluster provisioning and teardown — only the HostedCluster
+    is created and destroyed per run. Requires cluster_profile: hypershift-aws.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - chain: hypershift-aws-create
+    - ref: medik8s-sbr-hypershift-apply-image-sources
+    post:
+    - ref: medik8s-sbr-hypershift-restore-kubeconfig
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy

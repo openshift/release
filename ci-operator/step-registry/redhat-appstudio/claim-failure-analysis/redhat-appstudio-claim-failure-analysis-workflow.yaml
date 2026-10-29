@@ -1,0 +1,28 @@
+workflow:
+  as: redhat-appstudio-claim-failure-analysis
+  steps:
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#marking-post-steps-best-effort
+    allow_best_effort_post_steps: true
+    # https://docs.ci.openshift.org/docs/architecture/step-registry/#skipping-post-steps-on-success
+    allow_skip_on_success: true
+    pre:
+    - ref: ipi-install-rbac
+    - ref: redhat-appstudio-health-check
+      # Do not let potential failures in this step fail the whole workflow (for now)
+      best_effort: true
+    post:
+    - ref: konflux-ci-unregister-sprayproxy
+      best_effort: true
+    - chain: gather
+      optional_on_success: true
+    - ref: redhat-appstudio-gather
+      optional_on_success: true
+    - ref: redhat-appstudio-report
+      best_effort: true
+    - ref: redhat-appstudio-prow-failure-analysis
+      optional_on_success: true
+  documentation: |-
+    This workflows perform shared pre/post actions on clusters obtained from
+    preinstalled pools (https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-a-cluster-pool).
+    The intent of this workflow is to mimic the `ipi-$PLATFORM` workflow behavior,
+    just without the installation/deprovision steps.

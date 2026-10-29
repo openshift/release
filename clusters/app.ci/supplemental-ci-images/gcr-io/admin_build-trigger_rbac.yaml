@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-trigger
+  namespace: gcr-io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: build-trigger
+  namespace: gcr-io
+rules:
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs/instantiate
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: build-trigger
+  namespace: gcr-io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: build-trigger
+subjects:
+- kind: ServiceAccount
+  name: build-trigger
+  namespace: gcr-io

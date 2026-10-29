@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ops-alert-dashboard
+  namespace: ci
+  labels:
+    app: ops-alert-dashboard
+spec:
+  # Keep exactly one writer for the shared Slack action log.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ops-alert-dashboard
+  template:
+    metadata:
+      labels:
+        app: ops-alert-dashboard
+    spec:
+      serviceAccountName: ops-alert-dashboard
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: dashboard
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ops-alert-dashboard_latest
+        imagePullPolicy: Always
+        args:
+        - --config=/etc/ops-alerts/config.yaml
+        - --classification=/etc/classification/_ops-alerts.yaml
+        - --slack-token-file=/etc/slack/oauth_token
+        - --history-window=48h
+        # Pod-IP probes need this listener; API requests still require a trusted
+        # loopback proxy identity. The Service exposes only the OAuth proxy.
+        - --listen=0.0.0.0:8080
+        ports:
+        - name: backend
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: backend
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: backend
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: config
+          mountPath: /etc/ops-alerts
+          readOnly: true
+        - name: classification
+          mountPath: /etc/classification
+          readOnly: true
+        - name: slack
+          mountPath: /etc/slack
+          readOnly: true
+      - name: oauth-proxy
+        image: quay.io/openshift/origin-oauth-proxy:4.19
+        imagePullPolicy: IfNotPresent
+        args:
+        - -provider=openshift
+        - -proxy-prefix=/oauth
+        - -openshift-service-account=ops-alert-dashboard
+        - -https-address=:8443
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://127.0.0.1:8080
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - '-openshift-sar={"namespace":"ci","resource":"services","resourceName":"ops-alert-dashboard","verb":"get"}'
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -cookie-secure=true
+        - -cookie-expire=1h
+        - -cookie-samesite=lax
+        - -pass-basic-auth=false
+        # OAuth proxy overwrites X-Forwarded-Email with its authenticated identity.
+        - -pass-user-headers=true
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        ports:
+        - name: https
+          containerPort: 8443
+        readinessProbe:
+          httpGet:
+            path: /oauth/healthz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /oauth/healthz
+            port: https
+            scheme: HTTPS
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tls
+          mountPath: /etc/tls/private
+          readOnly: true
+        - name: session-secret
+          mountPath: /etc/proxy/secrets
+          readOnly: true
+      volumes:
+      - name: config
+        secret:
+          secretName: ops-alert-dashboard-config
+          items:
+          - key: config.yaml
+            path: config.yaml
+      - name: classification
+        configMap:
+          name: ops-alert-dashboard-classification
+          items:
+          - key: _ops-alerts.yaml
+            path: _ops-alerts.yaml
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+          items:
+          - key: oauth_token
+            path: oauth_token
+      - name: tls
+        secret:
+          secretName: ops-alert-dashboard-tls
+      - name: session-secret
+        secret:
+          secretName: ops-alert-dashboard-session
+          items:
+          - key: session_secret
+            path: session_secret

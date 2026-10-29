@@ -1,0 +1,26 @@
+workflow:
+  as: baremetalds-sno
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BOOTSTRAP_IN_PLACE=true
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        MASTER_DISK=120
+        MASTER_VCPU=16
+      DEVSCRIPTS_TARGET: sno_bip
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-sno-conf
+    test:
+      - ref: baremetalds-sno-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes single-node OpenShift installation using the
+    dev-scripts sno_bip make target (bootstrap-in-place method).

@@ -1,0 +1,56 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# release_reimport_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
+  name: release-reimport-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: release-reimport-controller
+  template:
+    metadata:
+      labels:
+        app: release-reimport-controller
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-reimport-controller
+        - start
+        - -v=4
+        - --namespaces=ocp
+        - --namespaces=ocp-s390x
+        - --namespaces=ocp-ppc64le
+        - --namespaces=ocp-arm64
+        - --namespaces=ocp-multi
+        - --namespaces=ocp-priv
+        - --namespaces=ocp-s390x-priv
+        - --namespaces=ocp-ppc64le-priv
+        - --namespaces=ocp-arm64-priv
+        - --namespaces=ocp-multi-priv
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-reimport-controller_latest
+        imagePullPolicy: Always
+        name: controller
+        resources:
+          limits:
+            cpu: 500m
+            memory: 8Gi
+          requests:
+            cpu: 250m
+            memory: 2Gi
+      serviceAccountName: release-reimport-controller

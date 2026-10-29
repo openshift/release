@@ -1,0 +1,1 @@
+../../test/check-dependencies/capz-test-check-dependencies-commands.sh

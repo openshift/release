@@ -1,0 +1,23 @@
+workflow:
+  as: openshift-e2e-aws-calico
+  steps:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: network-calico
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    env:
+      # 1) skip maxUnavailable test as openshift-kube-proxy doesn't pass it
+      # 2) skip /config/master test (pending investigation)
+      # 3) pod_network_name_info metrics is empty (pending investigation)
+      TEST_SKIPS: >-
+        Managed cluster should only include cluster daemonsets that have maxUnavailable update of 10 or 33 percent\|
+        Pods cannot access the /config/master API endpoint \|
+        Prometheus when installed on the cluster should provide named network metrics
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+  documentation: |-
+    The Openshift E2E Calico workflow executes the common end-to-end test suite with the Calico network plugin with default configuration.

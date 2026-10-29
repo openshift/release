@@ -1,0 +1,17 @@
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority-nonpreempting
+preemptionPolicy: Never
+value: 1000000000
+description: |
+  This priority class is equivalent to `openshift-user-critical`, except it is
+  non-preemptive.  It is used by the pod-scaler as a hack to make pods with high
+  resource usage schedulable in the build clusters.  Because the built-in
+  classes (e.g. `openshift-user-critical`) are preemptive, they cause disruption
+  when test pods are removed from the nodes to accomodate these high-prority
+  pods (PDBs are configured for test pods, but they are not binding with regards
+  to preemption).
+
+  https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption#non-preempting-priority-class

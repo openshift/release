@@ -1,0 +1,24 @@
+ref:
+  as: quay-omr-v2-install
+  from_image:
+    namespace: ci
+    name: tests-private-base
+    tag: "4.22"
+  cli: latest
+  commands: quay-omr-v2-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 60m0s
+  grace_period: 5m0s
+  env:
+  - name: OMR_V2_DOWNLOAD_URL
+    default: https://mirror.openshift.com/pub/cgw/mirror-registry/latest/mirror-registry-amd64.tar.gz
+    documentation: Fallback floating official OMR v2 archive URL when no PR-built pipeline image was prepared. The step rejects any extracted artifact whose semantic major version is not 2.
+  documentation: |-
+    Install OMR v2 rootlessly on the dedicated RHEL host. When a PR-built
+    pipeline image was prepared, extract and validate its offline archive in
+    this step before transferring it directly to the host; otherwise download
+    the official floating artifact on the host. Verify major version 2 and
+    atomically publish its endpoint, credentials, and CA.

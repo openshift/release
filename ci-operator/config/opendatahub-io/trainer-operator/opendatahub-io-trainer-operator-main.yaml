@@ -1,0 +1,104 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: trainer-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      OPERATOR_NAMESPACE: trainer-operator-system
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: trainer-operator-system,opendatahub
+      TRAINER_NAMESPACE: opendatahub
+    post:
+    - chain: gather
+    test:
+    - ref: cert-manager-install-operator
+    - chain: jobset-install
+    - as: deploy-e2e-and-prepare-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # The builder image defaults to -mod=vendor, which prevents the
+        # Makefile from installing its pinned controller-gen and kustomize.
+        export GOFLAGS=''
+
+        make deploy IMG="${OPERATOR_IMAGE}" KUBECTL=oc
+        oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
+          deployment/trainer-operator-controller-manager --timeout=10m
+
+        make test-e2e-ocp
+
+        # The E2E suite removes Trainer/default-trainer during cleanup. Restore
+        # it so both controller endpoints are running when the scanner starts.
+        oc apply -f - <<EOF
+        apiVersion: components.platform.opendatahub.io/v1alpha1
+        kind: Trainer
+        metadata:
+          name: default-trainer
+        spec:
+          appNamespace: "${TRAINER_NAMESPACE}"
+        EOF
+        oc wait --for=condition=Ready trainer/default-trainer --timeout=15m
+        oc -n "${TRAINER_NAMESPACE}" wait --for=condition=Available \
+          deployment/kubeflow-trainer-controller-manager --timeout=10m
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: trainer-operator
+      env:
+      - default: trainer-operator-system
+        documentation: Namespace where trainer-operator is deployed.
+        name: OPERATOR_NAMESPACE
+      - default: opendatahub
+        documentation: Namespace where the Kubeflow Trainer operand is deployed.
+        name: TRAINER_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h15m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: trainer-operator

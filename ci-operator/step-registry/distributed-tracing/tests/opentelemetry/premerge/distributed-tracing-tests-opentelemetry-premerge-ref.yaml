@@ -1,0 +1,70 @@
+ref:
+  as: distributed-tracing-tests-opentelemetry-premerge
+  from: obs-tests-runner
+  timeout: 3h30m0s
+  grace_period: 2m0s
+  commands: distributed-tracing-tests-opentelemetry-premerge-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+  env:
+  - name: RUN_TESTS
+    default: ""
+    documentation: |-
+      Space separated chainsaw test directories of the operator repository to run, relative to the repository root,
+      for example "tests/e2e/smoke-deletion tests/e2e-crd-validations tests/e2e-sidecar". Exactly these directories
+      run; a directory that does not exist fails the job. Empty (the default) runs the full suite, minus SKIP_TESTS.
+      Exactly one of RUN_TESTS and SKIP_TESTS must be set: both, or neither, fail the job.
+  - name: SKIP_TESTS
+    default: ""
+    documentation: |-
+      Space separated test directories, relative to the repository and under tests/, that are removed from the full
+      suite before it runs, for example "tests/e2e/smoke-ip-families tests/e2e-otel/*aws*". Globs are allowed. An entry
+      that does not start with tests/, or contains "..", is reported and ignored. The full-suite jobs set it to the tests
+      that cannot run on their OpenShift version, platform or architecture. Not used with RUN_TESTS.
+  - name: OTEL_COLLECTOR_IMAGE
+    default: ""
+    documentation: The OpenTelemetry Collector image used by the operator in testing. Filled from the opentelemetry-collector pipeline image.
+  - name: TARGETALLOCATOR_IMG
+    default: ""
+    documentation: The OpenTelemetry Target Allocator image used by the operator in testing. Filled from the opentelemetry-target-allocator-art pipeline image.
+  - name: OPERATOR_IMG
+    default: ""
+    documentation: The OpenTelemetry Operator image that must run in the test. Filled from the opentelemetry-operator-art pipeline image and checked against the installed operator.
+  dependencies:
+  - name: "opentelemetry-collector"
+    env: OTEL_COLLECTOR_IMAGE
+  - name: "opentelemetry-target-allocator-art"
+    env: TARGETALLOCATOR_IMG
+  - name: "opentelemetry-operator-art"
+    env: OPERATOR_IMG
+  documentation: |-
+    The distributed-tracing-tests-opentelemetry-premerge step runs OpenTelemetry Operator e2e tests against an
+    operator that was installed from a bundle built in the same CI run. It validates the changes of a pull request
+    to a product branch. A job either names the exact tests to run (RUN_TESTS, the critical e2e-pre-merge job) or
+    the tests to skip from the full suite (SKIP_TESTS, the optional e2e-ocp-<version> jobs). The full suite is
+    tests/e2e tests/e2e-autoscale tests/e2e-crd-validations tests/e2e-openshift tests/e2e-instrumentation
+    tests/e2e-pdb tests/e2e-otel tests/e2e-multi-instrumentation tests/e2e-targetallocator-cr
+    tests/e2e-targetallocator tests/e2e-prometheuscr tests/e2e-sidecar tests/e2e-metadata-filters
+    tests/e2e-openshift-tls-profile.
+
+    The tests run in one chainsaw invocation with the label selector sidecar!=legacy (OpenShift 4.16 and later, native
+    sidecars) or sidecar!=native (older), which keeps the sidecar variant of the OpenShift version and every unlabeled
+    test. Two directories run on their own after the rest, in this order: tests/e2e-metadata-filters, after
+    ANNOTATIONS_FILTER and LABELS_FILTER were set on the operator (they stay set for the rest of the run), and
+    tests/e2e-openshift-tls-profile last, because it changes the cluster-wide TLS profile and the MachineConfig
+    rollout that follows would disrupt other tests.
+
+    Unlike the downstream step, the tests are taken from the pull request source that is baked into the
+    obs-tests-runner image (tests/e2e-openshift/Dockerfile) instead of being cloned from a branch.
+
+    This step requires the following pipeline images to be built by the ci-operator config:
+    - obs-tests-runner: test runner image that contains the operator repository in /tmp/opentelemetry-operator
+    - opentelemetry-collector: Red Hat build of the OpenTelemetry Collector
+    - opentelemetry-target-allocator-art: Red Hat build of the Target Allocator
+    - opentelemetry-operator-art: Red Hat build of the Operator, which must be the image of the installed operator
+
+    The collector and target allocator images are passed to the operator by patching the RELATED_IMAGE_COLLECTOR and
+    RELATED_IMAGE_TARGET_ALLOCATOR environment variables into the operator ClusterServiceVersion. The metadata
+    filter variables are patched the same way.

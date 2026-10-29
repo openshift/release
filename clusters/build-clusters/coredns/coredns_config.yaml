@@ -1,0 +1,24 @@
+apiVersion: v1
+data:
+  Corefile: |
+      .:5353 {
+            errors
+            log
+            health
+            rewrite stop name regex ^.*libvirt-ppc64le-s2s-([0-9])-[0-9].* libvirt-ppc64le-s2s-{1}.ppc64le-libvirt.svc.cluster.local
+            hosts {
+              10.130.40.102 libvirt-ppc64le-s2s-0.ppc64le-libvirt.svc.cluster.local
+              10.130.40.101 libvirt-ppc64le-s2s-1.ppc64le-libvirt.svc.cluster.local
+              10.130.40.103 libvirt-ppc64le-s2s-2.ppc64le-libvirt.svc.cluster.local
+              fallthrough
+            }
+            forward . /etc/resolv.conf {
+                policy sequential
+            }
+            cache 3600
+      }
+
+kind: ConfigMap
+metadata:
+  name: coredns-config
+  namespace: coredns

@@ -1,0 +1,59 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v2.10.1
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: collectors/collector-code-acs/Dockerfile
+    to: initiative-engine-collector-code-acs
+  - dockerfile_path: collectors/collector-code-github/Dockerfile
+    to: initiative-engine-collector-code-github
+  - dockerfile_path: collectors/collector-code-gitlab/Dockerfile
+    to: initiative-engine-collector-code-gitlab
+  - dockerfile_path: collectors/collector-code-konflux/Dockerfile
+    to: initiative-engine-collector-code-konflux
+  - dockerfile_path: collectors/collector-code-ocp-release/Dockerfile
+    to: initiative-engine-collector-code-ocp-release
+  - dockerfile_path: collectors/collector-code-operators/Dockerfile
+    to: initiative-engine-collector-code-operators
+  - dockerfile_path: enrichers/enricher-code-jira/Dockerfile
+    to: initiative-engine-enricher-code-jira
+  - dockerfile_path: enrichers/enricher-code-rover/Dockerfile
+    to: initiative-engine-enricher-code-rover
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m1s
+  container:
+    clone: true
+    from: golangci-lint
+- as: test
+  commands: make test
+  container:
+    from: src
+  run_if_changed: \.go$|go.sum
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: initiative-engine-collectors

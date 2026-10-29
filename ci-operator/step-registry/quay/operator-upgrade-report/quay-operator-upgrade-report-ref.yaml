@@ -1,0 +1,26 @@
+ref:
+  as: quay-operator-upgrade-report
+  from: quay-playwright-runner
+  commands: quay-operator-upgrade-report-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  documentation: |-
+    Final step of the operator-upgrade test. It does two things:
+
+    1. Combined report: the last Playwright phase (functional) merges every
+       phase's "blob" report inside its own pod -- its full-suite blob is far
+       larger than the 1MiB Kubernetes Secret backing SHARED_DIR and can never
+       travel through it -- and leaves a tiny pointer file with the merged
+       report's public GCS URL in SHARED_DIR; this step links that report in
+       Spyglass. If the pointer is missing (that phase crashed early), it falls
+       back to merging the small seed/verify blobs that did fit in SHARED_DIR.
+    2. Gate: the best-effort Playwright phases (seed/verify/functional) each write
+       their result to the flat file SHARED_DIR/quay-upgrade-result-<phase>.rc and
+       exit 0 so the chain keeps running and every phase publishes its own report.
+       This step reads those markers and exits non-zero if ANY phase had test
+       failures, or if no phase wrote a marker, turning the job RED while still
+       having run the complete set of phases. Non-test steps (operator install,
+       storage install, the OLM upgrade, provisioning) are not best-effort and
+       still abort the job directly on failure.
