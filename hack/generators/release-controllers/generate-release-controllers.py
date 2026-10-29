@@ -59,6 +59,9 @@ def generate_app_ci_content(config, git_clone_dir):
         content.add_osd_rc_service_account_resources(gendoc)
         content.add_release_payload_modifier_service_account(gendoc)
 
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('01_release-controller-sparse-checkout.yaml'), context=config) as gendoc:
+        content.add_release_controller_sparse_checkout_configmap(gendoc, config)
+
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 

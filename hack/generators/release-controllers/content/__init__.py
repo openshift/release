@@ -23,3 +23,4 @@ from content.release_reimport_controller_resources import add_release_reimport_c
 from content.release_mirror_cleanup_controller_resources import add_release_mirror_cleanup_controller_resources
 from content.signer_resources import generate_signer_resources
 from content.trt_rbac import generate_trt_rbac
+from content.utils import add_release_controller_sparse_checkout_configmap
