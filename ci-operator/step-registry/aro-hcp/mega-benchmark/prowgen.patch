@@ -1,0 +1,183 @@
+diff --git a/cmd/ci-operator-prowgen/main.go b/cmd/ci-operator-prowgen/main.go
+index bf8e45a73..9f6546f48 100644
+--- a/cmd/ci-operator-prowgen/main.go
++++ b/cmd/ci-operator-prowgen/main.go
+@@ -10,6 +10,7 @@ import (
+ 
+ 	"github.com/sirupsen/logrus"
+ 
++	"k8s.io/apimachinery/pkg/labels"
+ 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+ 	prowconfig "sigs.k8s.io/prow/pkg/config"
+ 	"sigs.k8s.io/prow/pkg/flagutil"
+@@ -146,6 +147,7 @@ func (o *options) generateJobsFromFile(path string) error {
+ 	return o.generateJobsFromConfig(path, configSpec)
+ }
+ 
++// Generates one configuration and prunes stale jobs only within the controlled benchmark's exact variant.
+ func (o *options) generateJobsFromConfig(source string, configSpec cioperatorapi.ReleaseBuildConfiguration) error {
+ 	info := configSpec.Metadata
+ 	if info.Org == "" || info.Repo == "" || info.Branch == "" {
+@@ -163,7 +165,14 @@ func (o *options) generateJobsFromConfig(source string, configSpec cioperatorapi
+ 	if err != nil {
+ 		return fmt.Errorf("failed to generate jobs for %s@%s: %w", orgRepo, info.Branch, err)
+ 	}
+-	if err := jc.WriteToDir(o.toDir, info.Org, info.Repo, generated, prowgen.Generator, nil, jc.WriteToFileAtomic, false); err != nil {
++	var matchLabels labels.Set
++	pruneAll := info.Org == "Azure" && info.Repo == "ARO-HCP" &&
++		info.Branch == "4ce838f7293c12e6a65f994aa493ac63e3cc2dbb" &&
++		strings.HasPrefix(info.Variant, "mega-control-1029-")
++	if pruneAll {
++		matchLabels = labels.Set{jc.ProwJobLabelVariant: info.Variant}
++	}
++	if err := jc.WriteToDir(o.toDir, info.Org, info.Repo, generated, prowgen.Generator, matchLabels, jc.WriteToFileAtomic, pruneAll); err != nil {
+ 		return fmt.Errorf("failed to write jobs for %s@%s: %w", orgRepo, info.Branch, err)
+ 	}
+ 	return nil
+diff --git a/pkg/prowgen/prowgen.go b/pkg/prowgen/prowgen.go
+index f852c7b58..633e6e30a 100644
+--- a/pkg/prowgen/prowgen.go
++++ b/pkg/prowgen/prowgen.go
+@@ -5,9 +5,11 @@ import (
+ 	"hash/fnv"
+ 	"strings"
+ 
++	corev1 "k8s.io/api/core/v1"
+ 	"k8s.io/apimachinery/pkg/util/sets"
+ 	prowv1 "sigs.k8s.io/prow/pkg/apis/prowjobs/v1"
+ 	prowconfig "sigs.k8s.io/prow/pkg/config"
++	"sigs.k8s.io/yaml"
+ 
+ 	cioperatorapi "github.com/openshift/ci-tools/pkg/api"
+ 	jc "github.com/openshift/ci-tools/pkg/jobconfig"
+@@ -19,6 +21,57 @@ const (
+ 	Generator      jc.Generator = "prowgen"
+ )
+ 
++const controlledMegaSharedCommands = `set -o errexit
++set -o nounset
++set -o pipefail
++artifact_root="${ARTIFACTS:?}"
++mkdir -p "${artifact_root}/seed" "${artifact_root}/warm"
++printf '%s\n' "${JOB_SPEC:?}" > "${artifact_root}/shared-job-spec.json"
++seed_args=("$@")
++warm_args=()
++target_count=0
++for arg in "$@"; do
++    if [ "${arg}" = "--target=integration" ]; then
++        warm_args+=("--target=mega-linter")
++        target_count=$((target_count + 1))
++    else
++        warm_args+=("${arg}")
++    fi
++done
++test "${target_count}" -eq 1
++printf '%s' "${JOB_SPEC}" | sha256sum > "${artifact_root}/seed/job-spec.sha256"
++printf '%q ' ci-operator "${seed_args[@]}" > "${artifact_root}/seed/operator-argv.txt"
++seed_start="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
++printf 'MEGA_BENCHMARK_NATIVE_START phase=seed utc=%s\n' "${seed_start}"
++printf '{"phase":"seed","event":"start","utc":"%s"}\n' "${seed_start}" >> "${artifact_root}/shared-native-events.jsonl"
++set +o errexit
++ARTIFACTS="${artifact_root}/seed" ci-operator "${seed_args[@]}"
++seed_status=$?
++seed_end="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
++set -o errexit
++printf 'MEGA_BENCHMARK_NATIVE_END phase=seed utc=%s exit=%s\n' "${seed_end}" "${seed_status}"
++printf '{"phase":"seed","event":"end","utc":"%s","exit":%s}\n' "${seed_end}" "${seed_status}" >> "${artifact_root}/shared-native-events.jsonl"
++printf '%s\n' "${seed_status}" > "${artifact_root}/seed/native-exit-status.txt"
++if [ "${seed_status}" -ne 0 ]; then
++    printf '{"phase":"warm","event":"skipped","reason":"integration-failed"}\n' >> "${artifact_root}/shared-native-events.jsonl"
++    exit "${seed_status}"
++fi
++printf '%s' "${JOB_SPEC}" | sha256sum > "${artifact_root}/warm/job-spec.sha256"
++printf '%q ' ci-operator "${warm_args[@]}" > "${artifact_root}/warm/operator-argv.txt"
++warm_start="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
++printf 'MEGA_BENCHMARK_NATIVE_START phase=warm utc=%s\n' "${warm_start}"
++printf '{"phase":"warm","event":"start","utc":"%s"}\n' "${warm_start}" >> "${artifact_root}/shared-native-events.jsonl"
++set +o errexit
++ARTIFACTS="${artifact_root}/warm" ci-operator "${warm_args[@]}"
++warm_status=$?
++warm_end="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
++set -o errexit
++printf 'MEGA_BENCHMARK_NATIVE_END phase=warm utc=%s exit=%s\n' "${warm_end}" "${warm_status}"
++printf '{"phase":"warm","event":"end","utc":"%s","exit":%s}\n' "${warm_end}" "${warm_status}" >> "${artifact_root}/shared-native-events.jsonl"
++printf '%s\n' "${warm_status}" > "${artifact_root}/warm/native-exit-status.txt"
++exit "${warm_status}"
++`
++
+ // GenerateJobs
+ // Given a ci-operator configuration file and basic information about what
+ // should be tested, generate a following JobConfig:
+@@ -32,14 +85,21 @@ const (
+ // new jobs are generated with GenerateJobs, the call site should also use
+ // Prune() function to remove all stale jobs and label the jobs as simply
+ // "generated".
++// Controlled shared-source benchmark periodics run integration and warm MegaLinter in separate native processes with identical Prow refs.
+ func GenerateJobs(configSpec *cioperatorapi.ReleaseBuildConfiguration, info *cioperatorapi.Metadata, clusterProfileResolver ClusterProfileResolver) (*prowconfig.JobConfig, error) {
+ 	orgrepo := fmt.Sprintf("%s/%s", info.Org, info.Repo)
+ 	presubmits := map[string][]prowconfig.Presubmit{}
+ 	postsubmits := map[string][]prowconfig.Postsubmit{}
+ 	var periodics []prowconfig.Periodic
+ 	disableAllRehearsals := configSpec.Prowgen != nil && configSpec.Prowgen.DisableRehearsals
++	controlledMegaShared := info.Org == "Azure" && info.Repo == "ARO-HCP" &&
++		info.Branch == "4ce838f7293c12e6a65f994aa493ac63e3cc2dbb" &&
++		strings.HasPrefix(info.Variant, "mega-control-1029-") && strings.HasSuffix(info.Variant, "-shared")
+ 
+ 	for _, element := range configSpec.Tests {
++		if controlledMegaShared && element.As == "mega-linter" && element.IsPeriodic() {
++			continue
++		}
+ 		shardCount := 1
+ 		if element.ShardCount != nil {
+ 			shardCount = *element.ShardCount
+@@ -95,6 +155,11 @@ func GenerateJobs(configSpec *cioperatorapi.ReleaseBuildConfiguration, info *cio
+ 					options.MaxConcurrency = element.MaxConcurrency
+ 					options.SlackReporterConfig = element.SlackReporterConfig
+ 				})
++				if controlledMegaShared && element.As == "integration" {
++					if err := configureControlledMegaSharedPeriodic(periodic, configSpec); err != nil {
++						return nil, err
++					}
++				}
+ 				periodics = append(periodics, *periodic)
+ 				if element.Presubmit {
+ 					handlePresubmit(g, element, info, name, disableRehearsal, configSpec.Resources.RequirementsForStep(element.As).Requests, presubmits, orgrepo, true)
+@@ -222,6 +287,18 @@ func GenerateJobs(configSpec *cioperatorapi.ReleaseBuildConfiguration, info *cio
+ 	}, nil
+ }
+ 
++// Configure the controlled benchmark's sequential native invocations and inline its fully resolved configuration.
++func configureControlledMegaSharedPeriodic(periodic *prowconfig.Periodic, configSpec *cioperatorapi.ReleaseBuildConfiguration) error {
++	resolved, err := yaml.Marshal(configSpec)
++	if err != nil {
++		return fmt.Errorf("serialize controlled benchmark configuration: %w", err)
++	}
++	container := &periodic.Spec.Containers[0]
++	container.Env = append(container.Env, corev1.EnvVar{Name: "CONFIG_SPEC", Value: string(resolved)})
++	container.Command = []string{"/bin/bash", "-c", controlledMegaSharedCommands, "mega-shared-native-operator"}
++	return nil
++}
++
+ func handlePresubmit(g *prowJobBaseBuilder, element cioperatorapi.TestStepConfiguration, info *cioperatorapi.Metadata, name string, disableRehearsal bool, requests cioperatorapi.ResourceList, presubmits map[string][]prowconfig.Presubmit, orgrepo string, fromPeriodic bool) {
+ 	slackConfig := element.SlackReporterConfig
+ 	if fromPeriodic && (slackConfig == nil || !slackConfig.ReportPresubmit) {
+@@ -403,6 +480,7 @@ func FromConfigSpec(configSpec *cioperatorapi.ReleaseBuildConfiguration) Generat
+ 	}
+ }
+ 
++// GeneratePeriodicForTest builds a periodic job and pins the controlled benchmark's source ref for cache reuse.
+ func GeneratePeriodicForTest(jobBaseBuilder *prowJobBaseBuilder, info *cioperatorapi.Metadata, options ...GeneratePeriodicOption) *prowconfig.Periodic {
+ 	opts := &GeneratePeriodicOptions{}
+ 	for _, opt := range options {
+@@ -427,6 +505,11 @@ func GeneratePeriodicForTest(jobBaseBuilder *prowJobBaseBuilder, info *cioperato
+ 		Repo:    info.Repo,
+ 		BaseRef: info.Branch,
+ 	}
++	if info.Org == "Azure" && info.Repo == "ARO-HCP" &&
++		info.Branch == "4ce838f7293c12e6a65f994aa493ac63e3cc2dbb" &&
++		strings.HasPrefix(info.Variant, "mega-control-1029-") {
++		ref.BaseSHA = "4ce838f7293c12e6a65f994aa493ac63e3cc2dbb"
++	}
+ 	if opts.PathAlias != nil {
+ 		ref.PathAlias = *opts.PathAlias
+ 	}
