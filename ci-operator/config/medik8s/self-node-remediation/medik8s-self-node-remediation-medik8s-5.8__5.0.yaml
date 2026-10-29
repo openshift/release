@@ -66,16 +66,19 @@ tests:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: snr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
+      EXTRA_MG_ARGS: --image=quay.io/medik8s/must-gather:latest
       MEDIK8S_BUNDLE_IMAGES: node-healthcheck-operator
       TEST_NAME: e2e-system-tests-snr-daily-aws
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: build-and-install-snr
@@ -268,6 +271,7 @@ tests:
         echo '==> Run system-tests (snr-operator)'
         make -C /tmp/system-tests run-tests
       env:
+      - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
