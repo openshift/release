@@ -564,6 +564,41 @@ def test_upgrade_nightlies() -> None:
         assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
 
 
+def test_upgrade_stable_flavour() -> None:
+    # source: stable upgrades the released operator from redhat-operators and seeds
+    # and verifies through the API refs: no ART catalog, no Playwright.
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    expected = {
+        "quay-quay-redhat-3.16__aws-ocp419-s3-upgrade.yaml": ("from-315", "4.19", "3.15", "3.16"),
+        "quay-quay-redhat-3.15__aws-ocp418-s3-upgrade.yaml": ("from-314", "4.18", "3.14", "3.15"),
+    }
+    for filename, (as_name, ocp, source, target) in expected.items():
+        config = by_name[filename]
+        assert "images" not in config
+        assert config["releases"]["latest"] == {
+            "release": {"architecture": "amd64", "channel": "stable", "version": ocp}
+        }
+        test = config["tests"][0]
+        assert test["as"] == as_name
+        assert test["cron"] == "@daily"
+        env = test["steps"]["env"]
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_UPGRADE_CATALOG_SOURCE"] == "redhat-operators"
+        assert not [key for key in env if key.startswith("PLAYWRIGHT_")]
+        assert not {"QUAY_OPERATOR_SOURCE", "QUAY_INDEX_IMAGE_TAG", "QUAY_EXTRA_CONFIG"} & set(env)
+        refs = [s.get("ref") or s.get("chain") for s in test["steps"]["test"]]
+        assert "quay-enable-catalogsource-art" not in refs
+        assert refs[refs.index("quay-operator-upgrade-prepare-e2e"):] == [
+            "quay-operator-upgrade-prepare-e2e",
+            "quay-create-admin-user",
+            "quay-operator-upgrade-seed-api",
+            "quay-operator-upgrade-channel",
+            "quay-operator-upgrade-verify-api",
+        ]
+
+
 def test_redhat_318_aws_upgrade_cell() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
