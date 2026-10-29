@@ -14,6 +14,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'red',
+              ops_category: 'ci_platform',
               message: 'Tide has not merged any pull requests in the last hour, likely indicating an outage in the service.',
             },
           }

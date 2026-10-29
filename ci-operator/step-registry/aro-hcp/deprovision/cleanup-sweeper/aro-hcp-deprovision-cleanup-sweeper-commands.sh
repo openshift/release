@@ -66,7 +66,7 @@ run_cleanup() {
   local cmd=(
     /tmp/cleanup-sweeper
     --workflow "${CLEANUP_SWEEPER_WORKFLOW}"
-    --subscription-id "${subscription_id}"
+    --options "${CLEANUP_SWEEPER_WORKFLOW}.subscription-id=${subscription_id}"
   )
 
   if [[ -n "${CLEANUP_SWEEPER_POLICY}" ]]; then
@@ -78,7 +78,7 @@ run_cleanup() {
   fi
 
   if [[ -n "${CLEANUP_SWEEPER_WAIT}" ]]; then
-    cmd+=(--wait="${CLEANUP_SWEEPER_WAIT}")
+    cmd+=(--options "${CLEANUP_SWEEPER_WORKFLOW}.wait=${CLEANUP_SWEEPER_WAIT}")
   fi
 
   if [[ -n "${CLEANUP_SWEEPER_VERBOSITY}" ]]; then

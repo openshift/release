@@ -79,11 +79,14 @@ resources:
 tests:
 - as: fips-check
   commands: |
-    CGO_ENABLED=0 GOFIPS140=certified go build -tags no_openssl -o ./opentelemetry-operator -trimpath
-    CGO_ENABLED=0 GOFIPS140=certified go build -C ./cmd/otel-allocator -tags no_openssl -o ./opentelemetry-target-allocator -trimpath
+    # The --binary check is disabled because the ocp/builder:rhel-9-golang-1.26-openshift-5.0
+    # image wraps the go binary with a compliance shim (/usr/bin/go is a shell script that
+    # delegates to go.real). When OPENSHIFT_CI is set, the shim enforces the OpenSSL FIPS
+    # backend: it overrides GOFIPS140=certified to GOFIPS140=off and forces CGO_ENABLED=1,
+    # because the built-in Go FIPS module is only auto-enabled for OCP 5.1+.
+    export GOFLAGS=-mod=mod
     GOFLAGS= go install github.com/os-observability/konflux-opentelemetry/tools/fips-check@latest
-    fips-check --binary ./opentelemetry-operator --module . --allowlist ./fips-allowlist.yaml
-    fips-check --binary ./cmd/otel-allocator/opentelemetry-target-allocator --module . --allowlist ./fips-allowlist.yaml
+    fips-check --module . --allowlist ./fips-allowlist.yaml
   container:
     from: src
 - as: e2e-pre-merge
@@ -117,8 +120,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -162,8 +176,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -208,8 +233,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -228,7 +264,9 @@ tests:
   cluster_claim:
     architecture: arm64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 1h30m0s
     version: "4.18"
@@ -257,8 +295,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -310,8 +359,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -358,8 +418,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -397,8 +468,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -414,7 +496,9 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    labels:
+      region: us-east-2
+    owner: obs
     product: ocp
     timeout: 1h30m0s
     version: "4.23"
@@ -439,8 +523,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -484,8 +579,19 @@ tests:
       commands: |
         oc create namespace opentelemetry-operator-system
         oc label namespace opentelemetry-operator-system openshift.io/cluster-monitoring="true"
-        cd /tmp && operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE"
-        oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager
+        cd /tmp
+        if ! { operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator-system "$OO_BUNDLE" &&
+          oc wait --for condition=Available --timeout=5m -n opentelemetry-operator-system deployment opentelemetry-operator-controller-manager; }; then
+          echo "The installation of the operator bundle failed, the state of the operator namespace and the image mirrors follows."
+          oc get pods,jobs,catalogsources,subscriptions,installplans,clusterserviceversions -n opentelemetry-operator-system -o wide || true
+          oc describe pods -n opentelemetry-operator-system || true
+          oc get events -n opentelemetry-operator-system --sort-by=.lastTimestamp || true
+          oc get imagedigestmirrorsets -o yaml || true
+          oc get imagetagmirrorsets -o yaml || true
+          oc get imagecontentsourcepolicies -o yaml || true
+          oc get nodes || true
+          exit 1
+        fi
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle

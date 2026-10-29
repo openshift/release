@@ -580,6 +580,32 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
 
 
+def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}["quay-quay-redhat-3.15__aws-ocp419-e2e-legacy.yaml"]
+    # Containerfile.playwright does not exist on redhat-3.15.
+    assert "images" not in config
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
+    assert steps["env"]["QUAY_VERSION"] == "3.15"
+    # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
+    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
+    assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert [step["ref"] for step in steps["test"]] == [
+        "quay-enable-catalogsource-art",
+        "quay-deploy-aws-s3",
+        "quay-test-e2e-legacy",
+        "quay-test-api-legacy",
+    ]
+    post = [step.get("ref") or step.get("chain") for step in steps["post"]]
+    assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
 def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
@@ -1446,6 +1472,41 @@ def test_redhat_318_database_shares_cloud_files() -> None:
     assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
         "azure-blob-postgres-nightly"
     ]["steps"]["post"]
+
+
+def test_redhat_317_and_50_database_shares_cloud_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    for branch, ocp in (("redhat-3.17", "ocp422"), ("redhat-5.0", "ocp50")):
+        aws = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__aws-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert "aws-s3-rds-nightly" in aws
+        rds = aws["aws-s3-rds-nightly"]
+        assert rds["cron"] == "@weekly"
+        assert {"ref": "quay-database-intg-aws-rds"} in rds["steps"]["test"]
+        assert rds["steps"]["test"].index(
+            {"ref": "quay-database-intg-aws-rds"}
+        ) < rds["steps"]["test"].index({"ref": "quay-deploy-aws-s3"})
+        assert {"ref": "quay-database-intg-aws-rds-deprovision"} in rds["steps"]["post"]
+        assert (
+            {"ref": "quay-database-intg-aws-rds"}
+            not in aws["aws-s3-nightly"]["steps"]["test"]
+        )
+
+        azure = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__azure-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert set(azure) == {"azure-blob-nightly", "azure-blob-postgres-nightly"}
+        assert {"ref": "quay-database-intg-azure-postgres"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["test"]
+        assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["post"]
 
 
 def test_database_rejects_unsupported_cloud() -> None:

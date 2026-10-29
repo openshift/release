@@ -12,6 +12,8 @@ spec:
     - alert: deck-Down
       annotations:
         message: The service deck has been down for 5 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="deck"} == 1)
       for: 5m
@@ -21,6 +23,8 @@ spec:
     - alert: deck-internal-Down
       annotations:
         message: The service deck-internal has been down for 5 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="deck-internal"} == 1)
       for: 5m
@@ -30,6 +34,8 @@ spec:
     - alert: qe-private-deck-Down
       annotations:
         message: The service qe-private-deck has been down for 5 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="qe-private-deck"} == 1)
       for: 5m
@@ -39,6 +45,8 @@ spec:
     - alert: hook-apps-Down
       annotations:
         message: The service hook-apps has been down for 5 minutes.
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         absent(up{job="hook-apps"} == 1)
       for: 5m
@@ -48,6 +56,8 @@ spec:
     - alert: pj-rehearse-plugin-Down
       annotations:
         message: The service pj-rehearse-plugin has been down for 5 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="pj-rehearse-plugin"} == 1)
       for: 5m
@@ -57,6 +67,8 @@ spec:
     - alert: crier-Singleton-Down
       annotations:
         message: The service crier has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         absent(up{job="crier"} == 1)
       for: 10m
@@ -66,6 +78,8 @@ spec:
     - alert: ghproxy-Singleton-Down
       annotations:
         message: The service ghproxy has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         absent(up{job="ghproxy"} == 1)
       for: 10m
@@ -75,6 +89,8 @@ spec:
     - alert: prow-controller-manager-Singleton-Down
       annotations:
         message: The service prow-controller-manager has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="prow-controller-manager"} == 1)
       for: 10m
@@ -84,6 +100,8 @@ spec:
     - alert: sinker-Singleton-Down
       annotations:
         message: The service sinker has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="sinker"} == 1)
       for: 10m
@@ -93,6 +111,8 @@ spec:
     - alert: tide-Singleton-Down
       annotations:
         message: The service tide has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         absent(up{job="tide"} == 1)
       for: 10m
@@ -102,6 +122,8 @@ spec:
     - alert: dptp-controller-manager-Singleton-Down
       annotations:
         message: The service dptp-controller-manager has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="dptp-controller-manager"} == 1)
       for: 10m
@@ -111,6 +133,8 @@ spec:
     - alert: retester-Singleton-Down
       annotations:
         message: The service retester has been down for 10 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(up{job="retester"} == 1)
       for: 10m
@@ -122,6 +146,8 @@ spec:
     - alert: no-webhook-calls
       annotations:
         message: There have been no webhook calls on working hours for 5 minutes
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         (sum(increase(prow_webhook_counter[1m])) == 0 or absent(prow_webhook_counter))
         and ( (day_of_week() > 0) and (day_of_week() < 6) and (hour() >= 7) )
@@ -134,6 +160,8 @@ spec:
     - alert: ConfigMapFullInOneWeek
       annotations:
         message: Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace {{ $labels.namespace }} is expected to fill up within a week. Currently {{ printf "%0.2f" $value }}% is available.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         100 * ((1048576 - prow_configmap_size_bytes) / 1048576) < 15
         and
@@ -146,6 +174,8 @@ spec:
     - alert: ci-tools-postsubmit-failures
       annotations:
         message: ci-tools postsubmit {{ $labels.job_name }} has failures. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         (
           sum by (job_name) (
@@ -172,6 +202,8 @@ spec:
     - alert: infrastructure-job-failures
       annotations:
         message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).
+        ops_category: '{{ if match "^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$" $labels.job_name }}repo_automation{{ else if match "^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$" $labels.job_name }}cluster_fleet{{ else if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$|^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$" $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}'
+        ops_color: '{{ if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$" $labels.job_name }}yellow{{ else }}orange{{ end }}'
       expr: |
         (
           sum by (job_name) (
@@ -198,6 +230,8 @@ spec:
     - alert: plank-job-with-infra-internal-role-failures
       annotations:
         message: plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>.
+        ops_category: '{{ if match "^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$" $labels.job_name }}repo_automation{{ else if match "^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$" $labels.job_name }}cluster_fleet{{ else if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$|^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$" $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}'
+        ops_color: '{{ if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$" $labels.job_name }}yellow{{ else }}orange{{ end }}'
       expr: |
         (
           sum by (job_name) (
@@ -226,6 +260,8 @@ spec:
     - alert: quay-io-image-mirroring-failures
       annotations:
         message: 'Many mirroring tasks to quay.io have failed in the last 10 minutes. Please check errors in the pod logs to figure out the cause: <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures|SOP>.'
+        ops_category: ci_platform
+        ops_color: orange
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/misc.md#quay-io-image-mirroring-failures
       expr: |
         max_over_time(
@@ -241,6 +277,8 @@ spec:
     - alert: component-failed-to-construct-a-client
       annotations:
         message: Component {{ $labels.service }} failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.
+        ops_category: ci_platform
+        ops_color: orange
       expr: kubernetes_failed_client_creations > 0
       for: 5m
       keep_firing_for: 15m
@@ -251,6 +289,8 @@ spec:
     - alert: high-ci-operator-infra-error-rate
       annotations:
         message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}` across multiple jobs, which indicates an infrastructure issue. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md|SOP>.
+        ops_category: ci_platform
+        ops_color: orange
         runbook_url: https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-infra-error-rate.md
       expr: |
         (
@@ -284,6 +324,8 @@ spec:
     - alert: high-ci-operator-error-rate
       annotations:
         message: An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.dptools.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/high-ci-operator-error-rate.md|SOP>.
+        ops_category: ci_platform
+        ops_color: yellow
       expr: |
         max_over_time(
           (sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason))[15m:1m]
@@ -298,6 +340,8 @@ spec:
     - alert: jobs-failing-with-lease-acquire-timeout
       annotations:
         message: Jobs on provider {{ $labels.provider }} fail because they were unable to acquire a lease.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[30m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
       for: 1m
@@ -308,6 +352,8 @@ spec:
     - alert: SSLCertExpiringSoon
       annotations:
         message: The SSL certificates for instance {{ $labels.instance }} are expiring in 28 days.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 28
       for: 1m
@@ -316,6 +362,8 @@ spec:
     - alert: ProbeFailing
       annotations:
         message: Blackbox probe is failing for service {{ $labels.instance }} for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
@@ -325,6 +373,8 @@ spec:
     - alert: ProbeFailing-Lenient
       annotations:
         message: Blackbox probe is failing for service {{ $labels.instance }} for the past five minutes. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
       for: 5m
@@ -336,6 +386,8 @@ spec:
     - alert: openshift-priv-image-building-jobs-failing
       annotations:
         message: The priv image-building job branch-ci-openshift-priv-{{ $labels.job_tail }} is failing while the corresponding public job branch-ci-openshift-{{ $labels.job_tail }} remains healthy. See priv <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=branch-ci-openshift-priv-{{ $labels.job_tail }}|deck-internal> and public <https://prow.ci.openshift.org/?job=branch-ci-openshift-{{ $labels.job_tail }}|deck>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.
+        ops_category: repo_automation
+        ops_color: orange
       expr: |
         (
           sum by (job_tail) (
@@ -387,6 +439,8 @@ spec:
     - alert: openshift-mirroring-failures
       annotations:
         message: OpenShift image mirroring jobs have had no successful run in the last 6 hours. The primary recovery target is to restore at least one successful run after repeated failures. Check <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/openshift-mirroring-failures.md|SOP>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         sum by (job_name) (
           rate(
@@ -403,6 +457,8 @@ spec:
     - alert: ghproxy-too-many-pending-alerts
       annotations:
         message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 10 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and follow <https://github.com/openshift/release/blob/main/docs/dptp-triage-sop/ghproxy-too-many-pending-alerts.md|SOP>.
+        ops_category: ci_platform
+        ops_color: yellow
       expr: |
         sum_over_time(pending_outbound_requests{container="ghproxy"}[10m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[10m]) > 100
         and
@@ -439,6 +495,8 @@ spec:
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
         message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         min_over_time(
           (github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9)[5m:1m]
@@ -453,6 +511,8 @@ spec:
     - alert: ghproxy-running-out-github-tokens-in-a-hour-by-token-hash
       annotations:
         message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         min_over_time(
           (github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9)[5m:1m]
@@ -473,6 +533,8 @@ spec:
 
           $ oc --context app.ci -n ci exec $(oc --context app.ci get pod -n ci -l component=ghproxy -o custom-columns=":metadata.name" --no-headers) -- find /cache/data /cache/temp -mtime +1 -type f -delete
 
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         ghcache_disk_inode_used / ghcache_disk_inode_total * 100 > 90
       for: 5m
@@ -483,6 +545,8 @@ spec:
     - alert: SinkerNotRemovingPods
       annotations:
         message: Sinker has not removed any Pods in the last hour, likely indicating an outage in the service.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(sum(rate(sinker_pods_removed[1h]))) == 1
       for: 5m
@@ -491,6 +555,8 @@ spec:
     - alert: SinkerNotRemovingProwJobs
       annotations:
         message: Sinker has not removed any Prow jobs in the last hour, likely indicating an outage in the service.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         absent(sum(rate(sinker_prow_jobs_cleaned[1h]))) == 1
       for: 5m
@@ -566,6 +632,8 @@ spec:
     - alert: prow-pod-crashlooping
       annotations:
         message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 1 hour.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 10
         and
@@ -587,6 +655,8 @@ spec:
     - alert: prow-job-backlog-growing
       annotations:
         message: The number of triggered Prow jobs that have not yet started running has been growing (net positive) over the past 30 minutes.
+        ops_category: ci_platform
+        ops_color: orange
       expr: sum(rate(prowjob_state_transitions{state="triggered"}[30m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[30m])) > 0
       for: 10m
       labels:
@@ -594,6 +664,8 @@ spec:
     - alert: Controller backlog is not being drained
       annotations:
         message: The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         workqueue_depth{name=~"crier.*|plank"} > 80
         and
@@ -604,6 +676,8 @@ spec:
     - alert: TriggeredButPendingJobs
       annotations:
         message: There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         sum by (job_name) (increase(prowjob_state_transitions{state="triggered"}[15m]))
         - sum by (job_name) (increase(prowjob_state_transitions{state="pending"}[15m]))
@@ -621,6 +695,8 @@ spec:
     - alert: TriggeredProwJobsPileup
       annotations:
         message: Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
+        ops_category: ci_platform
+        ops_color: orange
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak
       expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
       keep_firing_for: 10m
@@ -698,6 +774,8 @@ spec:
     - alert: TideNotMergingPRs
       annotations:
         message: Tide has not merged any pull requests in the last hour, likely indicating an outage in the service.
+        ops_category: ci_platform
+        ops_color: red
       expr: |
         (sum(rate(merges_count[60m])) and on () (day_of_week() <= 5 and day_of_week() >= 1) and on() (hour() > 7 and hour() < 22 )) == 0
       for: 60m
