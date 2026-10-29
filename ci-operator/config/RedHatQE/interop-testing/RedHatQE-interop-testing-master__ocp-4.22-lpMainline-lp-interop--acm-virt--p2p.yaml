@@ -91,7 +91,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
-      ACM_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
       ACM_SPOKE_CLUSTER_COUNT: "1"
       ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.21"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
@@ -114,12 +113,12 @@ tests:
         {
           "failure_rules":
             [
+              {"step": "cucushift-chainupgrade-toimage"        , "failure_type": "all"          , "classification": "Hub OCP Upgrade"                                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-cluster-install"           , "failure_type": "all"          , "classification": "Spoke cluster Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-cluster-uninstall"           , "failure_type": "all"          , "classification": "Spoke cluster Un-Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-install-odf-hub"                 , "failure_type": "all"          , "classification": "ODF Hub Deployment"                              , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-acm-cnv-install-policy"           , "failure_type": "all"          , "classification": "CNV installation policy deploy"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
-              {"step": "acm-interop-p2p-cluster-upgrade"       , "failure_type": "all"          , "classification": "Hub OCP Upgrade"                                 , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "interop-opp-product-upgrade-acm"       , "failure_type": "all"          , "classification": "ACM Operator Upgrade"                             , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-spoke-upgrade-prehealthcheck", "failure_type": "all"     , "classification": "Spoke Pre-Upgrade Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "acm-interop-p2p-spoke-upgrade"         , "failure_type": "all"          , "classification": "Spoke OCP Upgrade"                               , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
@@ -149,7 +148,9 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.16", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      SPOKE_CLUSTER_UPGRADE_CPOU: "true"
       SPOKE_CLUSTER_UPGRADE_TARGET_CHANNEL: candidate-4.22
+      UPGRADE_CHANNEL: candidate
       USER_TAGS: |
         scenario acm-cnv-p2p
     leases:
@@ -185,7 +186,20 @@ tests:
     - ref: p2p-install-odf-spokes
     - ref: p2p-acm-cnv-install-policy
     - ref: cucushift-upgrade-prehealthcheck
-    - ref: acm-interop-p2p-cluster-upgrade
+    - ref: cucushift-upgrade-setchannel
+    - ref: cucushift-upgrade-cpou-pause-worker-mcp
+    - as: set-n1-upgrade-edge
+      commands: echo "${RELEASE_IMAGE_TARGET}" > "${SHARED_DIR}/upgrade-edge"
+      dependencies:
+      - env: RELEASE_IMAGE_TARGET
+        name: release:latest
+      from: cli
+      resources:
+        requests:
+          cpu: 50m
+          memory: 10Mi
+    - ref: cucushift-chainupgrade-toimage
+    - ref: cucushift-upgrade-cpou-unpause-worker-mcp
     - ref: cucushift-upgrade-healthcheck
     - ref: interop-opp-product-upgrade-acm
     - ref: acm-interop-p2p-spoke-upgrade-prehealthcheck
