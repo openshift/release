@@ -383,8 +383,9 @@ echo "Clair serves ${clair_endpoint} from nodes 1 and 2."
 
 # g. One config bundle for all nodes. JSON is YAML, and jq keeps every value
 # quoted; secrets reach jq through the environment, not its arguments. The
-# default model cache keeps a security report for 300s, which would answer
-# failover's security reads without asking Clair.
+# model cache lives in the shared Redis so all nodes agree; its default keeps a
+# security report for 300s, which would answer failover's security reads
+# without asking Clair.
 set +x
 QUAY_S3_ACCESS_KEY=$(</var/run/quay-qe-aws-secret/access_key)
 QUAY_S3_SECRET_KEY=$(</var/run/quay-qe-aws-secret/secret_key)
@@ -460,8 +461,9 @@ jq -n \
         DEFAULT_TAG_EXPIRATION: "2w",
         TAG_EXPIRATION_OPTIONS: ["2w", "4w", "8w", "1d"],
         REDIS_FLUSH_INTERVAL_SECONDS: 30,
-        FEATURE_IMAGE_PULL_STATS: true,
+        FEATURE_IMAGE_PULL_STATS: false,
         FEATURE_ORG_MIRROR: true,
+        FEATURE_REPO_MIRROR: true,
         FEATURE_IMMUTABLE_TAGS: true,
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false,
         FEATURE_USER_METADATA: true,
@@ -478,7 +480,11 @@ jq -n \
         SECURITY_SCANNER_V4_ENDPOINT: $clair_endpoint,
         SECURITY_SCANNER_V4_PSK: env.QUAY_CLAIR_PSK,
         SECURITY_SCANNER_INDEXING_INTERVAL: 30,
-        DATA_MODEL_CACHE_CONFIG: {engine: "inmemory", security_report_cache_ttl: "1s"}
+        DATA_MODEL_CACHE_CONFIG: {
+            engine: "redis",
+            redis_config: {primary: $redis},
+            security_report_cache_ttl: "1s"
+        }
     }' > "${workdir}/config.yaml"
 unset QUAY_S3_ACCESS_KEY QUAY_S3_SECRET_KEY redis_password clair_psk
 $WAS_TRACING && set -x
