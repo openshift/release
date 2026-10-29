@@ -1315,7 +1315,10 @@ if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --auto-repair"
 fi
 
-case "${IP_STACK}" in
+# The hosted cluster may use a different stack from the management cluster, e.g.
+# a bridged localnet that carries IPv4 only.  IP_STACK keeps describing the
+# management cluster, so only the CIDRs below follow HOSTED_IP_STACK.
+case "${HOSTED_IP_STACK:-${IP_STACK}}" in
  "v4")
    EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
    ;;
