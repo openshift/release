@@ -229,7 +229,7 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
 - **`standalone-ha`**: runs workflow `quay-standalone-aws-ha` (three RHEL 9
   Quay nodes behind an NLB, Redis, Multi-AZ RDS, S3, and Clair on nodes 1 and 2
   behind an internal NLB; smoke with a Clair scan, node and scanner failover,
-  then a Playwright subset) under an 8h timeout. Builds only
+  then the full Playwright suite) under an 8h timeout. Builds only
   `quay-playwright-runner`; `ocp` picks the step images, and the deploy step
   resolves the ART nightly Quay and Clair images. Takes no `source`, `storage`, `fips`, `database`, `sts` or `arches`.
 - **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
