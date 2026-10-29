@@ -338,8 +338,10 @@ for _ in {1..60}; do
     quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}') || true
     curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
          --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
-    QUAY_S3_CLEANUP_NEEDED=false
     archive_pod_info
+    # Disable failure cleanup only after the last failure-prone call, so an
+    # archive_pod_info failure under errexit still triggers terraform destroy.
+    QUAY_S3_CLEANUP_NEEDED=false
     exit 0
   fi
   sleep 15
