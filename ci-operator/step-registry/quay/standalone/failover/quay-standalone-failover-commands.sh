@@ -85,6 +85,8 @@ mkdir -p "${ARTIFACT_DIR}"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 region=$(<"${SHARED_DIR}/quay_standalone_region")
 hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
+# Deploy lowercased SERVER_HOSTNAME, and the token audience must match it.
+hostname=${hostname,,}
 target_group_arn=$(<"${SHARED_DIR}/quay_standalone_target_group_arn")
 clair_target_group_arn=$(<"${SHARED_DIR}/quay_standalone_clair_target_group_arn")
 ssh_user=$(<"${SHARED_DIR}/quay_standalone_ssh_user")

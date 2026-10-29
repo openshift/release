@@ -94,6 +94,8 @@ mkdir -p "${ARTIFACT_DIR}"
 umask 077
 workdir=$(mktemp -d /tmp/quay-standalone-smoke.XXXXXX)
 hostname=$(<"${SHARED_DIR}/quay_standalone_hostname")
+# Deploy lowercased SERVER_HOSTNAME, and the token audience must match it.
+hostname=${hostname,,}
 username=$(</var/run/quay-qe-quay-secret/username)
 mapfile -t nodes < "${SHARED_DIR}/quay_standalone_nodes"
 ca="${SHARED_DIR}/quay_standalone_ca.crt"
