@@ -89,11 +89,11 @@ if [[ -s "${SHARED_DIR}/quay_standalone_nodes" ]]; then
         fi
         clair=()
         if (( index < 2 )); then
-            clair=(podman-logs-clair 'sudo podman logs --tail 5000 clair')
+            clair=(podman-logs-clair 'sudo podman logs --tail 100000 clair')
         fi
         gather_host "${node_dir}" "${public_ip}" \
             podman-ps 'sudo podman ps -a' \
-            podman-logs-quay 'sudo podman logs --tail 5000 quay' \
+            podman-logs-quay 'sudo podman logs --tail 100000 quay' \
             "${clair[@]}" \
             journal-cloud-final 'sudo journalctl -u cloud-final --no-pager'
     done
