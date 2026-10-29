@@ -3,6 +3,8 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+# Do not inherit tracing while generating credentials or discovering endpoints.
+set +x
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -18,7 +20,7 @@ die() {
 }
 
 log() {
-  printf '==> %s\n' "$*"
+  echo "==> $*"
 }
 
 wait_for() {
@@ -26,7 +28,7 @@ wait_for() {
   shift 3
   local deadline=$(( $(date +%s) + timeout ))
 
-  until "$@" >/dev/null 2>&1; do
+  until "$@"; do
     if [[ $(date +%s) -ge ${deadline} ]]; then
       die "timed out waiting for ${description}"
     fi
@@ -37,12 +39,8 @@ wait_for() {
 random_password() {
   # FSx requires upper-case, lower-case, and numeric characters. The random
   # suffix makes the value unique without relying on a pipe that can fail under
-  # pipefail when its reader exits early.
-  printf 'Aa1%s\n' "$(od -An -N11 -tx1 /dev/urandom | tr -d ' \n')"
-}
-
-random_passphrase() {
-  od -An -N24 -tx1 /dev/urandom | tr -d ' \n'
+  # pipefail when its reader exits early. Keep the result below FSx's 50-character limit.
+  echo "Aa1$(od -An -N22 -tx1 /dev/urandom | tr -d ' \n')"
 }
 
 require_tools() {
@@ -69,7 +67,8 @@ discover_cluster_network() {
   REGION="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.region}')"
   [[ -n "${REGION}" ]] || die "cluster is not running on AWS"
   export AWS_DEFAULT_REGION="${REGION}"
-  printf '%s\n' "${REGION}" > "${SHARED_DIR}/fsxn-region"
+  echo "${REGION}" > "${SHARED_DIR}/fsxn-region"
+  echo "${FSXN_TAG}" > "${SHARED_DIR}/fsxn-resource-tag"
 
   local provider_id worker_instance instance_json
   provider_id="$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[0].spec.providerID}')"
@@ -88,21 +87,25 @@ create_security_group() {
   FSXN_SECURITY_GROUP="$(aws ec2 describe-security-groups --filters "Name=group-name,Values=${group_name}" "Name=vpc-id,Values=${VPC_ID}" --query 'SecurityGroups[0].GroupId' --output text)"
   if [[ -z "${FSXN_SECURITY_GROUP}" || "${FSXN_SECURITY_GROUP}" == "None" ]]; then
     FSXN_SECURITY_GROUP="$(aws ec2 create-security-group --group-name "${group_name}" --description "Prow CI FSx for NetApp ONTAP SAN access" --vpc-id "${VPC_ID}" --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${group_name}},{Key=ci.openshift.io/owned,Value=true}]" --query GroupId --output text)"
+    echo "${FSXN_SECURITY_GROUP}" > "${SHARED_DIR}/fsxn-security-group-id"
     for port in 3260 4420 443; do
       aws ec2 authorize-security-group-ingress --group-id "${FSXN_SECURITY_GROUP}" --protocol tcp --port "${port}" --source-group "${NODE_SECURITY_GROUP}"
     done
   fi
-  printf '%s\n' "${FSXN_SECURITY_GROUP}" > "${SHARED_DIR}/fsxn-security-group-id"
+  echo "${FSXN_SECURITY_GROUP}" > "${SHARED_DIR}/fsxn-security-group-id"
 }
 
 create_filesystem() {
-  FSXN_FILESYSTEM_ID="$(aws fsx describe-file-systems --query "FileSystems[?Tags[?Key=='Name' && Value=='${FSXN_TAG}']].FileSystemId | [0]" --output text)"
+  FSXN_FILESYSTEM_ID="$(aws fsx describe-file-systems --query "FileSystems[?Tags[?Key=='Name' && Value=='${FSXN_TAG}']].FileSystemId | [0]" --output json | jq -r '. // "None"')"
   [[ "${FSXN_FILESYSTEM_ID}" == "None" ]] || die "FSx filesystem ${FSXN_FILESYSTEM_ID} already exists; run the cleanup step before retrying"
 
   local ontap_configuration
+  # Disable tracing while passing the generated administrator password to AWS.
+  set +x
   ontap_configuration="DeploymentType=${FSXN_DEPLOYMENT_TYPE},ThroughputCapacityPerHAPair=${FSXN_THROUGHPUT},HAPairs=1,AutomaticBackupRetentionDays=0,FsxAdminPassword=${FSX_ADMIN_PASSWORD}"
   FSXN_FILESYSTEM_ID="$(aws fsx create-file-system --file-system-type ONTAP --storage-capacity "${FSXN_STORAGE_GIB}" --subnet-ids "${FSXN_SUBNET}" --security-group-ids "${FSXN_SECURITY_GROUP}" --ontap-configuration "${ontap_configuration}" --tags "Key=Name,Value=${FSXN_TAG}" "Key=ci.openshift.io/owned,Value=true" --query 'FileSystem.FileSystemId' --output text)"
-  printf '%s\n' "${FSXN_FILESYSTEM_ID}" > "${SHARED_DIR}/fsxn-filesystem-id"
+  echo "${FSXN_FILESYSTEM_ID}" > "${SHARED_DIR}/fsxn-filesystem-id"
+  set -x
   wait_for 3000 30 "FSx filesystem ${FSXN_FILESYSTEM_ID}" bash -c "[[ \$(aws fsx describe-file-systems --file-system-ids '${FSXN_FILESYSTEM_ID}' --query 'FileSystems[0].Lifecycle' --output text) == AVAILABLE ]]"
 }
 
@@ -123,7 +126,7 @@ EOF
 )"
   nvme_module='data:,nvme_tcp%0A'
 
-  cat <<EOF | oc apply -f -
+  oc apply -f - <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -171,35 +174,58 @@ spec:
           WantedBy=multi-user.target
 EOF
 
-  printf '%s\n' "${MACHINECONFIG_NAME}" > "${SHARED_DIR}/fsxn-machineconfig-name"
-  wait_for 3000 30 "worker MachineConfigPool update" bash -c 'read -r updating updated degraded < <(oc get mcp worker -o jsonpath="{.status.conditions[?(@.type==\"Updating\")].status} {.status.conditions[?(@.type==\"Updated\")].status} {.status.conditions[?(@.type==\"Degraded\")].status}"); [[ "$updating" == False && "$updated" == True && "$degraded" == False ]]'
+  echo "${MACHINECONFIG_NAME}" > "${SHARED_DIR}/fsxn-machineconfig-name"
+}
+
+workers_configured() {
+  local mcp
+  mcp="$(oc get machineconfigpool worker -o json)" || return 1
+  # Require the new config in both desired and applied sources. Checking only
+  # Updated=True can succeed on the old status before MCO begins the rollout.
+  # Do not require observing Updating=True: FSx creation may outlast the rollout.
+  jq -e --arg name "${MACHINECONFIG_NAME}" '
+    ([.spec.configuration.source[]?.name] | index($name) != null) and
+    ([.status.configuration.source[]?.name] | index($name) != null) and
+    .spec.configuration.name == .status.configuration.name and
+    any(.status.conditions[]; .type == "Updating" and .status == "False") and
+    any(.status.conditions[]; .type == "Updated" and .status == "True") and
+    any(.status.conditions[]; .type == "Degraded" and .status == "False")
+  ' <<<"${mcp}" >/dev/null
 }
 
 create_svm() {
-  FSXN_SVM_ID="$(aws fsx describe-storage-virtual-machines --filters "Name=file-system-id,Values=${FSXN_FILESYSTEM_ID}" --query "StorageVirtualMachines[?Name=='${SVM_NAME}'].StorageVirtualMachineId | [0]" --output text)"
+  FSXN_SVM_ID="$(aws fsx describe-storage-virtual-machines --filters "Name=file-system-id,Values=${FSXN_FILESYSTEM_ID}" --query "StorageVirtualMachines[?Name=='${SVM_NAME}'].StorageVirtualMachineId | [0]" --output json | jq -r '. // "None"')"
   if [[ "${FSXN_SVM_ID}" == "None" ]]; then
+    # Disable tracing while passing the SVM administrator password to AWS.
+    set +x
     FSXN_SVM_ID="$(aws fsx create-storage-virtual-machine --file-system-id "${FSXN_FILESYSTEM_ID}" --name "${SVM_NAME}" --svm-admin-password "${SVM_ADMIN_PASSWORD}" --query 'StorageVirtualMachine.StorageVirtualMachineId' --output text)"
+    set -x
   fi
-  printf '%s\n' "${FSXN_SVM_ID}" > "${SHARED_DIR}/fsxn-svm-id"
+  echo "${FSXN_SVM_ID}" > "${SHARED_DIR}/fsxn-svm-id"
   wait_for 1200 20 "FSx SVM ${SVM_NAME}" bash -c "[[ \$(aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids '${FSXN_SVM_ID}' --query 'StorageVirtualMachines[0].Lifecycle' --output text) == CREATED ]]"
+  set +x
   SVM_MANAGEMENT_LIF="$(aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids "${FSXN_SVM_ID}" --query 'StorageVirtualMachines[0].Endpoints.Management.IpAddresses[0]' --output text)"
   [[ "${SVM_MANAGEMENT_LIF}" != "None" ]] || die "SVM does not have a management LIF"
-  printf '%s\n' "${SVM_MANAGEMENT_LIF}" > "${SHARED_DIR}/fsxn-svm-management-lif"
+  # This endpoint is not needed by cleanup; keep it out of shared state/logs.
+  set -x
 }
 
 install_trident() {
   install_helm
   helm repo add netapp-trident https://netapp.github.io/trident-helm-chart --force-update
   helm upgrade --install trident netapp-trident/trident-operator --version "${TRIDENT_CHART_VERSION}" --create-namespace --namespace "${TRIDENT_NAMESPACE}" --wait --timeout 15m
-  wait_for 900 15 "Trident installation" bash -c "[[ \$(oc get tridentorchestrator trident -o jsonpath='{.status.status}' 2>/dev/null) == Installed ]]"
+  wait_for 900 15 "Trident installation" bash -c "[[ \$(oc get tridentorchestrator trident -o jsonpath='{.status.status}') == Installed ]]"
   oc rollout status daemonset/trident-node-linux --namespace "${TRIDENT_NAMESPACE}" --timeout=10m
 }
 
 configure_trident() {
+  # Disable tracing due to password and passphrase handling. The backend
+  # manifests also contain the private management endpoint.
+  set +x
   oc create secret generic fsxn-backend-credentials --namespace "${TRIDENT_NAMESPACE}" --from-literal=username=vsadmin --from-literal=password="${SVM_ADMIN_PASSWORD}" --dry-run=client -o yaml | oc apply -f -
   oc create secret generic fsxn-luks --namespace "${TRIDENT_NAMESPACE}" --from-literal=luks-passphrase-name=A --from-literal=luks-passphrase="${LUKS_PASSPHRASE}" --dry-run=client -o yaml | oc apply -f -
 
-  cat <<EOF | oc apply -f -
+  oc apply -f - <<EOF
 apiVersion: trident.netapp.io/v1
 kind: TridentBackendConfig
 metadata:
@@ -329,8 +355,9 @@ parameters:
   csi.storage.k8s.io/node-stage-secret-namespace: ${TRIDENT_NAMESPACE}
 EOF
 
+  set -x
   for backend in ci-fsxn-iscsi ci-fsxn-iscsi-luks ci-fsxn-nvme ci-fsxn-nvme-luks; do
-    wait_for 300 10 "Trident backend ${backend}" bash -c "[[ \$(oc get tridentbackendconfig '${backend}' -n '${TRIDENT_NAMESPACE}' -o jsonpath='{.status.phase}' 2>/dev/null) == Bound ]]"
+    wait_for 300 10 "Trident backend ${backend}" bash -c "[[ \$(oc get tridentbackendconfig '${backend}' -n '${TRIDENT_NAMESPACE}' -o jsonpath='{.status.phase}') == Bound ]]"
   done
 }
 
@@ -351,7 +378,8 @@ verify_storageclass() {
       mountPath: /volume'
   fi
 
-  cat <<EOF | oc apply -f -
+  # This function is called in a conditional, where Bash disables errexit.
+  oc apply -f - <<EOF || return 1
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -392,7 +420,7 @@ ${volume_consumer}
     persistentVolumeClaim:
       claimName: ${pvc}
 EOF
-  oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/${pvc}" --namespace "${namespace}" --timeout=10m
+  oc wait --for=jsonpath='{.status.phase}'=Bound "pvc/${pvc}" --namespace "${namespace}" --timeout=10m || return 1
   oc wait --for=condition=Ready "pod/${pod}" --namespace "${namespace}" --timeout=10m
 }
 
@@ -419,16 +447,19 @@ main() {
   require_tools
   FSX_ADMIN_PASSWORD="$(random_password)"
   SVM_ADMIN_PASSWORD="$(random_password)"
-  LUKS_PASSPHRASE="$(random_passphrase)"
+  LUKS_PASSPHRASE="$(random_password)"
 
   log "Discovering the worker network"
   discover_cluster_network
+  set -x
+  log "Configuring worker SAN prerequisites"
+  prepare_workers
   log "Creating the FSxN security group"
   create_security_group
   log "Creating the FSx for ONTAP filesystem"
   create_filesystem
-  log "Configuring worker SAN prerequisites"
-  prepare_workers
+  log "Waiting for worker SAN prerequisites"
+  wait_for 3000 30 "worker MachineConfigPool update" workers_configured
   log "Creating the FSxN storage virtual machine"
   create_svm
   log "Installing Trident"

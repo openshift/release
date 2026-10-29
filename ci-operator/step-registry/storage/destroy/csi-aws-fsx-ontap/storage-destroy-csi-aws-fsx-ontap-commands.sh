@@ -1,291 +1,111 @@
 #!/bin/bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
+set -euo pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp}"
-TRIDENT_NAMESPACE="trident"
-cleanup_status=0
-
 state_value() {
-  local name="$1"
-  local path="${SHARED_DIR}/${name}"
-
-  if [[ -s "${path}" ]]; then
-    cat "${path}"
+  if [[ -s "${SHARED_DIR}/$1" ]]; then
+    cat "${SHARED_DIR}/$1"
   fi
-}
-
-record_failure() {
-  echo "ERROR: $*" >&2
-  cleanup_status=1
-}
-
-wait_for() {
-  local timeout="$1" interval="$2" description="$3"
-  shift 3
-  local deadline=$(( $(date +%s) + timeout ))
-
-  until "$@" >/dev/null 2>&1; do
-    if [[ $(date +%s) -ge ${deadline} ]]; then
-      record_failure "timed out waiting for ${description}"
-      return 1
-    fi
-    sleep "${interval}"
-  done
-}
-
-install_helm() {
-  if command -v helm >/dev/null; then
-    return
-  fi
-
-  local archive="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
-  if ! curl --fail --location --silent --show-error "https://get.helm.sh/${archive}" -o "/tmp/${archive}" ||
-    ! curl --fail --location --silent --show-error "https://get.helm.sh/${archive}.sha256sum" -o "/tmp/${archive}.sha256sum" ||
-    ! (cd /tmp && sha256sum --check --status "${archive}.sha256sum") ||
-    ! tar -xzf "/tmp/${archive}" -C /tmp; then
-    record_failure "could not install Helm for Trident cleanup"
-    return 1
-  fi
-  install -m 0755 /tmp/linux-amd64/helm /tmp/helm
-  export PATH="/tmp:${PATH}"
 }
 
 gather() {
   local output="$1"
   shift
-  "$@" >"${output}" 2>&1 || true
+  # Diagnostics must not prevent AWS cleanup. Keep command names and errors.
+  (set -x; timeout 60s "$@") >"${directory}/${output}" 2>&1 || true
 }
 
 gather_diagnostics() {
-  local directory="${ARTIFACT_DIR}/fsxn-trident"
-  local filesystem_id svm_id security_group
+  local directory="${ARTIFACT_DIR:-/tmp}/fsxn-trident" pod
   mkdir -p "${directory}"
-
-  filesystem_id="$(state_value fsxn-filesystem-id)"
-  svm_id="$(state_value fsxn-svm-id)"
-  security_group="$(state_value fsxn-security-group-id)"
-  [[ -n "${filesystem_id}" ]] && gather "${directory}/fsxn-filesystem.json" aws fsx describe-file-systems --file-system-ids "${filesystem_id}"
-  [[ -n "${svm_id}" ]] && gather "${directory}/fsxn-svm.json" aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids "${svm_id}"
-  [[ -n "${security_group}" ]] && gather "${directory}/fsxn-security-group.json" aws ec2 describe-security-groups --group-ids "${security_group}"
-
-  if [[ ! -s "${KUBECONFIG}" ]]; then
-    echo "Kubeconfig is unavailable; skipping cluster diagnostics" >"${directory}/cluster-unavailable"
-    return
-  fi
-
-  gather "${directory}/trident-resources.yaml" oc get all,tridentorchestrator,tridentbackendconfig -n "${TRIDENT_NAMESPACE}" -o yaml
-  gather "${directory}/trident-events.txt" oc get events -n "${TRIDENT_NAMESPACE}" --sort-by=.lastTimestamp
-  gather "${directory}/storageclasses.yaml" oc get storageclass ci-netapp-iscsi ci-netapp-iscsi-luks ci-netapp-nvme ci-netapp-nvme-luks -o yaml
-  gather "${directory}/pvcs.yaml" oc get pvc --all-namespaces -o yaml
-  gather "${directory}/pvs.yaml" oc get pv -o yaml
-  gather "${directory}/mcp-worker.yaml" oc get machineconfigpool worker -o yaml
-  gather "${directory}/machineconfig.yaml" oc get machineconfig "$(state_value fsxn-machineconfig-name)" -o yaml
-  gather "${directory}/trident-operator.log" oc logs deployment/trident-operator -n "${TRIDENT_NAMESPACE}" --all-containers=true
-
-  local node
-  while read -r node; do
-    [[ -n "${node}" ]] || continue
-    gather "${directory}/node-${node}-san-state.txt" timeout 90s oc debug "node/${node}" -- chroot /host sh -c 'multipath -ll; nvme list-subsys; iscsiadm -m session; systemctl status iscsid multipathd --no-pager'
-  done < <(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-}
-
-delete_test_pvcs() {
+  [[ -n "${filesystem_id}" ]] && gather fsxn-filesystem.json aws fsx describe-file-systems --file-system-ids "${filesystem_id}"
+  [[ -n "${security_group}" ]] && gather fsxn-security-group.json aws ec2 describe-security-groups --group-ids "${security_group}"
   [[ -s "${KUBECONFIG}" ]] || return 0
 
-  local namespace name target_pvcs
-  target_pvcs="$(oc get pvc --all-namespaces -o json 2>/dev/null | jq '[.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | "\(.metadata.namespace)/\(.metadata.name)"]' || true)"
-  [[ -n "${target_pvcs}" ]] || target_pvcs='[]'
-
-  # PVC protection prevents deletion until every pod that mounts the claim is gone.
-  while read -r namespace name; do
-    [[ -n "${namespace}" && -n "${name}" ]] || continue
-    oc delete pod "${name}" --namespace "${namespace}" --ignore-not-found --wait=false || record_failure "could not delete pod ${namespace}/${name} using an FSxN test PVC"
-  done < <(oc get pod --all-namespaces -o json 2>/dev/null | jq -r --argjson target_pvcs "${target_pvcs}" '.items[] | . as $pod | select(any(.spec.volumes[]?; .persistentVolumeClaim? as $claim | $claim != null and ($target_pvcs | index("\($pod.metadata.namespace)/\($claim.claimName)")))) | "\(.metadata.namespace) \(.metadata.name)"' || true)
-
-  while read -r namespace name; do
-    [[ -n "${namespace}" && -n "${name}" ]] || continue
-    oc delete pvc "${name}" --namespace "${namespace}" --ignore-not-found --wait=false || record_failure "could not delete PVC ${namespace}/${name}"
-  done < <(oc get pvc --all-namespaces -o json 2>/dev/null | jq -r '.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | "\(.metadata.namespace) \(.metadata.name)"' || true)
-
-  if ! wait_for_test_pvcs; then
-    clear_test_volume_finalizers
-    wait_for 120 10 "forced FSxN test PVC cleanup" test_pvcs_removed || true
-  fi
-  oc delete namespace fsxn-trident-smoke --ignore-not-found --wait=true --timeout=15m || record_failure "could not delete smoke-test namespace"
+  gather trident-resources.yaml oc get all,tridentorchestrator,tridentbackendconfig --namespace trident -o yaml
+  gather trident-events.txt oc get events --namespace trident --sort-by=.lastTimestamp
+  gather storageclasses.yaml oc get storageclass -o yaml
+  gather pvcs.yaml oc get pvc --all-namespaces -o yaml
+  gather pvs.yaml oc get pv -o yaml
+  while read -r pod; do
+    [[ -n "${pod}" ]] || continue
+    gather "${pod##*/}.log" oc logs "${pod}" --namespace trident --all-containers=true --prefix=true
+  done < <(oc get pods --namespace trident -o name --request-timeout=30s || true)
 }
 
-test_pvcs_removed() {
-  local remaining
-  remaining="$(oc get pvc --all-namespaces -o json 2>/dev/null | jq '[.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks")] | length')"
-  [[ "${remaining}" == "0" ]]
-}
-
-wait_for_test_pvcs() {
-  local deadline=$(( $(date +%s) + 900 ))
-
-  until test_pvcs_removed; do
-    [[ $(date +%s) -lt ${deadline} ]] || return 1
-    sleep 10
-  done
-}
-
-clear_test_volume_finalizers() {
-  local namespace name
-
-  # Trident may be unavailable after a failed teardown. These claims and
-  # volumes belong solely to the CI StorageClasses, so unblock their deletion.
-  while read -r namespace name; do
-    [[ -n "${namespace}" && -n "${name}" ]] || continue
-    oc patch pvc "${name}" --namespace "${namespace}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on PVC ${namespace}/${name}"
-  done < <(oc get pvc --all-namespaces -o json 2>/dev/null | jq -r '.items[] | select((.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") and .metadata.deletionTimestamp != null) | "\(.metadata.namespace) \(.metadata.name)"' || true)
-
-  while read -r name; do
-    [[ -n "${name}" ]] || continue
-    oc delete pv "${name}" --ignore-not-found --wait=false || record_failure "could not delete PV ${name}"
-  done < <(oc get pv -o json 2>/dev/null | jq -r '.items[] | select(.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") | .metadata.name' || true)
-
-  while read -r name; do
-    [[ -n "${name}" ]] || continue
-    oc patch pv "${name}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on PV ${name}"
-  done < <(oc get pv -o json 2>/dev/null | jq -r '.items[] | select((.spec.storageClassName == "ci-netapp-iscsi" or .spec.storageClassName == "ci-netapp-iscsi-luks" or .spec.storageClassName == "ci-netapp-nvme" or .spec.storageClassName == "ci-netapp-nvme-luks") and .metadata.deletionTimestamp != null) | .metadata.name' || true)
-}
-
-clear_trident_finalizers() {
-  [[ -s "${KUBECONFIG}" ]] || return 0
-
-  local resource namespace name
-  while read -r resource; do
-    [[ -n "${resource}" ]] || continue
-    while read -r namespace name; do
-      [[ -n "${name}" ]] || continue
-      if [[ -n "${namespace}" ]]; then
-        oc patch "${resource}" "${name}" --namespace "${namespace}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on ${resource}/${name}"
-      else
-        oc patch "${resource}" "${name}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on ${resource}/${name}"
-      fi
-    done < <(oc get "${resource}" --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
-  done < <(oc get crd -o name 2>/dev/null | awk -F/ '/trident\.netapp\.io/ {print $2}' || true)
-}
-
-cleanup_trident() {
-  [[ -s "${KUBECONFIG}" ]] || return 0
-
-  delete_test_pvcs
-  oc delete tridentbackendconfig ci-fsxn-iscsi ci-fsxn-iscsi-luks ci-fsxn-nvme ci-fsxn-nvme-luks --namespace "${TRIDENT_NAMESPACE}" --ignore-not-found --wait=true --timeout=10m || record_failure "could not delete Trident backends"
-  oc delete storageclass ci-netapp-iscsi ci-netapp-iscsi-luks ci-netapp-nvme ci-netapp-nvme-luks --ignore-not-found || record_failure "could not delete FSxN StorageClasses"
-
-  if oc get tridentorchestrator trident >/dev/null 2>&1; then
-    oc delete tridentorchestrator trident --ignore-not-found --wait=true --timeout=10m || record_failure "could not delete TridentOrchestrator"
-  fi
-
-  install_helm || true
-  if command -v helm >/dev/null; then
-    helm uninstall trident --namespace "${TRIDENT_NAMESPACE}" || record_failure "could not uninstall Trident Helm release"
-  fi
-
-  clear_trident_finalizers
-  oc delete namespace "${TRIDENT_NAMESPACE}" --ignore-not-found --wait=true --timeout=10m || record_failure "could not delete Trident namespace"
-}
-
-svm_data_volumes_removed() {
-  local svm_id="$1"
-  local remaining
-  remaining="$(aws fsx describe-volumes --filters "Name=storage-virtual-machine-id,Values=${svm_id}" --query 'length(Volumes[?OntapConfiguration.StorageVirtualMachineRoot==`false`])' --output text)"
-  [[ "${remaining}" == "0" ]]
-}
-
-delete_svm_data_volumes() {
-  local svm_id="$1" volume_ids volume_id
-  [[ -n "${svm_id}" ]] || return 0
-
-  # The SVM is dedicated to this CI environment. Remove orphaned Trident
-  # volumes so a failed Kubernetes cleanup cannot block SVM deletion.
-  volume_ids="$(aws fsx describe-volumes --filters "Name=storage-virtual-machine-id,Values=${svm_id}" --query 'Volumes[?OntapConfiguration.StorageVirtualMachineRoot==`false`].VolumeId' --output text)" || {
-    record_failure "could not list FSx volumes for SVM ${svm_id}"
-    return 0
-  }
-  for volume_id in ${volume_ids}; do
-    [[ "${volume_id}" == "None" ]] && continue
-    aws fsx delete-volume --volume-id "${volume_id}" >/dev/null 2>&1 || record_failure "could not delete FSx volume ${volume_id}"
-  done
-  wait_for 1200 20 "FSx SVM ${svm_id} data volume deletion" svm_data_volumes_removed "${svm_id}" || true
-}
-
-delete_svm() {
-  local svm_id="$1"
-  [[ -n "${svm_id}" ]] || return 0
-
-  aws fsx delete-storage-virtual-machine --storage-virtual-machine-id "${svm_id}" >/dev/null 2>&1 || true
-  wait_for 1200 20 "FSx SVM ${svm_id} deletion" bash -c "! aws fsx describe-storage-virtual-machines --storage-virtual-machine-ids '${svm_id}' >/dev/null 2>&1" || true
-}
-
-delete_filesystem() {
-  local filesystem_id="$1"
-  [[ -n "${filesystem_id}" ]] || return 0
-
-  aws fsx delete-file-system --file-system-id "${filesystem_id}" >/dev/null 2>&1 || true
-  wait_for 1800 30 "FSx filesystem ${filesystem_id} deletion" bash -c "! aws fsx describe-file-systems --file-system-ids '${filesystem_id}' >/dev/null 2>&1" || true
-}
-
-delete_security_group() {
-  local security_group="$1"
-  [[ -n "${security_group}" ]] || return 0
-
-  local deadline=$(( $(date +%s) + 600 ))
-  until aws ec2 delete-security-group --group-id "${security_group}" >/dev/null 2>&1; do
-    if ! aws ec2 describe-security-groups --group-ids "${security_group}" >/dev/null 2>&1; then
-      return
+delete_aws_resources() {
+  local filesystems volumes svms groups id volume svm pending=0
+  # JSON output applies the query after aggregating all AWS pages. The tag is
+  # saved before provisioning so cleanup also finds resources with a lost ID.
+  filesystems="$(aws fsx describe-file-systems --query "FileSystems[?FileSystemId=='${filesystem_id}' || ('${resource_tag}'!='' && Tags[?Key=='Name' && Value=='${resource_tag}'])].FileSystemId" --output json)" || return 1
+  for id in $(jq -r '.[]' <<<"${filesystems}"); do
+    pending=1
+    volumes="$(aws fsx describe-volumes --filters "Name=file-system-id,Values=${id}" --query 'Volumes[?OntapConfiguration.StorageVirtualMachineRoot==`false`].VolumeId' --output json)" || continue
+    if [[ "$(jq length <<<"${volumes}")" != 0 ]]; then
+      for volume in $(jq -r '.[]' <<<"${volumes}"); do
+        # Do not leave chargeable final backups behind. Automatic backups are
+        # disabled at creation; the SVM's root volume is removed with the SVM.
+        aws fsx delete-volume --volume-id "${volume}" --ontap-configuration SkipFinalBackup=true >/dev/null || true
+      done
+      continue
     fi
-    if [[ $(date +%s) -ge ${deadline} ]]; then
-      record_failure "timed out deleting security group ${security_group}"
-      return 0
+    svms="$(aws fsx describe-storage-virtual-machines --filters "Name=file-system-id,Values=${id}" --query 'StorageVirtualMachines[].StorageVirtualMachineId' --output json)" || continue
+    if [[ "$(jq length <<<"${svms}")" != 0 ]]; then
+      for svm in $(jq -r '.[]' <<<"${svms}"); do
+        aws fsx delete-storage-virtual-machine --storage-virtual-machine-id "${svm}" >/dev/null || true
+      done
+      continue
     fi
-    sleep 15
+    aws fsx delete-file-system --file-system-id "${id}" >/dev/null || true
   done
-}
 
-cleanup_machineconfig() {
-  [[ -s "${KUBECONFIG}" ]] || return 0
-
-  local machineconfig
-  machineconfig="$(state_value fsxn-machineconfig-name)"
-  [[ -n "${machineconfig}" ]] || return 0
-  oc delete machineconfig "${machineconfig}" --ignore-not-found || record_failure "could not delete ${machineconfig}"
-  wait_for 3000 30 "worker MachineConfigPool cleanup" bash -c 'read -r updating updated degraded < <(oc get mcp worker -o jsonpath="{.status.conditions[?(@.type==\"Updating\")].status} {.status.conditions[?(@.type==\"Updated\")].status} {.status.conditions[?(@.type==\"Degraded\")].status}"); [[ "$updating" == False && "$updated" == True && "$degraded" == False ]]' || true
+  # The dedicated group cannot disappear until FSx has released its ENIs.
+  # Match its ID or its unique cluster tag, never unrelated VPC security groups.
+  [[ "${pending}" == 0 ]] || return 1
+  groups="$(aws ec2 describe-security-groups --query "SecurityGroups[?GroupId=='${security_group}' || ('${resource_tag}'!='' && Tags[?Key=='Name' && Value=='${resource_tag}-sg'])].GroupId" --output json)" || return 1
+  for id in $(jq -r '.[]' <<<"${groups}"); do
+    pending=1
+    aws ec2 delete-security-group --group-id "${id}" >/dev/null || true
+  done
+  # Only successful inventories proving absence can complete cleanup; API
+  # failures and asynchronous deletes are retried, with errors left visible.
+  [[ "${pending}" == 0 ]]
 }
 
 main() {
-  local region filesystem_id svm_id security_group
+  local filesystem_id security_group resource_tag region deadline tool
+  for tool in aws jq; do
+    command -v "${tool}" >/dev/null || { echo "ERROR: ${tool} is required" >&2; return 1; }
+  done
   region="$(state_value fsxn-region)"
   filesystem_id="$(state_value fsxn-filesystem-id)"
-  svm_id="$(state_value fsxn-svm-id)"
   security_group="$(state_value fsxn-security-group-id)"
+  resource_tag="$(state_value fsxn-resource-tag)"
+  export AWS_DEFAULT_REGION="${region}"
 
-  [[ -n "${region}" ]] && export AWS_DEFAULT_REGION="${region}"
-  gather_diagnostics
-
-  if [[ -n "${region}" ]]; then
-    cleanup_trident
-    delete_svm_data_volumes "${svm_id}"
-    delete_svm "${svm_id}"
-    delete_filesystem "${filesystem_id}"
-    delete_security_group "${security_group}"
-  else
-    cleanup_trident
-    delete_svm_data_volumes "${svm_id}"
-    if [[ -n "${filesystem_id}" || -n "${svm_id}" || -n "${security_group}" ]]; then
-      record_failure "FSxN cleanup state is incomplete: ${SHARED_DIR}/fsxn-region is missing"
+  gather_diagnostics || true
+  if [[ -z "${region}" ]]; then
+    if [[ -n "${filesystem_id}${security_group}${resource_tag}" ]]; then
+      echo "ERROR: FSxN resource state exists but fsxn-region is missing" >&2
+      return 1
     fi
+    return 0 # Provisioning never reached AWS resource creation.
   fi
-  cleanup_machineconfig
+  [[ -n "${filesystem_id}${security_group}${resource_tag}" ]] || return 0
 
-  return "${cleanup_status}"
+  # No OCP objects are deleted: the disposable cluster is destroyed next.
+  set -x
+  deadline=$(( $(date +%s) + 4200 ))
+  until delete_aws_resources; do
+    if [[ $(date +%s) -ge ${deadline} ]]; then
+      echo "ERROR: timed out deleting FSxN AWS resources" >&2
+      return 1
+    fi
+    sleep 30
+  done
 }
 
 main "$@"

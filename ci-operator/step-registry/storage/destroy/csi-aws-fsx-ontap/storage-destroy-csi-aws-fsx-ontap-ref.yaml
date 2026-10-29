@@ -1,6 +1,6 @@
 ref:
   as: storage-destroy-csi-aws-fsx-ontap
-  from: cli
+  from: upi-installer
   cli: latest
   commands: storage-destroy-csi-aws-fsx-ontap-commands.sh
   resources:
@@ -8,14 +8,9 @@ ref:
       cpu: 100m
       memory: 200Mi
   timeout: 80m
-  env:
-  - name: HELM_VERSION
-    default: 3.17.3
-    documentation: |-
-      Helm version downloaded with checksum verification when Helm is unavailable.
   documentation: |-
-    Collects FSx for NetApp ONTAP and Trident diagnostics, then removes the
-    Trident workloads, FSx SVM, filesystem, security group, and worker SAN
-    MachineConfig created by storage-create-csi-aws-fsx-ontap. It consumes only
-    non-secret resource IDs from ${SHARED_DIR} and attempts all cleanup phases
-    before reporting a failure.
+    Collects Trident logs and leftover OCP objects for diagnostics, then deletes
+    the dedicated FSx data volumes without final backups, SVMs, filesystem, and
+    security group. Resource IDs and the unique cluster tag from ${SHARED_DIR}
+    scope AWS cleanup, including partially completed provisioning. OCP objects
+    are left intact because the disposable cluster is destroyed next.
