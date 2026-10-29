@@ -1,10 +1,9 @@
 # Ops alert dashboard on core-ci
 
-This change stages the deployment with **zero replicas**. Merging it creates no
-process that can read or write Slack. Activation is a separate reviewed change
-to `replicas: 1`, after every prerequisite below has been verified. Keep the
-single writer at exactly one replica and keep `strategy: Recreate`; never use a
-rolling update or run a second live copy for the same ops channel.
+Run the dashboard with **one replica** and `strategy: Recreate`, after verifying
+the provisioning prerequisites below. Set `replicas: 0` to stop the writer.
+Keep exactly one live writer for the ops channel; never use a rolling update or
+run a second live copy.
 
 The backend and image Dockerfile come from `openshift/ci-tools-standalone`.
 [Source PR #58](https://github.com/openshift/ci-tools-standalone/pull/58) must
@@ -28,26 +27,28 @@ TLS and redirects HTTP to HTTPS; the service CA provisions
 `ops-alert-dashboard-tls`. The proxy connects over loopback, replaces forwarded
 identity headers, and passes its authenticated email identity as
 `X-Forwarded-Email`. For an email-shaped OpenShift username, this preserves the
-full value; a plain username maps to `username@cluster.local`. The backend
-allowlist and durable Slack action actors use exactly this proxy-generated email
-identity. The proxy requires the user's permission to get the specific
-`ci/ops-alert-dashboard` Service. The view RoleBinding uses the existing
-`test-platform-ci-admins` group; the backend separately checks its explicit email
-identity allowlist. Verify group membership and the actual proxy-generated
-identity for every intended operator before activation. No anonymous access or bearer-token delegation is
-configured. Browser OAuth evaluates the SAR using the user's identity; the
-ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
+full value; a plain username maps to `username@cluster.local`. Durable Slack
+action records use this proxy-generated identity for attribution. The proxy
+requires the user's permission to get the specific `ci/ops-alert-dashboard`
+Service. The view RoleBinding uses the existing
+`test-platform-ci-admins` group. With `access.authorization: proxy`, the backend
+relies on this proxy authorization and requires a valid forwarded identity from
+the trusted loopback proxy; individual operator entries are unnecessary. Verify
+group membership and the proxy-generated identity before activation. No anonymous
+access or bearer-token delegation is configured. Browser OAuth evaluates the SAR
+using the user's identity; the ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
 
 The proxy session expires after one hour, requiring a new login and Service SAR.
 Service access is checked at login, not on every request, so revoking that
 permission can leave an existing session usable for up to one hour. Cookie refresh
-stays disabled to keep that limit fixed. Removing an identity from the backend allowlist and
-restarting the dashboard denies that identity independently of the proxy session.
+stays disabled to keep that limit fixed. Group and Service-permission changes
+govern operator access. Verify revocation with a new login after the existing
+session expires.
 
 The backend listens on port 8080 for pod health probes. `/healthz` is process
 liveness; `/readyz` requires complete Slack replay. All application routes still
-require a trusted loopback proxy and an allowlisted user; direct pod requests
-with forged identity headers must fail. The Service does not expose this port.
+require a trusted loopback proxy and a valid authenticated identity authorized
+for the Service; direct pod requests with forged identity headers must fail. The Service does not expose this port.
 
 The ingress NetworkPolicy selects only dashboard pods and permits router traffic
 to the OAuth proxy on TCP 8443. It adds no pod ingress rule for backend port 8080.
@@ -72,9 +73,9 @@ normal secret-management process:
 - `ops-alert-dashboard-config`, required key `config.yaml`: copy the example
   outside the Git checkout and replace all placeholders. Verify workspace ID,
   ops channel ID, workspace URL, DPTP writer user and bot IDs, each producer ID,
-  exact proxy-generated operator email identities, and public HTTPS origin. Keep trusted proxy
-  CIDRs restricted to loopback. Chai needs its verified user ID for explicit
-  mentions. The `DPTP Bot` SHIP source uses the same user/bot IDs as the writer;
+  and public HTTPS origin. Set `access.authorization: proxy` and keep trusted proxy
+  CIDRs restricted to loopback. The OAuth proxy enforces group-based Service access.
+  Chai needs its verified user ID for explicit mentions. The `DPTP Bot` SHIP source uses the same user/bot IDs as the writer;
   unrelated DPTP notifications remain Orange / Other. Never trust display names.
 - `ops-alert-dashboard-session`, required key `session_secret`: provision a
   fresh cryptographically random OAuth cookie secret dedicated to this app
@@ -108,7 +109,7 @@ merged catalog (or trigger and verify config-updater), then compare its contents
 to the canonical file. Do not create another classification catalog in this
 application directory. Catalog/config changes require a process restart.
 
-## Activation checklist (separate reviewed change)
+## Activation and provisioning checklist
 
 1. Merge the source PR and verify successful image publishing for both
    architectures. Record the image digest/source revision and rollback digest.
@@ -117,17 +118,19 @@ application directory. Catalog/config changes require a process restart.
    channel membership, token permissions, history window and retention coverage.
 3. Validate the completed configuration against the canonical catalog. Verify
    the final Route host matches `access.external_url`, OAuth redirect reference,
-   trusted proxies, intended group membership and explicit operator allowlist.
-   Verify the actual `X-Forwarded-Email` generated after authenticated SSO for
-   each operator, including any `@cluster.local` mapping; do not derive the
-   allowlist or durable actor from client-supplied identity headers.
+   trusted proxies and intended `test-platform-ci-admins` group membership.
+   Verify the actual `X-Forwarded-Email` generated after authenticated SSO,
+   including any `@cluster.local` mapping, for durable action attribution; never
+   accept client-supplied identity headers.
    Confirm required network access to Slack, the Kubernetes API, internal Thanos
    frontend and public GitHub SOP Markdown.
-4. Review a change from zero to **one** replica, retaining `Recreate`. Only after
-   that change is approved and merged should GitOps start the writer. There is
-   no automatic activation or live smoke test in this staging PR.
+4. The merged deployment requests **one** replica with `Recreate`. Creating the
+   missing required Secrets allows its waiting pod to start automatically. Verify
+   the published image supports `access.authorization: proxy` before merging
+   the bootstrap mapping and letting it sync. Keep exactly one writer; use
+   `replicas: 0` to hold or stop activation when prerequisites are not ready.
 5. Verify complete archive replay and readiness, authenticated SSO access for
-   allowed operators, rejection for other users, rejection of spoofed direct-pod
+   group members, rejection for other users, rejection of spoofed direct-pod
    identity, secure proxy/header behavior, and the HTTPS route/certificate chain.
    Confirm the router namespace has the ingress selector label, route traffic
    reaches 8443, peer pods cannot reach backend 8080, and kubelet probes succeed.
@@ -147,7 +150,3 @@ If replay is incomplete or identity/authorization checks fail, keep or restore
 configured history window and Slack history. Reverting the image to the recorded digest also
 uses `Recreate` and one replica; a rollback must never introduce concurrent
 writers. Do not delete durable Slack action records as a rollback mechanism.
-
-No cluster resources have been applied and no live Slack checks are claimed by
-this PR. Remaining deployment values and the activation evidence belong in the
-follow-up activation review.
