@@ -4,23 +4,48 @@ set -Eeuo pipefail
 
 export PATH=/usr/libexec/origin:$PATH
 
-# For disconnected or otherwise unreachable environments, we want to
-# have steps use an HTTP(S) proxy to reach the API server. This proxy
-# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
-# environment variables, as well as their lowercase equivalents (note
-# that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
     echo "File ${SHARED_DIR}/mirror_registry_url does not exist, skipping community e2e image mirroring..."
     exit 0
 fi
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 MIRROR_REPO="${MIRROR_REGISTRY_HOST}/${MIRROR_REGISTRY_PATH}"
+
+# Grant anonymous image-pull access to the ephemeral CI namespace on the
+# build farm so that 'openshift-tests images' can pull image-references from
+# the per-job imagestream without registry credentials.
+# Unset KUBECONFIG so this oc call targets the build farm, not the cluster
+# under test.  This is the same pattern used by openshift-e2e-test-commands.sh.
+echo "Granting anonymous image-pull access to CI namespace ${NAMESPACE} on the build farm..."
+KUBECONFIG_BAK="${KUBECONFIG}"
+unset KUBECONFIG
+oc adm policy add-role-to-group \
+    system:image-puller \
+    system:unauthenticated \
+    --namespace "${NAMESPACE}"
+export KUBECONFIG="${KUBECONFIG_BAK}"
+
+# Source the proxy configuration so extension binaries launched by
+# 'openshift-tests images' can reach the private cluster API (needed to
+# enumerate images). Extensions like ovn-kubernetes-tests-ext call the
+# cluster API during image discovery; without the proxy they cannot resolve
+# the internal API hostname.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# Exempt all CI build-farm registries and API servers from the proxy so that
+# openshift-tests can pull extension binaries and imagestream references
+# directly without routing through the disconnected cluster proxy.
+# Using stable wildcard patterns covers all current and future build farms
+# (registry.buildNN.ci.openshift.org) without requiring the farm name to be
+# derived at runtime — which is fragile because oc whoami --show-server may
+# return the in-cluster VIP (172.30.0.1) rather than a resolvable hostname.
+NO_PROXY="${NO_PROXY:+${NO_PROXY},}*.ci.openshift.org,*.ci.devcluster.openshift.com"
+no_proxy="${no_proxy:+${no_proxy},}*.ci.openshift.org,*.ci.devcluster.openshift.com"
+export NO_PROXY no_proxy
+echo "NO_PROXY: ${NO_PROXY}"
 
 echo "Discovering community e2e test images required by this release via 'openshift-tests images'..."
 openshift-tests images --to-repository "${MIRROR_REPO}" | grep "${MIRROR_REPO}" >> "${SHARED_DIR}/mirror-images-list.yaml"
