@@ -674,219 +674,18 @@ wait_for_localnet_multi_vmis_running() {
   return 1
 }
 
-prepare_localnet_multi_dhcp_renewal_secret() {
-  local multi_ns="$1"
-  local ssh_key_secret="${CLUSTER_NAME}-ssh-key"
-
-  if ! oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" &>/dev/null; then
-    echo "WARNING: SSH key secret ${ssh_key_secret} not found, skipping DHCP renewal"
-    return 1
-  fi
-
-  # Create SSH renewal pods in a dedicated namespace that we control, rather
-  # than the HCP namespace where the HyperShift control-plane operator
-  # continuously reconciles pod-security labels back to "restricted".
-  DHCP_RENEWAL_NS="localnet-dhcp-renew-${CLUSTER_NAME}"
-  oc create namespace "${DHCP_RENEWAL_NS}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${DHCP_RENEWAL_NS}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
-
-  IFS=',' read -ra _PREP_SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
-  local _nad_subnets="${_PREP_SUBNETS[0]}"
-  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
-    _nad_subnets="${_nad_subnets},${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
-  fi
-  oc apply -f - <<RENEWAL_NAD_EOF
-apiVersion: "k8s.cni.cncf.io/v1"
-kind: NetworkAttachmentDefinition
-metadata:
-  name: localnet-1
-  namespace: ${DHCP_RENEWAL_NS}
-spec:
-  config: '{
-      "cniVersion": "0.3.1",
-      "name": "${LOCALNET_MULTI_PHYSNET:-physnet}",
-      "type": "ovn-k8s-cni-overlay",
-      "topology": "localnet",
-      "netAttachDefName": "${DHCP_RENEWAL_NS}/localnet-1",
-      "subnets": "${_nad_subnets}"
-  }'
-RENEWAL_NAD_EOF
-
-  oc get secret -n "${CLUSTER_NAMESPACE_PREFIX}" "${ssh_key_secret}" -o json \
-    | python3 -c "import sys,json; s=json.load(sys.stdin); s['metadata']={'name':s['metadata']['name'],'namespace':'${DHCP_RENEWAL_NS}'}; print(json.dumps(s))" \
-    | oc apply -f - 2>/dev/null || true
-  return 0
-}
-
-renew_localnet_multi_dhcp_on_vmi_via_ssh() {
-  local multi_ns="$1"
-  local network_count="$2"
-  local vmi="$3"
-  local vmi_ip vmi_node renew_pod
-
-  # Resolve the SSH renewal pod image once (lazy-init). Use the tools image
-  # from the release payload — it is CI-authenticated and already pullable on
-  # the management cluster nodes via ICSP.
-  if [[ -z "${RENEWAL_POD_IMAGE:-}" ]]; then
-    RENEWAL_POD_IMAGE=$(oc adm release info "${RELEASE_IMAGE}" --image-for=tools 2>/dev/null) || true
-    if [[ -z "${RENEWAL_POD_IMAGE}" ]]; then
-      RENEWAL_POD_IMAGE=$(oc adm release info "${RELEASE_IMAGE}" --image-for=cli 2>/dev/null) || true
-    fi
-    if [[ -z "${RENEWAL_POD_IMAGE}" ]]; then
-      RENEWAL_POD_IMAGE="registry.redhat.io/ubi9/ubi-minimal:latest"
-    fi
-    echo "SSH renewal pod image: ${RENEWAL_POD_IMAGE}"
-  fi
-
-  vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null)
-  vmi_node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null)
-  if [[ -z "${vmi_ip}" || -z "${vmi_node}" ]]; then
-    echo "WARNING: Could not determine IP/node for VMI ${vmi}, skipping DHCP renewal"
-    return 1
-  fi
-
-  echo "Fixing networking on VMI ${vmi} (${vmi_ip}) via SSH pod on ${vmi_node}..."
-  renew_pod="dhcp-renew-${vmi##*-}"
-  renew_devices=""
-  for idx in $(seq "${network_count}" -1 1); do
-    renew_devices="${renew_devices} enp${idx}s0"
-  done
-
-  # Build the remote fix script with a quoted heredoc (zero expansion), then
-  # substitute placeholders.  base64-encode the result and pass it as a pod
-  # env-var so no multi-level shell escaping is needed.
-  # The script: (1) optionally disables IPv6 on localnet interfaces (skipped
-  # when dual-stack IPv6 is configured on the NAD), (2) injects a static
-  # default route (immune to competing DHCP servers such as baremetal dnsmasq),
-  # and (3) installs a NM dispatcher so the route survives the MCD rpm-ostree
-  # rebase + reboot (OVS takes over enp1s0 → br-ex after rebase).
-  local fix_script fix_b64 disable_ipv6="false"
-  localnet_multi_should_disable_ipv6_boot && disable_ipv6="true"
-  fix_script=$(sed "s|__GW__|${LOCALNET_MULTI_PRIMARY_GATEWAY}|g; s|__DEVS__|${renew_devices}|g; s|__DISABLE_IPV6__|${disable_ipv6}|g" <<'FIXEOF'
-#!/bin/bash
-set -e
-GW="__GW__"
-if [ "__DISABLE_IPV6__" = "true" ]; then
-  for dev in __DEVS__; do
-    sudo nmcli device set "$dev" ipv6.method disabled 2>/dev/null || true
-    sudo nmcli device reapply "$dev" 2>/dev/null || true
-  done
-fi
-GW_DEV=""
-for cand in br-ex enp1s0; do
-  if ip addr show "$cand" 2>/dev/null | grep -q 'inet '; then
-    GW_DEV="$cand"; break
-  fi
-done
-if [ -z "$GW_DEV" ]; then
-  echo "ERROR: no interface with an IP address found for gateway route"
-  exit 1
-fi
-sudo ip route replace "$GW" dev "$GW_DEV" scope link 2>/dev/null || true
-sudo ip route replace default via "$GW" dev "$GW_DEV" 2>/dev/null || true
-cat > /tmp/disp.sh <<DISPSCRIPT
-#!/bin/bash
-for d in br-ex enp1s0; do
-  if ip addr show "\$d" 2>/dev/null | grep -q 'inet '; then
-    ip route replace $GW dev "\$d" scope link 2>/dev/null || true
-    ip route replace default via $GW dev "\$d" 2>/dev/null || true
-    break
-  fi
-done
-DISPSCRIPT
-sudo cp /tmp/disp.sh /etc/NetworkManager/dispatcher.d/99-localnet-gateway.sh
-sudo chmod 755 /etc/NetworkManager/dispatcher.d/99-localnet-gateway.sh
-echo "Default IPv4 route:"
-ip route show default 2>/dev/null || echo "(none)"
-FIXEOF
-  )
-  fix_b64=$(echo "${fix_script}" | base64 -w0)
-
-  # The SSH pod is attached to localnet-1 so it can reach the VMI on the
-  # localnet subnet (with attachDefaultNetwork=false the VMI has no pod network).
-  # Use DHCP_RENEWAL_NS (a namespace we control) instead of the HCP namespace
-  # to avoid PodSecurity label races with the HyperShift control-plane operator.
-  local _renewal_ns="${DHCP_RENEWAL_NS:-${multi_ns}}"
-  if ! cat <<RENEW_EOF | oc apply -f -; then
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ${renew_pod}
-  namespace: ${_renewal_ns}
-  annotations:
-    k8s.v1.cni.cncf.io/networks: localnet-1
-spec:
-  nodeSelector:
-    kubernetes.io/hostname: ${vmi_node}
-  restartPolicy: Never
-  volumes:
-  - name: ssh-key
-    secret:
-      secretName: ${CLUSTER_NAME}-ssh-key
-      defaultMode: 384
-  containers:
-  - name: renew
-    image: ${RENEWAL_POD_IMAGE}
-    env:
-    - name: VMI_IP
-      value: "${vmi_ip}"
-    - name: FIX_SCRIPT_B64
-      value: "${fix_b64}"
-    volumeMounts:
-    - name: ssh-key
-      mountPath: /ssh
-    command:
-    - sh
-    - -c
-    - |
-      command -v ssh >/dev/null 2>&1 || microdnf install -y openssh-clients 2>/dev/null || dnf install -y openssh-clients -q 2>/dev/null
-      if [ -f /ssh/id_rsa ]; then
-        cp /ssh/id_rsa /tmp/key
-      else
-        cp /ssh/id_ed25519 /tmp/key
-      fi
-      chmod 600 /tmp/key
-      echo "\${FIX_SCRIPT_B64}" | base64 -d > /tmp/fix.sh
-      renew_ok=1
-      for attempt in 1 2 3 4 5; do
-        if ssh -i /tmp/key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-             -o ConnectTimeout=15 "core@\${VMI_IP}" bash < /tmp/fix.sh 2>&1; then
-          renew_ok=0
-          break
-        fi
-        echo "SSH attempt \${attempt} failed, retrying in 5s..."
-        sleep 5
-      done
-      exit \${renew_ok}
-RENEW_EOF
-    echo "WARNING: Failed to create DHCP renewal pod ${renew_pod} for ${vmi}"
-    return 1
-  fi
-  oc wait pod/"${renew_pod}" -n "${_renewal_ns}" \
-    --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s 2>&1 || true
-  echo "--- DHCP renewal output for ${vmi} ---"
-  oc logs "${renew_pod}" -n "${_renewal_ns}" 2>&1 | tail -20
-  if ! oc logs "${renew_pod}" -n "${_renewal_ns}" 2>&1 | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"; then
-    echo "WARNING: VMI ${vmi} may still lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY} after SSH renewal"
-    localnet_multi_log_check "${vmi}" "default_route=MISSING renewal=ssh"
-    oc delete pod "${renew_pod}" -n "${_renewal_ns}" --ignore-not-found 2>/dev/null || true
-    return 1
-  fi
-  localnet_multi_log_check "${vmi}" "default_route=OK renewal=ssh"
-  oc delete pod "${renew_pod}" -n "${_renewal_ns}" --ignore-not-found 2>/dev/null || true
-  return 0
-}
-
 renew_localnet_multi_dhcp_on_vmi() {
   local multi_ns="$1"
   local network_count="$2"
   local vmi="$3"
 
-  if renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"; then
-    return 0
-  fi
-  echo "WARNING: guest-exec renewal failed for ${vmi}, falling back to SSH renewal pod"
-  renew_localnet_multi_dhcp_on_vmi_via_ssh "${multi_ns}" "${network_count}" "${vmi}"
+  # There is no SSH fallback.  It required a booted guest with sshd, which by
+  # definition is not the case when ignition has not completed, and its pods
+  # could never start: a second NAD for an OVN network that already exists is
+  # rejected ("CNI config does not match that of network physnet"), and Multus
+  # namespace isolation forbids referencing the original NAD from another
+  # namespace.  See the removal commit for the full analysis.
+  renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"
 }
 
 renew_localnet_multi_dhcp_for_running_vmis() {
@@ -922,9 +721,6 @@ ensure_localnet_multi_worker_networking() {
   echo "Ensuring OVN DHCP on worker node(s):${vmi_nodes}"
   configure_localnet_multi_dhcp_on_nodes "${multi_ns}" "${network_count}" "${vmi_nodes}" || true
 
-  if ! prepare_localnet_multi_dhcp_renewal_secret "${multi_ns}"; then
-    return 1
-  fi
   if ! renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}"; then
     echo "WARNING: DHCP renewal failed on one or more worker VMIs"
     return 1
@@ -1453,7 +1249,6 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
     ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
   fi
 
-  prepare_localnet_multi_dhcp_renewal_secret "${MULTI_NAMESPACE}" || true
   for attempt in $(seq 1 120); do
     LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
     if [[ -z "${LAUNCHER_NODES// }" ]]; then
