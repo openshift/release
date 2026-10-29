@@ -1,0 +1,28 @@
+ref:
+  as: quay-operator-upgrade-seed-api
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-operator-upgrade-seed-api-commands.sh
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: QUAY_UPGRADE_SEED_IMAGE
+    default: quay.io/libpod/busybox@sha256:c9249fdf56138f0d929e2080ae98ee9cb2946f71498fc1484288e6a935b5e5bc
+    documentation: |-
+      Small public single-arch image, pinned by digest, copied into the seeded
+      repository. Its digest is the one quay-operator-upgrade-verify-api expects.
+  documentation: |-
+    Seeds the source-version Quay before an operator upgrade through the REST API
+    and skopeo, without the Playwright suite. Signs in as the admin from
+    quay-create-admin-user (SHARED_DIR/quay-admin-username and
+    quay-admin-password) against SHARED_DIR/quayroute, creates a per-run
+    organization, a private repository and a robot account with write on it,
+    then copies QUAY_UPGRADE_SEED_IMAGE into the repository as the robot and
+    requires the pushed digest to match the pin. Writes org/repo/robot/tag/digest
+    to SHARED_DIR/quay-upgrade-seed and the robot token to
+    SHARED_DIR/quay-upgrade-seed-robot-token for quay-operator-upgrade-verify-api.
