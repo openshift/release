@@ -311,9 +311,11 @@ rm -f "${VALUES_FILE}"
 # symlink (/opt/cni -> /usr/lib/opt/cni), so kubelet cannot create
 # /opt/cni/bin and the init container fails with CreateContainerError
 # ("mkdir /opt/cni: file exists"). Point the volume at the ROSA/CRI-O path
-# the values already use for HOST_CNI_BIN_PATH. The volumes list merges by
-# name, so only cni-bin-dir is replaced.
-oc patch daemonset/aws-node -n kube-system --type=merge -p '
+# the values already use for HOST_CNI_BIN_PATH. Use a strategic merge patch
+# (oc's default): it merges the volumes list by name, so only cni-bin-dir is
+# replaced — a JSON merge patch would drop every other volume and be rejected
+# by the API server.
+oc patch daemonset/aws-node -n kube-system -p '
   {"spec":{"template":{"spec":{"volumes":[
     {"name":"cni-bin-dir","hostPath":{"path":"/var/lib/cni/bin"}}
   ]}}}}'
