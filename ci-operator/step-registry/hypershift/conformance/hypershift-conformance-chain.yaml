@@ -1,5 +1,8 @@
 chain:
   as: hypershift-conformance
+  env:
+  - name: HYPERSHIFT_CLUSTER_ROLE
+    default: ''
   steps:
   - as: conformance-tests
     from: tests
@@ -63,7 +66,17 @@ chain:
         # Use management cluster's kubeconfig to get the hosted cluster namespace.
         # Some workflows might call the step cucushift-hypershift-extended-enable-guest
         # which sets the kubeconfig to the guest cluster.
-        if [ -s "${SHARED_DIR}/mgmt_kubeconfig" ] ; then
+        if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+          if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+            echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+            exit 1
+          fi
+          export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+          if [[ ! -s "${KUBECONFIG}" ]]; then
+            echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+            exit 1
+          fi
+        elif [ -s "${SHARED_DIR}/mgmt_kubeconfig" ] ; then
           export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
         fi
         # Workflows with a static cluster name (e.g. OZ/libvirt KubeVirt) write the
@@ -288,6 +301,9 @@ chain:
     timeout: 14400s
     grace_period: 30m0s
     env:
+    - name: HYPERSHIFT_CLUSTER_ROLE
+      default: ''
+      documentation: Optional management cluster role used to select a role-specific kubeconfig.
     - name: TEST_ARGS
       default: ""
       documentation: |-
