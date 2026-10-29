@@ -16,6 +16,15 @@ cp .mega-linter.yml "${benchmark_artifacts}/mega-linter.yml"
 cp .yamllint.yml "${benchmark_artifacts}/yamllint.yml"
 git ls-files -z | xargs -0 sha256sum > "${benchmark_artifacts}/tracked-content-before.sha256"
 printf 'MEGA_BENCHMARK_HOST_CPUS=%s\n' "$(getconf _NPROCESSORS_ONLN)"
+# Record container lifecycle events without changing the lint command.
+cat > "${benchmark_artifacts}/containers.conf" <<EOF
+[engine]
+events_logger = "file"
+events_logfile_path = "${benchmark_artifacts}/podman-events.log"
+EOF
+export CONTAINERS_CONF_OVERRIDE="${benchmark_artifacts}/containers.conf"
+podman info --format json > "${benchmark_artifacts}/podman-info.json"
+python3 -c 'import json, sys; sys.exit(0 if json.load(sys.stdin)["host"]["eventLogger"] == "file" else 1)' < "${benchmark_artifacts}/podman-info.json"
 printf 'MEGA_BENCHMARK_PULL_START=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
 podman pull 'docker.io/oxsecurity/megalinter-ci_light@sha256:54e221da51b3fb959dfd4fc5e21920e0a0fa339ba68e0e9162b894a01a52ed34'
 podman tag 'docker.io/oxsecurity/megalinter-ci_light@sha256:54e221da51b3fb959dfd4fc5e21920e0a0fa339ba68e0e9162b894a01a52ed34' docker.io/oxsecurity/megalinter-ci_light:v9
