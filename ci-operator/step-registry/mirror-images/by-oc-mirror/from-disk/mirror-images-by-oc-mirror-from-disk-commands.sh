@@ -81,7 +81,7 @@ ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
      [[ -e \"\${archives[0]}\" ]] || { echo 'ERROR: no mirror_*.tar archives found in ${BASTION_WORKSPACE_PATH}'; ls -la '${BASTION_WORKSPACE_PATH}/'; exit 1; }; \
      echo \"Found \${#archives[@]} archive(s) in ${BASTION_WORKSPACE_PATH}.\"; \
      test -f '${BASTION_WORKSPACE_PATH}/sha256sums.txt' || { echo 'ERROR: sha256sums.txt missing'; exit 1; }; \
-     cd '${BASTION_WORKSPACE_PATH}' && sha256sum -c sha256sums.txt && echo 'Bastion checksum verification PASSED'; \
+     { cd '${BASTION_WORKSPACE_PATH}' && sha256sum -c sha256sums.txt && echo 'Bastion checksum verification PASSED'; } || { echo 'ERROR: bastion checksum verification failed'; exit 1; }; \
      echo 'oc-mirror binary and workspace verified.'; \
      '${BASTION_BIN_PATH}' version --output=yaml"
 
@@ -469,11 +469,13 @@ ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "chmod +x '${REMOTE_D2M_SCRI
 rm -f "${local_script}"
 
 echo "=== Executing remote D2M script on bastion ==="
-ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "${REMOTE_D2M_SCRIPT}"
-echo "Remote D2M script complete."
+REMOTE_D2M_RC=0
+ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" "${REMOTE_D2M_SCRIPT}" || REMOTE_D2M_RC=$?
+echo "Remote D2M script exit code: ${REMOTE_D2M_RC}"
 
 # ---------------------------------------------------------------------------
-# Artifact collection (firewall is now restored, all scp/ssh unrestricted)
+# Artifact collection (firewall is now restored, all scp/ssh unrestricted).
+# Runs unconditionally so diagnostics are always available, even on D2M failure.
 # ---------------------------------------------------------------------------
 
 # D2M log tee-d to /var/tmp during the remote script run
@@ -516,11 +518,13 @@ if [[ -z "${BASTION_PROXY_URL}" ]]; then
     echo "WARNING: SHARED_DIR/proxy_public_url not found — skipping proxy-path check"
 else
     ENDPOINT="https://servicequotas.us-west-2.amazonaws.com"
-    echo "Proxy: ${BASTION_PROXY_URL}"
-    echo "Endpoint: ${ENDPOINT}"
-    # Disable tracing — proxy URL may contain credentials.
+    # Disable tracing before logging the proxy URL — it contains credentials.
     [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
     set +x
+    # Log a redacted form: strip user:password@ from http(s)://user:pass@host:port
+    PROXY_REDACTED=$(sed -E 's|^(https?://)([^@]+@)?|\1<redacted>@|' <<<"${BASTION_PROXY_URL}")
+    echo "Proxy: ${PROXY_REDACTED}"
+    echo "Endpoint: ${ENDPOINT}"
     if ssh ${SSH_OPTS} "${BASTION_SSH_USER}@${BASTION_IP}" \
             "curl --proxy '${BASTION_PROXY_URL}' --noproxy '' \
              -m 15 --silent --output /dev/null --write-out 'HTTP %{http_code}\n' \
@@ -536,6 +540,12 @@ else
     $WAS_TRACING && set -x
 fi
 echo "Post-cleanup proxy-path check passed."
+
+# Propagate remote D2M failure after all artifacts have been collected.
+if (( REMOTE_D2M_RC != 0 )); then
+    echo "ERROR: remote D2M script failed with exit code ${REMOTE_D2M_RC} — artifacts collected above"
+    exit "${REMOTE_D2M_RC}"
+fi
 
 # ---------------------------------------------------------------------------
 # Copy IDMS/ITMS from bastion to SHARED_DIR
