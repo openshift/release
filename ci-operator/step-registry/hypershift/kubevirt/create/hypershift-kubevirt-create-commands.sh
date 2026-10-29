@@ -269,12 +269,6 @@ localnet_multi_should_disable_ipv6_boot() {
     && [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]
 }
 
-localnet_multi_log_check() {
-  local vmi="$1"
-  shift
-  echo "LOCALNET_MULTI_CHECK: vmi=${vmi} $* gateway=${LOCALNET_MULTI_PRIMARY_GATEWAY}"
-}
-
 localnet_multi_clear_lsp_dhcpv6() {
   local ovn_pod="$1"
   local lsp_name="$2"
@@ -383,201 +377,226 @@ localnet_multi_launcher_nodes_have_ovn() {
   [[ ${missing} -eq 0 ]]
 }
 
-resolve_virtctl_cmd() {
-  if command -v virtctl >/dev/null 2>&1; then
-    echo "virtctl"
-    return 0
-  fi
-  if [[ -x /usr/bin/virtctl ]]; then
-    echo "/usr/bin/virtctl"
-    return 0
-  fi
-  if [[ -x /tmp/virtctl ]]; then
-    echo "/tmp/virtctl"
-    return 0
-  fi
+# DISABLED: the guest-exec cluster below never worked.
+#
+# Every function in this block bottoms out in "virtctl guest-exec", which is
+# not a virtctl subcommand.  The call always failed, the failure was swallowed
+# by "|| true", and the resulting error string was then grepped for a default
+# route -- so the verifiers reported default_route=MISSING for every VMI
+# whether or not anything was wrong, and the renewal path renewed nothing.
+#
+# Nothing of value is lost.  The missing-gateway bug these were written to
+# paper over is fixed at the source: the CNV l2bridge binding suppresses
+# KubeVirt's in-pod DHCP server, so OVN's responder -- which does send the
+# router option -- serves the guest from first boot.  Boot is now confirmed by
+# wait_for_localnet_multi_vmis_booted, which keys off AgentConnected and can
+# only be true once the guest has completed ignition.
+#
+# Kept commented rather than deleted so the shape of the intended check
+# survives: if KubeVirt ever grows a working in-guest exec (or the step moves
+# to "oc debug node" against the guest), this is the logic to restore.
 
-  # Download virtctl from the cluster's KubeVirt/HCO deployment
-  local dl_url=""
+# localnet_multi_log_check() {
+#   local vmi="$1"
+#   shift
+#   echo "LOCALNET_MULTI_CHECK: vmi=${vmi} $* gateway=${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+# }
 
-  # Method 1: ConsoleCLIDownload resource (standard HCO deployment)
-  dl_url=$(oc get ConsoleCLIDownload virtctl-clidownloads-kubevirt-hyperconverged \
-    -o jsonpath='{.spec.links[?(@.text=="Download virtctl for Linux for x86_64")].href}' 2>/dev/null) || true
+# resolve_virtctl_cmd() {
+#   if command -v virtctl >/dev/null 2>&1; then
+#     echo "virtctl"
+#     return 0
+#   fi
+#   if [[ -x /usr/bin/virtctl ]]; then
+#     echo "/usr/bin/virtctl"
+#     return 0
+#   fi
+#   if [[ -x /tmp/virtctl ]]; then
+#     echo "/tmp/virtctl"
+#     return 0
+#   fi
+#
+#   # Download virtctl from the cluster's KubeVirt/HCO deployment
+#   local dl_url=""
+#
+#   # Method 1: ConsoleCLIDownload resource (standard HCO deployment)
+#   dl_url=$(oc get ConsoleCLIDownload virtctl-clidownloads-kubevirt-hyperconverged \
+#     -o jsonpath='{.spec.links[?(@.text=="Download virtctl for Linux for x86_64")].href}' 2>/dev/null) || true
+#
+#   # Method 2: Construct URL from the HCO CLI download route
+#   if [[ -z "${dl_url}" ]]; then
+#     local route_host
+#     route_host=$(oc get route -n openshift-cnv hyperconverged-cluster-cli-download \
+#       -o jsonpath='{.spec.host}' 2>/dev/null) || true
+#     if [[ -n "${route_host}" ]]; then
+#       dl_url="https://${route_host}/amd64/linux/virtctl.tar.gz"
+#     fi
+#   fi
+#
+#   if [[ -n "${dl_url}" ]]; then
+#     echo "Downloading virtctl from ${dl_url}..." >&2
+#     if curl -sSLk "${dl_url}" --output /tmp/virtctl.tar.gz 2>/dev/null \
+#        && tar xzf /tmp/virtctl.tar.gz -C /tmp/ 2>/dev/null; then
+#       local virtctl_path
+#       virtctl_path=$(find /tmp -name virtctl -type f -executable 2>/dev/null | head -1)
+#       if [[ -n "${virtctl_path}" && "${virtctl_path}" != "/tmp/virtctl" ]]; then
+#         mv "${virtctl_path}" /tmp/virtctl
+#       fi
+#       rm -f /tmp/virtctl.tar.gz
+#       if [[ -x /tmp/virtctl ]]; then
+#         echo "/tmp/virtctl"
+#         return 0
+#       fi
+#     fi
+#     rm -f /tmp/virtctl.tar.gz
+#   fi
+#
+#   echo "WARNING: virtctl not found and download failed; guest-exec renewal unavailable" >&2
+#   return 1
+# }
 
-  # Method 2: Construct URL from the HCO CLI download route
-  if [[ -z "${dl_url}" ]]; then
-    local route_host
-    route_host=$(oc get route -n openshift-cnv hyperconverged-cluster-cli-download \
-      -o jsonpath='{.spec.host}' 2>/dev/null) || true
-    if [[ -n "${route_host}" ]]; then
-      dl_url="https://${route_host}/amd64/linux/virtctl.tar.gz"
-    fi
-  fi
+# vmi_guest_agent_ready() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local ga_status
+#
+#   ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+#     -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
+#   [[ "${ga_status}" == "True" ]]
+# }
 
-  if [[ -n "${dl_url}" ]]; then
-    echo "Downloading virtctl from ${dl_url}..." >&2
-    if curl -sSLk "${dl_url}" --output /tmp/virtctl.tar.gz 2>/dev/null \
-       && tar xzf /tmp/virtctl.tar.gz -C /tmp/ 2>/dev/null; then
-      local virtctl_path
-      virtctl_path=$(find /tmp -name virtctl -type f -executable 2>/dev/null | head -1)
-      if [[ -n "${virtctl_path}" && "${virtctl_path}" != "/tmp/virtctl" ]]; then
-        mv "${virtctl_path}" /tmp/virtctl
-      fi
-      rm -f /tmp/virtctl.tar.gz
-      if [[ -x /tmp/virtctl ]]; then
-        echo "/tmp/virtctl"
-        return 0
-      fi
-    fi
-    rm -f /tmp/virtctl.tar.gz
-  fi
+# wait_for_vmi_guest_agent() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local attempt
+#
+#   for attempt in $(seq 1 45); do
+#     if vmi_guest_agent_ready "${multi_ns}" "${vmi}"; then
+#       return 0
+#     fi
+#     sleep 2
+#   done
+#   return 1
+# }
 
-  echo "WARNING: virtctl not found and download failed; guest-exec renewal unavailable" >&2
-  return 1
-}
+# localnet_multi_guest_renew_script() {
+#   local network_count="$1"
+#   local idx renew_devices inner_script
+#
+#   renew_devices=""
+#   for idx in $(seq 1 "${network_count}"); do
+#     renew_devices="${renew_devices} enp${idx}s0"
+#   done
+#   inner_script="for dev in${renew_devices}; do "
+#   if localnet_multi_should_disable_ipv6_boot; then
+#     inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
+#   fi
+#   inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
+#   inner_script+="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
+#   inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
+#   inner_script+="echo 'IPv6 global addresses:'; ip -6 addr show scope global 2>/dev/null || true"
+#   echo "${inner_script}"
+# }
 
-vmi_guest_agent_ready() {
-  local multi_ns="$1"
-  local vmi="$2"
-  local ga_status
+# localnet_multi_guest_exec_output() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local inner_script="$3"
+#   local virtctl_cmd output
+#
+#   virtctl_cmd=$(resolve_virtctl_cmd) || return 1
+#   output=$("${virtctl_cmd}" guest-exec "${vmi}" -n "${multi_ns}" --username core --return stdout -- \
+#     sh -c "${inner_script}" 2>&1) || true
+#   echo "${output}"
+# }
 
-  ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
-    -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
-  [[ "${ga_status}" == "True" ]]
-}
+# localnet_multi_output_has_default_route() {
+#   local output="$1"
+#   echo "${output}" | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+# }
 
-wait_for_vmi_guest_agent() {
-  local multi_ns="$1"
-  local vmi="$2"
-  local attempt
+# localnet_multi_output_has_ipv6_on_localnet() {
+#   local output="$1"
+#   echo "${output}" | grep -E 'inet6 (fd|2[0-9a-f]{3}:)' >/dev/null 2>&1
+# }
 
-  for attempt in $(seq 1 45); do
-    if vmi_guest_agent_ready "${multi_ns}" "${vmi}"; then
-      return 0
-    fi
-    sleep 2
-  done
-  return 1
-}
+# verify_localnet_multi_vmi_default_route() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local output inner_script
+#
+#   [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+#
+#   if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+#     localnet_multi_log_check "${vmi}" "default_route=MISSING guest_agent=unavailable"
+#     return 1
+#   fi
+#
+#   inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
+#   output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+#
+#   if localnet_multi_output_has_default_route "${output}"; then
+#     if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+#     else
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+#     fi
+#     return 0
+#   fi
+#
+#   localnet_multi_log_check "${vmi}" "default_route=MISSING"
+#   return 1
+# }
 
-localnet_multi_guest_renew_script() {
-  local network_count="$1"
-  local idx renew_devices inner_script
+# renew_localnet_multi_dhcp_via_guest_exec() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi="$3"
+#   local inner_script output
+#
+#   if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+#     echo "WARNING: Guest agent not ready on VMI ${vmi}, skipping guest-exec renewal"
+#     return 1
+#   fi
+#
+#   inner_script=$(localnet_multi_guest_renew_script "${network_count}")
+#   echo "Forcing DHCP renewal on VMI ${vmi} via guest-exec..."
+#   output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+#
+#   echo "--- guest-exec renewal output for ${vmi} ---"
+#   echo "${output}" | tail -30
+#
+#   if localnet_multi_output_has_default_route "${output}"; then
+#     if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+#     else
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+#     fi
+#     return 0
+#   fi
+#
+#   localnet_multi_log_check "${vmi}" "default_route=MISSING"
+#   return 1
+# }
 
-  renew_devices=""
-  for idx in $(seq 1 "${network_count}"); do
-    renew_devices="${renew_devices} enp${idx}s0"
-  done
-  inner_script="for dev in${renew_devices}; do "
-  if localnet_multi_should_disable_ipv6_boot; then
-    inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
-  fi
-  inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
-  inner_script+="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
-  inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
-  inner_script+="echo 'IPv6 global addresses:'; ip -6 addr show scope global 2>/dev/null || true"
-  echo "${inner_script}"
-}
-
-localnet_multi_guest_exec_output() {
-  local multi_ns="$1"
-  local vmi="$2"
-  local inner_script="$3"
-  local virtctl_cmd output
-
-  virtctl_cmd=$(resolve_virtctl_cmd) || return 1
-  output=$("${virtctl_cmd}" guest-exec "${vmi}" -n "${multi_ns}" --username core --return stdout -- \
-    sh -c "${inner_script}" 2>&1) || true
-  echo "${output}"
-}
-
-localnet_multi_output_has_default_route() {
-  local output="$1"
-  echo "${output}" | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
-}
-
-localnet_multi_output_has_ipv6_on_localnet() {
-  local output="$1"
-  echo "${output}" | grep -E 'inet6 (fd|2[0-9a-f]{3}:)' >/dev/null 2>&1
-}
-
-verify_localnet_multi_vmi_default_route() {
-  local multi_ns="$1"
-  local vmi="$2"
-  local output inner_script
-
-  [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
-
-  if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
-    localnet_multi_log_check "${vmi}" "default_route=MISSING guest_agent=unavailable"
-    return 1
-  fi
-
-  inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
-  output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
-
-  if localnet_multi_output_has_default_route "${output}"; then
-    if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
-      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
-    else
-      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
-    fi
-    return 0
-  fi
-
-  localnet_multi_log_check "${vmi}" "default_route=MISSING"
-  return 1
-}
-
-renew_localnet_multi_dhcp_via_guest_exec() {
-  local multi_ns="$1"
-  local network_count="$2"
-  local vmi="$3"
-  local inner_script output
-
-  if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
-    echo "WARNING: Guest agent not ready on VMI ${vmi}, skipping guest-exec renewal"
-    return 1
-  fi
-
-  inner_script=$(localnet_multi_guest_renew_script "${network_count}")
-  echo "Forcing DHCP renewal on VMI ${vmi} via guest-exec..."
-  output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
-
-  echo "--- guest-exec renewal output for ${vmi} ---"
-  echo "${output}" | tail -30
-
-  if localnet_multi_output_has_default_route "${output}"; then
-    if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
-      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
-    else
-      localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
-    fi
-    return 0
-  fi
-
-  localnet_multi_log_check "${vmi}" "default_route=MISSING"
-  return 1
-}
-
-verify_localnet_multi_worker_routes() {
-  local multi_ns="$1"
-  local vmi failures=0
-
-  [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
-
-  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    if ! verify_localnet_multi_vmi_default_route "${multi_ns}" "${vmi}"; then
-      failures=$((failures + 1))
-    fi
-  done
-
-  if [[ ${failures} -gt 0 ]]; then
-    echo "ERROR: ${failures} worker VMI(s) lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
-    return 1
-  fi
-  return 0
-}
+# verify_localnet_multi_worker_routes() {
+#   local multi_ns="$1"
+#   local vmi failures=0
+#
+#   [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     if ! verify_localnet_multi_vmi_default_route "${multi_ns}" "${vmi}"; then
+#       failures=$((failures + 1))
+#     fi
+#   done
+#
+#   if [[ ${failures} -gt 0 ]]; then
+#     echo "ERROR: ${failures} worker VMI(s) lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+#     return 1
+#   fi
+#   return 0
+# }
 
 configure_localnet_multi_dhcp_on_nodes() {
   local multi_ns="$1"
@@ -634,25 +653,26 @@ configure_localnet_multi_dhcp_on_nodes() {
   [[ ${pending} -eq 0 ]]
 }
 
-renew_localnet_multi_dhcp_for_running_vmis_if_ready() {
-  local multi_ns="$1"
-  local network_count="$2"
-  local vmi phase vmi_ip renewed=0 marker
-
-  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
-    [[ "${phase}" == "Running" ]] || continue
-    marker="${SHARED_DIR}/localnet_multi_renewed_${vmi}"
-    [[ -f "${marker}" ]] && continue
-    vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
-    [[ -n "${vmi_ip}" ]] || continue
-    if renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
-      touch "${marker}"
-      renewed=$((renewed + 1))
-    fi
-  done
-  [[ ${renewed} -gt 0 ]]
-}
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_for_running_vmis_if_ready() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi phase vmi_ip renewed=0 marker
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+#     [[ "${phase}" == "Running" ]] || continue
+#     marker="${SHARED_DIR}/localnet_multi_renewed_${vmi}"
+#     [[ -f "${marker}" ]] && continue
+#     vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
+#     [[ -n "${vmi_ip}" ]] || continue
+#     if renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
+#       touch "${marker}"
+#       renewed=$((renewed + 1))
+#     fi
+#   done
+#   [[ ${renewed} -gt 0 ]]
+# }
 
 wait_for_localnet_multi_vmis_running() {
   local multi_ns="$1"
@@ -752,34 +772,36 @@ wait_for_localnet_multi_vmis_booted() {
   return 1
 }
 
-renew_localnet_multi_dhcp_on_vmi() {
-  local multi_ns="$1"
-  local network_count="$2"
-  local vmi="$3"
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_on_vmi() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi="$3"
+#
+#   # There is no SSH fallback.  It required a booted guest with sshd, which by
+#   # definition is not the case when ignition has not completed, and its pods
+#   # could never start: a second NAD for an OVN network that already exists is
+#   # rejected ("CNI config does not match that of network physnet"), and Multus
+#   # namespace isolation forbids referencing the original NAD from another
+#   # namespace.  See the removal commit for the full analysis.
+#   renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"
+# }
 
-  # There is no SSH fallback.  It required a booted guest with sshd, which by
-  # definition is not the case when ignition has not completed, and its pods
-  # could never start: a second NAD for an OVN network that already exists is
-  # rejected ("CNI config does not match that of network physnet"), and Multus
-  # namespace isolation forbids referencing the original NAD from another
-  # namespace.  See the removal commit for the full analysis.
-  renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"
-}
-
-renew_localnet_multi_dhcp_for_running_vmis() {
-  local multi_ns="$1"
-  local network_count="$2"
-  local vmi phase failures=0
-
-  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-    phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
-    [[ "${phase}" == "Running" ]] || continue
-    if ! renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
-      failures=$((failures + 1))
-    fi
-  done
-  [[ ${failures} -eq 0 ]]
-}
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_for_running_vmis() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi phase failures=0
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+#     [[ "${phase}" == "Running" ]] || continue
+#     if ! renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
+#       failures=$((failures + 1))
+#     fi
+#   done
+#   [[ ${failures} -eq 0 ]]
+# }
 
 ensure_localnet_multi_worker_networking() {
   local multi_ns="$1"
@@ -799,10 +821,11 @@ ensure_localnet_multi_worker_networking() {
   echo "Ensuring OVN DHCP on worker node(s):${vmi_nodes}"
   configure_localnet_multi_dhcp_on_nodes "${multi_ns}" "${network_count}" "${vmi_nodes}" || true
 
-  # DHCP renewal is best effort: a guest that already has the right lease needs
-  # nothing, and a guest that is wedged is handled by the boot wait below.
-  renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}" \
-    || echo "WARNING: DHCP renewal reported a failure on one or more worker VMIs"
+  # No lease renewal here any more; see the DISABLED block near the top of this
+  # file.  With the l2bridge binding, OVN's DHCP responder is the only one on the
+  # segment and it sends the router option, so there is nothing to re-ask for.
+  # renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}" \
+  #   || echo "WARNING: DHCP renewal reported a failure on one or more worker VMIs"
 
   # Wait for the guests to actually boot, re-rolling any that got stuck. This
   # replaces verify_localnet_multi_worker_routes, which shelled out to
@@ -813,24 +836,6 @@ ensure_localnet_multi_worker_networking() {
   if ! wait_for_localnet_multi_vmis_booted "${multi_ns}"; then
     return 1
   fi
-  return 0
-}
-
-# Block until the SCC controller has annotated a freshly created namespace.
-# Applying a pod before openshift.io/sa.scc.uid-range exists is rejected by
-# admission with "unable to find annotation openshift.io/sa.scc.uid-range",
-# which under set -e kills the step.
-wait_for_ns_scc_annotations() {
-  local ns="$1" i
-  echo "Waiting for SCC annotations on namespace ${ns}..."
-  for i in $(seq 1 60); do
-    if [[ -n "$(oc get ns "${ns}" \
-         -o jsonpath='{.metadata.annotations.openshift\.io/sa\.scc\.uid-range}' 2>/dev/null)" ]]; then
-      return 0
-    fi
-    sleep 2
-  done
-  echo "WARNING: namespace ${ns} still has no openshift.io/sa.scc.uid-range after 120s; continuing"
   return 0
 }
 
@@ -1463,12 +1468,13 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
     if [[ ${PRIMARY_CONFIGURED} -ge ${HYPERSHIFT_NODE_COUNT} ]] \
       && localnet_multi_launcher_nodes_have_ovn "${LAUNCHER_NODES}"; then
       echo "Early OVN DHCP configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
-      renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+      # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
       break
     fi
 
-    # Best-effort: renew DHCP and disable IPv6 on enp*s0 as soon as guest agent is ready.
-    renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    # Best-effort DHCP renewal used to run here; disabled with the rest of the
+    # guest-exec cluster (see the DISABLED block near the top of this file).
+    # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
 
     echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured on virt-launcher node(s)"
     if [[ ${attempt} -eq 120 ]]; then
@@ -1537,7 +1543,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
   MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
   for attempt in $(seq 1 360); do
-    renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
     # Re-apply br-ex IPv6 flow every ~60s in case OVN-K reconciled it away.
     if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && [[ $((attempt % 12)) -eq 0 ]]; then
       ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
@@ -1702,131 +1708,8 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
     echo "WARNING: Nested kubeconfig not found at ${NESTED_KUBECONFIG}, skipping enp2s0 forwarding setup"
   fi
 
-  # Deploy ip-echo on the management cluster with localnet NAD for EgressIP
-  # source-IP verification. The ip-echo pod gets a localnet IP that is NOT in the
-  # hosted cluster's OVN node address set, so EgressIP reroute + SNAT applies
-  # to traffic going to it. Without this, traffic to hosted cluster node IPs
-  # (including localnet IPs) is exempted from EgressIP by OVN priority 102 policy.
-  #
-  # The ip-echo pod is deployed in a dedicated namespace (not the HyperShift
-  # control plane namespace) to prevent HyperShift's control plane operator from
-  # garbage-collecting it during namespace reconciliation.
-  IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
-  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
-  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
-  wait_for_ns_scc_annotations "${IPECHO_NAMESPACE}"
-
-  # Create a localnet NAD in the ip-echo namespace (same config as the hosted cluster namespace)
-  oc apply -f - <<IPECHO_NAD_EOF
-apiVersion: "k8s.cni.cncf.io/v1"
-kind: NetworkAttachmentDefinition
-metadata:
-  name: localnet-network
-  namespace: ${IPECHO_NAMESPACE}
-spec:
-  config: '{
-      "cniVersion": "0.3.1",
-      "name": "physnet",
-      "type": "ovn-k8s-cni-overlay",
-      "topology": "localnet",
-      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-network",
-      "subnets": "192.168.223.0/24"
-  }'
-IPECHO_NAD_EOF
-
-  oc apply -f - <<IPECHO_EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: egressip-ipecho
-  namespace: ${IPECHO_NAMESPACE}
-  annotations:
-    k8s.v1.cni.cncf.io/networks: localnet-network
-spec:
-  containers:
-  - name: ip-echo
-    image: quay.io/openshifttest/ip-echo:1.2.0
-    ports:
-    - containerPort: 80
-      protocol: TCP
-    securityContext:
-      runAsUser: 0
-  restartPolicy: Always
-  tolerations:
-  - operator: Exists
-IPECHO_EOF
-
-  echo "Waiting for ip-echo pod to be ready..."
-  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
-
-  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
-    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
-    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
-  echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
-  echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
-elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
-  # OVN DHCP and lease renewal run in ensure_localnet_multi_worker_networking above.
-  # Deploy ip-echo for EgressIP source-IP verification.
-  IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
-  IPECHO_NAMESPACE="egressip-ipecho-${CLUSTER_NAME}"
-  echo "Deploying ip-echo in dedicated namespace ${IPECHO_NAMESPACE}..."
-  oc create namespace "${IPECHO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-  oc label ns "${IPECHO_NAMESPACE}" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || true
-  wait_for_ns_scc_annotations "${IPECHO_NAMESPACE}"
-
-  # Create a primary localnet NAD in the ip-echo namespace
-  IPECHO_EXCLUDE=""
-  if [[ -n "${LOCALNET_MULTI_EXCLUDE_SUBNETS:-}" ]]; then
-    IPECHO_EXCLUDE=",\"excludeSubnets\": \"${LOCALNET_MULTI_EXCLUDE_SUBNETS}\""
-  fi
-  oc apply -f - <<IPECHO_NAD_EOF
-apiVersion: "k8s.cni.cncf.io/v1"
-kind: NetworkAttachmentDefinition
-metadata:
-  name: localnet-1
-  namespace: ${IPECHO_NAMESPACE}
-spec:
-  config: '{
-      "cniVersion": "0.3.1",
-      "name": "physnet",
-      "type": "ovn-k8s-cni-overlay",
-      "topology": "localnet",
-      "netAttachDefName": "${IPECHO_NAMESPACE}/localnet-1",
-      "subnets": "${SUBNETS[0]}"${IPECHO_EXCLUDE}
-  }'
-IPECHO_NAD_EOF
-
-  oc apply -f - <<IPECHO_EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: egressip-ipecho
-  namespace: ${IPECHO_NAMESPACE}
-  annotations:
-    k8s.v1.cni.cncf.io/networks: localnet-1
-spec:
-  containers:
-  - name: ip-echo
-    image: quay.io/openshifttest/ip-echo:1.2.0
-    ports:
-    - containerPort: 80
-      protocol: TCP
-    securityContext:
-      runAsUser: 0
-  restartPolicy: Always
-  tolerations:
-  - operator: Exists
-IPECHO_EOF
-
-  echo "Waiting for ip-echo pod to be ready..."
-  oc wait --for=condition=Ready pod/egressip-ipecho -n "${IPECHO_NAMESPACE}" --timeout=120s
-
-  IPECHO_LOCALNET_IP=$(oc get pod egressip-ipecho -n "${IPECHO_NAMESPACE}" \
-    -o jsonpath='{.metadata.annotations.k8s\.v1\.cni\.cncf\.io/network-status}' | \
-    python3 -c "import sys,json; nets=json.loads(sys.stdin.read()); [print(n['ips'][0]) for n in nets if 'localnet' in n.get('name','')]")
-  echo "ip-echo localnet IP: ${IPECHO_LOCALNET_IP}:80"
-  echo "${IPECHO_LOCALNET_IP}:80" > "${SHARED_DIR}/kubevirt_ipecho_url"
+  # localnet-multi needs nothing here: OVN DHCP and the l2bridge switch run in
+  # ensure_localnet_multi_worker_networking above.
 fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

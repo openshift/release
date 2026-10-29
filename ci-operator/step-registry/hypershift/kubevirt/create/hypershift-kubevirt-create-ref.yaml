@@ -145,8 +145,11 @@ ref:
     - name: LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE
       default: "true"
       documentation: |-
-        When true, verify each worker VMI has an IPv4 default route via LOCALNET_MULTI_PRIMARY_GATEWAY
-        after guest-exec/SSH renewal. Fail the create step if verification fails post-Available.
+        When true, verify worker VMI networking after the HostedCluster reports Available.
+        Verification is now a boot check: every worker VMI must report AgentConnected, which
+        the guest can only do once ignition has completed, and VMIs that are Running without
+        it are re-rolled. The previous in-guest route check ran through "virtctl guest-exec",
+        which is not a virtctl subcommand, and has been disabled.
     - name: LOCALNET_MULTI_DHCP_MODE
       default: "ovn"
       documentation: |-
