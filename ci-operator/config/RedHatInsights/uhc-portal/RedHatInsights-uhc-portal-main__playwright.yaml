@@ -1,0 +1,60 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/nodejs-24:latest
+      USER root
+      RUN mkdir -p /go/src && chmod -R 777 /go
+      USER 1001
+images:
+  items:
+  - dockerfile_path: Dockerfile.playwright
+    to: uhc-portal-playwright
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-playwright-rosa
+  optional: true
+  steps:
+    test:
+    - as: playwright-rosa
+      commands: |
+        cd /app
+        export CREDENTIALS_DIR=/var/run/secrets/uhc-portal-playwright
+        echo "--- Credential mount validation ---"
+        if [[ ! -d "${CREDENTIALS_DIR}" ]]; then
+          echo "ERROR: credentials not mounted at ${CREDENTIALS_DIR}"
+          exit 1
+        fi
+        echo "Credentials mounted. Files present:"
+        ls -la "${CREDENTIALS_DIR}/"
+        echo "--- End validation ---"
+        export ARTIFACT_DIR="${ARTIFACT_DIR}"
+        export SETUP_CLOUD=true
+        export SETUP_ROSA_ROLES=true
+        export EUT="${EUT:-staging}"
+        export GREP_TAGS="${GREP_TAGS:-@smoke|@wizard-validation}"
+        export WORKERS="${WORKERS:-2}"
+        export SKIP_SQS_QUEUE="${SKIP_SQS_QUEUE:-false}"
+        export SKIP_S3_BUCKET="${SKIP_S3_BUCKET:-false}"
+        ./playwright/scripts/playwright-qe-executor.sh
+      credentials:
+      - collection: uhc-portal
+        group: playwright-e2e
+        mount_path: /var/run/secrets/uhc-portal-playwright
+      from: uhc-portal-playwright
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: RedHatInsights
+  repo: uhc-portal
+  variant: playwright
