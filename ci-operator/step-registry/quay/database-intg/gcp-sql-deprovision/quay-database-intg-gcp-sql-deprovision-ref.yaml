@@ -1,0 +1,21 @@
+ref:
+  as: quay-database-intg-gcp-sql-deprovision
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-database-intg-gcp-sql-deprovision-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Deprovision the Google Cloud SQL PostgreSQL database for Quay. Runs
+    terraform destroy from the archived DB Terraform state. If the archive is
+    missing, it imports the instance by its SHARED_DIR identifiers and
+    destroys it; deleting the instance cascades its databases, users, and
+    client certificates. Uses the gcp-quay-qe cluster profile's service
+    account - the same credentials the provisioning step uses.
