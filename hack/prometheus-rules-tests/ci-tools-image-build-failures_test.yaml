@@ -1,0 +1,81 @@
+# promtool unit tests for ci-tools-image-build-failures.
+# Only the POSTSUBMIT (branch-ci) ci-tools image builds are alerted, and the rule
+# compares the latest terminal transition's timestamp (last_failure > last_success)
+# rather than "a failure in the window and no success in the window". Case 2 is the
+# regression CodeRabbit asked for: a success followed by a later failing build must
+# FIRE (the previous window-contains rule stayed silent for up to 24h). Presubmit
+# (pull-ci) builds must never fire.
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. Postsubmit image build fails (increment at t=30m), never succeeds -> fires;
+  #    ops_color orange, ops_category ci_platform.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: ci-tools-image-build-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-ci-tools-main-images
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'The ci-tools image postsubmit branch-ci-openshift-ci-tools-main-images is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job=branch-ci-openshift-ci-tools-main-images|Deck>.'
+
+  # 2. REGRESSION (success -> later failure): a build succeeds at t=30m, then a later
+  #    build fails at t=90m. Must FIRE because the newest transition is a failure.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-standalone-main-images", job="prow-controller-manager", state="success"}'
+        values: '0+0x29 1+0x200'
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-standalone-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x89 1+0x140'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ci-tools-image-build-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-ci-tools-standalone-main-images
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'The ci-tools image postsubmit branch-ci-openshift-ci-tools-standalone-main-images is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job=branch-ci-openshift-ci-tools-standalone-main-images|Deck>.'
+
+  # 3. Resolve (failure -> later success): fail at t=30m (fires), success at t=90m
+  #    -> resolves once the success is the latest transition.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x200'
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="success"}'
+        values: '0+0x89 1+0x140'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: ci-tools-image-build-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-ci-tools-main-images
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'The ci-tools image postsubmit branch-ci-openshift-ci-tools-main-images is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job=branch-ci-openshift-ci-tools-main-images|Deck>.'
+      - eval_time: 150m
+        alertname: ci-tools-image-build-failures
+        exp_alerts: []
+
+  # 4. Negative: a PRESUBMIT (pull-ci) image build failing must NOT fire this alert.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="pull-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: ci-tools-image-build-failures
+        exp_alerts: []

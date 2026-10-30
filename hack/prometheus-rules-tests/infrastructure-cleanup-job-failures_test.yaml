@@ -1,0 +1,110 @@
+# promtool unit tests for infrastructure-cleanup-job-failures.
+# The alert compares the timestamp of each job's most recent terminal failure vs
+# its most recent success (last_failure > last_success, or never succeeded), NOT
+# merely "a failure in the window and no success in the window". Cases 2 and 3 are
+# the regressions CodeRabbit asked for: a failure followed by a success must
+# RESOLVE, and a success followed by a later failure must still FIRE.
+# ops_color/ops_category come from the shared infraJobAnnotations templates (yellow
+# for the cleanup family, orange otherwise; cloud_cleanup for deprovision/cloud jobs,
+# ci_platform for the pruner).
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. GCP deprovision fails (increment at t=30m), never succeeds -> fires; cleanup
+  #    family => ops_color yellow, ops_category cloud_cleanup.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="periodic-ipi-deprovision-gcp", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: periodic-ipi-deprovision-gcp
+            exp_annotations:
+              ops_color: yellow
+              ops_category: cloud_cleanup
+              message: 'Cleanup/cloud CI job periodic-ipi-deprovision-gcp is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.'
+
+  # 2. REGRESSION (failure -> later success): fail at t=30m (fires), success at
+  #    t=90m -> resolves once the success is the latest transition.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="periodic-ipi-deprovision-gcp", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x200'
+      - series: 'prowjob_state_transitions{job_name="periodic-ipi-deprovision-gcp", job="prow-controller-manager", state="success"}'
+        values: '0+0x89 1+0x140'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: periodic-ipi-deprovision-gcp
+            exp_annotations:
+              ops_color: yellow
+              ops_category: cloud_cleanup
+              message: 'Cleanup/cloud CI job periodic-ipi-deprovision-gcp is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.'
+      - eval_time: 150m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts: []
+
+  # 3. REGRESSION (success -> later failure): success at t=30m, fail at t=90m. The
+  #    old window-contains rule stayed silent (a success was in the window); the
+  #    latest-transition rule must FIRE because the newest transition is a failure.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="periodic-ipi-deprovision-gcp", job="prow-controller-manager", state="success"}'
+        values: '0+0x29 1+0x200'
+      - series: 'prowjob_state_transitions{job_name="periodic-ipi-deprovision-gcp", job="prow-controller-manager", state="failure"}'
+        values: '0+0x89 1+0x140'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: periodic-ipi-deprovision-gcp
+            exp_annotations:
+              ops_color: yellow
+              ops_category: cloud_cleanup
+              message: 'Cleanup/cloud CI job periodic-ipi-deprovision-gcp is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.'
+
+  # 4. qci-pruner fails -> not in the cleanup/cloud families => ops_color orange,
+  #    ops_category ci_platform.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="periodic-openshift-release-qci-pruner", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: periodic-openshift-release-qci-pruner
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'Cleanup/cloud CI job periodic-openshift-release-qci-pruner is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job=periodic-openshift-release-qci-pruner|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.'
+
+  # 5. konflux hypershift deprovision fails -> cloud family (not cleanup) => ops_color
+  #    orange, ops_category cloud_cleanup.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="periodic-hypershift-deprovision-aws-konflux-stg-hosted-mgmt", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: infrastructure-cleanup-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: periodic-hypershift-deprovision-aws-konflux-stg-hosted-mgmt
+            exp_annotations:
+              ops_color: orange
+              ops_category: cloud_cleanup
+              message: 'Cleanup/cloud CI job periodic-hypershift-deprovision-aws-konflux-stg-hosted-mgmt is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job=periodic-hypershift-deprovision-aws-konflux-stg-hosted-mgmt|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.'
