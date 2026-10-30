@@ -113,7 +113,7 @@ trap 'cleanup_s3_bucket; eval "${_saved_exit_trap_body}"' EXIT
 
 QUAY_S3_CLEANUP_NEEDED=true
 
-# Bounded retry for S3 BucketAlreadyExists (409) conflicts
+# Bounded retry for S3 bucket-name collisions (409: BucketAlreadyExists / BucketAlreadyOwnedByYou)
 max_retries=3
 retry=0
 tf_exit=0
@@ -123,7 +123,7 @@ while (( retry < max_retries )); do
   if (( tf_exit == 0 )); then
     break
   fi
-  if grep -q "BucketAlreadyExists" /tmp/tf_apply.log; then
+  if grep -Eq "BucketAlready(Exists|OwnedByYou)" /tmp/tf_apply.log; then
     retry=$((retry + 1))
     if (( retry >= max_retries )); then
       echo "Terraform apply failed after ${max_retries} retries due to S3 bucket conflict" >&2
