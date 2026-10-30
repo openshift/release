@@ -1,31 +1,23 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
-  cron: 0 9 * * *
+  cluster: build13
+  cron: '@yearly'
   decorate: true
   decoration_config:
     sparse_checkout_files:
     - .ci-operator.yaml
-    - images/baremetal/Dockerfile.ci
-    - images/installer/Dockerfile.ci
-    - images/installer/Dockerfile.upi.ci
-    - images/libvirt/Dockerfile.ci
-    - images/openstack/Dockerfile.ci
   extra_refs:
   - base_ref: main
     org: openshift
-    repo: installer
+    repo: ci-tools
     sparse_checkout_files:
     - .ci-operator.yaml
-    - images/baremetal/Dockerfile.ci
-    - images/installer/Dockerfile.ci
-    - images/installer/Dockerfile.upi.ci
-    - images/libvirt/Dockerfile.ci
-    - images/openstack/Dockerfile.ci
   labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-installer-main-periodic-jira-agent
+  name: periodic-ci-openshift-ci-tools-main-agentic-periodic-jira-agent
   spec:
     containers:
     - args:
@@ -37,8 +29,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --target=periodic-jira-agent
+      - --variant=agentic
       command:
       - ci-operator
       env:
@@ -58,9 +50,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -88,9 +77,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config
@@ -110,32 +96,24 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build13
   cron: '@yearly'
   decorate: true
   decoration_config:
     sparse_checkout_files:
     - .ci-operator.yaml
-    - images/baremetal/Dockerfile.ci
-    - images/installer/Dockerfile.ci
-    - images/installer/Dockerfile.upi.ci
-    - images/libvirt/Dockerfile.ci
-    - images/openstack/Dockerfile.ci
   extra_refs:
   - base_ref: main
     org: openshift
-    repo: installer
+    repo: ci-tools
     sparse_checkout_files:
     - .ci-operator.yaml
-    - images/baremetal/Dockerfile.ci
-    - images/installer/Dockerfile.ci
-    - images/installer/Dockerfile.upi.ci
-    - images/libvirt/Dockerfile.ci
-    - images/openstack/Dockerfile.ci
   labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-installer-main-periodic-review-agent
+  name: periodic-ci-openshift-ci-tools-main-agentic-periodic-pr-followup-agent
   spec:
     containers:
     - args:
@@ -147,8 +125,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=periodic-review-agent
+      - --target=periodic-pr-followup-agent
+      - --variant=agentic
       command:
       - ci-operator
       env:
@@ -168,9 +146,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -198,9 +173,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config

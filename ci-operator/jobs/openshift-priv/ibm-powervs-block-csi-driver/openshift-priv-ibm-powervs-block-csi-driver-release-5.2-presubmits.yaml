@@ -1,12 +1,12 @@
 presubmits:
-  openshift-priv/azure-file-csi-driver-operator:
+  openshift-priv/ibm-powervs-block-csi-driver:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
-    context: ci/prow/e2e-azure-file-csi
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build07
+    context: ci/prow/images
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -15,16 +15,80 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
-      - Dockerfile.test
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-file-csi-driver-operator-release-4.11-e2e-azure-file-csi
-    path_alias: github.com/openshift/azure-file-csi-driver-operator
-    rerun_command: /test e2e-azure-file-csi
+    name: pull-ci-openshift-priv-ibm-powervs-block-csi-driver-release-5.2-images
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build07
+    context: ci/prow/security
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.openshift
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-ibm-powervs-block-csi-driver-release-5.2-security
+    optional: true
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
+    rerun_command: /test security
     spec:
       containers:
       - args:
@@ -38,7 +102,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-file-csi
+        - --target=security
         command:
         - ci-operator
         env:
@@ -112,80 +176,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-file-csi,?($|\s.*)
+    trigger: (?m)^/test( | .* )security,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.openshift
-      - Dockerfile.test
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-file-csi-driver-operator-release-4.11-images
-    path_alias: github.com/openshift/azure-file-csi-driver-operator
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build07
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -195,13 +192,12 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
-      - Dockerfile.test
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-file-csi-driver-operator-release-4.11-unit
-    path_alias: github.com/openshift/azure-file-csi-driver-operator
+    name: pull-ci-openshift-priv-ibm-powervs-block-csi-driver-release-5.2-unit
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
     rerun_command: /test unit
     spec:
       containers:
@@ -258,9 +254,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build07
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -270,13 +266,12 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
-      - Dockerfile.test
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-file-csi-driver-operator-release-4.11-verify
-    path_alias: github.com/openshift/azure-file-csi-driver-operator
+    name: pull-ci-openshift-priv-ibm-powervs-block-csi-driver-release-5.2-verify
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
     rerun_command: /test verify
     spec:
       containers:
@@ -333,9 +328,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
+    - ^release-5\.2$
+    - ^release-5\.2-
+    cluster: build07
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
@@ -345,13 +340,12 @@ presubmits:
       sparse_checkout_files:
       - .ci-operator.yaml
       - Dockerfile.openshift
-      - Dockerfile.test
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-file-csi-driver-operator-release-4.11-verify-deps
-    path_alias: github.com/openshift/azure-file-csi-driver-operator
+    name: pull-ci-openshift-priv-ibm-powervs-block-csi-driver-release-5.2-verify-deps
+    path_alias: sigs.k8s.io/ibm-powervs-block-csi-driver
     rerun_command: /test verify-deps
     spec:
       containers:

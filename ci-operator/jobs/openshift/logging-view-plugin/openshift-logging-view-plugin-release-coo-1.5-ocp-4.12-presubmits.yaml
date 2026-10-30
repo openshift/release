@@ -1,21 +1,21 @@
 presubmits:
-  openshift/openshift-mcp-server:
+  openshift/logging-view-plugin:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.2\.0$
-    - ^release-0\.2\.0-
+    - ^release-coo-1\.5-ocp-4\.12$
+    - ^release-coo-1\.5-ocp-4\.12-
     cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - .ci-operator.yaml
       - Dockerfile.ci
+      - Dockerfile.cypress
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.2.0-images
+    name: pull-ci-openshift-logging-view-plugin-release-coo-1.5-ocp-4.12-images
     rerun_command: /test images
     spec:
       containers:
@@ -60,19 +60,19 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.2\.0$
-    - ^release-0\.2\.0-
+    - ^release-coo-1\.5-ocp-4\.12$
+    - ^release-coo-1\.5-ocp-4\.12-
     cluster: build04
     context: ci/prow/lint
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - .ci-operator.yaml
       - Dockerfile.ci
+      - Dockerfile.cypress
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.2.0-lint
+    name: pull-ci-openshift-logging-view-plugin-release-coo-1.5-ocp-4.12-lint
     rerun_command: /test lint
     spec:
       containers:
@@ -123,36 +123,29 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-0\.2\.0$
-    - ^release-0\.2\.0-
+    - ^release-coo-1\.5-ocp-4\.12$
+    - ^release-coo-1\.5-ocp-4\.12-
     cluster: build04
-    context: ci/prow/security
+    context: ci/prow/test-e2e
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - .ci-operator.yaml
       - Dockerfile.ci
+      - Dockerfile.cypress
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.2.0-security
-    optional: true
-    rerun_command: /test security
-    skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+    name: pull-ci-openshift-logging-view-plugin-release-coo-1.5-ocp-4.12-test-e2e
+    rerun_command: /test test-e2e
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=security
+        - --target=test-e2e
         command:
         - ci-operator
         env:
@@ -170,17 +163,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -193,21 +177,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -217,31 +186,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )test-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.2\.0$
-    - ^release-0\.2\.0-
+    - ^release-coo-1\.5-ocp-4\.12$
+    - ^release-coo-1\.5-ocp-4\.12-
     cluster: build04
-    context: ci/prow/test
+    context: ci/prow/test-unit
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - .ci-operator.yaml
       - Dockerfile.ci
+      - Dockerfile.cypress
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-openshift-mcp-server-release-0.2.0-test
-    rerun_command: /test test
+    name: pull-ci-openshift-logging-view-plugin-release-coo-1.5-ocp-4.12-test-unit
+    rerun_command: /test test-unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test
+        - --target=test-unit
         command:
         - ci-operator
         env:
@@ -282,4 +251,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)

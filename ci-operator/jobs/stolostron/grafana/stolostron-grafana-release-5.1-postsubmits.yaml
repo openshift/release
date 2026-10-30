@@ -1,23 +1,19 @@
 postsubmits:
-  openshift/ibm-roks-toolkit:
+  stolostron/grafana:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
+    - ^release-5\.1$
     cluster: build01
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - DockerCITest
-      - Dockerfile
-      - Dockerfile.cpoperator
-      - Dockerfile.metrics
-      - hack/releaser/Dockerfile
+      - Dockerfile.ocp
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-ibm-roks-toolkit-release-4.6-images
+    name: branch-ci-stolostron-grafana-release-5.1-images
     spec:
       containers:
       - args:
@@ -68,20 +64,16 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.6$
+    - ^release-5\.1$
     cluster: build01
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - DockerCITest
-      - Dockerfile
-      - Dockerfile.cpoperator
-      - Dockerfile.metrics
-      - hack/releaser/Dockerfile
+      - Dockerfile.ocp
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-ibm-roks-toolkit-release-4.6-makerelease
+    name: branch-ci-stolostron-grafana-release-5.1-publish
     spec:
       containers:
       - args:
@@ -93,8 +85,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=makerelease
+        - --target=publish
         command:
         - ci-operator
         env:
@@ -114,9 +105,6 @@ postsubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -144,9 +132,6 @@ postsubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - configMap:
           name: gsm-config
         name: gsm-config

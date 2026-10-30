@@ -1,26 +1,31 @@
 presubmits:
-  openshift/image-customization-controller:
+  openshift/assisted-installer:
   - agent: kubernetes
     always_run: false
+    annotations:
+      pipeline_skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build10
-    context: ci/prow/e2e-metal-ipi
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build06
+    context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-e2e-metal-ipi
-    rerun_command: /test e2e-metal-ipi
-    skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-e2e-ai-operator-ztp
+    optional: true
+    rerun_command: /test e2e-ai-operator-ztp
     spec:
       containers:
       - args:
@@ -33,7 +38,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi
+        - --target=e2e-ai-operator-ztp
         command:
         - ci-operator
         env:
@@ -104,41 +109,35 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ai-operator-ztp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build10
-    context: ci/prow/e2e-metal-ipi-serial-ipv4
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build04
+    context: ci/prow/format-check
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
     labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-e2e-metal-ipi-serial-ipv4
-    rerun_command: /test e2e-metal-ipi-serial-ipv4
-    skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-format-check
+    rerun_command: /test format-check
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-serial-ipv4
+        - --target=format-check
         command:
         - ci-operator
         env:
@@ -156,20 +155,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -182,24 +169,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -209,23 +178,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-serial-ipv4,?($|\s.*)
+    trigger: (?m)^/test( | .* )format-check,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build02
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-images
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-images
     rerun_command: /test images
     spec:
       containers:
@@ -234,7 +206,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -269,22 +240,26 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build02
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-lint
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-lint
     rerun_command: /test lint
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -334,43 +309,37 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build02
-    context: ci/prow/unit
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build04
+    context: ci/prow/mce-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-controller
     labels:
+      ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-unit
-    rerun_command: /test unit
-    skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-mce-images
+    rerun_command: /test mce-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=[images]
+        - --variant=mce
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
@@ -398,32 +367,39 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.10$
-    - ^release-4\.10-
-    cluster: build02
-    context: ci/prow/vendor
+    - ^backplane-5\.0$
+    - ^backplane-5\.0-
+    cluster: build04
+    context: ci/prow/unit-test
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile
+      - Dockerfile.assisted-installer
+      - Dockerfile.assisted-installer-build
+      - Dockerfile.assisted-installer-controller
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-image-customization-controller-release-4.10-vendor
-    rerun_command: /test vendor
-    run_if_changed: (go\.(mod|sum)$)|(^vendor/)
+    name: pull-ci-openshift-assisted-installer-backplane-5.0-unit-test
+    rerun_command: /test unit-test
+    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=vendor
+        - --target=unit-test
         command:
         - ci-operator
         env:
@@ -444,6 +420,12 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -455,6 +437,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -464,4 +455,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )vendor,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)

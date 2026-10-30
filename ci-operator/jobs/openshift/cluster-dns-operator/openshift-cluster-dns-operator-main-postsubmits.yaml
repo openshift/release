@@ -1,20 +1,20 @@
 postsubmits:
-  rh-ecosystem-edge/console-plugin-nvidia-gpu:
+  openshift/cluster-dns-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.3\.0$
-    cluster: build05
+    - ^main$
+    cluster: build08
     decorate: true
     decoration_config:
       sparse_checkout_files:
+      - .ci-operator.yaml
       - Dockerfile
     labels:
-      capability/arm64: arm64
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-rh-ecosystem-edge-console-plugin-nvidia-gpu-release-0.3.0-images
+    name: branch-ci-openshift-cluster-dns-operator-main-images
     spec:
       containers:
       - args:
@@ -65,57 +65,39 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.3\.0$
-    cluster: build04
+    - ^main$
+    cluster: build08
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfile
     labels:
-      capability/arm64: arm64
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-rh-ecosystem-edge-console-plugin-nvidia-gpu-release-0.3.0-mirror-vcsref-image
+    name: branch-ci-openshift-cluster-dns-operator-main-okd-scos-images
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=mirror-vcsref-image
+        - --target=[images]
+        - --variant=okd-scos
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -123,32 +105,23 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator

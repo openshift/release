@@ -1,21 +1,20 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
-  cron: 0 4 * * *
+  cluster: build12
+  cron: '@yearly'
   decorate: true
   decoration_config:
-    sparse_checkout_files:
-    - ci/Containerfile
+    skip_cloning: true
   extra_refs:
   - base_ref: main
-    org: openshift-online
-    repo: rosa-hyperfleet
-    sparse_checkout_files:
-    - ci/Containerfile
+    org: openshift-eng
+    repo: ship-status-dash
   labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-hyperfleet-main-nightly-ephemeral
+  name: periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-jira-agent
   spec:
     containers:
     - args:
@@ -27,8 +26,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=nightly-ephemeral
+      - --target=periodic-ship-status-dash-jira-agent
+      - --variant=agentic
       command:
       - ci-operator
       env:
@@ -48,9 +47,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -78,9 +74,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config
@@ -100,22 +93,21 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 0 4 * * *
+  cluster: build12
+  cron: '@yearly'
   decorate: true
   decoration_config:
-    sparse_checkout_files:
-    - ci/Containerfile
+    skip_cloning: true
   extra_refs:
   - base_ref: main
-    org: openshift-online
-    repo: rosa-hyperfleet
-    sparse_checkout_files:
-    - ci/Containerfile
+    org: openshift-eng
+    repo: ship-status-dash
   labels:
+    capability/nested-podman: nested-podman
+    ci-operator.openshift.io/variant: agentic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-hyperfleet-main-nightly-integration
+  name: periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-pr-followup-agent
   spec:
     containers:
     - args:
@@ -127,8 +119,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=nightly-integration
+      - --target=periodic-ship-status-dash-pr-followup-agent
+      - --variant=agentic
       command:
       - ci-operator
       env:
@@ -148,9 +140,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -178,9 +167,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config
