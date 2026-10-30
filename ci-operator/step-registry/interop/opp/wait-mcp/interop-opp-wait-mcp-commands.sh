@@ -543,6 +543,11 @@ def redact(o):
                 # the string bypasses the dict walker, so the whole raw
                 # template is replaced (preflight review).
                 out[k] = "REDACTED (raw object templates)"
+            elif k.endswith("last-applied-configuration") and isinstance(v, str):
+                # oc-apply annotations carry the full applied object as a
+                # JSON string - including any embedded Secret data; the
+                # whole annotation is replaced (preflight review).
+                out[k] = "REDACTED (last-applied-configuration)"
             else:
                 out[k] = redact(v)
         return out
