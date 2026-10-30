@@ -145,6 +145,7 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
 fi
 EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
+EXTRA_FLAGS+=" --log-level=debug"
 if [[ "${UDN_BGP_LAYER2}" == "true" ]]; then
   EXTRA_FLAGS+=" --layer2"
 fi
