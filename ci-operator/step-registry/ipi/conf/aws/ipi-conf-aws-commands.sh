@@ -465,6 +465,15 @@ if [[ "${DEDICATED_HOST}" == "yes" ]]; then
     exit
   fi
 
+  # Candidate zones for dedicated-host fallback allocation: the install-config's
+  # ZONES (computed earlier) requires a zone to offer the bootstrap,
+  # control-plane, AND compute instance types together, and is truncated to
+  # ZONES_COUNT entries -- neither constraint is appropriate here, since
+  # bootstrap and control-plane machines stay in their originally configured
+  # zones and only the compute instance type matters for a fallback zone.
+  mapfile -t COMPUTE_TYPE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort -u)
+  mapfile -t ELIGIBLE_ZONES < <(comm -12 <(printf '%s\n' "${AVAILABILITY_ZONES[@]}") <(printf '%s\n' "${COMPUTE_TYPE_ZONES[@]}"))
+
   cat > "${patch_dedicated_host}" << EOF
 compute:
 - name: worker
@@ -530,12 +539,45 @@ EOF
       --resources "${HOST_ID}" \
       --tags "Key=${USAGE_TAG_KEY},Value=${JOB_NAME_SAFE}"
   else
-    # No available host found, try to allocate a new one in the first available zone
+    # No available host found, try to allocate a new one.
+    # Prefer the zones already configured for the worker pool, but dedicated
+    # host capacity is zone-specific and shifts over time, so if none of
+    # those zones currently have spare capacity for this instance type, fall
+    # back to any other zone in the region that supports it rather than
+    # failing the job outright. Worker zones and fallback zones are tracked
+    # in separate queues, and the fallback queue is only drained once the
+    # worker queue is empty, so a fallback zone (which pins the worker pool
+    # outside its originally configured zones) is never tried ahead of an
+    # untried, already-configured worker zone.
+    declare -a WORKER_ZONE_QUEUE=()
+    for z in ${WORKER_ZONES}; do
+      WORKER_ZONE_QUEUE+=("${z}")
+    done
+    declare -a FALLBACK_ZONE_QUEUE=()
+    for fallback_zone in "${ELIGIBLE_ZONES[@]}"; do
+      if ! echo "${WORKER_ZONES}" | grep -qw "${fallback_zone}"; then
+        FALLBACK_ZONE_QUEUE+=("${fallback_zone}")
+      fi
+    done
+
     echo "No available existing hosts found. Attempting to allocate new host..."
     HOST_ID=""
     zone=""
+    declare -A TRIED_ZONES=()
 
-    for candidate_zone in ${WORKER_ZONES}; do
+    while [[ ${#WORKER_ZONE_QUEUE[@]} -gt 0 || ${#FALLBACK_ZONE_QUEUE[@]} -gt 0 ]]; do
+      if [[ ${#WORKER_ZONE_QUEUE[@]} -gt 0 ]]; then
+        candidate_zone="${WORKER_ZONE_QUEUE[0]}"
+        WORKER_ZONE_QUEUE=("${WORKER_ZONE_QUEUE[@]:1}")
+      else
+        candidate_zone="${FALLBACK_ZONE_QUEUE[0]}"
+        FALLBACK_ZONE_QUEUE=("${FALLBACK_ZONE_QUEUE[@]:1}")
+      fi
+      if [[ -n "${TRIED_ZONES[${candidate_zone}]:-}" ]]; then
+        continue
+      fi
+      TRIED_ZONES[${candidate_zone}]=1
+
       echo "Attempting to allocate dedicated host in zone '${candidate_zone}'..."
 
       EXPIRATION_DATE=$(date -d '6 hours' --iso=minutes --utc)
@@ -558,11 +600,31 @@ EOF
         break
       else
         echo "Failed to allocate host in zone ${candidate_zone}: ${HOST_RESULT}"
+
+        # AWS's InsufficientHostCapacity error names other zones that
+        # currently have capacity for this instance type (e.g. "You can
+        # currently get m6a.xlarge capacity by specifying us-west-2a,
+        # us-west-2b in your request."). That's a live capacity signal more
+        # authoritative than our static candidate list, so try those zones
+        # next instead of working through the rest of the list blindly.
+        SUGGESTED_ZONES=$(echo "${HOST_RESULT}" | sed -n 's/.*specifying \(.*\) in your request\..*/\1/p' | tr -d ',')
+        for suggested_zone in ${SUGGESTED_ZONES}; do
+          if [[ -n "${TRIED_ZONES[${suggested_zone}]:-}" ]]; then
+            continue
+          fi
+          if echo "${WORKER_ZONES}" | grep -qw "${suggested_zone}"; then
+            echo "AWS suggested worker zone '${suggested_zone}' has capacity; trying it next"
+            WORKER_ZONE_QUEUE=("${suggested_zone}" "${WORKER_ZONE_QUEUE[@]}")
+          else
+            echo "AWS suggested fallback zone '${suggested_zone}' has capacity; trying it after remaining worker zones"
+            FALLBACK_ZONE_QUEUE=("${suggested_zone}" "${FALLBACK_ZONE_QUEUE[@]}")
+          fi
+        done
       fi
     done
 
     if [[ -z "${HOST_ID}" ]]; then
-      echo "ERROR: Failed to allocate dedicated host in any zone"
+      echo "ERROR: Failed to allocate dedicated host in any zone in region ${aws_source_region}"
       exit 1
     fi
   fi
@@ -577,6 +639,14 @@ EOF
   echo "Patching install-config.yaml for dedicated hosts."
   yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
   cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
+
+  # Only one dedicated host is allocated/claimed above, and it only exists in
+  # a single zone. Pin the worker pool's zones to that zone directly on
+  # ${CONFIG} (rather than via the yq-go merge above): "yq-go m -x" merges
+  # arrays by index, so a one-element zones patch only overwrites index 0 of
+  # an existing multi-zone list, leaving stale zones (without the dedicated
+  # host) in place for the installer to schedule workers into.
+  zone="${zone}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.zones = [ strenv(zone) ])' "${CONFIG}"
 fi
 
 # Configure dual-stack networking if IP_FAMILY is set
