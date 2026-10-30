@@ -181,7 +181,7 @@ typeset -a readyHistory=()
 typeset -a updatedHistory=()
 typeset -a machineCountHistory=()
 typeset -i _renderChurnCount=0
-typeset -i _lastGenSum=-1
+typeset _lastGenPrint=""
 typeset -i _signatureRepeat=0
 typeset -i _bundleCollected=0
 _lastSignatureReason=""
@@ -688,7 +688,7 @@ total_ready = 0
 total_updated = 0
 total_machine = 0
 any_degraded = 0
-gen_sum = 0
+gen_parts = []
 for mcp in data.get('items', []):
     name = mcp['metadata']['name']
     paused = mcp.get('spec', {}).get('paused', False)
@@ -705,7 +705,10 @@ for mcp in data.get('items', []):
     unavailable = status.get('unavailableMachineCount', 0)
     generation = mcp['metadata'].get('generation', 0)
     observed = status.get('observedGeneration', -1)
-    gen_sum += generation
+    # Per-pool generation fingerprint (sorted name=gen pairs), not a sum:
+    # a replaced pool (one removed, another created, both generation 1)
+    # keeps the sum unchanged and would hide the churn (preflight review).
+    gen_parts.append(f'{name}={generation}')
     total_ready += ready
     total_updated += updated
     total_machine += total
@@ -718,34 +721,35 @@ for mcp in data.get('items', []):
             or observed != generation):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
-    print('UNSTABLE|' + '; '.join(issues) + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + str(gen_sum))
+    print('UNSTABLE|' + '; '.join(issues) + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
 else:
-    print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + str(gen_sum))
-" 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|-1"
+    print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
+" 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
 
     typeset statusKey="${statusLine%%|*}"
-    # statusLine = KEY|detail|ready|updated|machine|degraded|genSum
-    typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0 genSum=-1
-    typeset _detail="" _degField=""
-    IFS='|' read -r _statusKeyField _detail totalReady totalUpdated totalMachine _degField genSum <<< "${statusLine}"
+    # statusLine = KEY|detail|ready|updated|machine|degraded|genPrint
+    typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0
+    typeset _detail="" _degField="" genPrint=""
+    IFS='|' read -r _statusKeyField _detail totalReady totalUpdated totalMachine _degField genPrint <<< "${statusLine}"
     statusKey="${_statusKeyField}"
     typeset statusDetail="${_detail}"
     [[ "${totalReady}" =~ ^[0-9]+$ ]] || totalReady=0
     [[ "${totalUpdated}" =~ ^[0-9]+$ ]] || totalUpdated=0
     [[ "${totalMachine}" =~ ^[0-9]+$ ]] || totalMachine=0
     [[ "${_degField}" =~ ^[0-9]+$ ]] && anyDegraded=$(( _degField ))
-    [[ "${genSum}" =~ ^-?[0-9]+$ ]] || genSum=-1
     # Window reset on desired-config change (render churn); count churn runs.
-    if (( _lastGenSum >= 0 && genSum >= 0 && genSum != _lastGenSum )); then
+    # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
+    # changes it even when a numeric sum would not (preflight review).
+    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
         (( ++_renderChurnCount )) || true
-        echo "Render churn detected (generation sum ${_lastGenSum} -> ${genSum}, churn #${_renderChurnCount}); resetting trend window"
+        echo "Render churn detected (generations ${_lastGenPrint} -> ${genPrint}, churn #${_renderChurnCount}); resetting trend window"
         readyHistory=()
         updatedHistory=()
         machineCountHistory=()
         degradedHistory=()
         consecutivePasses=0
     fi
-    _lastGenSum=${genSum}
+    _lastGenPrint="${genPrint}"
     readyHistory+=("${totalReady}")
     updatedHistory+=("${totalUpdated}")
     machineCountHistory+=("${totalMachine}")
