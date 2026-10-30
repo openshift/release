@@ -1,0 +1,25 @@
+workflow:
+  as: kuadrant-s390x
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: kuadrant-s390x-test
+    post:
+    - ref: kuadrant-s390x-cleanup
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    End-to-end workflow for the Kuadrant (RHCL) operator on the s390x (IBM Z)
+    architecture. It provisions an OCP cluster on the VPN'd IBM-Z CI environment
+    using the same UPI/libvirt pre and post steps as openshift-e2e-libvirt-vpn,
+    then installs OpenShift Service Mesh 3.x, the Kuadrant operator (including the
+    Authorino, Limitador and DNS operators) and the Kuadrant testing tools, and
+    finally runs the Kuadrant end-to-end testsuite. Component cleanup runs first in
+    the post phase, followed by log gathering and cluster deprovisioning.
