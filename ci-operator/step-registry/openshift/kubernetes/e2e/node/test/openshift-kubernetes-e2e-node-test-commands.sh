@@ -17,9 +17,11 @@ timeout 5m bash -c "until ssh -q ${SSHOPTS[*]} ${IP} exit; do sleep 10; done"
 
 # The upstream remote runner expects a host with a running container runtime; it
 # takes care of CNI, firewall, SELinux labels and the kubelet itself. CRI-O is
-# installed with its own CI playbook, same as the cri-o-node-e2e-* jobs.
+# installed with its own CI playbooks: setup-main.yml installs the build
+# dependencies (what the nightly cri-o-setup job bakes into crio-setup images),
+# then CRI-O is built and started the same way as in the cri-o-node-e2e-* jobs.
 echo "Installing CRI-O ${CRIO_REF} on ${IP}"
-timeout --kill-after 10m 90m ssh "${SSHOPTS[@]}" "${IP}" -- bash - <<EOF
+timeout --kill-after 10m 150m ssh "${SSHOPTS[@]}" "${IP}" -- bash - <<EOF
 set -xeuo pipefail
 export PATH="\${HOME}/.local/bin:\${PATH}"
 sudo dnf install -y python3.11 git
@@ -34,6 +36,7 @@ sudo chown "\$(id -u)" "\${SOURCE_DIR}"
 git clone --depth 1 --branch "${CRIO_REF}" https://github.com/cri-o/cri-o.git "\${SOURCE_DIR}"
 cd "\${SOURCE_DIR}/contrib/test/ci"
 echo "localhost" >> hosts
+ansible-playbook setup-main.yml --connection=local
 cat > install-crio.yml <<'PLAYBOOK'
 ---
 - hosts: localhost, all

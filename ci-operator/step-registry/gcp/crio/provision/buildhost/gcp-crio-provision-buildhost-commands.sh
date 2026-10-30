@@ -111,7 +111,7 @@ for zone in ${ZONES}; do
 	if gcloud compute instances create "${server_name}" \
 		${IMAGE_ARGS} \
 		--boot-disk-type hyperdisk-balanced \
-		--boot-disk-size=200GB \
+		--boot-disk-size=${BOOT_DISK_SIZE} \
 		--machine-type=${MACHINE_TYPE} \
 		--metadata ssh-keys="${SSH_USER}:${SSH_PUB_KEY}" \
 		--network=${NETWORK} \

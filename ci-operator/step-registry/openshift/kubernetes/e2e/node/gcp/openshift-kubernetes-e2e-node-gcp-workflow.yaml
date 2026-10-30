@@ -10,8 +10,12 @@ workflow:
       - ref: gcp-crio-deprovision-buildhost
       - ref: gcp-crio-deprovision-vpc
     env:
-      IMAGE_FAMILY: "crio-setup"
+      # The prebuilt crio-setup images are snapshots of 200GB disks, whose >1e8 inodes
+      # break the Summary API NodeConformance test. Start from the base image instead
+      # and let the test step install CRI-O's build dependencies.
+      IMAGE_NAME: "rhel-9-crio-ci"
       IMAGE_PROJECT: "openshift-node-devel"
+      BOOT_DISK_SIZE: "50GB"
   documentation: |-
     The Kubernetes node E2E workflow provisions a single GCP VM (no OpenShift cluster), installs CRI-O on
     it, and runs test/e2e_node built from the openshift/kubernetes fork against it over SSH.
