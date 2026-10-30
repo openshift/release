@@ -78,12 +78,34 @@ resource "google_sql_database_instance" "instance" {
 EOF
   cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
   terraform init || return 1
-  # Tolerant import: a never-created or already-deleted instance must not
-  # abort cleanup (the state check below skips destroy when it failed).
-  terraform import google_sql_database_instance.instance "${GCP_PROJECT}/${instance_name}" || true
-  if ! terraform state list | grep -q google_sql_database_instance; then
+  # Import the instance by its persisted name. Only a confirmed "remote
+  # object does not exist" counts as nothing to clean up: any other import
+  # failure (transient API error, bad credentials) must fail the step so
+  # manual cleanup is flagged instead of silently reported as success.
+  local import_log
+  import_log="$(mktemp)"
+  if terraform import google_sql_database_instance.instance "${GCP_PROJECT}/${instance_name}" >"${import_log}" 2>&1; then
+    echo "Imported google_sql_database_instance.instance (${instance_name})."
+  elif grep -qE "Cannot import non-existent remote object|googleapi: Error 404" "${import_log}"; then
     echo "Instance ${instance_name} not found in project ${GCP_PROJECT}; nothing to clean up."
+    rm -f "${import_log}"
     return 0
+  else
+    echo "ERROR: terraform import failed for instance ${instance_name}; the instance may still exist and need manual cleanup:" >&2
+    cat "${import_log}" >&2
+    rm -f "${import_log}"
+    return 1
+  fi
+  rm -f "${import_log}"
+  # A failing state list must not be read as an empty state.
+  local state_list
+  if ! state_list="$(terraform state list)"; then
+    echo "ERROR: terraform state list failed after import." >&2
+    return 1
+  fi
+  if ! grep -q google_sql_database_instance <<<"${state_list}"; then
+    echo "ERROR: instance missing from Terraform state after a successful import." >&2
+    return 1
   fi
   terraform destroy -auto-approve
 }
@@ -115,7 +137,24 @@ echo "Destroying Google Cloud SQL database..."
 export TF_VAR_database_password="${TF_VAR_database_password:-dummypass}"
 
 terraform init
-terraform state list
+state_list="$(terraform state list)" || { echo "ERROR: terraform state list failed on the archived state." >&2; exit 1; }
+echo "${state_list}"
+
+# The archive can predate the instance: a step that died during apply still
+# archives an empty/partial state via its EXIT trap, while GCP may be
+# mid-creating the instance. When the state has no instance but the
+# persisted identifier exists, fall back to identifier-based cleanup so the
+# in-flight instance is still deleted.
+if ! grep -q google_sql_database_instance <<<"${state_list}" \
+   && [[ -f "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME" ]]; then
+  echo "Archived state has no instance; falling back to identifier-based cleanup." >&2
+  if ! cleanup_by_identifiers; then
+    echo "ERROR: identifier cleanup failed; the instance may need manual cleanup." >&2
+    exit 1
+  fi
+  echo "Google Cloud SQL database destroyed successfully via identifier fallback"
+  exit 0
+fi
 
 # Workaround for known terraform-provider-google destroy issues (both hit in
 # QE before, see the original quay-tests/resource/deprovisioning/gcp-sql step):
