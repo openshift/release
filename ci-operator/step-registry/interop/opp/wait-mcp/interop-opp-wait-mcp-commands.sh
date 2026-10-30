@@ -73,10 +73,13 @@ _junit_emit() {
   local _jn="wait-mcp"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
-  local _esc_reason="${_junit_reason//\"/&quot;}"
-  _esc_reason="${_esc_reason//</&lt;}"
-  _esc_reason="${_esc_reason//>/&gt;}"
-  local _esc_class="${_junit_class//\"/&quot;}"
+  # XML-escape via sed: bash >= 5.2 patsub_replacement expands a bare & in
+  # ${var//pat/repl} to the matched text (breaking &lt; into <lt;), and older
+  # bash keeps a backslash literally - sed's \& is unambiguous everywhere.
+  local _esc_reason
+  _esc_reason=$(printf '%s' "${_junit_reason}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g')
+  local _esc_class
+  _esc_class=$(printf '%s' "${_junit_class}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g')
   if (( _jr != 0 )); then
     _fc=1
     _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}</failure>"
@@ -94,7 +97,7 @@ _junit_emit() {
     <property name="extensions" value="${extensionsApplied}"/>
     <property name="mcp_wait_seconds" value="${_jd}"/>
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
-    <property name="final_class" value="${_junit_class}"/>
+    <property name="final_class" value="${_esc_class}"/>
   </properties>
   <testcase name="predicate-selftest" classname="lp-interop.OPP.${_jn}" time="0">
     ${_st_fx}
@@ -114,7 +117,7 @@ JUNITEOF
 # trap keeps the first recorded value (corrected idiom per the 9527/86592
 # precedent: capture the code first, set +e/+u, emit and bundle each guarded,
 # single trailing exit).
-trap 'if (( ! _jrc_set )); then _jrc=$?; _jrc_set=1; fi; set +e; set +u; _junit_emit "${_jrc}"; _opp_cleanup; exit "${_jrc}"' EXIT
+trap '_rc=$?; if (( ! _jrc_set )); then _jrc=${_rc}; _jrc_set=1; fi; set +e; set +u; _junit_emit "${_jrc}"; _opp_cleanup; exit "${_jrc}"' EXIT
 trap '_jrc=143; _jrc_set=1; exit 143' TERM INT
 
 # --- Bounded oc wrapper for diagnostic/failure-path calls: never hangs,
