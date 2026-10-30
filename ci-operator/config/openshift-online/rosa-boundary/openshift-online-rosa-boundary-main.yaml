@@ -60,6 +60,26 @@ images:
         - destination_dir: golang
           source_path: /usr/lib/golang/.
     to: localstack-test-runner
+  - dockerfile_literal: |
+      FROM src
+      USER 0
+      # components/trusted-actions is a separate Go module whose `make test`
+      # regenerates the OpenAPI bindings before running the tests, so the unit
+      # job needs Node alongside the Go toolchain that src already provides.
+      RUN dnf install -y --nodocs nodejs npm && dnf clean all
+      # Installed at image build time rather than at test time, matching
+      # lambda-test-runner above, so the job does not depend on the npm
+      # registry being reachable from the test pod.
+      WORKDIR /go/src/github.com/openshift-online/rosa-boundary/components/trusted-actions
+      RUN npm install
+      # Same reasoning for the Go side: code generation runs oapi-codegen with
+      # `go run`, so its module has to be in the cache before the test pod,
+      # which has no reason to reach proxy.golang.org.
+      RUN GOPATH=/tmp/go go mod download
+      WORKDIR /go/src/github.com/openshift-online/rosa-boundary
+      USER 1001
+    from: src
+    to: trusted-actions-test-runner
   skip_if_only_changed: ^(components/trusted-actions/|hcp-terraform/rosa-trusted-actions/|\.tekton/rosa-trusted-actions-)
 prowgen:
   expose: true
@@ -117,6 +137,32 @@ tests:
     collection: rosa-boundary
     group: ci
     mount_path: /etc/localstack-secret
+- as: trusted-actions-unit
+  commands: HOME=/tmp make -C components/trusted-actions test
+  container:
+    from: trusted-actions-test-runner
+  run_if_changed: ^components/trusted-actions/
+- as: e2e-rosa-classic-sts
+  cron: 0 2 * * *
+  reporter_config:
+    channel: '#rosa-zoa-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{.Spec.Job}} failed: <{{.Status.URL}}|logs>'
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      SOURCE_DIR: components/trusted-actions
+    workflow: rosa-trusted-actions-e2e-workflow
+- always_run: false
+  as: e2e-rosa-classic-sts-ondemand
+  optional: true
+  steps:
+    cluster_profile: rosa-e2e-01
+    env:
+      SOURCE_DIR: components/trusted-actions
+    workflow: rosa-trusted-actions-e2e-workflow
 - as: publish-coverage
   commands: |
     unset GOFLAGS
