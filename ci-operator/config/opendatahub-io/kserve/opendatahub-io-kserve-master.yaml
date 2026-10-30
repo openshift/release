@@ -344,6 +344,78 @@ tests:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       HYPERSHIFT_NODE_COUNT: "3"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/modh/must-gather:rhoai-2.24 --dest-dir
+        "${ARTIFACT_DIR}/gather-kserve" -- "export COMPONENT=kserve; /usr/bin/gather"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - chain: hypershift-hostedcluster-destroy
+    test:
+    - as: e2e-llm-inference-service
+      cli: latest
+      commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
+        make e2e-llmisvc-ocp RUNNING_LOCAL=false
+      dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: LLMISVC_CONTROLLER_IMAGE
+        name: llmisvc-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-tls-scanner
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/|^kserve-module/
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_NODE_COUNT: "3"
       PQC_CHECK: "true"
       PQC_REPORT_ONLY: "true"
       SCAN_NAMESPACE: kserve-tls-scanner
@@ -378,6 +450,48 @@ tests:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: tls-scanner-workloads-cleanup
+      best_effort: true
+      cli: latest
+      commands: |-
+        KSERVE_SOURCE_DIR="/go/src/github.com/mholder6/kserve"
+        if ! grep -q '^cleanup-tls-scanner-workloads-ocp:' "$KSERVE_SOURCE_DIR/Makefile.ocp.mk"; then
+          KSERVE_SOURCE_DIR="/go/src/github.com/opendatahub-io/kserve"
+        fi
+        cd "$KSERVE_SOURCE_DIR"
+        make cleanup-tls-scanner-workloads-ocp \
+          TLS_SCANNER_NAMESPACE=kserve-tls-scanner
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
+    - chain: hypershift-hostedcluster-destroy
+    test:
+    - as: setup-llmisvc
+      cli: latest
+      commands: |-
+        make deploy-e2e-ocp \
+          E2E_MARKER="llmisvc_core and cluster_cpu and not pvc_storage" \
+          RUNNING_LOCAL=false
+      dependencies:
+      - env: KSERVE_MODULE_CONTROLLER_IMAGE
+        name: kserve-module-controller
+      - env: KSERVE_CONTROLLER_IMAGE
+        name: kserve-controller
+      - env: LLMISVC_CONTROLLER_IMAGE
+        name: llmisvc-controller
+      - env: KSERVE_AGENT_IMAGE
+        name: kserve-agent
+      - env: STORAGE_INITIALIZER_IMAGE
+        name: kserve-storage-initializer
+      - env: SKLEARN_IMAGE
+        name: sklearn-serving-runtime
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: tls-scanner-workloads
       cli: latest
       commands: |-
@@ -398,53 +512,6 @@ tests:
           cpu: 100m
       timeout: 20m0s
     - ref: tls-scanner-run
-    - as: tls-scanner-workloads-cleanup
-      best_effort: true
-      cli: latest
-      commands: |-
-        KSERVE_SOURCE_DIR="/go/src/github.com/mholder6/kserve"
-        if ! grep -q '^cleanup-tls-scanner-workloads-ocp:' "$KSERVE_SOURCE_DIR/Makefile.ocp.mk"; then
-          KSERVE_SOURCE_DIR="/go/src/github.com/opendatahub-io/kserve"
-        fi
-        cd "$KSERVE_SOURCE_DIR"
-        make cleanup-tls-scanner-workloads-ocp \
-          TLS_SCANNER_NAMESPACE=kserve-tls-scanner
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - chain: hypershift-hostedcluster-destroy
-    test:
-    - as: e2e-llm-inference-service
-      cli: latest
-      commands: |-
-        pushd "$CLI_DIR"
-        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
-        cat > kustomize <<'WRAP'
-        #!/bin/sh
-        exec oc kustomize "$@"
-        WRAP
-        chmod +x kustomize
-        popd
-        make e2e-llmisvc-ocp RUNNING_LOCAL=false
-      dependencies:
-      - env: KSERVE_MODULE_CONTROLLER_IMAGE
-        name: kserve-module-controller
-      - env: KSERVE_CONTROLLER_IMAGE
-        name: kserve-controller
-      - env: LLMISVC_CONTROLLER_IMAGE
-        name: llmisvc-controller
-      - env: KSERVE_AGENT_IMAGE
-        name: kserve-agent
-      - env: STORAGE_INITIALIZER_IMAGE
-        name: kserve-storage-initializer
-      - env: SKLEARN_IMAGE
-        name: sklearn-serving-runtime
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: e2e-kserve-module
