@@ -464,7 +464,8 @@ else
 fi
 if [[ -z "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
   if WaitMcpTrapSelfTest; then
-    _junit_trapselftest="pass"
+    # keep a warn verdict set inside the harness-failure paths
+    [[ "${_junit_trapselftest}" == "warn" ]] || _junit_trapselftest="pass"
     echo ">>> PHASE 0: trap self-test passed (TERM -> 143, JUnit reason, xtrace bundle, bounded grace)"
   else
     _junit_trapselftest="fail"
@@ -536,6 +537,12 @@ def redact(o):
         for k, v in o.items():
             if k in ("data", "stringData") and isinstance(v, dict):
                 out[k] = {ik: "REDACTED" for ik in v}
+            elif k == "object-templates-raw" and isinstance(v, str):
+                # Embedded manifests as a raw string (ConfigurationPolicy
+                # spec, or a Policy embedding one): a Secret manifest inside
+                # the string bypasses the dict walker, so the whole raw
+                # template is replaced (preflight review).
+                out[k] = "REDACTED (raw object templates)"
             else:
                 out[k] = redact(v)
         return out
