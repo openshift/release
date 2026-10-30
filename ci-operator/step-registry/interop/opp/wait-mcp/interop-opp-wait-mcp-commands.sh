@@ -227,6 +227,12 @@ function IsMcpProgressing () {
     fi
     typeset -i notReadyStreak=0
     for (( i = len - 1; i >= 0; --i )); do
+        # The streak is "not-ready WITHOUT Degraded": a Degraded poll
+        # breaks it (a pool Degraded for 100 polls then cycling for 20
+        # must not inherit the Degraded period's count - preflight review).
+        if (( degradedHistory[i] )); then
+            break
+        fi
         if (( readyHistory[i] < machineCountHistory[i] )); then
             (( ++notReadyStreak ))
         else
@@ -569,8 +575,8 @@ json.dump(redact(json.load(sys.stdin)), sys.stdout, indent=1)
 REDACTEOF
     fi
     timeout 120s bash -c '
-      oc --request-timeout=10s get machines -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get machinesets -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || true
+      oc --request-timeout=10s get machines -A -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || true
+      oc --request-timeout=10s get machinesets -A -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || true
       if [ -n "'"${_redact}"'" ]; then
         oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || true
         oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || true
