@@ -74,6 +74,9 @@ metadata:
   # TODO: Remove after OCPBUGS-55106 is fixed
   # OCPBUGS-55106 workaround
   unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
+$(if [[ -n "${MCE_AGENT_IMAGE:-}" ]]; then
+    printf '  unsupported.agent-install.openshift.io/assisted-service-configmap: assisted-service-agent-image-override\n'
+  fi)
  name: agent
 spec:
  databaseStorage:
@@ -343,9 +346,19 @@ if [ "${DISCONNECTED}" = "true" ]; then
 fi
 
 deploy_mirror_config_map
+if [[ -n "${MCE_AGENT_IMAGE:-}" ]]; then
+  oc create configmap assisted-service-agent-image-override -n "${ASSISTED_NAMESPACE}" \
+    --from-literal="AGENT_DOCKER_IMAGE=${MCE_AGENT_IMAGE}" \
+    --dry-run=client -o yaml | oc apply -f -
+fi
 config_agentserviceconfig
 
 oc wait --timeout=5m --for=condition=ReconcileCompleted AgentServiceConfig agent
+if [[ -n "${MCE_AGENT_IMAGE:-}" ]]; then
+  oc get deployment assisted-service -n "${ASSISTED_NAMESPACE}" -o json | \
+    jq -e '[.spec.template.spec.containers[] | select(.name == "assisted-service") | .envFrom[]?.configMapRef.name] | index("assisted-service-agent-image-override") != null'
+  oc rollout status -n "${ASSISTED_NAMESPACE}" deployment/assisted-service --timeout=5m
+fi
 oc wait --timeout=5m --for=condition=Available deployment assisted-service -n "${ASSISTED_NAMESPACE}"
 oc wait --timeout=15m --for=condition=Ready pod -l app=assisted-image-service -n "${ASSISTED_NAMESPACE}"
 
