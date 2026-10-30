@@ -11,7 +11,7 @@ echo "=== TRT Jira Solver ==="
     exit 1
 }
 [[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — openshift-agentic-trt-init-model step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
@@ -119,10 +119,10 @@ if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
 fi
 
 # Layer native permissions over repository settings without replacing its hooks.
-# These command rules are tool controls, not a sandbox for arbitrary scripts.
+# Credential path denies are non-exhaustive and best effort, not a sandbox.
 SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-solver.XXXXXX")
 AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
-jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)"]}}' > "${AGENT_SETTINGS}"
+jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)", "Read(//var/run/codex-openai-api-key/**)"]}}' > "${AGENT_SETTINGS}"
 cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)

@@ -1,0 +1,56 @@
+ref:
+  as: monitoring-plugin-tests-integration-ui
+  from: monitoring-ui-tests-runner
+  cli: latest
+  commands: monitoring-plugin-tests-integration-ui-commands.sh
+  timeout: 4h0m0s
+  grace_period: 60s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 6Gi
+    limits:
+      memory: 8Gi
+  credentials:
+  - mount_path: /var/run/bedrock
+    group: bedrock-obsinta-ci
+    collection: obsinta
+  - mount_path: /var/run/vault/dt-secrets
+    group: distributed-tracing-team
+    collection: distributed-tracing
+  env:
+  - name: CYPRESS_SKIP_COO_INSTALL
+    default: "true"
+    documentation: "Use the operators installed by the preceding install-operators step."
+  - name: CYPRESS_COO_NAMESPACE
+    default: "coo"
+    documentation: "Namespace where Cluster Observability Operator is installed."
+  - name: CYPRESS_TIMEZONE
+    default: "UTC"
+    documentation: "Cluster timezone for incident timeline calculations."
+  - name: CYPRESS_SESSION
+    default: "true"
+    documentation: "Enable Cypress session reuse."
+  - name: CYPRESS_DEBUG
+    default: "true"
+    documentation: "Enable Cypress debug logging."
+  - name: OLS_NAMESPACE
+    default: "openshift-lightspeed"
+    documentation: "Namespace where the OpenShift Lightspeed operator is installed."
+  - name: OLS_BEDROCK_MODEL
+    default: "anthropic.claude-opus-4-6-v1"
+    documentation: "AWS Bedrock model id to configure as the OLS default model."
+  - name: OLS_BEDROCK_URL
+    default: "https://bedrock-runtime.us-east-1.amazonaws.com"
+    documentation: "AWS Bedrock endpoint URL. Encodes the AWS region (default: us-east-1)."
+  dependencies:
+  - name: monitoring-console-plugin
+    env: CYPRESS_MCP_CONSOLE_IMAGE
+  - name: monitoring-plugin
+    env: CYPRESS_MP_IMAGE
+  documentation: |-
+    Run the tracing, incidents, troubleshooting-panel, and Lightspeed UI integration suites
+    against PR-built monitoring-plugin images. Monitoring-plugin tests use the PR checkout;
+    tracing and troubleshooting-panel tests are cloned from their upstream repositories.
+    Requires COO, Tempo, OpenTelemetry, and Lightspeed to be installed beforehand.
+    All suites run, preserving separate artifacts, and any test failure fails the step.

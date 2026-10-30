@@ -1,5 +1,5 @@
 from content.osd_rc_deployments import get_oc_env_vars, get_oc_prepare_container
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
+from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
 def add_legacy_origin_deployments_scaled_down(gendoc):
@@ -179,7 +179,8 @@ def add_okd_deployments(gendoc):
                                                       "--ref=main",
                                                       "--root=/tmp/git-sync",
                                                       "--one-time=true",
-                                                      "--depth=1"
+                                                      "--depth=1",
+                                                      GIT_SYNC_SPARSE_CHECKOUT_ARG
                                                   ],
                                                   "env": [
                                                       {
@@ -193,7 +194,7 @@ def add_okd_deployments(gendoc):
                                                           "name": "release",
                                                           "mountPath": "/tmp/git-sync"
                                                       }
-                                                  ]
+                                                  ] + get_git_sync_sparse_checkout_volume_mounts()
                                               }
                                           ] + get_oc_prepare_container(context),
                         "containers": [
@@ -205,7 +206,8 @@ def add_okd_deployments(gendoc):
                                     "--ref=main",
                                     "--period=30s",
                                     "--root=/tmp/git-sync",
-                                    "--max-failures=3"
+                                    "--max-failures=3",
+                                    GIT_SYNC_SPARSE_CHECKOUT_ARG
                                 ],
                                 "env": [
                                     {
@@ -219,7 +221,7 @@ def add_okd_deployments(gendoc):
                                         "name": "release",
                                         "mountPath": "/tmp/git-sync"
                                     }
-                                ],
+                                ] + get_git_sync_sparse_checkout_volume_mounts(),
                                 "resources": {
                                     "requests": {
                                         "memory": "1Gi",

@@ -2460,7 +2460,7 @@ bundles:
     targets:
       - cluster: build01  # todo: change to cluster_groups: [non_app_ci]
         namespace: ci
-  
+
   - name: hypershift-workload-credentials
     gsm_secrets:
       - collection: test-platform-infra
@@ -7856,6 +7856,57 @@ bundles:
     gsm_secrets:
     - collection: test-platform-infra
       fields:
+      - as: insights-live.yaml
+        name: insights-live--dot--yaml
+      group: insights-ci-account
+    - collection: shiftstack-secrets
+      fields:
+      - as: .awscred
+        name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-rackspace
+    name: cluster-secrets-openstack-rackspace
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: test-platform-infra
+      fields:
       - as: ca-cert.pem
         name: ca-cert--dot--pem
       - as: clouds.yaml
@@ -12014,7 +12065,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: openshift-crt-sonar-tokens
     gsm_secrets:
       - collection: crt
@@ -12212,7 +12263,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: release-watcher-bot-token
     gsm_secrets:
       - collection: crt
@@ -13947,6 +13998,30 @@ bundles:
     targets:
       - cluster: app.ci
         namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
+  - name: ops-alert-dashboard-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ops-alert-dashboard
+        fields:
+          - name: config
+            as: config.yaml
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci
+
+  - name: ops-alert-dashboard-session
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ops-alert-dashboard
+        fields:
+          - name: session-secret
+            as: session_secret
+    sync_to_cluster: true
+    targets:
       - cluster: core-ci
         namespace: ci
 

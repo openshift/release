@@ -138,11 +138,6 @@ function print_failing_pod_logs() {
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
-#Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
 # Create AWS S3 storage bucket. Names are globally unique; $RANDOM (0-32767)
 # collides with leftover quay-tests buckets that use the same quayprowci prefix.
 function new_s3_bucket_name() {
@@ -317,7 +312,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -325,8 +319,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -370,7 +362,7 @@ FEATURE_OTEL_TRACING: false
 EOF
 
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
-# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# not '*', so a fragment's lists extend the defaults instead of replacing them).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
@@ -544,9 +536,6 @@ for i in $(seq 1 90); do
     QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi

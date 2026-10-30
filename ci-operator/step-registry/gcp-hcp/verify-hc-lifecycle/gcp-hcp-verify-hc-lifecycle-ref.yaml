@@ -3,9 +3,12 @@ ref:
   from: gcp-hcp-e2e-tests
   commands: gcp-hcp-verify-hc-lifecycle-commands.sh
   env:
+  - name: HC_VERSION_MINOR
+    default: "5.0"
+    documentation: "Supported/tested OpenShift minor; select its latest advertised version in HC_CHANNEL_GROUP"
   - name: HC_VERSION
-    default: "5.0.0-ec.6"
-    documentation: "OpenShift version for the hosted cluster"
+    default: ""
+    documentation: "Optional exact reproduction override; must match HC_VERSION_MINOR and be advertised in HC_CHANNEL_GROUP"
   - name: HC_CHANNEL_GROUP
     default: "candidate"
     documentation: "Channel group for version resolution"
@@ -31,7 +34,7 @@ ref:
     requests:
       cpu: 500m
       memory: 1Gi
-  timeout: 150m0s
+  timeout: 195m0s
   grace_period: 5m0s
   documentation: |-
     Runs the HC lifecycle Ginkgo v2 test that exercises the full hosted cluster
@@ -43,10 +46,11 @@ ref:
     Depends on:
     - gcp-hcp-tf-provision or gcp-hcp-on-demand-config (must write api-endpoint, oidc-endpoint, customer-project-id, and region; region-project-id is needed only for authorization bootstrap)
     - hypershift-gcp-wif-auth (provides the WIF ADC credential used by gcphcpctl)
-    - gcp-hcp-e2e-tests image (provides /usr/bin/test-e2e and /usr/bin/gcphcpctl)
+    - gcp-hcp-e2e-tests image (provides /usr/bin/test-e2e, /usr/bin/gcphcpctl, and timeout)
 
     Environment variables (optional):
-    - HC_VERSION: Cluster version (default: 5.0.0-ec.6)
+    - HC_VERSION_MINOR: Supported/tested minor (default: 5.0)
+    - HC_VERSION: Optional exact override, e.g. 5.0.0-rc.7 (default: empty)
     - HC_CHANNEL_GROUP: Channel group (default: candidate)
     - HC_READY_TIMEOUT: Ready timeout (default: 30m)
     - HC_DELETE_TIMEOUT: Delete timeout (default: 20m)
@@ -64,7 +68,17 @@ ref:
     This step derives platform-api-subject-email from wif-config.json for the
     Ginkgo bootstrap; no alternate service-account credential is created.
 
+    After API readiness, selects the latest advertised version matching
+    HC_VERSION_MINOR and HC_CHANNEL_GROUP. An exact HC_VERSION override must
+    match both selectors. The selected version is fixed for the entire lifecycle,
+    with no fallback to another minor, channel, or old pin.
+
+    Polls every 30 seconds for up to 20 minutes while the catalog synchronizes.
+    Each request has a 30-second timeout; request and JSON errors fail immediately.
+    The step timeout covers startup waits and the 140-minute lifecycle test.
+
     Outputs:
+    - ${ARTIFACT_DIR}/hc-version-selection.json: Exact version, minor, and channel group for reproduction
     - ${ARTIFACT_DIR}/junit_hc_lifecycle.xml: JUnit test results for Prow
     - ${ARTIFACT_DIR}/cluster-status.json: Cluster state on failure
     - ${ARTIFACT_DIR}/nodepool-status.json: Nodepool state on failure

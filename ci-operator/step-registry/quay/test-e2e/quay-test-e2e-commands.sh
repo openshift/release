@@ -46,14 +46,6 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
-# Read credentials
-# Disable tracing due to password handling
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-$WAS_TRACING && set -x
-
 # Configure Playwright environment
 # PLAYWRIGHT_BASE_URL: browser navigation URL (Quay UI)
 # REACT_QUAY_APP_API_URL: backend API URL (same as UI on OCP)
@@ -63,8 +55,6 @@ export PLAYWRIGHT_JUNIT_OUTPUT_NAME="${ARTIFACT_DIR}/junit_playwright.xml"
 # results.json is a structured Prow artifact from the Playwright json reporter (ref quay/quay#7049)
 export PLAYWRIGHT_JSON_OUTPUT_NAME="${ARTIFACT_DIR}/results.json"
 export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-export QUAY_USERNAME
-export QUAY_PASSWORD
 export CI=true
 
 # Mailpit HTTP API base URL for email-dependent specs. utils/mailpit.ts reads

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set +x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -7,6 +8,51 @@ set -o pipefail
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
+
+ocm_login() {
+    local target_env="$1" attempt exit_code
+    local -a credentials
+    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
+    elif [[ -n "${OCM_TOKEN}" ]]; then
+        credentials=(--token "${OCM_TOKEN}")
+    else
+        return 1
+    fi
+
+    for attempt in 1 2 3; do
+        if ocm login --url "${target_env}" "${credentials[@]}" > /dev/null 2>&1; then
+            CURRENT_OCM_ENV="${target_env}"
+            return 0
+        else
+            exit_code=$?
+        fi
+        if [[ "${attempt}" -eq 3 ]]; then
+            return "${exit_code}"
+        fi
+        sleep 10
+    done
+}
+
+ocm_authenticate() {
+    SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
+    SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
+    OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
+    CURRENT_OCM_ENV=""
+    ocm_login "${OCM_LOGIN_ENV}"
+}
+
+ocm_ensure_env() {
+    local target_env="$1"
+    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
+        return 0
+    fi
+    ocm_login "${target_env}"
+}
+
+if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
+    return 0
+fi
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
@@ -51,7 +97,7 @@ ocm_get_cluster() {
 ocm_check_cluster() {
     local cluster_id="$1" ocm_env="${2:-staging}"
     OCM_CHECK_RESULT="" OCM_CHECK_STATUS="" OCM_CHECK_RESPONSE=""
-    ocm_ensure_env "${ocm_env}"
+    ocm_ensure_env "${ocm_env}" || return $?
     local response rc
     if response=$(ocm get /api/clusters_mgmt/v1/clusters/"${cluster_id}" 2>&1); then
         rc=0
@@ -361,36 +407,7 @@ schedule_upgrade() {
     fi
 }
 
-# Log in to OCM
-SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
-SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
-
-if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with SSO credentials"
-    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-elif [[ -n "${OCM_TOKEN}" ]]; then
-    log "Logging into OCM ${OCM_LOGIN_ENV} with offline token"
-    ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
-else
-    log "ERROR: No OCM credentials found in cluster profile"
-    exit 1
-fi
-
-CURRENT_OCM_ENV="${OCM_LOGIN_ENV}"
-
-ocm_ensure_env() {
-    local target_env="$1"
-    if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
-        return 0
-    fi
-    if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-        ocm login --url "${target_env}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
-    elif [[ -n "${OCM_TOKEN}" ]]; then
-        ocm login --url "${target_env}" --token "${OCM_TOKEN}"
-    fi
-    CURRENT_OCM_ENV="${target_env}"
-}
+ocm_authenticate || exit $?
 
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
@@ -732,7 +749,7 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         continue
     fi
 
-    # Verify provisioning clusters still exist in OCM
+    # Reconcile provisioning clusters from their current OCM state
     if [[ "${STATUS}" == "provisioning" ]]; then
         ocm_check_cluster "${CLUSTER_ID}" "$(echo "${CM}" | jq -r '.data["ocm-env"] // "staging"')"
         if [[ "${OCM_CHECK_RESULT}" == "unreachable" ]]; then
@@ -749,8 +766,53 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
                 echo "STALE PROVISIONING: ${CM_NAME} (delete failed)" >> "${REPORT}"
             fi
             UNHEALTHY=$((UNHEALTHY + 1))
-        else
+        elif [[ "${OCM_CHECK_STATUS}" == "ready" ]]; then
+            API_URL=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.api.url // empty')
+            ACTUAL_VERSION=$(echo "${OCM_CHECK_RESPONSE}" | jq -r '.openshift_version // empty')
+            VERSION_LABEL=$(echo "${ACTUAL_VERSION}" | cut -d. -f1,2)
+            if [[ -z "${API_URL}" || -z "${ACTUAL_VERSION}" ]]; then
+                log "WARNING: Incomplete cluster data for ${CM_NAME}, leaving provisioning for retry"
+                echo "SKIPPED: ${CM_NAME} (ready, incomplete cluster data)" >> "${REPORT}"
+                continue
+            fi
+            if dry_run_guard "Would mark ${CM_NAME} as available"; then
+                echo "DRY RUN: ${CM_NAME} (ready, would mark available)" >> "${REPORT}"
+            elif lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "$(jq -n \
+                --arg api_url "${API_URL}" --arg version "${ACTUAL_VERSION}" --arg version_label "${VERSION_LABEL}" '{
+                    metadata: {labels: {"rosa-cluster-lease/status": "available", "rosa-cluster-lease/version": $version_label}},
+                    data: {"api-url": $api_url, version: $version}
+                }')"; then
+                log "PROVISIONED: ${CM_NAME} is ready, restored to available"
+                echo "PROVISIONED: ${CM_NAME} (available)" >> "${REPORT}"
+            else
+                log "WARNING: Failed to mark ${CM_NAME} as available"
+                echo "SKIPPED: ${CM_NAME} (ready, patch failed)" >> "${REPORT}"
+                continue
+            fi
             HEALTHY=$((HEALTHY + 1))
+        elif [[ "${OCM_CHECK_STATUS}" == "error" || "${OCM_CHECK_STATUS}" == "uninstalling" ]]; then
+            log "UNHEALTHY: ${CM_NAME} OCM status is ${OCM_CHECK_STATUS}"
+            if dry_run_guard "Would mark ${CM_NAME} as error"; then
+                echo "DRY RUN: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS}, would mark error)" >> "${REPORT}"
+            elif lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "$(jq -n \
+                --arg reason "OCM status: ${OCM_CHECK_STATUS}" --arg error_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{
+                    metadata: {
+                        labels: {"rosa-cluster-lease/status": "error"},
+                        annotations: {"rosa-cluster-lease/error-reason": $reason, "rosa-cluster-lease/error-at": $error_at}
+                    }
+                }')"; then
+                echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
+            else
+                log "WARNING: Failed to mark ${CM_NAME} as error"
+                echo "UNHEALTHY: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS}, patch failed)" >> "${REPORT}"
+            fi
+            UNHEALTHY=$((UNHEALTHY + 1))
+        elif [[ "${OCM_CHECK_STATUS}" == "pending" || "${OCM_CHECK_STATUS}" == "installing" || "${OCM_CHECK_STATUS}" == "waiting" ]]; then
+            echo "PROVISIONING: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
+            HEALTHY=$((HEALTHY + 1))
+        else
+            log "WARNING: ${CM_NAME} has unexpected OCM state ${OCM_CHECK_STATUS}, leaving provisioning for retry"
+            echo "SKIPPED: ${CM_NAME} (unexpected OCM state: ${OCM_CHECK_STATUS})" >> "${REPORT}"
         fi
         continue
     fi

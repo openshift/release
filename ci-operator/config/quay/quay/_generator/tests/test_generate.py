@@ -580,6 +580,48 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
 
 
+def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}["quay-quay-redhat-3.15__aws-ocp419-e2e-legacy.yaml"]
+    # Containerfile.playwright does not exist on redhat-3.15.
+    assert "images" not in config
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
+    assert steps["env"]["QUAY_VERSION"] == "3.15"
+    # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
+    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
+    assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert [step["ref"] for step in steps["test"]] == [
+        "quay-enable-catalogsource-art",
+        "quay-deploy-aws-s3",
+        "quay-test-e2e-legacy",
+        "quay-test-api-legacy",
+    ]
+    post = [step.get("ref") or step.get("chain") for step in steps["post"]]
+    assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
+@pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
+def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
+    results, _retired = generate_all()
+    name = f"quay-quay-redhat-{quay}__aws-ocp{ocp.replace('.', '')}-e2e-legacy.yaml"
+    config = {filename: cfg for _group, filename, cfg in results}[name]
+    assert "images" not in config
+    assert config["releases"]["latest"]["candidate"]["version"] == ocp
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    env = test["steps"]["env"]
+    assert env["QUAY_VERSION"] == quay
+    assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
+    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+
+
 def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
