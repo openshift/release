@@ -368,6 +368,19 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+# Unmanaged DB fragment from the quay-database-intg-gcp-sql step; absent in
+# the plain (in-cluster postgres) lanes.
+DATABASE_CONFIG_FRAGMENT=""
+if [[ -s "${SHARED_DIR}/quay-database-gcp-sql-config.yaml" ]]; then
+	DATABASE_CONFIG_FRAGMENT="${SHARED_DIR}/quay-database-gcp-sql-config.yaml"
+fi
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
+	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+	POSTGRES_MANAGED="false"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -376,8 +389,8 @@ fi
 
 # Strip field-group keys for components this CR keeps managed. The operator
 # injects those values; leaving them in configBundleSecret blocks rollout.
-# Runs unconditionally now: a no-op on the defaults block when no overlay
-# above added any of these keys.
+# Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
+# merged above; otherwise strip them so the operator manages postgres.
 yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
@@ -393,13 +406,14 @@ yq -i '
 		.REPO_MIRROR_TLS_VERIFY,
 		.BUILDLOGS_REDIS,
 		.USER_EVENTS_REDIS,
-		.DB_URI,
-		.DB_CONNECTION_ARGS,
 		.SERVER_HOSTNAME,
 		.PREFERRED_URL_SCHEME,
 		.EXTERNAL_TLS_TERMINATION
 	)
 ' config.yaml
+if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+	yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
+fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -443,14 +457,36 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
   sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
 
-  oc create secret generic -n quay-enterprise config-bundle-secret \
-    --from-file config.yaml=./config.yaml \
-    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
-    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+  secret_args=(
+    --from-file config.yaml=./config.yaml
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert"
+    --from-file ssl.key="${SHARED_DIR}/ssl.key"
     --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+  )
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  secret_args=(--from-file config.yaml=./config.yaml)
 fi
+
+# On redhat-3.18+ the Quay operator projects the config bundle secret into
+# /run/secrets/postgresql only when it is named postgresql-client-certs (see
+# the QE gsql deploy). When the GCP SQL client certificates are present,
+# include them in the bundle under that name so the Quay pods can verify the
+# Cloud SQL server and present the client certificate.
+CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
+if [[ -s "${SHARED_DIR}/client-cert.pem" && -s "${SHARED_DIR}/client-key.pem" && -s "${SHARED_DIR}/server-ca.pem" ]]; then
+  echo "Including GCP SQL client certificates in postgresql-client-certs..." >&2
+  secret_args+=(
+    --from-file tls.crt="${SHARED_DIR}/client-cert.pem"
+    --from-file tls.key="${SHARED_DIR}/client-key.pem"
+    --from-file ca.crt="${SHARED_DIR}/server-ca.pem"
+  )
+  CONFIG_BUNDLE_SECRET_NAME="postgresql-client-certs"
+elif [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+  echo "ERROR: GCP SQL config fragment present but client certificates missing in SHARED_DIR" >&2
+  exit 1
+fi
+
+oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -460,7 +496,7 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: ${CONFIG_BUNDLE_SECRET_NAME}
   components:
   - kind: objectstorage
     managed: false

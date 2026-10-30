@@ -1,0 +1,27 @@
+ref:
+  as: quay-database-intg-gcp-sql
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-database-intg-gcp-sql-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Provision Google Cloud SQL PostgreSQL database for Quay in the cluster's
+    region, using the gcp-quay-qe cluster profile's service account and
+    project (the same credentials the cluster was installed with and
+    quay-deploy-gcp-gcs uses). Creates the database instance with SSL client
+    certificates and outputs connection details, certificates, and a
+    configuration fragment to SHARED_DIR for use by Quay deployment steps.
+    Database name, username, and password are generated per job - no static
+    database secret is required.
+  env:
+  - name: POSTGRESQL_VERSION
+    documentation: Support PostgreSQL Version 17/16/15/14/13/12
+    default: "17"
