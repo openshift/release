@@ -106,6 +106,16 @@ checkmodule -M -m -o /tmp/e2e-node-kubelet.mod /tmp/e2e-node-kubelet.te
 semodule_package -o /tmp/e2e-node-kubelet.pp -m /tmp/e2e-node-kubelet.mod
 sudo semodule -i /tmp/e2e-node-kubelet.pp
 
+# RuntimeClass/PodOverhead tests expect a "test-handler" runtime handler, as on upstream node e2e images.
+CRUN_PATH=\$(sudo sh -c 'command -v crun')
+sudo tee /etc/crio/crio.conf.d/99-test-handler.conf <<CONF
+[crio.runtime.runtimes.test-handler]
+runtime_path = "\${CRUN_PATH}"
+runtime_type = "oci"
+runtime_root = "/run/crun"
+CONF
+sudo systemctl restart crio
+
 sudo crictl --runtime-endpoint unix:///var/run/crio/crio.sock version
 EOF
 
