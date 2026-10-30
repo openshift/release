@@ -64,7 +64,7 @@ Common `from` alias values: `cli`, `tests`, or another image alias from the cons
 
 1. Edit `*-commands.sh`:
    - Start with `set -euo pipefail` (avoid `-x` unless debugging).
-   - Disable tracing around secrets/passwords (see root `CLAUDE.md`).
+   - Disable tracing around secrets/passwords (see root `AGENTS.md`).
    - Use `${SHARED_DIR}` to pass data between steps; do not echo credentials.
 2. Edit `*-ref.yaml`:
    - Add `env` entries with `default` + `documentation` for tunables.
