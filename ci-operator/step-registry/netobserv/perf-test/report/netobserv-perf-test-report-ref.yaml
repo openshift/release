@@ -1,0 +1,38 @@
+ref:
+  as: netobserv-perf-test-report
+  best_effort: true
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  commands: netobserv-perf-test-report-commands.sh
+  timeout: 5m
+  env:
+  - name: ORION_CONFIG
+    default: ""
+    documentation: Orion configuration used by the preceding analysis step.
+  - name: ORION_ENVS
+    default: ""
+    documentation: Parameters used by the preceding Orion analysis.
+  - name: LOOKBACK
+    default: "15"
+    documentation: Requested analysis lookback in days.
+  - name: LOOKBACK_SIZE
+    default: ""
+    documentation: Requested maximum number of analyzed samples.
+  - name: VERSION
+    default: ""
+    documentation: OpenShift version filter used by Orion.
+  - name: RUN_ORION
+    default: "false"
+    documentation: Whether Orion was enabled for this test.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Generate custom-link-orion.html for Spyglass from the completed Orion step's
+    public GCS artifacts. Show this build's metrics using the workload UUID
+    recorded by netobserv-perf-test-metrics-upload, with a separate historical
+    change-point summary and expandable graphs. Run in post so failed or skipped
+    analyses still get a report. Reporting does not change the test verdict.
