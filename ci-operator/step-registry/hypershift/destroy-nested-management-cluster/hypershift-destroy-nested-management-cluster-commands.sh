@@ -49,3 +49,12 @@ else
     --base-domain=${DOMAIN} \
     --cluster-grace-period 40m
 fi
+
+# hypershift-setup-nested-management-cluster created this ConfigMap under a
+# per-job name when HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE was set (see the
+# comment there). "hypershift destroy cluster" deletes only the CLI secrets, so
+# remove it here to keep the shared namespace clean.
+if [[ "${CLOUD_PROVIDER}" != "Azure" && -n "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
+  oc delete configmap "${CLUSTER_NAME}-additional-trust-bundle" \
+    --namespace="${HYPERSHIFT_NAMESPACE}" --ignore-not-found
+fi
