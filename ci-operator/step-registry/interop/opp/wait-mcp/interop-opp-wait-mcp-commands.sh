@@ -205,6 +205,11 @@ function IsMcpProgressing () {
     #  4. ready count recovering within the window with bounded regression
     #     (a healthy rolling update dips by up to maxUnavailable reboots).
     _vetoStreakHit=0
+    # Optional args pin the phase-0 self-test to the reviewed default
+    # thresholds regardless of runtime env tuning (fixture verdicts must
+    # depend on predicate logic, not job configuration).
+    typeset -i _pinnedPolls="${1:-${pinnedUpdatedPolls}}"
+    typeset -i _maxUnavail="${2:-${maxUnavailable}}"
     typeset -i len=${#readyHistory[@]}
     (( len < 3 )) && return 1
     typeset -i windowStart=$(( len > 6 ? len - 6 : 0 ))
@@ -228,7 +233,7 @@ function IsMcpProgressing () {
             break
         fi
     done
-    if (( notReadyStreak >= pinnedUpdatedPolls )); then
+    if (( notReadyStreak >= _pinnedPolls )); then
         # Sustained-cycling veto (preflight-review note): at default cadence
         # the maxTimeout cap already bounds extensions before this threshold
         # is reached, so the veto's value is FAIL-FAST, not extension denial -
@@ -243,7 +248,7 @@ function IsMcpProgressing () {
     for (( i = windowStart + 1; i < len; ++i )); do
         (( readyHistory[i] < readyHistory[i-1] )) && (( ++decreases )) || true
     done
-    if (( last > first && decreases <= maxUnavailable )); then
+    if (( last > first && decreases <= _maxUnavail )); then
         return 0
     fi
     return 1
@@ -341,7 +346,7 @@ WaitMcpSelfTest () {
     machineCountHistory=()
     local _v
     for _v in "${FIX_UPDATED[@]}"; do machineCountHistory+=("${FIX_MACHINECOUNT}"); done
-    if IsMcpProgressing; then _got="PROGRESSING"; else _got="NOT-PROGRESSING"; fi
+    if IsMcpProgressing 120 3; then _got="PROGRESSING"; else _got="NOT-PROGRESSING"; fi
     echo ">>> selftest: ${_fixture}: ${_got} (pinned: ${_expected})"
     [[ "${_got}" == "${_expected}" ]] || _fail=1
   done
