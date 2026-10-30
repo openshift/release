@@ -36,7 +36,7 @@ target_ref="$(jq -cr --arg org "${target_org}" --arg repo "${target_repo}" '
 
 # Jobs from component repositories (e.g. a gecko e2e-platform presubmit) do not
 # include gcp-hcp-infra in JOB_SPEC: their gcp-hcp-infra-src is the latest
-# gcp-hcp-infra main promoted to the gcp-hcp namespace. Test the commit that image
+# gcp-hcp-infra main promoted to the ci namespace. Test the commit that image
 # was built from, and leave gcp-hcp-infra's commit statuses alone: the run tests
 # the component pull request, not that commit.
 if [[ "${target_ref}" == "null" ]]; then
