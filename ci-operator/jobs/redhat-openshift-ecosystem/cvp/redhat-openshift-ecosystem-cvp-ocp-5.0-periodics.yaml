@@ -1,21 +1,23 @@
 periodics:
 - agent: kubernetes
-  cluster: build12
-  cron: '@yearly'
+  cluster: build07
+  cron: 11 18 7 5 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
   extra_refs:
-  - base_ref: ocp-5.0
-    org: redhat-openshift-ecosystem
-    repo: cvp
+  - base_ref: release-4.11
+    org: openshift
+    repo: ovn-kubernetes
+    sparse_checkout_files:
+    - Dockerfile
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cpaas
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-5.0-cvp-common-aws
+  name: periodic-ci-openshift-ovn-kubernetes-release-4.11-e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
   spec:
     containers:
     - args:
@@ -28,7 +30,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=cvp-common-aws
+      - --target=e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
       command:
       - ci-operator
       env:
@@ -100,20 +102,24 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: '@yearly'
+  cluster: build07
+  cron: 11 0 3 8 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
   extra_refs:
-  - base_ref: ocp-5.0
-    org: redhat-openshift-ecosystem
-    repo: cvp
+  - base_ref: release-4.11
+    org: openshift
+    repo: ovn-kubernetes
+    sparse_checkout_files:
+    - Dockerfile
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-5.0-cvp-common-claim
+  name: periodic-ci-openshift-ovn-kubernetes-release-4.11-e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
   spec:
     containers:
     - args:
@@ -122,12 +128,11 @@ periodics:
       - --gsm-config=/etc/gsm-config/gsm-config.yaml
       - --gsm-credentials-file=/etc/gsm-credentials/key.json
       - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=cvp-common-claim
+      - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
       command:
       - ci-operator
       env:
@@ -160,9 +165,6 @@ periodics:
       - mountPath: /etc/gsm-credentials
         name: gsm-sa-key
         readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
-        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -192,9 +194,6 @@ periodics:
         volumeAttributes:
           secretProviderClass: ci-operator-sa-key-spc
       name: gsm-sa-key
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher
@@ -205,20 +204,24 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
-  cron: '@yearly'
+  cluster: build04
+  cron: 0 1 6 11 *
   decorate: true
   decoration_config:
-    skip_cloning: true
+    sparse_checkout_files:
+    - Dockerfile
   extra_refs:
-  - base_ref: ocp-5.0
-    org: redhat-openshift-ecosystem
-    repo: cvp
+  - base_ref: release-4.11
+    org: openshift
+    repo: ovn-kubernetes
+    sparse_checkout_files:
+    - Dockerfile
   labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-5.0-cvp-fips-common-claim
+  name: periodic-ci-openshift-ovn-kubernetes-release-4.11-e2e-ibmcloud-ipi-ovn-periodic
   spec:
     containers:
     - args:
@@ -227,12 +230,11 @@ periodics:
       - --gsm-config=/etc/gsm-config/gsm-config.yaml
       - --gsm-credentials-file=/etc/gsm-credentials/key.json
       - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=cvp-fips-common-claim
+      - --target=e2e-ibmcloud-ipi-ovn-periodic
       command:
       - ci-operator
       env:
@@ -265,9 +267,6 @@ periodics:
       - mountPath: /etc/gsm-credentials
         name: gsm-sa-key
         readOnly: true
-      - mountPath: /secrets/hive-hive-credentials
-        name: hive-hive-credentials
-        readOnly: true
       - mountPath: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         readOnly: true
@@ -297,9 +296,6 @@ periodics:
         volumeAttributes:
           secretProviderClass: ci-operator-sa-key-spc
       name: gsm-sa-key
-    - name: hive-hive-credentials
-      secret:
-        secretName: hive-hive-credentials
     - name: manifest-tool-local-pusher
       secret:
         secretName: manifest-tool-local-pusher

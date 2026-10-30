@@ -1,12 +1,12 @@
 presubmits:
-  openshift-priv/agentic-skills:
+  openshift-priv/network-metrics-daemon:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build04
-    context: ci/prow/eval
+    context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,23 +14,30 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Containerfile
+      - Dockerfile.openshift
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-agentic-skills-release-5.2-eval
-    path_alias: github.com/openshift/agentic-skills
-    rerun_command: /test eval
-    skip_if_only_changed: ^(README\.md|OWNERS|LICENSE|AGENTS\.md|CLAUDE\.md|\.gitignore)$
+    name: pull-ci-openshift-priv-network-metrics-daemon-release-4.10-e2e-gcp
+    path_alias: github.com/openshift/network-metrics-daemon
+    rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
+        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=eval
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp
         command:
         - ci-operator
         env:
@@ -48,11 +55,23 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -65,6 +84,24 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -74,12 +111,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )eval,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build04
     context: ci/prow/images
     decorate: true
@@ -89,13 +126,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Containerfile
+      - Dockerfile.openshift
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-agentic-skills-release-5.2-images
-    path_alias: github.com/openshift/agentic-skills
+    name: pull-ci-openshift-priv-network-metrics-daemon-release-4.10-images
+    path_alias: github.com/openshift/network-metrics-daemon
     rerun_command: /test images
     spec:
       containers:
@@ -142,10 +179,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build04
     context: ci/prow/unit
     decorate: true
@@ -155,15 +192,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Containerfile
+      - Dockerfile.openshift
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-agentic-skills-release-5.2-unit
-    path_alias: github.com/openshift/agentic-skills
+    name: pull-ci-openshift-priv-network-metrics-daemon-release-4.10-unit
+    path_alias: github.com/openshift/network-metrics-daemon
     rerun_command: /test unit
-    skip_if_only_changed: ^(README\.md|OWNERS|LICENSE|AGENTS\.md|CLAUDE\.md|\.gitignore|evals/)$
     spec:
       containers:
       - args:

@@ -1,26 +1,25 @@
 presubmits:
-  openshift/autoscale-tests:
+  openshift/cluster-image-registry-operator:
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^cas/
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build01
-    context: ci/prow/e2e-aws-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build09
+    context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-aws-autoscaler
-    optional: true
-    rerun_command: /test e2e-aws-autoscaler
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-aws
+    rerun_command: /test e2e-aws
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -33,7 +32,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-autoscaler
+        - --target=e2e-aws
         command:
         - ci-operator
         env:
@@ -104,26 +103,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build01
-    context: ci/prow/e2e-aws-autoscaler-periodic
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build09
+    context: ci/prow/e2e-aws-image-registry
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-aws-autoscaler-periodic
-    optional: true
-    rerun_command: /test e2e-aws-autoscaler-periodic
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-aws-image-registry
+    rerun_command: /test e2e-aws-image-registry
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -136,7 +136,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-autoscaler-periodic
+        - --target=e2e-aws-image-registry
         command:
         - ci-operator
         env:
@@ -207,28 +207,132 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-autoscaler-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-image-registry,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^cas/
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build04
-    context: ci/prow/e2e-azure-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build09
+    context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-aws-operator
+    rerun_command: /test e2e-aws-operator
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-operator
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
+    context: ci/prow/e2e-azure
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-azure-autoscaler
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-azure
     optional: true
-    rerun_command: /test e2e-azure-autoscaler
+    rerun_command: /test e2e-azure
+    run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
     spec:
       containers:
       - args:
@@ -241,7 +345,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-autoscaler
+        - --target=e2e-azure
         command:
         - ci-operator
         env:
@@ -312,26 +416,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build04
-    context: ci/prow/e2e-azure-autoscaler-periodic
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
+    context: ci/prow/e2e-azure-operator
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-azure-autoscaler-periodic
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-azure-operator
     optional: true
-    rerun_command: /test e2e-azure-autoscaler-periodic
+    rerun_command: /test e2e-azure-operator
+    run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
     spec:
       containers:
       - args:
@@ -344,7 +450,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-autoscaler-periodic
+        - --target=e2e-azure-operator
         command:
         - ci-operator
         env:
@@ -415,28 +521,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-autoscaler-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^cas/
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build08
-    context: ci/prow/e2e-gcp-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build13
+    context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-gcp-autoscaler
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-gcp
     optional: true
-    rerun_command: /test e2e-gcp-autoscaler
+    rerun_command: /test e2e-gcp
+    run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
     spec:
       containers:
       - args:
@@ -449,7 +555,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcp-autoscaler
+        - --target=e2e-gcp
         command:
         - ci-operator
         env:
@@ -520,26 +626,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build08
-    context: ci/prow/e2e-gcp-autoscaler-periodic
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build13
+    context: ci/prow/e2e-gcp-operator
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-gcp-autoscaler-periodic
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-gcp-operator
     optional: true
-    rerun_command: /test e2e-gcp-autoscaler-periodic
+    rerun_command: /test e2e-gcp-operator
+    run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
     spec:
       containers:
       - args:
@@ -552,7 +660,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcp-autoscaler-periodic
+        - --target=e2e-gcp-operator
         command:
         - ci-operator
         env:
@@ -623,26 +731,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-autoscaler-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build01
-    context: ci/prow/e2e-openstack-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build09
+    context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-openstack-autoscaler
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-openstack
     optional: true
-    rerun_command: /test e2e-openstack-autoscaler
+    rerun_command: /test e2e-openstack
+    run_if_changed: (^(.*swift.*|vendor/github\.com/gophercloud/.*)\.go$|.*openstack.*)
     spec:
       containers:
       - args:
@@ -655,7 +765,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-autoscaler
+        - --target=e2e-openstack
         command:
         - ci-operator
         env:
@@ -726,26 +836,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build01
-    context: ci/prow/e2e-openstack-autoscaler-periodic
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
+    context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: openstack-vexxhost
-      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
+      ci-operator.openshift.io/cloud: ovirt
+      ci-operator.openshift.io/cloud-cluster-profile: ovirt
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-openstack-autoscaler-periodic
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-ovirt
     optional: true
-    rerun_command: /test e2e-openstack-autoscaler-periodic
+    rerun_command: /test e2e-ovirt
     spec:
       containers:
       - args:
@@ -758,7 +869,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-openstack-autoscaler-periodic
+        - --target=e2e-ovirt
         command:
         - ci-operator
         env:
@@ -829,27 +940,132 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-autoscaler-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: vsphere02
-    context: ci/prow/e2e-vsphere-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build09
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-upgrade
+    rerun_command: /test e2e-upgrade
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-upgrade
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: vsphere02
+    context: ci/prow/e2e-vsphere
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-vsphere-autoscaler
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-vsphere
     optional: true
-    rerun_command: /test e2e-vsphere-autoscaler
-    run_if_changed: ^cas/
+    rerun_command: /test e2e-vsphere
+    run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
     spec:
       containers:
       - args:
@@ -862,7 +1078,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-vsphere-autoscaler
+        - --target=e2e-vsphere
         command:
         - ci-operator
         env:
@@ -933,26 +1149,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
+    - ^release-4\.9$
+    - ^release-4\.9-
     cluster: vsphere02
-    context: ci/prow/e2e-vsphere-autoscaler-periodic
+    context: ci/prow/e2e-vsphere-operator
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-e2e-vsphere-autoscaler-periodic
-    optional: true
-    rerun_command: /test e2e-vsphere-autoscaler-periodic
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-e2e-vsphere-operator
+    rerun_command: /test e2e-vsphere-operator
+    run_if_changed: ^(.*(vsphere|baremetal).*)\.go$
     spec:
       containers:
       - args:
@@ -965,7 +1182,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-vsphere-autoscaler-periodic
+        - --target=e2e-vsphere-operator
         command:
         - ci-operator
         env:
@@ -1036,23 +1253,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-autoscaler-periodic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build04
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
     context: ci/prow/images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-images
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-images
     rerun_command: /test images
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1061,7 +1280,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
-        - --target=src
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -1098,34 +1316,28 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.23$
-    - ^release-4\.23-
-    cluster: build04
-    context: ci/prow/lint-autoscaler
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-autoscale-tests-release-4.23-lint-autoscaler
-    optional: true
-    rerun_command: /test lint-autoscaler
-    run_if_changed: ^cas/
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-unit
+    rerun_command: /test unit
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=lint-autoscaler
+        - --target=unit
         command:
         - ci-operator
         env:
@@ -1143,20 +1355,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1169,24 +1369,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1196,4 +1378,70 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint-autoscaler,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build08
+    context: ci/prow/verify
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-image-registry-operator-release-4.9-verify
+    rerun_command: /test verify
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)

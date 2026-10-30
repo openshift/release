@@ -1,23 +1,25 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
-  cron: '@yearly'
+  cluster: build04
+  cron: 24 23 3 4 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
     - .ci-operator.yaml
+    - Dockerfile.rhel
   extra_refs:
-  - base_ref: main
+  - base_ref: release-4.10
     org: openshift
-    repo: ci-tools-standalone
+    repo: cluster-api-provider-ovirt
     sparse_checkout_files:
     - .ci-operator.yaml
+    - Dockerfile.rhel
   labels:
-    capability/nested-podman: nested-podman
-    ci-operator.openshift.io/variant: agentic
+    ci-operator.openshift.io/cloud: ovirt
+    ci-operator.openshift.io/cloud-cluster-profile: ovirt
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ci-tools-standalone-main-agentic-periodic-jira-agent
+  name: periodic-ci-openshift-cluster-api-provider-ovirt-release-4.10-e2e-ovirt-cleanup
   spec:
     containers:
     - args:
@@ -29,8 +31,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=periodic-jira-agent
-      - --variant=agentic
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-ovirt-cleanup
       command:
       - ci-operator
       env:
@@ -50,6 +52,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -77,6 +82,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config
@@ -96,24 +104,26 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: '@yearly'
+  cluster: build04
+  cron: 48 21 23 6 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
     - .ci-operator.yaml
+    - Dockerfile.rhel
   extra_refs:
-  - base_ref: main
+  - base_ref: release-4.10
     org: openshift
-    repo: ci-tools-standalone
+    repo: cluster-api-provider-ovirt
     sparse_checkout_files:
     - .ci-operator.yaml
+    - Dockerfile.rhel
   labels:
-    capability/nested-podman: nested-podman
-    ci-operator.openshift.io/variant: agentic
+    ci-operator.openshift.io/cloud: ovirt
+    ci-operator.openshift.io/cloud-cluster-profile: ovirt
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ci-tools-standalone-main-agentic-periodic-pr-followup-agent
+  name: periodic-ci-openshift-cluster-api-provider-ovirt-release-4.10-e2e-ovirt-prfinder
   spec:
     containers:
     - args:
@@ -125,8 +135,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=periodic-pr-followup-agent
-      - --variant=agentic
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-ovirt-prfinder
       command:
       - ci-operator
       env:
@@ -146,6 +156,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -173,6 +186,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - configMap:
         name: gsm-config
       name: gsm-config

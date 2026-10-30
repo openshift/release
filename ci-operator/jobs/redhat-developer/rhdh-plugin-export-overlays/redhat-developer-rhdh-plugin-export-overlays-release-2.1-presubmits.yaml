@@ -1,22 +1,24 @@
 presubmits:
-  redhat-developer/rhdh-plugin-export-overlays:
+  openshift/cluster-machine-approver:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build11
-    context: ci/prow/e2e-ocp-helm
+    context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 2
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-helm
-    optional: true
-    rerun_command: /test e2e-ocp-helm
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-aws
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
@@ -25,12 +27,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm
+        - --target=e2e-aws
         command:
         - ci-operator
         env:
@@ -63,9 +64,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -95,9 +93,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -107,24 +102,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build11
-    context: ci/prow/e2e-ocp-helm-nightly
+    context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-helm-nightly
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-aws-disruptive
     optional: true
-    rerun_command: /test e2e-ocp-helm-nightly
+    rerun_command: /test e2e-aws-disruptive
     spec:
       containers:
       - args:
@@ -133,12 +131,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm-nightly
+        - --target=e2e-aws-disruptive
         command:
         - ci-operator
         env:
@@ -171,9 +168,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -203,9 +197,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -215,24 +206,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build11
-    context: ci/prow/e2e-ocp-helm-nightly-pr-scoped
+    context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 2
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-helm-nightly-pr-scoped
-    optional: true
-    rerun_command: /test e2e-ocp-helm-nightly-pr-scoped
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-aws-operator
+    rerun_command: /test e2e-aws-operator
     spec:
       containers:
       - args:
@@ -241,12 +234,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm-nightly-pr-scoped
+        - --target=e2e-aws-operator
         command:
         - ci-operator
         env:
@@ -279,9 +271,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -311,9 +300,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -323,24 +309,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm-nightly-pr-scoped,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build11
-    context: ci/prow/e2e-ocp-operator
+    context: ci/prow/e2e-azure-operator
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 2
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-operator
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-azure-operator
     optional: true
-    rerun_command: /test e2e-ocp-operator
+    rerun_command: /test e2e-azure-operator
     spec:
       containers:
       - args:
@@ -349,12 +338,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-operator
+        - --target=e2e-azure-operator
         command:
         - ci-operator
         env:
@@ -387,9 +375,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -419,9 +404,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -431,24 +413,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-operator,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
-    cluster: build11
-    context: ci/prow/e2e-ocp-operator-nightly
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build12
+    context: ci/prow/e2e-gcp-operator
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-operator-nightly
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-gcp-operator
     optional: true
-    rerun_command: /test e2e-ocp-operator-nightly
+    rerun_command: /test e2e-gcp-operator
     spec:
       containers:
       - args:
@@ -457,12 +442,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-operator-nightly
+        - --target=e2e-gcp-operator
         command:
         - ci-operator
         env:
@@ -495,9 +479,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -527,9 +508,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -539,24 +517,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-operator-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-operator,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build11
-    context: ci/prow/e2e-ocp-operator-nightly-pr-scoped
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 2
-    name: pull-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-operator-nightly-pr-scoped
-    optional: true
-    rerun_command: /test e2e-ocp-operator-nightly-pr-scoped
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-e2e-upgrade
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -565,12 +545,11 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-operator-nightly-pr-scoped
+        - --target=e2e-upgrade
         command:
         - ci-operator
         env:
@@ -603,9 +582,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -635,9 +611,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -647,4 +620,127 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-operator-nightly-pr-scoped,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build11
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build11
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.rhel
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-machine-approver-release-4.10-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

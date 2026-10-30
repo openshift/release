@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build02
     context: ci/prow/ci-bundle-opendatahub-operator-bundle
     decorate: true
     decoration_config:
@@ -61,7 +61,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -117,18 +117,20 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build08
     context: ci/prow/opendatahub-operator-e2e
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - Dockerfiles/Dockerfile
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-opendatahub
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-opendatahub-io-opendatahub-operator-stable-2.x-opendatahub-operator-e2e
     rerun_command: /test opendatahub-operator-e2e
-    skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
+    skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
     spec:
       containers:
       - args:
@@ -137,7 +139,6 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
@@ -175,9 +176,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -207,9 +205,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -225,7 +220,7 @@ presubmits:
     branches:
     - ^stable-2\.x$
     - ^stable-2\.x-
-    cluster: build07
+    cluster: build02
     context: ci/prow/opendatahub-operator-pr-image-mirror
     decorate: true
     decoration_config:

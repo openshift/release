@@ -1,25 +1,35 @@
 periodics:
 - agent: kubernetes
-  cluster: build12
-  cron: '@weekly'
+  cluster: build03
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-arm64-ocp50-e2e-install
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.14-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-arm64-ocp50-e2e-install-aws-s3-nightly
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.14-lp-interop-helm-interop-aws
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -32,8 +42,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-s3-nightly
-      - --variant=aws-arm64-ocp50-e2e-install
+      - --target=helm-interop-aws
+      - --variant=helm-ocp4.14-lp-interop
       command:
       - ci-operator
       env:
@@ -105,26 +115,151 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
-  cron: 53 3 * * *
+  cluster: build03
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.14-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.14-lp-interop-helm-interop-ibmcloud
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=helm-interop-ibmcloud
+      - --variant=helm-ocp4.14-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 6 11 7 *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
+  extra_refs:
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-ocp50-e2e-install
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.15-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-ocp50-e2e-install-aws-odf-nightly
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.15-lp-interop-helm-interop-aws
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -137,8 +272,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-odf-nightly
-      - --variant=aws-ocp50-e2e-install
+      - --target=helm-interop-aws
+      - --variant=helm-ocp4.15-lp-interop
       command:
       - ci-operator
       env:
@@ -210,26 +345,151 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
-  cron: 6 22 * * *
+  cluster: build03
+  cron: 0 6 11 7 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.15-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.15-lp-interop-helm-interop-ibmcloud
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=helm-interop-ibmcloud
+      - --variant=helm-ocp4.15-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
+  extra_refs:
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-ocp50-e2e-install
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.16-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-ocp50-e2e-install-aws-s3-nightly
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.16-lp-interop-helm-interop-aws
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -242,8 +502,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-s3-nightly
-      - --variant=aws-ocp50-e2e-install
+      - --target=helm-interop-aws
+      - --variant=helm-ocp4.16-lp-interop
       command:
       - ci-operator
       env:
@@ -315,26 +575,267 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
-  cron: '@weekly'
+  cluster: build03
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.16-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.16-lp-interop-helm-interop-ibmcloud
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=helm-interop-ibmcloud
+      - --variant=helm-ocp4.16-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
+  extra_refs:
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
+  labels:
+    ci-operator.openshift.io/cloud: ibmcloud
+    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.17-lp-interop
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.17-lp-interop-helm-interop-ibmcloud
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=helm-interop-ibmcloud
+      - --variant=helm-ocp4.17-lp-interop
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 23 31 2 *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
+  extra_refs:
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
+    sparse_checkout_files:
+    - openshift-ci/Dockerfile.tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-ocp50-e2e-install
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.18-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-ocp50-e2e-install-aws-s3-nightly-fips
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.18-lp-interop-helm-interop-aws
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -347,8 +848,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-s3-nightly-fips
-      - --variant=aws-ocp50-e2e-install
+      - --target=helm-interop-aws
+      - --variant=helm-ocp4.18-lp-interop
       command:
       - ci-operator
       env:
@@ -420,26 +921,37 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build12
-  cron: '@weekly'
+  cluster: build03
+  cron: 0 23 31 2 *
   decorate: true
   decoration_config:
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
+  - base_ref: release-3.11
+    org: redhat-developer
+    repo: helm
     sparse_checkout_files:
-    - web/Containerfile.playwright
+    - openshift-ci/Dockerfile.tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-ocp50-e2e-install
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: helm-ocp4.18-lp-interop
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
+    job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-ocp50-e2e-install-aws-s3-rds-nightly
+  name: periodic-ci-redhat-developer-helm-release-3.11-helm-ocp4.18-lp-interop-helm-interop-aws-fips
+  reporter_config:
+    slack:
+      channel: '#helm-interop'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -452,428 +964,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=aws-s3-rds-nightly
-      - --variant=aws-ocp50-e2e-install
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build12
-  cron: 6 22 * * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-    timeout: 6h0m0s
-  extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: aws-ocp50-s3-upgrade
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-aws-ocp50-s3-upgrade-from-318
-  spec:
-    containers:
-    - args:
-      - --enable-secrets-store-csi-driver=true
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=from-318
-      - --variant=aws-ocp50-s3-upgrade
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: 5 3 * * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-quay-qe
-    ci-operator.openshift.io/variant: azure-ocp50-e2e-install
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-azure-ocp50-e2e-install-azure-blob-nightly
-  spec:
-    containers:
-    - args:
-      - --enable-secrets-store-csi-driver=true
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=azure-blob-nightly
-      - --variant=azure-ocp50-e2e-install
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: '@weekly'
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure-quay-qe
-    ci-operator.openshift.io/variant: azure-ocp50-e2e-install
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-azure-ocp50-e2e-install-azure-blob-postgres-nightly
-  spec:
-    containers:
-    - args:
-      - --enable-secrets-store-csi-driver=true
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=azure-blob-postgres-nightly
-      - --variant=azure-ocp50-e2e-install
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/gsm-config
-        name: gsm-config
-        readOnly: true
-      - mountPath: /etc/gsm-credentials
-        name: gsm-sa-key
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - configMap:
-        name: gsm-config
-      name: gsm-config
-    - csi:
-        driver: secrets-store.csi.k8s.io
-        readOnly: true
-        volumeAttributes:
-          secretProviderClass: ci-operator-sa-key-spc
-      name: gsm-sa-key
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build13
-  cron: 45 1 * * *
-  decorate: true
-  decoration_config:
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  extra_refs:
-  - base_ref: redhat-5.0
-    org: quay
-    repo: quay
-    sparse_checkout_files:
-    - web/Containerfile.playwright
-  labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp-quay-qe
-    ci-operator.openshift.io/variant: gcp-ocp50-e2e-install
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-redhat-5.0-gcp-ocp50-e2e-install-gcp-gcs-nightly
-  spec:
-    containers:
-    - args:
-      - --enable-secrets-store-csi-driver=true
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --gsm-config=/etc/gsm-config/gsm-config.yaml
-      - --gsm-credentials-file=/etc/gsm-credentials/key.json
-      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=gcp-gcs-nightly
-      - --variant=gcp-ocp50-e2e-install
+      - --target=helm-interop-aws-fips
+      - --variant=helm-ocp4.18-lp-interop
       command:
       - ci-operator
       env:

@@ -1,12 +1,12 @@
 presubmits:
-  openshift-priv/distributed-tracing-console-plugin:
+  openshift-priv/driver-toolkit:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.4$
-    - ^release-0\.4-
-    cluster: build10
-    context: ci/prow/upstream-amd64-aws-e2e
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build03
+    context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,16 +14,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - Dockerfile
-      - Dockerfile.test
-      - tests/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: upstream-amd64-aws
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-distributed-tracing-console-plugin-release-0.4-upstream-amd64-aws-e2e
-    path_alias: github.com/openshift/distributed-tracing-console-plugin
-    rerun_command: /test upstream-amd64-aws-e2e
+    name: pull-ci-openshift-priv-driver-toolkit-release-4.7-e2e-aws
+    path_alias: github.com/openshift/driver-toolkit
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
@@ -32,14 +31,12 @@ presubmits:
         - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --gsm-credentials-file=/etc/gsm-credentials/key.json
         - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e
-        - --variant=upstream-amd64-aws
+        - --target=e2e-aws
         command:
         - ci-operator
         env:
@@ -75,9 +72,6 @@ presubmits:
         - mountPath: /etc/gsm-credentials
           name: gsm-sa-key
           readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -107,9 +101,6 @@ presubmits:
           volumeAttributes:
             secretProviderClass: ci-operator-sa-key-spc
         name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -119,14 +110,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-amd64-aws-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.4$
-    - ^release-0\.4-
-    cluster: build10
-    context: ci/prow/upstream-amd64-aws-fips-image-scan
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build03
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -134,16 +125,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - Dockerfile
-      - Dockerfile.test
-      - tests/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: upstream-amd64-aws
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-distributed-tracing-console-plugin-release-0.4-upstream-amd64-aws-fips-image-scan
-    path_alias: github.com/openshift/distributed-tracing-console-plugin
-    rerun_command: /test upstream-amd64-aws-fips-image-scan
+    name: pull-ci-openshift-priv-driver-toolkit-release-4.7-e2e-upgrade
+    path_alias: github.com/openshift/driver-toolkit
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -156,8 +146,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=fips-image-scan
-        - --variant=upstream-amd64-aws
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-upgrade
         command:
         - ci-operator
         env:
@@ -177,6 +167,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -207,6 +200,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - configMap:
           name: gsm-config
         name: gsm-config
@@ -225,14 +221,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-amd64-aws-fips-image-scan,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.4$
-    - ^release-0\.4-
-    cluster: build10
-    context: ci/prow/upstream-amd64-aws-images
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build03
+    context: ci/prow/image-contents
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -240,16 +236,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - Dockerfile
-      - Dockerfile.test
-      - tests/Dockerfile
     hidden: true
     labels:
-      ci-operator.openshift.io/variant: upstream-amd64-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-distributed-tracing-console-plugin-release-0.4-upstream-amd64-aws-images
-    path_alias: github.com/openshift/distributed-tracing-console-plugin
-    rerun_command: /test upstream-amd64-aws-images
+    name: pull-ci-openshift-priv-driver-toolkit-release-4.7-image-contents
+    path_alias: github.com/openshift/driver-toolkit
+    rerun_command: /test image-contents
     spec:
       containers:
       - args:
@@ -257,77 +250,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=upstream-amd64-aws
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-amd64-aws-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-0\.4$
-    - ^release-0\.4-
-    cluster: build10
-    context: ci/prow/upstream-amd64-aws-lint
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-      sparse_checkout_files:
-      - Dockerfile
-      - Dockerfile.test
-      - tests/Dockerfile
-    hidden: true
-    labels:
-      ci-operator.openshift.io/variant: upstream-amd64-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-distributed-tracing-console-plugin-release-0.4-upstream-amd64-aws-lint
-    path_alias: github.com/openshift/distributed-tracing-console-plugin
-    rerun_command: /test upstream-amd64-aws-lint
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=lint
-        - --variant=upstream-amd64-aws
+        - --target=image-contents
         command:
         - ci-operator
         env:
@@ -371,4 +294,142 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upstream-amd64-aws-lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )image-contents,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build03
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-driver-toolkit-release-4.7-images
+    path_alias: github.com/openshift/driver-toolkit
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.7$
+    - ^release-4\.7-
+    cluster: build03
+    context: ci/prow/verify
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - Dockerfile
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-driver-toolkit-release-4.7-verify
+    path_alias: github.com/openshift/driver-toolkit
+    rerun_command: /test verify
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)

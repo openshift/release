@@ -1,29 +1,233 @@
 presubmits:
-  openshift/assisted-installer:
+  openshift/cluster-baremetal-operator:
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-agnostic
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-agnostic
+    rerun_command: /test e2e-agnostic
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agnostic
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agnostic,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build03
+    context: ci/prow/e2e-aws
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-aws
+    optional: true
+    rerun_command: /test e2e-aws
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-assisted
+    optional: true
     rerun_command: /test e2e-metal-assisted
     spec:
       containers:
@@ -112,27 +316,24 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-cnv
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-cnv
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-ovn-dualstack
     optional: true
-    rerun_command: /test e2e-metal-assisted-cnv
+    rerun_command: /test e2e-metal-ipi-ovn-dualstack
     spec:
       containers:
       - args:
@@ -145,7 +346,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-cnv
+        - --target=e2e-metal-ipi-ovn-dualstack
         command:
         - ci-operator
         env:
@@ -216,31 +417,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-cnv,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-external
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-external
-    optional: true
-    rerun_command: /test e2e-metal-assisted-external
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-ovn-ipv6
+    rerun_command: /test e2e-metal-ipi-ovn-ipv6
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
     spec:
       containers:
       - args:
@@ -253,7 +451,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-external
+        - --target=e2e-metal-ipi-ovn-ipv6
         command:
         - ci-operator
         env:
@@ -324,31 +522,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-external,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-ipv6
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-sdn-ipv4
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-ipv6
-    optional: true
-    rerun_command: /test e2e-metal-assisted-ipv6
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-sdn-ipv4
+    rerun_command: /test e2e-metal-ipi-sdn-ipv4
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
     spec:
       containers:
       - args:
@@ -361,7 +556,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-ipv6
+        - --target=e2e-metal-ipi-sdn-ipv4
         command:
         - ci-operator
         env:
@@ -432,31 +627,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-ipv6,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-sdn-ipv4,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-lvm
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-serial-ipv4
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-lvm
-    optional: true
-    rerun_command: /test e2e-metal-assisted-lvm
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-serial-ipv4
+    rerun_command: /test e2e-metal-ipi-serial-ipv4
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
     spec:
       containers:
       - args:
@@ -469,7 +661,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-lvm
+        - --target=e2e-metal-ipi-serial-ipv4
         command:
         - ci-operator
         env:
@@ -540,31 +732,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-lvm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-serial-ipv4,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-odf
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-upgrade
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-odf
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-upgrade
     optional: true
-    rerun_command: /test e2e-metal-assisted-odf
+    rerun_command: /test e2e-metal-ipi-upgrade
     spec:
       containers:
       - args:
@@ -577,7 +766,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-odf
+        - --target=e2e-metal-ipi-upgrade
         command:
         - ci-operator
         env:
@@ -648,31 +837,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-odf,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-metal-assisted-single-node
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-upgrade-ovn-ipv6
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       capability/intranet: intranet
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-metal-assisted-single-node
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-upgrade-ovn-ipv6
     optional: true
-    rerun_command: /test e2e-metal-assisted-single-node
+    rerun_command: /test e2e-metal-ipi-upgrade-ovn-ipv6
     spec:
       containers:
       - args:
@@ -685,7 +871,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-single-node
+        - --target=e2e-metal-ipi-upgrade-ovn-ipv6
         command:
         - ci-operator
         env:
@@ -756,30 +942,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-single-node,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-upgrade-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/e2e-oci-assisted
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
-      ci-operator.openshift.io/cloud: oci-edge
-      ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-oci-assisted
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-e2e-metal-ipi-virtualmedia
     optional: true
-    rerun_command: /test e2e-oci-assisted
+    rerun_command: /test e2e-metal-ipi-virtualmedia
     spec:
       containers:
       - args:
@@ -792,7 +976,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-oci-assisted
+        - --target=e2e-metal-ipi-virtualmedia
         command:
         - ci-operator
         env:
@@ -863,142 +1047,32 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-oci-assisted,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: vsphere02
-    context: ci/prow/e2e-vsphere-assisted
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/generate-check
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci.openshift.io/generator: prowgen
-      job-release: "5.0"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-e2e-vsphere-assisted
-    optional: true
-    rerun_command: /test e2e-vsphere-assisted
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-vsphere-assisted
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-assisted,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/format-check
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-format-check
-    rerun_command: /test format-check
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-generate-check
+    rerun_command: /test generate-check
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=format-check
+        - --target=generate-check
         command:
         - ci-operator
         env:
@@ -1039,26 +1113,155 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )format-check,?($|\s.*)
+    trigger: (?m)^/test( | .* )generate-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/gofmt
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-gofmt
+    rerun_command: /test gofmt
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gofmt
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/govet
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-govet
+    rerun_command: /test govet
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=govet
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-images
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-images
     rerun_command: /test images
     spec:
       containers:
@@ -1067,6 +1270,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -1103,24 +1307,21 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-lint
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-lint
     rerun_command: /test lint
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
     spec:
       containers:
       - args:
@@ -1172,35 +1373,28 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^v2\.56$
-    - ^v2\.56-
-    cluster: build06
-    context: ci/prow/unit-test
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       sparse_checkout_files:
       - .ci-operator.yaml
-      - Dockerfile.assisted-installer
-      - Dockerfile.assisted-installer-build
-      - Dockerfile.assisted-installer-controller
+      - Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-v2.56-unit-test
-    rerun_command: /test unit-test
-    skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    name: pull-ci-openshift-cluster-baremetal-operator-release-4.10-unit
+    rerun_command: /test unit
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-test
+        - --target=unit
         command:
         - ci-operator
         env:
@@ -1221,12 +1415,6 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -1238,15 +1426,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1256,4 +1435,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

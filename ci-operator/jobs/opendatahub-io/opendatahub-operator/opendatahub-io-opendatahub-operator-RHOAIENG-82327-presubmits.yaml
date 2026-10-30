@@ -1,23 +1,129 @@
 presubmits:
-  opendatahub-io/opendatahub-operator:
+  openshift-knative/eventing-istio:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
-    - ^RHOAIENG-82327$
-    - ^RHOAIENG-82327-
-    cluster: build01
-    context: ci/prow/images
+    - ^release-v1\.22$
+    - ^release-v1\.22-
+    cluster: build10
+    context: ci/prow/414-e2e-tests
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfiles/Dockerfile
-      - Dockerfiles/rhoai.Dockerfile
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-serverless
+      ci-operator.openshift.io/variant: "414"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-opendatahub-operator-RHOAIENG-82327-images
-    optional: true
-    rerun_command: /test images
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.22-414-e2e-tests
+    rerun_command: /test 414-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-tests
+        - --variant=414
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(414-e2e-tests|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-v1\.22$
+    - ^release-v1\.22-
+    cluster: build06
+    context: ci/prow/414-images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
+    labels:
+      ci-operator.openshift.io/variant: "414"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.22-414-images
+    rerun_command: /test 414-images
+    run_if_changed: ^non-existing$
     spec:
       containers:
       - args:
@@ -25,6 +131,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
+        - --variant=414
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -57,25 +165,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )414-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^RHOAIENG-82327$
-    - ^RHOAIENG-82327-
-    cluster: build01
-    context: ci/prow/opendatahub-operator-e2e
+    - ^release-v1\.22$
+    - ^release-v1\.22-
+    cluster: build06
+    context: ci/prow/420-e2e-tests
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfiles/Dockerfile
-      - Dockerfiles/rhoai.Dockerfile
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
+      ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-opendatahub-operator-RHOAIENG-82327-opendatahub-operator-e2e
-    rerun_command: /test opendatahub-operator-e2e
-    skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.22-420-e2e-tests
+    rerun_command: /test 420-e2e-tests
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
@@ -89,7 +198,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=opendatahub-operator-e2e
+        - --target=e2e-tests
+        - --variant=420
         command:
         - ci-operator
         env:
@@ -166,73 +276,46 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opendatahub-operator-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )420-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^RHOAIENG-82327$
-    - ^RHOAIENG-82327-
-    cluster: build01
-    context: ci/prow/opendatahub-operator-rhoai-e2e
+    - ^release-v1\.22$
+    - ^release-v1\.22-
+    cluster: build06
+    context: ci/prow/420-images
     decorate: true
     decoration_config:
       sparse_checkout_files:
-      - Dockerfiles/Dockerfile
-      - Dockerfiles/rhoai.Dockerfile
+      - openshift/ci-operator/knative-images/controller/Dockerfile
+      - openshift/ci-operator/source-image/Dockerfile
     labels:
+      ci-operator.openshift.io/variant: "420"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-opendatahub-operator-RHOAIENG-82327-opendatahub-operator-rhoai-e2e
-    rerun_command: /test opendatahub-operator-rhoai-e2e
-    skip_if_only_changed: ^\.github/|^build/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^cmd/[^/]+/|^\.[^/]+\.(yaml|yml)$|^(component-params-env|semgrep)\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$|^api/cloudmanager/|^config/cloudmanager/|^internal/controller/cloudmanager/|^pkg/controller/cloudmanager/|^tests/e2e/cloudmanager/|^hack/update-cloudmanager-rbac\.sh$|^pkg/operatorconfig/cloudmanager\.go$|^pkg/utils/test/cloudmanager/
+    name: pull-ci-openshift-knative-eventing-istio-release-v1.22-420-images
+    rerun_command: /test 420-images
+    skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=opendatahub-operator-rhoai-e2e
+        - --target=[images]
+        - --target=src
+        - --variant=420
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -245,27 +328,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -275,4 +337,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )opendatahub-operator-rhoai-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )420-images,?($|\s.*)

@@ -1,17 +1,18 @@
 postsubmits:
-  stolostron/must-gather:
+  openshift/cluster-api-provider-kubevirt:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    cluster: build11
+    - ^release-4\.11$
+    cluster: build08
     decorate: true
-    decoration_config: {}
+    decoration_config:
+      skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-must-gather-release-5.1-images
+    name: branch-ci-openshift-cluster-api-provider-kubevirt-release-4.11-images
     spec:
       containers:
       - args:
@@ -62,14 +63,15 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.1$
-    cluster: build11
+    - ^release-4\.11$
+    cluster: build08
     decorate: true
-    decoration_config: {}
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-must-gather-release-5.1-publish
+    name: branch-ci-openshift-cluster-api-provider-kubevirt-release-4.11-mce-publish
     spec:
       containers:
       - args:
@@ -81,7 +83,8 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=publish
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=mce-publish
         command:
         - ci-operator
         env:
@@ -101,6 +104,9 @@ postsubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -128,6 +134,9 @@ postsubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - configMap:
           name: gsm-config
         name: gsm-config

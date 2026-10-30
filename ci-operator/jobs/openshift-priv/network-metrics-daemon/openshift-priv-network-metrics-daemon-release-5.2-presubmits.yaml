@@ -1,10 +1,10 @@
 presubmits:
-  openshift-priv/network-metrics-daemon:
+  openshift-priv/gcp-pd-csi-driver:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
+    - ^release-4\.10$
+    - ^release-4\.10-
     cluster: build04
     context: ci/prow/e2e-gcp
     decorate: true
@@ -21,8 +21,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-network-metrics-daemon-release-5.2-e2e-gcp
-    path_alias: github.com/openshift/network-metrics-daemon
+    name: pull-ci-openshift-priv-gcp-pd-csi-driver-release-4.10-e2e-gcp
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
     rerun_command: /test e2e-gcp
     spec:
       containers:
@@ -111,14 +111,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-gcp|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build08
-    context: ci/prow/images
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build04
+    context: ci/prow/e2e-gcp-csi
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -129,78 +129,13 @@ presubmits:
       - Dockerfile.openshift
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-network-metrics-daemon-release-5.2-images
-    path_alias: github.com/openshift/network-metrics-daemon
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build08
-    context: ci/prow/security
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-      sparse_checkout_files:
-      - .ci-operator.yaml
-      - Dockerfile.openshift
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-network-metrics-daemon-release-5.2-security
-    optional: true
-    path_alias: github.com/openshift/network-metrics-daemon
-    rerun_command: /test security
+    name: pull-ci-openshift-priv-gcp-pd-csi-driver-release-4.10-e2e-gcp-csi
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+    rerun_command: /test e2e-gcp-csi
     spec:
       containers:
       - args:
@@ -214,7 +149,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=security
+        - --target=e2e-gcp-csi
         command:
         - ci-operator
         env:
@@ -288,14 +223,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )security,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-csi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build08
-    context: ci/prow/unit
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build02
+    context: ci/prow/images
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -308,9 +243,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-network-metrics-daemon-release-5.2-unit
-    path_alias: github.com/openshift/network-metrics-daemon
-    rerun_command: /test unit
+    name: pull-ci-openshift-priv-gcp-pd-csi-driver-release-4.10-images
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -318,7 +253,73 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build02
+    context: ci/prow/test
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.openshift
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-gcp-pd-csi-driver-release-4.10-test
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
+    rerun_command: /test test
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test
         command:
         - ci-operator
         env:
@@ -362,13 +363,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.2$
-    - ^release-5\.2-
-    cluster: build08
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
@@ -382,8 +383,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-network-metrics-daemon-release-5.2-verify-deps
-    path_alias: github.com/openshift/network-metrics-daemon
+    name: pull-ci-openshift-priv-gcp-pd-csi-driver-release-4.10-verify-deps
+    path_alias: sigs.k8s.io/gcp-compute-persistent-disk-csi-driver
     rerun_command: /test verify-deps
     spec:
       containers:
