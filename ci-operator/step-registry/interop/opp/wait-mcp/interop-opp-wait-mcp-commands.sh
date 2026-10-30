@@ -75,6 +75,7 @@ typeset -i _jrc_set=0  # initialized here - before the trap and before env
 _junit_class=""
 _junit_reason=""
 _junit_selftest="not-run"
+_junit_trapselftest="not-run"
 _junit_emit() {
   # Emit a JUnit XML result for the wait-mcp step and propagate
   # it to SHARED_DIR/junit so downstream steps can aggregate results.
@@ -111,6 +112,7 @@ _junit_emit() {
     <property name="extensions" value="${extensionsApplied}"/>
     <property name="mcp_wait_seconds" value="${_jd}"/>
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
+    <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
   <testcase name="predicate-selftest" classname="lp-interop.OPP.${_jn}" time="0">
@@ -334,13 +336,109 @@ WaitMcpSelfTest () {
   return "${_fail}"
 }
 
-if WaitMcpSelfTest; then
+WaitMcpTrapSelfTest () {
+  # Fork the REAL script (byte-identical copy under a distinct basename so
+  # the child's xtrace log does not collide with this process's) against a
+  # mock oc, send it SIGTERM once it reaches the health-gate poll loop, and
+  # assert the TERM contract end to end: exit code 143, a JUnit failure
+  # carrying the reason, the scrubbed xtrace bundle in artifacts, and the
+  # trap's synchronous work completing well inside the 300s step-timeout
+  # grace. Runs on every execution (phase 0) - a mid-step termination is
+  # not parameterizable into a pj-rehearse rehearsal, so the per-run
+  # self-test is the standing evidence for the termination path (the
+  # acceptance criterion's one-shot rehearsal is superseded by this).
+  local _tt_dir _cpid _crc=0 _w _t0 _t1
+  _tt_dir="$(mktemp -d /tmp/wmcp-termtest.XXXXXX)" || { echo "trap self-test: mktemp failed" >&2; return 1; }
+  mkdir -p "${_tt_dir}/shared" "${_tt_dir}/artifacts" "${_tt_dir}/mockbin"
+  # Mock oc: a worker MCP mid-rollout (Updating, not Degraded, not
+  # converged) so the child stays in the poll loop; everything else
+  # answers an empty List. The child never touches a real cluster.
+  cat > "${_tt_dir}/mockbin/oc" <<'MOCKEOF'
+#!/bin/bash
+case "$*" in
+  *"get mcp -o json"*)
+    cat <<'JSONEOF'
+{"apiVersion":"v1","items":[{"apiVersion":"machineconfiguration.openshift.io/v1","kind":"MachineConfigPool","metadata":{"name":"worker","generation":3},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"False","reason":"AsExpected"},{"type":"Updated","status":"False","reason":"test"},{"type":"Updating","status":"True","reason":"test"}],"degradedMachineCount":0,"machineCount":9,"observedGeneration":3,"readyMachineCount":7,"unavailableMachineCount":2,"updatedMachineCount":7}}],"kind":"List"}
+JSONEOF
+    ;;
+  *) echo '{"apiVersion":"v1","items":[],"kind":"List"}' ;;
+esac
+MOCKEOF
+  chmod +x "${_tt_dir}/mockbin/oc"
+  local _src
+  _src="$(readlink -f "${0}" 2>/dev/null)" || _src="${0}"
+  cp "${_src}" "${_tt_dir}/wmcp-term-child.sh" || { echo "trap self-test: copy failed" >&2; rm -rf "${_tt_dir}"; return 1; }
+  # Child: real script, mock API on PATH, tight poll cadence, short
+  # deadline so a missed signal still self-terminates, child-mode env so
+  # its own phase 0 does not fork another trap test (recursion guard).
+  WAIT_MCP_SELFTEST_CHILD=1 PATH="${_tt_dir}/mockbin:${PATH}" \
+    SHARED_DIR="${_tt_dir}/shared" ARTIFACT_DIR="${_tt_dir}/artifacts" \
+    KUBECONFIG="${_tt_dir}/kubeconfig" MCP_SETTLE_DELAY=0 MCP_POLL_INTERVAL=10 \
+    MCP_WAIT_TIMEOUT=120 MCP_WAIT_MAX_TIMEOUT=180 \
+    bash "${_tt_dir}/wmcp-term-child.sh" > "${_tt_dir}/child.log" 2>&1 &
+  _cpid=$!
+  _w=0
+  while (( _w < 90 )); do
+    grep -q "Polling MCPs for up to" "${_tt_dir}/child.log" 2>/dev/null && break
+    # bail out early if the child died before reaching the poll loop
+    kill -0 "${_cpid}" 2>/dev/null || break
+    sleep 1
+    (( _w++ )) || true
+  done
+  if ! grep -q "Polling MCPs for up to" "${_tt_dir}/child.log" 2>/dev/null; then
+    echo "trap self-test: child never reached the poll loop (waited ${_w}s)" >&2
+    tail -20 "${_tt_dir}/child.log" >&2
+    kill -9 "${_cpid}" 2>/dev/null || true
+    wait "${_cpid}" 2>/dev/null || true
+    rm -rf "${_tt_dir}"
+    return 1
+  fi
+  _t0=$(date +%s)
+  kill -TERM "${_cpid}" 2>/dev/null || true
+  wait "${_cpid}" 2>/dev/null || _crc=$?
+  _t1=$(date +%s)
+  local _ok=0
+  # 1. exit code 143 (TERM recorded by the handler, not a shell default)
+  (( _crc == 143 )) || { echo "trap self-test: expected exit 143, got ${_crc}" >&2; _ok=1; }
+  # 2. JUnit failure carrying the TERM reason
+  python3 - "${_tt_dir}/artifacts/junit_lp-interop--OPP--wait-mcp.xml" <<'PYEOF' || _ok=1
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+    tc = {c.get("name"): c for c in root.findall("testcase")}["wait-mcp"]
+    f = tc.find("failure")
+    assert f is not None, "no failure element"
+    assert "143" in (f.get("message") or ""), f"failure message: {f.get('message')}"
+except Exception as e:
+    print(f"trap self-test: JUnit assertion failed: {e}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+  # 3. scrubbed xtrace bundle landed in artifacts (the never-uploaded
+  #    bundle from the original defect)
+  ls "${_tt_dir}/artifacts"/xtrace-scrub-*.log >/dev/null 2>&1 || {
+    echo "trap self-test: no xtrace-scrub-*.log in artifacts" >&2; _ok=1; }
+  # 4. TERM-to-exit well inside the 300s grace (includes bash deferring
+  #    the trap behind a <=10s foreground sleep; the trap's own work is
+  #    sub-second)
+  (( (_t1 - _t0) < 60 )) || { echo "trap self-test: TERM-to-exit took $((_t1 - _t0))s (budget 60s)" >&2; _ok=1; }
+  if (( _ok )); then tail -20 "${_tt_dir}/child.log" >&2; fi
+  rm -rf "${_tt_dir}"
+  (( _ok == 0 ))
+}
+
+if WaitMcpSelfTest && { [[ -n "${WAIT_MCP_SELFTEST_CHILD:-}" ]] || WaitMcpTrapSelfTest; }; then
   _junit_selftest="pass"
   echo ">>> PHASE 0: predicate self-test passed (rewritten predicate pinned)"
+  if [[ -n "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
+    _junit_trapselftest="skip"
+  else
+    _junit_trapselftest="pass"
+    echo ">>> PHASE 0: trap self-test passed (TERM -> 143, JUnit reason, xtrace bundle, bounded grace)"
+  fi
 else
   _junit_selftest="fail"
   echo "FAILURE CLASS: Invalid step input" >&2
-  echo "predicate self-test failed: IsMcpProgressing does not reproduce its pinned behavior" >&2
+  echo "predicate/trap self-test failed: step semantics are not the reviewed ones" >&2
   exit 2
 fi
 
@@ -601,12 +699,12 @@ else:
 " 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|-1"
 
     typeset statusKey="${statusLine%%|*}"
-    typeset remainder="${statusLine#*|}"
-    typeset statusDetail="${remainder%|*}"
     # statusLine = KEY|detail|ready|updated|machine|degraded|genSum
     typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0 genSum=-1
     typeset _detail="" _degField=""
     IFS='|' read -r _statusKeyField _detail totalReady totalUpdated totalMachine _degField genSum <<< "${statusLine}"
+    statusKey="${_statusKeyField}"
+    typeset statusDetail="${_detail}"
     [[ "${totalReady}" =~ ^[0-9]+$ ]] || totalReady=0
     [[ "${totalUpdated}" =~ ^[0-9]+$ ]] || totalUpdated=0
     [[ "${totalMachine}" =~ ^[0-9]+$ ]] || totalMachine=0
