@@ -227,14 +227,18 @@ function IsMcpProgressing () {
     fi
     typeset -i notReadyStreak=0
     for (( i = len - 1; i >= 0; --i )); do
-        # The streak is "not-ready WITHOUT Degraded": Degraded polls are
-        # SKIPPED, not counted and not terminating (preflight reviews: a
-        # pool Degraded for 100 polls then cycling for 20 must not inherit
-        # the Degraded period's count, but a 179-poll sawtooth with two
-        # Degraded blips must still accumulate ~177 cycling polls toward
-        # the veto - run2's pinned verdict).
+        # The streak is the PINNED-UPDATED cycling mode (MCP_PINNED_
+        # UPDATED_POLLS): updated pinned at machineCount, ready oscillating
+        # below it, no Degraded - run 2's mode (all machines updated, the
+        # pool never went ready). Degraded polls are SKIPPED (not counted,
+        # not terminating); a poll with updated below machineCount
+        # TERMINATES the streak (a still-updating rollout is a different
+        # failure mode, not cycling).
         if (( degradedHistory[i] )); then
             continue
+        fi
+        if (( updatedHistory[i] != machineCountHistory[i] )); then
+            break
         fi
         if (( readyHistory[i] < machineCountHistory[i] )); then
             (( ++notReadyStreak ))
