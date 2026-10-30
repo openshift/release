@@ -75,11 +75,17 @@ case "${PR_METADATA_DIR}/" in
         ;;
 esac
 PR_BODY_FILE="${PR_METADATA_DIR}/pr-description.md"
+rm -f -- "${PR_BODY_FILE}"
 
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        for artifact in "${WORKDIR}/artifacts/"*; do
+            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
+                continue
+            fi
+            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+        done
         if [[ -f "${PR_BODY_FILE}" ]]; then
             cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
         fi
@@ -244,6 +250,8 @@ fi
 
 # Fail closed if the former pipeline metadata path was committed. Other files
 # under artifacts/ remain valid repository content and are not blocked.
+(
+export GIT_NO_REPLACE_OBJECTS=1
 PR_HISTORY_RC=0
 git merge-base --is-ancestor "${START_COMMIT}" HEAD || PR_HISTORY_RC=$?
 if [[ "${PR_HISTORY_RC}" -ne 0 ]]; then
@@ -304,6 +312,7 @@ while read -r -a PR_HISTORY_ENTRY; do
         exit 1
     fi
 done <<< "${PR_FEATURE_HISTORY}"
+)
 
 # The agent never pushes. Publish only this branch to the configured fork; do
 # not fall back to upstream, honor push.default, or delete another remote ref.
