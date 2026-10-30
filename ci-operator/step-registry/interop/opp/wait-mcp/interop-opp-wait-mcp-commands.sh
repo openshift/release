@@ -511,16 +511,48 @@ function CollectFailureBundle () {
     _bundleCollected=1
     [[ -n "${ARTIFACT_DIR:-}" ]] || return 0
     set +x 2>/dev/null
+    # Policy artifacts are SECRET-REDACTED on the way out (preflight
+    # review): policy-templates can embed Secret objects whose
+    # data/stringData would otherwise land in the public artifact
+    # bucket; fromSecret references (names only) are kept.
+    local _redact
+    _redact="$(mktemp /tmp/wmcp-redact.XXXXXX.py)" || _redact=""
+    if [[ -n "${_redact}" ]]; then
+      cat > "${_redact}" <<'REDACTEOF'
+import sys, json
+
+def redact(o):
+    if isinstance(o, dict):
+        out = {}
+        for k, v in o.items():
+            if k in ("data", "stringData") and isinstance(v, dict):
+                out[k] = {ik: "REDACTED" for ik in v}
+            else:
+                out[k] = redact(v)
+        return out
+    if isinstance(o, list):
+        return [redact(x) for x in o]
+    return o
+
+json.dump(redact(json.load(sys.stdin)), sys.stdout, indent=1)
+REDACTEOF
+    fi
     timeout 120s bash -c '
       oc --request-timeout=10s get machines -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || true
       oc --request-timeout=10s get machinesets -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/policies.yaml" 2>/dev/null || true
+      if [ -n "'"${_redact}"'" ]; then
+        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || true
+        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || true
+      else
+        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" 2>/dev/null || true
+        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/policies.yaml" 2>/dev/null || true
+      fi
       oc --request-timeout=10s get kubeletconfigs.machineconfiguration.openshift.io -A -o yaml > "'"${ARTIFACT_DIR}"'/kubeletconfigs.yaml" 2>/dev/null || true
       oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || true
       oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || true
     ' || true
-    echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies, kubeletconfigs, mcps, nodes)"
+    if [[ -n "${_redact}" ]]; then rm -f "${_redact}"; fi
+    echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], kubeletconfigs, mcps, nodes)"
     set -x 2>/dev/null || true
     return 0
 }
