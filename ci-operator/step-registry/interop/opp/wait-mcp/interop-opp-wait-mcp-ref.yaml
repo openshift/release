@@ -13,23 +13,34 @@ ref:
     Fails if any check is unhealthy, preventing misleading downstream
     test failures from degraded infrastructure.
 
-    Patches the worker MCP maxUnavailable to parallelize node rollout on
-    large clusters.
+    Does not patch the worker MCP (the former maxUnavailable=3 patch was
+    an unreverted SUT mutation; the serialized rollout fits the budget).
 
-    Supports progress-based timeout extension: when the ready count is
-    trending upward during the poll loop, the deadline is automatically
-    extended (up to MCP_WAIT_MAX_TIMEOUT) to avoid timing out on
-    slow-but-healthy rollouts common in multi-operator installs.
+    Progress-based timeout extension (INTEROP-9646 rewrite): the deadline
+    is extended only when the per-pool updated-machine count is rising
+    monotonically, or the ready count is recovering with bounded
+    regression - never while any pool is Degraded, and never once the
+    pool has failed to converge for MCP_PINNED_UPDATED_POLLS consecutive
+    polls without Degraded (sustained cycling). The trend window resets
+    on MachineConfig generation change (render churn).
 
-    On MCP timeout, classifies the failure mode:
-    - DEGRADED: Hard failure. One or more MCPs have Degraded=True, indicating
-      a product interop issue where policies caused nodes to enter a bad state.
-    - UPDATING (progressing): Hard failure. Ready count is increasing but
-      the rollout exceeded the timeout. Runs the health gate for diagnostics,
-      then exits 1 without continuing to downstream steps.
-    - UPDATING (oscillating): Hard failure. Ready count is not progressing,
-      suggesting nodes may be cycling due to conflicting configurations.
-    - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
+    On MCP timeout, classifies the failure mode with fixed
+    FAILURE_CLASS tokens:
+    - storage-capacity-enospc: Degraded with a non-self-healing ENOSPC
+      signature (unchanged condition message across >= 2 polls), e.g.
+      the machine-config daemon unable to write the internal registry
+      pull-secret on an undersized node. Also fails fast in-loop.
+    - mcp-degraded: Degraded without the ENOSPC signature.
+    - mcp-deadline-exceeded: progressing but too slow for the timeout.
+    - mcp-rollout-not-converging: all machines updated but the pool
+      never went ready; ready count oscillated without Degraded.
+    - mcp-render-churn: MachineConfig generation changed more than
+      MCP_RENDER_CHURN_LIMIT times during the wait.
+    - cluster-api-unreachable: 5 consecutive oc failures.
+    - Unknown timeout: none of the above.
+    On any failure a bounded evidence bundle (machines, machinesets,
+    policies, kubeletconfigs, MCPs, nodes) is collected to the step's
+    artifact directory so attribution needs no must-gather.
 
     Diagnostics (INTEROP-9646): the first Degraded sighting and the final
     classification emit every non-paused MCP condition (type, status, reason,
@@ -50,8 +61,14 @@ ref:
     documentation: Number of consecutive clean polls required before declaring stable
     name: MCP_CONSECUTIVE_CHECKS
   - default: "3"
-    documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
+    documentation: Maximum ready-count regression tolerated within a progress window (bounded dips from rolling reboots)
     name: MCP_MAX_UNAVAILABLE
+  - default: "120"
+    documentation: Consecutive not-ready polls (no Degraded) after which the rollout is considered cycling and no further deadline extensions are granted
+    name: MCP_PINNED_UPDATED_POLLS
+  - default: "5"
+    documentation: MachineConfig generation changes (render churn) after which the timeout classifies as mcp-render-churn
+    name: MCP_RENDER_CHURN_LIMIT
   - default: "90"
     documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
     name: MCP_SETTLE_DELAY
