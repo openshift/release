@@ -30,3 +30,21 @@ spec:
   operatorLogLevel: Normal
   storageClassState: Unmanaged
 EOF
+
+if [ "${HYPERDISK_THROUGHPUT_STORAGECLASS:-}" = "true" ]; then
+    # Not the default: registry and monitoring stay on hyperdisk-balanced.
+    # Hyperdisk Throughput volumes are 2Ti minimum.
+    cat << EOF > "${SHARED_DIR}/manifest_hyperdisk-throughput-storageclass.yaml"
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: hyperdisk-throughput
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: hyperdisk-throughput
+  provisioned-throughput-on-create: "50Mi"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+EOF
+fi
