@@ -165,16 +165,27 @@ EOF
 }
 
 # ---------------------------------------------------------------- source verify
+# Resolves the source archive path: either the pre-provisioned
+# ANALYZER_SOURCE_PATH, or a download from ANALYZER_SOURCE_URL. On success the
+# sha256 has been verified and the resolved path is exported as
+# ANALYZER_SOURCE_RESOLVED (the caller extracts from THAT; the pre-rehearsal
+# build 2116229379922071552 failed extracting /dev/null because the downloaded
+# path never left this function).
 verify_source() {
     local path="${ANALYZER_SOURCE_PATH}"
     if [ -z "${path}" ]; then
         path="$(mktemp /tmp/prow-analyzer-src.XXXXXX.tar.gz)"
+        _CLEANUP_FILES="${_CLEANUP_FILES} ${path}"
         if ! curl -fsSL --max-time 120 "${ANALYZER_SOURCE_URL}" -o "${path}"; then
             return 1
         fi
     fi
     [ -f "${path}" ] || return 1
-    echo "${ANALYZER_SOURCE_SHA256}  ${path}" | sha256sum -c - >/dev/null 2>&1
+    if echo "${ANALYZER_SOURCE_SHA256}  ${path}" | sha256sum -c - >/dev/null 2>&1; then
+        ANALYZER_SOURCE_RESOLVED="${path}"
+        return 0
+    fi
+    return 1
 }
 
 # ---------------------------------------------------------------- analysis block
@@ -236,7 +247,7 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
         exit 0
     fi
     ANALYZER_CLI_PATH="$(mktemp -d /tmp/prow-analyzer-build.XXXXXX)"
-    if ! tar -xzf "${ANALYZER_SOURCE_PATH:-/dev/null}" -C "${ANALYZER_CLI_PATH}" 2>/dev/null; then
+    if ! tar -xzf "${ANALYZER_SOURCE_RESOLVED}" -C "${ANALYZER_CLI_PATH}" 2>/dev/null; then
         _OUTCOME="error"; _GATE="source_extract_failed"
         exit 0
     fi
