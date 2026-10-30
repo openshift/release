@@ -136,11 +136,12 @@ else
     # per-job name, and apply them ourselves. Rendering still creates the AWS
     # infrastructure and produces the same objects. What we must replicate from
     # the CLI apply step (cmd/cluster/core/create.go, func apply) is:
-    #   - server-side apply with field manager "hypershift-cli";
     #   - the label hypershift.openshift.io/auto-created-for-infra=<infra ID> on
-    #     every object. "destroy cluster" deletes the CLI secrets (pull secret,
-    #     SSH key, etcd encryption key) by that label, and the operator uses it
-    #     to set their owner reference, so without it they would leak.
+    #     every object, set before the objects are created. "destroy cluster"
+    #     deletes the CLI secrets (pull secret, SSH key, etcd encryption key) by
+    #     that label, and the operator uses it to set their owner reference, so
+    #     without it they would leak;
+    #   - server-side apply with field manager "hypershift-cli".
     # Keep this in sync with func apply if it changes. The ConfigMap itself is
     # deleted by hypershift-destroy-nested-management-cluster.
     TRUST_BUNDLE_FILE="${SHARED_DIR}/${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE}"
@@ -169,8 +170,13 @@ else
     fi
     sed -i -E "s/^([[:space:]]*)name: user-ca-bundle$/\1name: ${TRUST_BUNDLE_CONFIGMAP}/" "${RENDERED}"
 
-    oc apply --server-side --force-conflicts --field-manager=hypershift-cli -f "${RENDERED}"
-    oc label --overwrite -f "${RENDERED}" "hypershift.openshift.io/auto-created-for-infra=${CLUSTER_NAME}"
+    # Label the objects before applying them, as the CLI does, so the secrets
+    # never exist without the label that destroy relies on. "oc label --local"
+    # works offline; JSON output keeps the objects as a stream oc apply accepts.
+    LABELED="${RENDER_DIR}/management-cluster-labeled.json"
+    oc label --local -f "${RENDERED}" -o json \
+      "hypershift.openshift.io/auto-created-for-infra=${CLUSTER_NAME}" > "${LABELED}"
+    oc apply --server-side --force-conflicts --field-manager=hypershift-cli -f "${LABELED}"
   fi
 fi
 

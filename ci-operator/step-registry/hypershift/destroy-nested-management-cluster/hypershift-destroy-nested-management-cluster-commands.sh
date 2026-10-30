@@ -41,13 +41,14 @@ if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
     --cluster-grace-period 40m
 else
   echo "Destroying AWS management cluster ${CLUSTER_NAME}"
+  destroy_rc=0
   bin/hypershift destroy cluster aws \
     --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
     --name="${CLUSTER_NAME}" \
     --namespace="${HYPERSHIFT_NAMESPACE}" \
     --infra-id=${CLUSTER_NAME} \
     --base-domain=${DOMAIN} \
-    --cluster-grace-period 40m
+    --cluster-grace-period 40m || destroy_rc=$?
 fi
 
 # hypershift-setup-nested-management-cluster created this ConfigMap under a
@@ -55,6 +56,8 @@ fi
 # comment there). "hypershift destroy cluster" deletes only the CLI secrets, so
 # remove it here to keep the shared namespace clean.
 if [[ "${CLOUD_PROVIDER}" != "Azure" && -n "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
+  # Runs even if the destroy above failed, so the ConfigMap never outlives the job.
   oc delete configmap "${CLUSTER_NAME}-additional-trust-bundle" \
     --namespace="${HYPERSHIFT_NAMESPACE}" --ignore-not-found
 fi
+exit "${destroy_rc:-0}"
