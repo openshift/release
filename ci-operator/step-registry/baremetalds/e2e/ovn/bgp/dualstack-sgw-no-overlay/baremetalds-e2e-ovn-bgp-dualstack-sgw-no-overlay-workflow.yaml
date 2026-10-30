@@ -1,0 +1,50 @@
+workflow:
+  as: baremetalds-e2e-ovn-bgp-dualstack-sgw-no-overlay
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-no-overlay-pre
+      - ref: baremetalds-e2e-ovn-bgp-pre
+      - ref: baremetalds-e2e-ovn-bgp-no-overlay-outbound-snat
+      - ref: baremetalds-e2e-ovn-debug-enable-console
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - ref: baremetalds-e2e-ovn-debug-console-gather
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on a cluster provisioned by running
+    dev-scripts on a packet server with both IPv4 and IPv6 enabled, installed with the NoOverlay
+    network transport and left in shared gateway mode.
+
+    It differs from baremetalds-e2e-ovn-bgp-dualstack in that the cluster is installed with the
+    NoOverlay transport, which is immutable and therefore cannot be patched in after the install
+    the way the rest of the BGP configuration is. The transport requires the NoOverlayMode feature
+    gate, so the job has to ask for a preview feature set.
+
+    Unlike baremetalds-e2e-ovn-bgp-dualstack-lgw-no-overlay it runs
+    baremetalds-e2e-ovn-bgp-no-overlay-outbound-snat after the install, so a job here can ask for
+    NO_OVERLAY_OUTBOUND_SNAT=Disabled. Every no-overlay cluster is installed with outboundSNAT
+    enabled, because Disabled cannot be installed: with no SNAT, pods reach kube-apiserver only
+    once the cluster gateway has learned the pod routes over BGP, and the operators that bring BGP
+    up need the API server first. outboundSNAT is the one field of noOverlayConfig that is mutable
+    day 2, so the step patches it off once the cluster is up. The tests still run against
+    outboundSNAT=Disabled, so no coverage is lost.
+
+    The hypervisor side of that is handled by baremetalds-e2e-ovn-bgp-nftables-pre, which keys on
+    NO_OVERLAY_OUTBOUND_SNAT, the value the cluster ends up with. Its rules have to be in place
+    before the cluster is installed, and they are inert for as long as pod traffic still leaves
+    with a node address.
+
+    The routing mode is left to the job: set NO_OVERLAY_ROUTING to Managed or Unmanaged. It is
+    immutable, so unlike outboundSNAT it can only be chosen at install time.
+
+    It does not configure the extra machine network or install kubernetes-nmstate, since the
+    VRF-Lite scenarios that need them are not part of what this workflow is meant to cover.

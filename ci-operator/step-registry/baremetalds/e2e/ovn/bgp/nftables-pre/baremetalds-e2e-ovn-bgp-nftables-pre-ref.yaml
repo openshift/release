@@ -1,0 +1,28 @@
+ref:
+  as: baremetalds-e2e-ovn-bgp-nftables-pre
+  from: dev-scripts
+  commands: baremetalds-e2e-ovn-bgp-nftables-pre-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 5m
+  env:
+  - name: NO_OVERLAY_OUTBOUND_SNAT
+    default: "Enabled"
+    documentation: |-
+      Value of defaultNetwork.ovnKubernetesConfig.noOverlayConfig.outboundSNAT on the cluster this
+      step prepares the hypervisor for. This step is a no-op unless it is "Disabled": with
+      outbound SNAT enabled, pod traffic leaving the cluster already carries a node address and
+      the default hypervisor rules handle it.
+  documentation: |-
+    Prepares the packet server to route pod traffic that is not SNATed to a node address, which is
+    what a no-overlay cluster with outboundSNAT=Disabled sends it. It installs a systemd unit that
+    waits for the master VMs to come up and then enables IP forwarding, adds forward and
+    masquerade rules for the cluster network in dedicated nftables tables, drops the netavark rule
+    that discards the conntrack-invalid pod traffic arriving over BGP learned routes, and stops
+    libvirt from masquerading hypervisor to pod traffic so pods can route the replies back.
+
+    It has to run before baremetalds-devscripts-setup: without these rules the installer cannot
+    reach the pods it is waiting on. It is a no-op when outbound SNAT is enabled, so it is safe to
+    keep in the chain for every no-overlay job.
