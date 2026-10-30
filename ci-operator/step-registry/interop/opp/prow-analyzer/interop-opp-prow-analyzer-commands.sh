@@ -17,9 +17,11 @@ set -uo pipefail
 READONLY_PREFIX="OPP-PROW-ANALYZER"
 : "${JOB_NAME:=unset-job}"
 : "${BUILD_ID:=unset-build}"
-: "${ARTIFACT_BASE_DIR:?ARTIFACT_BASE_DIR is required}"
+# CI layout (cucushift precedent): a step's own artifacts are ${ARTIFACT_DIR}; sibling steps' artifact dirs live under its parent. Derived, overridable; a missing tree degrades to config_error in main, never an abort.
+ARTIFACT_BASE_DIR="${ARTIFACT_BASE_DIR:-${ARTIFACT_DIR:+${ARTIFACT_DIR}/..}}"
 : "${SHARED_DIR:=/tmp}"
-ANALYZER_MCP_URL="${ANALYZER_MCP_URL:-https://ship-help-mcp-continuous-release-toolting--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp}"
+SHIP_HELP_MCP_URL="${SHIP_HELP_MCP_URL:-${ANALYZER_MCP_URL:-https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp}}"
+ANALYZER_MCP_URL="${SHIP_HELP_MCP_URL}"
 ANALYZER_SECRET_TOKEN_FILE="${ANALYZER_SECRET_TOKEN_FILE:-/tmp/secrets/ship-help/token}"
 ANALYZER_WEBHOOK_FILE="${ANALYZER_WEBHOOK_FILE:-/tmp/secrets/opp-discussion-webhook/url}"
 ANALYZER_ATTEMPT_TIMEOUT="${ANALYZER_ATTEMPT_TIMEOUT:-600}"
@@ -186,6 +188,12 @@ extract_analysis_block() {
 emit_skeleton
 
 ARTIFACT_SNAPSHOT_EPOCH="$(date -u +%s)"
+# graceful degradation: no artifacts tree readable means no admission gate can
+# run; report it as metadata and stay green (best-effort contract).
+if [ -z "${ARTIFACT_BASE_DIR}" ] || [ ! -d "${ARTIFACT_BASE_DIR}" ]; then
+    _OUTCOME="config_error"; _GATE="artifact_base_dir_absent"
+    exit 0
+fi
 
 if [ "${ANALYZER_VERIFY_ONLY}" = "1" ]; then
     if verify_source; then
