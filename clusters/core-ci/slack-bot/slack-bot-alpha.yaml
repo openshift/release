@@ -1,0 +1,131 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slack-bot-alpha
+  namespace: ci
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: slack-bot-alpha
+spec:
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: slack-bot-alpha
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: slack-bot-alpha
+  labels:
+    app: slack-bot-alpha
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+spec:
+  selector:
+    app: slack-bot-alpha
+  ports:
+  - name: main
+    port: 8888
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: slack-bot-alpha
+  name: slack-bot-alpha
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: slack-bot-alpha
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: slack-bot-alpha
+    spec:
+      containers:
+      - args:
+        - -D
+        - -e
+        - -f/config/sshd_config
+        command:
+        - /usr/sbin/sshd
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sshd_latest
+        name: slack-bot-alpha
+        ports:
+        - containerPort: 8888
+          name: main
+          protocol: TCP
+        - containerPort: 2222
+          name: ssh
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 10Mi
+        volumeMounts:
+        - mountPath: /keys/authorized
+          name: authorized-keys
+          readOnly: true
+        - mountPath: /keys/host/
+          name: host-keys
+          readOnly: true
+        - mountPath: /config/
+          name: config
+          readOnly: true
+      serviceAccount: slack-bot-alpha
+      serviceAccountName: slack-bot-alpha
+      volumes:
+      - name: authorized-keys
+        secret:
+          defaultMode: 420
+          secretName: sshd-slack-bot-alpha-authorized-keys
+      - name: host-keys
+        secret:
+          defaultMode: 256
+          secretName: sshd-slack-bot-alpha-host-keys
+      - configMap:
+          defaultMode: 420
+          name: sshd-config
+        name: config
+---
+apiVersion: v1
+data:
+  sshd_config: |
+    AuthorizedKeysFile /keys/authorized/authorized_keys
+    HostKey /keys/host/ssh_host_rsa_key
+    HostKey /keys/host/ssh_host_dsa_key
+    HostKey /keys/host/ssh_host_ecdsa_key
+    HostKey /keys/host/ssh_host_ed25519_key
+    PasswordAuthentication no
+    PermitTunnel yes
+    PidFile /tmp/ssh.pid
+    Port 2222
+    StrictModes no
+    GatewayPorts yes
+kind: ConfigMap
+metadata:
+  name: sshd-config
+  namespace: ci
