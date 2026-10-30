@@ -143,7 +143,7 @@ spec:
   monitoring:
     perses:
       enabled: true
-    incidents:
+    clusterHealthAnalyzer:
       enabled: true
 EOF
 waitForImage openshift-monitoring app.kubernetes.io/name=monitoring-plugin "${CYPRESS_MP_IMAGE}"
