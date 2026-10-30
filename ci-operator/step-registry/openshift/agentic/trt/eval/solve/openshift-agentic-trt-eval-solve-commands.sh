@@ -48,8 +48,9 @@ copy_artifacts() {
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
             cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
         fi
-        if [[ -d "${PR_METADATA_ROOT}/${case_name}" ]]; then
-            cp "${PR_METADATA_ROOT}/${case_name}/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+        if [[ -f "${PR_METADATA_ROOT}/${case_name}/pr-description.md" ]]; then
+            cp "${PR_METADATA_ROOT}/${case_name}/pr-description.md" \
+                "${ARTIFACT_DIR}/${case_name}/pr-description.md" 2>/dev/null || true
         fi
         if [[ -f "/tmp/eval-otel/${case_name}.claude-otel.jsonl" ]]; then
             cp "/tmp/eval-otel/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"

@@ -80,7 +80,9 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
         cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
-        cp "${PR_METADATA_DIR}/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        if [[ -f "${PR_BODY_FILE}" ]]; then
+            cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
+        fi
         podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
         if [[ -d "${HOME}/.claude/projects" ]]; then
             echo "Archiving Claude session logs..."
@@ -242,14 +244,39 @@ fi
 
 # Fail closed if the former pipeline metadata path was committed. Other files
 # under artifacts/ remain valid repository content and are not blocked.
-if ! PR_METADATA_COMMITS=$(git log --format='%H' "${START_COMMIT}..HEAD" -- ':(top)artifacts/pr-description.md'); then
+PR_HISTORY_RC=0
+git merge-base --is-ancestor "${START_COMMIT}" HEAD || PR_HISTORY_RC=$?
+if [[ "${PR_HISTORY_RC}" -ne 0 ]]; then
     echo "ERROR: Unable to verify that pipeline PR metadata is absent from the solution history."
     exit 1
 fi
-if [[ -n "${PR_METADATA_COMMITS}" ]]; then
-    echo "ERROR: Refusing to publish pipeline PR metadata committed at artifacts/pr-description.md."
+if ! PR_FEATURE_HISTORY=$(git rev-list --parents "${START_COMMIT}..HEAD"); then
+    echo "ERROR: Unable to inspect the solution history for pipeline PR metadata."
     exit 1
 fi
+while read -r -a PR_HISTORY_ENTRY; do
+    [[ "${#PR_HISTORY_ENTRY[@]}" -gt 0 ]] || continue
+    if [[ "${#PR_HISTORY_ENTRY[@]}" -lt 2 ]]; then
+        echo "ERROR: Unable to inspect a parentless solution commit for pipeline PR metadata."
+        exit 1
+    fi
+    PR_COMMIT="${PR_HISTORY_ENTRY[0]}"
+    for PR_PARENT in "${PR_HISTORY_ENTRY[@]:1}"; do
+        PR_HISTORY_RC=0
+        git diff --quiet "${PR_PARENT}" "${PR_COMMIT}" -- ':(top)artifacts/pr-description.md' || PR_HISTORY_RC=$?
+        case "${PR_HISTORY_RC}" in
+            0) ;;
+            1)
+                echo "ERROR: Refusing to publish pipeline PR metadata committed at artifacts/pr-description.md."
+                exit 1
+                ;;
+            *)
+                echo "ERROR: Unable to inspect the solution history for pipeline PR metadata."
+                exit 1
+                ;;
+        esac
+    done
+done <<< "${PR_FEATURE_HISTORY}"
 
 # The agent never pushes. Publish only this branch to the configured fork; do
 # not fall back to upstream, honor push.default, or delete another remote ref.
@@ -291,7 +318,10 @@ echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
 
 # Copy PR description to SHARED_DIR for downstream steps (e.g., eval-judge)
 if [[ -s "${PR_BODY_FILE}" ]]; then
-    cp "${PR_BODY_FILE}" "${SHARED_DIR}/pr-description.md"
+    SHARED_PR_BODY_FILE=$(realpath -m "${SHARED_DIR}/pr-description.md")
+    if [[ "$(realpath "${PR_BODY_FILE}")" != "${SHARED_PR_BODY_FILE}" ]]; then
+        cp "${PR_BODY_FILE}" "${SHARED_PR_BODY_FILE}"
+    fi
 fi
 
 PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
