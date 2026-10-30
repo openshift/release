@@ -59,6 +59,8 @@ if [[ "${PLATFORM}" == "aws" ]]; then
     echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
     exit 1
   fi
+  HYPERSHIFT_AWS_REGION="${HYPERSHIFT_AWS_REGION:-${LEASED_RESOURCE:-us-east-1}}"
+  echo "Using AWS region ${HYPERSHIFT_AWS_REGION} for the hosted cluster"
 elif [[ "${PLATFORM}" == "powervs" ]]; then
   export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/.powervscred"
   if [[ ! -f "${IBMCLOUD_CREDENTIALS}" ]]; then
