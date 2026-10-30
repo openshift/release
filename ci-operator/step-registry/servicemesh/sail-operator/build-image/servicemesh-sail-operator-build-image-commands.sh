@@ -11,9 +11,10 @@
 # 1. Detects the target architecture: OCP_ARCH if set (for ARM clusters), else
 #    the CI build node's native arch via `go env GOARCH`.
 # 2. Derives a unique image tag from Prow build metadata.
-#    Tag format: pr-${PULL_NUMBER} for presubmit jobs (matches what the test
-#    suite computes internally so the operator pod can pull the image), or
-#    ${BUILD_ID} for periodic/postsubmit jobs.
+#    Tag format: pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH} for presubmit jobs,
+#    or ${BUILD_ID} for periodic/postsubmit jobs.
+#    Matches what common-operator-integ-suite.sh computes so the test suite
+#    can pull the correct image.
 # 3. Creates an OCP Secret with the quay.io push credentials.
 # 4. Pre-compiles the operator binary with `make build`. When the target arch
 #    differs from the build node arch (ARM clusters), cross-compiles by passing
@@ -49,11 +50,19 @@ ARCH="${OCP_ARCH:-$(go env GOARCH)}"
 echo "Target architecture: ${ARCH} (build node: $(go env GOARCH))"
 
 # --- Tag derivation ---
-# For presubmit (PR) jobs, use pr-${PULL_NUMBER} — this matches the tag that
-# common-operator-integ-suite.sh computes independently so the operator pod can
-# pull the image. For periodic/postsubmit jobs fall back to BUILD_ID.
+# For presubmit (PR) jobs, include the commit SHA and target arch so that:
+#   - concurrent amd64 and arm64 builds push to distinct tags
+#   - retries on different commits push to distinct tags
+# PULL_PULL_SHA is the actual PR head SHA (not the Prow merge commit).
+# Downstream test steps read BUILD_TAG from SHARED_DIR and deploy using this value.
+# For periodic/postsubmit jobs (no PULL_NUMBER) fall back to BUILD_ID.
 if [[ -n "${PULL_NUMBER:-}" ]]; then
-  COMPUTED_TAG="pr-${PULL_NUMBER}"
+  if [[ -z "${PULL_PULL_SHA:-}" ]]; then
+    echo "ERROR: PULL_PULL_SHA is not set for a presubmit job." >&2
+    exit 1
+  fi
+  COMMIT_HASH="${PULL_PULL_SHA:0:8}"
+  COMPUTED_TAG="pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH}"
 else
   COMPUTED_TAG="${BUILD_ID}"
 fi

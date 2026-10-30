@@ -185,6 +185,12 @@ run_tests_local() {
   export OLM="${OLM:-true}"
   export GINKGO_LABEL_FILTER="${GINKGO_LABEL_FILTER:-}"
   export EXPECTED_REGISTRY="${EXPECTED_REGISTRY:-}"
+  # For ARM jobs the step container runs on the amd64 CI build cluster, so
+  # setup_env.sh would derive TARGET_ARCH=amd64 from uname -m. Override it
+  # here so the test suite computes the correct image tag arch suffix.
+  if [[ -n "${OCP_ARCH:-}" ]]; then
+    export TARGET_ARCH="${OCP_ARCH}"
+  fi
 
   # VERSIONS_YAML_CONFIG, if set, must be an export assignment of the form
   # "export VERSIONS_YAML_FILE=<path>". Validate before evaluating to prevent
