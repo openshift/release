@@ -5,6 +5,25 @@ set -o errexit
 set -o pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
+# shellcheck disable=SC2154
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "ERROR: Step failed at line $LINENO with exit code $rc"; fi' EXIT
+
+ssh_retry() {
+  local retries=3 delay=10
+  for ((i=1; i<=retries; i++)); do
+    if "$@"; then return 0; fi
+    if ((i < retries)); then
+      echo "Attempt $i/$retries failed, retrying in ${delay}s..."
+      sleep "$delay"
+      delay=$((delay * 2))
+    else
+      echo "Attempt $i/$retries failed"
+    fi
+  done
+  echo "All $retries attempts failed"
+  return 1
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -50,10 +69,46 @@ export PULL_SECRET=\$(<\$REGISTRY_AUTH_FILE)
 export BACKUP_SECRET=\$(<${remote_workdir}/.backup_secret.json)
 export IP_STACK="${IP_STACK}"
 
-sudo dnf -y install runc crun gcc-c++ zip
+function dnf_install_retry {
+  local packages=(\$@)
+  local delay=10
+  echo "Installing packages with retry"
+  for attempt in \$(seq 3); do
+    if [ "\$attempt" -gt 1 ]; then
+      sudo dnf clean all
+    fi
+    sudo dnf install -y \${packages[*]} && return 0
+    if [ "\$attempt" -lt 3 ]; then
+      echo "Failed to run dnf install, retrying in \${delay}s..."
+      sleep "\$delay"
+      delay=\$((delay * 2))
+    else
+      echo "Failed to run dnf install after 3 attempts"
+    fi
+  done
+  return 1
+}
+
+function podman_retry {
+  local retries=3 delay=15
+  for ((i=1; i<=retries; i++)); do
+    if "\$@"; then return 0; fi
+    if ((\$i < \$retries)); then
+      echo "podman attempt \$i/\$retries failed, retrying in \${delay}s..."
+      sleep "\$delay"
+      delay=\$((delay * 2))
+    else
+      echo "podman attempt \$i/\$retries failed"
+    fi
+  done
+  echo "All \$retries podman attempts failed"
+  return 1
+}
+
+dnf_install_retry runc crun gcc-c++ zip
 
 mkdir tmp
-podman run -v ./tmp:/tmp:Z --user root:root --rm --entrypoint='["/bin/sh","-c"]' ${INSTALLER_PULL_REF} "cp /bin/openshift-install /tmp/openshift-install"
+podman_retry podman run -v ./tmp:/tmp:Z --user root:root --rm --entrypoint='["/bin/sh","-c"]' ${INSTALLER_PULL_REF} "cp /bin/openshift-install /tmp/openshift-install"
 sudo mv ./tmp/openshift-install /usr/bin/openshift-install
 rm -rf tmp
 
@@ -86,12 +141,11 @@ EOF
 
 chmod +x ${SHARED_DIR}/image_based_install.sh
 
-echo "Transfering install script..."
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/image_based_install.sh $ssh_host_ip:$remote_workdir
+echo "Transferring install script..."
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/image_based_install.sh" "${ssh_host_ip}:${remote_workdir}"
 
 echo "Transferring pull secrets..."
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/.pull_secret.json $ssh_host_ip:$remote_workdir
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/.backup_secret.json $ssh_host_ip:$remote_workdir
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/.pull_secret.json" "${SHARED_DIR}/.backup_secret.json" "${ssh_host_ip}:${remote_workdir}"
 
 echo "Installing target cluster..."
-ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/image_based_install.sh"
+ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "${remote_workdir}/image_based_install.sh"
