@@ -46,7 +46,12 @@ copy_artifacts() {
     for case_name in "${CASE_LIST[@]}"; do
         mkdir -p "${ARTIFACT_DIR}/${case_name}"
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
-            cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+            for artifact in "/workspace/${case_name}/artifacts/"*; do
+                if [[ "${artifact}" == "/workspace/${case_name}/artifacts/pr-description.md" ]]; then
+                    continue
+                fi
+                cp "${artifact}" "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+            done
         fi
         if [[ -f "${PR_METADATA_ROOT}/${case_name}/pr-description.md" ]]; then
             cp "${PR_METADATA_ROOT}/${case_name}/pr-description.md" \
