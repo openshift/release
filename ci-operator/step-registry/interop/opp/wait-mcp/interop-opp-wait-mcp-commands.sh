@@ -619,6 +619,7 @@ else:
         readyHistory=()
         updatedHistory=()
         machineCountHistory=()
+        degradedHistory=()
         consecutivePasses=0
     fi
     _lastGenSum=${genSum}
@@ -725,7 +726,7 @@ case "${classification}" in
     DEGRADED)
         if [[ -n "${_junit_reason}" && "${_junit_reason}" =~ (no\ space\ left\ on\ device|disk\ full|could\ not\ write\ image\ pull\ secret) ]]; then
             echo "FAILURE CLASS: storage-capacity-enospc"
-            _junit_class="storage-capacity-enoscp"
+            _junit_class="storage-capacity-enospc"
         else
             echo "FAILURE CLASS: mcp-degraded"
             _junit_class="mcp-degraded"
