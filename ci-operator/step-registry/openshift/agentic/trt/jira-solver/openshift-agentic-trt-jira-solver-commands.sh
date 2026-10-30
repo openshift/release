@@ -242,19 +242,14 @@ fi
 
 # Fail closed if the former pipeline metadata path was committed. Other files
 # under artifacts/ remain valid repository content and are not blocked.
-PR_METADATA_DIFF_RC=0
-git diff --quiet "${START_COMMIT}" HEAD -- ':(top)artifacts/pr-description.md' || PR_METADATA_DIFF_RC=$?
-case "${PR_METADATA_DIFF_RC}" in
-    0) ;;
-    1)
-        echo "ERROR: Refusing to publish committed pipeline PR metadata at artifacts/pr-description.md."
-        exit 1
-        ;;
-    *)
-        echo "ERROR: Unable to verify that pipeline PR metadata is absent from the solution commit."
-        exit 1
-        ;;
-esac
+if ! PR_METADATA_COMMITS=$(git log --format='%H' "${START_COMMIT}..HEAD" -- ':(top)artifacts/pr-description.md'); then
+    echo "ERROR: Unable to verify that pipeline PR metadata is absent from the solution history."
+    exit 1
+fi
+if [[ -n "${PR_METADATA_COMMITS}" ]]; then
+    echo "ERROR: Refusing to publish pipeline PR metadata committed at artifacts/pr-description.md."
+    exit 1
+fi
 
 # The agent never pushes. Publish only this branch to the configured fork; do
 # not fall back to upstream, honor push.default, or delete another remote ref.
