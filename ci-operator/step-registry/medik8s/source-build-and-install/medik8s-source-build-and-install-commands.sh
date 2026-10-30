@@ -253,7 +253,6 @@ verify_candidate() {
   : "${candidate_version:?candidate bundle CSV must specify spec.version}"
   test "$candidate_version" = "$SOURCE_VERSION"
 
-  CANDIDATE_VERSION="$candidate_version"
   echo "==> Candidate bundle verified: version $candidate_version"
 }
 
