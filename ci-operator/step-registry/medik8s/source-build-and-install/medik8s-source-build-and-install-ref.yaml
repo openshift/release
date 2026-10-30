@@ -1,0 +1,33 @@
+ref:
+  as: medik8s-source-build-and-install
+  from: pr-test-runner
+  cli: latest
+  commands: medik8s-source-build-and-install-commands.sh
+  nested_podman: true
+  env:
+  - name: SOURCE_OPERATOR
+    default: ""
+    documentation: Operator to build and install from the Prow-selected checkout (nhc, sbr, snr, far, mdr, or nmo).
+  - name: PEER_BUNDLES
+    default: __default__
+    documentation: |-
+      Comma-separated peer installs as package[=bundle-image].
+      __default__ uses the operator matrix (NHC→SNR, SNR/MDR→NHC; others none).
+      Empty string installs no peers. Explicit values override the matrix.
+  - name: OO_INSTALL_NAMESPACE
+    default: openshift-workload-availability
+    documentation: Namespace for operator-sdk run bundle installs.
+  - name: OO_INSTALL_TIMEOUT_MINUTES
+    default: "10"
+    documentation: Timeout in minutes for run bundle and CSV Succeeded wait.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  documentation: |-
+    Builds the operator checkout selected by Prow (copied into the runner at
+    /opt/<operator>-ci-src), pushes temporary operator/bundle/catalog images to
+    ttl.sh via make dev-olm-catalog-push, verifies the candidate bundle version,
+    and installs it with operator-sdk run bundle. Optional peer Quay bundles are
+    installed afterward. NHC resolves console/must-gather :latest digests at
+    runtime; SBR passes DEV_OLM_AGENT_IMAGE. Does not run system-tests.
