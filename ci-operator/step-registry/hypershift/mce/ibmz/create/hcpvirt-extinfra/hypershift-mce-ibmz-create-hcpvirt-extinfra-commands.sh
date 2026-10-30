@@ -568,13 +568,9 @@ DNSEOF
       --dry-run=client -o yaml | \
       oc --kubeconfig "${VIRT_KC}" apply -f - || true
 
-    oc --kubeconfig "${VIRT_KC}" delete pods -n openshift-dns \
-      -l dns.operator.openshift.io/daemonset-dns=default --wait=false || true
-    echo "$(date) Waiting for CoreDNS pods to restart"
-    sleep 15
-    oc --kubeconfig "${VIRT_KC}" wait pods -n openshift-dns \
-      -l dns.operator.openshift.io/daemonset-dns=default \
-      --for=condition=Ready --timeout=120s || true
+    # Let CoreDNS auto-reload via the reload plugin (no pod restart needed)
+    echo "$(date) Waiting for CoreDNS to auto-reload new Corefile (~60s)"
+    sleep 90
 
     echo "$(date) Verifying CoreDNS Corefile contains apps override:"
     oc --kubeconfig "${VIRT_KC}" get configmap dns-default -n openshift-dns \
