@@ -1,0 +1,43 @@
+ref:
+  as: baremetalds-e2e-ovn-bgp-no-overlay
+  from: dev-scripts
+  commands: baremetalds-e2e-ovn-bgp-no-overlay-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  grace_period: 10m
+  env:
+  - name: NO_OVERLAY_OUTBOUND_SNAT
+    default: "Enabled"
+    documentation: |-
+      Value of defaultNetwork.ovnKubernetesConfig.noOverlayConfig.outboundSNAT. Valid values are
+      "Enabled" and "Disabled". With "Enabled" pod traffic leaving the cluster is SNATed to the
+      node IP, as it is on a regular cluster. "Disabled" keeps the pod IP as the source address
+      and additionally requires the hypervisor firewall to forward and not masquerade pod
+      traffic, which this step does not configure.
+  - name: NO_OVERLAY_ROUTING
+    default: "Unmanaged"
+    documentation: |-
+      Value of defaultNetwork.ovnKubernetesConfig.noOverlayConfig.routing. Valid values are
+      "Unmanaged" and "Managed". With "Unmanaged" this step deploys an external BGP route
+      reflector the nodes peer with, and the FRRConfiguration and RouteAdvertisements that
+      advertise the pod network to it. With "Managed" OVN-Kubernetes peers the nodes with each
+      other and none of that external scaffolding is deployed.
+  - name: NO_OVERLAY_BGP_TOPOLOGY
+    default: ""
+    documentation: |-
+      Value of defaultNetwork.ovnKubernetesConfig.bgpManagedConfig.bgpTopology, for example
+      "FullMesh". Defaults to "FullMesh" when NO_OVERLAY_ROUTING is "Managed", where the API
+      requires it. Setting it on an unmanaged cluster is what allows individual CUDNs to ask
+      for managed routing there; leave it empty to not configure managed BGP at all.
+  documentation: |-
+    Creates the Network operator manifest that installs the cluster with the NoOverlay transport,
+    the FRR routing provider and route advertisements enabled. The manifest is picked up by
+    dev-scripts, so this step has to run before baremetalds-devscripts-setup: the transport is
+    immutable and can only be chosen at installation time.
+
+    With unmanaged routing it also runs an FRR route reflector on the packet server and creates
+    the FRRConfiguration and RouteAdvertisements manifests the nodes need to exchange pod subnets
+    with it. Without those the cluster has no pod to pod connectivity across nodes while it
+    installs, since nothing else provides the routes an overlay would have replaced.
