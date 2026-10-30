@@ -39,8 +39,7 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 # --- Artifact collection ---
 REAL_SHARED_DIR="${SHARED_DIR}"
-PR_METADATA_ROOT="/tmp/eval-pr-metadata"
-mkdir -p "${PR_METADATA_ROOT}"
+PR_METADATA_ROOT=$(mktemp -d "/tmp/eval-pr-metadata.XXXXXX")
 copy_artifacts() {
     echo "Copying artifacts..."
     for case_name in "${CASE_LIST[@]}"; do
