@@ -152,15 +152,19 @@ quay:
         test: e2e-install
       # True bare metal on AWS: *.metal workers are full physical hosts with no
       # hypervisor.
-      # Same S3-backed deploy as the aws lane; the only difference is the worker
-      # machine type (ipi-conf-aws consumes COMPUTE_NODE_TYPE). Masters stay on
-      # regular VMs to keep the cost down. Weekly because metal instances run
-      # ~5-10x the hourly price of the equivalent VM sizes.
+      # Same S3-backed deploy as the aws lane, except the worker machine type
+      # (ipi-conf-aws consumes COMPUTE_NODE_TYPE) and the builder: the QEMU
+      # ("bare metal") executor boots each build in a qemu-kvm VM, which needs
+      # /dev/kvm on the workers; the other lanes run kubernetesPodman. Masters
+      # stay on regular VMs to keep the cost down. Weekly because metal
+      # instances run ~5-10x the hourly price of the equivalent VM sizes.
       - cron: weekly
         source: nightly
         clouds: [aws-metal]
         ocp: ["5.0"]
         test: e2e-install
+        env:
+          QUAY_BUILDER_EXECUTOR: kubernetes
       - cron: weekly
         source: nightly
         clouds: [aws,azure]
