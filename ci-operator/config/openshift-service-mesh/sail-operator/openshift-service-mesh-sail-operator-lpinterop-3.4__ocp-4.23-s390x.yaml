@@ -1,0 +1,111 @@
+base_images:
+  cli:
+    name: "4.23"
+    namespace: ocp
+    tag: cli
+  kiali-int-tests-runner:
+    name: kiali-int-tests
+    namespace: ci
+    tag: v2.27
+  libvirt-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.23"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: upstream-1.28
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.23"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "4.23"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: e2e-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  cron: 0 23 31 2 *
+  reporter_config:
+    channel: '#ossm-qe-ci'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.23"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ETCD_DISK_SPEED: slow
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "pod_failure", "classification": "Sail e2e Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "test_failure", "classification": "Sail e2e Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-istio-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Istio Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.23-lp","self-managed-lp","servicemesh-lp","s390x"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail Operator","QE"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: OSSM
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GINKGO_FLAGS: -v --keep-going --label-filter=smoke&&!cert-manager&&!ztwim&&!tls-profile
+      ISTIO_SAMPLE_APP_VERSION: v1.30.1
+      ISTIO_VERSION: v1.30-latest
+      KIALI_VERSION: v2.27
+      NODE_TUNING: "true"
+      OCP_VERSION: "4.23"
+      OPERATORS: |
+        [
+            {"name": "servicemeshoperator3", "source": "redhat-operators", "channel": "stable-3.4", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
+        ]
+      USE_EXTERNAL_DNS: "true"
+    test:
+    - ref: install-operators
+    - ref: servicemesh-sail-operator-e2e-lpinterop
+    - ref: servicemesh-istio-install
+    - ref: servicemesh-kiali-int-tests-execute
+    workflow: servicemesh-istio-e2e-libvirt-s390x
+zz_generated_metadata:
+  branch: lpinterop-3.4
+  org: openshift-service-mesh
+  repo: sail-operator
+  variant: ocp-4.23-s390x

@@ -16,9 +16,15 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
     ' EXIT
 fi
 
-CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+if [ -f "${SHARED_DIR}/console.url" ]; then
+  CONSOLE_URL=$(cat "${SHARED_DIR}/console.url")
+  OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+else
+  # libvirt UPI clusters do not write console.url — derive API URL from kubeconfig
+  OCP_API_URL=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc whoami --show-server)
+  CONSOLE_URL="https://console-openshift-console.apps.${OCP_API_URL#"https://api."}"; CONSOLE_URL="${CONSOLE_URL%:6443}"
+fi
 export CONSOLE_URL
-OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
 
 function install_yq_if_not_exists() {
