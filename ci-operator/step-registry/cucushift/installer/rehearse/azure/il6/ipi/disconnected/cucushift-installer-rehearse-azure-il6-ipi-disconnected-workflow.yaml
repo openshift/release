@@ -1,0 +1,26 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-il6-ipi-disconnected
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-provision
+    post:
+      - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-deprovision
+  documentation: |-
+    Provisions and deprovisions a disconnected OpenShift cluster on an EMULATED Azure IL6
+    environment (SHIFT / Applied Insight emulator), allowing job authors to inject their own
+    end-to-end test logic.
+
+    Deliberately carries no ReportPortal steps. The consumer is a presubmit in the
+    openshift/installer config, not an openshift-tests-private periodic, and
+    send-results-to-reportportal needs the openshift-qe Vault collection to post results QE
+    reporting has no reason to receive. A later periodic that does want them can wrap this
+    workflow rather than this workflow assuming them.
+
+    The cluster is installed into a pre-existing, permanent resource group and VNet that carry the
+    IPsec tunnels to the emulator. All modifications should be made to the
+    `cucushift-installer-rehearse-azure-il6-ipi-disconnected-{provision,deprovision}` chains so
+    that other workflows can extend this one without backporting changes.
+
+    Uses the azure-qe cluster profile for the commercial-plane credential and a separate Vault
+    collection, installer-ci-azureil6, for the emulated-plane service principal and the emulator's
+    CA chain.

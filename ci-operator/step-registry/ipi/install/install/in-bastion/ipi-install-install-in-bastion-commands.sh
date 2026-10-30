@@ -191,7 +191,13 @@ aws|aws-arm64|aws-usgov)
     echo "export AWS_SHARED_CREDENTIALS_FILE='${REMOTE_SECRETS_DIR}/.awscred'" >> "${REMOTE_ENV_FILE}"
     ;;
 azure4|azuremag|azure-arm64)
-    if [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
+    if [[ -f "${SHARED_DIR}/azure_il6_osServicePrincipal.json" ]]; then
+        # Azure IL6: the cluster profile's principal belongs to commercial Azure. The resources
+        # being created live on the emulated IL6 plane and need its own principal, which
+        # ipi-conf-azureil6 puts here.
+        echo "Setting AZURE credential for the emulated IL6 plane"
+        AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_il6_osServicePrincipal.json"
+    elif [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
         echo "Setting AZURE credential using managed identity for installer"
         AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json"
     else
@@ -199,6 +205,14 @@ azure4|azuremag|azure-arm64)
     fi
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
+
+    # openshift-install talks to the emulated ARM endpoint over TLS signed by the emulator's own
+    # CA. Go reads SSL_CERT_FILE; without it every ARM call fails x509 verification. The bundle
+    # is installed on the bastion by azure-il6-bastion-ca.
+    if [[ -f "${SHARED_DIR}/azure_il6_remote_ca_path" ]]; then
+        echo "export SSL_CERT_FILE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
+        echo "export REQUESTS_CA_BUNDLE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
+    fi
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then

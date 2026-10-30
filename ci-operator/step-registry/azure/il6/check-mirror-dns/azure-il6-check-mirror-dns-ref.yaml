@@ -1,0 +1,41 @@
+ref:
+  as: azure-il6-check-mirror-dns
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-check-mirror-dns-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_FAIL_ON_MIRROR_DNS
+    default: "true"
+    documentation: |-
+      Fail the job when the mirror registry does not resolve from the VNet's DNS servers. Set to
+      "false" to downgrade to a warning while the DNS record is being arranged, so the rest of the
+      chain can still be exercised.
+  documentation: |-
+    Verifies, from the bastion, that the mirror registry's FQDN resolves to the bastion's PRIVATE
+    IP using the DNS servers the VNet hands out -- which is what the cluster nodes will use.
+
+    Why this check exists:
+
+    azure-provision-bastionhost registers the mirror registry two ways. It creates an Azure Private
+    DNS zone linked to the VNet, and it adds a public A record pointing at the bastion's public IP.
+    In an ordinary Azure job the private zone is what cluster nodes resolve through, because the
+    VNet uses Azure-provided DNS (168.63.129.16).
+
+    This VNet does not. The emulator sets custom DNS servers on it (10.55.1.53 and 10.55.2.53), and
+    Azure Private DNS zones are only resolvable through Azure-provided DNS. So the private zone is
+    inert here, and the public record points at a public IP the cluster subnets have no route to.
+
+    The practical consequence is that the bootstrap node cannot pull the release payload, and the
+    install fails roughly forty minutes in with a bootstrap timeout and no obvious cause. This step
+    turns that into an immediate, named failure.
+
+    Resolving it requires an A record for the mirror registry FQDN, pointing at the bastion's
+    private IP, in the emulator-side DNS. That is an environment prerequisite, not something CI can
+    provision -- see the job's README and the PR description.

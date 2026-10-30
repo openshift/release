@@ -1,0 +1,70 @@
+ref:
+  as: ipi-conf-azureil6
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: ipi-conf-azureil6-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: installer-ci-azureil6
+    group: service-principal
+    mount_path: /var/run/azureil6-secrets
+  env:
+  - name: AZURE_IL6_CLOUD_NAME
+    default: "AzureUSSecCloud"
+    documentation: |-
+      The value written to platform.azure.cloudName. This is an Azure SDK cloud identifier and is
+      NOT a free choice -- it must be one the installer understands. For Azure Government Secret
+      that is AzureUSSecCloud; for Azure National Security, AzureUSNatCloud.
+
+      Note this is a different namespace from the name passed to 'az cloud register', which is an
+      arbitrary local label in the CLI's own config.
+  - name: AZURE_IL6_ARM_ENDPOINT
+    default: "https://management.azure.microsoft.scloud"
+    documentation: |-
+      The emulated IL6 Azure Resource Manager endpoint, written to platform.azure.armEndpoint.
+      For Azure National Security this is https://management.azure.eaglex.ic.gov.
+  - name: AZURE_IL6_CLUSTER_REGION
+    default: "usseceast"
+    documentation: |-
+      The region ON THE EMULATED IL6 PLANE that the cluster is created in. This is deliberately
+      not ${LEASED_RESOURCE}: the lease names a commercial-plane region (westus2 and friends),
+      which is where the VNet lives, not where the cluster's own resources are created.
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The shared, permanent resource group holding the VNet. Used only to assert that it has not
+      leaked into platform.azure.resourceGroupName.
+  - name: AZURE_IL6_CLOUD_REGISTER_NAME
+    default: "AzureUSSecCloud"
+    documentation: |-
+      The local label used for 'az cloud register --name' in the generated login script. Arbitrary;
+      the emulator team's own documentation uses "SHIFT".
+  documentation: |-
+    Configures install-config.yaml for an OpenShift cluster on the emulated Azure IL6 plane, and
+    generates the az CLI login script that later steps source on the bastion.
+
+    Structurally this follows ipi-conf-azuremag, which is the cleanest sovereign-cloud step in the
+    registry. It borrows the generated-login-script idea from ipi-conf-azurestack, with two
+    deliberate changes:
+
+      * the heredoc is QUOTED. The Azure Stack version uses an unquoted '<< EOF', which expands
+        the service principal secret at write time and leaves it in plaintext in ${SHARED_DIR}.
+        This job's artifacts are public.
+      * there is no 'az cloud update --profile 2019-03-01-hybrid'. Azure Stack needs that API
+        profile downgrade; IL6 explicitly forbids it.
+
+    This step also enforces the single most dangerous invariant in the job: the shared resource
+    group must never appear as platform.azure.resourceGroupName, because 'openshift-install
+    destroy' deletes that group unconditionally. It asserts this and fails rather than letting a
+    later step quietly destroy the emulator environment.
+
+    Outputs:
+      ${SHARED_DIR}/azureil6-login-script.sh           sourced on the bastion to reach IL6 ARM
+      ${SHARED_DIR}/azure_il6_osServicePrincipal.json  the IL6 SP, consumed by
+                                                       ipi-install-install-in-bastion
