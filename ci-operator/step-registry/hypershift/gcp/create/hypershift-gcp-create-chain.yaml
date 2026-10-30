@@ -12,7 +12,7 @@ chain:
       documentation: "GCP boot image for hosted cluster nodes (RHCOS image path). If empty, falls back to a pinned default (see TODO GCP-440)."
     - name: HYPERSHIFT_GCP_ZONE
       default: ""
-      documentation: "GCP zone for hosted cluster nodes"
+      documentation: "GCP zone for hosted cluster nodes (fallback when ${SHARED_DIR}/gcp-zone from hypershift-gcp-capacity-probe is absent)"
     - name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
       default: ""
       documentation: "DNS domain for HyperShift CI hosted clusters"
@@ -21,7 +21,22 @@ chain:
 
       # Load configuration from SHARED_DIR (populated by prior steps)
       GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+
+      # Zone/machine type: prefer the capacity probe results (written by
+      # hypershift-gcp-capacity-probe), fall back to HYPERSHIFT_GCP_ZONE /
+      # hypershift's default machine type when the probe step is absent.
       GCP_ZONE="${HYPERSHIFT_GCP_ZONE}"
+      if [[ -s "${SHARED_DIR}/gcp-zone" ]]; then
+        GCP_ZONE="$(<"${SHARED_DIR}/gcp-zone")"
+      fi
+      GCP_MACHINE_TYPE=""
+      if [[ -s "${SHARED_DIR}/gcp-machine-type" ]]; then
+        GCP_MACHINE_TYPE="$(<"${SHARED_DIR}/gcp-machine-type")"
+      fi
+      MACHINE_TYPE_ARGS=()
+      if [[ -n "${GCP_MACHINE_TYPE}" ]]; then
+        MACHINE_TYPE_ARGS=(--machine-type "${GCP_MACHINE_TYPE}")
+      fi
       HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
       CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
 
@@ -66,6 +81,7 @@ chain:
         --project "${HC_PROJECT_ID}" \
         --region "${GCP_REGION}" \
         --zone "${GCP_ZONE}" \
+        ${MACHINE_TYPE_ARGS[@]+"${MACHINE_TYPE_ARGS[@]}"} \
         --network "${VPC_NAME}" \
         --private-service-connect-subnet "${PSC_SUBNET}" \
         --endpoint-access PublicAndPrivate \
@@ -155,6 +171,11 @@ chain:
 
     Reads infrastructure configuration from SHARED_DIR files created by
     hypershift-gcp-gke-provision and hypershift-gcp-hosted-cluster-setup.
+
+    If hypershift-gcp-capacity-probe ran earlier, the zone and machine type
+    come from ${SHARED_DIR}/gcp-zone and ${SHARED_DIR}/gcp-machine-type;
+    otherwise the chain falls back to the HYPERSHIFT_GCP_ZONE env var and
+    hypershift's default machine type.
 
     Saves the HostedCluster CR name to SHARED_DIR/cluster-name for the
     e2e-v2 test chain and destroy chain.
