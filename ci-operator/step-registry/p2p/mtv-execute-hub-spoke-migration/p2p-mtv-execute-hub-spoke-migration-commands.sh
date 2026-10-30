@@ -715,10 +715,7 @@ WriteJunit() {
     done < "${junitFile}"
 
     {
-        typeset suiteName="hub-spoke-cclm-migration"
-        if [[ "${MAP_TESTS}" == "true" && -n "${LP_IO__CR_COMP_NAME}" ]]; then
-            suiteName="${LP_IO__CR_COMP_NAME}--${suiteName}"
-        fi
+        typeset suiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}hub-spoke-cclm-migration"
         typeset escapedSuiteName; escapedSuiteName="$(XmlEscape "${suiteName}")"
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
         printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \

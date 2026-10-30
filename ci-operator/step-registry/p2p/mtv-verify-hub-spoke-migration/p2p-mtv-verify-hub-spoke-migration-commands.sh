@@ -894,10 +894,7 @@ function WriteJunit () {
   done < "${junitFile}"
 
   {
-    typeset suiteName="cclm-migration-verify${migrationSuffix}"
-    if [[ "${MAP_TESTS}" == "true" && -n "${LP_IO__CR_COMP_NAME}" ]]; then
-      suiteName="${LP_IO__CR_COMP_NAME}--${suiteName}"
-    fi
+    typeset suiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}cclm-migration-verify${migrationSuffix}"
     typeset escapedSuiteName; escapedSuiteName="$(XmlEscape "${suiteName}")"
     printf '<?xml version="1.0" encoding="UTF-8"?>\n'
     printf '<testsuites>\n'
