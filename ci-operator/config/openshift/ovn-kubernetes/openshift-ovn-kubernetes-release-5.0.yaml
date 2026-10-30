@@ -711,6 +711,37 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - always_run: false
+  as: cudn-density-midterm-scenario-b-120nodes-aws
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "117"
+      AWS_REGION: us-east-2
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST: "5"
+      COMPUTE_NODE_TYPE: r5.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7a.64xlarge
+      EXTERNAL_INSTANCE_TYPE: m5.4xlarge
+      GC: "false"
+      ITERATIONS: "200"
+      MAX_TARGETS: "25"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r7a.64xlarge
+      QPS: "5"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "1"
+    post:
+    - chain: ipi-aws-post
+    - ref: openshift-qe-cudn-density-midterm-b-teardown
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-cudn-density-midterm-b-setup
+    test:
+    - ref: openshift-qe-cudn-density-midterm-b
+    - ref: openshift-qe-cudn-density-midterm-collect-logs
+- always_run: false
   as: cudn-density-midterm-scenario-a-120nodes-aws
   optional: true
   steps:
@@ -737,6 +768,7 @@ tests:
     - ref: openshift-qe-workers-scale
     test:
     - ref: openshift-qe-cudn-density-midterm-a
+    - ref: openshift-qe-cudn-density-midterm-collect-logs
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
