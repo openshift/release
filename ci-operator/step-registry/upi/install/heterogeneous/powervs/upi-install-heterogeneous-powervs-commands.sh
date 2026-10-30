@@ -24,6 +24,25 @@ RESOURCE_GROUP=$(yq-v4 -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/
 export RESOURCE_GROUP
 
 ##### Functions
+# Maps a VPC region to its PowerVS zone (replaces the removed scripts/region.sh)
+function map_powervs_region() {
+    local REGION="${1}"
+    case "${REGION}" in
+        ("us-south") echo "dal10" ;;
+        ("us-east")  echo "wdc06" ;;
+        ("br-sao")   echo "sao01" ;;
+        ("ca-tor")   echo "tor01" ;;
+        ("ca-mon")   echo "mon01" ;;
+        ("eu-de")    echo "eu-de-1" ;;
+        ("eu-gb")    echo "lon06" ;;
+        ("eu-es")    echo "mad02" ;;
+        ("au-syd")   echo "syd05" ;;
+        ("jp-tok")   echo "tok04" ;;
+        ("jp-osa")   echo "osa21" ;;
+        (*)          echo "${REGION}" ;;
+    esac
+}
+
 # setup ibmcloud cli and the necessary plugins
 function setup_ibmcloud_cli() {
     if [ -z "$(command -v ibmcloud)" ]
@@ -73,7 +92,7 @@ function cleanup_prior() {
     # Delete the current TGW VPC Connection from the static transit gateway
     echo "Clean up transit gateway - VPC connection"
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
-    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    POWERVS_REGION=$(map_powervs_region "${REGION}")
     echo ":started searching for gateway... output expected:"
     for GW in $(ibmcloud tg gateways --output json | jq --arg resource_group "${RESOURCE_GROUP_ID}" --arg name "multi-arch-x-px-${POWERVS_REGION}-1-tg" -r '.[] | select(.resource_group.id == $resource_group) | select(.name == $name) | .id')
     do
@@ -86,7 +105,7 @@ function cleanup_prior() {
             if [ -n "${VPC_CONN_ID}" ]
             then
                 echo "deleting VPC connection"
-                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                ibmcloud tg connection-delete "${GW}" "${VPC_CONN_ID}" --force || true
                 sleep 120
                 echo "Done Cleaning up GW VPC Connection"
             else
@@ -139,7 +158,7 @@ function configure_automation() {
 
     # create workspace for powervs from cli
     echo "Display all the variable values:"
-    POWERVS_REGION=$(bash "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+    POWERVS_REGION=$(map_powervs_region "${REGION}")
     echo "${POWERVS_REGION}" > "${SHARED_DIR}"/POWERVS_REGION
 
     echo "VPC Region is ${REGION}"
@@ -174,11 +193,24 @@ function configure_automation() {
     echo "Target the PowerVS Workspace"
     ibmcloud pi workspace target "${CRN}"
 
-    # Invoke create-var-file.sh to generate var.tfvars file
+    echo "DEBUG: Images available in the workspace:"
+    ibmcloud pi image list || true
+
+    # Run scripts/pre.sh: sets up OCP prerequisites before Terraform
+    echo "Running scripts/pre.sh"
+    cd "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs \
+        && bash scripts/pre.sh
+
+    # Invoke scripts/vars.sh to generate var.tfvars file
     echo "Creating the var file"
-    cd ${IBMCLOUD_HOME}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud/ocp4-upi-compute-powervs "${ADDITIONAL_WORKERS}" "p-px"
+    echo "DEBUG: RHCOS_IMAGE_NAME='${RHCOS_IMAGE_NAME:-unset}'"
+    echo "DEBUG: OCP_VERSION='${OCP_VERSION}'"
+    echo "DEBUG: RHEL_IMAGE_NAME='${RHEL_IMAGE_NAME}'"
+    cd "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs \
+        && bash scripts/vars.sh /tmp/ibmcloud/ocp4-upi-compute-powervs "${ADDITIONAL_WORKERS}" "p-px"
     cp "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
+    echo "DEBUG: Generated var.tfvars:"
+    grep -E "rhcos_image_name|rhcos_import_image" "${SHARED_DIR}/var.tfvars" || true
 
     #Create the VPC to fixed transit gateway Connection for the TG
     RESOURCE_GROUP_ID=$(ibmcloud resource groups --output json | jq -r '.[] | select(.name == "'${RESOURCE_GROUP}'").id')
@@ -332,6 +364,10 @@ download_automation_code
 cleanup_prior
 configure_automation
 run_automation
-wait_for_additional_nodes_readiness "$((2+${ADDITIONAL_WORKERS}))"
+
+# Run scripts/post.sh: handles CSR approval, taint removal, and RMC DaemonSet
+echo "Running scripts/post.sh"
+cd "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs \
+    && bash scripts/post.sh
 
 exit 0
