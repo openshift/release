@@ -854,6 +854,19 @@ if finalJson="$(oc get mcp -o json --request-timeout=30s 2>/dev/null)"; then
 fi
 
 CollectFailureBundle
+# Render churn is orthogonal to the final condition state: a churning
+# pool is Updating=True (or Degraded) while it re-renders, so the state
+# branches below would otherwise misattribute it (preflight review:
+# the churn check in the UNKNOWN branch was unreachable). The churn
+# count is the mechanism; the branch diagnostics (conditions verbatim,
+# node dumps) are already captured per-poll and in the bundle.
+if (( _renderChurnCount >= renderChurnLimit )); then
+    echo "FAILURE CLASS: mcp-render-churn"
+    echo "MachineConfig generation changed ${_renderChurnCount} times during the wait (limit ${renderChurnLimit}); the pool is being re-rendered faster than it can converge (final state: ${classification})"
+    _junit_class="mcp-render-churn"
+    echo "Ready count trend: ${readyHistory[*]}"
+    exit 1
+fi
 case "${classification}" in
     DEGRADED)
         if [[ -n "${_junit_reason}" && "${_junit_reason}" =~ (no\ space\ left\ on\ device|disk\ full|could\ not\ write\ image\ pull\ secret) ]]; then
@@ -900,14 +913,8 @@ case "${classification}" in
         fi
         ;;
     *)
-        if (( _renderChurnCount >= renderChurnLimit )); then
-            echo "FAILURE CLASS: mcp-render-churn"
-            echo "MachineConfig generation changed ${_renderChurnCount} times during the wait (limit ${renderChurnLimit}); the pool is being re-rendered faster than it can converge"
-            _junit_class="mcp-render-churn"
-        else
-            echo "FAILURE CLASS: Unknown timeout"
-            _junit_class="UNKNOWN"
-        fi
+        echo "FAILURE CLASS: Unknown timeout"
+        _junit_class="UNKNOWN"
         echo "Ready count trend: ${readyHistory[*]}"
         exit 1
         ;;
