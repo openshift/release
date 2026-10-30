@@ -58,6 +58,7 @@ _junit_start=$(date +%s)
 _junit_emitted=0
 _bundle_emitted=0
 _jrc=0  # assigned by the EXIT trap (set-once); TERM/INT set 143
+_rc=0  # exit status captured by the EXIT trap (SC2154: visible assignment for shellcheck)
 _junit_class=""
 _junit_reason=""
 _junit_selftest="not-run"
