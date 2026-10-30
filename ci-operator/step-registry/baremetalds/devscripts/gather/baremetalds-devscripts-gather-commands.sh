@@ -16,16 +16,33 @@ fi
 source "${SHARED_DIR}/packet-conf.sh"
 
 function getlogs() {
+  local original_status=$?
+  trap - EXIT
+  set +e
   echo "### Downloading logs..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.tar*" "${ARTIFACT_DIR}"
+  if [[ "${DEVSCRIPTS_GATHER_AGENT:-false}" == true ]]; then
+    timeout --kill-after=5s 45s scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.tar*" "${ARTIFACT_DIR}"
+    echo "Fallback bundle retrieval rc=$?; missing matches or transfer failures do not prove node reachability"
+  else
+    scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.tar*" "${ARTIFACT_DIR}"
+  fi
+  exit "${original_status}"
 }
 
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
+collection_timeout=15m
+logs_timeout=5m
+metadata_timeout=()
+if [[ "${DEVSCRIPTS_GATHER_AGENT:-false}" == true ]]; then
+  collection_timeout=10m
+  logs_timeout=60s
+  metadata_timeout=(timeout --kill-after=5s 30s)
+fi
 
 if [[ ! -f "${SHARED_DIR}/devscripts-logs-collected" ]]; then
   echo "### Dev-scripts logs not collected by setup, collecting as fallback..."
-  timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
+  timeout -s 9 "${logs_timeout}" ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs 2>/dev/null | tar -C "${ARTIFACT_DIR}" -xzf - || true
   if [[ -d "${ARTIFACT_DIR}/root/dev-scripts/logs" ]]; then
     find "${ARTIFACT_DIR}/root/dev-scripts/logs" -type f -exec sed -i '
       /auths/ s/.*/*** PULL_SECRET ***/;
@@ -46,7 +63,8 @@ if [[ ! -f "${SHARED_DIR}/install-status.txt" ]]; then
 fi
 
 echo "### Gathering logs..."
-timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 "${collection_timeout}" ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+AGENT_MODE='${DEVSCRIPTS_GATHER_AGENT:-false}'
 cd dev-scripts
 
 echo "Testing API access"
@@ -80,9 +98,22 @@ done
 echo "Get libvirt logs..."
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --transform "s?^\.?libvirt-logs?" .
 
-. common.sh
-. network.sh
-. utils.sh
+if [[ \$AGENT_MODE == true && ( ! -s common.sh || ! -f network.sh || ! -f utils.sh || ! -f config_root.sh ) ]]; then
+  echo "Agent inventory unavailable: dev-scripts configuration missing; retaining provisioning-host bundles"
+  exit 0
+fi
+if [[ \$AGENT_MODE == true ]]; then
+  {
+    . common.sh
+    . network.sh
+    . utils.sh
+    set +x
+  } >/dev/null 2>&1
+else
+  . common.sh
+  . network.sh
+  . utils.sh
+fi
 
 INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -90,10 +121,7 @@ INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
   -o 'ServerAliveInterval=90'
 )
 
-echo "Get the bootstrap logs if it is around and we didn't already collect them..."
-if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
-then
-  # Collect log bundle
+if [[ \$AGENT_MODE != true ]] && ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1; then
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
   scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
 fi
@@ -125,13 +153,39 @@ done
 NODE_IPS=()
 for node_name in "\${NODE_NAMES[@]}"
 do
-  node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
-    NODE_IPS+=("\$node_ip")
+  if [[ \$AGENT_MODE == true ]]; then
+    node_ip=\$(awk -v name="\$node_name" '\$2 == name {print \$1; exit}' "\$OCP_DIR/hosts" 2>/dev/null) || node_ip=''
+    [[ -n \$node_ip ]] || echo "Agent inventory unavailable for node entry; not using DHCP"
+  else
+    node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
+  fi
+  NODE_IPS+=("\$node_ip")
 done
+
+echo "Get the bootstrap logs if it is around and we didn't already collect them..."
+if [[ \$AGENT_MODE == true ]]; then
+  rendezvous_ip=''
+  if [[ -s \$OCP_DIR/hosts && -f agent/common.sh ]]; then
+    rendezvous_ip=\$(. agent/common.sh >/dev/null 2>&1 || exit; set +x; getRendezvousIP 2>/dev/null) || rendezvous_ip=''
+  fi
+  if [[ -n \$rendezvous_ip && " \${NODE_IPS[*]} " == *" \$rendezvous_ip "* ]]; then
+    echo "Agent rendezvous selected from retained helper/inventory"
+    ssh "\${INTERNAL_SSH_OPTS[@]}" "core@\$rendezvous_ip" TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap "\${NODE_IPS[@]}" &&
+    scp "\${INTERNAL_SSH_OPTS[@]}" "core@\$(wrap_if_ipv6 "\$rendezvous_ip"):/tmp/log-bundle-bootstrap.tar.gz" /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
+  else
+    echo "Agent rendezvous unavailable or absent from inventory; not using IPI bootstrap address"
+  fi
+fi
 
 echo "Checking for pacemaker and podman etcd logs on master nodes..."
 for (( n=0; n<\$NUM_MASTERS; n++ ))
 do
+  [[ -n \${NODE_IPS[\$n]} ]] || continue
+  if [[ \$AGENT_MODE == true ]]; then
+    agent_status=0
+    ssh "\${INTERNAL_SSH_OPTS[@]}" "core@\${NODE_IPS[\$n]}" 'command -v agent-gather >/dev/null || exit 127' || agent_status=\$?
+    echo "Agent collector availability node \$n rc=\$agent_status (127: unavailable, 255: SSH failed)"
+  fi
   HAS_PACEMAKER=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo test -f /var/log/pacemaker/pacemaker.log && echo true || echo false)
   HAS_ETCD=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo podman container exists etcd && echo true || echo false)
   if \$HAS_PACEMAKER; then
@@ -158,7 +212,12 @@ if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
 
 # Collect sos report from each known node
 for NODE_IP in \${NODE_IPS[@]}; do
-  echo "Fetching SOS report from \${NODE_IP}"
+  [[ -n \$NODE_IP ]] || continue
+  if \$AGENT_MODE; then
+    echo "Fetching agent node SOS report"
+  else
+    echo "Fetching SOS report from \${NODE_IP}"
+  fi
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
   ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
     sudo journalctl \| sudo dd of=/var/log/journal.log || true
@@ -171,7 +230,7 @@ done
 EOF
 
 echo "### Fetching must-gather image information..."
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+"${metadata_timeout[@]}" ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd /root/dev-scripts
 source common.sh
 source ocp_install_env.sh
@@ -191,4 +250,4 @@ if printf '%s\n4.7\n' "\$OPENSHIFT_VERSION" | sort -V -C; then
   fi
 fi
 EOF
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/must-gather-image.sh" "${SHARED_DIR}/" || true
+"${metadata_timeout[@]}" scp "${SSHOPTS[@]}" "root@${IP}:/tmp/must-gather-image.sh" "${SHARED_DIR}/" || true
