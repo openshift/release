@@ -261,7 +261,30 @@ while read -r -a PR_HISTORY_ENTRY; do
         exit 1
     fi
     PR_COMMIT="${PR_HISTORY_ENTRY[0]}"
+    PR_COMMIT_ANCESTRY_RC=0
+    git merge-base --is-ancestor "${START_COMMIT}" "${PR_COMMIT}" || PR_COMMIT_ANCESTRY_RC=$?
+    case "${PR_COMMIT_ANCESTRY_RC}" in
+        0|1) ;;
+        *)
+            echo "ERROR: Unable to inspect the solution history for pipeline PR metadata."
+            exit 1
+            ;;
+    esac
+    PR_INSPECTED_PARENTS=0
     for PR_PARENT in "${PR_HISTORY_ENTRY[@]:1}"; do
+        if [[ "${PR_COMMIT_ANCESTRY_RC}" -eq 0 ]]; then
+            PR_PARENT_ANCESTRY_RC=0
+            git merge-base --is-ancestor "${START_COMMIT}" "${PR_PARENT}" || PR_PARENT_ANCESTRY_RC=$?
+            case "${PR_PARENT_ANCESTRY_RC}" in
+                0) ;;
+                1) continue ;;
+                *)
+                    echo "ERROR: Unable to inspect the solution history for pipeline PR metadata."
+                    exit 1
+                    ;;
+            esac
+        fi
+        PR_INSPECTED_PARENTS=$(( PR_INSPECTED_PARENTS + 1 ))
         PR_HISTORY_RC=0
         git diff --quiet "${PR_PARENT}" "${PR_COMMIT}" -- ':(top)artifacts/pr-description.md' || PR_HISTORY_RC=$?
         case "${PR_HISTORY_RC}" in
@@ -276,6 +299,10 @@ while read -r -a PR_HISTORY_ENTRY; do
                 ;;
         esac
     done
+    if [[ "${PR_INSPECTED_PARENTS}" -eq 0 ]]; then
+        echo "ERROR: Unable to find a relevant parent while inspecting solution history."
+        exit 1
+    fi
 done <<< "${PR_FEATURE_HISTORY}"
 
 # The agent never pushes. Publish only this branch to the configured fork; do
