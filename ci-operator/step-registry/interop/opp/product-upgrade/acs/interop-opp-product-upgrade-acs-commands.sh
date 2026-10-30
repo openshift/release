@@ -465,6 +465,14 @@ function Main () {
     fi
 
     currentVersion="$(GetInstalledVersion)"
+    # Fail closed on an unavailable installed version before any comparison:
+    # an empty or non-numeric version would compare as all-zeros and let a
+    # positive target head pass the guard (review finding on the order check).
+    if ! [[ "${currentVersion}" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+        _junit_reason="acs-upgrade rejected: installed version unavailable (currentCSV ${currentCsv} reports '${currentVersion:-empty}')"
+        echo >&2 "ERROR: ${_junit_reason}"
+        exit 3
+    fi
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
