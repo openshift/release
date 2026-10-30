@@ -34,7 +34,7 @@ ref:
     - mcp-deadline-exceeded: progressing but too slow for the timeout.
     - mcp-rollout-not-converging: all machines updated but the pool
       never went ready; ready count oscillated without Degraded.
-    - mcp-render-churn: MachineConfig generation changed more than
+    - mcp-render-churn: MachineConfig generation changed at least
       MCP_RENDER_CHURN_LIMIT times during the wait.
     - cluster-api-unreachable: 5 consecutive oc failures.
     - Unknown timeout: none of the above.
@@ -67,7 +67,7 @@ ref:
     documentation: Consecutive not-ready polls (no Degraded) after which the rollout is considered cycling and no further deadline extensions are granted
     name: MCP_PINNED_UPDATED_POLLS
   - default: "5"
-    documentation: MachineConfig generation changes (render churn) after which the timeout classifies as mcp-render-churn
+    documentation: MachineConfig generation changes (render churn) at which the timeout classifies as mcp-render-churn
     name: MCP_RENDER_CHURN_LIMIT
   - default: "90"
     documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
@@ -76,7 +76,7 @@ ref:
     documentation: Absolute maximum wait time in seconds including all progress-based extensions (default 90 min)
     name: MCP_WAIT_MAX_TIMEOUT
   - default: "1200"
-    documentation: Seconds to extend the deadline when MCP ready count is progressing (default 20 min per extension)
+    documentation: Seconds to extend the deadline on progress (monotone updated-machine rise, or ready-count recovery with bounded regression; default 20 min per extension)
     name: MCP_WAIT_PROGRESS_EXTENSION
   - default: "30"
     documentation: Poll interval in seconds for checking MCP status. Increase for slower clusters.
