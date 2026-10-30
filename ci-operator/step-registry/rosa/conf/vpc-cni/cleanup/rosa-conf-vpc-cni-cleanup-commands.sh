@@ -23,6 +23,17 @@ else
   exit 1
 fi
 
+# The EC2 calls below need a region. Take it from the contract the provision
+# steps published, falling back to the REGION env.
+REGION_FALLBACK="${REGION:-}"
+REGION=$(jq -r '.region // empty' "${SHARED_DIR}/cluster-metadata.json" 2>/dev/null || true)
+REGION="${REGION:-${REGION_FALLBACK}}"
+if [[ -z "${REGION}" ]]; then
+  log "ERROR: no AWS region available (cluster-metadata.json or REGION env)"
+  exit 1
+fi
+export AWS_DEFAULT_REGION="${REGION}"
+
 # ---- Revoke the node-to-node worker SG rule ----
 # Authorized by rosa-conf-vpc-cni so the VPC CNI's native pod traffic can
 # cross nodes. The worker SG itself is created and deleted with the cluster,
