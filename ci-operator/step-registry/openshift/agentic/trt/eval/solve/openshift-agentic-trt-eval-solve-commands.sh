@@ -39,12 +39,17 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 # --- Artifact collection ---
 REAL_SHARED_DIR="${SHARED_DIR}"
+PR_METADATA_ROOT="/tmp/eval-pr-metadata"
+mkdir -p "${PR_METADATA_ROOT}"
 copy_artifacts() {
     echo "Copying artifacts..."
     for case_name in "${CASE_LIST[@]}"; do
         mkdir -p "${ARTIFACT_DIR}/${case_name}"
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
             cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+        fi
+        if [[ -d "${PR_METADATA_ROOT}/${case_name}" ]]; then
+            cp "${PR_METADATA_ROOT}/${case_name}/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
         fi
         if [[ -f "/tmp/eval-otel/${case_name}.claude-otel.jsonl" ]]; then
             cp "/tmp/eval-otel/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"
@@ -91,6 +96,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
+        export PR_METADATA_DIR="${PR_METADATA_ROOT}/${case_name}"
         export EVAL_MODE=true
         /opt/scripts/solve.sh
 
