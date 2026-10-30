@@ -10,6 +10,26 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+function oc_with_retry() {
+    local max_retries="${OC_MAX_RETRIES:-5}"
+    local retry_wait="${OC_RETRY_WAIT:-10}"
+    local attempt=1
+
+    while (( attempt <= max_retries )); do
+        if oc "$@"; then
+            return 0
+        fi
+        if (( attempt == max_retries )); then
+            echo "oc command failed after ${max_retries} attempts: oc $*" >&2
+            return 1
+        fi
+        echo "oc command failed (attempt ${attempt}/${max_retries}), retrying in ${retry_wait}s: oc $*" >&2
+        sleep "$retry_wait"
+        attempt=$(( attempt + 1 ))
+    done
+    return 1
+}
+
 function getDesiredInfraCount() {
   desired_infra_count=${MP_REPLICAS}
   echo "Desired Infra node count: $desired_infra_count"
@@ -21,12 +41,12 @@ function listNodeDetails() {
     # Get current machine pools and status of nodes
     log "$(date) - List infra nodes"
     echo "oc get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n"
-    oc get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n
+    oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra | cat -n
 
     # Get details of Infra nodes not in Ready state
     log "$(date) - Infra nodes not in Ready state, if any"
-    for node in $(oc get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type!='Ready')].metadata.name}"); do
-      oc describe node "$node"
+    for node in $(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type!='Ready')].metadata.name}"); do
+      oc_with_retry describe node "$node"
     done
     log "$(date) - Finished printing details of all infra nodes."
 }
@@ -56,7 +76,7 @@ function checkForInfraReady() {
 
     deadline=$(( $(date +%s) + timeout_seconds ))
     while true; do
-        if ready_nodes=$(oc get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" 2>/dev/null); then
+        if ready_nodes=$(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}"); then
             node_count=$(wc -w <<< "$ready_nodes" | xargs)
         else
             node_count=0
@@ -84,8 +104,8 @@ function checkForInfraReady() {
 function rebalanceInfra() {
     if [[ $1 == "prometheus-k8s" ]] ; then
         log "$(date) - Initiate migration of prometheus to infra nodepools"
-        oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
-        oc get sts prometheus-k8s -n openshift-monitoring
+        oc_with_retry get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+        oc_with_retry get sts prometheus-k8s -n openshift-monitoring
 
         log "$(date) - Apply cluster-monitoring-config to move prometheus to infra nodes"
         # Note: Fresh ROSA HCP clusters don't have cluster-monitoring-config by default.
@@ -93,7 +113,8 @@ function rebalanceInfra() {
         # clusters with existing monitoring config, this would overwrite retention/resources.
         # Only moving prometheusK8s as it's the resource-intensive component; other monitoring
         # components consume minimal resources and can remain on worker nodes.
-        cat << 'EOF' | oc apply -f -
+        monitoring_config_file=$(mktemp)
+        cat > "$monitoring_config_file" << 'EOF'
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -109,11 +130,16 @@ data:
           key: "node-role.kubernetes.io/infra"
           operator: "Exists"
 EOF
+        oc_with_retry apply -f "$monitoring_config_file" || {
+            rm -f "$monitoring_config_file"
+            exit 1
+        }
+        rm -f "$monitoring_config_file"
 
         log "$(date) - Wait for cluster-monitoring-operator to reconcile the configuration"
         RECONCILED=false
         for i in {1..30}; do
-            if oc get sts prometheus-k8s -n openshift-monitoring -o json | \
+            if oc_with_retry get sts prometheus-k8s -n openshift-monitoring -o json | \
                 jq -e '.spec.template.spec.nodeSelector["node-role.kubernetes.io/infra"] == "" and any(.spec.template.spec.tolerations[]?; .key == "node-role.kubernetes.io/infra" and .operator == "Exists" and .effect == "NoSchedule")' >/dev/null; then
                 RECONCILED=true
                 log "$(date) - StatefulSet reconciled with infra nodeSelector and tolerations"
@@ -125,16 +151,16 @@ EOF
         if [[ "${RECONCILED}" != "true" ]]; then
             log "$(date) - ERROR: cluster-monitoring-operator did not update prometheus-k8s placement"
             log "Current StatefulSet spec:"
-            oc get sts prometheus-k8s -n openshift-monitoring -o json | jq '.spec.template.spec | {nodeSelector, tolerations}'
+            oc_with_retry get sts prometheus-k8s -n openshift-monitoring -o json | jq '.spec.template.spec | {nodeSelector, tolerations}'
             exit 1
         fi
 
         log "$(date) - Restart stateful set pods"
         echo "rollout restart -n openshift-monitoring statefulset/prometheus-k8s"
-        oc rollout restart -n openshift-monitoring statefulset/prometheus-k8s
+        oc_with_retry rollout restart -n openshift-monitoring statefulset/prometheus-k8s
 
         log "$(date) - Wait till they are completely restarted"
-        oc rollout status -n openshift-monitoring statefulset/prometheus-k8s
+        oc_with_retry rollout status -n openshift-monitoring statefulset/prometheus-k8s
 
         log "$(date) - Verify prometheus pods are running on infra nodes"
         # Wait up to 2 minutes for pods to be scheduled on infra nodes
@@ -143,8 +169,8 @@ EOF
         VERIFY_SUCCESS=false
         while [ $RETRY -lt $MAX_RETRIES ]; do
             ALL_ON_INFRA=true
-            for node in $(oc get pods -n openshift-monitoring -o wide | grep -i "prometheus-k8s-" | grep -i running | awk '{print$7}'); do
-                if [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/infra | awk '{print$1}' | grep -w "$node") != "" ]]; then
+            for node in $(oc_with_retry get pods -n openshift-monitoring -o wide | grep -i "prometheus-k8s-" | grep -i running | awk '{print$7}'); do
+                if [[ $(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra | awk '{print$1}' | grep -w "$node") != "" ]]; then
                     log "$(date) - prometheus pod on $node (infra node) ✓"
                 else
                     log "$(date) - WARNING: prometheus pod on $node is NOT an infra node"
@@ -165,22 +191,22 @@ EOF
 
         if [ "$VERIFY_SUCCESS" = false ]; then
             log "$(date) - ERROR: Prometheus pods failed to move to infra nodes after $MAX_RETRIES attempts"
-            oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+            oc_with_retry get pods -n openshift-monitoring -o wide | grep prometheus-k8s
             exit 1
         fi
 
         log "$(date) - Check pods status again and the hosting nodes"
-        oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+        oc_with_retry get pods -n openshift-monitoring -o wide | grep prometheus-k8s
     else
         log "$(date) - Initiate migration of ingress router-default pods to infra nodepools"
         echo "Add toleration to use infra nodes"
 
-        oc patch ingresscontroller -n openshift-ingress-operator default --type merge --patch  '{"spec":{"nodePlacement":{"nodeSelector":{"matchLabels":{"node-role.kubernetes.io/infra":""}},"tolerations":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/infra","operator":"Exists"}]}}}'
+        oc_with_retry patch ingresscontroller -n openshift-ingress-operator default --type merge --patch  '{"spec":{"nodePlacement":{"nodeSelector":{"matchLabels":{"node-role.kubernetes.io/infra":""}},"tolerations":[{"effect":"NoSchedule","key":"node-role.kubernetes.io/infra","operator":"Exists"}]}}}'
         
         echo "Wait till it gets rolled out"
         sleep 60
 
-        oc get pods -n openshift-ingress -o wide
+        oc_with_retry get pods -n openshift-ingress -o wide
     fi    
 }
 
@@ -189,9 +215,9 @@ function checkInfra() {
     while [ $TRY -le 3 ]; do # Attempts three times to migrate pods
         FLAG_ERROR=""
         rebalanceInfra $1
-        for node in $(oc get pods -n "$2" -o wide | grep -i "$1" | grep -i running | awk '{print$7}');
+        for node in $(oc_with_retry get pods -n "$2" -o wide | grep -i "$1" | grep -i running | awk '{print$7}');
         do
-            if [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/infra | awk '{print$1}' | grep $node) != "" ]]; then
+            if [[ $(oc_with_retry get nodes --no-headers -l node-role.kubernetes.io/infra | awk '{print$1}' | grep $node) != "" ]]; then
                 log "$(date) - $node is an infra node"
             else
                 log "$(date) - $1 pod on $node is not an infra node, retrying"
