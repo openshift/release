@@ -387,9 +387,19 @@ JSONEOF
 esac
 MOCKEOF
   chmod +x "${_tt_dir}/mockbin/oc"
+  # $0 must resolve to this file (ref sets run_as_script so it is
+  # executed directly, not via bash -c); validate the copy carries this
+  # script's marker so an invocation-semantics change degrades to warn,
+  # never to silently testing the wrong file (preflight review).
   local _src
   _src="$(readlink -f "${0}" 2>/dev/null)" || _src="${0}"
   cp "${_src}" "${_tt_dir}/wmcp-term-child.sh" || { echo "trap self-test: copy failed (environmental); continuing" >&2; rm -rf "${_tt_dir}"; _junit_trapselftest="warn"; return 0; }
+  if ! grep -q "WaitMcpTrapSelfTest" "${_tt_dir}/wmcp-term-child.sh" 2>/dev/null; then
+    echo "trap self-test: script path resolved to ${_src}, which is not this script (invocation semantics?); continuing" >&2
+    rm -rf "${_tt_dir}"
+    _junit_trapselftest="warn"
+    return 0
+  fi
   # Child: real script, mock API on PATH, tight poll cadence, short
   # deadline so a missed signal still self-terminates, child-mode env so
   # its own phase 0 does not fork another trap test (recursion guard).
