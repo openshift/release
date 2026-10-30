@@ -30,27 +30,47 @@ tests:
     export XDG_CACHE_HOME="/tmp/cache"
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
-    # istio.deps is merged semantically: take upstream's file but keep our own
-    # proxy and ztunnel pins. Everything else, agentgateway included, follows
-    # upstream. Scoped to istio.deps so every other file merges normally.
-    cat > /tmp/merge-istio-deps.sh <<'EOF'
-    #!/usr/bin/env bash
-    set -euo pipefail
-    merged=$(mktemp)
-    trap 'rm -f "${merged}"' EXIT
-    jq -e --slurpfile ours "$1" '
-      ($ours[0] | map(select(.name == "PROXY_REPO_SHA" or .name == "ZTUNNEL_REPO_SHA"))
-        | map({key: .name, value: .lastStableSHA}) | from_entries) as $pins
-      | map(if $pins[.name] then .lastStableSHA = $pins[.name] else . end)
-    ' "$2" > "${merged}"
-    cat "${merged}" > "$1"
-    EOF
-    chmod +x /tmp/merge-istio-deps.sh
+    # Resolve istio.deps conflicts with upstream. The hook also handles trivial
+    # merges, where Git skips the driver, and restores only our proxy/ztunnel hashes.
     echo 'istio.deps merge=istio-deps' > /tmp/gitattributes
     export GIT_CONFIG_GLOBAL=/tmp/gitconfig
     git config --global core.attributesFile /tmp/gitattributes
-    git config --global merge.istio-deps.name 'keep downstream proxy and ztunnel pins'
-    git config --global merge.istio-deps.driver '/tmp/merge-istio-deps.sh %A %B'
+    git config --global merge.istio-deps.name 'take upstream istio.deps'
+    git config --global merge.istio-deps.driver 'cp %B %A'
+    # Requires maistra/test-infra#461. origin/<branch> remains at the pre-merge
+    # downstream commit in the automator's clone, even after a successful merge.
+    cat > /tmp/post-merge-istio-deps.sh <<'EOF'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    downstream=$(git rev-parse "origin/${AUTOMATOR_BRANCH}")
+    # Never amend an existing downstream commit on an already-up-to-date run.
+    [[ $(git rev-parse HEAD) != "${downstream}" ]] || exit 0
+    if [[ $(git rev-parse HEAD^1) != "${downstream}" ]]; then
+      echo 'Expected a new merge commit with the downstream branch as its first parent' >&2
+      exit 1
+    fi
+    tmp=$(mktemp -d)
+    trap 'rm -rf "${tmp}"' EXIT
+    git show "${downstream}:istio.deps" > "${tmp}/downstream"
+    git show "upstream/${AUTOMATOR_BRANCH}:istio.deps" > "${tmp}/upstream"
+    jq -e --slurpfile downstream "${tmp}/downstream" '
+      reduce ["PROXY_REPO_SHA", "ZTUNNEL_REPO_SHA"][] as $name (. ;
+        ($downstream[0] | map(select(.name == $name))) as $pin
+        | if ($pin | length) != 1
+            or ($pin[0].lastStableSHA | type) != "string"
+            or ($pin[0].lastStableSHA | length) == 0
+            or (map(select(.name == $name)) | length) != 1
+          then error("Missing, duplicate, or invalid pin: " + $name)
+          else map(if .name == $name then .lastStableSHA = $pin[0].lastStableSHA else . end)
+          end)
+    ' "${tmp}/upstream" > "${tmp}/merged"
+    cp "${tmp}/merged" istio.deps
+    git add istio.deps
+    if ! git diff --cached --quiet -- istio.deps; then
+      git -c "user.name=$(git show -s --format=%cn HEAD)" \
+          -c "user.email=$(git show -s --format=%ce HEAD)" commit --amend --no-edit
+    fi
+    EOF
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=istio \
@@ -62,7 +82,7 @@ tests:
     --merge-repository=https://github.com/istio/istio \
     --merge-branch=release-1.30 \
     --merge-strategy=merge \
-    --merge-failure-pr
+    --post-merge-hook=/tmp/post-merge-istio-deps.sh
   container:
     from: src
   cron: 00 05 * * 1-5
