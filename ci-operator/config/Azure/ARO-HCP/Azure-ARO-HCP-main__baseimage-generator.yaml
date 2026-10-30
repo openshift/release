@@ -68,14 +68,17 @@ tests:
   - nested-podman
   - arm64
   nested_podman: true
-  run_if_changed: ^dev-infrastructure/openshift-ci/Dockerfile\.nested-podman$
+  run_if_changed: ^dev-infrastructure/openshift-ci/(Dockerfile\.nested-podman|Makefile|versions\.mk)$
   steps:
     test:
     - as: nested-podman-smoke-test
       commands: |
         set -euxo pipefail
         export AZURE_TOKEN_CREDENTIALS=prod
+        export GOPATH=/opt/app-root
+        make -C dev-infrastructure/openshift-ci test-nested-podman IN_CONTAINER=true
         test-integration/hack/start-cosmos-emulator.sh
+        test-integration/hack/test-integration.sh
         test-integration/hack/stop-cosmos-emulator.sh
         unset GOFLAGS
         make mega-lint CONTAINER_RUNTIME=podman
