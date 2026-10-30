@@ -115,11 +115,27 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
 
     echo "API reachable again after ${_probe} failed probes"
     # ipForwarding is a CNO setting: it re-renders ovnkube-config and rolls the
-    # ovnkube-node DaemonSet, it does not generate a MachineConfig.  These waits
-    # therefore return immediately in practice and are kept only as a guard.
-    echo "Confirming machine config pools are settled..."
-    oc wait mcp master worker --for condition=Updating=False --timeout=5m
-    oc wait mcp master worker --for condition=Updated --timeout=5m
+    # ovnkube-node DaemonSet, it does not generate a MachineConfig.  Wait for
+    # the ovnkube-node DaemonSet to complete its rollout so all pods have
+    # consistent generations and container layouts.
+    echo "Waiting for ovnkube-node DaemonSet rollout to complete..."
+    oc wait -n openshift-ovn-kubernetes daemonset/ovnkube-node \
+      --for=condition=Progressing=False --timeout=10m
+    # Verify all desired pods are actually updated (generation matches)
+    _ovn_deadline=$(( SECONDS + 5 * 60 ))
+    while (( SECONDS < _ovn_deadline )); do
+      _updated=$(oc get daemonset -n openshift-ovn-kubernetes ovnkube-node \
+        -o jsonpath='{.status.updatedNumberScheduled}/{.status.desiredNumberScheduled}')
+      _ready=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+        --field-selector status.phase=Running -o jsonpath='{.items | length}')
+      if [[ "${_updated}" == "${_updated%/*}/${_updated%/*}" ]] && \
+         [[ "${_ready}" == "${_updated%/*}" ]]; then
+        echo "ovnkube-node DaemonSet converged: ${_updated} pods updated, ${_ready} running"
+        break
+      fi
+      echo "  Waiting for rollout convergence: ${_updated} updated, ${_ready} running"
+      sleep 10
+    done
     echo "Global IP forwarding enabled"
   else
     echo "Global IP forwarding already enabled"
@@ -127,59 +143,49 @@ if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Discover OVN container names from the first ovnkube-node pod.
+# Per-node: discover container names and configure secondary network.
 # ---------------------------------------------------------------------------
 namespace="openshift-ovn-kubernetes"
 
-# Wait for ovnkube-node pods to stabilize after MCP rollout, then verify
-# at least one is ready before probing container names.
-echo "Waiting for ovnkube-node pods to be ready..."
-_ovn_deadline=$(( SECONDS + 10 * 60 ))
-while (( SECONDS < _ovn_deadline )); do
-  if oc get nodes --request-timeout=10s &>/dev/null; then
-    break
+# Helper to discover containers in a pod
+discover_containers_in_pod() {
+  local pod_name="$1"
+  local containers
+
+  containers=$(oc get pod -n "${namespace}" "${pod_name}" \
+    -o jsonpath='{.spec.containers[*].name}')
+
+  local ovs_container=""
+  for c in ovs-daemons ovnkube-node ovnkube-controller; do
+    if [[ " ${containers} " == *" ${c} "* ]] && \
+       oc exec -n "${namespace}" "${pod_name}" -c "${c}" -- \
+         which ovs-vsctl >/dev/null 2>&1; then
+      ovs_container="${c}"
+      break
+    fi
+  done
+
+  if [[ -z "${ovs_container}" ]]; then
+    echo "ERROR: could not find container with ovs-vsctl in pod ${pod_name}" >&2
+    return 1
   fi
-  echo "  API not ready, $(( (_ovn_deadline - SECONDS) / 60 ))m of budget left"
-  sleep 20
-done
-oc wait pod -n "${namespace}" -l app=ovnkube-node --for=condition=Ready --timeout=5m
 
-first_ovn_pod=$(oc get pods -n "${namespace}" -l app=ovnkube-node \
-  --field-selector status.phase=Running \
-  -o jsonpath='{.items[0].metadata.name}')
-containers=$(oc get pod -n "${namespace}" "${first_ovn_pod}" \
-  -o jsonpath='{.spec.containers[*].name}')
+  local net_container=""
+  for c in ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${c} "* ]] && \
+       oc exec -n "${namespace}" "${pod_name}" -c "${c}" -- \
+         bash -c "ip -V" >/dev/null 2>&1; then
+      net_container="${c}"
+      break
+    fi
+  done
 
-OVS_CONTAINER=""
-for c in ovs-daemons ovnkube-node ovnkube-controller; do
-  if [[ " ${containers} " == *" ${c} "* ]] && \
-     oc exec -n "${namespace}" "${first_ovn_pod}" -c "${c}" -- \
-       which ovs-vsctl >/dev/null 2>&1; then
-    OVS_CONTAINER="${c}"
-    break
+  if [[ -z "${net_container}" ]]; then
+    net_container="${ovs_container}"
   fi
-done
-if [[ -z "${OVS_CONTAINER}" ]]; then
-  echo "ERROR: could not find a container with ovs-vsctl" >&2
-  exit 1
-fi
 
-NET_CONTAINER=""
-for c in ovnkube-controller ovnkube-node; do
-  if [[ " ${containers} " == *" ${c} "* ]] && \
-     oc exec -n "${namespace}" "${first_ovn_pod}" -c "${c}" -- \
-       bash -c "ip -V" >/dev/null 2>&1; then
-    NET_CONTAINER="${c}"
-    break
-  fi
-done
-if [[ -z "${NET_CONTAINER}" ]]; then
-  NET_CONTAINER="${OVS_CONTAINER}"
-fi
-
-echo ""
-echo "OVS container: ${OVS_CONTAINER}"
-echo "Net container: ${NET_CONTAINER}"
+  echo "${ovs_container}:${net_container}"
+}
 
 # ---------------------------------------------------------------------------
 # On each node: discover the secondary NIC, create an OVS bridge, attach the
@@ -209,6 +215,12 @@ for node_name in "${nodes[@]}"; do
   fi
   echo ""
   echo "=== ${node_name} (${pod_name}) ==="
+
+  # Discover container names in this pod (may differ from other pods post-rollout)
+  containers_result=$(discover_containers_in_pod "${pod_name}") || continue
+  OVS_CONTAINER="${containers_result%:*}"
+  NET_CONTAINER="${containers_result#*:}"
+  echo "  Containers: OVS=${OVS_CONTAINER}, Net=${NET_CONTAINER}"
 
   # Discover the secondary interface by matching the extra-network subnet.
   secondary_record=$(oc exec -n "${namespace}" "${pod_name}" -c "${NET_CONTAINER}" -- \
