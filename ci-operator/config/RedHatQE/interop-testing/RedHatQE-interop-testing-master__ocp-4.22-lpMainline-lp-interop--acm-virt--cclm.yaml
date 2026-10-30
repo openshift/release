@@ -241,6 +241,86 @@ tests:
       resource_type: aws-cspi-qe-quota-slice
     workflow: p2p-cclm-hub-spoke
   timeout: 14h0m0s
+- as: poc--windows-vm--aws
+  cron: 0 10 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      ACM_SPOKE_CLUSTER_COUNT: "1"
+      ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.22"
+      ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
+      ACM_SPOKE_CP_TYPE: m6a.2xlarge
+      ACM_SPOKE_WORKER_TYPE: c5n.metal
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CNV_EXPECTED_MAJOR_MINOR: "4.22"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-cluster-install", "failure_type": "all", "classification": "Spoke cluster Installation", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]},
+              {"step": "acm-interop-p2p-cluster-uninstall", "failure_type": "all", "classification": "Spoke cluster Un-Installation", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]},
+              {"step": "p2p-acm-mtv-integration", "failure_type": "all", "classification": "ACM MTV integration (mtv-operator add-on / ForkliftController CCLM) failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "acm-fetch-managed-clusters", "failure_type": "all", "classification": "ACM cluster failure", "jira_project": "!default", "group": {"name": "opp-tests", "priority": 4}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-acm-cnv-addon-install", "failure_type": "all", "classification": "ACM CNV add-on install failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-install-odf-spokes", "failure_type": "all", "classification": "ODF spoke cluster install failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
+              {"step": "p2p-cclm-create-windows-vm", "failure_type": "all", "classification": "CCLM Windows VM creation failure", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","windows-vm-poc"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_OPERATOR_CHANNEL: stable-4.22
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      P2P_HS_SPOKE_VM_PREFIX: test-vm
+      P2P_HS_VM_COUNT: "1"
+      P2P_HS_VM_CPUS: "4"
+      P2P_HS_VM_DISK_SIZE: 70Gi
+      P2P_HS_VM_MEMORY: 8Gi
+      USER_TAGS: |
+        scenario acm-cnv-windows-vm-poc
+    leases:
+    - count: 1
+      env: LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    - count: 1
+      env: MANAGED_CLUSTER_LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    post:
+    - ref: acm-must-gather
+    - ref: acm-interop-p2p-cluster-uninstall
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: p2p-acm-mtv-integration
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-fetch-managed-clusters
+    - ref: p2p-acm-cnv-addon-install
+    - ref: p2p-install-odf-spokes
+    - ref: p2p-cclm-create-windows-vm
+  timeout: 12h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE

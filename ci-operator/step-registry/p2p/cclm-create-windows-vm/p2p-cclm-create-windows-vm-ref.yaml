@@ -1,0 +1,113 @@
+ref:
+  as: p2p-cclm-create-windows-vm
+  from_image:
+    namespace: ci
+    name: openshift-virtualization-tests
+    tag: latest
+  commands: p2p-cclm-create-windows-vm-commands.sh
+  timeout: 4h0m0s
+  grace_period: 10m0s
+  cli: latest
+  credentials:
+    - collection: cnv-ci-secrets
+      group: cnv-ci-brew-pull-secret
+      mount_path: /var/run/cnv-ci-brew-pull-secret
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Import a Windows boot image and create Windows VirtualMachines on the ACM
+    spoke (and, when asked, the hub) for MTV cross-cluster live migration.
+
+    Brew registry auth is added to the target cluster pull secret in this shell
+    step, using BREW_IMAGE_REGISTRY_USERNAME and the token file at
+    BREW_IMAGE_REGISTRY_TOKEN_PATH. That is the same injection cnv-ci runs from
+    hack/update-pull-secret.sh before DataImportCrons pull images. The
+    openshift-virtualization-tests image supplies jq and the step runtime; the
+    pull-secret update is not performed by openshift-python-wrapper.
+
+    After the pull secret changes, the step waits until MachineConfigPools have
+    rolled, then waits until the Windows DataSource is Ready and clones it onto
+    ODF RWX block storage. VM names match the CCLM migration steps:
+    ${P2P_HS_SPOKE_VM_PREFIX}-1 .. N in ${P2P_HS_VM_NAMESPACE}.
+
+    The cnv-ci-secrets vault policy must allow this step to mount
+    cnv-ci-brew-pull-secret. Windows guests have no cloud-init SSH key, so
+    MTV_VM_SSH_VERIFY, MTV_VM_DATA_INTEGRITY, and MTV_VM_GUEST_EXEC should be
+    false, and MTV_VM_ROOTDISK_SIZE must match P2P_HS_VM_DISK_SIZE.
+  env:
+  - name: BREW_IMAGE_REGISTRY_USERNAME
+    default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+    documentation: Username placed in the brew.registry.redhat.io pull-secret entry.
+  - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+    default: /var/run/cnv-ci-brew-pull-secret/token
+    documentation: File containing the Brew registry token. The token is never logged.
+  - name: CCLM_WINDOWS_DATASOURCE
+    default: windows2k22
+    documentation: DataSource name of the Windows boot image (windows10, windows11, windows2k22).
+  - name: CCLM_WINDOWS_DATASOURCE_NAMESPACE
+    default: openshift-virtualization-os-images
+    documentation: Namespace of the HCO-managed Windows DataSource.
+  - name: CCLM_WINDOWS_DISK_BUS
+    default: sata
+    documentation: Root disk bus for the Windows guest. Golden Windows images boot from sata.
+  - name: CCLM_WINDOWS_MACHINE_TYPE
+    default: q35
+    documentation: KubeVirt machine type for the Windows guest.
+  - name: P2P_HS_VM_COUNT
+    default: "1"
+    documentation: Number of Windows VMs to create on the spoke. Names are ${P2P_HS_SPOKE_VM_PREFIX}-1 .. N.
+  - name: P2P_HS_SPOKE_VM_PREFIX
+    default: test-vm
+    documentation: Name prefix for spoke VMs. Must match the MTV migration steps.
+  - name: P2P_HS_HUB_VM_PREFIX
+    default: hub-vm
+    documentation: Name prefix for hub VMs when P2P_HS_CREATE_HUB_VMS=true.
+  - name: P2P_HS_VM_NAMESPACE
+    default: vm-migration-test
+    documentation: Namespace for the Windows VMs and their DataVolumes.
+  - name: P2P_HS_SPOKE_STORAGE_CLASS
+    default: ocs-storagecluster-ceph-rbd-virtualization
+    documentation: ODF StorageClass for spoke Windows disks. Must support ReadWriteMany block.
+  - name: P2P_HS_HUB_STORAGE_CLASS
+    default: ocs-storagecluster-ceph-rbd-virtualization
+    documentation: ODF StorageClass for hub Windows disks when hub VMs are created.
+  - name: P2P_HS_VM_DISK_SIZE
+    default: 70Gi
+    documentation: Root disk size. Must match MTV_VM_ROOTDISK_SIZE in the verify steps.
+  - name: P2P_HS_VM_MEMORY
+    default: 8Gi
+    documentation: Guest memory for each Windows VM.
+  - name: P2P_HS_VM_CPUS
+    default: "4"
+    documentation: vCPU cores for each Windows VM.
+  - name: P2P_HS_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
+  - name: P2P_HS_SPOKE_KUBECONFIG
+    default: ""
+    documentation: |-
+      Optional explicit kubeconfig path for the spoke. When empty, uses
+      SHARED_DIR/managed-cluster-kubeconfig-${P2P_HS_SPOKE_INDEX}.
+  - name: P2P_HS_CREATE_HUB_VMS
+    default: "false"
+    documentation: When true, also create the same number of Windows VMs on the hub.
+  - name: P2P_HS_VM_CLEAN
+    default: "false"
+    documentation: When true, delete an existing VM and DataVolume with the same name before create.
+  - name: P2P_HS_VM_DATAVOLUME_WAIT_TIMEOUT
+    default: 45m
+    documentation: oc wait timeout for each Windows DataVolume Ready condition.
+  - name: P2P_HS_VM_VMI_WAIT_TIMEOUT
+    default: 20m
+    documentation: oc wait timeout for each VMI to reach Running.
+  - name: CCLM_WINDOWS_DATASOURCE_WAIT_TIMEOUT
+    default: 40m
+    documentation: How long to wait for the Windows DataSource to become Ready after Brew auth is in place.
+  - name: CCLM_MCP_WAIT_TIMEOUT
+    default: 45m
+    documentation: How long to wait for MachineConfigPools to roll after the pull secret changes.
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: When true, log failures and exit 0 so later debug steps can run.
