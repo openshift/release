@@ -1,0 +1,74 @@
+ref:
+  as: p2p-cclm-s3-windows-vm
+  from: cli
+  commands: p2p-cclm-s3-windows-vm-commands.sh
+  documentation: |-
+    Import a Windows qcow2 from S3 onto an ACM spoke and start it for CCLM.
+
+    The VM is created on the spoke kubeconfig (SHARED_DIR/managed-cluster-kubeconfig-N),
+    not on the hub. CDI on the spoke pulls the image with IAM keys from the
+    test-credentials secret lp-chaos--vm-img--windows. S3 access does not use
+    the cluster AWS account.
+
+    The disk is an ODF RWX block volume on ocs-storagecluster-ceph-rbd-virtualization,
+    in namespace vm-migration-test, named test-vm-1. That matches the source VM
+    the spoke-to-spoke MTV steps migrate (MTV_TEST_VM_NAME / MTV_TEST_VM_NAMESPACE
+    / MTV_SOURCE_STORAGE_NAME).
+
+    Requires, on the spoke, before this step:
+      - acm-interop-p2p-cluster-install (writes the spoke kubeconfig)
+      - p2p-acm-mtv-integration and p2p-acm-cnv-addon-install (CNV with CCLM enabled)
+      - p2p-install-odf-spokes (virt StorageClass)
+  timeout: 1h30m0s
+  grace_period: 5m0s
+  cli: latest
+  credentials:
+  - namespace: test-credentials
+    name: lp-chaos--vm-img--windows
+    mount_path: /var/run/secrets/windows-vm
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: WINDOWS_IMAGE_URL
+    documentation: |-
+      Full HTTPS URL to a Windows qcow2 in the S3 dist/ directory.
+      Example: https://ieng--vm-image--windows--us-east-1.s3.us-east-1.amazonaws.com/windows/dist/win2k22--template--base.qcow2
+  - name: VM_NAME
+    default: "test-vm-1"
+    documentation: |-
+      VirtualMachine name on the source spoke. Must match MTV_TEST_VM_NAME
+      (default test-vm-1) so a later CCLM plan migrates this guest.
+  - name: VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: |-
+      Namespace for the VM and DataVolume on the spoke. Must match
+      MTV_TEST_VM_NAMESPACE.
+  - name: STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: |-
+      ODF virtualization StorageClass on the spoke. Must match
+      MTV_SOURCE_STORAGE_NAME. Live migration requires this RWX block class,
+      not gp3-csi.
+  - name: VM_DISK_SIZE
+    default: "70Gi"
+    documentation: Size of the root disk PVC
+  - name: VM_CPU_CORES
+    default: "4"
+    documentation: Guest CPU cores for the Windows VM
+  - name: VM_MEMORY
+    default: "8Gi"
+    documentation: Guest memory for the Windows VM
+  - name: P2P_HS_SPOKE_INDEX
+    default: "1"
+    documentation: |-
+      1-based spoke index. The kubeconfig is
+      SHARED_DIR/managed-cluster-kubeconfig-<index>, the same files
+      acm-interop-p2p-cluster-install writes. Spoke-to-spoke CCLM creates the
+      source guest on spoke 1.
+  - name: P2P_HS_SPOKE_KUBECONFIG
+    default: ""
+    documentation: |-
+      Optional explicit kubeconfig path for the spoke. When empty, uses
+      SHARED_DIR/managed-cluster-kubeconfig-${P2P_HS_SPOKE_INDEX}.
