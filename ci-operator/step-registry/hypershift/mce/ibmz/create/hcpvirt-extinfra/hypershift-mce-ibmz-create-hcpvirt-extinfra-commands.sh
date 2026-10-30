@@ -487,24 +487,12 @@ CP_NS="${HC_NS}-${HC_NAME}"
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity for ${APPS_DOMAIN}"
+# Only bypass konnectivity for the API server, not for routes.
+# Route traffic from the ingress-operator (canary checks) should go through
+# konnectivity → worker node → CoreDNS override → infra-range LB → router.
+echo "$(date) Setting ingress-operator NO_PROXY (API server only — routes go through konnectivity)"
 oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
-  "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
-
-echo "$(date) Pausing HostedCluster ${HC_NS}/${HC_NAME} so CPO does not reset ingress-operator NO_PROXY"
-oc patch hostedcluster "${HC_NAME}" -n "${HC_NS}" --type=merge \
-  -p '{"spec":{"pausedUntil":"true"}}'
-echo "$(date) HostedCluster pausedUntil=$(oc get hostedcluster "${HC_NAME}" -n "${HC_NS}" -o jsonpath='{.spec.pausedUntil}')"
-
-# Confirm NO_PROXY still contains the LB IP after pause (CPO must not have wiped it)
-NOPROXY_CUR=$(oc get deploy ingress-operator -n "${CP_NS}" \
-  -o jsonpath='{.spec.template.spec.containers[?(@.name=="ingress-operator")].env[?(@.name=="NO_PROXY")].value}')
-echo "$(date) ingress-operator NO_PROXY=${NOPROXY_CUR}"
-if [[ "${NOPROXY_CUR}" != *"${LB_IP}"* ]]; then
-  echo "$(date) WARNING: NO_PROXY missing ${LB_IP} after pause; re-applying"
-  oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
-    "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
-fi
+  "NO_PROXY=kube-apiserver,127.0.0.1,localhost"
 
 oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s
 
@@ -568,13 +556,34 @@ DNSEOF
       --dry-run=client -o yaml | \
       oc --kubeconfig "${VIRT_KC}" apply -f - || true
 
-    # Let CoreDNS auto-reload via the reload plugin (no pod restart needed)
-    echo "$(date) Waiting for CoreDNS to auto-reload new Corefile (~60s)"
-    sleep 90
-
     echo "$(date) Verifying CoreDNS Corefile contains apps override:"
     oc --kubeconfig "${VIRT_KC}" get configmap dns-default -n openshift-dns \
       -o jsonpath='{.data.Corefile}' 2>/dev/null | grep -A3 "template IN A" || true
+
+    # Restart CoreDNS pods to pick up new Corefile immediately
+    echo "$(date) Restarting CoreDNS pods to pick up new Corefile"
+    oc --kubeconfig "${VIRT_KC}" delete pods -n openshift-dns \
+      -l dns.operator.openshift.io/daemonset-dns=default --wait=false || true
+
+    # Verify DNS override is active before proceeding (up to 5 minutes)
+    echo "$(date) Verifying CoreDNS override is active"
+    DNS_VERIFIED=false
+    for i in $(seq 1 30); do
+      RESOLVED=$(oc --kubeconfig "${VIRT_KC}" run "dns-verify-${i}" \
+        --rm -i --restart=Never --image=busybox -- \
+        nslookup "console-openshift-console.${APPS_DOMAIN}" 2>/dev/null \
+        | grep -oP 'Address.*:\s*\K[\d.]+' | tail -1) || true
+      if [[ "${RESOLVED}" == "${INTERNAL_LB_IP}" ]]; then
+        echo "$(date) DNS override verified: ${APPS_DOMAIN} → ${RESOLVED}"
+        DNS_VERIFIED=true
+        break
+      fi
+      echo "$(date) DNS not ready (attempt ${i}/30, got: ${RESOLVED:-none}), retrying in 10s"
+      sleep 10
+    done
+    if [[ "${DNS_VERIFIED}" != "true" ]]; then
+      echo "$(date) WARNING: DNS override not confirmed after 30 attempts; proceeding anyway"
+    fi
 
     echo "$(date) DNS override complete — *.${APPS_DOMAIN} now resolves to ${INTERNAL_LB_IP}"
   fi
