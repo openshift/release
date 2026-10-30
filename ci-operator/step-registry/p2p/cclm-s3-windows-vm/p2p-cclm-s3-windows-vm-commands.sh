@@ -7,12 +7,8 @@
 #
 set -euxo pipefail; shopt -s inherit_errexit
 
-eval "$(
-    typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
-)"; EnsureReqs jq
-
+# Source the CI proxy before any outbound call. This step does not download
+# or eval a remote helper; jq is not required.
 if [[ -n "${SHARED_DIR:-}" && -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
     # Disable tracing: proxy-conf.sh may set HTTP_PROXY with embedded credentials.
     typeset _wasTracing=''
@@ -32,12 +28,45 @@ if [[ -z "${WINDOWS_IMAGE_URL:-}" ]]; then
     exit 1
 fi
 case "${WINDOWS_IMAGE_URL}" in
-    */dist/*) ;;
+    https://*/dist/*) ;;
     *)
-        printf 'ERROR: WINDOWS_IMAGE_URL must point at the dist/ subdirectory\n' >&2
+        printf 'ERROR: WINDOWS_IMAGE_URL must be an HTTPS URL pointing at the dist/ subdirectory\n' >&2
         exit 1
         ;;
 esac
+if [[ "${WINDOWS_IMAGE_URL}" == *[[:space:]]* || "${WINDOWS_IMAGE_URL}" == *\"* || "${WINDOWS_IMAGE_URL}" == *\'* ]]; then
+    printf 'ERROR: WINDOWS_IMAGE_URL contains unsupported characters\n' >&2
+    exit 1
+fi
+
+# Trusted digest of the qcow2. CDI checks it while importing, before the VM starts.
+# Do not invent a value here; the job must supply the publisher's SHA-256.
+typeset imageSha="${WINDOWS_IMAGE_SHA256:-}"
+imageSha="${imageSha#sha256:}"
+if [[ -z "${imageSha}" ]]; then
+    printf 'ERROR: WINDOWS_IMAGE_SHA256 is empty; set the trusted SHA-256 of the qcow2\n' >&2
+    exit 1
+fi
+if [[ ! "${imageSha}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    printf 'ERROR: WINDOWS_IMAGE_SHA256 must be a 64-character SHA-256 hex digest\n' >&2
+    exit 1
+fi
+typeset imageChecksum="sha256:${imageSha}"
+
+# Names are interpolated into manifests. Reject anything that is not a token.
+function RejectUnsafe () {
+    typeset name="${1:?}"
+    typeset value="${2-}"
+    [[ -n "${value}" && "${value}" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] || {
+        printf 'ERROR: %s is empty or contains unsupported characters\n' "${name}" >&2
+        exit 1
+    }
+}
+RejectUnsafe VM_NAME "${VM_NAME}"
+RejectUnsafe VM_NAMESPACE "${VM_NAMESPACE}"
+RejectUnsafe STORAGE_CLASS "${STORAGE_CLASS}"
+RejectUnsafe VM_DISK_SIZE "${VM_DISK_SIZE}"
+RejectUnsafe VM_MEMORY "${VM_MEMORY}"
 
 typeset credDir=''
 typeset spokeKubeconfig=''
@@ -156,33 +185,33 @@ function CreateS3Secret () {
 # ApplyDataVolume creates the CDI S3 import on the ODF virt StorageClass.
 # RWX block is what the CCLM StorageMap migrates. usePopulator=false avoids
 # the prime-* ClaimMisbound failure the other CCLM DataVolumes hit on ODF.
+# storage.import.checksum is copied onto the PVC; the importer rejects the
+# volume when the downloaded bytes do not match, so the VM is not started.
 function ApplyDataVolume () {
     SpokeOc get "storageclass/${STORAGE_CLASS}" 1>/dev/null
-    jq -n \
-        --arg name "${dvName}" \
-        --arg ns "${VM_NAMESPACE}" \
-        --arg url "${WINDOWS_IMAGE_URL}" \
-        --arg secret "${secretName}" \
-        --arg sc "${STORAGE_CLASS}" \
-        --arg size "${VM_DISK_SIZE}" \
-        '{
-            apiVersion: "cdi.kubevirt.io/v1beta1",
-            kind: "DataVolume",
-            metadata: {
-                name: $name,
-                namespace: $ns,
-                annotations: {"cdi.kubevirt.io/storage.usePopulator": "false"}
-            },
-            spec: {
-                source: {s3: {url: $url, secretRef: $secret}},
-                storage: {
-                    storageClassName: $sc,
-                    accessModes: ["ReadWriteMany"],
-                    volumeMode: "Block",
-                    resources: {requests: {storage: $size}}
-                }
-            }
-        }' | SpokeOc apply -f -
+    SpokeOc apply -f - <<EOF
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: ${dvName}
+  namespace: ${VM_NAMESPACE}
+  annotations:
+    cdi.kubevirt.io/storage.usePopulator: "false"
+    cdi.kubevirt.io/storage.import.checksum: "${imageChecksum}"
+spec:
+  source:
+    s3:
+      url: "${WINDOWS_IMAGE_URL}"
+      secretRef: "${secretName}"
+  storage:
+    storageClassName: ${STORAGE_CLASS}
+    accessModes:
+    - ReadWriteMany
+    volumeMode: Block
+    resources:
+      requests:
+        storage: ${VM_DISK_SIZE}
+EOF
     SpokeOc get "datavolume/${dvName}" -n "${VM_NAMESPACE}" 1>/dev/null
 }
 
@@ -192,55 +221,56 @@ function ApplyDataVolume () {
 # because the Windows template does not ship virtio drivers. The disk is a
 # dataVolume so MTV resolves the same root disk the RHEL CCLM VMs use.
 function ApplyVirtualMachine () {
-    jq -n \
-        --arg name "${VM_NAME}" \
-        --arg ns "${VM_NAMESPACE}" \
-        --arg mem "${VM_MEMORY}" \
-        --arg dv "${dvName}" \
-        --argjson cores "${VM_CPU_CORES}" \
-        '{
-            apiVersion: "kubevirt.io/v1",
-            kind: "VirtualMachine",
-            metadata: {
-                name: $name,
-                namespace: $ns,
-                labels: {"vm.kubevirt.io/name": $name}
-            },
-            spec: {
-                runStrategy: "Always",
-                template: {
-                    metadata: {
-                        labels: {
-                            "kubevirt.io/domain": $name,
-                            "vm.kubevirt.io/name": $name
-                        }
-                    },
-                    spec: {
-                        evictionStrategy: "LiveMigrate",
-                        terminationGracePeriodSeconds: 180,
-                        domain: {
-                            cpu: {cores: $cores},
-                            memory: {guest: $mem},
-                            machine: {type: "q35"},
-                            firmware: {bootloader: {efi: {secureBoot: false}}},
-                            devices: {
-                                disks: [{
-                                    name: "rootdisk",
-                                    bootOrder: 1,
-                                    disk: {bus: "sata"}
-                                }],
-                                interfaces: [{name: "default", masquerade: {}}]
-                            }
-                        },
-                        networks: [{name: "default", pod: {}}],
-                        volumes: [{
-                            name: "rootdisk",
-                            dataVolume: {name: $dv}
-                        }]
-                    }
-                }
-            }
-        }' | SpokeOc apply -f -
+    if [[ ! "${VM_CPU_CORES}" =~ ^[0-9]+$ ]]; then
+        printf 'ERROR: VM_CPU_CORES must be an integer\n' >&2
+        exit 1
+    fi
+    SpokeOc apply -f - <<EOF
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: ${VM_NAME}
+  namespace: ${VM_NAMESPACE}
+  labels:
+    vm.kubevirt.io/name: ${VM_NAME}
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        kubevirt.io/domain: ${VM_NAME}
+        vm.kubevirt.io/name: ${VM_NAME}
+    spec:
+      evictionStrategy: LiveMigrate
+      terminationGracePeriodSeconds: 180
+      domain:
+        cpu:
+          cores: ${VM_CPU_CORES}
+        memory:
+          guest: ${VM_MEMORY}
+        machine:
+          type: q35
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+        devices:
+          disks:
+          - name: rootdisk
+            bootOrder: 1
+            disk:
+              bus: sata
+          interfaces:
+          - name: default
+            masquerade: {}
+      networks:
+      - name: default
+        pod: {}
+      volumes:
+      - name: rootdisk
+        dataVolume:
+          name: ${dvName}
+EOF
     SpokeOc get "virtualmachine/${VM_NAME}" -n "${VM_NAMESPACE}" 1>/dev/null
 }
 
@@ -254,9 +284,14 @@ printf 'Waiting for VirtualMachine %s on spoke %s to become Ready\n' "${VM_NAME}
 SpokeOc wait "vm/${VM_NAME}" -n "${VM_NAMESPACE}" --for=condition=Ready --timeout=15m
 SpokeOc wait "vmi/${VM_NAME}" -n "${VM_NAMESPACE}" --for=jsonpath='{.status.phase}'=Running --timeout=15m
 
-SpokeOc get "vmi/${VM_NAME}" -n "${VM_NAMESPACE}" -o yaml >&2
+# Phase and Ready only. The full VMI object includes the node name and guest
+# addresses, which must not be written to the CI log or the status artifact.
+typeset vmiPhase vmiReady
+vmiPhase="$(SpokeOc get "vmi/${VM_NAME}" -n "${VM_NAMESPACE}" -o jsonpath='{.status.phase}')"
+vmiReady="$(SpokeOc get "vmi/${VM_NAME}" -n "${VM_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')"
+printf 'VMI %s phase=%s ready=%s\n' "${VM_NAME}" "${vmiPhase}" "${vmiReady}" >&2
 if [[ -n "${ARTIFACT_DIR:-}" ]]; then
-    SpokeOc get "vmi/${VM_NAME}" -n "${VM_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/vmi-status.yaml"
+    printf 'name=%s\nphase=%s\nready=%s\n' "${VM_NAME}" "${vmiPhase}" "${vmiReady}" > "${ARTIFACT_DIR}/vmi-status.yaml"
 fi
 
 printf '%s\n' "${VM_NAME}" > "${SHARED_DIR}/windows-vm-name"
