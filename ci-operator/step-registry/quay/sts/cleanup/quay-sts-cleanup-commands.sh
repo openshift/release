@@ -33,6 +33,7 @@ def load_state():
 
 state = load_state()
 name = state['role']
+second_role = state.get('second_role')
 options = Config(connect_timeout=10, read_timeout=30,
                  retries={'mode': 'standard', 'max_attempts': 5})
 session = boto3.Session(region_name=state['region'])
@@ -43,19 +44,21 @@ iam = session.client('iam', config=options)
 s3 = session.client('s3', config=options)
 
 errors = []
-if state['role_created']:
+
+
+def delete_role(role_name):
     try:
-        role = iam.get_role(RoleName=name)['Role']
+        role = iam.get_role(RoleName=role_name)['Role']
         if {'Key': 'quay-sts-run', 'Value': state['run_id']} not in role.get('Tags', []):
-            raise RuntimeError('Role ownership tag mismatch')
+            raise RuntimeError(f'Role ownership tag mismatch for {role_name}')
         try:
-            iam.delete_role_policy(RoleName=name, PolicyName='quay-sts-bucket')
+            iam.delete_role_policy(RoleName=role_name, PolicyName='quay-sts-bucket')
         except ClientError as error:
             if error.response['Error']['Code'] != 'NoSuchEntity':
                 raise
         for attempt in range(1, 11):
             try:
-                iam.delete_role(RoleName=name)
+                iam.delete_role(RoleName=role_name)
                 break
             except ClientError as error:
                 code = error.response['Error']['Code']
@@ -69,6 +72,12 @@ if state['role_created']:
             errors.append(error)
     except RuntimeError as error:
         errors.append(error)
+
+
+if state.get('role_created'):
+    delete_role(name)
+if second_role and state.get('second_role_created'):
+    delete_role(second_role)
 
 if state['bucket_created']:
     try:
