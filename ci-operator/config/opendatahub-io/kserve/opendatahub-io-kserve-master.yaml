@@ -471,6 +471,14 @@ tests:
     - as: setup-llmisvc
       cli: latest
       commands: |-
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then ln -s oc kubectl; fi
+        cat > kustomize <<'WRAP'
+        #!/bin/sh
+        exec oc kustomize "$@"
+        WRAP
+        chmod +x kustomize
+        popd
         make deploy-e2e-ocp \
           E2E_MARKER="llmisvc_core and cluster_cpu and not pvc_storage" \
           RUNNING_LOCAL=false
