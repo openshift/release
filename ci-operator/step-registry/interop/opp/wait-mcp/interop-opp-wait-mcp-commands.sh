@@ -100,9 +100,12 @@ _junit_emit() {
     _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}</failure>"
   fi
   local _st_fc=0 _st_fx=""
-  if [[ "${_junit_selftest}" == "fail" ]]; then
+  local _st_failed=""
+  if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
+  if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
+  if [[ -n "${_st_failed}" ]]; then
     _st_fc=1
-    _st_fx="<failure message=\"predicate self-test failed\" type=\"SelfTestFailure\">Offline predicate self-test failed; step semantics are not the reviewed ones.</failure>"
+    _st_fx="<failure message=\"${_st_failed} self-test failed\" type=\"SelfTestFailure\">Offline ${_st_failed} self-test failed; step semantics are not the reviewed ones.</failure>"
   fi
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
@@ -197,9 +200,11 @@ function IsMcpProgressing () {
     #  3. sustained cycling vetoes extension: the pool not ready for >=
     #     MCP_PINNED_UPDATED_POLLS consecutive polls without Degraded means
     #     the rollout is cycling (re-rendering and re-rebooting), not
-    #     progressing (run 2115458776726245376: 179 polls, ready 4-8);
+    #     progressing (run 2115458776726245376: 179 polls, ready 4-8). The
+    #     veto sets _vetoStreakHit for the poll loop's fail-fast exit;
     #  4. ready count recovering within the window with bounded regression
     #     (a healthy rolling update dips by up to maxUnavailable reboots).
+    _vetoStreakHit=0
     typeset -i len=${#readyHistory[@]}
     (( len < 3 )) && return 1
     typeset -i windowStart=$(( len > 6 ? len - 6 : 0 ))
@@ -223,7 +228,15 @@ function IsMcpProgressing () {
             break
         fi
     done
-    (( notReadyStreak >= pinnedUpdatedPolls )) && return 1
+    if (( notReadyStreak >= pinnedUpdatedPolls )); then
+        # Sustained-cycling veto (preflight-review note): at default cadence
+        # the maxTimeout cap already bounds extensions before this threshold
+        # is reached, so the veto's value is FAIL-FAST, not extension denial -
+        # the poll loop reads _vetoStreakHit and exits with
+        # mcp-rollout-not-converging instead of polling to the deadline.
+        _vetoStreakHit=1
+        return 1
+    fi
     first=${readyHistory[windowStart]}
     last=${readyHistory[len - 1]}
     typeset -i decreases=0
@@ -426,20 +439,27 @@ PYEOF
   (( _ok == 0 ))
 }
 
-if WaitMcpSelfTest && { [[ -n "${WAIT_MCP_SELFTEST_CHILD:-}" ]] || WaitMcpTrapSelfTest; }; then
+if WaitMcpSelfTest; then
   _junit_selftest="pass"
   echo ">>> PHASE 0: predicate self-test passed (rewritten predicate pinned)"
-  if [[ -n "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
-    _junit_trapselftest="skip"
-  else
-    _junit_trapselftest="pass"
-    echo ">>> PHASE 0: trap self-test passed (TERM -> 143, JUnit reason, xtrace bundle, bounded grace)"
-  fi
 else
   _junit_selftest="fail"
   echo "FAILURE CLASS: Invalid step input" >&2
-  echo "predicate/trap self-test failed: step semantics are not the reviewed ones" >&2
+  echo "predicate self-test failed: IsMcpProgressing does not reproduce its pinned behavior" >&2
   exit 2
+fi
+if [[ -z "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
+  if WaitMcpTrapSelfTest; then
+    _junit_trapselftest="pass"
+    echo ">>> PHASE 0: trap self-test passed (TERM -> 143, JUnit reason, xtrace bundle, bounded grace)"
+  else
+    _junit_trapselftest="fail"
+    echo "FAILURE CLASS: Invalid step input" >&2
+    echo "trap self-test failed: TERM contract (exit 143, JUnit reason, xtrace bundle, bounded grace) not reproduced" >&2
+    exit 2
+  fi
+else
+  _junit_trapselftest="skip"
 fi
 
 function EmitMcpConditions () {
@@ -796,6 +816,15 @@ else:
                 else
                     echo "Progress detected but max timeout ${maxTimeout}s would be exceeded — no further extensions"
                 fi
+            elif (( _vetoStreakHit )); then
+                # Sustained-cycling fail-fast: the veto's purpose (the
+                # maxTimeout cap already bounds extensions; without this
+                # exit the cycling pool would poll to the deadline).
+                echo "FAILURE CLASS: mcp-rollout-not-converging"
+                echo "sustained cycling: ${pinnedUpdatedPolls} consecutive not-ready polls without Degraded (rollout re-rendering/re-rebooting, not progressing)"
+                _junit_class="mcp-rollout-not-converging"
+                CollectFailureBundle
+                exit 1
             fi
         fi
     fi
