@@ -41,30 +41,7 @@ tests:
     test:
     - ref: fips-check-image-scan
 - always_run: false
-  as: e2e-aws-operator
-  pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      FIPS_ENABLED: "true"
-    test:
-    - ref: fips-check-fips-or-die
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: cli-manager-operator
-      - env: OPERAND_IMAGE
-        name: pipeline:cli-manager
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- always_run: false
   as: e2e-aws-operator-serial-ote
-  optional: true
   pipeline_skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
   steps:
     cluster_profile: openshift-org-aws
@@ -79,6 +56,7 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     test:
+    - ref: fips-check-fips-or-die
     - ref: openshift-tests-extension-setup-out-of-payload
     - as: resolve-images
       commands: |
