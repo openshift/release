@@ -32,16 +32,53 @@ function listNodeDetails() {
 }
 
 function checkForInfraReady() {
-    node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
-    echo "Count of infra nodes in Ready state: $node_count"
-    
-    if (( "$node_count" >= "$1" )); then
-        log "$(date): All $node_count Infra nodes are ready and match desired $1 infra count."
+    local desired_count="$1"
+    local timeout="${READY_WAIT_TIMEOUT:-10m}"
+    local timeout_seconds
+    local timeout_value
+    local timeout_unit
+    local deadline
+    local ready_nodes
+    local node_count
+
+    if [[ "$timeout" =~ ^([0-9]+)([smh])?$ ]]; then
+        timeout_value="${BASH_REMATCH[1]}"
+        timeout_unit="${BASH_REMATCH[2]}"
+        case "$timeout_unit" in
+            h) timeout_seconds=$(( timeout_value * 3600 )) ;;
+            m) timeout_seconds=$(( timeout_value * 60 )) ;;
+            s|'') timeout_seconds=$timeout_value ;;
+        esac
     else
-        log "$(date): Only $node_count Infra nodes are ready but does not match desired $1 node count."
+        log "Invalid READY_WAIT_TIMEOUT value: ${timeout}"
         exit 1
     fi
-    listNodeDetails
+
+    deadline=$(( $(date +%s) + timeout_seconds ))
+    while true; do
+        if ready_nodes=$(oc get nodes --no-headers -l node-role.kubernetes.io/infra --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" 2>/dev/null); then
+            node_count=$(wc -w <<< "$ready_nodes" | xargs)
+        else
+            node_count=0
+            log "$(date): Failed to query infra nodes; retrying."
+        fi
+        echo "Count of infra nodes in Ready state: $node_count/$desired_count"
+
+        if (( node_count >= desired_count )); then
+            log "$(date): All $node_count Infra nodes are ready and match desired $desired_count infra count."
+            listNodeDetails
+            return 0
+        fi
+
+        if (( $(date +%s) >= deadline )); then
+            log "$(date): Only $node_count Infra nodes are ready after waiting ${timeout}; desired $desired_count."
+            listNodeDetails
+            exit 1
+        fi
+
+        log "$(date): Waiting for infra nodes to become ready; retrying in 30 seconds."
+        sleep 30
+    done
 }
 
 function rebalanceInfra() {
