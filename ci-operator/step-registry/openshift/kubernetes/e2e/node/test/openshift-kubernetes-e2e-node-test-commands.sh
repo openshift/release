@@ -24,10 +24,11 @@ echo "Installing CRI-O ${CRIO_REF} on ${IP}"
 timeout --kill-after 10m 150m ssh "${SSHOPTS[@]}" "${IP}" -- bash - <<EOF
 set -xeuo pipefail
 export PATH="\${HOME}/.local/bin:\${PATH}"
-sudo dnf install -y python3.11 git
-curl -sSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
-python3.11 /tmp/get-pip.py --user
-python3.11 -m pip install --user ansible
+cat /etc/os-release
+# iptables is used by the upstream remote runner's firewall setup; checkpolicy and
+# semodule_package build the SELinux module below. Not all are in the RHEL 10 cloud image.
+sudo dnf install -y python3 python3-pip git iptables-nft checkpolicy /usr/bin/semodule_package
+python3 -m pip install --user ansible
 
 SOURCE_DIR=/usr/go/src/github.com/cri-o/cri-o
 sudo rm -rf "\${SOURCE_DIR}"
