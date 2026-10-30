@@ -1,0 +1,132 @@
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-nested-podman-ci@sha256:c6b313815eb9cf885459135b6ca984cd25fb3cb22a6318906f7a9ac8d4f06bdd
+canonical_go_repository: github.com/Azure/ARO-HCP
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+tests:
+- always_run: false
+  as: integration
+  capabilities:
+  - nested-podman
+  - arm64
+  cluster: build11
+  nested_podman: true
+  optional: true
+  run_if_changed: ^$
+  steps:
+    test:
+    - as: integration
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+        set -x
+        expected_sha=315566146b578ed615ddb7f827532d9a886ae66d
+        frozen_branch=bench-int-exec-base-1030
+        benchmark_variant=exec-base-1030-p3
+        benchmark_root=quay-proxy.ci.openshift.org/openshift/ci@sha256:c6b313815eb9cf885459135b6ca984cd25fb3cb22a6318906f7a9ac8d4f06bdd
+        emulator_image=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        mkdir -p "${ARTIFACT_DIR}/execution-bench"
+        export BENCH_ARTIFACT_DIR="${ARTIFACT_DIR}/execution-bench"
+        actual_sha=$(git rev-parse HEAD)
+        printf '%s\n' "expected_sha=${expected_sha}" "actual_sha=${actual_sha}" \
+          "branch=${frozen_branch}" "variant=${benchmark_variant}" \
+          "root=${benchmark_root}" > "${BENCH_ARTIFACT_DIR}/source.txt"
+        if [[ "${actual_sha}" != "${expected_sha}" ]]; then
+          echo "Refusing benchmark: checkout HEAD differs from frozen SHA" >&2
+          exit 1
+        fi
+        export GOPATH=/opt/app-root
+        export PATH="${PATH}:${GOPATH}/bin"
+        export AZURE_TOKEN_CREDENTIALS=prod
+        {
+          uname -a
+          go version
+          go env GOOS GOARCH GOVERSION GOPATH GOCACHE
+        } > "${BENCH_ARTIFACT_DIR}/environment.txt"
+
+        # Match the ordinary pre-bootstrap integration job, including install cost.
+        go install gotest.tools/gotestsum@v1.13.0
+        export BENCH_GOTESTSUM_BIN
+        BENCH_GOTESTSUM_BIN=$(command -v gotestsum)
+        {
+          command -v gotestsum
+          go version -m "${BENCH_GOTESTSUM_BIN}"
+          if command -v setup-envtest; then
+            go version -m "$(command -v setup-envtest)"
+          else
+            echo 'setup-envtest: absent before source envtest-setup (normal source bootstrap)'
+          fi
+        } > "${BENCH_ARTIFACT_DIR}/helpers-before-tests.txt"
+
+        # Capture module metadata before the exported function hides command -v.
+        # The original argv and exit status are preserved, including race failures.
+        gotestsum() {
+          local record started finished status=0
+          record=$(mktemp "${BENCH_ARTIFACT_DIR}/gotestsum.XXXXXX")
+          printf '%q ' "${BENCH_GOTESTSUM_BIN}" "$@" > "${record}.argv"
+          printf '\n' >> "${record}.argv"
+          started=$(date +%s%N)
+          "${BENCH_GOTESTSUM_BIN}" "$@" || status=$?
+          finished=$(date +%s%N)
+          printf 'start_unix_ns=%s\nend_unix_ns=%s\nwall_ns=%s\nexit_status=%s\n' \
+            "${started}" "${finished}" "$((finished - started))" "${status}" > "${record}"
+          return "${status}"
+        }
+        export -f gotestsum
+
+        capture_emulator() {
+          local container
+          podman image inspect "${emulator_image}" > "${BENCH_ARTIFACT_DIR}/emulator-image.json"
+          podman image inspect --format '{{json .RepoDigests}}' "${emulator_image}" \
+            > "${BENCH_ARTIFACT_DIR}/emulator-repo-digests.json"
+          for container in $(podman ps -aq --filter 'name=local-cosmos-emulator-*'); do
+            podman inspect "${container}" > "${BENCH_ARTIFACT_DIR}/${container}.inspect.json"
+            podman logs "${container}" > "${BENCH_ARTIFACT_DIR}/${container}.log" 2>&1 || true
+          done
+        }
+        cleanup() {
+          local status=$? cleanup_status=0
+          trap - EXIT
+          set +e
+          capture_emulator
+          test-integration/hack/stop-cosmos-emulator.sh \
+            > "${BENCH_ARTIFACT_DIR}/stop-cosmos.log" 2>&1 || cleanup_status=$?
+          {
+            if command -v setup-envtest; then
+              go version -m "$(command -v setup-envtest)"
+            fi
+          } > "${BENCH_ARTIFACT_DIR}/helpers-after-tests.txt" 2>&1
+          printf 'test_exit_status=%s\ncleanup_exit_status=%s\n' "${status}" "${cleanup_status}" \
+            > "${BENCH_ARTIFACT_DIR}/exit-status.txt"
+          if ((status != 0)); then
+            exit "${status}"
+          fi
+          exit "${cleanup_status}"
+        }
+        trap cleanup EXIT
+        test-integration/hack/start-cosmos-emulator.sh
+        # The mutable MCR tag is intentionally unchanged; compare RepoDigests across
+        # every baseline/candidate run before accepting the measurements.
+        capture_emulator
+        test-integration/hack/test-integration.sh
+      from: src
+      grace_period: 30s
+      nested_podman: true
+      resources:
+        requests:
+          cpu: "6"
+          memory: 4Gi
+zz_generated_metadata:
+  branch: "bench-int-exec-base-1030"
+  org: raelga
+  repo: ARO-HCP
+  variant: exec-base-1030-p3
