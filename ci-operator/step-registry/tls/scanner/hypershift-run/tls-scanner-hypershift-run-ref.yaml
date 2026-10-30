@@ -78,10 +78,17 @@ ref:
   - name: TLS_PROFILE_TYPE
     default: "Modern"
     documentation: |-
-      Expected TLS profile for compliance checks on HyperShift clusters. The
-      hosted cluster APIServer CR and shared management cluster APIServer CR do
-      not reflect the HostedCluster Modern TLS configuration, so the scanner
-      uses this value instead of querying the API.
+      Expected TLS profile for compliance checks on HyperShift clusters: Old,
+      Intermediate or Modern is passed to tls-scanner --tls-profile-type (which
+      also enforces StrictAllComponents adherence). The hosted cluster
+      APIServer CR and shared management cluster APIServer CR do not reflect
+      the HostedCluster Modern TLS configuration, so the scanner uses this
+      value instead of querying the API. Custom is supported for clusters
+      running a Custom profile (e.g. after hypershift-tls-groups): the flag is
+      omitted so the scanner reads the effective profile from APIServer/cluster
+      (HyperShift mirrors the HostedCluster configuration into the guest
+      APIServer CR) and compliance enforcement follows the cluster's
+      tlsAdherence. Any other value fails the step before scanning.
   dependencies:
   - env: RELEASE_IMAGE_LATEST
     name: release:latest

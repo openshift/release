@@ -118,9 +118,28 @@ run_tls_scan() {
       echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
   fi
 
+  # tls-scanner only accepts Old, Intermediate and Modern for
+  # --tls-profile-type: a Custom profile has no predefined cipher list, so the
+  # CLI override cannot express it (the scanner exits before scanning). For a
+  # cluster running a Custom profile (e.g. after tls-groups-configure or
+  # hypershift-tls-groups), omit the flag and let the scanner read the
+  # effective profile from APIServer/cluster instead. Note that the CLI
+  # override implies StrictAllComponents enforcement, while reading from the
+  # API honours the cluster's tlsAdherence setting.
   if [[ -n "${TLS_PROFILE_TYPE:-}" ]]; then
-      SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${TLS_PROFILE_TYPE}"
-      echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
+      case "${TLS_PROFILE_TYPE,,}" in
+        old|intermediate|modern)
+          SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${TLS_PROFILE_TYPE}"
+          echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
+          ;;
+        custom)
+          echo "TLS_PROFILE_TYPE=Custom: no --tls-profile-type override, scanner reads the effective profile from APIServer/cluster"
+          ;;
+        *)
+          echo "Invalid TLS_PROFILE_TYPE '${TLS_PROFILE_TYPE}' (supported: Old, Intermediate, Modern, Custom)"
+          exit 1
+          ;;
+      esac
   fi
 
   # SCANNER_CPU / SCANNER_MEMORY are deprecated but still honoured as fallback
