@@ -4,6 +4,30 @@ set -e
 set -u
 set -o pipefail
 
+JUNIT_SUITE="OSImageStream Default Configuration"
+JUNIT_TEST="Default osImageStream configured and verified"
+
+emit_junit() {
+  local rc=${1:-0}
+  local junit_file="${ARTIFACT_DIR}/junit_osimagestream.xml"
+  local fc=0 fx=""
+
+  if (( rc != 0 )); then
+    fc=1
+    fx="<failure message=\"\">Step failed with exit code ${rc}</failure>"
+  fi
+
+  cat >"${junit_file}" <<EOF
+<testsuite name="${JUNIT_SUITE}" tests="1" failures="${fc}">
+  <testcase name="${JUNIT_TEST}">
+    ${fx}
+  </testcase>
+</testsuite>
+EOF
+}
+
+trap 'rc=$?; emit_junit ${rc}; exit ${rc}' EXIT
+
 function set_proxy () {
     if [ -s "${SHARED_DIR}/proxy-conf.sh" ]; then
         echo "Setting the proxy ${SHARED_DIR}/proxy-conf.sh"
