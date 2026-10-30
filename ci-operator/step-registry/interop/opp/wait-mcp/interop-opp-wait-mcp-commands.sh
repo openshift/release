@@ -365,8 +365,12 @@ WaitMcpTrapSelfTest () {
   # not parameterizable into a pj-rehearse rehearsal, so the per-run
   # self-test is the standing evidence for the termination path (the
   # acceptance criterion's one-shot rehearsal is superseded by this).
+  # Harness setup failures (mktemp/copy - environmental, not a semantics
+  # break) warn and continue: the step still runs, the JUnit property
+  # records trap_selftest=warn. Contract failures (child ran but the TERM
+  # path misbehaved) fail the step (exit 2) - preflight review split.
   local _tt_dir _cpid _crc=0 _w _t0 _t1
-  _tt_dir="$(mktemp -d /tmp/wmcp-termtest.XXXXXX)" || { echo "trap self-test: mktemp failed" >&2; return 1; }
+  _tt_dir="$(mktemp -d /tmp/wmcp-termtest.XXXXXX)" || { echo "trap self-test: mktemp failed (environmental); continuing" >&2; _junit_trapselftest="warn"; return 0; }
   mkdir -p "${_tt_dir}/shared" "${_tt_dir}/artifacts" "${_tt_dir}/mockbin"
   # Mock oc: a worker MCP mid-rollout (Updating, not Degraded, not
   # converged) so the child stays in the poll loop; everything else
@@ -385,7 +389,7 @@ MOCKEOF
   chmod +x "${_tt_dir}/mockbin/oc"
   local _src
   _src="$(readlink -f "${0}" 2>/dev/null)" || _src="${0}"
-  cp "${_src}" "${_tt_dir}/wmcp-term-child.sh" || { echo "trap self-test: copy failed" >&2; rm -rf "${_tt_dir}"; return 1; }
+  cp "${_src}" "${_tt_dir}/wmcp-term-child.sh" || { echo "trap self-test: copy failed (environmental); continuing" >&2; rm -rf "${_tt_dir}"; _junit_trapselftest="warn"; return 0; }
   # Child: real script, mock API on PATH, tight poll cadence, short
   # deadline so a missed signal still self-terminates, child-mode env so
   # its own phase 0 does not fork another trap test (recursion guard).
@@ -544,8 +548,7 @@ REDACTEOF
         oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || true
         oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || true
       else
-        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" 2>/dev/null || true
-        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o yaml > "'"${ARTIFACT_DIR}"'/policies.yaml" 2>/dev/null || true
+        echo "redactor unavailable: policies/configurationpolicies SKIPPED (fail closed - templates can embed Secret data)" > "'"${ARTIFACT_DIR}"'/policies.yaml"
       fi
       oc --request-timeout=10s get kubeletconfigs.machineconfiguration.openshift.io -A -o yaml > "'"${ARTIFACT_DIR}"'/kubeletconfigs.yaml" 2>/dev/null || true
       oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || true
