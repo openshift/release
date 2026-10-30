@@ -45,14 +45,17 @@ DEPLOY_REF_BY_STORAGE = {
 # expand rejects database: true for clouds missing from this map.
 DATABASE_BY_CLOUD = {
     "aws": "rds",
+    "gcp": "sql",
     "azure": "postgres",
 }
 DATABASE_PROVISION_REF_BY_CLOUD = {
     "aws": "quay-database-intg-aws-rds",
+    "gcp": "quay-database-intg-gcp-sql",
     "azure": "quay-database-intg-azure-postgres",
 }
 DATABASE_DEPROVISION_REF_BY_CLOUD = {
     "aws": "quay-database-intg-aws-rds-deprovision",
+    "gcp": "quay-database-intg-gcp-sql-deprovision",
     "azure": "quay-database-intg-azure-postgres-deprovision",
 }
 # No rhel-9-release-golang-1.25-openshift-<ocp> build root tag exists for older OCP (e.g. 4.14).

@@ -175,7 +175,7 @@ Per job, `quay[].jobs[]`:
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
 | `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
-| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp`, `libvirt`, or `baremetal`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
+| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, GCP Cloud SQL, Azure Postgres) and removes it in `post`. Not on `libvirt` or `baremetal`. Adds the DB kind to the name (`aws-s3-rds-nightly`, `gcp-gcs-sql-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
 | `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
