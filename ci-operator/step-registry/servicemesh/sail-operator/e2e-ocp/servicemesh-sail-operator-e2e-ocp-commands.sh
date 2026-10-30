@@ -280,14 +280,15 @@ execute_local() {
   test_rc=$?
   echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
 
-  # make test.e2e.ocp writes JUnit to out/report.xml (relative to source root).
-  # Copy all XMLs from out/ into ARTIFACT_DIR so has_junit_reports() can find them.
+  # Collect JUnit reports from all known locations the test suite may use:
+  #   - out/          (documented default, relative to source root)
+  #   - test_artifacts/
+  #   - /tmp/tmp.*/   (common-operator-integ-suite.sh mktemp dir, e.g. /tmp/tmp.xxx/report.xml)
   find out/ -name "*.xml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-
-  # Also check ./test_artifacts/ which some make targets use as the output directory.
   if [[ -d "./test_artifacts" ]]; then
     cp -r ./test_artifacts/. "${ARTIFACT_DIR}/" 2>/dev/null || true
   fi
+  find /tmp/ -maxdepth 2 -name "report.xml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
 
   echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
   cp "${ARTIFACT_DIR}/"*.xml "${SHARED_DIR}" 2>/dev/null || true
