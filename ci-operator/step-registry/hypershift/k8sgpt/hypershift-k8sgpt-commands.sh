@@ -92,10 +92,15 @@ HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.name
 
 if [[ -n "${HOSTED_CLUSTER_NS}" ]]; then
     add_namespace "${HOSTED_CLUSTER_NS}"
+    # Capture the listing before the loop: a process substitution would hide oc's exit status,
+    # so a failed request would silently drop the control plane namespaces from the scan.
+    hosted_clusters="$(oc get hostedclusters -A --ignore-not-found \
+        -ojsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}')"
     while IFS=$'\t' read -r hc_namespace hc_name; do
-        add_namespace "${hc_namespace}-${hc_name}"
-    done < <(oc get hostedclusters -A --ignore-not-found \
-        -ojsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}')
+        if [[ -n "${hc_namespace}" && -n "${hc_name}" ]]; then
+            add_namespace "${hc_namespace}-${hc_name}"
+        fi
+    done <<< "${hosted_clusters}"
     # Single-cluster workflows still describe the cluster in SHARED_DIR/cluster-name.
     if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
         add_namespace "${HOSTED_CLUSTER_NS}-$(<"${SHARED_DIR}/cluster-name")"
