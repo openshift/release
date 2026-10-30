@@ -42,7 +42,14 @@ ref:
     policies, kubeletconfigs, MCPs, nodes) is collected to the step's
     artifact directory so attribution needs no must-gather.
 
-    Diagnostics (INTEROP-9646): the first Degraded sighting and the final
+    Diagnostics (INTEROP-9646): phase 0 runs two offline self-tests
+    before touching the cluster - the predicate self-test (four recorded
+    run fixtures, pinned verdicts) and a trap self-test that forks this
+    script against a mock oc, SIGTERMs it in the poll loop, and asserts
+    the TERM contract (exit 143, JUnit failure reason, scrubbed xtrace
+    bundle, bounded grace). Either self-test failing the contract exits
+    2 (Invalid step input); environmental harness failures record
+    trap_selftest=warn and continue. The first Degraded sighting and the final
     classification emit every non-paused MCP condition (type, status, reason,
     message) verbatim into the build log and the JUnit failure body, so the
     decisive evidence (e.g. an ENOSPC writing the internal registry
