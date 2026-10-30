@@ -41,7 +41,7 @@ export PATH=${PATH}:"${GOPATH}/bin"
 export AZURE_TOKEN_CREDENTIALS=prod
 command -v gotestsum
 command -v setup-envtest
-test -n "${KUBEBUILDER_ASSETS}"
+test -n "${ENVTEST_PREBUILT_ASSETS}"
 finish_phase 0
 
 start_phase emulator-start
