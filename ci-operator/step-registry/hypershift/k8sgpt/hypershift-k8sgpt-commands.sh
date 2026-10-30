@@ -73,17 +73,33 @@ common_params=(--output json --anonymize --with-doc "$explain_arg" --filter "$ac
 
 mkdir -p "${ARTIFACT_DIR}/namespaces" "${ARTIFACT_DIR}/hostedcluster"
 
-if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
-  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
-else
-  CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-fi
-HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' --ignore-not-found)
-
 mgmt_namespaces=(hypershift)
 
+add_namespace() {
+    local candidate="$1" existing
+    [[ -z "${candidate}" ]] && return 0
+    for existing in "${mgmt_namespaces[@]}"; do
+        [[ "${existing}" == "${candidate}" ]] && return 0
+    done
+    mgmt_namespaces+=("${candidate}")
+}
+
+# Each HostedCluster runs its control plane in <hostedcluster-namespace>-<hostedcluster-name>.
+# Multi-cluster workflows (create-guests) never write SHARED_DIR/cluster-name, so the names
+# have to come from the API: the PROW_JOB_ID-derived fallback never matches a real namespace
+# and silently skipped the guest control plane.
+HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' --ignore-not-found)
+
 if [[ -n "${HOSTED_CLUSTER_NS}" ]]; then
-    mgmt_namespaces+=("${HOSTED_CLUSTER_NS}" "${HOSTED_CLUSTER_NS}-${CLUSTER_NAME}")
+    add_namespace "${HOSTED_CLUSTER_NS}"
+    while IFS=$'\t' read -r hc_namespace hc_name; do
+        add_namespace "${hc_namespace}-${hc_name}"
+    done < <(oc get hostedclusters -A --ignore-not-found \
+        -ojsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}')
+    # Single-cluster workflows still describe the cluster in SHARED_DIR/cluster-name.
+    if [[ -f "${SHARED_DIR}/cluster-name" ]]; then
+        add_namespace "${HOSTED_CLUSTER_NS}-$(<"${SHARED_DIR}/cluster-name")"
+    fi
 fi
 
 echo "Collecting data from namespaces: ${mgmt_namespaces[*]}"
