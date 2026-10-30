@@ -7,6 +7,7 @@ It provisions no test cluster and makes no changes to GitHub or Konflux.
 ## Execution
 
 1. ci-operator creates a Python 3.11 runtime from the job's build-root definition.
+   Package and CA setup runs as root during image construction; validation runs as UID 1001.
 2. The step clones the configured ART tools ref outside the metadata checkout and
    installs dependencies from its lockfile with `uv sync --locked --no-dev`.
 3. It clones internal konflux-release-data with normal TLS verification.
@@ -93,7 +94,25 @@ First publish the art-tools implementation to a test ref (or merge it) and provi
 its credential. Open the release configuration PR and use the repository's rehearsal
 process to exercise the new job before merging. Rehearsal requires a trusted
 maintainer and the configured secret/intranet access; YAML checks alone do not
-prove private-source access.
+prove private-source access. The release PR bot lists this job as rehearsable.
+Because the step needs network access, an OpenShift organization member other
+than the PR author must first comment on the release PR:
+
+```text
+/pj-rehearse network-access-allowed
+```
+
+Then request just this job on the same PR:
+
+```text
+/pj-rehearse pull-ci-openshift-eng-ocp-build-data-validation
+```
+
+This is the pre-merge test; `/test art-build-data-validation` on a metadata PR
+becomes available after the release configuration is merged. Rehearsal does not
+apply branch protection. After merge, check matching branches through GitHub's
+branch-protection API for `allow_force_pushes.enabled: false` and
+`enforce_admins.enabled: true`; a force-push attempt is unnecessary.
 
 After the release configuration merges, open an LP metadata PR and use:
 

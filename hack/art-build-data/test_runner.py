@@ -16,6 +16,7 @@ RUNNER = (
 
 class TestRunner(unittest.TestCase):
     def test_pr_python_modules_cannot_shadow_installed_validator(self):
+        """Execute the trusted validator despite hostile import hooks in the PR checkout."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             checkout = root / "checkout"
@@ -86,6 +87,7 @@ chmod +x "${UV_PROJECT_ENVIRONMENT}/bin/python"
 
 class TestSharedJob(unittest.TestCase):
     def test_future_y_streams_use_shared_job_and_protection(self):
+        """Future LP y-streams automatically receive the shared job and force-push protection."""
         import re
         import yaml
 
@@ -126,6 +128,7 @@ class TestSharedJob(unittest.TestCase):
         self.assertFalse(policy["unmanaged"])
         self.assertTrue(policy["protect"])
         self.assertFalse(policy["allow_force_pushes"])
+        self.assertTrue(policy["enforce_admins"])
         self.assertNotIn("branches", policy)
         environment = {
             item["name"]: item for item in job["spec"]["containers"][0]["env"]
@@ -133,6 +136,15 @@ class TestSharedJob(unittest.TestCase):
         # ci-operator requires this input when resolving registry workflows remotely.
         config = yaml.safe_load(environment["UNRESOLVED_CONFIG"]["value"])
         self.assertEqual(config["tests"][0]["steps"]["workflow"], "ocp-art-build-data")
+        dockerfile = config["build_root"]["project_image"]["dockerfile_literal"]
+        users = [
+            line.split()[1]
+            for line in dockerfile.splitlines()
+            if line.startswith("USER ")
+        ]
+        self.assertEqual(
+            users[-1], "1001", "Package installation must not leave the runtime as root"
+        )
 
 
 if __name__ == "__main__":
