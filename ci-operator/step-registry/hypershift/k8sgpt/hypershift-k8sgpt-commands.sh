@@ -91,13 +91,13 @@ add_namespace() {
 HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}' --ignore-not-found)
 
 if [[ -n "${HOSTED_CLUSTER_NS}" ]]; then
-    add_namespace "${HOSTED_CLUSTER_NS}"
     # Capture the listing before the loop: a process substitution would hide oc's exit status,
     # so a failed request would silently drop the control plane namespaces from the scan.
     hosted_clusters="$(oc get hostedclusters -A --ignore-not-found \
         -ojsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\n"}{end}')"
     while IFS=$'\t' read -r hc_namespace hc_name; do
         if [[ -n "${hc_namespace}" && -n "${hc_name}" ]]; then
+            add_namespace "${hc_namespace}"
             add_namespace "${hc_namespace}-${hc_name}"
         fi
     done <<< "${hosted_clusters}"
