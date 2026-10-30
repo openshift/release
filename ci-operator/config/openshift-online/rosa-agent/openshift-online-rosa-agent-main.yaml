@@ -1,0 +1,32 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+      RUN dnf module enable -y nodejs:20 && \
+            dnf install -y git make python3 python3-pyyaml jq npm tar gzip && \
+            npm install -g markdownlint-cli2@0.17.2 && \
+            dnf clean all
+      RUN curl --location --fail --silent --show-error \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz" \
+            | tar --extract --gzip --directory=/usr/local/bin kustomize && \
+            kustomize version
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-agent
