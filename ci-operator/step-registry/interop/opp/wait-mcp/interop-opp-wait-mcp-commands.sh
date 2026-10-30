@@ -227,11 +227,14 @@ function IsMcpProgressing () {
     fi
     typeset -i notReadyStreak=0
     for (( i = len - 1; i >= 0; --i )); do
-        # The streak is "not-ready WITHOUT Degraded": a Degraded poll
-        # breaks it (a pool Degraded for 100 polls then cycling for 20
-        # must not inherit the Degraded period's count - preflight review).
+        # The streak is "not-ready WITHOUT Degraded": Degraded polls are
+        # SKIPPED, not counted and not terminating (preflight reviews: a
+        # pool Degraded for 100 polls then cycling for 20 must not inherit
+        # the Degraded period's count, but a 179-poll sawtooth with two
+        # Degraded blips must still accumulate ~177 cycling polls toward
+        # the veto - run2's pinned verdict).
         if (( degradedHistory[i] )); then
-            break
+            continue
         fi
         if (( readyHistory[i] < machineCountHistory[i] )); then
             (( ++notReadyStreak ))
