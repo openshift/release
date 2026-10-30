@@ -132,3 +132,5 @@ echo "fd99:2222:3456::3:${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ipv6_address"
 #  build_user: ci-op
 #  name: master-02 # This name must be either master or worker or bootstrap in order for the steps to set the role correctly
 #  ipxe_via_vmedia: true # Whether to use ipxe via virtual media or not (some UEFI has no drivers for the network card being used)
+#echo "sleeping for 1 hour to allow saas ISO download"
+#sleep 3600
