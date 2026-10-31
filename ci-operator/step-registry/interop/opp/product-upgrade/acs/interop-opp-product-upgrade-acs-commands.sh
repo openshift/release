@@ -31,6 +31,7 @@ _opp_cleanup() {
 _junit_start=$(date +%s)
 _junit_emitted=0
 _jrc=0  # initialized here, assigned inside trap string
+_junit_reason=""  # optional human-readable failure reason (set before exit)
 _junit_emit() {
   # Emit a JUnit XML result for the ACS upgrade step and propagate
   # it to SHARED_DIR/junit so downstream steps can aggregate results.
@@ -45,7 +46,11 @@ _junit_emit() {
   local _fc=0 _fx=""
   if (( _jr != 0 )); then
     _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
+    local _jm="${_jn} exited with code ${_jr}"
+    if [[ -n "${_junit_reason}" ]]; then
+      _jm="${_junit_reason}"
+    fi
+    _fx="<failure message=\"$(_xml_escape "${_jm}")\" type=\"StepFailure\">Step exited with code ${_jr}</failure>"
   fi
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
@@ -128,6 +133,46 @@ function GetCurrentChannel () {
     oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
         -o jsonpath='{.spec.channel}' || true
+}
+
+function GetChannelHeadVersion () {
+    # Return the head CSV version for a channel from the packagemanifest
+    # (e.g. channel rhacs-4.11 -> currentCSV rhacs-operator.v4.11.6 -> 4.11.6).
+    typeset channel="$1"
+    typeset catalogNamespace packageName csvName
+    catalogNamespace="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.sourceNamespace}' || true)"
+    packageName="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.spec.name}' || true)"
+    csvName="$(oc get packagemanifest "${packageName}" \
+        -n "${catalogNamespace}" \
+        -o jsonpath="{.status.channels[?(@.name==\"${channel}\")].currentCSV}" || true)"
+    # Strip the package prefix (everything up to and including '.v').
+    echo "${csvName}" | sed -E 's/^[^.]*\.v//'
+}
+
+function VersionCompare () {
+    # Compare two dotted numeric versions as tuples: prints -1, 0, or 1.
+    # Non-numeric segments and missing segments count as 0; leading zeros
+    # are neutralized with 10# (no octal interpretation).
+    typeset a="$1" b="$2"
+    # Strip a leading non-digit run (e.g. 'v4.11.6') like the reference.
+    a="${a#${a%%[0-9]*}}"; b="${b#${b%%[0-9]*}}"
+    typeset -a ap bp
+    IFS='.' read -ra ap <<< "${a}"
+    IFS='.' read -ra bp <<< "${b}"
+    typeset n i av bv
+    n=$(( ${#ap[@]} > ${#bp[@]} ? ${#ap[@]} : ${#bp[@]} ))
+    for (( i=0; i<n; i++ )); do
+        av="${ap[i]:-0}"; av="${av%%[!0-9]*}"; av="${av:-0}"
+        bv="${bp[i]:-0}"; bv="${bv%%[!0-9]*}"; bv="${bv:-0}"
+        if (( 10#${av} < 10#${bv} )); then echo -1; return 0; fi
+        if (( 10#${av} > 10#${bv} )); then echo 1; return 0; fi
+    done
+    echo 0
+    true
 }
 
 function ResolveTargetChannel () {
@@ -420,6 +465,14 @@ function Main () {
     fi
 
     currentVersion="$(GetInstalledVersion)"
+    # Fail closed on an unavailable installed version before any comparison:
+    # an empty or non-numeric version would compare as all-zeros and let a
+    # positive target head pass the guard (review finding on the order check).
+    if ! [[ "${currentVersion}" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+        _junit_reason="acs-upgrade rejected: installed version unavailable (currentCSV ${currentCsv} reports '${currentVersion:-empty}')"
+        echo >&2 "ERROR: ${_junit_reason}"
+        exit 3
+    fi
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
@@ -451,6 +504,31 @@ function Main () {
         installPlan="${prePatchPlan}"
     else
         echo "Patching subscription channel: ${currentChannel} -> ${targetChannel}"
+
+        # Version-ordering guard (INTEROP-9606): refuse to patch the
+        # subscription to a channel whose head does not move the installed
+        # version forward. Downgrade and no-forward-path both fail closed
+        # with exit 3 and an explicit JUnit-visible reason.
+        typeset targetHeadVersion versionCmp
+        targetHeadVersion="$(GetChannelHeadVersion "${targetChannel}")"
+        echo "Version check: installed=${currentVersion} target head=${targetHeadVersion:-unknown} (${targetChannel})"
+        if [[ -z "${targetHeadVersion}" ]]; then
+            _junit_reason="acs-upgrade rejected: cannot resolve head version for target channel ${targetChannel}"
+            echo >&2 "ERROR: ${_junit_reason}"
+            exit 3
+        fi
+        versionCmp="$(VersionCompare "${targetHeadVersion}" "${currentVersion}")"
+        if (( versionCmp < 0 )); then
+            _junit_reason="acs-upgrade rejected: downgrade (target channel ${targetChannel} head ${targetHeadVersion} < installed ${currentVersion})"
+            echo >&2 "ERROR: ${_junit_reason}"
+            exit 3
+        fi
+        if (( versionCmp == 0 )); then
+            _junit_reason="acs-upgrade rejected: no forward path (target channel ${targetChannel} head ${targetHeadVersion} equals installed ${currentVersion})"
+            echo >&2 "ERROR: ${_junit_reason}"
+            exit 3
+        fi
+
         oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
             --type merge \
