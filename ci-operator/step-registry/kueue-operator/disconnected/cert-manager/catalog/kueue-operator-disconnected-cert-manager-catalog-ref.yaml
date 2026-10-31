@@ -1,0 +1,28 @@
+ref:
+  as: kueue-operator-disconnected-cert-manager-catalog
+  from: upi-installer
+  cli: latest
+  commands: kueue-operator-disconnected-cert-manager-catalog-commands.sh
+  grace_period: 1m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - collection: openshift-qe
+      group: mirror-registry
+      mount_path: /var/run/vault/mirror-registry
+  env:
+    - name: CATSRC_IMG
+      default: ""
+      documentation: Catalog image containing the openshift-cert-manager-operator package. Required.
+    - name: CATSRC_NAME
+      default: "custom-catalog-cert-manager"
+      documentation: Name of the mirrored catalog passed to cert-manager-install-operator.
+    - name: CHANNEL
+      default: "stable-v1"
+      documentation: Cert-manager subscription channel that must be present in the mirrored catalog.
+  documentation: |-
+    Prepare cert-manager's disconnected catalog for Kueue without modifying shared
+    cert-manager routines. Mirror the package and its declared related images,
+    excluding cert-manager test-support images, then hand off to the shared installer.
