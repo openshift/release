@@ -205,7 +205,10 @@ echo "Configure IPAddressPool"
 # Priority:
 #   1. METALLB_MGMT_IPS env var, if explicitly set by the caller.
 #   2. A default derived from the cluster/environment (extend this if-block
-#      as new environments are added).
+#      as new environments are added). The last octets of the range default to
+#      53-54 and can be overridden with METALLB_POOL_HOST_START/END.
+POOL_START="${METALLB_POOL_HOST_START:-53}"
+POOL_END="${METALLB_POOL_HOST_END:-54}"
 if [[ -n "${METALLB_MGMT_IPS:-}" ]]; then
   IP_POOL="${METALLB_MGMT_IPS}"
 else
@@ -215,13 +218,13 @@ else
     | awk '{print $6}' | grep -v '^$' | head -1)
   echo "  Detected node IP: ${NODE_IP}"
   if [[ "${NODE_IP}" == 192.168.126.* ]]; then 
-    IP_POOL="192.168.126.53-192.168.126.54" # lease 3-0
-  elif [[ "${NODE_IP}" == 192.168.1.* ]]; then 
-    IP_POOL="192.168.1.53-192.168.1.54" # lease 3-1
-  elif [[ "${NODE_IP}" == 192.168.2.* ]]; then 
-    IP_POOL="192.168.2.53-192.168.2.54" # lease 3-2
+    IP_POOL="192.168.126.${POOL_START}-192.168.126.${POOL_END}" # lease 3-0
+  elif [[ "${NODE_IP}" == 192.168.1.* ]]; then
+    IP_POOL="192.168.1.${POOL_START}-192.168.1.${POOL_END}" # lease 3-1 (0-0 for hcpmulti)
+  elif [[ "${NODE_IP}" == 192.168.2.* ]]; then
+    IP_POOL="192.168.2.${POOL_START}-192.168.2.${POOL_END}" # lease 3-2
   else
-    IP_POOL="192.168.3.53-192.168.3.54" # lease 3-3
+    IP_POOL="192.168.3.${POOL_START}-192.168.3.${POOL_END}" # lease 3-3 (0-1 for hcpmulti)
   fi
 fi
 echo "  IPAddressPool range: ${IP_POOL}"

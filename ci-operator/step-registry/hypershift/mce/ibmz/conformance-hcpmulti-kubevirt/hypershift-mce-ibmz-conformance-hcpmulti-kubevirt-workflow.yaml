@@ -1,0 +1,121 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-hcpmulti-kubevirt
+  documentation: |-
+    Workflow that provisions a single ephemeral multi-arch (s390x control plane with
+    amd64 or arm64 additional worker) OpenShift management cluster on libvirt, using the
+    openshift-e2e-libvirt-heterogeneous-vpn pre steps, and deploys a HyperShift KubeVirt
+    hosted cluster on top of it. Both the
+    HCP control plane pods and the KubeVirt worker VMs run on the same management
+    cluster — there is no separate external infrastructure cluster.
+    MCE, the virt operator, HPP, and MetalLB are installed on the management cluster
+    before the hosted cluster is created.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    # ── Management cluster: multi-arch (s390x control plane + amd64/arm64 worker) ──
+    # Same pre steps as the openshift-e2e-libvirt-heterogeneous-vpn workflow
+    - ref: upi-libvirt-cleanup-heterogeneous-pre
+    - chain: upi-conf-libvirt-heterogeneous
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt-heterogeneous
+
+    # ── Operator installs ─────────────────────────────────────────────────
+    # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+
+    # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
+    - ref: hypershift-mce-ibmz-create-hcpmulti
+
+    test:
+    - chain: hypershift-mce-ibmz-test
+    - chain: hypershift-conformance
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-heterogeneous-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+
+    env:
+      ADDITIONAL_WORKER_COUNT: "1"
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "1"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      # MetalLB pool = <mgmt node subnet>.56-57 → 192.168.1.56-57 (lease 0-0) / 192.168.3.56-57 (lease 0-1)
+      METALLB_POOL_HOST_START: "56"
+      METALLB_POOL_HOST_END: "57"
+      DOMAIN_MEMORY: "63356"   # 64 GiB
+      DOMAIN_VCPUS: "16"       # 16 vCPUs
+      VOLUME_CAPACITY: "200G"  # 200 GB root disk (s390x nodes)
+      DOMAIN_DISK_SIZE: "200G"  # 200 GB root disk (amd64/arm64 additional worker)
+      SKIP_MONITOR_TEST: "true"
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        Kubectl client Simple pod should support exec through an HTTP proxy\|
+        Managed cluster should have no crashlooping recycler pods over four minutes\|
+        PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted\|
+        CSI Mock volume expansion CSI Volume expansion\|
+        Services should .*session affinity.* for NodePort service\|
+        deploymentconfigs\|
+        oc new-app should succeed with a --name of 58 characters\|
+        Image layer subresource should return layers from tagged images\|
+        s2i build with a\|
+        build can reference a cluster service\|
+        builds installing subscription content\|
+        imagechangetriggers should trigger builds of all types\|
+        HAProxy router should\|
+        oc tag should.*image reference for\|
+        Aggregator Should be able to support the 1.17 Sample API Server using the current Aggregator\|
+        HTPasswd IDP should successfully configure htpasswd and be responsive\|
+        anonymous browsers should get a 403 from\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should adopt matching orphans and release non-matching pods\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should not deadlock when a pod's predecessor fails\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should perform rolling updates and roll backs of template modifications with PVCs\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should provide basic identity\|
+        StatefulSet Non-retain StatefulSetPersistentVolumeClaimPolicy\|
+        LDAP IDP should authenticate against an ldap server\|
+        expected headers returned from the\|
+        Using a OAuth client with a non-default token max age\|
+        oc basics can get version information from API\|
+        Prometheus .* when installed on the cluster should\|
+        Alerts shouldn't exceed the series limit of total series sent via telemetry from each cluster\|
+        OpenShift alerting rules\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via LoadBalancer service across different guest nodes\|
+        services when running openshift cluster on KubeVirt virtual machines should allow connections to pods from infra cluster pod via NodePort across different infra nodes\|
+        Managed cluster should report ready nodes the entire duration of the test run \[Late\]\[apigroup:monitoring.coreos.com\]\|
+        Metrics should report short\|
+        \[sig-api-machinery\] OpenAPIV3 should round trip OpenAPI V3 for all built-in group versions\|
+        \[sig-kubevirt\] migration when running openshift cluster on KubeVirt virtual machines and live migrate hosted control plane workers \[Early\] should maintain node readiness \[Suite:openshift/conformance/parallel\]\|
+        \[sig-network\] Services should be rejected for evicted pods\|
+        \[sig-node\] Pods Extended Pod Container lifecycle evicted pods should be terminal\|
+        Platform Prometheus targets should not skip TLS CA verification\|
+        should allow connections to pods from guest cluster PodNetwork pod via LoadBalancer service across different guest nodes\|
+        Networking should provide Internet connection for containers\|
+        the router should support external certificate\|
+        \[sig-builds\]\|
+        \[sig-imageregistry\]\[Feature:ImageLookup\]\|
+        oc builds complex build\|
+        oc set image can set images for pods and deployments\|
+        Object count check the quota after import-image\|
+        Users should be able to create and run a job in a user project\|
+        Managed cluster should expose cluster services outside the cluster\|
+        TestPodDefaultCapabilities\|
+        oc debug deployment configs from a build\|
+        oc rsh specific flags should work well when access to a remote shell\|
+        Image extract should extract content from an image\|
+        Image info should display information about images\|
+        Image append should create images by appending them\|
+        zstd:chunked Image should successfully run date command\|
+        verify /run filesystem contents\|
+        Pods cannot access the /config/master API endpoint\|
+        pod should start with all sysctl on whitelist\|
+        pod sysctls should not affect node\|
+        templateinstance readiness test should report ready soon after all annotated objects are ready\|
+        oc builds new-build\|
+        samples operator can import sample imagestreams\|
+        oc debug deployment from a build
