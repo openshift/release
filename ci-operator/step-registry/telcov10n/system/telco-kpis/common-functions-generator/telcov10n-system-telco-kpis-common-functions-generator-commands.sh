@@ -327,39 +327,6 @@ setup_telco_kpis_exit_handler() {
     trap '__telco_kpis_exit_handler' EXIT
 }
 
-# ======================================================================
-# DEPRECATED FUNCTIONS (Backwards Compatibility)
-# ======================================================================
-# The functions below are kept for backwards compatibility with existing
-# scripts. New scripts should use:
-#   - setup_telco_kpis_exit_handler() instead of setup_debug_on_fail/setup_continue_on_fail
-#   - add_cleanup_handler() instead of add_exit_handler()
-# ======================================================================
-
-# ----------------------------------------------------------------------
-# add_exit_handler (DEPRECATED)
-#
-# Legacy function - redirects to add_cleanup_handler for backwards compatibility.
-# Automatically installs the unified handler if not already installed.
-# Use add_cleanup_handler() in new code.
-# ----------------------------------------------------------------------
-
-add_exit_handler() {
-    _ensure_unified_handler_installed
-    add_cleanup_handler "$1"
-}
-
-# Internal helper to ensure unified handler is installed (for backwards compat)
-_ensure_unified_handler_installed() {
-    # Check if our unified handler is already installed
-    local current_trap
-    current_trap=$(trap -p EXIT | sed "s/trap -- '\(.*\)' EXIT/\1/")
-
-    if [[ "${current_trap}" != "__telco_kpis_exit_handler" ]]; then
-        setup_telco_kpis_exit_handler
-    fi
-}
-
 # ----------------------------------------------------------------------
 # setup_direct_ssh
 #
@@ -720,49 +687,6 @@ for key, value in merged.items():
     while IFS='=' read -r key value; do
         export "${key}=${value}"
     done <<< "${settings_lines}"
-}
-
-# ----------------------------------------------------------------------
-# setup_continue_on_fail (DEPRECATED)
-#
-# Legacy function for backwards compatibility with existing scripts.
-# Now handled by setup_telco_kpis_exit_handler() which checks CONTINUE_ON_FAIL.
-#
-# Automatically installs the unified handler if not already installed.
-# New scripts should call setup_telco_kpis_exit_handler() directly.
-# ----------------------------------------------------------------------
-
-setup_continue_on_fail() {
-    _ensure_unified_handler_installed
-
-    if [[ "${CONTINUE_ON_FAIL:-false}" == "true" ]]; then
-        echo "CONTINUE_ON_FAIL enabled — test failures will not stop the pipeline"
-        # Still set -E for ERR trap inheritance (might be used elsewhere)
-        set -E
-    fi
-}
-
-# ----------------------------------------------------------------------
-# setup_debug_on_fail (DEPRECATED)
-#
-# Legacy function for backwards compatibility with existing scripts.
-# Now handled by setup_telco_kpis_exit_handler() which checks DEBUG_ON_FAIL.
-#
-# Automatically installs the unified handler if not already installed.
-# New scripts should call setup_telco_kpis_exit_handler() directly.
-# ----------------------------------------------------------------------
-
-setup_debug_on_fail() {
-    _ensure_unified_handler_installed
-
-    if [[ "${DEBUG_ON_FAIL:-false}" != "true" ]]; then
-        return 0
-    fi
-    if [[ -z "${PULL_NUMBER:-}" ]]; then
-        echo "DEBUG_ON_FAIL enabled but not a PR run — will be skipped"
-        return 0
-    fi
-    echo "DEBUG_ON_FAIL enabled — will enter debug mode on failure (PR ${PULL_NUMBER})"
 }
 
 # ----------------------------------------------------------------------
