@@ -92,6 +92,17 @@ _junit_emit() {
   local _jn="wait-mcp"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
+  # A self-test failure always exits 2, so it only ever rides the main
+  # failure element as a note - never a second <failure> child (JUnit
+  # consumers expect at most one failure element per testcase, and the
+  # suite count must stay failures<=tests; preflight review).
+  local _st_failed=""
+  if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
+  if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
+  local _st_note=""
+  if [[ -n "${_st_failed}" ]]; then
+    _st_note=" Offline ${_st_failed} self-test failed; step semantics are not the reviewed ones."
+  fi
   # XML-escape via sed: bash >= 5.2 patsub_replacement expands a bare & in
   # ${var//pat/repl} to the matched text (breaking &lt; into <lt;), and older
   # bash keeps a backslash literally - sed's \& is unambiguous everywhere.
@@ -101,15 +112,7 @@ _junit_emit() {
   _esc_class=$(printf '%s' "${_junit_class}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g')
   if (( _jr != 0 )); then
     _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}</failure>"
-  fi
-  local _st_fc=0 _st_fx=""
-  local _st_failed=""
-  if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
-  if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
-  if [[ -n "${_st_failed}" ]]; then
-    _st_fc=1
-    _st_fx="<failure message=\"${_st_failed} self-test failed\" type=\"SelfTestFailure\">Offline ${_st_failed} self-test failed; step semantics are not the reviewed ones.</failure>"
+    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}${_st_note}</failure>"
   fi
   # Self-test verdicts are suite PROPERTIES, not testcases: the
   # skip-ratio gate aggregates tests= across suites, and a meta-test
@@ -119,7 +122,7 @@ _junit_emit() {
   # the main testcase's failure element, and the step exits 2.
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
   <properties>
     <property name="polls" value="${_junit_polls}"/>
     <property name="extensions" value="${extensionsApplied}"/>
@@ -130,7 +133,7 @@ _junit_emit() {
     <property name="final_class" value="${_esc_class}"/>
   </properties>
   <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
-    ${_fx}${_st_fx}
+    ${_fx}
   </testcase>
 </testsuite>
 JUNITEOF
