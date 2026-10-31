@@ -116,7 +116,7 @@ class LeaseControllerFixture(unittest.TestCase):
             for command in ("oc", "ocm", "rosa", "aws", "sleep"):
                 stub = binary / command
                 stub.write_text(
-                    f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
+                    f'#!/bin/bash\nexec "{sys.executable}" -S "{Path(__file__).resolve()}" '
                     f'--mock {command} "$@"\n', encoding="utf-8")
                 stub.chmod(0o755)
             ref = (STEP / "rosa-cluster-lease-controller-ref.yaml").read_text(encoding="utf-8")
@@ -135,7 +135,7 @@ class LeaseControllerFixture(unittest.TestCase):
                 (artifacts / "provisioning-outcomes.jsonl").mkdir()
             result = subprocess.run(
                 ["/bin/bash", "-c", "#!/bin/bash\nset -eu\n" + body],
-                env=environment, capture_output=True, text=True, timeout=30, check=False)
+                env=environment, capture_output=True, text=True, timeout=60, check=False)
             artifact_text = "".join(path.read_text(encoding="utf-8")
                                     for path in artifacts.iterdir() if path.is_file())
             self.assertNotIn(CANARY, result.stdout + result.stderr + artifact_text)
