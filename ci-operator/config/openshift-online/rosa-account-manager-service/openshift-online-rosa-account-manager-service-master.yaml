@@ -31,6 +31,9 @@ test_binary_build_commands: |
   go test -exec /bin/true -tags=fedramp -ldflags -s ./test/fedramp
   go test -exec /bin/true -tags=xcm -ldflags -s ./test/xcm
   go clean -testcache
+  # go writes its telemetry dir to $HOME/.config; rootless podman (make db/setup)
+  # refuses to start when $HOME/.config exists and is owned by another user.
+  rm -rf /home/user/.config
   chgrp -R 0 /home/user /go
   chmod -R g=u /home/user /go
 tests:
