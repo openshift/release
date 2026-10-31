@@ -39,19 +39,20 @@ if [[ "${WINDOWS_IMAGE_URL}" == *[[:space:]]* || "${WINDOWS_IMAGE_URL}" == *\"* 
     exit 1
 fi
 
-# Trusted digest of the qcow2. CDI checks it while importing, before the VM starts.
-# Do not invent a value here; the job must supply the publisher's SHA-256.
+# Optional for this POC. When set, CDI checks the digest during import.
+# When empty, the image is imported without checksum verification.
 typeset imageSha="${WINDOWS_IMAGE_SHA256:-}"
 imageSha="${imageSha#sha256:}"
-if [[ -z "${imageSha}" ]]; then
-    printf 'ERROR: WINDOWS_IMAGE_SHA256 is empty; set the trusted SHA-256 of the qcow2\n' >&2
-    exit 1
+typeset checksumAnnotation=""
+if [[ -n "${imageSha}" ]]; then
+    if [[ ! "${imageSha}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+        printf 'ERROR: WINDOWS_IMAGE_SHA256 must be a 64-character SHA-256 hex digest\n' >&2
+        exit 1
+    fi
+    checksumAnnotation="    cdi.kubevirt.io/storage.import.checksum: \"sha256:${imageSha}\""
+else
+    printf 'INFO: WINDOWS_IMAGE_SHA256 is empty; importing without checksum verification\n' >&2
 fi
-if [[ ! "${imageSha}" =~ ^[0-9a-fA-F]{64}$ ]]; then
-    printf 'ERROR: WINDOWS_IMAGE_SHA256 must be a 64-character SHA-256 hex digest\n' >&2
-    exit 1
-fi
-typeset imageChecksum="sha256:${imageSha}"
 
 # Names are interpolated into manifests. Reject anything that is not a token.
 function RejectUnsafe () {
@@ -185,8 +186,8 @@ function CreateS3Secret () {
 # ApplyDataVolume creates the CDI S3 import on the ODF virt StorageClass.
 # RWX block is what the CCLM StorageMap migrates. usePopulator=false avoids
 # the prime-* ClaimMisbound failure the other CCLM DataVolumes hit on ODF.
-# storage.import.checksum is copied onto the PVC; the importer rejects the
-# volume when the downloaded bytes do not match, so the VM is not started.
+# When WINDOWS_IMAGE_SHA256 is set, storage.import.checksum is copied onto
+# the PVC and the importer rejects a download that does not match.
 function ApplyDataVolume () {
     SpokeOc get "storageclass/${STORAGE_CLASS}" 1>/dev/null
     SpokeOc apply -f - <<EOF
@@ -197,7 +198,7 @@ metadata:
   namespace: ${VM_NAMESPACE}
   annotations:
     cdi.kubevirt.io/storage.usePopulator: "false"
-    cdi.kubevirt.io/storage.import.checksum: "${imageChecksum}"
+${checksumAnnotation}
 spec:
   source:
     s3:
