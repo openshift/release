@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+  ocp_builder_rhel-9-base-nodejs-openshift-5.1:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.22
+    tag: rhel-9-base-nodejs-openshift-5.1
   ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
@@ -10,7 +10,7 @@ base_images:
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      FROM registry.access.redhat.com/ubi9/nodejs-24:latest
       USER root
       RUN mkdir -p /go/src && chmod -R 777 /go
       ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -23,10 +23,10 @@ images:
   - dockerfile_path: Dockerfile.downloads
     to: console-downloads
   - dockerfile_path: Dockerfile.plugins.demo
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: ocp_builder_rhel-9-base-nodejs-openshift-5.1
     to: console-plugin-demo
   - dockerfile_literal: |
-      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      FROM ocp_builder_rhel-9-base-nodejs-openshift-5.1
       USER root
       RUN dnf install -y \
           alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
@@ -45,7 +45,7 @@ images:
           yarn playwright install chromium
       RUN dnf install -y python3 git jq && dnf clean all
       RUN npm install -g @anthropic-ai/claude-code@2.1.273 && claude --version
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: ocp_builder_rhel-9-base-nodejs-openshift-5.1
     inputs:
       src:
         paths:
