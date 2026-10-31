@@ -17,6 +17,7 @@ CANARY = "fixture-sensitive-response-do-not-publish"
 
 
 def mock(command, arguments):
+    """Record and emulate CLI operations using only local fixture data."""
     base = Path(os.environ["FIXTURE_DIR"])
     case = os.environ["FIXTURE_CASE"]
     with (base / "calls").open("a", encoding="utf-8") as calls:
@@ -60,6 +61,7 @@ def mock(command, arguments):
 
 
 def mock_ocm(base, case, arguments):
+    """Return canned OCM responses and signal the explicitly identified shell."""
     if arguments[0] == "login":
         if case == "early":
             os.kill(os.getppid(), signal.SIGTERM)
@@ -80,6 +82,13 @@ def mock_ocm(base, case, arguments):
     if count == 1:
         print('{"items":[]}')
         return 0
+    if case in ("lookup-term", "lookup-int") and name == "first" and count == 3:
+        controller_pid = int(os.environ["FIXTURE_CONTROLLER_PID"])
+        if controller_pid == os.getppid():
+            raise AssertionError("Lookup must run inside a command substitution")
+        with (base / "calls").open("a", encoding="utf-8") as calls:
+            calls.write(f"lookup-cancel target={controller_pid} parent={os.getppid()}\n")
+        os.kill(controller_pid, signal.SIGTERM if case == "lookup-term" else signal.SIGINT)
     state = "ready"
     if name == "first":
         if case in ("term", "int", "exhausted"):
@@ -101,7 +110,10 @@ def mock_ocm(base, case, arguments):
 
 
 class LeaseControllerFixture(unittest.TestCase):
+    """Exercise the actual inline controller with isolated, bounded CLI stubs."""
+
     def run_step(self, case, artifact_mode="normal"):
+        """Run a fixture and verify secret exclusion and temporary-file cleanup."""
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             binary = base / "bin"
@@ -133,9 +145,18 @@ class LeaseControllerFixture(unittest.TestCase):
                 environment["ARTIFACT_DIR"] = str(artifacts)
             if artifact_mode == "blocked":
                 (artifacts / "provisioning-outcomes.jsonl").mkdir()
-            result = subprocess.run(
-                ["/bin/bash", "-c", "#!/bin/bash\nset -eu\n" + body],
-                env=environment, capture_output=True, text=True, timeout=60, check=False)
+            prefix = "#!/bin/bash\nset -eu\nexport FIXTURE_CONTROLLER_PID=$$\n"
+            with subprocess.Popen(
+                    ["/bin/bash", "-c", prefix + body], env=environment,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
+                try:
+                    stdout, stderr = process.communicate(timeout=60)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                    raise
+                result = subprocess.CompletedProcess(
+                    process.args, process.returncode, stdout, stderr)
             artifact_text = "".join(path.read_text(encoding="utf-8")
                                     for path in artifacts.iterdir() if path.is_file())
             self.assertNotIn(CANARY, result.stdout + result.stderr + artifact_text)
@@ -147,10 +168,13 @@ class LeaseControllerFixture(unittest.TestCase):
                     "outcome", "state", "attempts", "elapsed_seconds", "lookup"})
                 self.assertGreaterEqual(record["elapsed_seconds"], 0)
             calls = (base / "calls").read_text(encoding="utf-8")
+            if case in ("lookup-term", "lookup-int"):
+                self.assertIn(f"lookup-cancel target={process.pid} ", calls)
             self.assertFalse(list(base.glob("tmp.*")), "temporary kubeconfig must be removed")
             return result, records, calls
 
     def test_signals_stop_before_later_operations(self):
+        """Signals during the first polling sleep prevent later operations."""
         for case, exit_code in (("term", 143), ("int", 130)):
             with self.subTest(case=case):
                 result, records, calls = self.run_step(case)
@@ -162,7 +186,27 @@ class LeaseControllerFixture(unittest.TestCase):
                 self.assertNotIn("--cluster-name second", calls)
                 self.assertTrue(calls.rstrip().endswith("sleep 60"), calls)
 
+    def test_lookup_signals_stop_before_later_operations(self):
+        """Lookup signals stop the outer shell before its snapshot is updated."""
+        for case, exit_code in (("lookup-term", 143), ("lookup-int", 130)):
+            with self.subTest(case=case):
+                result, records, calls = self.run_step(case)
+                self.assertEqual(result.returncode, exit_code, result.stderr)
+                self.assertEqual(len(records), 1)
+                self.assertEqual(records[0], {
+                    "outcome": "cancelled", "state": "unknown", "attempts": 1,
+                    "lookup": "not_attempted", "elapsed_seconds": records[0]["elapsed_seconds"]})
+                before, cancellation = calls.split("lookup-cancel ", 1)
+                self.assertIn("--cluster-name first", before)
+                self.assertEqual(before.count("rosa create cluster"), 1)
+                self.assertEqual(before.count(" apply "), 1)
+                self.assertNotIn("--cluster-name second", calls)
+                self.assertEqual(len(cancellation.splitlines()), 1)
+                target, parent = cancellation.strip().split()
+                self.assertNotEqual(target.split("=")[1], parent.split("=")[1])
+
     def test_early_cancellation_and_optional_context(self):
+        """Early cancellation tolerates missing or unusable artifact context."""
         for artifact_mode in ("normal", "unset", "blocked"):
             with self.subTest(artifact_mode=artifact_mode):
                 result, records, calls = self.run_step("early", artifact_mode)
@@ -174,6 +218,7 @@ class LeaseControllerFixture(unittest.TestCase):
                     self.assertEqual(records[0]["lookup"], "not_attempted")
 
     def test_existing_exit_cleanup(self):
+        """Both signals retain the controller's existing kubeconfig EXIT cleanup."""
         for case, exit_code in (("cleanup", 143), ("cleanup-int", 130)):
             with self.subTest(case=case):
                 result, records, _ = self.run_step(case)
@@ -181,6 +226,7 @@ class LeaseControllerFixture(unittest.TestCase):
                 self.assertEqual(records[0]["outcome"], "cancelled")
 
     def test_transient_invalid_lookup_recovers(self):
+        """Malformed or empty lookup data can recover to valid readiness."""
         for case in ("malformed", "empty"):
             with self.subTest(case=case):
                 result, records, calls = self.run_step(case)
@@ -190,6 +236,7 @@ class LeaseControllerFixture(unittest.TestCase):
                 self.assertEqual(calls.count("available-registration\n"), 2)
 
     def test_ready(self):
+        """Ready clusters register normally without failure summaries."""
         result, records, calls = self.run_step("ready")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(records, [])
@@ -198,6 +245,7 @@ class LeaseControllerFixture(unittest.TestCase):
         self.assertIn("Controller reconcile complete", result.stderr)
 
     def test_failure_summaries(self):
+        """Exhaustion and error summaries retain only normalized fields."""
         for case, state, lookup, attempts, outcome in (
                 ("error", "error", "ok", 1, "error"),
                 ("exhausted", "installing", "ok", 60, "exhausted"),
@@ -212,11 +260,13 @@ class LeaseControllerFixture(unittest.TestCase):
                     "attempts": attempts, "elapsed_seconds": records[0]["elapsed_seconds"]})
 
     def test_collection_failure_does_not_change_result(self):
+        """A blocked summary destination does not alter the controller result."""
         result, records, _ = self.run_step("error", "blocked")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(records, [])
 
     def test_create_failure_not_hidden(self):
+        """Create failures remain visible while reconciliation continues."""
         result, records, calls = self.run_step("create-failure")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(records, [])
@@ -224,6 +274,7 @@ class LeaseControllerFixture(unittest.TestCase):
         self.assertIn("--cluster-name second", calls)
 
     def test_login_failure_status_preserved(self):
+        """Authentication failures retain their original nonzero exit status."""
         result, records, calls = self.run_step("login-failure")
         self.assertEqual(result.returncode, 17, result.stderr)
         self.assertEqual(records, [])
