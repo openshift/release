@@ -17,6 +17,11 @@ run_tls_scan() {
     true|false) ;;
     *) echo "Invalid SCANNER_POD_MODE: expected true or false" >&2; exit 1 ;;
   esac
+  local pqc_report_only="${PQC_REPORT_ONLY:-false}"
+  case "${pqc_report_only}" in
+    true|false) ;;
+    *) echo "Invalid PQC_REPORT_ONLY: expected true or false" >&2; exit 1 ;;
+  esac
   if [[ "${scanner_pod_mode}" == "true" && ( -n "${SCANNER_NAMESPACE:-}" || -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ) ]]; then
       echo "SCANNER_POD_MODE requires the scanner-owned namespace and no cluster label" >&2
       exit 1
@@ -325,10 +330,10 @@ EOF
 
   wait $LOGS_PID 2>/dev/null || true
 
-  # Check final pod status. The scanner exits non-zero when TLS findings are
-  # detected — this is expected and not an infrastructure failure. Propagate
-  # the scanner's exit code so CI marks the job accordingly, but do not treat
-  # it as a timeout or describe the pod as failed when artifacts were collected.
+  # Check final pod status. The scanner exits non-zero when compliance findings
+  # are detected. Keep that fatal by default; in PQC report-only mode, suppress
+  # only an explicit PQC compliance result after its artifacts were collected.
+  # Startup, execution, and artifact-collection failures remain fatal.
   local pod_phase
   pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
   local pod_exit_code
@@ -338,6 +343,11 @@ EOF
       echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
       if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
           echo "Artifacts were collected — scanner found TLS compliance issues."
+          if [[ "${pqc_report_only}" == "true" && "${PQC_CHECK:-false}" == "true" && -f "${SCANNER_ARTIFACT_DIR}/output.log" ]] && \
+              grep -Fq "PQC COMPLIANCE CHECK: FAILED" "${SCANNER_ARTIFACT_DIR}/output.log"; then
+              echo "PQC report-only mode: recording findings without failing this step."
+              return 0
+          fi
       else
           echo "No artifacts found — scanner may have crashed."
           oc describe pod/tls-scanner -n "${NAMESPACE}"
@@ -361,6 +371,11 @@ EOF
           echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
           if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
               echo "Artifacts were collected — scanner found TLS compliance issues."
+              if [[ "${pqc_report_only}" == "true" && "${PQC_CHECK:-false}" == "true" && -f "${SCANNER_ARTIFACT_DIR}/output.log" ]] && \
+                  grep -Fq "PQC COMPLIANCE CHECK: FAILED" "${SCANNER_ARTIFACT_DIR}/output.log"; then
+                  echo "PQC report-only mode: recording findings without failing this step."
+                  return 0
+              fi
           else
               echo "No artifacts found — scanner may have crashed."
               oc describe pod/tls-scanner -n "${NAMESPACE}"
