@@ -27,6 +27,12 @@ SVC_ACR_NAME=$(yq '.acr.svc.name' "${CONFIG_FILE}")
 SVC_ACR_URL="${SVC_ACR_NAME}.azurecr.io"
 echo "SVC ACR: ${SVC_ACR_URL} (HO image)"
 
+if [[ "${PUSH_CPO_IMAGE}" == "true" ]]; then
+    OCP_ACR_NAME=$(yq '.acr.ocp.name' "${CONFIG_FILE}")
+    OCP_ACR_URL="${OCP_ACR_NAME}.azurecr.io"
+    echo "OCP ACR: ${OCP_ACR_URL} (CPO image)"
+fi
+
 # Authenticate to CI registry
 export XDG_RUNTIME_DIR="/tmp/run"
 mkdir -p "${XDG_RUNTIME_DIR}/containers" "${HOME}/.docker"
@@ -35,6 +41,11 @@ oc registry login
 # Authenticate to SVC ACR
 SVC_ACR_TOKEN=$(az acr login --name "${SVC_ACR_NAME}" --expose-token --output tsv --query accessToken)
 oc registry login --registry "${SVC_ACR_URL}" --auth-basic="00000000-0000-0000-0000-000000000000:${SVC_ACR_TOKEN}"
+
+if [[ "${PUSH_CPO_IMAGE}" == "true" ]]; then
+    OCP_ACR_TOKEN=$(az acr login --name "${OCP_ACR_NAME}" --expose-token --output tsv --query accessToken)
+    oc registry login --registry "${OCP_ACR_URL}" --auth-basic="00000000-0000-0000-0000-000000000000:${OCP_ACR_TOKEN}"
+fi
 
 IMAGE_TAG="hypershift-pr-${PULL_NUMBER:-unknown}-$(date +%s)"
 
@@ -55,6 +66,16 @@ retry() {
 HO_ACR_REF="${SVC_ACR_URL}/hypershift-operator:${IMAGE_TAG}"
 echo "Pushing hypershift-operator: ${HYPERSHIFT_OPERATOR_IMAGE} -> ${HO_ACR_REF}"
 retry oc image mirror "${HYPERSHIFT_OPERATOR_IMAGE}" "${HO_ACR_REF}"
+
+# Push control-plane-operator (CPO) image to OCP ACR if provided.
+# The CPO runs in HCP namespaces on the management cluster, which have pull
+# credentials for the OCP ACR but not the SVC ACR. The override must go to
+# the same registry that normal CPO images land in via registryOverrides.
+if [[ "${PUSH_CPO_IMAGE}" == "true" ]]; then
+    CPO_ACR_REF="${OCP_ACR_URL}/hypershift:${IMAGE_TAG}"
+    echo "Pushing control-plane-operator: ${HYPERSHIFT_CPO_IMAGE} -> ${CPO_ACR_REF}"
+    retry oc image mirror "${HYPERSHIFT_CPO_IMAGE}" "${CPO_ACR_REF}"
+fi
 
 # Resolve digests from ACR for the pushed images.
 # ACR metadata can lag behind a successful push, so retry the query.
@@ -104,5 +125,27 @@ unset _YQ_REG _YQ_REPO _YQ_DIG
 echo "Created hypershift image overrides at ${HYPERSHIFT_OVERRIDES}:"
 cat "${HYPERSHIFT_OVERRIDES}"
 
-echo "Hypershift operator image pushed successfully."
-echo "HO: ${SVC_ACR_URL}/hypershift-operator@${HO_DIGEST}"
+if [[ "${PUSH_CPO_IMAGE}" == "true" ]]; then
+    CPO_DIGEST=$(resolve_digest "${OCP_ACR_URL}" "hypershift" "${IMAGE_TAG}")
+    echo "CPO digest: ${CPO_DIGEST}"
+
+    if [[ -z "${CPO_DIGEST}" ]]; then
+        echo "ERROR: Failed to resolve digest for hypershift:${IMAGE_TAG} from ${OCP_ACR_URL}"
+        exit 1
+    fi
+
+    # Write CPO image ref for e2e tests to use as an ARM resource tag.
+    # The CPO override is applied via the aro-hcp.experimental.cluster.
+    # control-plane-operator-image-override tag (AFEC-gated), not a config key.
+    CPO_OVERRIDE_FILE="${SHARED_DIR}/hypershift-cpo-override.env"
+    echo "export CPO_IMAGE_OVERRIDE=\"${OCP_ACR_URL}/hypershift@${CPO_DIGEST}\"" > "${CPO_OVERRIDE_FILE}"
+    echo "Created CPO override env at ${CPO_OVERRIDE_FILE}:"
+    cat "${CPO_OVERRIDE_FILE}"
+
+    echo "All hypershift images pushed successfully."
+    echo "HO: ${SVC_ACR_URL}/hypershift-operator@${HO_DIGEST}"
+    echo "CPO: ${OCP_ACR_URL}/hypershift@${CPO_DIGEST}"
+else
+    echo "Hypershift operator image pushed successfully."
+    echo "HO: ${SVC_ACR_URL}/hypershift-operator@${HO_DIGEST}"
+fi
