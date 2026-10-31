@@ -59,10 +59,36 @@ START_COMMIT=$(git rev-parse HEAD)
 
 mkdir -p "${WORKDIR}/artifacts"
 
+# Keep pipeline-owned publication metadata outside the target checkout so it
+# cannot be swept into the solution commit with repository changes.
+REPO_ROOT=$(realpath "$(git rev-parse --show-toplevel)")
+if [[ -n "${PR_METADATA_DIR:-}" ]]; then
+    mkdir -p "${PR_METADATA_DIR}"
+else
+    PR_METADATA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/trt-jira-solver-pr-metadata.XXXXXX")
+fi
+PR_METADATA_DIR=$(realpath "${PR_METADATA_DIR}")
+case "${PR_METADATA_DIR}/" in
+    "${REPO_ROOT}/"*)
+        echo "ERROR: PR metadata directory must be outside the target checkout."
+        exit 1
+        ;;
+esac
+PR_BODY_FILE="${PR_METADATA_DIR}/pr-description.md"
+rm -f -- "${PR_BODY_FILE}"
+
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        cp "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        for artifact in "${WORKDIR}/artifacts/"*; do
+            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
+                continue
+            fi
+            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+        done
+        if [[ -f "${PR_BODY_FILE}" ]]; then
+            cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
+        fi
         podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
         if [[ -d "${HOME}/.claude/projects" ]]; then
             echo "Archiving Claude session logs..."
@@ -83,7 +109,7 @@ $(cat "${ISSUE_JSON}")
 
 ## Additional Instructions
 
-- Write the PR description to \`${WORKDIR}/artifacts/pr-description.md\`.
+- Write the PR description to \`${PR_BODY_FILE}\`.
 - Do not use the \`gh\` CLI or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
@@ -141,7 +167,7 @@ agentic_ci --timeout 5400 \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Work serially without delegation. Commit locally; do not push or use gh. The pipeline publishes. Write the PR description to ${WORKDIR}/artifacts/pr-description.md and report actual validation results." \
+Work serially without delegation. Commit locally; do not push or use gh. The pipeline publishes. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
     --settings "${AGENT_SETTINGS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
@@ -150,7 +176,7 @@ Work serially without delegation. Commit locally; do not push or use gh. The pip
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
     agentic_ci --timeout 600 \
-        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${WORKDIR}/artifacts/pr-description.md. Do not push or use gh; only the pipeline publishes. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
+        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or use gh; only the pipeline publishes. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
         --continue \
         --settings "${AGENT_SETTINGS}" \
         --output-format stream-json \
@@ -228,7 +254,6 @@ git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO
 echo "Branch pushed: ${BRANCH_NAME}"
 echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
 
-PR_BODY_FILE="${WORKDIR}/artifacts/pr-description.md"
 if [[ ! -s "${PR_BODY_FILE}" ]]; then
     echo "Warning: No PR description generated. Using default."
     cat > "${PR_BODY_FILE}" <<PR_DEFAULT
@@ -263,7 +288,10 @@ echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
 
 # Copy PR description to SHARED_DIR for downstream steps (e.g., eval-judge)
 if [[ -s "${PR_BODY_FILE}" ]]; then
-    cp "${PR_BODY_FILE}" "${SHARED_DIR}/pr-description.md"
+    SHARED_PR_BODY_FILE=$(realpath -m "${SHARED_DIR}/pr-description.md")
+    if [[ "$(realpath "${PR_BODY_FILE}")" != "${SHARED_PR_BODY_FILE}" ]]; then
+        cp "${PR_BODY_FILE}" "${SHARED_PR_BODY_FILE}"
+    fi
 fi
 
 PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
