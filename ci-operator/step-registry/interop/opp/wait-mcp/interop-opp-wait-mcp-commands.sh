@@ -47,7 +47,11 @@ _opp_cleanup() {
   set +x 2>/dev/null
   if [[ ${_jrc} -ne 0 && -n "${ARTIFACT_DIR:-}" && -s "${_xtrace_log}" ]]; then
     local _scrub="/tmp/xtrace-scrub-$$.log"
-    tail -c 5242880 "${_xtrace_log}" > "${_scrub}" 2>/dev/null || true
+    # tail -c cuts at a byte offset that can fall between a key and its
+    # value (after `token=` or `Bearer `); the partial first line would
+    # begin with a bare credential fragment no sed pattern can match.
+    # Drop it before scrubbing (preflight review).
+    tail -c 5242880 "${_xtrace_log}" 2>/dev/null | tail -n +2 > "${_scrub}" 2>/dev/null || true
     # Scrub credentials before copying
     sed -i -E \
       -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
@@ -107,22 +111,26 @@ _junit_emit() {
     _st_fc=1
     _st_fx="<failure message=\"${_st_failed} self-test failed\" type=\"SelfTestFailure\">Offline ${_st_failed} self-test failed; step semantics are not the reviewed ones.</failure>"
   fi
+  # Self-test verdicts are suite PROPERTIES, not testcases: the
+  # skip-ratio gate aggregates tests= across suites, and a meta-test
+  # (harness self-check, never skipped) would dilute skipped/total and
+  # could mask a threshold breach (preflight review). A self-test
+  # failure still fails the suite: it increments failures= and rides
+  # the main testcase's failure element, and the step exits 2.
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="lp-interop--OPP--${_jn}" tests="2" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
   <properties>
     <property name="polls" value="${_junit_polls}"/>
     <property name="extensions" value="${extensionsApplied}"/>
     <property name="mcp_wait_seconds" value="${_jd}"/>
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
+    <property name="predicate_selftest" value="${_junit_selftest}"/>
     <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
-  <testcase name="predicate-selftest" classname="lp-interop.OPP.${_jn}" time="0">
-    ${_st_fx}
-  </testcase>
   <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
-    ${_fx}
+    ${_fx}${_st_fx}
   </testcase>
 </testsuite>
 JUNITEOF
@@ -152,7 +160,11 @@ echo ">>> PHASE: initialization"
 #     value exits 2 with a message instead of an arithmetic error) ---
 _opp_validate_int() {
   local _name="${1}" _raw="${2}" _min="${3}"
-  if ! [[ "${_raw}" =~ ^[0-9]+$ ]] || (( _raw < _min )); then
+  # Leading zeros are rejected (not normalized): bash arithmetic reads
+  # 010 as octal 8 and errors on 08, so a digit-only regex alone would
+  # accept values the typeset -i assignments then misread (preflight
+  # review: reject leading zeros except bare "0").
+  if ! [[ "${_raw}" =~ ^(0|[1-9][0-9]*)$ ]] || (( 10#${_raw} < _min )); then
     echo "FAILURE CLASS: Invalid step input" >&2
     echo "env ${_name} must be an integer >= ${_min} (got '${_raw}')" >&2
     exit 2
@@ -217,14 +229,6 @@ function IsMcpProgressing () {
     for (( i = windowStart; i < len; ++i )); do
         (( degradedHistory[i] )) && return 1
     done
-    typeset -i first=${updatedHistory[windowStart]}
-    typeset -i last=${updatedHistory[len - 1]}
-    if (( last > first )); then
-        for (( i = windowStart + 1; i < len; ++i )); do
-            (( updatedHistory[i] < updatedHistory[i-1] )) && return 1
-        done
-        return 0
-    fi
     typeset -i notReadyStreak=0
     for (( i = len - 1; i >= 0; --i )); do
         # The streak is the PINNED-UPDATED cycling mode (MCP_PINNED_
@@ -246,22 +250,42 @@ function IsMcpProgressing () {
             break
         fi
     done
+    # Sustained-cycling veto (preflight-review note): at default cadence
+    # the maxTimeout cap already bounds extensions before this threshold
+    # is reached, so the veto's value is FAIL-FAST, not extension denial -
+    # the poll loop reads _vetoStreakHit and exits with
+    # mcp-rollout-not-converging instead of polling to the deadline.
+    # The veto is computed BEFORE the rising-updated clause so a pool that
+    # cycled not-ready for the streak while its machine count grew
+    # (updated tracking machineCount) cannot mask the veto behind a
+    # rising window (preflight review: apply the veto before returning
+    # progress).
     if (( notReadyStreak >= _pinnedPolls )); then
-        # Sustained-cycling veto (preflight-review note): at default cadence
-        # the maxTimeout cap already bounds extensions before this threshold
-        # is reached, so the veto's value is FAIL-FAST, not extension denial -
-        # the poll loop reads _vetoStreakHit and exits with
-        # mcp-rollout-not-converging instead of polling to the deadline.
         _vetoStreakHit=1
-        return 1
     fi
+    typeset -i first=${updatedHistory[windowStart]}
+    typeset -i last=${updatedHistory[len - 1]}
+    if (( last > first )); then
+        for (( i = windowStart + 1; i < len; ++i )); do
+            (( updatedHistory[i] < updatedHistory[i-1] )) && return 1
+        done
+        (( _vetoStreakHit )) && return 1
+        return 0
+    fi
+    (( _vetoStreakHit )) && return 1
+    # Ready-count recovery within the window with bounded regression: the
+    # bound is the maximum single-poll drop (machines concurrently
+    # unavailable, mirroring MCO maxUnavailable), not the number of polls
+    # containing a drop - a single 9 -> 0 collapse is one event but an
+    # unbounded regression (preflight review: bound by magnitude).
     first=${readyHistory[windowStart]}
     last=${readyHistory[len - 1]}
-    typeset -i decreases=0
+    typeset -i maxDrop=0 _drop=0
     for (( i = windowStart + 1; i < len; ++i )); do
-        (( readyHistory[i] < readyHistory[i-1] )) && (( ++decreases )) || true
+        (( _drop = readyHistory[i-1] - readyHistory[i] )) || true
+        (( _drop > maxDrop )) && maxDrop=${_drop} || true
     done
-    if (( last > first && decreases <= _maxUnavail )); then
+    if (( last > first && maxDrop <= _maxUnavail )); then
         return 0
     fi
     return 1
@@ -607,7 +631,7 @@ function AssertClusterHealthy () {
     echo ""
     echo "=== ClusterOperator health gate ==="
     typeset coJson=""
-    if ! coJson="$(oc get clusteroperators -o json --request-timeout=30s 2>/dev/null)"; then
+    if ! coJson="$(timeout 45s oc get clusteroperators -o json --request-timeout=30s 2>/dev/null)"; then
         echo "WARNING: Failed to fetch ClusterOperators"
         (( ++failures )) || true
     else
@@ -639,7 +663,7 @@ if issues:
     echo ""
     echo "=== Node readiness gate ==="
     typeset notReady=""
-    notReady="$(oc get nodes -o json --request-timeout=30s 2>/dev/null | python3 -c "
+    notReady="$(timeout 45s oc get nodes -o json --request-timeout=30s 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 bad = []
@@ -928,7 +952,7 @@ echo ""
 
 typeset classification="UNKNOWN"
 typeset finalJson=""
-if finalJson="$(oc get mcp -o json --request-timeout=30s 2>/dev/null)"; then
+if finalJson="$(timeout 45s oc get mcp -o json --request-timeout=30s 2>/dev/null)"; then
     classification="$(ClassifyMcpState "${finalJson}")"
 fi
 
