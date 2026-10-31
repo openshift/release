@@ -1,0 +1,49 @@
+ref:
+  as: openshift-qe-cudn-density-midterm-a
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ITERATIONS
+    default: "100"
+    documentation: Number of CUDNs to create
+  - name: JOB_PAUSE
+    default: "10m"
+    documentation: Pause between Group 1 and Group 2
+  - name: POD_READY_THRESHOLD
+    default: "1400s"
+    documentation: Maximum threshold for Pod Ready
+  - name: QPS
+    default: "5"
+    documentation: kube-burner QPS
+  - name: BURST
+    default: "5"
+    documentation: kube-burner burst
+  - name: TIMEOUT
+    default: "10h"
+    documentation: kube-burner timeout
+  - name: ES_SECRETS_PATH
+    default: "/secret"
+    documentation: Path to elasticsearch credentials secret mount
+  - name: ES_INDEX
+    default: "ripsaw-kube-burner"
+    documentation: Elasticsearch index name
+  - name: GC
+    default: "false"
+    documentation: Enable garbage collection after run
+  commands: openshift-qe-cudn-density-midterm-a-commands.sh
+  timeout: 12h
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Runs Scenario A (baseline) of the UDN macbinding midterm test using
+    midterm_scenario_a branch of kube-burner-ocp. Tests CUDN density with
+    internal traffic only (no external IPs) with patched OVN.
