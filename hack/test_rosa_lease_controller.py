@@ -1,19 +1,49 @@
 #!/usr/bin/env python3
 """Offline delivered-command fixtures: python3 hack/test_rosa_lease_controller.py."""
 
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import shlex
 import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 STEP = ROOT / "ci-operator/step-registry/rosa/cluster-lease/controller"
 CANARY = "fixture-sensitive-response-do-not-publish"
+
+
+@contextmanager
+def controller_process(body, environment):
+    """Own an isolated controller with bounded cleanup on exceptional exit."""
+    process = subprocess.Popen(
+        ["/bin/bash", "-c", body], env=environment, start_new_session=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        yield process
+    except BaseException:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+        try:
+            process.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        raise
+    finally:
+        process.stdout.close()
+        process.stderr.close()
 
 
 def mock(command, arguments):
@@ -146,15 +176,8 @@ class LeaseControllerFixture(unittest.TestCase):
             if artifact_mode == "blocked":
                 (artifacts / "provisioning-outcomes.jsonl").mkdir()
             prefix = "#!/bin/bash\nset -eu\nexport FIXTURE_CONTROLLER_PID=$$\n"
-            with subprocess.Popen(
-                    ["/bin/bash", "-c", prefix + body], env=environment,
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
-                try:
-                    stdout, stderr = process.communicate(timeout=60)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate()
-                    raise
+            with controller_process(prefix + body, environment) as process:
+                stdout, stderr = process.communicate(timeout=60)
                 result = subprocess.CompletedProcess(
                     process.args, process.returncode, stdout, stderr)
             artifact_text = "".join(path.read_text(encoding="utf-8")
@@ -172,6 +195,41 @@ class LeaseControllerFixture(unittest.TestCase):
                 self.assertIn(f"lookup-cancel target={process.pid} ", calls)
             self.assertFalse(list(base.glob("tmp.*")), "temporary kubeconfig must be removed")
             return result, records, calls
+
+    def test_timeout_kills_pipe_holding_descendants(self):
+        """Timeout kills owned descendants even after the controller has exited."""
+        for parent_exits, invalid_output in ((False, False), (True, False), (False, True)):
+            with self.subTest(parent_exits=parent_exits, invalid_output=invalid_output), \
+                    tempfile.TemporaryDirectory() as temporary:
+                base = Path(temporary)
+                group_file = base / "controller-group"
+                child_file = base / "descendant"
+                child = (
+                    "import os,signal; from pathlib import Path; signal.alarm(5); "
+                    f"Path({str(child_file)!r}).write_text(f'{{os.getpid()}} {{os.getpgrp()}}'); "
+                    + ("os.write(1, b'\\xff'); " if invalid_output else "")
+                    + "signal.pause()")
+                body = (f'printf "%s" "$$" > {shlex.quote(str(group_file))}\n'
+                        f'{shlex.quote(sys.executable)} -S -c {shlex.quote(child)} &\n'
+                        + ("exit 0\n" if parent_exits else "wait\n"))
+                started = time.monotonic()
+                with self.assertRaises(subprocess.TimeoutExpired) as raised:
+                    with controller_process(body, {"PATH": os.defpath}) as process:
+                        process.communicate(timeout=1)
+                self.assertEqual(raised.exception.timeout, 1)
+                self.assertEqual(raised.exception.cmd, ["/bin/bash", "-c", body])
+                self.assertLess(time.monotonic() - started, 3)
+                child_pid, child_group = map(int, child_file.read_text().split())
+                self.assertEqual(child_group, int(group_file.read_text()))
+                self.assertEqual(child_group, process.pid)
+                self.assertNotEqual(child_group, os.getpgrp())
+                self.assertFalse(Path(f"/proc/{child_group}").exists(), "controller must be reaped")
+                try:
+                    status = Path(f"/proc/{child_pid}/stat").read_text(encoding="utf-8")
+                except FileNotFoundError:
+                    pass
+                else:
+                    self.assertIn(status.rsplit(")", 1)[1].split()[0], ("Z", "X"))
 
     def test_signals_stop_before_later_operations(self):
         """Signals during the first polling sleep prevent later operations."""
