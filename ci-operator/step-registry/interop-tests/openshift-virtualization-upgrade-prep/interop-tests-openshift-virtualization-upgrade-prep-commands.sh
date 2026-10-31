@@ -39,6 +39,7 @@ ResolveCnvFirstVersion() {
         | sort -V | head -n1
 }
 
+# CnvCsvNameToVersion: Print the x.y.z from a kubevirt-hyperconverged-operator CSV name.
 CnvCsvNameToVersion() {
     typeset csvName="${1:?}"; (($#)) && shift
     typeset ver="${csvName#kubevirt-hyperconverged-operator.v}"
@@ -48,12 +49,14 @@ CnvCsvNameToVersion() {
     true
 }
 
+# CnvSameMajorMinor: Return 0 when two x.y.z versions share the same major.minor.
 CnvSameMajorMinor() {
     typeset left="${1:?}"; (($#)) && shift
     typeset right="${1:?}"; (($#)) && shift
     [[ "${left%.*}" == "${right%.*}" ]]
 }
 
+# CnvVersionGte: Return 0 when the first x.y.z version is greater than or equal to the second.
 CnvVersionGte() {
     typeset left="${1:?}"; (($#)) && shift
     typeset right="${1:?}"; (($#)) && shift
@@ -63,6 +66,7 @@ CnvVersionGte() {
     return 1
 }
 
+# WriteCnvTargetVersion: Export CNV_TARGET_VERSION and write it for the upgrade-tests step.
 WriteCnvTargetVersion() {
     typeset ver="${1:?}"; (($#)) && shift
     export CNV_TARGET_VERSION="${ver}"
@@ -87,6 +91,7 @@ IsCnvOfferedTargetPlan() {
     return 0
 }
 
+# WaitForNewInstallPlan: Poll until OLM publishes an install plan other than the one just completed.
 WaitForNewInstallPlan() {
     typeset subApi="${1:?}"; (($#)) && shift
     typeset ns="${1:?}"; (($#)) && shift
@@ -117,6 +122,7 @@ WaitForNewInstallPlan() {
     )
 }
 
+# Retry: Re-run a command until it succeeds or the time budget is spent.
 Retry() {
     typeset -i maxSecs="${1:?}"; (($#)) && shift
     typeset -i delay="${1:?}"; (($#)) && shift
@@ -137,6 +143,7 @@ Retry() {
     true
 }
 
+# SetDefaultStorageClassForCnv: Mark one StorageClass as the default Kubernetes and KubeVirt class.
 SetDefaultStorageClassForCnv() {
     typeset storageClassName="${1:?}"; (($#)) && shift
     oc get "storageclass/${storageClassName}" > /dev/null || {
@@ -152,6 +159,7 @@ SetDefaultStorageClassForCnv() {
     true
 }
 
+# Cnv__WaitRhelBootImportCronsUpToDate: Wait until RHEL and Windows boot-image DataImportCrons are UpToDate.
 Cnv__WaitRhelBootImportCronsUpToDate() {
     typeset dvNamespace="${1:?}"; (($#)) && shift
     typeset waitTimeout="${CNV_BOOT_IMPORT_CRON_UPTODATE_WAIT_TIMEOUT}"
@@ -174,16 +182,262 @@ Cnv__WaitRhelBootImportCronsUpToDate() {
 
     ((${#bootCrons[@]})) || {
         : "No RHEL/Windows DataImportCrons in ${dvNamespace} after ${appearTimeoutSec}s"
+        Cnv__DumpBootImportCronFailureDiagnostics "${dvNamespace}"
         exit 1
     }
 
     for cronName in "${bootCrons[@]}"; do
         oc wait DataImportCron -n "${dvNamespace}" "${cronName}" \
-            --for=condition=UpToDate --timeout="${waitTimeout}"
+            --for=condition=UpToDate --timeout="${waitTimeout}" || {
+            Cnv__DumpBootImportCronFailureDiagnostics "${dvNamespace}" "${cronName}"
+            exit 1
+        }
     done
     true
 }
 
+# Cnv__RedactUrlCredentials: Strip URL userinfo and credential query parameters
+# from stdin. Resource names and other query parameters stay. GNU sed; the cli
+# image provides it. '#' is the delimiter because the pattern contains '|'.
+# The value match stops before a double quote so a credential at the end of a
+# JSON string does not eat the closer.
+Cnv__RedactUrlCredentials() {
+    sed -E 's#(https?://)[^@[:space:]]*@#\1REDACTED@#g; s#([?&]([^=[:space:]]*[-_])?(token|password|passwd|secret|api_key|apikey|signature|sig)=)[^&[:space:]"]*#\1REDACTED#gI'
+}
+
+# Cnv__DumpCnvOnFailureDiagnostics: Collect filtered PVC, VolumeSnapshot, HCO,
+# VM, and VMI status for CNV failure root-cause analysis.
+# Artifacts keep name plus status and conditions, including free-text messages
+# so resource names in those messages remain. Messages pass through
+# Cnv__RedactUrlCredentials. VM and VMI queries stay in the boot-image
+# namespace and openshift-cnv. oc stderr goes to a sibling .oc-err.txt so a
+# failed get cannot corrupt the JSON. Writes artifacts to $ARTIFACT_DIR.
+# All commands are best-effort.
+Cnv__DumpCnvOnFailureDiagnostics() {
+    typeset dvNamespace="${1:-openshift-virtualization-os-images}"
+    typeset ns
+    # openshift-cnv is already the boot-image namespace when those names match.
+    typeset -a queryNamespaces=("${dvNamespace}")
+    if [[ "${dvNamespace}" != "openshift-cnv" ]]; then
+        queryNamespaces+=("openshift-cnv")
+    fi
+
+    oc get pvc -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-pvcs-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            phase: .status.phase,
+            capacity: .status.capacity.storage,
+            accessModes: .status.accessModes,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+          }]' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-pvcs-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-pvcs-on-failure.json"
+    oc get volumesnapshot -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            readyToUse: .status.readyToUse,
+            restoreSize: .status.restoreSize,
+            error: .status.error.message,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+          }]' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-volumesnapshots-on-failure.json"
+    oc get hco kubevirt-hyperconverged -n openshift-cnv -o json \
+        2>>"${ARTIFACT_DIR}/cnv-hco-on-failure.oc-err.txt" \
+        | jq '{
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            observedGeneration: .status.observedGeneration,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+            versions: [.status.versions[]? | {name, version}]
+          }' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-hco-on-failure.json" \
+        || echo '{}' > "${ARTIFACT_DIR}/cnv-hco-on-failure.json"
+    # Name, run strategy, and status only. Omits spec, annotations, and
+    # cloudInitNoCloud userData. oc stderr stays out of the JSON file.
+    {
+        for ns in "${queryNamespaces[@]}"; do
+            oc get vm -n "${ns}" -o json \
+                2>>"${ARTIFACT_DIR}/cnv-vms-on-failure.oc-err.txt" \
+                | jq '[.items[]? | {
+                    namespace: .metadata.namespace,
+                    name: .metadata.name,
+                    runStrategy: (.spec.runStrategy // .spec.running),
+                    printableStatus: .status.printableStatus,
+                    ready: .status.ready,
+                    conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+                }]' || echo '[]'
+        done | jq -s 'add // []'
+    } | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-vms-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-vms-on-failure.json"
+    {
+        for ns in "${queryNamespaces[@]}"; do
+            oc get vmi -n "${ns}" -o json \
+                2>>"${ARTIFACT_DIR}/cnv-vmis-on-failure.oc-err.txt" \
+                | jq '[.items[]? | {
+                    namespace: .metadata.namespace,
+                    name: .metadata.name,
+                    phase: .status.phase,
+                    conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+                }]' || echo '[]'
+        done | jq -s 'add // []'
+    } | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-vmis-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-vmis-on-failure.json"
+    true
+}
+
+# Cnv__DumpBootImportCronFailureDiagnostics: Save filtered DataImportCron,
+# DataVolume, DataSource, and pod status, redacted importer logs, and
+# namespace Events. $2 may be empty when no cron was found. PVC, VolumeSnapshot,
+# HCO, and VM snapshots are in Cnv__DumpCnvOnFailureDiagnostics.
+# Event text, condition messages, and pod termination messages pass through
+# Cnv__RedactUrlCredentials: importer errors repeat the source URL. Resource
+# names in those messages stay. oc stderr goes to a sibling .oc-err.txt so a
+# failed get cannot corrupt JSON.
+Cnv__DumpBootImportCronFailureDiagnostics() {
+    typeset dvNamespace="${1:?}"; (($#)) && shift
+    typeset cronName="${1:-}"
+
+    # Status, conditions, and import-tracking timestamps. currentImports links
+    # an in-progress import to its DataVolume. lastExecutionTimestamp is the
+    # last poll; lastImportTimestamp is the last completed import. The cron
+    # template can carry registry URLs and is omitted.
+    if [[ -n "${cronName}" ]]; then
+        oc get dataimportcron "${cronName}" -n "${dvNamespace}" -o json \
+            2>>"${ARTIFACT_DIR}/cnv-dataimportcron-${cronName}-on-failure.oc-err.txt" \
+            | jq '{
+                name: .metadata.name,
+                namespace: .metadata.namespace,
+                managedDataSource: .spec.managedDataSource,
+                schedule: .spec.schedule,
+                conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+                currentImports: [(.status.currentImports // [])[] | {
+                    dataVolumeName: (.dataVolumeName // .DataVolumeName),
+                    digest: (.digest // .Digest)
+                }],
+                lastExecutionTimestamp: .status.lastExecutionTimestamp,
+                lastImportTimestamp: .status.lastImportTimestamp,
+                lastImportedPVC: .status.lastImportedPVC.name
+              }' \
+            | Cnv__RedactUrlCredentials \
+            > "${ARTIFACT_DIR}/cnv-dataimportcron-${cronName}-on-failure.json" \
+            || echo '{}' > "${ARTIFACT_DIR}/cnv-dataimportcron-${cronName}-on-failure.json"
+    else
+        oc get dataimportcron -n "${dvNamespace}" -o json \
+            2>>"${ARTIFACT_DIR}/cnv-dataimportcrons-on-failure.oc-err.txt" \
+            | jq '[.items[]? | {
+                name: .metadata.name,
+                namespace: .metadata.namespace,
+                managedDataSource: .spec.managedDataSource,
+                schedule: .spec.schedule,
+                conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+                currentImports: [(.status.currentImports // [])[] | {
+                    dataVolumeName: (.dataVolumeName // .DataVolumeName),
+                    digest: (.digest // .Digest)
+                }],
+                lastExecutionTimestamp: .status.lastExecutionTimestamp,
+                lastImportTimestamp: .status.lastImportTimestamp,
+                lastImportedPVC: .status.lastImportedPVC.name
+              }]' \
+            | Cnv__RedactUrlCredentials \
+            > "${ARTIFACT_DIR}/cnv-dataimportcrons-on-failure.json" \
+            || echo '[]' > "${ARTIFACT_DIR}/cnv-dataimportcrons-on-failure.json"
+    fi
+    oc get datavolume -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-datavolumes-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            sourceType: (
+                if .spec.source then (.spec.source | keys[0] // "unknown")
+                elif .spec.sourceRef then "sourceRef"
+                else "unknown"
+                end
+            ),
+            phase: .status.phase,
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}],
+            progress: .status.progress
+          }]' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-datavolumes-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-datavolumes-on-failure.json"
+    oc get datasource -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-datasources-on-failure.oc-err.txt" \
+        | jq '[.items[]? | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            sourceRef: (.spec.source | walk(if type == "string" then
+                gsub("https?://[^@[:space:]]+@"; "https://REDACTED@")
+                | gsub("(?i)(?<cred>[?&]([^=[:space:]]*[-_])?(token|password|passwd|secret|api_key|apikey|signature|sig)=)[^&[:space:]]+"; "\(.cred)REDACTED")
+              else . end)),
+            conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+          }]' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-datasources-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-datasources-on-failure.json"
+    # Current and previous termination for app and init containers. Keeps
+    # CrashLoopBackOff together with the prior OOMKilled/exit code. Omits env,
+    # volume mounts, and the pod spec.
+    oc get pods -n "${dvNamespace}" -o json \
+        2>>"${ARTIFACT_DIR}/cnv-boot-image-pods-on-failure.oc-err.txt" \
+        | jq '
+            def terminated: {
+                reason, exitCode, signal, message, startedAt, finishedAt
+            };
+            def containerPhase:
+                if .waiting then {waiting: {reason: .waiting.reason, message: .waiting.message}}
+                elif .running then {running: {startedAt: .running.startedAt}}
+                elif .terminated then {terminated: (.terminated | terminated)}
+                else null end;
+            def containerDiag: {
+                name, ready, restartCount,
+                state: (if .state then (.state | containerPhase) else null end),
+                lastState: (if .lastState then (.lastState | containerPhase) else null end)
+            };
+            [.items[]? | {
+                name: .metadata.name,
+                phase: .status.phase,
+                containerStatuses: [(.status.containerStatuses // [])[] | containerDiag],
+                initContainerStatuses: [(.status.initContainerStatuses // [])[] | containerDiag],
+                conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
+            }]' \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-boot-image-pods-on-failure.json" \
+        || echo '[]' > "${ARTIFACT_DIR}/cnv-boot-image-pods-on-failure.json"
+    oc get events -n "${dvNamespace}" --sort-by='.metadata.creationTimestamp' \
+        2>>"${ARTIFACT_DIR}/cnv-boot-image-events-on-failure.oc-err.txt" \
+        | Cnv__RedactUrlCredentials \
+        > "${ARTIFACT_DIR}/cnv-boot-image-events-on-failure.txt" || true
+    Cnv__DumpCnvOnFailureDiagnostics "${dvNamespace}"
+
+    # Capture importer pod logs (current + previous) — best-effort, bounded.
+    # Strip URL userinfo and credential query parameters before writing the artifact.
+    typeset podName
+    while read -r podName; do
+        [[ -z "${podName}" ]] && continue
+        oc logs "${podName}" -n "${dvNamespace}" --tail=500 2>&1 \
+            | Cnv__RedactUrlCredentials \
+            > "${ARTIFACT_DIR}/cnv-importer-log-${podName}.txt" || true
+        oc logs "${podName}" -n "${dvNamespace}" --previous --tail=200 2>&1 \
+            | Cnv__RedactUrlCredentials \
+            >> "${ARTIFACT_DIR}/cnv-importer-log-${podName}.txt" || true
+    done < <(
+        oc get pods -n "${dvNamespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+            | grep -E 'importer' || true
+    )
+    true
+}
+
+# Cnv__ToggleCommonBootImageImport: Set HCO enableCommonBootImageImport and wait until HCO is Available.
 Cnv__ToggleCommonBootImageImport() {
     typeset status="${1:?}"; (($#)) && shift
     Retry 25 5 oc patch hco kubevirt-hyperconverged -n openshift-cnv \
@@ -198,6 +452,7 @@ Cnv__ToggleCommonBootImageImport() {
     true
 }
 
+# Cnv__WaitNamespacePvcsIdle: Wait until no PVC in the namespace is Pending, Lost, or Terminating.
 Cnv__WaitNamespacePvcsIdle() {
     typeset ns="${1:?}"; (($#)) && shift
     typeset -i wMax="${1:?}"; (($#)) && shift
@@ -213,6 +468,7 @@ Cnv__WaitNamespacePvcsIdle() {
             if (( SECONDS >= wMax )); then
                 oc get pvc -n "${ns}" -o wide \
                     > "${ARTIFACT_DIR}/cnv-stuck-pvcs-${ns}.txt" || true
+                Cnv__DumpBootImportCronFailureDiagnostics "${ns}"
                 : "PVCs still not idle in ${ns} after ${wMax}s: ${pending:-<see artifact>}"
                 exit 1
             fi
@@ -226,6 +482,7 @@ Cnv__WaitNamespacePvcsIdle() {
     true
 }
 
+# Cnv__ForceDeleteStuckPvcs: Drop finalizers from PVCs that are stuck deleting.
 Cnv__ForceDeleteStuckPvcs() {
     typeset ns="${1:?}"; (($#)) && shift
     typeset pvcName
@@ -241,6 +498,7 @@ Cnv__ForceDeleteStuckPvcs() {
     true
 }
 
+# Cnv__WaitBootImagesUpToDate: Enable common boot-image import and wait for crons and PVCs to settle.
 Cnv__WaitBootImagesUpToDate() {
     typeset dvNamespace="openshift-virtualization-os-images"
     typeset -i pvcWaitTimeout="${CNV_DV_NAMESPACE_PVC_WAIT_TIMEOUT}"
@@ -267,6 +525,7 @@ Cnv__WaitBootImagesUpToDate() {
     true
 }
 
+# ConfigureOdfVolumeSnapshotClass: Mark the ODF RBD VolumeSnapshotClass as the default snapshot class.
 ConfigureOdfVolumeSnapshotClass() {
     typeset -r snapClass='ocs-storagecluster-rbdplugin-snapclass'
     typeset -r snapCtrlNs='openshift-cluster-storage-operator'
@@ -289,6 +548,7 @@ ConfigureOdfVolumeSnapshotClass() {
     true
 }
 
+# EnsureCdiStorageProfileRwx: Put ReadWriteMany Block first on the CDI StorageProfile claim sets.
 EnsureCdiStorageProfileRwx() {
     typeset storageClassName="${1:?}"; (($#)) && shift
 
@@ -314,6 +574,7 @@ EnsureCdiStorageProfileRwx() {
     true
 }
 
+# WaitOdfCsiHealthy: Restart the ODF RBD CSI controller and node plugin and wait until they roll out.
 WaitOdfCsiHealthy() {
     typeset -r odfNs="openshift-storage"
     typeset -r rbdDeploy="openshift-storage.rbd.csi.ceph.com-ctrlplugin"
@@ -477,6 +738,7 @@ WaitCnvHcoAvailable() {
     true
 }
 
+# InstallAndVerifyVirtctl: Download virtctl from the HCO CLI route and check that the client runs.
 InstallAndVerifyVirtctl() {
     typeset baseURL
     if ! baseURL="$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' | tr -d '\n\r')"; then
@@ -516,7 +778,11 @@ PrepareCnvOlmForUpgradeTest() {
     typeset -r ns="openshift-cnv"
     typeset -r subApi="subscription.operators.coreos.com/hco-operatorhub"
     typeset -i maxHops=10
-    typeset -i planPollMax=180  # seconds to wait for OLM to create/update a plan
+    # 10 min — OLM can briefly report ResolutionFailed/ConstraintsNotSatisfiable
+    # right after an intermediate CSV installs, while the previous CSV is still
+    # being garbage-collected. 180s was observed to be too short to ride out
+    # that transient window during N+2 (multi-hop) upgrades.
+    typeset -i planPollMax=600
     typeset -i planPollInt=10
     typeset -i csvInstallMax=1800  # 30 min per intermediate CSV install
     typeset -i csvInstallInt=30
@@ -653,6 +919,40 @@ SlowDownHcoWorkloadUpdateForUpgradeTest() {
     true
 }
 
+# shellcheck disable=SC2329
+# EXIT trap. Saves the step status before any oc call: a successful diagnostic
+# write must not turn a failed prep into a green step. Runs for every non-zero
+# exit, including storage, HCO, OLM, virtctl, missing boot-image crons, and a
+# VirtualMachine that never becomes ready.
+#
+# CNV must-gather is out of scope here. RunMustGather in the upgrade-tests step
+# already runs when that step fails before pytest. A boot-image timeout stops in
+# this step, and the filtered cron, PVC, DataVolume, and pod artifacts are the
+# record of that failure. oc adm must-gather --vms_details also writes full
+# VirtualMachine manifests, including cloud-init userData, into the public
+# artifact directory, and it needs a gather image this step does not pin.
+Cnv__OnPrepExit() {
+    typeset -i rc=$?
+    typeset ns
+    if (( rc == 0 )); then
+        exit 0
+    fi
+    oc get storagecluster,cephcluster -n openshift-storage -o yaml \
+        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
+    # Boot-image, CNV, and ODF namespaces. A cluster-wide list is not required
+    # to see the PVCs this step waits on.
+    {
+        for ns in openshift-virtualization-os-images openshift-cnv openshift-storage; do
+            oc get pvc -n "${ns}" -o wide || true
+        done
+    } > "${ARTIFACT_DIR}/pvcs-on-failure.txt" \
+        2>>"${ARTIFACT_DIR}/pvcs-on-failure.oc-err.txt" || true
+    oc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
+        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
+    Cnv__DumpCnvOnFailureDiagnostics
+    exit "${rc}"
+}
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 typeset binFolder
@@ -662,15 +962,7 @@ export PATH="${binFolder}:${PATH}"
 [ -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]
 export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 
-trap '
-    (($?)) || exit 0
-    oc get storagecluster,cephcluster -n openshift-storage -o yaml \
-        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
-    oc get pvc -A -o wide \
-        > "${ARTIFACT_DIR}/pvcs-on-failure.txt" 2>&1 || true
-    oc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv -o yaml \
-        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
-' EXIT
+trap 'Cnv__OnPrepExit' EXIT
 
 if [[ -n "${CNV_TARGET_MAJOR_MINOR}" ]]; then
     typeset resolvedCnvVersion
