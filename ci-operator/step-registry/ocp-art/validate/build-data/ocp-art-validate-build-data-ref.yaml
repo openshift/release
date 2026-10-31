@@ -1,0 +1,31 @@
+ref:
+  as: ocp-art-validate-build-data
+  from: src
+  commands: ocp-art-validate-build-data-commands.sh
+  env:
+  - name: ART_TOOLS_REF
+    default: 6948fbf4faee3b4a77030e2cbe947e98014ab340
+    documentation: Immutable ART tools revision providing validator.ci. Update deliberately after validating changes.
+  - name: KONFLUX_APPLICATION
+    default: ""
+    documentation: Exact application to check in stage and production RPAs. Defaults to the target branch with dots replaced by dashes.
+  - name: RELEASE_DATA_REF
+    default: main
+    documentation: Branch or tag of the internal konflux-release-data repository to validate against.
+  credentials:
+  - collection: art
+    group: build-data-validation
+    field: github-token
+    as: token
+    mount_path: /var/run/art-build-data-validation
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 30m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs shared schema, metadata, source branch/Dockerfile, dependency and RPA validation
+    for LP and OCP build data. Requires a read-only GitHub token with access to configured
+    private sources in art/build-data-validation/github-token. Writes validation.json
+    to the job artifacts. Does not provision a test cluster or change remote repositories.

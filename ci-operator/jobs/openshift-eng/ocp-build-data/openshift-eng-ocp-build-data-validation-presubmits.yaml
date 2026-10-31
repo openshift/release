@@ -1,0 +1,121 @@
+presubmits:
+  openshift-eng/ocp-build-data:
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^(acm|cert-manager|coo|external-secrets|installer-ove-ui|kueue|logging|mce|mirror-gui|mta|mtc|oadp|oc-mirror|osus|quay|rhosdt|zero-trust)-[0-9]+\.[0-9]+$
+    cluster: build10
+    context: ci/prow/art-build-data-validation
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-build-data-validation
+    optional: true
+    rerun_command: /test art-build-data-validation
+    run_if_changed: (^|/)(group|streams|releases|bug|bugzilla|erratatool)\.yml$|^(images|rpms|repos)/.*\.ya?ml$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=art-build-data-validation
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: UNRESOLVED_CONFIG
+          value: |
+            build_root:
+              project_image:
+                dockerfile_literal: |
+                  FROM registry.ci.openshift.org/ocp/ubi-python-311:9
+                  USER 0
+                  RUN dnf install -y git gcc krb5-devel python3.11-devel && dnf clean all
+                  RUN python3.11 -m pip install --no-cache-dir uv==0.9.18
+                  RUN curl --fail --silent --show-error --location \
+                      https://certs.corp.redhat.com/certs/Current-IT-Root-CAs.pem \
+                      --output /etc/pki/ca-trust/source/anchors/IT-Root-CAs.pem && update-ca-trust
+                  ENV UV_NATIVE_TLS=true REQUESTS_CA_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt
+                  USER 1001
+            resources:
+              '*':
+                limits:
+                  memory: 4Gi
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            tests:
+            - as: art-build-data-validation
+              restrict_network_access: false
+              steps:
+                workflow: ocp-art-build-data
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )art-build-data-validation,?($|\s.*)
