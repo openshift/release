@@ -38,6 +38,14 @@ if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
 fi
 mkdir -p "${ARTIFACT_DIR}"
 
+# Standalone Quay runs outside OpenShift: no cluster to query for the image,
+# builder diagnostics or Jaeger, so every oc call against a cluster is skipped.
+PLAYWRIGHT_STANDALONE="${PLAYWRIGHT_STANDALONE:-false}"
+if [[ "${PLAYWRIGHT_STANDALONE}" != "true" && "${PLAYWRIGHT_STANDALONE}" != "false" ]]; then
+  echo "ERROR: PLAYWRIGHT_STANDALONE must be true or false" >&2
+  exit 1
+fi
+
 # Read the Quay route written by the deploy step
 QUAY_ROUTE=$(cat "${SHARED_DIR}/quayroute")
 if [[ -z "${QUAY_ROUTE}" ]]; then
@@ -194,7 +202,7 @@ clone_playwright_sources() {
 # has no jq.
 function mirror_pullspecs() {
   local pullspec="$1"
-  if [[ "${pullspec}" == *@* ]]; then
+  if [[ "${pullspec}" == *@* && "${PLAYWRIGHT_STANDALONE}" != "true" ]]; then
     # One get per kind: a combined get fails whole when either kind is not served.
     local kind
     for kind in imagecontentsourcepolicies imagedigestmirrorsets; do
@@ -227,8 +235,12 @@ declare -A PW_LABELS=()
 function resolve_playwright_ref() {
   local ns="${QUAYNAMESPACE:-quay-enterprise}"
   local app_img authfile errfile candidate info="" key value sha tried=" " was_tracing
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    app_img=$(cat "${SHARED_DIR}/quay_app_image" 2>/dev/null || true)
+  else
+    app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
+      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  fi
   if [[ -z "${app_img}" ]]; then
     echo "WARNING: could not determine the deployed quay-app imageID" >&2
     return 1
@@ -240,8 +252,13 @@ function resolve_playwright_ref() {
   set +x
   authfile=$(mktemp)
   errfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  # A copy, so the rm below never deletes the SHARED_DIR original.
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    cp "${SHARED_DIR}/quay-pull-auth.json" "${authfile}" 2>/dev/null || true
+  else
+    oc get secret/pull-secret -n openshift-config \
+      --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  fi
   # stderr stays out of ${info}: a warning on the success path would corrupt the JSON.
   for candidate in $(mirror_pullspecs "${app_img}"); do
     if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
@@ -372,6 +389,7 @@ function gatherBuilderDiagnostics {
   local ns="${QUAYNAMESPACE:-quay-enterprise}"
   local bns="virtual-builders"
   local out="${ARTIFACT_DIR}/builder-diagnostics"
+  [[ "${PLAYWRIGHT_STANDALONE}" != "true" ]] || return 0
   command -v oc >/dev/null 2>&1 || return 0
   oc whoami >/dev/null 2>&1 || return 0
   echo "Gathering virtual-builder diagnostics into ${out}..."
@@ -406,6 +424,10 @@ function startJaegerPortForward {
   # Drop any inherited value so the "unset" paths below cannot leave an
   # unverified URL in the suite's environment.
   unset JAEGER_QUERY_URL
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    echo "PLAYWRIGHT_STANDALONE=true: no cluster Jaeger; leaving JAEGER_QUERY_URL unset"
+    return 0
+  fi
   if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
     echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
     return 0
@@ -818,8 +840,12 @@ function copyArtifacts {
       quay_rev="${PW_TEST_SHA}"
     fi
     local quay_image
-    quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
-      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+      quay_image=$(cat "${SHARED_DIR}/quay_app_image" 2>/dev/null || true)
+    else
+      quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
+        -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    fi
     # PLAYWRIGHT_SPYGLASS_TITLE is the Prow html-lens section name (<title>).
     local spyglass_title="${PLAYWRIGHT_SPYGLASS_TITLE:-Quay e2e results}"
     {
@@ -849,8 +875,12 @@ EOF
       if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
         echo "<li><a target=\"_blank\" href=\"${steps_base}/${report_path}/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
       fi
-      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
-      echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-standalone-gather/artifacts/\">Quay logs<span>Node containers, journals and AWS state</span></a></li>"
+      else
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      fi
       if [[ -n "${quay_rev}" ]]; then
         echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
       fi

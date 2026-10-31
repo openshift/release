@@ -1,0 +1,42 @@
+workflow:
+  as: quay-standalone-aws-ha
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration|OCP-81036|creates notifications for each event type'
+      PLAYWRIGHT_MAX_FAILURES: "0"
+      PLAYWRIGHT_REF_MODE: strict
+      PLAYWRIGHT_STANDALONE: "true"
+      PLAYWRIGHT_WORKERS: "2"
+      ZONES_COUNT: "3"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: quay-standalone-aws-infra
+    - ref: quay-standalone-deploy
+    test:
+    - ref: quay-standalone-smoke
+    - ref: quay-standalone-failover
+    - ref: quay-test-e2e
+    post:
+    - ref: quay-standalone-gather
+      best_effort: true
+    - ref: aws-deprovision-s3buckets
+    - ref: aws-deprovision-stacks
+    - ref: quay-standalone-aws-leak-check
+  documentation: |-
+    Quay standalone HA on AWS, with no OpenShift cluster: three RHEL 9 Quay
+    nodes behind an NLB across three AZs (two in a region with only two), a
+    Redis host, Multi-AZ RDS PostgreSQL, S3 storage, and redundant Clair in
+    combo mode on Quay nodes 1 and 2 behind an internal NLB, with its own
+    database on the RDS instance.
+    Tests run the smoke checks (including a Clair scan of a pushed image),
+    then node and scanner failover, then the full Playwright suite pinned to
+    the deployed image's commit, minus the grep-invert exclusions, with every
+    test run to completion; it skips OCP-81036 until quay/quay's regctl uses
+    TLS, and "creates notifications for each event type" until quay/quay's
+    test closes the notification drawer when an event is unavailable (build
+    support is off here). Failover runs before Playwright because the OAuth
+    token from quay-standalone-deploy expires 9000s after the deploy.
+    Post gathers diagnostics, deletes the bucket and stacks, and fails on
+    leaked resources.
