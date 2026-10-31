@@ -27,6 +27,7 @@ set -u
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
 export CONFIG=/root/dev-scripts/config_root.sh
+export OPENPEROUTER_DATAPATH=${OPENPEROUTER_DATAPATH:-"kernel"}
 
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"
@@ -34,6 +35,20 @@ echo "Kernel version: $(uname -v)"
 unset DOCKER_HOST
 
 bash /root/openperouter/openshift/e2e/deploy.sh </dev/null
+
+
+cat <<'EOF' | oc apply -f -
+apiVersion: network.openperouter.io/v1alpha1
+kind: OpenPERouter
+metadata:
+  name: openperouter
+  namespace: openshift-openperouter
+spec:
+  logLevel: debug
+  datapath: grout
+EOF
+
+
 bash /root/openperouter/openshift/e2e/run_tests.sh </dev/null
 
 RUNTESTS
