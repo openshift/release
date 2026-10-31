@@ -1,5 +1,5 @@
 #!/bin/bash
-# Create an ARO HCP Cluster + Node pool using bicep.
+# Run race-enabled frontend integration tests with the local Cosmos emulator.
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -7,9 +7,10 @@ set -o pipefail
 set -x # Turn on command tracing
 
 export GOPATH=/opt/app-root
-go install gotest.tools/gotestsum@latest
 export PATH=${PATH}:"${GOPATH}/bin"
 export AZURE_TOKEN_CREDENTIALS=prod
+command -v gotestsum
+command -v setup-envtest
 
 test-integration/hack/start-cosmos-emulator.sh
 test-integration/hack/test-integration.sh
