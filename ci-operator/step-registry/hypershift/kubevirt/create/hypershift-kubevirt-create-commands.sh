@@ -48,6 +48,914 @@ function support_np_skew() {
   echo "$EXTRA_FLARGS"
 }
 
+# discover_ovn_container_names sets OVN_OVS_CONTAINER and OVN_NBDB_CONTAINER
+# based on the containers available in the ovnkube-node pod.
+# In OCP 4.17+ (INTERCONNECT mode), ovnkube-node container was replaced by ovnkube-controller.
+discover_ovn_container_names() {
+  local pod_name="$1"
+  local containers
+
+  containers=$(oc get pod -n openshift-ovn-kubernetes "${pod_name}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null)
+
+  # Discover OVS container (for ovs-vsctl commands)
+  for candidate in ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${candidate} "* ]]; then
+      OVN_OVS_CONTAINER="${candidate}"
+      break
+    fi
+  done
+
+  # Discover NBDB container (for ovn-nbctl commands)
+  for candidate in nbdb ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${candidate} "* ]]; then
+      OVN_NBDB_CONTAINER="${candidate}"
+      break
+    fi
+  done
+
+  if [[ -z "${OVN_OVS_CONTAINER}" ]] || [[ -z "${OVN_NBDB_CONTAINER}" ]]; then
+    echo "ERROR: unable to discover OVN containers in pod ${pod_name}" >&2
+    echo "  Available containers: ${containers}" >&2
+    return 1
+  fi
+
+  echo "INFO: Discovered OVN containers - OVS: ${OVN_OVS_CONTAINER}, NBDB: ${OVN_NBDB_CONTAINER}"
+  return 0
+}
+
+# discover_localnet_ipv6_subnet auto-discovers an IPv6 subnet for localnet VMs
+# from the management cluster's worker node IPv6 addresses.  Returns the upper
+# half (/121) of the /120 machine network so VM addresses do not collide with
+# management node addresses or VIPs in the lower half.
+discover_localnet_ipv6_subnet() {
+  local node_ipv6
+  node_ipv6=$(oc get nodes -l node-role.kubernetes.io/worker \
+    -o jsonpath='{.items[0].status.addresses}' 2>/dev/null \
+    | python3 -c "
+import sys, json
+try:
+    addrs = json.loads(sys.stdin.read())
+    for a in addrs:
+        if ':' in a['address'] and a['type'] == 'InternalIP':
+            print(a['address']); break
+except: pass
+" 2>/dev/null)
+  if [[ -z "${node_ipv6}" ]]; then
+    return 1
+  fi
+  python3 -c "
+import ipaddress
+addr = ipaddress.ip_address('${node_ipv6}')
+net  = ipaddress.ip_network(f'{addr}/120', strict=False)
+print(ipaddress.ip_network(f'{net.network_address + 128}/121'))
+" 2>/dev/null
+}
+
+# ensure_brex_ipv6_localnet_flow adds a priority-102 NORMAL rule on br-ex for
+# IPv6 traffic originating from the kernel (in_port=LOCAL) to the management
+# IPv6 /120.  OVN-K generates a matching subnet-wide rule for IPv4
+# (nw_dst=192.168.111.0/24 → NORMAL) but only per-address rules for IPv6
+# (node-self + VIPs).  Without a subnet-wide IPv6 rule, kernel responses
+# (Ingress VIP SYN-ACKs) to localnet VMs are sent to output:1 (physical NIC)
+# only and never reach the localnet OVS patch port on same-node VMs, causing
+# TCP timeouts.  The rule uses the OVN-K cookie so it matches the existing flow
+# format.  Because OVN-K may reconcile br-ex flows periodically, this function
+# should be called more than once during the VM bootstrap window.
+ensure_brex_ipv6_localnet_flow() {
+  local ipv6_subnet="$1"
+  local mgmt_net node ovn_pod brex_mac
+
+  mgmt_net=$(python3 -c "
+import ipaddress
+net = ipaddress.ip_network('${ipv6_subnet}', strict=False)
+print(ipaddress.ip_network(f'{net.network_address}/120', strict=False))
+" 2>/dev/null)
+  if [[ -z "${mgmt_net}" ]]; then
+    echo "WARNING: could not derive /120 from ${ipv6_subnet}, skipping br-ex flow fix"
+    return 1
+  fi
+
+  for node in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}'); do
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    [[ -z "${ovn_pod}" ]] && continue
+    if oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      ovs-ofctl dump-flows br-ex 2>/dev/null | grep -q "ipv6_dst=${mgmt_net}"; then
+      continue
+    fi
+    brex_mac=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      cat /sys/class/net/br-ex/address 2>/dev/null || true)
+    [[ -z "${brex_mac}" ]] && continue
+    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_OVS_CONTAINER}" -- \
+      ovs-ofctl add-flow br-ex \
+      "cookie=0xdeff105,priority=102,ipv6,in_port=LOCAL,dl_src=${brex_mac},ipv6_dst=${mgmt_net},actions=ct(commit,zone=64000,exec(load:0x2->NXM_NX_CT_MARK[])),NORMAL" \
+      2>/dev/null || true
+    echo "  ${node}: added br-ex IPv6 NORMAL flow for ${mgmt_net}"
+  done
+}
+
+# find_localnet_lsps_for_nad prints LSP names (one per line) for a NAD on a node's OVN DB.
+find_localnet_lsps_for_nad() {
+  local multi_ns="$1"
+  local ovn_pod="$2"
+  local nad_name="$3"
+  local subnet="$4"
+  local lsp_names subnet_prefix name ip line
+
+  lsp_names=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+    "external_ids:k8s.ovn.org/nad=${multi_ns}/${nad_name}" 2>/dev/null || true)
+
+  if [[ -z "${lsp_names}" && -n "${subnet}" ]]; then
+    subnet_prefix=$(echo "${subnet}" | cut -d'.' -f1-3)
+    while IFS= read -r line; do
+      [[ -z "${line}" ]] && continue
+      name=$(echo "${line}" | awk '{print $1}')
+      ip=$(echo "${line}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+      if [[ "${ip}" == "${subnet_prefix}."* ]]; then
+        echo "${name}"
+      fi
+    done < <(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --columns=name,dynamic_addresses --bare find Logical_Switch_Port \
+      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null || true)
+    return 0
+  fi
+
+  for name in ${lsp_names}; do
+    echo "${name}"
+  done
+}
+
+lsp_has_dhcp_configured() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+  local existing_dhcp
+
+  existing_dhcp=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl get Logical_Switch_Port "${lsp_name}" dhcpv4_options 2>/dev/null || true)
+  [[ -n "${existing_dhcp}" && "${existing_dhcp}" != "[]" ]]
+}
+
+configure_localnet_multi_dhcp_on_lsp() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+  local subnet="$3"
+  local net_index="$4"
+  local subnet_gw server_mac dhcp_uuid
+
+  if lsp_has_dhcp_configured "${ovn_pod}" "${lsp_name}"; then
+    return 0
+  fi
+
+  server_mac=$(printf "c0:ff:ee:00:00:%02x" "${net_index}")
+  if [[ ${net_index} -eq 1 ]]; then
+    dhcp_uuid=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl create DHCP_Options cidr="${subnet}" \
+      options='"lease_time"="3500" "router"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "dns_server"="'"${LOCALNET_MULTI_PRIMARY_DNS}"'" "server_id"="'"${LOCALNET_MULTI_PRIMARY_GATEWAY}"'" "server_mac"="'"${server_mac}"'"' \
+      2>/dev/null)
+  else
+    subnet_gw=$(echo "${subnet}" | sed 's|/.*||' | sed 's/\.0$/.1/')
+    dhcp_uuid=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl create DHCP_Options cidr="${subnet}" \
+      options='"lease_time"="3500" "server_id"="'"${subnet_gw}"'" "server_mac"="'"${server_mac}"'"' \
+      2>/dev/null)
+  fi
+
+  if [[ -z "${dhcp_uuid}" ]]; then
+    return 1
+  fi
+
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl lsp-set-dhcpv4-options "${lsp_name}" "${dhcp_uuid}" 2>/dev/null
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl clear Logical_Switch_Port "${lsp_name}" port_security 2>/dev/null
+  localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
+  return 0
+}
+
+count_configured_localnet_lsps_for_nad() {
+  local multi_ns="$1"
+  local nad_name="$2"
+  local subnet="$3"
+  local -a target_nodes=()
+  local count=0 node ovn_pod lsp_name
+
+  if [[ $# -ge 4 && -n "${4:-}" ]]; then
+    read -ra target_nodes <<< "${4}"
+  else
+    read -ra target_nodes <<< "$(oc get nodes -o jsonpath='{.items[*].metadata.name}')"
+  fi
+
+  for node in "${target_nodes[@]}"; do
+    [[ -z "${node}" ]] && continue
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    [[ -z "${ovn_pod}" ]] && continue
+    while IFS= read -r lsp_name; do
+      [[ -z "${lsp_name}" ]] && continue
+      if lsp_has_dhcp_configured "${ovn_pod}" "${lsp_name}"; then
+        count=$((count + 1))
+      fi
+    done < <(find_localnet_lsps_for_nad "${multi_ns}" "${ovn_pod}" "${nad_name}" "${subnet}")
+  done
+  echo "${count}"
+}
+
+localnet_multi_should_disable_ipv6_boot() {
+  # When OVN manages IPv6 natively on the localnet (IPv6 subnet in the NAD),
+  # do not block IPv6 during boot — the whole point is dual-stack.
+  [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && return 1
+  [[ "${LOCALNET_MULTI_DISABLE_IPV6_BOOT:-true}" == "true" ]] \
+    && [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]
+}
+
+localnet_multi_clear_lsp_dhcpv6() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl clear Logical_Switch_Port "${lsp_name}" dhcpv6_options 2>/dev/null || true
+}
+
+# localnet_multi_block_ipv6_ingress adds an OVN ACL that drops all IPv6 traffic
+# destined to a VM's localnet LSP.  Clearing OVN DHCPv6 options and stripping IPv6
+# from the LSP addresses (restrict_localnet_lsp_to_ipv4) prevents OVN itself from
+# issuing IPv6 leases, but on a dual-stack management cluster the physical network's
+# DHCPv6 server (dnsmasq/radvd on the baremetal host) still reaches the VM through
+# the localnet bridge because localnet is L2-transparent.  Without an ACL the VM
+# acquires an IPv6 address, DNS resolves the ignition server to the IPv6 ingress VIP,
+# and every connection attempt times out — the VM never fetches ignition and never
+# becomes a node.
+localnet_multi_block_ipv6_ingress() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+
+  local lsp_uuid ls_name
+
+  lsp_uuid=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only get Logical_Switch_Port "${lsp_name}" _uuid 2>/dev/null \
+    | tr -d '"' | tr -d "'") || return 0
+  if [[ -z "${lsp_uuid}" ]]; then
+    return 0
+  fi
+
+  ls_name=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only --bare --columns=name find Logical_Switch \
+    "ports{>=}${lsp_uuid}" 2>/dev/null | head -1) || return 0
+  if [[ -z "${ls_name}" ]]; then
+    echo "  Warning: could not find logical switch for ${lsp_name}, skipping IPv6 ACL"
+    return 0
+  fi
+
+  oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl --no-leader-only acl-add "${ls_name}" to-lport 1000 \
+    "outport == \"${lsp_name}\" && ip6" drop 2>/dev/null || true
+  echo "  Blocked IPv6 ingress on ${ls_name} for ${lsp_name}"
+}
+
+# restrict_localnet_lsp_to_ipv4 removes IPv6 addresses from a localnet LSP so initrd
+# Ignition uses IPv4 DNS/route to the ingress VIP instead of timing out on IPv6 ::4.
+restrict_localnet_lsp_to_ipv4() {
+  local ovn_pod="$1"
+  local lsp_name="$2"
+  local addrs ipv4_addr
+
+  if ! localnet_multi_should_disable_ipv6_boot; then
+    return 0
+  fi
+
+  localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
+
+  addrs=$(oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+    ovn-nbctl get Logical_Switch_Port "${lsp_name}" dynamic_addresses 2>/dev/null || true)
+  addrs=${addrs//\"/}
+  if [[ -z "${addrs}" || "${addrs}" == "[]" ]]; then
+    return 0
+  fi
+
+  ipv4_addr=$(echo "${addrs}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+  if [[ -z "${ipv4_addr}" ]]; then
+    return 0
+  fi
+  if [[ "${addrs}" == *":"* ]]; then
+    oc exec -n openshift-ovn-kubernetes "${ovn_pod}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl lsp-set-addresses "${lsp_name}" "${ipv4_addr}" 2>/dev/null || true
+    localnet_multi_clear_lsp_dhcpv6 "${ovn_pod}" "${lsp_name}"
+    echo "  Restricted ${lsp_name} to IPv4 ${ipv4_addr} (disabled IPv6 for initrd bootstrap)"
+  fi
+  return 0
+}
+
+get_localnet_multi_launcher_nodes() {
+  local multi_ns="$1"
+  oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher \
+    -o jsonpath='{range .items[*]}{.spec.nodeName}{" "}{end}' 2>/dev/null \
+    | tr ' ' '\n' | sort -u | tr '\n' ' ' || true
+}
+
+localnet_multi_launcher_nodes_have_ovn() {
+  local -a target_nodes=()
+  local node ovn_pod missing=0
+
+  read -ra target_nodes <<< "$1"
+  for node in "${target_nodes[@]}"; do
+    [[ -z "${node}" ]] && continue
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -z "${ovn_pod}" ]]; then
+      echo "WARNING: No ovnkube-node pod on virt-launcher node ${node}"
+      missing=$((missing + 1))
+    fi
+  done
+  [[ ${missing} -eq 0 ]]
+}
+
+# DISABLED: the guest-exec cluster below never worked.
+#
+# Every function in this block bottoms out in "virtctl guest-exec", which is
+# not a virtctl subcommand.  The call always failed, the failure was swallowed
+# by "|| true", and the resulting error string was then grepped for a default
+# route -- so the verifiers reported default_route=MISSING for every VMI
+# whether or not anything was wrong, and the renewal path renewed nothing.
+#
+# Nothing of value is lost.  The missing-gateway bug these were written to
+# paper over is fixed at the source: the CNV l2bridge binding suppresses
+# KubeVirt's in-pod DHCP server, so OVN's responder -- which does send the
+# router option -- serves the guest from first boot.  Boot is now confirmed by
+# wait_for_localnet_multi_vmis_booted, which keys off AgentConnected and can
+# only be true once the guest has completed ignition.
+#
+# Kept commented rather than deleted so the shape of the intended check
+# survives: if KubeVirt ever grows a working in-guest exec (or the step moves
+# to "oc debug node" against the guest), this is the logic to restore.
+
+# localnet_multi_log_check() {
+#   local vmi="$1"
+#   shift
+#   echo "LOCALNET_MULTI_CHECK: vmi=${vmi} $* gateway=${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+# }
+
+# resolve_virtctl_cmd() {
+#   if command -v virtctl >/dev/null 2>&1; then
+#     echo "virtctl"
+#     return 0
+#   fi
+#   if [[ -x /usr/bin/virtctl ]]; then
+#     echo "/usr/bin/virtctl"
+#     return 0
+#   fi
+#   if [[ -x /tmp/virtctl ]]; then
+#     echo "/tmp/virtctl"
+#     return 0
+#   fi
+#
+#   # Download virtctl from the cluster's KubeVirt/HCO deployment
+#   local dl_url=""
+#
+#   # Method 1: ConsoleCLIDownload resource (standard HCO deployment)
+#   dl_url=$(oc get ConsoleCLIDownload virtctl-clidownloads-kubevirt-hyperconverged \
+#     -o jsonpath='{.spec.links[?(@.text=="Download virtctl for Linux for x86_64")].href}' 2>/dev/null) || true
+#
+#   # Method 2: Construct URL from the HCO CLI download route
+#   if [[ -z "${dl_url}" ]]; then
+#     local route_host
+#     route_host=$(oc get route -n openshift-cnv hyperconverged-cluster-cli-download \
+#       -o jsonpath='{.spec.host}' 2>/dev/null) || true
+#     if [[ -n "${route_host}" ]]; then
+#       dl_url="https://${route_host}/amd64/linux/virtctl.tar.gz"
+#     fi
+#   fi
+#
+#   if [[ -n "${dl_url}" ]]; then
+#     echo "Downloading virtctl from ${dl_url}..." >&2
+#     if curl -sSLk "${dl_url}" --output /tmp/virtctl.tar.gz 2>/dev/null \
+#        && tar xzf /tmp/virtctl.tar.gz -C /tmp/ 2>/dev/null; then
+#       local virtctl_path
+#       virtctl_path=$(find /tmp -name virtctl -type f -executable 2>/dev/null | head -1)
+#       if [[ -n "${virtctl_path}" && "${virtctl_path}" != "/tmp/virtctl" ]]; then
+#         mv "${virtctl_path}" /tmp/virtctl
+#       fi
+#       rm -f /tmp/virtctl.tar.gz
+#       if [[ -x /tmp/virtctl ]]; then
+#         echo "/tmp/virtctl"
+#         return 0
+#       fi
+#     fi
+#     rm -f /tmp/virtctl.tar.gz
+#   fi
+#
+#   echo "WARNING: virtctl not found and download failed; guest-exec renewal unavailable" >&2
+#   return 1
+# }
+
+# vmi_guest_agent_ready() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local ga_status
+#
+#   ga_status=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+#     -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
+#   [[ "${ga_status}" == "True" ]]
+# }
+
+# wait_for_vmi_guest_agent() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local attempt
+#
+#   for attempt in $(seq 1 45); do
+#     if vmi_guest_agent_ready "${multi_ns}" "${vmi}"; then
+#       return 0
+#     fi
+#     sleep 2
+#   done
+#   return 1
+# }
+
+# localnet_multi_guest_renew_script() {
+#   local network_count="$1"
+#   local idx renew_devices inner_script
+#
+#   renew_devices=""
+#   for idx in $(seq 1 "${network_count}"); do
+#     renew_devices="${renew_devices} enp${idx}s0"
+#   done
+#   inner_script="for dev in${renew_devices}; do "
+#   if localnet_multi_should_disable_ipv6_boot; then
+#     inner_script+="sudo nmcli device set \\\$dev ipv6.method disabled 2>/dev/null || true; "
+#   fi
+#   inner_script+="sudo nmcli device reapply \\\$dev 2>/dev/null || "
+#   inner_script+="{ sudo nmcli device disconnect \\\$dev 2>/dev/null; sudo nmcli device connect \\\$dev 2>/dev/null; }; "
+#   inner_script+="done; echo 'Default IPv4 route:'; ip route show default 2>/dev/null || echo '(none)'; "
+#   inner_script+="echo 'IPv6 global addresses:'; ip -6 addr show scope global 2>/dev/null || true"
+#   echo "${inner_script}"
+# }
+
+# localnet_multi_guest_exec_output() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local inner_script="$3"
+#   local virtctl_cmd output
+#
+#   virtctl_cmd=$(resolve_virtctl_cmd) || return 1
+#   output=$("${virtctl_cmd}" guest-exec "${vmi}" -n "${multi_ns}" --username core --return stdout -- \
+#     sh -c "${inner_script}" 2>&1) || true
+#   echo "${output}"
+# }
+
+# localnet_multi_output_has_default_route() {
+#   local output="$1"
+#   echo "${output}" | grep -q "via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+# }
+
+# localnet_multi_output_has_ipv6_on_localnet() {
+#   local output="$1"
+#   echo "${output}" | grep -E 'inet6 (fd|2[0-9a-f]{3}:)' >/dev/null 2>&1
+# }
+
+# verify_localnet_multi_vmi_default_route() {
+#   local multi_ns="$1"
+#   local vmi="$2"
+#   local output inner_script
+#
+#   [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+#
+#   if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+#     localnet_multi_log_check "${vmi}" "default_route=MISSING guest_agent=unavailable"
+#     return 1
+#   fi
+#
+#   inner_script="ip route show default 2>/dev/null || echo '(none)'; ip -6 addr show scope global 2>/dev/null || true"
+#   output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+#
+#   if localnet_multi_output_has_default_route "${output}"; then
+#     if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+#     else
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+#     fi
+#     return 0
+#   fi
+#
+#   localnet_multi_log_check "${vmi}" "default_route=MISSING"
+#   return 1
+# }
+
+# renew_localnet_multi_dhcp_via_guest_exec() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi="$3"
+#   local inner_script output
+#
+#   if ! wait_for_vmi_guest_agent "${multi_ns}" "${vmi}"; then
+#     echo "WARNING: Guest agent not ready on VMI ${vmi}, skipping guest-exec renewal"
+#     return 1
+#   fi
+#
+#   inner_script=$(localnet_multi_guest_renew_script "${network_count}")
+#   echo "Forcing DHCP renewal on VMI ${vmi} via guest-exec..."
+#   output=$(localnet_multi_guest_exec_output "${multi_ns}" "${vmi}" "${inner_script}") || return 1
+#
+#   echo "--- guest-exec renewal output for ${vmi} ---"
+#   echo "${output}" | tail -30
+#
+#   if localnet_multi_output_has_default_route "${output}"; then
+#     if localnet_multi_output_has_ipv6_on_localnet "${output}"; then
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=present"
+#     else
+#       localnet_multi_log_check "${vmi}" "default_route=OK ipv6_on_localnet=disabled"
+#     fi
+#     return 0
+#   fi
+#
+#   localnet_multi_log_check "${vmi}" "default_route=MISSING"
+#   return 1
+# }
+
+# verify_localnet_multi_worker_routes() {
+#   local multi_ns="$1"
+#   local vmi failures=0
+#
+#   [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]] || return 0
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     if ! verify_localnet_multi_vmi_default_route "${multi_ns}" "${vmi}"; then
+#       failures=$((failures + 1))
+#     fi
+#   done
+#
+#   if [[ ${failures} -gt 0 ]]; then
+#     echo "ERROR: ${failures} worker VMI(s) lack default route via ${LOCALNET_MULTI_PRIMARY_GATEWAY}"
+#     return 1
+#   fi
+#   return 0
+# }
+
+configure_localnet_multi_dhcp_on_nodes() {
+  local multi_ns="$1"
+  local network_count="$2"
+  local -a target_nodes=()
+  local node ovn_pod i nad_name subnet lsp_name pending
+
+  if [[ $# -ge 3 && -n "${3:-}" ]]; then
+    read -ra target_nodes <<< "${3}"
+  else
+    echo "ERROR: configure_localnet_multi_dhcp_on_nodes requires virt-launcher node list" >&2
+    return 1
+  fi
+
+  pending=0
+  for node in "${target_nodes[@]}"; do
+    [[ -z "${node}" ]] && continue
+    ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -z "${ovn_pod}" ]]; then
+      echo "WARNING: No ovnkube-node pod on node ${node}, skipping DHCP config"
+      pending=$((pending + 1))
+      continue
+    fi
+
+    for i in $(seq 1 "${network_count}"); do
+      nad_name="localnet-${i}"
+      subnet="${SUBNETS[$((i - 1))]}"
+      while IFS= read -r lsp_name; do
+        [[ -z "${lsp_name}" ]] && continue
+        if lsp_has_dhcp_configured "${ovn_pod}" "${lsp_name}"; then
+          restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
+          localnet_multi_block_ipv6_ingress "${ovn_pod}" "${lsp_name}"
+          continue
+        fi
+        if configure_localnet_multi_dhcp_on_lsp "${ovn_pod}" "${lsp_name}" "${subnet}" "${i}"; then
+          restrict_localnet_lsp_to_ipv4 "${ovn_pod}" "${lsp_name}"
+          localnet_multi_block_ipv6_ingress "${ovn_pod}" "${lsp_name}"
+          echo "  Configured DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
+        else
+          echo "  WARNING: Failed to configure DHCP for ${nad_name} (LSP=${lsp_name}, node=${node})"
+          pending=$((pending + 1))
+        fi
+      done < <(find_localnet_lsps_for_nad "${multi_ns}" "${ovn_pod}" "${nad_name}" "${subnet}")
+    done
+  done
+
+  if [[ $# -ge 3 && -n "${3:-}" ]]; then
+    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${multi_ns}" "localnet-1" "${SUBNETS[0]}" "${3}")
+  else
+    PRIMARY_CONFIGURED=0
+  fi
+  echo "localnet-multi DHCP: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured, ${pending} pending on targeted nodes"
+  [[ ${pending} -eq 0 ]]
+}
+
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_for_running_vmis_if_ready() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi phase vmi_ip renewed=0 marker
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+#     [[ "${phase}" == "Running" ]] || continue
+#     marker="${SHARED_DIR}/localnet_multi_renewed_${vmi}"
+#     [[ -f "${marker}" ]] && continue
+#     vmi_ip=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || true)
+#     [[ -n "${vmi_ip}" ]] || continue
+#     if renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
+#       touch "${marker}"
+#       renewed=$((renewed + 1))
+#     fi
+#   done
+#   [[ ${renewed} -gt 0 ]]
+# }
+
+wait_for_localnet_multi_vmis_running() {
+  local multi_ns="$1"
+  local running_count=0
+
+  echo "Waiting for localnet-multi worker VMIs to reach Running..."
+  for _ in $(seq 1 120); do
+    running_count=$(oc get vmi -n "${multi_ns}" --no-headers 2>/dev/null \
+      | awk '$3 ~ /Running/ {count++} END {print count+0}')
+    if [[ "${running_count}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${running_count} worker VMIs are Running"
+      return 0
+    fi
+    echo "Waiting for worker VMIs... (${running_count}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "WARNING: Only ${running_count}/${HYPERSHIFT_NODE_COUNT} worker VMIs running after 20 minutes"
+  return 1
+}
+
+# recover_stuck_localnet_multi_vmis re-rolls worker VMIs whose guest never
+# finished booting.
+#
+# The ignition fetch occasionally dies mid-transfer ("failed to fetch config:
+# unexpected EOF") during the narrow window in which the VM first comes up. The
+# guest then drops to emergency mode: KubeVirt still reports the VMI Running and
+# Ready, because the domain is up, but the OS never gets far enough to start the
+# qemu guest agent or kubelet, so no Node ever registers and the NodePool sits at
+# "Waiting for a Node with spec.providerID kubevirt://... to exist".
+#
+# The failure is transient — a re-rolled VM fetches the same payload without
+# trouble — so delete the VMI and let the VirtualMachine controller recreate it.
+# AgentConnected is the discriminator: it can only be True once the guest has
+# booted, which means ignition completed. VMs that are still early in boot are
+# protected by the grace period rather than being re-rolled underneath
+# themselves.
+recover_stuck_localnet_multi_vmis() {
+  local multi_ns="$1"
+  local grace_seconds="${2:-600}"
+  local vmi phase agent created age now rerolled=0
+
+  now=$(date -u +%s)
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vmi}" ]] && continue
+    phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    [[ "${phase}" == "Running" ]] || continue
+    agent=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
+    [[ "${agent}" == "True" ]] && continue
+
+    created=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
+    [[ -z "${created}" ]] && continue
+    age=$(( now - $(date -u -d "${created}" +%s 2>/dev/null || echo "${now}") ))
+    if (( age < grace_seconds )); then
+      echo "  VMI ${vmi}: no guest agent yet, ${age}s old — still within the ${grace_seconds}s grace period"
+      continue
+    fi
+
+    echo "  VMI ${vmi}: Running but no guest agent after ${age}s — re-rolling so ignition retries"
+    oc delete vmi "${vmi}" -n "${multi_ns}" --wait=false >/dev/null 2>&1 || true
+    rerolled=$((rerolled + 1))
+  done
+
+  [[ ${rerolled} -gt 0 ]] && echo "Re-rolled ${rerolled} stuck VMI(s)"
+  return 0
+}
+
+# wait_for_localnet_multi_vmis_booted waits for every worker VMI to report
+# AgentConnected, re-rolling any that get stuck, and gives up after a bounded
+# number of recovery rounds rather than looping forever.
+wait_for_localnet_multi_vmis_booted() {
+  local multi_ns="$1"
+  local max_rounds="${2:-3}"
+  local grace="${3:-600}"
+  local round attempt booted
+
+  for round in $(seq 1 "${max_rounds}"); do
+    for attempt in $(seq 1 60); do
+      booted=$(oc get vmi -n "${multi_ns}" \
+        -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="AgentConnected")].status}{"\n"}{end}' 2>/dev/null \
+        | grep -c '^True$' || true)
+      if [[ "${booted}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${booted} worker guests booted (guest agent connected)"
+        return 0
+      fi
+      if [[ $((attempt % 6)) -eq 0 ]]; then
+        echo "  ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted (round ${round}/${max_rounds}, attempt ${attempt}/60)"
+      fi
+      sleep 10
+    done
+    echo "Round ${round}: ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted; checking for stuck VMIs"
+    recover_stuck_localnet_multi_vmis "${multi_ns}" "${grace}"
+  done
+
+  echo "WARNING: only ${booted}/${HYPERSHIFT_NODE_COUNT} worker guests booted after ${max_rounds} recovery rounds"
+  return 1
+}
+
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_on_vmi() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi="$3"
+#
+#   # There is no SSH fallback.  It required a booted guest with sshd, which by
+#   # definition is not the case when ignition has not completed, and its pods
+#   # could never start: a second NAD for an OVN network that already exists is
+#   # rejected ("CNI config does not match that of network physnet"), and Multus
+#   # namespace isolation forbids referencing the original NAD from another
+#   # namespace.  See the removal commit for the full analysis.
+#   renew_localnet_multi_dhcp_via_guest_exec "${multi_ns}" "${network_count}" "${vmi}"
+# }
+
+# DISABLED with the rest of the guest-exec cluster; see the block above.
+# renew_localnet_multi_dhcp_for_running_vmis() {
+#   local multi_ns="$1"
+#   local network_count="$2"
+#   local vmi phase failures=0
+#
+#   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+#     phase=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+#     [[ "${phase}" == "Running" ]] || continue
+#     if ! renew_localnet_multi_dhcp_on_vmi "${multi_ns}" "${network_count}" "${vmi}"; then
+#       failures=$((failures + 1))
+#     fi
+#   done
+#   [[ ${failures} -eq 0 ]]
+# }
+
+ensure_localnet_multi_worker_networking() {
+  local multi_ns="$1"
+  local network_count="$2"
+  local vmi node vmi_nodes=""
+
+  IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+
+  wait_for_localnet_multi_vmis_running "${multi_ns}" || true
+
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    node=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.nodeName}' 2>/dev/null || true)
+    [[ -n "${node}" ]] && vmi_nodes="${vmi_nodes} ${node}"
+  done
+  vmi_nodes=$(echo "${vmi_nodes}" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+  echo "Ensuring OVN DHCP on worker node(s):${vmi_nodes}"
+  configure_localnet_multi_dhcp_on_nodes "${multi_ns}" "${network_count}" "${vmi_nodes}" || true
+
+  # No lease renewal here any more; see the DISABLED block near the top of this
+  # file.  With the l2bridge binding, OVN's DHCP responder is the only one on the
+  # segment and it sends the router option, so there is nothing to re-ask for.
+  # renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}" \
+  #   || echo "WARNING: DHCP renewal reported a failure on one or more worker VMIs"
+
+  # Wait for the guests to actually boot, re-rolling any that got stuck. This
+  # replaces verify_localnet_multi_worker_routes, which shelled out to
+  # "virtctl guest-exec" — not a virtctl subcommand, so it grepped the resulting
+  # error string for a route, found none and reported default_route=MISSING for
+  # every VMI whether or not anything was wrong. AgentConnected is a real signal:
+  # it requires the guest to have completed ignition and booted.
+  if ! wait_for_localnet_multi_vmis_booted "${multi_ns}"; then
+    return 1
+  fi
+  return 0
+}
+
+# patch_localnet_multi_vm_dns_policy patches VMs with dnsPolicy=None and explicit
+# nameservers so KubeVirt's bridge DHCP serves correct DNS to guest VMs.
+#
+# KubeVirt's bridge binding runs a DHCP server inside the virt-launcher pod that
+# copies DNS from the pod's /etc/resolv.conf. With the default dnsPolicy=ClusterFirst,
+# pods get the management cluster's CoreDNS (172.30.0.10), which is unreachable from
+# localnet. This DHCP server always wins the race against OVN DHCP (it's local to
+# the pod), so VMs get incorrect DNS and ignition cannot resolve the API hostname.
+#
+# Setting dnsPolicy=None with explicit nameservers ensures the pod's resolv.conf
+# (and hence KubeVirt's DHCP) provides the correct DNS server from first boot.
+patch_localnet_multi_vm_dns_policy() {
+  local ns="$1"
+  local dns_server="$2"
+  local expected_count="$3"
+  local vm current_policy patched=0
+
+  for vm in $(oc get vm -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vm}" ]] && continue
+    current_policy=$(oc get vm "${vm}" -n "${ns}" -o jsonpath='{.spec.template.spec.dnsPolicy}' 2>/dev/null || true)
+    if [[ "${current_policy}" == "None" ]]; then
+      patched=$((patched + 1))
+      continue
+    fi
+    if oc patch vm "${vm}" -n "${ns}" --type=merge -p "{
+      \"spec\": {
+        \"template\": {
+          \"spec\": {
+            \"dnsPolicy\": \"None\",
+            \"dnsConfig\": {
+              \"nameservers\": [\"${dns_server}\"]
+            }
+          }
+        }
+      }
+    }" 2>/dev/null; then
+      echo "  Patched VM ${vm} with dnsPolicy=None, DNS=${dns_server}"
+      patched=$((patched + 1))
+    fi
+  done
+  return $(( patched >= expected_count ? 0 : 1 ))
+}
+
+# Is CNV's l2bridge network binding plugin registered on this cluster?
+localnet_multi_l2bridge_available() {
+  [[ -n "$(oc get kubevirt -n openshift-cnv \
+      -o jsonpath='{.items[0].spec.configuration.network.binding.l2bridge}' 2>/dev/null)" ]]
+}
+
+# patch_localnet_multi_vm_l2bridge switches VM interfaces from KubeVirt's default
+# "bridge" binding to the l2bridge plugin, and re-rolls any VMI still running on
+# the old binding.
+#
+# With bridge binding KubeVirt moves the pod interface's address onto a bridge it
+# owns and runs its own DHCP server inside virt-launcher on a link-local address.
+# That server always beats OVN's (it is local to the pod) and it builds its reply
+# from the pod's own configuration: the address and, since the dnsPolicy=None
+# patch above, the DNS come out right, but the pod interface carries no default
+# route, so the lease has no routers option. The guest then comes up with no
+# gateway, nodeip-configuration cannot determine a node IP, kubelet never starts
+# and the node never joins.
+#
+# l2bridge (domainAttachmentType=managedTap) attaches the VM at layer 2 without
+# taking over addressing, so no DHCP server is started in the pod and the guest
+# leases directly from OVN, whose options do include router. Verified on a live
+# cluster: with bridge the guest gets server_identifier=169.254.75.10 and no
+# routers; with l2bridge it gets server_identifier=192.168.111.1 and
+# routers=192.168.111.1.
+#
+# HyperShift's KubevirtNetwork API exposes only a NAD name, so the binding cannot
+# be requested at VM-creation time and has to be patched in afterwards. Re-rolling
+# costs one extra boot per VM and must happen before OVN DHCP options are attached
+# to the logical switch ports, since a re-roll creates fresh ports.
+patch_localnet_multi_vm_l2bridge() {
+  local ns="$1"
+  local expected_count="$2"
+  local vm new_ifaces converted=0
+
+  for vm in $(oc get vm -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    [[ -z "${vm}" ]] && continue
+
+    # Already converted? No interface left carrying a "bridge" binding.
+    if [[ -z "$(oc get vm "${vm}" -n "${ns}" \
+         -o jsonpath='{.spec.template.spec.domain.devices.interfaces[?(@.bridge)].name}' 2>/dev/null)" ]]; then
+      converted=$((converted + 1))
+    else
+      new_ifaces=$(oc get vm "${vm}" -n "${ns}" -o json 2>/dev/null | python3 -c "
+import json, sys
+vm = json.load(sys.stdin)
+ifaces = vm['spec']['template']['spec']['domain']['devices']['interfaces']
+for i in ifaces:
+    i.pop('bridge', None)
+    i['binding'] = {'name': 'l2bridge'}
+print(json.dumps(ifaces))
+" 2>/dev/null) || continue
+      [[ -z "${new_ifaces}" ]] && continue
+      if oc patch vm "${vm}" -n "${ns}" --type=merge \
+           -p "{\"spec\":{\"template\":{\"spec\":{\"domain\":{\"devices\":{\"interfaces\":${new_ifaces}}}}}}}" >/dev/null 2>&1; then
+        echo "  Patched VM ${vm} interfaces to the l2bridge binding"
+        converted=$((converted + 1))
+      else
+        echo "  WARNING: failed to patch VM ${vm} to l2bridge"
+        continue
+      fi
+    fi
+
+    # Re-roll a VMI still running on the old binding so it picks up the new one.
+    if [[ -n "$(oc get vmi "${vm}" -n "${ns}" \
+         -o jsonpath='{.spec.domain.devices.interfaces[?(@.bridge)].name}' 2>/dev/null)" ]]; then
+      echo "  Re-rolling VMI ${vm} (still running with the bridge binding)"
+      oc delete vmi "${vm}" -n "${ns}" --wait=false >/dev/null 2>&1 || true
+    fi
+  done
+
+  return $(( converted >= expected_count ? 0 : 1 ))
+}
+
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
   HCP_CLI="/usr/bin/hypershift"
@@ -140,7 +1048,215 @@ fi
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CONTROL_PLANE_NAMESPACE}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
-  oc apply -f - <<EOF
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+    # Model 3: Localnet — VMs connect directly to physical network via OVN localnet.
+    # The NAD config "name" must match an existing OVN bridge-mapping on the nodes.
+    # OVN-Kubernetes automatically creates "physnet:br-ex" on all nodes, so we use
+    # "physnet" as the network name to reuse that default mapping (no NNCP needed).
+    # The "subnets" field enables OVN-managed IPAM so VMs get IPs automatically.
+    # attach-default-network=true keeps the pod network for control plane traffic
+    # (ignition, API server, konnectivity) while the localnet interface provides
+    # direct L2 connectivity for data plane features like EgressIP.
+    oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: localnet-network
+  namespace: ${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "physnet",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network",
+      "subnets": "192.168.223.0/24"
+  }'
+EOF
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}/localnet-network"
+  elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+    # Multi-Network Localnet Architecture:
+    # VMs get LOCALNET_MULTI_NETWORK_COUNT localnet interfaces with --attach-default-network=false
+    # (no pod network). enp1s0 → localnet-1 (physnet:br-ex) with default gateway and DNS.
+    # enp2s0.. → localnet-2..N (physnet2..physnetN:br-ex) without gateway.
+    # Guest OVN picks enp1s0 as br-ex (has default route) → EgressIP SNAT works natively.
+
+    ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+    NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+    LOCALNET_BRIDGE="${LOCALNET_MULTI_BRIDGE:-br-ex}"
+    LOCALNET_PHYSNET="${LOCALNET_MULTI_PHYSNET:-physnet}"
+    if [[ "${NETWORK_COUNT}" -lt 1 ]]; then
+      echo "ERROR: LOCALNET_MULTI_NETWORK_COUNT must be at least 1"
+      exit 1
+    fi
+    echo "Setting up ${NETWORK_COUNT} localnet networks (no pod network, bridge=${LOCALNET_BRIDGE}, physnet=${LOCALNET_PHYSNET})..."
+
+    # Discover OVN container names before first oc exec usage
+    if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+      # Get first ovnkube-node pod for container discovery
+      discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+      if ! discover_ovn_container_names "${discovery_pod}"; then
+        echo "ERROR: Failed to discover OVN container names" >&2
+        exit 1
+      fi
+    fi
+
+    # Parse subnets from comma-separated LOCALNET_MULTI_SUBNETS into an array.
+    # Format: "192.168.111.0/24,192.168.224.0/24,..." — first subnet gets default gateway.
+    # On baremetal dev-scripts the primary subnet must not overlap management VIPs on br-ex
+    # (ingress .4, api .5, node .20-.25, MetalLB/HC API .30-.32); default uses /24 with
+    # excludeSubnets=192.168.111.0/25 to keep IPAM in .128-.254 while making the gateway
+    # (.1) reachable in-subnet (no DHCP option 3/121 needed for first-hop connectivity).
+    IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+    if [[ ${#SUBNETS[@]} -lt ${NETWORK_COUNT} ]]; then
+      echo "ERROR: LOCALNET_MULTI_SUBNETS has ${#SUBNETS[@]} entries but LOCALNET_MULTI_NETWORK_COUNT=${NETWORK_COUNT}"
+      exit 1
+    fi
+
+    # Resolve IPv6 subnet for dual-stack localnet.
+    # "auto" discovers the management cluster's IPv6 machineNetwork and carves
+    # out the upper /121 for VM addresses.  An explicit CIDR is used as-is.
+    # Empty string means no IPv6 on localnet (IPv4-only).
+    LOCALNET_MULTI_IPV6_SUBNET_RESOLVED=""
+    if [[ "${LOCALNET_MULTI_IPV6_SUBNET:-}" == "auto" ]]; then
+      if [[ "${IP_STACK}" == "v4v6" || "${IP_STACK}" == "v6v4" ]]; then
+        LOCALNET_MULTI_IPV6_SUBNET_RESOLVED=$(discover_localnet_ipv6_subnet) || true
+        if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" ]]; then
+          echo "Auto-discovered IPv6 subnet for localnet: ${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+        else
+          echo "WARNING: Could not auto-discover IPv6 subnet; localnet will be IPv4-only"
+        fi
+      fi
+    elif [[ -n "${LOCALNET_MULTI_IPV6_SUBNET:-}" ]]; then
+      LOCALNET_MULTI_IPV6_SUBNET_RESOLVED="${LOCALNET_MULTI_IPV6_SUBNET}"
+      echo "Using explicit IPv6 subnet for localnet: ${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+    fi
+
+    # Add bridge-mappings on all nodes when using multiple localnet networks or a
+    # custom bridge/physnet.  The default physnet:br-ex exists automatically; additional
+    # names (physnet2, physnet3, ...) are needed because OVN-K doesn't support multiple
+    # NADs with different configs on the same NetConf.Name.
+    if [[ ${NETWORK_COUNT} -gt 1 || "${LOCALNET_BRIDGE}" != "br-ex" || "${LOCALNET_PHYSNET}" != "physnet" ]]; then
+      echo "Configuring bridge-mappings on all nodes (physnet=${LOCALNET_PHYSNET}, bridge=${LOCALNET_BRIDGE})..."
+      for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+          --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+        if [[ -z "${OVN_POD}" ]]; then
+          echo "WARNING: No ovnkube-node pod found on node ${NODE}, skipping"
+          continue
+        fi
+        CURRENT_MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
+          ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null | tr -d '"' || true)
+        if [[ -z "${CURRENT_MAPPINGS}" ]]; then
+          CURRENT_MAPPINGS="physnet:br-ex"
+        fi
+        NEW_MAPPINGS="${CURRENT_MAPPINGS}"
+        # Ensure the primary physnet mapping exists when using a custom bridge or physnet
+        PRIMARY_MAPPING="${LOCALNET_PHYSNET}:${LOCALNET_BRIDGE}"
+        if ! echo "${NEW_MAPPINGS}" | grep -q "${PRIMARY_MAPPING}"; then
+          NEW_MAPPINGS="${NEW_MAPPINGS},${PRIMARY_MAPPING}"
+        fi
+        for i in $(seq 2 "${NETWORK_COUNT}"); do
+          EXTRA_MAPPING="${LOCALNET_PHYSNET}${i}:${LOCALNET_BRIDGE}"
+          if ! echo "${NEW_MAPPINGS}" | grep -q "${EXTRA_MAPPING}"; then
+            NEW_MAPPINGS="${NEW_MAPPINGS},${EXTRA_MAPPING}"
+          fi
+        done
+        if [[ "${NEW_MAPPINGS}" != "${CURRENT_MAPPINGS}" ]]; then
+          oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
+            ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-mappings="${NEW_MAPPINGS}" || true
+          echo "Updated bridge-mappings on node ${NODE}: ${NEW_MAPPINGS}"
+        else
+          echo "Bridge-mappings already correct on node ${NODE}: ${CURRENT_MAPPINGS}"
+        fi
+      done
+
+      # Verify bridge-mappings on all nodes
+      echo "Verifying bridge-mappings on all nodes..."
+      for NODE in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+          --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+        MAPPINGS=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_OVS_CONTAINER}" -- \
+          ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null || true)
+        echo "  ${NODE}: ${MAPPINGS}"
+      done
+    fi
+
+    # Create localnet NADs: localnet-1 uses LOCALNET_PHYSNET, localnet-2 uses LOCALNET_PHYSNET2, etc.
+    # When LOCALNET_MULTI_DHCP_MODE=external, NADs are subnet-less (L2 passthrough):
+    # OVN-K does not assign IPs or run IPAM, so KubeVirt sees no IP on the pod interface
+    # and does not create its internal DHCP server — eliminating the DHCP race entirely.
+    # An external DHCP server (e.g. dnsmasq on the bridge) provides DHCP with correct
+    # gateway and DNS settings. SUBNETS are still parsed for logging/validation but not
+    # included in the NAD config.
+    DHCP_MODE="${LOCALNET_MULTI_DHCP_MODE:-ovn}"
+    for i in $(seq 1 "${NETWORK_COUNT}"); do
+      NAD_NAME="localnet-${i}"
+      if [[ ${i} -eq 1 ]]; then
+        PHYSNET_NAME="${LOCALNET_PHYSNET}"
+      else
+        PHYSNET_NAME="${LOCALNET_PHYSNET}${i}"
+      fi
+      SUBNET="${SUBNETS[$((i-1))]}"
+
+      if [[ "${DHCP_MODE}" == "external" ]]; then
+        oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: ${NAD_NAME}
+  namespace: ${ns}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "${PHYSNET_NAME}",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${ns}/${NAD_NAME}"
+  }'
+EOF
+        echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet-less L2 passthrough, external DHCP)"
+      else
+        EXCLUDE_SUBNETS_JSON=""
+        if [[ ${i} -eq 1 && -n "${LOCALNET_MULTI_EXCLUDE_SUBNETS:-}" ]]; then
+          EXCLUDE_SUBNETS_JSON=",\"excludeSubnets\": \"${LOCALNET_MULTI_EXCLUDE_SUBNETS}\""
+        fi
+        # For the primary localnet, add the IPv6 subnet for dual-stack.
+        NAD_SUBNETS="${SUBNET}"
+        if [[ ${i} -eq 1 && -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+          NAD_SUBNETS="${SUBNET},${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}"
+        fi
+        oc apply -f - <<EOF
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: ${NAD_NAME}
+  namespace: ${ns}
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "name": "${PHYSNET_NAME}",
+      "type": "ovn-k8s-cni-overlay",
+      "topology": "localnet",
+      "netAttachDefName": "${ns}/${NAD_NAME}",
+      "subnets": "${NAD_SUBNETS}"${EXCLUDE_SUBNETS_JSON}
+  }'
+EOF
+        if [[ -n "${EXCLUDE_SUBNETS_JSON}" ]]; then
+          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${NAD_SUBNETS}, exclude ${LOCALNET_MULTI_EXCLUDE_SUBNETS})"
+        else
+          echo "Created NAD ${NAD_NAME} (${PHYSNET_NAME}:${LOCALNET_BRIDGE}, subnet ${NAD_SUBNETS})"
+        fi
+      fi
+    done
+
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false"
+    for i in $(seq 1 "${NETWORK_COUNT}"); do
+      EXTRA_ARGS="${EXTRA_ARGS} --additional-network name:${ns}/localnet-${i}"
+    done
+  else
+    # Existing macvlan path
+    oc apply -f - <<EOF
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -159,10 +1275,11 @@ spec:
       }
   }'
 EOF
-  if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
-  else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    else
+      EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    fi
   fi
 fi
 
@@ -176,7 +1293,10 @@ if [[ $HYPERSHIFT_NP_AUTOREPAIR == "true" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --auto-repair"
 fi
 
-case "${IP_STACK}" in
+# The hosted cluster may use a different stack from the management cluster, e.g.
+# a bridged localnet that carries IPv4 only.  IP_STACK keeps describing the
+# management cluster, so only the CIDRs below follow HOSTED_IP_STACK.
+case "${HOSTED_IP_STACK:-${IP_STACK}}" in
  "v4")
    EXTRA_ARGS="${EXTRA_ARGS} --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
    ;;
@@ -236,10 +1356,361 @@ else
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
+# For localnet and localnet-multi, configure OVN DHCP BEFORE waiting for
+# Available. The VMs boot as soon as the NodePool controller creates them, which
+# is well before the control plane is Available. If DHCP options (including the
+# default gateway) are not attached to the LSPs by then, the VMs get a lease
+# with no gateway and cannot pull the MCD OS extension image — kubelet never
+# starts and the node never joins.
+#
+# When LOCALNET_MULTI_DHCP_MODE=external, OVN DHCP setup and DHCP renewal are
+# skipped entirely. The NAD is subnet-less, so KubeVirt does not create its
+# internal DHCP server (no IP on pod interface = no race). An external DHCP
+# server (e.g. dnsmasq on the bridge) provides correct gateway and DNS from
+# first boot. IPv6 blocking via OVN ACLs is still applied if needed.
+LOCALNET_MULTI_DHCP_MODE_EFFECTIVE="${LOCALNET_MULTI_DHCP_MODE:-ovn}"
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "ovn" ]]; then
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+  IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+
+  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      exit 1
+    fi
+  fi
+
+  # Patch VMs with dnsPolicy=None so KubeVirt's bridge DHCP serves correct DNS.
+  # This must happen before VMs boot — the virt-launcher pod's /etc/resolv.conf
+  # determines what DNS KubeVirt's DHCP advertises to the guest. The NodePool
+  # controller creates VMs after the control plane infrastructure is partially
+  # ready, giving us a window to patch before the first boot.
+  echo "Waiting for VMs to apply dnsPolicy=None (DNS=${LOCALNET_MULTI_PRIMARY_DNS})..."
+  for dns_attempt in $(seq 1 120); do
+    if patch_localnet_multi_vm_dns_policy "${MULTI_NAMESPACE}" "${LOCALNET_MULTI_PRIMARY_DNS}" "${HYPERSHIFT_NODE_COUNT}"; then
+      echo "All VMs patched with dnsPolicy=None and DNS=${LOCALNET_MULTI_PRIMARY_DNS} (attempt ${dns_attempt})"
+      break
+    fi
+    if [[ $((dns_attempt % 12)) -eq 0 ]]; then
+      echo "  DNS policy patching: waiting for VMs... (attempt ${dns_attempt}/120)"
+    fi
+    sleep 5
+  done
+
+  # Switch the VMs off KubeVirt's bridge binding so OVN's DHCP — which does carry
+  # a router option — is the only DHCP server the guests can see. This has to run
+  # before the DHCP options are attached to the logical switch ports below,
+  # because re-rolling a VMI creates fresh ports with no options on them.
+  if localnet_multi_l2bridge_available; then
+    echo "Switching VM interfaces to the l2bridge binding (suppresses KubeVirt's in-pod DHCP server)..."
+    for l2b_attempt in $(seq 1 60); do
+      if patch_localnet_multi_vm_l2bridge "${MULTI_NAMESPACE}" "${HYPERSHIFT_NODE_COUNT}"; then
+        echo "All VMs on the l2bridge binding (attempt ${l2b_attempt})"
+        break
+      fi
+      if [[ $((l2b_attempt % 12)) -eq 0 ]]; then
+        echo "  l2bridge patching: waiting for VMs... (attempt ${l2b_attempt}/60)"
+      fi
+      sleep 5
+    done
+  else
+    echo "WARNING: CNV l2bridge network binding not registered on this cluster;"
+    echo "         leaving the default bridge binding. KubeVirt's in-pod DHCP server"
+    echo "         will answer the guests and its lease carries no router option."
+  fi
+
+  # Poll for virt-launcher pods and configure OVN DHCP on those worker nodes before
+  # the VM's first DHCP request. Per-node ovn-nbctl works on standalone and INTERCONNECT modes.
+  echo "Waiting for virt-launcher pods so we can configure OVN DHCP before VM first boot..."
+  LAUNCHER_NODES=""
+  for attempt in $(seq 1 120); do
+    LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
+    LAUNCHER_COUNT=$(echo "${LAUNCHER_NODES}" | wc -w)
+    if [[ ${LAUNCHER_COUNT} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
+      echo "Found virt-launcher pods on ${LAUNCHER_COUNT} node(s) (attempt ${attempt})"
+      break
+    fi
+    # Keep patching VMs in case new ones appear during scaling
+    patch_localnet_multi_vm_dns_policy "${MULTI_NAMESPACE}" "${LOCALNET_MULTI_PRIMARY_DNS}" "${HYPERSHIFT_NODE_COUNT}" 2>/dev/null || true
+    echo "Waiting for virt-launcher pods... (${LAUNCHER_COUNT}/${HYPERSHIFT_NODE_COUNT} nodes, attempt ${attempt}/120)"
+    sleep 5
+  done
+
+  if [[ -z "${LAUNCHER_NODES// }" ]]; then
+    echo "ERROR: No virt-launcher pods found after 10 minutes; cannot configure localnet-multi OVN DHCP" >&2
+    exit 1
+  fi
+
+  echo "Configuring early OVN DHCP for multi (${NETWORK_COUNT})-localnet interfaces on nodes:${LAUNCHER_NODES}"
+
+  # When dual-stack is enabled, add the missing br-ex IPv6 NORMAL flow so kernel
+  # responses (Ingress VIP SYN-ACKs) can reach localnet VMs.  Re-applied
+  # periodically below because OVN-K may reconcile br-ex flows.
+  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+    echo "Applying br-ex IPv6 flow fix for dual-stack localnet (${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED})..."
+    ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+  fi
+
+  for attempt in $(seq 1 120); do
+    LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
+    if [[ -z "${LAUNCHER_NODES// }" ]]; then
+      echo "WARNING: virt-launcher pods disappeared during early DHCP setup (attempt ${attempt})"
+      sleep 5
+      continue
+    fi
+
+    configure_localnet_multi_dhcp_on_nodes "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" "${LAUNCHER_NODES}" || true
+
+    PRIMARY_CONFIGURED=$(count_configured_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "localnet-1" "${SUBNETS[0]}" "${LAUNCHER_NODES}")
+
+    if [[ ${PRIMARY_CONFIGURED} -ge ${HYPERSHIFT_NODE_COUNT} ]] \
+      && localnet_multi_launcher_nodes_have_ovn "${LAUNCHER_NODES}"; then
+      echo "Early OVN DHCP configuration complete for multi (${NETWORK_COUNT})-localnet interfaces"
+      # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+      break
+    fi
+
+    # Best-effort DHCP renewal used to run here; disabled with the rest of the
+    # guest-exec cluster (see the DISABLED block near the top of this file).
+    # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+
+    echo "Attempt ${attempt}/120: ${PRIMARY_CONFIGURED}/${HYPERSHIFT_NODE_COUNT} primary LSPs configured on virt-launcher node(s)"
+    if [[ ${attempt} -eq 120 ]]; then
+      echo "ERROR: Failed to configure DHCP on all worker localnet LSPs after 10 minutes" >&2
+      exit 1
+    fi
+    sleep 5
+  done
+elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "external" ]]; then
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  LAUNCHER_NODES=""
+  echo "DHCP mode: external — skipping OVN DHCP setup (dnsmasq on bridge provides DHCP)"
+  echo "Waiting for virt-launcher pods to verify VM scheduling..."
+  for attempt in $(seq 1 120); do
+    LAUNCHER_NODES=$(get_localnet_multi_launcher_nodes "${MULTI_NAMESPACE}")
+    LAUNCHER_COUNT=$(echo "${LAUNCHER_NODES}" | wc -w)
+    if [[ ${LAUNCHER_COUNT} -ge ${HYPERSHIFT_NODE_COUNT} ]]; then
+      echo "Found virt-launcher pods on ${LAUNCHER_COUNT} node(s) (attempt ${attempt})"
+      break
+    fi
+    echo "Waiting for virt-launcher pods... (${LAUNCHER_COUNT}/${HYPERSHIFT_NODE_COUNT} nodes, attempt ${attempt}/120)"
+    sleep 5
+  done
+  if [[ -z "${LAUNCHER_NODES// }" ]]; then
+    echo "WARNING: No virt-launcher pods found after 10 minutes" >&2
+  fi
+
+  # When dual-stack is enabled, add the br-ex IPv6 flow fix.
+  if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]]; then
+    echo "Applying br-ex IPv6 flow fix for dual-stack localnet (${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED})..."
+    ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+  fi
+
+  # Even with external DHCP, block IPv6 ingress on localnet LSPs in dual-stack
+  # environments to prevent VMs from getting DHCPv6 leases from the management
+  # cluster's dnsmasq/radvd, which would cause Ignition to resolve the IPv6
+  # ingress VIP and time out.
+  if localnet_multi_should_disable_ipv6_boot; then
+    echo "Blocking IPv6 ingress on localnet LSPs for dual-stack bootstrap safety..."
+    if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+      discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+      discover_ovn_container_names "${discovery_pod}" || true
+    fi
+    if [[ -n "${OVN_NBDB_CONTAINER:-}" ]]; then
+      IFS=',' read -ra SUBNETS <<< "${LOCALNET_MULTI_SUBNETS}"
+      NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+      for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
+        ovn_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+          --field-selector "spec.nodeName=${node}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        [[ -z "${ovn_pod}" ]] && continue
+        for i in $(seq 1 "${NETWORK_COUNT}"); do
+          nad_name="localnet-${i}"
+          subnet="${SUBNETS[$((i - 1))]}"
+          while IFS= read -r lsp_name; do
+            [[ -z "${lsp_name}" ]] && continue
+            localnet_multi_block_ipv6_ingress "${ovn_pod}" "${lsp_name}"
+          done < <(find_localnet_lsps_for_nad "${MULTI_NAMESPACE}" "${ovn_pod}" "${nad_name}" "${subnet}")
+        done
+      done
+    fi
+  fi
+fi
+
 echo "Waiting for cluster to become available"
-oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "ovn" ]]; then
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  NETWORK_COUNT="${LOCALNET_MULTI_NETWORK_COUNT:-2}"
+  for attempt in $(seq 1 360); do
+    # renew_localnet_multi_dhcp_for_running_vmis_if_ready "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || true
+    # Re-apply br-ex IPv6 flow every ~60s in case OVN-K reconciled it away.
+    if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && [[ $((attempt % 12)) -eq 0 ]]; then
+      ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+    fi
+    if oc get hostedcluster "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
+      echo "HostedCluster became Available (attempt ${attempt})"
+      break
+    fi
+    if [[ ${attempt} -eq 360 ]]; then
+      echo "ERROR: HostedCluster did not become Available within 30 minutes"
+      exit 1
+    fi
+    sleep 5
+  done
+elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "external" ]]; then
+  # With external DHCP, VMs get correct settings from first boot — no renewal needed.
+  # Just wait for HC Available with periodic status logging.
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  for attempt in $(seq 1 360); do
+    # Re-apply br-ex IPv6 flow every ~60s in case OVN-K reconciled it away.
+    if [[ -n "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED:-}" ]] && [[ $((attempt % 12)) -eq 0 ]]; then
+      ensure_brex_ipv6_localnet_flow "${LOCALNET_MULTI_IPV6_SUBNET_RESOLVED}" || true
+    fi
+    if oc get hostedcluster "${CLUSTER_NAME}" -n "${CLUSTER_NAMESPACE_PREFIX}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null | grep -q True; then
+      echo "HostedCluster became Available (attempt ${attempt})"
+      break
+    fi
+    if [[ $((attempt % 60)) -eq 0 ]]; then
+      echo "Still waiting for HostedCluster Available... (attempt ${attempt}/360)"
+      RUNNING_VMIS=$(oc get vmi -n "${MULTI_NAMESPACE}" --no-headers 2>/dev/null \
+        | awk '$3 ~ /Running/ {count++} END {print count+0}')
+      echo "  Running VMIs: ${RUNNING_VMIS}/${HYPERSHIFT_NODE_COUNT}"
+    fi
+    if [[ ${attempt} -eq 360 ]]; then
+      echo "ERROR: HostedCluster did not become Available within 30 minutes"
+      exit 1
+    fi
+    sleep 5
+  done
+else
+  oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
+fi
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "ovn" ]]; then
+  # After HC is Available and VMIs are Running, configure OVN DHCP on each worker node
+  # and renew leases so enp1s0 gets the default gateway (no pod network fallback).
+  ensure_localnet_multi_worker_networking "${MULTI_NAMESPACE}" "${NETWORK_COUNT}" || {
+    echo "ERROR: post-Available localnet-multi worker networking verification failed" >&2
+    exit 1
+  }
+elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "external" ]]; then
+  # With external DHCP the VMs should already have correct networking, so just
+  # confirm the guests booted, re-rolling any left in emergency mode by a
+  # transient ignition failure.
+  MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  echo "Verifying worker VMI networking (external DHCP mode)..."
+  if [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]]; then
+    wait_for_localnet_multi_vmis_booted "${MULTI_NAMESPACE}" || {
+      echo "WARNING: not all worker guests booted; the NodePool will be short of nodes" >&2
+    }
+  fi
+fi
+
+# OVN-Kubernetes assigns IPs to localnet ports via IPAM but does not create
+# DHCP_Options entries, so the VMs never receive the assigned IP via DHCP.
+# This block creates DHCP options in each per-node nbdb and attaches them to
+# the localnet logical switch ports so that OVN's built-in DHCP responder
+# hands out the IPs to the VMs.
+if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
+  LOCALNET_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  LOCALNET_SUBNET="192.168.223.0/24"
+
+  # Discover OVN container names before first oc exec usage
+  if [[ -z "${OVN_OVS_CONTAINER:-}" ]]; then
+    # Get first ovnkube-node pod for container discovery
+    discovery_pod=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}')
+    if ! discover_ovn_container_names "${discovery_pod}"; then
+      echo "ERROR: Failed to discover OVN container names" >&2
+      exit 1
+    fi
+  fi
+
+  echo "Waiting for VMIs to be running..."
+  for _ in $(seq 1 60); do
+    RUNNING_COUNT=$(oc get vmi -n "${LOCALNET_NAMESPACE}" --no-headers 2>/dev/null \
+      | grep -c Running || true)
+    if [[ "${RUNNING_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+      echo "All ${RUNNING_COUNT} VMIs are running"
+      break
+    fi
+    echo "Waiting for VMIs... (${RUNNING_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+    sleep 10
+  done
+
+  echo "Configuring OVN DHCP for localnet interfaces..."
+  for VMI in $(oc get vmi -n "${LOCALNET_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    NODE=$(oc get vmi -n "${LOCALNET_NAMESPACE}" "${VMI}" -o jsonpath='{.status.nodeName}')
+    OVN_POD=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${NODE}" -o jsonpath='{.items[0].metadata.name}')
+
+    LSP_NAME=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl --columns=name --bare find Logical_Switch_Port \
+      "external_ids:k8s.ovn.org/topology=localnet" 2>/dev/null)
+
+    if [[ -z "${LSP_NAME}" ]]; then
+      echo "WARNING: No localnet LSP found on node ${NODE} for VMI ${VMI}"
+      continue
+    fi
+
+    DHCP_UUID=$(oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl create DHCP_Options cidr="${LOCALNET_SUBNET}" \
+      options='"lease_time"="3500" "router"="192.168.223.1" "server_id"="192.168.223.1" "server_mac"="c0:ff:ee:00:00:01"' \
+      2>/dev/null)
+
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl lsp-set-dhcpv4-options "${LSP_NAME}" "${DHCP_UUID}" 2>/dev/null
+
+    # Clear port security on the VM's localnet port so EgressIP-SNATed packets
+    # can exit the management cluster's OVN. Without this, OVN drops packets
+    # whose source IP is the EgressIP (not the VM's assigned localnet IP).
+    oc exec -n openshift-ovn-kubernetes "${OVN_POD}" -c "${OVN_NBDB_CONTAINER}" -- \
+      ovn-nbctl clear Logical_Switch_Port "${LSP_NAME}" port_security 2>/dev/null
+
+    echo "Configured DHCP and cleared port security for VMI ${VMI} on node ${NODE}"
+  done
+  echo "OVN DHCP and port security configuration complete for localnet interfaces"
+
+  # Enable IP forwarding on enp2s0 (the secondary/localnet NIC) inside each
+  # hosted cluster VM. OVN multi-NIC EgressIP uses iptables SNAT to change the
+  # source IP on enp2s0, but the de-SNATed return traffic needs to be forwarded
+  # from enp2s0 back to ovn-k8s-mp0. Without forwarding enabled on enp2s0,
+  # these return packets are silently dropped by the kernel.
+  # OVN-Kubernetes only enables forwarding on interfaces it manages (br-ex,
+  # ovn-k8s-mp0) but not on the secondary NIC.
+  NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  if [[ -f "${NESTED_KUBECONFIG}" ]]; then
+    echo "Waiting for OVN node pods to be ready in hosted cluster..."
+    for _ in $(seq 1 60); do
+      OVN_READY_COUNT=$(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+        -l app=ovnkube-node --no-headers 2>/dev/null | grep -c Running || true)
+      if [[ "${OVN_READY_COUNT}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${OVN_READY_COUNT} OVN node pods are running"
+        break
+      fi
+      echo "Waiting for OVN node pods... (${OVN_READY_COUNT}/${HYPERSHIFT_NODE_COUNT} running)"
+      sleep 10
+    done
+
+    echo "Enabling IP forwarding on enp2s0 for all hosted cluster nodes..."
+    for OVN_NODE_POD in $(KUBECONFIG="${NESTED_KUBECONFIG}" oc get pods -n openshift-ovn-kubernetes \
+      -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+      KUBECONFIG="${NESTED_KUBECONFIG}" oc exec -n openshift-ovn-kubernetes "${OVN_NODE_POD}" \
+        -c "${OVN_OVS_CONTAINER}" -- sysctl -w net.ipv4.conf.enp2s0.forwarding=1 2>/dev/null || true
+      echo "Enabled enp2s0 forwarding on ${OVN_NODE_POD}"
+    done
+    echo "IP forwarding configuration complete for hosted cluster nodes"
+  else
+    echo "WARNING: Nested kubeconfig not found at ${NESTED_KUBECONFIG}, skipping enp2s0 forwarding setup"
+  fi
+
+  # localnet-multi needs nothing here: OVN DHCP and the l2bridge switch run in
+  # ensure_localnet_multi_worker_networking above.
+fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 

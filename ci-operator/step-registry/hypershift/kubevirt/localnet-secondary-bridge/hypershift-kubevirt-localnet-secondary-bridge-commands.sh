@@ -1,0 +1,534 @@
+#!/bin/bash
+
+set -euo pipefail
+
+echo "************ hypershift-kubevirt localnet secondary bridge ************"
+
+LOCALNET_SECONDARY_SUBNET="${LOCALNET_SECONDARY_SUBNET:?LOCALNET_SECONDARY_SUBNET is required}"
+LOCALNET_SECONDARY_BRIDGE="${LOCALNET_SECONDARY_BRIDGE:-br-localnet}"
+LOCALNET_SECONDARY_PHYSNET="${LOCALNET_SECONDARY_PHYSNET:-physnet-localnet}"
+ENABLE_FORWARDING="${LOCALNET_SECONDARY_ENABLE_FORWARDING:-true}"
+
+subnet_base="${LOCALNET_SECONDARY_SUBNET%%/*}"
+subnet_prefix="${subnet_base%.*}."
+escaped_prefix=$(printf '%s' "${subnet_prefix}" | sed 's/\./\\./g')
+
+echo "Secondary subnet:  ${LOCALNET_SECONDARY_SUBNET}"
+echo "Interface prefix:  ${subnet_prefix}*"
+echo "OVS bridge:        ${LOCALNET_SECONDARY_BRIDGE}"
+echo "OVN physnet:       ${LOCALNET_SECONDARY_PHYSNET}"
+echo "Global forwarding: ${ENABLE_FORWARDING}"
+
+# How long to wait for the API after the ipForwarding patch.  Must leave room
+# inside the ref's timeout for diagnostics and the bridge work that follows.
+API_WAIT_MINUTES=40
+
+# Report on an API outage without using the API.  Every oc-based check returns
+# nothing in exactly the situation that triggers this, so probe the
+# provisioning host first: a broken resolver or VIP there is invisible from
+# inside the CI pod and has taken this step out before.
+collect_api_outage_diagnostics() {
+  local server api_host
+  server=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+  api_host=${server#*://}
+  api_host=${api_host%%:*}
+  echo "=== API endpoint: ${server:-unknown} ==="
+
+  if [[ -n "${api_host}" && -f "${SHARED_DIR}/packet-conf.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+    echo "=== provisioning host (API-independent) ==="
+    timeout 180 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${api_host}" "${server}" <<'HOSTDIAG' || echo "host-side diagnostics failed"
+api_host="${1}"; server="${2}"
+echo "--- resolve ${api_host}"
+getent hosts "${api_host}" || echo "does not resolve"
+echo "--- dnsmasq"
+systemctl is-active dnsmasq 2>/dev/null || true
+pgrep -a dnsmasq | head -5 || echo "no dnsmasq running"
+echo "--- NetworkManager dnsmasq config"
+cat /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf 2>/dev/null || echo "absent"
+echo "--- ${server}/readyz"
+curl -sk -m 10 -o /dev/null -w 'http_code=%{http_code}\n' "${server}/readyz" || echo "unreachable"
+echo "--- libvirt networks"
+virsh net-list --all 2>/dev/null || true
+HOSTDIAG
+  else
+    echo "packet-conf.sh unavailable; skipping host-side checks"
+  fi
+
+  echo "=== cluster-side (best effort, expected empty if the API is down) ==="
+  oc get mcp -o wide --request-timeout=15s || true
+  oc get nodes -o wide --request-timeout=15s || true
+  oc -n openshift-etcd logs -l app=etcd -c etcd --tail=20 --request-timeout=15s || true
+  oc -n openshift-apiserver logs -l app=openshift-apiserver --tail=20 --request-timeout=15s || true
+  oc -n openshift-machine-config-operator logs -l k8s-app=machine-config-controller --tail=20 --request-timeout=15s || true
+}
+
+# ---------------------------------------------------------------------------
+# Enable global IP forwarding so management nodes route between the secondary
+# network and the primary (management) network.
+# ---------------------------------------------------------------------------
+if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
+  current_fwd=$(oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.ipForwarding}' 2>/dev/null || true)
+  if [[ "${current_fwd}" != "Global" ]]; then
+    echo ""
+    echo "Enabling global IP forwarding (current: ${current_fwd:-Restricted})..."
+
+    echo "Pre-patch state:"
+    oc get mcp -o wide
+    oc get nodes -o wide
+    
+    oc patch network.operator cluster --type=merge \
+      -p '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+    echo "Network patch applied. Waiting for the API to stay reachable..."
+    sleep 30
+
+    # Budget against a wall-clock deadline rather than an attempt count.  Each
+    # probe costs its own request timeout on top of the sleep, so a fixed count
+    # drifts well past what it claims: 120 attempts measured ~33s each, i.e. 67
+    # minutes against this ref's 60m timeout, which meant the step was always
+    # SIGKILLed before it could report anything.  Leave enough of the timeout
+    # for the diagnostics below and the remaining work to run.
+    api_ready=false
+    _probe=0
+    api_deadline=$(( SECONDS + API_WAIT_MINUTES * 60 ))
+    while (( SECONDS < api_deadline )); do
+      if oc get nodes --request-timeout=10s &>/dev/null; then
+        api_ready=true
+        break
+      fi
+      _probe=$(( _probe + 1 ))
+      if (( _probe % 3 == 0 )); then
+        mcp_status=$(oc get mcp --request-timeout=10s -o jsonpath='{range .items[*]}{.metadata.name}{":"}{.status.conditions[?(@.type=="Updated")].status}{" "}{end}' 2>/dev/null || echo "unreachable")
+        echo "  API not ready, $(( (api_deadline - SECONDS) / 60 ))m of budget left, MCP: ${mcp_status}"
+      else
+        echo "  API not ready, $(( (api_deadline - SECONDS) / 60 ))m of budget left"
+      fi
+      sleep 20
+    done
+
+    if [[ "${api_ready}" != "true" ]]; then
+      echo "ERROR: API did not recover within ${API_WAIT_MINUTES} minutes of the ipForwarding patch."
+      collect_api_outage_diagnostics
+      exit 1
+    fi
+
+    echo "API reachable again after ${_probe} failed probes"
+    # ipForwarding is a CNO setting: it re-renders ovnkube-config and rolls the
+    # ovnkube-node DaemonSet, it does not generate a MachineConfig.  Wait for
+    # the ovnkube-node DaemonSet to complete its rollout so all pods have
+    # consistent generations and container layouts.
+    echo "Waiting for ovnkube-node DaemonSet rollout to complete..."
+    oc wait -n openshift-ovn-kubernetes daemonset/ovnkube-node \
+      --for=condition=Progressing=False --timeout=10m
+    # Verify all desired pods are actually updated (generation matches)
+    _ovn_deadline=$(( SECONDS + 5 * 60 ))
+    while (( SECONDS < _ovn_deadline )); do
+      _updated=$(oc get daemonset -n openshift-ovn-kubernetes ovnkube-node \
+        -o jsonpath='{.status.updatedNumberScheduled}/{.status.desiredNumberScheduled}')
+      _ready=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node \
+        --field-selector status.phase=Running -o jsonpath='{.items | length}')
+      if [[ "${_updated}" == "${_updated%/*}/${_updated%/*}" ]] && \
+         [[ "${_ready}" == "${_updated%/*}" ]]; then
+        echo "ovnkube-node DaemonSet converged: ${_updated} pods updated, ${_ready} running"
+        break
+      fi
+      echo "  Waiting for rollout convergence: ${_updated} updated, ${_ready} running"
+      sleep 10
+    done
+    echo "Global IP forwarding enabled"
+  else
+    echo "Global IP forwarding already enabled"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Per-node: discover container names and configure secondary network.
+# ---------------------------------------------------------------------------
+namespace="openshift-ovn-kubernetes"
+
+# Helper to discover containers in a pod
+discover_containers_in_pod() {
+  local pod_name="$1"
+  local containers
+
+  containers=$(oc get pod -n "${namespace}" "${pod_name}" \
+    -o jsonpath='{.spec.containers[*].name}')
+
+  local ovs_container=""
+  for c in ovs-daemons ovnkube-node ovnkube-controller; do
+    if [[ " ${containers} " == *" ${c} "* ]] && \
+       oc exec -n "${namespace}" "${pod_name}" -c "${c}" -- \
+         which ovs-vsctl >/dev/null 2>&1; then
+      ovs_container="${c}"
+      break
+    fi
+  done
+
+  if [[ -z "${ovs_container}" ]]; then
+    echo "ERROR: could not find container with ovs-vsctl in pod ${pod_name}" >&2
+    return 1
+  fi
+
+  local net_container=""
+  for c in ovnkube-controller ovnkube-node; do
+    if [[ " ${containers} " == *" ${c} "* ]] && \
+       oc exec -n "${namespace}" "${pod_name}" -c "${c}" -- \
+         bash -c "ip -V" >/dev/null 2>&1; then
+      net_container="${c}"
+      break
+    fi
+  done
+
+  if [[ -z "${net_container}" ]]; then
+    net_container="${ovs_container}"
+  fi
+
+  echo "${ovs_container}:${net_container}"
+}
+
+# ---------------------------------------------------------------------------
+# On each node: discover the secondary NIC, create an OVS bridge, attach the
+# NIC, move the IP to the bridge, and add the bridge-mapping.
+# Iterate by node and look up the current ovnkube-node pod for each node to
+# avoid stale pod references after MCP rolling restarts.
+# ---------------------------------------------------------------------------
+readarray -t nodes < <(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
+for node_name in "${nodes[@]}"; do
+  # Look up the current ovnkube-node pod on this node, with retry in case
+  # the pod is being replaced after MCP rollout.
+  pod_name=""
+  for attempt in 1 2 3 4 5; do
+    pod_name=$(oc get pods -n "${namespace}" -l app=ovnkube-node \
+      --field-selector "spec.nodeName=${node_name},status.phase=Running" \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [[ -n "${pod_name}" ]]; then
+      break
+    fi
+    echo "  waiting for ovnkube-node pod on ${node_name} (attempt ${attempt}/5)..."
+    sleep 10
+  done
+  if [[ -z "${pod_name}" ]]; then
+    echo "  WARNING: no running ovnkube-node pod found on ${node_name}, skipping"
+    continue
+  fi
+  echo ""
+  echo "=== ${node_name} (${pod_name}) ==="
+
+  # Discover container names in this pod (may differ from other pods post-rollout)
+  containers_result=$(discover_containers_in_pod "${pod_name}") || continue
+  OVS_CONTAINER="${containers_result%:*}"
+  NET_CONTAINER="${containers_result#*:}"
+  echo "  Containers: OVS=${OVS_CONTAINER}, Net=${NET_CONTAINER}"
+
+  # Discover the secondary interface by matching the extra-network subnet.
+  secondary_record=$(oc exec -n "${namespace}" "${pod_name}" -c "${NET_CONTAINER}" -- \
+    bash -c "ip -o -4 addr show scope global | awk '\$4 ~ /^${escaped_prefix}/ {print \$2, \$4; exit}'" 2>/dev/null || true)
+  if [[ -z "${secondary_record}" ]]; then
+    echo "  WARNING: no interface matching ${subnet_prefix}* found, skipping"
+    continue
+  fi
+
+  secondary_iface=$(echo "${secondary_record}" | awk '{print $1}')
+  secondary_cidr=$(echo "${secondary_record}" | awk '{print $2}')
+  echo "  secondary NIC: ${secondary_iface} (${secondary_cidr})"
+
+  # Create OVS bridge if it doesn't already exist.
+  if oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+      ovs-vsctl br-exists "${LOCALNET_SECONDARY_BRIDGE}" 2>/dev/null; then
+    echo "  bridge ${LOCALNET_SECONDARY_BRIDGE} already exists"
+  else
+    echo "  creating bridge ${LOCALNET_SECONDARY_BRIDGE}"
+    oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+      ovs-vsctl --may-exist add-br "${LOCALNET_SECONDARY_BRIDGE}"
+  fi
+
+  # Attach the secondary NIC to the bridge.
+  if oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+      ovs-vsctl list-ports "${LOCALNET_SECONDARY_BRIDGE}" 2>/dev/null | grep -qx "${secondary_iface}"; then
+    echo "  ${secondary_iface} already on ${LOCALNET_SECONDARY_BRIDGE}"
+  else
+    echo "  attaching ${secondary_iface} to ${LOCALNET_SECONDARY_BRIDGE}"
+    oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+      ovs-vsctl --may-exist add-port "${LOCALNET_SECONDARY_BRIDGE}" "${secondary_iface}"
+  fi
+
+  # Move the IP from the NIC to the bridge so the node keeps L3 reachability.
+  has_ip_on_bridge=$(oc exec -n "${namespace}" "${pod_name}" -c "${NET_CONTAINER}" -- \
+    bash -c "ip -o -4 addr show dev ${LOCALNET_SECONDARY_BRIDGE} 2>/dev/null | awk '\$4 ~ /^${escaped_prefix}/ {print \$4; exit}'" 2>/dev/null || true)
+  if [[ -n "${has_ip_on_bridge}" ]]; then
+    echo "  bridge already has IP ${has_ip_on_bridge}"
+  else
+    echo "  moving IP ${secondary_cidr} from ${secondary_iface} to ${LOCALNET_SECONDARY_BRIDGE}"
+    oc exec -n "${namespace}" "${pod_name}" -c "${NET_CONTAINER}" -- \
+      bash -c "
+        ip addr del ${secondary_cidr} dev ${secondary_iface} 2>/dev/null || true
+        ip addr add ${secondary_cidr} dev ${LOCALNET_SECONDARY_BRIDGE} 2>/dev/null || true
+        ip link set ${LOCALNET_SECONDARY_BRIDGE} up
+      "
+  fi
+
+  # Add bridge-mapping.
+  current_mappings=$(oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+    ovs-vsctl get Open_vSwitch . external-ids:ovn-bridge-mappings 2>/dev/null | tr -d '"' || true)
+  if [[ -z "${current_mappings}" ]]; then
+    current_mappings="physnet:br-ex"
+  fi
+  desired="${LOCALNET_SECONDARY_PHYSNET}:${LOCALNET_SECONDARY_BRIDGE}"
+  if echo "${current_mappings}" | grep -q "${desired}"; then
+    echo "  bridge-mapping already has ${desired}"
+  else
+    new_mappings="${current_mappings},${desired}"
+    oc exec -n "${namespace}" "${pod_name}" -c "${OVS_CONTAINER}" -- \
+      ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-mappings="${new_mappings}"
+    echo "  bridge-mappings: ${new_mappings}"
+  fi
+done
+
+echo ""
+echo "Secondary localnet bridge setup complete"
+echo "  bridge:  ${LOCALNET_SECONDARY_BRIDGE}"
+echo "  physnet: ${LOCALNET_SECONDARY_PHYSNET}"
+
+# ---------------------------------------------------------------------------
+# Cross-subnet routing: each management node routes traffic between the
+# secondary network (e.g. 192.168.221.0/24 on br-localnet) and the primary
+# management network (e.g. 192.168.111.0/24 on br-ex).  The hypervisor
+# (libvirt host) does NOT forward between its bridges, so each node acts as
+# its own gateway.
+#
+# Required fixes:
+# 1. rp_filter=2 (loose) — strict reverse-path filtering drops packets from
+#    the secondary subnet arriving on br-ex because the reverse route goes
+#    via the secondary bridge.
+# 2. MASQUERADE — source-NAT traffic from the secondary subnet going out
+#    br-ex.  Return traffic then arrives back at this node.
+# ---------------------------------------------------------------------------
+if [[ "${ENABLE_FORWARDING}" == "true" ]]; then
+  echo ""
+  echo "Configuring cross-subnet routing on each node..."
+
+  routing_setup_b64=$(base64 -w0 <<'ROUTING_SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+bridge="$1"
+subnet="$2"
+
+sysctl -w "net.ipv4.conf.br-ex.rp_filter=2" >/dev/null
+sysctl -w "net.ipv4.conf.${bridge}.rp_filter=2" >/dev/null
+sysctl -w "net.ipv4.conf.all.rp_filter=0" >/dev/null
+echo "  rp_filter: loose mode on br-ex and ${bridge}"
+
+if ! iptables -t nat -C POSTROUTING -s "${subnet}" -o br-ex -j MASQUERADE 2>/dev/null; then
+  iptables -t nat -A POSTROUTING -s "${subnet}" -o br-ex -j MASQUERADE
+  echo "  MASQUERADE: added ${subnet} -> br-ex"
+else
+  echo "  MASQUERADE: rule already exists"
+fi
+ROUTING_SCRIPT_EOF
+  )
+
+  for node_name in "${nodes[@]}"; do
+    echo "  ${node_name}:"
+    routing_ok=false
+    for attempt in 1 2 3; do
+      if oc debug "node/${node_name}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${routing_setup_b64}' | base64 -d | bash -s -- '${LOCALNET_SECONDARY_BRIDGE}' '${LOCALNET_SECONDARY_SUBNET}'"
+      then
+        routing_ok=true
+        break
+      fi
+      echo "    oc debug failed (attempt ${attempt}/3), retrying..." >&2
+      sleep 5
+    done
+    if [[ "${routing_ok}" != "true" ]]; then
+      echo "WARNING: routing setup failed on ${node_name}" >&2
+    fi
+  done
+  echo "Cross-subnet routing configured"
+fi
+
+# ---------------------------------------------------------------------------
+# When LOCALNET_SECONDARY_DNSMASQ_ENABLED=true, deploy dnsmasq on br-localnet
+# on each management node to provide DHCP to guest VMs.
+#
+# With subnet-less NADs (LOCALNET_MULTI_DHCP_MODE=external in the create step),
+# KubeVirt does not run its internal DHCP server because the pod interface has
+# no IP. An external DHCP source is required. Each node runs its own dnsmasq
+# instance with a partitioned DHCP range to avoid IP conflicts on the shared L2
+# segment (all nodes' secondary NICs share the same libvirt network).
+# ---------------------------------------------------------------------------
+if [[ "${LOCALNET_SECONDARY_DNSMASQ_ENABLED:-false}" == "true" ]]; then
+  echo ""
+  echo "Setting up dnsmasq on ${LOCALNET_SECONDARY_BRIDGE} on each node..."
+
+  DNSMASQ_GATEWAY="${LOCALNET_SECONDARY_DNSMASQ_GATEWAY:-auto}"
+  DNSMASQ_DNS="${LOCALNET_SECONDARY_DNSMASQ_DNS:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_RANGE_START="${LOCALNET_SECONDARY_DNSMASQ_RANGE_START:?required when DNSMASQ_ENABLED=true}"
+  DNSMASQ_RANGE_END="${LOCALNET_SECONDARY_DNSMASQ_RANGE_END:?required when DNSMASQ_ENABLED=true}"
+
+  ip_to_int() {
+    local IFS='.'
+    read -r a b c d <<< "$1"
+    echo $(( a * 16777216 + b * 65536 + c * 256 + d ))
+  }
+  int_to_ip() {
+    local n=$1
+    echo "$(( (n >> 24) & 255 )).$(( (n >> 16) & 255 )).$(( (n >> 8) & 255 )).$(( n & 255 ))"
+  }
+
+  start_int=$(ip_to_int "${DNSMASQ_RANGE_START}")
+  end_int=$(ip_to_int "${DNSMASQ_RANGE_END}")
+  node_count=${#nodes[@]}
+  total_ips=$(( end_int - start_int + 1 ))
+  range_per_node=$(( total_ips / node_count ))
+
+  echo "  DHCP gateway:    ${DNSMASQ_GATEWAY}"
+  echo "  DHCP DNS:        ${DNSMASQ_DNS}"
+  echo "  DHCP pool:       ${DNSMASQ_RANGE_START} - ${DNSMASQ_RANGE_END} (${total_ips} IPs)"
+  echo "  Nodes:           ${node_count} (${range_per_node} IPs/node)"
+
+  # Base64-encoded setup script run inside chroot /host on each node.
+  # Configures dnsmasq as a systemd service that provides DHCP-only (port=0)
+  # on the secondary OVS bridge.  Also blocks the hypervisor's competing DHCP
+  # server via an OVS flow rule and auto-detects the gateway when set to "auto".
+  dnsmasq_setup_b64=$(base64 -w0 <<'DNSMASQ_SCRIPT_EOF'
+#!/bin/bash
+set -euo pipefail
+bridge="$1"
+range_start="$2"
+range_end="$3"
+gateway="$4"
+dns_server="$5"
+conf="/etc/dnsmasq.d/localnet-secondary.conf"
+pidfile="/run/localnet-secondary-dnsmasq.pid"
+unit="/etc/systemd/system/localnet-secondary-dnsmasq.service"
+
+if ! ip link show "${bridge}" &>/dev/null; then
+  echo "Bridge ${bridge} not present on this node; skipping dnsmasq"
+  exit 0
+fi
+
+# Auto-detect gateway: use the node's own bridge IP.  Traffic to management
+# VIPs (API, ingress) is delivered locally via the kernel's local routing
+# table; other management-network traffic goes via br-ex with MASQUERADE.
+if [[ "${gateway}" == "auto" ]]; then
+  gateway=$(ip -o -4 addr show dev "${bridge}" 2>/dev/null \
+    | awk '{print $4}' | cut -d/ -f1 | head -1)
+  if [[ -z "${gateway}" ]]; then
+    echo "ERROR: could not auto-detect gateway on ${bridge}"
+    exit 1
+  fi
+  echo "Auto-detected gateway: ${gateway}"
+fi
+
+# Block competing DHCP from the hypervisor's dnsmasq / libvirt by dropping
+# DHCP server responses (UDP src=67 dst=68) arriving from the physical NIC
+# port on the OVS bridge.  Management nodes have static IPs, so this only
+# prevents the hypervisor from racing with our dnsmasq for guest VM DHCP.
+nic_port=$(ovs-vsctl list-ports "${bridge}" 2>/dev/null | head -1)
+if [[ -n "${nic_port}" ]]; then
+  nic_ofport=$(ovs-vsctl get Interface "${nic_port}" ofport 2>/dev/null || echo "")
+  if [[ -n "${nic_ofport}" && "${nic_ofport}" != "-1" ]]; then
+    ovs-ofctl add-flow "${bridge}" \
+      "priority=100,udp,in_port=${nic_ofport},tp_src=67,tp_dst=68,actions=drop"
+    echo "Blocked hypervisor DHCP on ${bridge} (NIC=${nic_port}, ofport=${nic_ofport})"
+  else
+    echo "WARNING: could not determine ofport for ${nic_port}, hypervisor DHCP not blocked"
+  fi
+else
+  echo "WARNING: no NIC port found on ${bridge}, hypervisor DHCP not blocked"
+fi
+
+mkdir -p /etc/dnsmasq.d
+cat > "${conf}" <<CONF
+# DHCP-only server for KubeVirt guest VMs on the secondary localnet bridge.
+# DNS is disabled (port=0) — VMs use the DNS server from dhcp-option 6.
+interface=${bridge}
+bind-interfaces
+port=0
+dhcp-range=${range_start},${range_end},255.255.255.0,12h
+dhcp-option=3,${gateway}
+dhcp-option=6,${dns_server}
+log-dhcp
+CONF
+
+cat > "${unit}" <<UNIT
+[Unit]
+Description=Localnet secondary bridge DHCP on ${bridge}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+PIDFile=${pidfile}
+ExecStart=/usr/sbin/dnsmasq --conf-file=${conf} --pid-file=${pidfile}
+ExecStop=/bin/kill -s TERM \$MAINPID
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+/usr/sbin/dnsmasq --test --conf-file="${conf}"
+
+systemctl stop localnet-secondary-dnsmasq.service 2>/dev/null || true
+pkill -f "localnet-secondary.conf" 2>/dev/null || true
+rm -f "${pidfile}"
+systemctl reset-failed localnet-secondary-dnsmasq.service 2>/dev/null || true
+
+systemctl daemon-reload
+systemctl enable --now localnet-secondary-dnsmasq.service
+
+if ! systemctl is-active --quiet localnet-secondary-dnsmasq.service; then
+  echo "localnet-secondary-dnsmasq.service failed to start"
+  systemctl status localnet-secondary-dnsmasq.service --no-pager || true
+  journalctl -u localnet-secondary-dnsmasq.service -n 20 --no-pager || true
+  exit 1
+fi
+
+if ! ss -ulnp | grep -q ":67 "; then
+  echo "dnsmasq is not listening for DHCP on port 67"
+  journalctl -u localnet-secondary-dnsmasq.service -n 20 --no-pager || true
+  exit 1
+fi
+
+echo "dnsmasq configured on ${bridge} (DHCP ${range_start}-${range_end}, gw=${gateway}, dns=${dns_server})"
+DNSMASQ_SCRIPT_EOF
+  )
+
+  node_index=0
+  for node_name in "${nodes[@]}"; do
+    node_start_int=$(( start_int + node_index * range_per_node ))
+    if [[ ${node_index} -eq $((node_count - 1)) ]]; then
+      node_end_int=${end_int}
+    else
+      node_end_int=$(( node_start_int + range_per_node - 1 ))
+    fi
+    node_start=$(int_to_ip ${node_start_int})
+    node_end=$(int_to_ip ${node_end_int})
+
+    echo "  ${node_name}: DHCP range ${node_start} - ${node_end}"
+
+    dnsmasq_ok=false
+    for attempt in 1 2 3; do
+      if oc debug "node/${node_name}" -n default --quiet=true -- chroot /host bash -c \
+        "echo '${dnsmasq_setup_b64}' | base64 -d | bash -s -- '${LOCALNET_SECONDARY_BRIDGE}' '${node_start}' '${node_end}' '${DNSMASQ_GATEWAY}' '${DNSMASQ_DNS}'"
+      then
+        echo "  ${node_name}: dnsmasq configured"
+        dnsmasq_ok=true
+        break
+      fi
+      echo "  ${node_name}: oc debug failed (attempt ${attempt}/3), retrying in 10s..." >&2
+      sleep 10
+    done
+    if [[ "${dnsmasq_ok}" != "true" ]]; then
+      echo "ERROR: dnsmasq configuration failed on ${node_name}" >&2
+      exit 1
+    fi
+
+    node_index=$((node_index + 1))
+  done
+  echo "dnsmasq setup complete on all ${node_count} nodes"
+fi

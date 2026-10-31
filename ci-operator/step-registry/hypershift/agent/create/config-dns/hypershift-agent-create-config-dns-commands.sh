@@ -24,6 +24,24 @@ HOSTEDCLUSTER_NAME="${2}"
 WORKER_IP=$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 
+# WORKER_IP holds every InternalIP of the node, space separated, so on a
+# dual-stack cluster it is two addresses.  The single-stack branches below must
+# pick the one matching their family: writing the pair verbatim produces a
+# malformed "address=" line, which stops dnsmasq from loading the file at all
+# and takes down name resolution for the whole hypervisor, including
+# api.<cluster>.<basedomain> for the management cluster itself.
+first_ip_of_family() {
+  local family="${1}" ip
+  for ip in ${WORKER_IP}; do
+    if [[ "${family}" == "v6" && "${ip}" == *:* ]] || \
+       [[ "${family}" == "v4" && "${ip}" != *:* ]]; then
+      printf '%s' "${ip}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 # The .apps wildcard DNS entries point to the MetalLB ingress IPs configured in
 # the hypershift-agent-create-metallb step: 192.168.111.30 (IPv4) and
 # fd2e:6f44:5dd8:c956::1e (IPv6). These are from the dev-scripts default
@@ -39,12 +57,14 @@ if [[ $IP_STACK == "v4v6" ]]; then
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/fd2e:6f44:5dd8:c956::1e" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/192.168.111.30" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
 elif [[ $IP_STACK == "v6" ]]; then
-  echo "address=/api.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
-  echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
+  WORKER_IP6=$(first_ip_of_family v6) || { echo "no IPv6 InternalIP on worker: $WORKER_IP"; exit 1; }
+  echo "address=/api.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP6" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
+  echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP6" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/fd2e:6f44:5dd8:c956::1e" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
 elif [[ $IP_STACK == "v4" ]]; then
-  echo "address=/api.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
-  echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
+  WORKER_IP4=$(first_ip_of_family v4) || { echo "no IPv4 InternalIP on worker: $WORKER_IP"; exit 1; }
+  echo "address=/api.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP4" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
+  echo "address=/api-int.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/$WORKER_IP4" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
   echo "address=/.apps.$HOSTEDCLUSTER_NAME.$BASEDOMAIN/192.168.111.30" >> /etc/NetworkManager/dnsmasq.d/openshift-ostest.conf
 else
   echo "$IP_STACK don't support"
