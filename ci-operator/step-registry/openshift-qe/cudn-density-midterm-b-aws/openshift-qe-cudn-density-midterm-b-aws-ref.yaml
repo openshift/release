@@ -1,0 +1,59 @@
+ref:
+  as: openshift-qe-cudn-density-midterm-b-aws
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ITERATIONS
+    default: "200"
+    documentation: Number of CUDNs to create
+  - name: QPS
+    default: "5"
+    documentation: kube-burner QPS
+  - name: BURST
+    default: "5"
+    documentation: kube-burner burst
+  - name: TIMEOUT
+    default: "2h"
+    documentation: kube-burner timeout
+  - name: AWS_REGION
+    default: "us-east-2"
+    documentation: AWS region matching cluster deployment
+  - name: AWS_INSTANCE_TYPE
+    default: "m5.4xlarge"
+    documentation: EC2 instance type for external target (must support 25+ secondary IPs)
+  - name: AWS_MAX_TARGETS
+    default: "25"
+    documentation: Number of external ipvlan target IPs
+  - name: GC
+    default: "false"
+    documentation: Enable garbage collection after run
+  - name: ES_SECRETS_PATH
+    default: "/secret"
+    documentation: Path to elasticsearch credentials secret mount
+  - name: ES_INDEX
+    default: "ripsaw-kube-burner"
+    documentation: Elasticsearch index name
+  - name: KUBE_BURNER_OCP_REPO
+    default: "https://github.com/SachinNinganure/kube-burner-ocp.git"
+    documentation: kube-burner-ocp repo to clone (override to use different fork)
+  - name: KUBE_BURNER_OCP_BRANCH
+    default: "midterm-scenario-b-aws-infra"
+    documentation: kube-burner-ocp branch to use
+  commands: openshift-qe-cudn-density-midterm-b-aws-commands.sh
+  timeout: 4h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Runs Scenario B (external IP + NodePort) of the UDN macbinding midterm test.
+    Uses --external-aws-infra flag to automatically create EC2 external target
+    instance with ipvlan targets. AWS credentials come from cluster profile.
+    No manual AWS console steps or SSH key management required.
