@@ -111,6 +111,14 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
+      DEPENDS_ON_CANDIDATES: |-
+        openshift/velero RELATED_IMAGE_VELERO Dockerfile.ubi
+        openshift/velero RELATED_IMAGE_VELERO_RESTORE_HELPER Dockerfile-velero-restore-helper.ubi
+        openshift/openshift-velero-plugin RELATED_IMAGE_OPENSHIFT_VELERO_PLUGIN
+        openshift/velero-plugin-for-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_AWS Dockerfile.ubi
+        openshift/velero-plugin-for-legacy-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_LEGACY_AWS Dockerfile.ubi
+        openshift/velero-plugin-for-microsoft-azure RELATED_IMAGE_VELERO_PLUGIN_FOR_MICROSOFT_AZURE Dockerfile.ubi
+        openshift/velero-plugin-for-gcp RELATED_IMAGE_VELERO_PLUGIN_FOR_GCP Dockerfile.ubi
       FEATURE_GATES: '[''OpenShiftPodSecurityAdmission=false'']'
       FEATURE_SET: CustomNoUpgrade
       OADP_BRANCH: oadp-1.4
@@ -121,7 +129,12 @@ tests:
       TEST_NAME: e2e-test-aws
     post:
     - ref: oadp-analyze-e2e-failure
+    pre:
+    - chain: ipi-aws-pre
+    - ref: optional-operators-subscribe
+    - ref: oadp-depends-on-build
     test:
+    - ref: oadp-apply-depends-on-images
     - as: e2e
       cli: latest
       commands: make test-e2e
