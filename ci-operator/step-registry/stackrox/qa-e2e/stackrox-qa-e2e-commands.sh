@@ -27,7 +27,7 @@ https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/mai
         mkdir -p /tmp/bin
         printf "%s\n" "#!/bin/sh" "exit 1" > /tmp/bin/yq && chmod +x /tmp/bin/yq
         PATH="/tmp/bin:${PATH}"
-        LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
+        LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX}--%s" \
             ExitTrap--PostProcessPrep junit--stackrox__qa-e2e__stackrox-qa-e2e.xml
     ' EXIT
 fi

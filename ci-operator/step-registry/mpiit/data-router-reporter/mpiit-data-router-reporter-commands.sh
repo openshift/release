@@ -2,9 +2,9 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 # Legacy backward compatibility. TODO: To be removed once all caller are migrated.
-: "${DR__RP__CR_COMP_NAME:=${REPORTPORTAL_CMP}}"
+: "${LP_QE__CR__TS_NAME__PFX:=${REPORTPORTAL_CMP}}"
 
-[ -n "${DR__RP__CR_COMP_NAME}" ]
+[ -n "${LP_QE__CR__TS_NAME__PFX}" ]
 
 # If `OCP_VERSION` is not set, try to extract it form `JOB_NAME`.
 if [ -z "${OCP_VERSION}" ]; then
@@ -16,13 +16,13 @@ if [ -z "${OCP_VERSION}" ]; then
 fi
 
 DATAROUTER_RESULTS="${SHARED_DIR}/*.xml" \
-    REPORTPORTAL_LAUNCH_NAME="${DR__RP__CR_COMP_NAME}" \
+    REPORTPORTAL_LAUNCH_NAME="${LP_QE__CR__TS_NAME__PFX}" \
     REPORTPORTAL_LAUNCH_ATTRIBUTES="$(
         jq -nc \
             --arg jobName "${JOB_NAME}" \
             --arg buildID "${BUILD_ID}" \
             --arg ocpVer "${OCP_VERSION}" \
-            --arg crCompName "${DR__RP__CR_COMP_NAME}" \
+            --arg crCompName "${LP_QE__CR__TS_NAME__PFX}" \
             --arg fipsEnabled "${FIPS_ENABLED}" \
             '[
                 {key: "job_name", value: $jobName},
