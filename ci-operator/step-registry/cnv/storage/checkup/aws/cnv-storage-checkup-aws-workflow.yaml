@@ -1,0 +1,24 @@
+workflow:
+  as: cnv-storage-checkup-aws
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-aws-pre
+    - ref: cnv-enable-nested-virtualization-aws
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    test:
+    - ref: cnv-storage-checkup-run
+    post:
+    - ref: cnv-storage-checkup-gather
+    - chain: ipi-aws-post
+  documentation: |-
+    Provision OCP on AWS, enable virtualization, install CNV, and run its shipped
+    storage checkup through shared preparation, execution, and collection steps.
+    The caller must supply an AWS cluster_profile, the OCP release, CNV_VERSION
+    and catalog/channel inputs, and VM-capable worker sizing. Ten concurrent VMs
+    require at least 20 GiB guest memory plus virtualization and cluster overhead.
+    Uses the selected/default storage class; to check ODF or HPP, add that backend's
+    deployment and default-class configuration before checkup preparation.
+    Post steps collect diagnostics before deleting the checkup resources and OCP.
