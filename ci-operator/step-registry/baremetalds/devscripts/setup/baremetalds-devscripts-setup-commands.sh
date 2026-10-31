@@ -313,6 +313,8 @@ fi
 sysctl -w net.ipv6.conf.\$(ip -o route get 1.1.1.1 | cut -f 5 -d ' ').accept_ra=2
 
 cd dev-scripts
+git fetch https://github.com/pmtk/openshift-dev-scripts.git sno-bip-ipv6
+git checkout -B sno-bip-ipv6 FETCH_HEAD
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
