@@ -13,31 +13,31 @@ set -o pipefail
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p "${ARTIFACT_DIR}"
 
-QUAY_NS="${QUAYNAMESPACE:-quay-enterprise}"
+JAEGER_NS="${JAEGER_NAMESPACE:-${QUAYNAMESPACE:-quay-enterprise}}"
 JAEGER_IMAGE="${JAEGER_IMAGE:-quay.io/jaegertracing/jaeger:2.20.0}"
 JAEGER_MAX_TRACES="${JAEGER_MAX_TRACES:-50000}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared}"
 
 # Remove any stale fragment from a prior attempt so a retry never hands the
 # deploy steps a config left over from a different run.
-rm -f "${SHARED_DIR}/quay-otel-config.yaml"
+rm -f "${SHARED_DIR}/quay-otel-config.yaml" "${SHARED_DIR}/jaeger_namespace" "${SHARED_DIR}/jaeger_otlp_endpoint"
 
 # Any failure in setup/apply/rollout is best-effort: warn, print diagnostics,
 # leave ${SHARED_DIR}/jaeger_deployed unwritten, and exit 0.
 fail() {
   echo "WARNING: $1; the run continues without traces." >&2
-  oc get pods -n "${QUAY_NS}" -l app=jaeger -o wide || true
-  oc describe deployment/jaeger -n "${QUAY_NS}" || true
-  oc logs deploy/jaeger -n "${QUAY_NS}" --tail=100 || true
+  oc get pods -n "${JAEGER_NS}" -l app=jaeger -o wide || true
+  oc describe deployment/jaeger -n "${JAEGER_NS}" || true
+  oc logs deploy/jaeger -n "${JAEGER_NS}" --tail=100 || true
   exit 0
 }
 
 # Ensure the namespace exists (deploy-aws-s3 also creates it; be order-independent).
-if ! oc get namespace "${QUAY_NS}" >/dev/null 2>&1 && ! oc create namespace "${QUAY_NS}"; then
-  fail "could not ensure namespace ${QUAY_NS}"
+if ! oc get namespace "${JAEGER_NS}" >/dev/null 2>&1 && ! oc create namespace "${JAEGER_NS}"; then
+  fail "could not ensure namespace ${JAEGER_NS}"
 fi
 
-echo "Deploying Jaeger (${JAEGER_IMAGE}) into ${QUAY_NS}..."
+echo "Deploying Jaeger (${JAEGER_IMAGE}) into ${JAEGER_NS}..."
 # Jaeger 2.x is config-file driven (OpenTelemetry Collector based). The ConfigMap
 # below is the trimmed upstream cmd/jaeger/config.yaml: OTLP receiver (grpc 4317,
 # http 4318), a single in-memory storage backend, jaeger_query (UI/API 16686) and
@@ -47,7 +47,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: jaeger-config
-  namespace: ${QUAY_NS}
+  namespace: ${JAEGER_NS}
   labels:
     app: jaeger
 data:
@@ -88,7 +88,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: jaeger
-  namespace: ${QUAY_NS}
+  namespace: ${JAEGER_NS}
   labels:
     app: jaeger
 spec:
@@ -137,7 +137,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: jaeger
-  namespace: ${QUAY_NS}
+  namespace: ${JAEGER_NS}
   labels:
     app: jaeger
 spec:
@@ -156,7 +156,7 @@ then
 fi
 
 echo "Waiting for Jaeger rollout..."
-if ! oc rollout status deployment/jaeger -n "${QUAY_NS}" --timeout=5m; then
+if ! oc rollout status deployment/jaeger -n "${JAEGER_NS}" --timeout=5m; then
   fail "Jaeger did not roll out"
 fi
 
@@ -164,7 +164,12 @@ fi
 # export to windows starting here instead of exporting the whole store at once.
 date +%s > "${SHARED_DIR}/jaeger_deployed"
 cp "${SHARED_DIR}/jaeger_deployed" "${ARTIFACT_DIR}/jaeger_deployed" || true
-echo "Jaeger ready. In-cluster OTLP endpoint: http://jaeger.${QUAY_NS}.svc.cluster.local:4318/v1/traces"
+echo "Jaeger ready. In-cluster OTLP endpoint: http://jaeger.${JAEGER_NS}.svc.cluster.local:4318/v1/traces"
+
+# Let later steps (gather, non-Quay exporters) find this Jaeger without
+# repeating the namespace.
+echo "${JAEGER_NS}" > "${SHARED_DIR}/jaeger_namespace"
+echo "http://jaeger.${JAEGER_NS}.svc.cluster.local:4318" > "${SHARED_DIR}/jaeger_otlp_endpoint"
 
 # Own the Quay OTel config: the deploy steps merge this fragment in so
 # FEATURE_OTEL_TRACING is only enabled when Jaeger actually deployed.
@@ -173,7 +178,7 @@ FEATURE_OTEL_TRACING: true
 OTEL_CONFIG:
   service_name: quay
   sample_rate: 1.0
-  endpoint: http://jaeger.${QUAY_NS}.svc.cluster.local:4318/v1/traces
+  endpoint: http://jaeger.${JAEGER_NS}.svc.cluster.local:4318/v1/traces
 EOF
 cp "${SHARED_DIR}/quay-otel-config.yaml" "${ARTIFACT_DIR}/quay-otel-config.yaml" || true
 
