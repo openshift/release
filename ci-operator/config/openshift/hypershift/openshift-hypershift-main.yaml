@@ -195,6 +195,33 @@ tests:
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
     workflow: hypershift-azure-aks-e2e
 - always_run: false
+  as: e2e-aks-autonode
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      HYPERSHIFT_AZURE_KARPENTER_IDENTITY: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    workflow: hypershift-azure-aks-e2e
+- always_run: false
   as: e2e-aks-managed-hsm
   capabilities:
   - arm64
