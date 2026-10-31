@@ -110,7 +110,16 @@ _propagate_junit () {
     find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
 }
 
-trap '_opp_cleanup; GenerateJunit; _propagate_junit' EXIT
+# Load ExitTrap library for JUnit XML post-processing at script level
+# (must be loaded before trap can fire to avoid secondary errors)
+eval "$(
+    typeset -a _fURL=()
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+    "${_fURL[@]}" \
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+)"
+
+trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
@@ -629,19 +638,6 @@ function Main () {
     fi
 
     rm -f /tmp/quay-auth.json
-
-    if [[ "${MAP_TESTS}" == "true" ]]; then
-        eval "$(
-            typeset -a fetchCmd=()
-            type -t wget 1>/dev/null && fetchCmd=(wget --timeout=30 -qO-) || fetchCmd=(curl --connect-timeout 10 --max-time 30 -fsSL)
-            "${fetchCmd[@]}" \
-                https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-        )" || true
-        if type -t ExitTrap--PostProcessPrep; then
-            LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
-                ExitTrap--PostProcessPrep || true
-        fi
-    fi
 
     exit "${status}"
 }
