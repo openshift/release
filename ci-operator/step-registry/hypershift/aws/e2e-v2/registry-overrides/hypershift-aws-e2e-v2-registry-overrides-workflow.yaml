@@ -1,0 +1,51 @@
+workflow:
+  as: hypershift-aws-e2e-v2-registry-overrides
+  documentation: |-
+    The HyperShift AWS e2e v2 registry overrides workflow is hypershift-aws-e2e-v2 with a management cluster and a
+    HyperShift operator that trust the CA of the e2e v2 mirror registry fixture
+    (test/e2e/v2/util/mirrorregistry in openshift/hypershift). It exists for the HyperShift operator
+    --registry-overrides tests (CNTRLPLANE-3923), which deploy the mirror from the test, point the operator at it and
+    assert that control plane images are pulled from it. Those tests change management-cluster-wide state, so they
+    run in their own job instead of e2e-v2-aws.
+
+    Differences from hypershift-aws-e2e-v2:
+    - hypershift-mirror-registry-ca-generate writes a CA to SHARED_DIR before anything else. The tests sign the
+      mirror's serving certificate with it.
+    - The nested management cluster is created with that CA as additional trust bundle, so its kubelets can pull the
+      overridden control plane images from the mirror.
+    - hypershift-mirror-registry-ca-trust-mgmt adds the CA to image.config.openshift.io/cluster before
+      hypershift-install, so the operator and, through its trust bundle, every control plane operator trust it.
+
+    Test selection comes from TEST_PLAN in the job configuration.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - ref: hypershift-mirror-registry-ca-generate
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-mirror-registry-ca-trust-mgmt
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    - ref: hypershift-write-test-plan
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-aws-run-e2e-v2
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: "aws"
+      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: "alias/hypershift-ci"
+      HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE: "mirror-registry-ho-ca.crt"

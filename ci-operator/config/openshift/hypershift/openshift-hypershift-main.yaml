@@ -286,6 +286,33 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
 - always_run: false
+  as: e2e-v2-aws-registry-overrides
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_run_if_changed: ^(support/(releaseinfo|imageregistry|util/registryoverride)/|hypershift-operator/(main|init)\.go$|hypershift-operator/controllers/hostedcluster/|control-plane-operator/main\.go$|control-plane-operator/controllers/hostedcontrolplane/(imageprovider|v2/(controlplaneoperator|configoperator|ignitionserver))/|ignition-server/|cmd/install/assets/hypershift_operator\.go$|test/e2e/v2/util/mirrorregistry/|test/e2e/v2/tests/registry_overrides)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      OCP_IMAGE_N1: release:latest
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN: |
+        name: registry-overrides
+        platform: aws
+        testMatrix:
+          sequential:
+          - name: registry-overrides
+            steps:
+            - name: registry-overrides
+              variant: public
+              labelFilter: registry-overrides
+            - name: registry-overrides-smoke
+              variant: public
+              labelFilter: hosted-cluster-health || control-plane-workloads
+    workflow: hypershift-aws-e2e-v2-registry-overrides
+- always_run: false
   as: e2e-v2-aws-backuprestore
   capabilities:
   - arm64

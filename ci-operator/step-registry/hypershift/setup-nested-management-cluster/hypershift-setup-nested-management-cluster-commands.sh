@@ -94,28 +94,84 @@ EOF
     --etcd-storage-class=managed-csi-premium-v2
 else
   echo "Creating AWS management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
-  bin/hypershift create cluster aws \
-    --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
-    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-    --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-    --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-    --name=${CLUSTER_NAME} \
-    --region=us-east-1 \
-    --infra-id=${CLUSTER_NAME} \
-    --base-domain=${DOMAIN} \
-    --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
-    --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
-    --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-    --zones=${HYPERSHIFT_ZONES} \
-    --service-cidr=172.29.0.0/16 \
-    --cluster-cidr=10.124.0.0/14 \
-    --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-    --node-selector=hypershift.openshift.io/control-plane=true \
-    --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-    --release-stream=${DEFAULT_RELEASE_STREAM} \
-    --public-only \
-    --shared-role \
+  AWS_CREATE_ARGS=(
+    --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID}
+    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+    --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}
+    --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+    --name=${CLUSTER_NAME}
+    --region=us-east-1
+    --infra-id=${CLUSTER_NAME}
+    --base-domain=${DOMAIN}
+    --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt
+    --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private
+    --instance-type=${HYPERSHIFT_INSTANCE_TYPE}
+    --zones=${HYPERSHIFT_ZONES}
+    --service-cidr=172.29.0.0/16
+    --cluster-cidr=10.124.0.0/14
+    --node-pool-replicas=${HYPERSHIFT_NODE_COUNT}
+    --node-selector=hypershift.openshift.io/control-plane=true
+    --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE}
+    --release-stream=${DEFAULT_RELEASE_STREAM}
+    --public-only
+    --shared-role
     --namespace=${HYPERSHIFT_NAMESPACE}
+  )
+
+  if [[ -z "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
+    bin/hypershift create cluster aws "${AWS_CREATE_ARGS[@]}"
+  else
+    # The management cluster nodes must trust an extra CA (for example the e2e
+    # v2 mirror registry CA, see hypershift-mirror-registry-ca-generate).
+    #
+    # Why not just pass --additional-trust-bundle to "create cluster"? The CLI
+    # always stores the bundle in a ConfigMap named "user-ca-bundle" in the
+    # HostedCluster namespace (cmd/cluster/core/create.go,
+    # applyTrustBundleAndImageSources), and "destroy cluster" does not delete
+    # it. Here that namespace is shared by every concurrent CI job on the parent
+    # cluster, so two jobs would overwrite each other's CA and the ConfigMap
+    # would be left behind. The CLI has no flag to choose the name.
+    #
+    # So we render the manifests instead of applying them, give the ConfigMap a
+    # per-job name, and apply them ourselves. Rendering still creates the AWS
+    # infrastructure and produces the same objects. What we must replicate from
+    # the CLI apply step (cmd/cluster/core/create.go, func apply) is:
+    #   - server-side apply with field manager "hypershift-cli";
+    #   - the label hypershift.openshift.io/auto-created-for-infra=<infra ID> on
+    #     every object. "destroy cluster" deletes the CLI secrets (pull secret,
+    #     SSH key, etcd encryption key) by that label, and the operator uses it
+    #     to set their owner reference, so without it they would leak.
+    # Keep this in sync with func apply if it changes. The ConfigMap itself is
+    # deleted by hypershift-destroy-nested-management-cluster.
+    TRUST_BUNDLE_FILE="${SHARED_DIR}/${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE}"
+    if [[ ! -s "${TRUST_BUNDLE_FILE}" ]]; then
+      echo "HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE is set but ${TRUST_BUNDLE_FILE} is missing or empty" >&2
+      exit 1
+    fi
+    TRUST_BUNDLE_CONFIGMAP="${CLUSTER_NAME}-additional-trust-bundle"
+    RENDER_DIR="$(mktemp -d)"
+    # The rendered file contains secrets: keep it out of SHARED_DIR and ARTIFACT_DIR.
+    trap 'rm -rf "${RENDER_DIR}"' EXIT
+    RENDERED="${RENDER_DIR}/management-cluster.yaml"
+
+    echo "Management cluster nodes will trust ${TRUST_BUNDLE_FILE} (ConfigMap ${HYPERSHIFT_NAMESPACE}/${TRUST_BUNDLE_CONFIGMAP})"
+    bin/hypershift create cluster aws "${AWS_CREATE_ARGS[@]}" \
+      --additional-trust-bundle="${TRUST_BUNDLE_FILE}" \
+      --render-into="${RENDERED}" --render-sensitive
+
+    # "user-ca-bundle" appears exactly twice: the ConfigMap name and the
+    # HostedCluster spec.additionalTrustBundle reference. Fail on anything else
+    # rather than apply a half-renamed set.
+    occurrences="$(grep -cE '^[[:space:]]*name: user-ca-bundle$' "${RENDERED}" || true)"
+    if [[ "${occurrences}" != "2" ]]; then
+      echo "Expected 2 references to user-ca-bundle in the rendered manifests, found ${occurrences}" >&2
+      exit 1
+    fi
+    sed -i -E "s/^([[:space:]]*)name: user-ca-bundle$/\1name: ${TRUST_BUNDLE_CONFIGMAP}/" "${RENDERED}"
+
+    oc apply --server-side --force-conflicts --field-manager=hypershift-cli -f "${RENDERED}"
+    oc label --overwrite -f "${RENDERED}" "hypershift.openshift.io/auto-created-for-infra=${CLUSTER_NAME}"
+  fi
 fi
 
 echo "Waiting for cluster to become available"
