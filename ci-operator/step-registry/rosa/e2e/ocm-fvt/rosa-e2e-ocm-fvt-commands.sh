@@ -14,6 +14,12 @@ if [[ -z "${OCM_FVT_JOB_NAME:-}" ]]; then
   exit 1
 fi
 
+ocm_fvt_helpers="${SHARED_DIR}/ocm-fvt-artifacts.py"
+if [[ ! -f "${ocm_fvt_helpers}" || -L "${ocm_fvt_helpers}" ]]; then
+  echo "ERROR: ocm-fvt artifact helpers were not prepared" >&2
+  exit 1
+fi
+
 JOB_LINK="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   JOB_LINK="${JOB_LINK}pr-logs/pull/openshift_release/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
@@ -281,7 +287,12 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   )
 fi
 
-ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-results"
+if ! ocm_fvt_workdir="$(python3 "${ocm_fvt_helpers}" stage "${ARTIFACT_DIR}" 2>/dev/null
+)"; then
+  echo "ERROR: failed to prepare private ocm-fvt artifact staging" >&2
+  exit 1
+fi
+ocm_fvt_output="${ocm_fvt_workdir}/output"
 mkdir -p "${ocm_fvt_output}"
 chmod 1777 "${ocm_fvt_output}"
 podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
@@ -378,13 +389,7 @@ if [[ "${image_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   printf '%s\n' "${image_digest}"
   (
     umask 022
-    python3 - "${ARTIFACT_DIR}/ocm-fvt-image-digest.txt" "${image_digest}" <<'PY'
-import os
-import sys
-
-with os.fdopen(os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644), "w") as artifact:
-    artifact.write(sys.argv[2] + "\n")
-PY
+    python3 "${ocm_fvt_helpers}" digest "${ARTIFACT_DIR}/ocm-fvt-image-digest.txt" "${image_digest}"
   ) 2>/dev/null || echo "WARNING: failed to persist ocmci image digest"
 else
   echo "WARNING: failed to get ocmci image digest"
@@ -408,83 +413,7 @@ trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
 (
   umask 022
-  python3 - "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-artifact-metadata.json" <<'PY'
-import itertools
-import json
-import os
-import re
-import stat
-import sys
-
-directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-phase_report = re.compile(
-    r"(pre-env-validation|pre-vpc-cleaner|pre-cluster-creation|post-clean)_[0-9]{6}\.(xml|json)"
-)
-
-
-def metadata(parent, name):
-    try:
-        info = os.stat(name, dir_fd=parent, follow_symlinks=False)
-        return {
-            "type": stat.S_IFMT(info.st_mode),
-            "mode": format(stat.S_IMODE(info.st_mode), "04o"),
-            "uid": info.st_uid,
-            "gid": info.st_gid,
-        }
-    except OSError as error:
-        return {"errno": error.errno}
-
-
-def collect(parent, name, result_directory=False):
-    result = metadata(parent, name)
-    if result.get("type") != stat.S_IFDIR:
-        return result
-    try:
-        descriptor = os.open(name, directory_flags, dir_fd=parent)
-    except OSError as error:
-        result["errno"] = error.errno
-        return result
-    try:
-        children = []
-        result["reports" if result_directory else "results"] = children
-        with os.scandir(descriptor) as entries:
-            for index, entry in enumerate(itertools.islice(entries, 129)):
-                if index == 128 or len(children) == (32 if result_directory else 16):
-                    result["truncated"] = True
-                    break
-                if result_directory:
-                    match = phase_report.fullmatch(entry.name)
-                    if entry.name == "report.xml":
-                        label = "merged-xml"
-                    elif match:
-                        label = "-".join(match.groups())
-                    else:
-                        continue
-                    child = metadata(descriptor, entry.name)
-                else:
-                    if not entry.name.startswith("test-result-"):
-                        continue
-                    label = "result-" + str(len(children) + 1)
-                    child = collect(descriptor, entry.name, result_directory=True)
-                children.append(dict(child, label=label))
-    except OSError as error:
-        result["errno"] = error.errno
-    finally:
-        os.close(descriptor)
-    return result
-
-
-groups = os.getgroups()
-with os.fdopen(os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644), "w") as artifact:
-    json.dump({
-        "collector": {
-            "euid": os.geteuid(), "egid": os.getegid(),
-            "groups": groups[:32], "groups_truncated": len(groups) > 32,
-        },
-        "output": collect(None, sys.argv[1]),
-    }, artifact)
-    artifact.write("\n")
-PY
+  python3 "${ocm_fvt_helpers}" metadata "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-artifact-metadata.json"
 ) 2>/dev/null || echo "WARNING: failed to collect ocm-fvt artifact metadata"
 $WAS_TRACING_RUN && set -x
 
@@ -618,6 +547,11 @@ if [[ "${OCM_FVT_DEFER_CLEAN:-false}" == "true" ]]; then
   else
     echo "WARNING: ocm-fvt output dir missing (${ocm_fvt_output}); deferred clean may no-op"
   fi
+fi
+
+if ! python3 "${ocm_fvt_helpers}" publish "${ocm_fvt_output}" "${ARTIFACT_DIR}" 2>/dev/null
+then
+  echo "WARNING: failed to publish ocm-fvt artifacts; raw output remains private"
 fi
 
 exit "${exit_code}"
