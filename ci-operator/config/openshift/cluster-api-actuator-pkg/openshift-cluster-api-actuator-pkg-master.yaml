@@ -194,15 +194,16 @@ tests:
   interval: 72h
   steps:
     cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: cluster-api-actuator-pkg-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/cluster-api-actuator-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: cluster-api-actuator-pkg
+      TEST_SUITE: openshift/cluster-api-actuator/periodic
+      TEST_TYPE: suite
     test:
-    - as: test
-      cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
     workflow: ipi-aws
 - always_run: false
   as: e2e-vsphere-operator-periodic-pre
@@ -385,6 +386,6 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: master
-  org: openshift
+  branch: ote
+  org: simkam
   repo: cluster-api-actuator-pkg
