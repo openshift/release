@@ -251,7 +251,20 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
         _OUTCOME="error"; _GATE="source_extract_failed"
         exit 0
     fi
-    if ! (cd "${ANALYZER_CLI_PATH}"/*/ && go build -o prow-analyzer ./cmd/prow-analyzer 2>/dev/null); then
+    # Harden the Go toolchain env for the step container: HOME/GOCACHE/GOPATH
+    # must resolve to writable paths or go build fails before any module work
+    # (rehearsal 2116279745099337728: compile_failed with the error swallowed).
+    export HOME="${HOME:-/tmp}"
+    export GOCACHE="${GOCACHE:-/tmp/prow-analyzer-gocache}"
+    export GOPATH="${GOPATH:-/tmp/prow-analyzer-gopath}"
+    _GO_BUILD_ERR="$(mktemp /tmp/prow-analyzer-goerr.XXXXXX)"
+    _CLEANUP_FILES="${_CLEANUP_FILES} ${_GO_BUILD_ERR}"
+    if ! (cd "${ANALYZER_CLI_PATH}"/*/ && go build -o prow-analyzer ./cmd/prow-analyzer 2>"${_GO_BUILD_ERR}"); then
+        # Self-diagnosing note line (metadata-only: go toolchain errors carry
+        # paths/URLs, never analysis prose or credentials). Spaces become ~ so
+        # the key=value result-line grammar stays parseable.
+        _GO_DETAIL="$(head -c 200 "${_GO_BUILD_ERR}" | head -1 | tr ' ' '~')"
+        printf 'OPP-PROW-ANALYZER v=1 stage=note what=compile_failed detail=%s\n' "${_GO_DETAIL:-no_stderr}"
         _OUTCOME="error"; _GATE="compile_failed"
         exit 0
     fi
