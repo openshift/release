@@ -1,0 +1,23 @@
+ref:
+  as: openshift-qe-apply-etcd-readahead
+  cli: latest
+  commands: openshift-qe-apply-etcd-readahead-commands.sh
+  documentation: |-
+    Caps the bdi readahead window on the etcd volume of every master via
+    MachineConfig. Installs a oneshot systemd unit that resolves the block
+    device backing /var/lib/etcd at boot and writes read_a_head_kb. Waits
+    for the master MachineConfigPool to roll and verifies the knob live on
+    each master node.
+  env:
+  - default: "4"
+    documentation: |-
+      Target readahead value in KiB. Default 128 (kernel default).
+      Minimum 4 (one page).
+    name: READAHEAD_KB
+  from: src
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 2h0m0s
