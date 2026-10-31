@@ -496,6 +496,13 @@ oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
 
 oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s
 
+# Pause the HostedCluster so CPO does not reconcile dns-operator back to
+# its default replica count or reset the CoreDNS Corefile override.
+# The HC is unpaused at the end of this step, after conformance setup is done.
+echo "$(date) Pausing HostedCluster to prevent CPO from resetting dns-operator and CoreDNS override"
+oc patch hostedcluster "${HC_NAME}" -n "${HC_NS}" \
+  --type=merge -p '{"spec":{"pausedUntil":"true"}}'
+
 echo "$(date) Verifying canary URL from ingress-operator (should bypass konnectivity via NO_PROXY)"
 oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
   curl -vk --connect-timeout 10 "${CANARY_URL}" || true
@@ -645,6 +652,12 @@ oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
   -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
 
 oc adm top pods -n ${HC_NS}-${HC_NAME} || true 
+
+# Unpause the HostedCluster now that the CoreDNS override is in place and
+# conformance setup is complete. This allows CPO to resume normal reconciliation.
+echo "$(date) Unpausing HostedCluster"
+oc patch hostedcluster "${HC_NAME}" -n "${HC_NS}" \
+  --type=merge -p '{"spec":{"pausedUntil":""}}' || true
 
 # --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
