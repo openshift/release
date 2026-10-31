@@ -42,6 +42,12 @@ function set_proxy () {
 
 set_proxy
 
+api_resources=$(oc api-resources --api-group=hypershift.openshift.io --cached=false -o name)
+if ! grep -Fxq 'hostedclusters.hypershift.openshift.io' <<< "${api_resources}"; then
+    echo "Skipping hypershift-k8sgpt: HostedCluster API is not installed on the management cluster."
+    exit 0
+fi
+
 download_binary
 
 export PATH="${K8SGPT_DIR}:${PATH}"
