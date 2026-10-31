@@ -1,0 +1,23 @@
+ref:
+  as: medik8s-system-tests-s390x-ssh-bastion
+  from: upi-installer
+  commands: medik8s-system-tests-s390x-ssh-bastion-commands.sh
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: MEDIK8S_S390X_SSH_BASTION
+    default: "false"
+    documentation: |-
+      When "true", start a long-lived oc debug jump on a control-plane node and
+      record it in SHARED_DIR so system-tests can SSH to workers for kubelet
+      stop/start on libvirt OZ (CI pod cannot reach machine addresses). Does
+      not deploy quay.io/eparis/ssh (amd64-only) or a custom privileged sshd
+      Deployment. Set to "false" for smoke / NMO jobs that do not need node SSH.
+  documentation: |-
+    Conditionally prepares an oc-debug SSH jump for medik8s system-tests on
+    libvirt OZ. No-op when MEDIK8S_S390X_SSH_BASTION is not true. Pairs with
+    run-tests ssh PATH wrapper (ProxyCommand via oc exec + host /dev/tcp) so
+    kubelet-stop can reach node SSH without a privileged in-repo Deployment.
