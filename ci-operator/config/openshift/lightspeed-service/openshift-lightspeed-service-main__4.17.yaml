@@ -125,6 +125,16 @@ tests:
         ]
       SELF_MANAGED_ADDITIONAL_CA: "true"
       SELF_MANAGED_REGISTRY_CERT: "true"
+      # The OLS disconnected job creates its own product catalog
+      # (cs-redhat-operator-index-v4-17) via the
+      # openshift-lightspeed-service-install-disconnected step, so the QE
+      # optional-operators catalog (qe-app-registry) is not needed. The
+      # aosqe-index:v1.30 image is missing from the mirror registry's quay.io
+      # proxy (manifest unknown), which fails the shared
+      # enable-qe-catalogsource-disconnected pre-step before the e2e test
+      # phase ever runs. Skipping the QE catalogsource creation keeps the
+      # mirror auth/ICSP setup and lets the job proceed to the e2e step.
+      SKIP_QE_APP_REGISTRY: "true"
     post:
     - ref: gather-must-gather
     test:
