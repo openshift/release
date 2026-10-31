@@ -1,0 +1,91 @@
+workflow:
+  as: rosa-e2e-hcp-vpc-cni
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      ENABLE_BYOVPC: "true"
+      STS: "true"
+      REPLICAS: "3"
+      NO_CNI: "true"
+    pre:
+    # rosa-CLI head (ROSAENG-67583), manually expanded from the
+    # rosa-e2e-hcp-rosa-cli-provision chain: that chain runs
+    # rosa-conf-idp-htpasswd / rosa-cluster-wait-ready-operators before any CNI
+    # exists, which cannot work on a --no-cni cluster. Here the CNI swap
+    # (rosa-conf-vpc-cni) happens first; only then do the IDP and the
+    # wait-ready steps run. rosa-cluster-provision creates the cluster with
+    # --no-cni (nodes stay NotReady) and publishes cluster-id.
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - ref: rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    # The VPC-CNI variant step (ROSAENG-67432): IRSA role, SCCs, ip-forward
+    # tuning config and the eks/aws-vpc-cni helm release with the ROSA/CRI-O
+    # host-path overrides, per https://github.com/phbergsmann/rosa-vpc-cni.
+    # It also fetches the breakglass kubeconfig from the OCM credentials API
+    # (the customer kubeconfig only becomes usable after the CNI is in place;
+    # the osd-ccs admin-kubeconfig step is not usable here because it requires
+    # an ocm-token in the cluster profile, while the rosa profiles carry SSO
+    # client credentials) and records cni=aws-vpc-cni in cluster-metadata.json.
+    - ref: rosa-conf-vpc-cni
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: rosa-conf-idp-htpasswd
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the customer
+    # kubeconfig exists.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
+    # backplane (ROSAENG-67580).
+    - ref: rosa-backplane-login
+    test:
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    # Delete the IRSA role created by rosa-conf-vpc-cni: the standard
+    # deprovision chain does not know about it and would leak it. The in-cluster
+    # changes (SCCs, helm release, tuning config) are removed with the cluster.
+    - ref: rosa-conf-vpc-cni-cleanup
+      best_effort: true
+    - ref: rosa-gap-analysis-api-resources-and-crd
+      best_effort: true
+    - ref: rosa-gap-analysis-critical-alerts
+      best_effort: true
+    - ref: rosa-gap-analysis-cluster-install-delete-metrics
+      best_effort: true
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+    - chain: rosa-gather-hcp-diagnostics
+      best_effort: true
+  documentation: |-
+    The AWS VPC-CNI row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-67432): the rosa-CLI head with NO_CNI=true, a rosa-conf-vpc-cni
+    step that swaps in the AWS VPC CNI before the cluster settles, and the
+    shared, provisioner-agnostic validation tail (rosa-e2e-validate-customer,
+    rosa-e2e-validate-platform).
+
+    rosa-cluster-provision creates the cluster with --no-cni (nodes stay
+    NotReady), rosa-conf-vpc-cni installs the CNI following
+    https://github.com/phbergsmann/rosa-vpc-cni (IRSA role with the
+    AWS-managed AmazonEKS_CNI_Policy, hostaccess/privileged SCCs for aws-node,
+    an ip_forward tuning config via the rosa CLI because HCP reconciles away
+    direct Tuned CRs, and the eks/aws-vpc-cni helm chart with the ROSA/CRI-O
+    host-path overrides: /var/lib/cni/bin and /run/multus/cni/net.d). The step
+    also records cni=aws-vpc-cni in the SHARED_DIR contract
+    (cluster-metadata.json) so the validation tail can condition on the CNI
+    type. Its IRSA role is removed post-test by rosa-conf-vpc-cni-cleanup.
+
+    The platform plane requires corp-network reachability: run this workflow
+    only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).
