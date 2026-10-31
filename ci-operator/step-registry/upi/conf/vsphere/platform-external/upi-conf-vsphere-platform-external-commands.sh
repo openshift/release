@@ -142,6 +142,68 @@ else
   export INSTALLER_BINARY="openshift-install"
 fi
 
+# Ensure the installer binary matches the release payload being installed.
+# Opt-in via ALIGN_INSTALLER_TO_PAYLOAD: only jobs that redirect the install
+# payload away from the installer image's stream (e.g. upgrade jobs installing
+# the previous minor) want this. The image's upi-installer binary may be newer
+# than the payload selected via RELEASE_IMAGE_INITIAL or a redirected
+# OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, and a newer installer can render
+# bootstrap assets incompatible with the payload's CVO (observed:
+# "unknown flag: --cluster-version-manifest-path" from cvo-render). When the
+# X.Y versions differ, extract the payload's own installer so the bootimage
+# matches. If the payload version cannot be determined or extraction fails,
+# warn and keep the image's installer.
+if [[ "${ALIGN_INSTALLER_TO_PAYLOAD:-false}" == "true" && -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  # Build-farm release images (registry.build*.ci.openshift.org) need CI
+  # registry credentials on top of the cluster-profile pull secret. Fail fast
+  # with an explicit error: an opted-in job that cannot resolve its payload
+  # should stop now rather than keep a mismatched installer and time out at
+  # bootstrap.
+  ALIGN_PULL_SECRET="${SHARED_DIR}/pull-secret-with-ci"
+  if [[ ! -s "${ALIGN_PULL_SECRET}" ]]; then
+    ALIGN_PULL_SECRET="/tmp/pull-secret-with-ci"
+    if ! cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${ALIGN_PULL_SECRET}"; then
+      echo "ERROR: failed to copy the cluster-profile pull secret for installer alignment" 1>&2
+      exit 1
+    fi
+    if [[ "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%%/*}" != "quay.io" ]]; then
+      if ! KUBECONFIG="" oc registry login --to "${ALIGN_PULL_SECRET}"; then
+        echo "ERROR: failed to log in to the CI registry for installer alignment of ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" 1>&2
+        exit 1
+      fi
+    fi
+  fi
+  # Match the executable basename: the version output prints the binary as
+  # invoked ("openshift-install" from PATH, "/tmp/openshift-install" when
+  # extracted from a custom payload).
+  INSTALLER_VERSION="$(${INSTALLER_BINARY} version | awk '{sub(/^.*\//, "", $1); if (!found && $1 == "openshift-install") {print $2; found=1}}')"
+  # The image's upi-installer reports "v1.4.22-ec5..." (installer repo EC
+  # build); a payload-extracted installer reports the payload version
+  # "4.21.40...". Normalize both to X.Y.
+  if [[ "${INSTALLER_VERSION}" == v1.* ]]; then
+    INSTALLER_XY="$(echo "${INSTALLER_VERSION}" | cut -d. -f2,3 | cut -d- -f1)"
+  else
+    INSTALLER_XY="$(echo "${INSTALLER_VERSION}" | cut -d. -f1,2 | cut -d- -f1)"
+  fi
+  PAYLOAD_XY="$(oc adm release info -a "${ALIGN_PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' 2>/dev/null || echo '')"
+  PAYLOAD_XY="$(echo "${PAYLOAD_XY}" | cut -d. -f1,2)"
+  if [[ -z "${PAYLOAD_XY}" ]]; then
+    echo "WARNING: unable to determine payload version from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; keeping the image's installer (${INSTALLER_XY})" 1>&2
+  elif [[ "${INSTALLER_XY}" != "${PAYLOAD_XY}" ]]; then
+    echo "Installer is ${INSTALLER_XY} but the install payload is ${PAYLOAD_XY}; extracting the payload's installer so the bootimage matches"
+    # Extract to a fresh directory so a failed extraction cannot leave a
+    # truncated binary at the path the custom-payload flow may already be
+    # using; only switch INSTALLER_BINARY after a successful extraction.
+    if ! oc adm release extract -a "${ALIGN_PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+      --command=openshift-install --to="/tmp/align-installer"; then
+      echo "WARNING: failed to extract installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; keeping the image's installer (${INSTALLER_XY})" 1>&2
+    else
+      chmod +x /tmp/align-installer/openshift-install
+      export INSTALLER_BINARY="/tmp/align-installer/openshift-install"
+    fi
+  fi
+fi
+
 echo "=============== openshift-install version =============="
 ${INSTALLER_BINARY} version
 
