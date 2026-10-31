@@ -2,6 +2,7 @@ workflow:
   as: baremetalds-two-node-fencing-cnv-odf-ha
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: equinix-edge-enablement
     pre:
       - chain: baremetalds-ofcir-pre
@@ -12,6 +13,21 @@ workflow:
     test:
     - ref: baremetalds-two-node-fencing-cnv-vm-ha
     post:
+      - as: debug-on-failure
+        from: cli
+        optional_on_success: true
+        timeout: 3h5m0s
+        commands: |
+          echo "Holding for debugging for up to three hours."
+          echo "To finish early, touch /tmp/debug.done in this pod."
+          for ((i=0; i<1080; i++)); do
+            [[ -f /tmp/debug.done ]] && break
+            sleep 10
+          done
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
       - chain: baremetalds-ofcir-post
     env:
       DEVSCRIPTS_CONFIG: |
