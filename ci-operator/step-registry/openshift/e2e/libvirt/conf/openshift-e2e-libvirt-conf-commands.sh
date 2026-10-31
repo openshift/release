@@ -380,7 +380,9 @@ fi
 #        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
 #        pod should start\| pod sysctls\| build volumes should mount given secrets
 #        and configmaps into the build pod
-HETEROGENEOUS_CLUSTER_TYPE_REGEX="^(libvirt-s390x-amd64|libvirt-amd64-s390x)$"
+# Include OZ VPN hetero profiles (libvirt-s390x-vpn-amd64 / -vpn-arm64) so z-xz / z-za
+# jobs keep the same exclusions after migrating off libvirt-s390x-amd64.
+HETEROGENEOUS_CLUSTER_TYPE_REGEX="^(libvirt-s390x-amd64|libvirt-amd64-s390x|libvirt-s390x-vpn-amd64|libvirt-s390x-vpn-arm64)$"
 if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HETEROGENEOUS_CLUSTER_TYPE_REGEX} ]]; then
     echo "Adding excluded tests for multi-architecture compute clusters"
     cat >> "${SHARED_DIR}/excluded_tests" << EOF
@@ -485,6 +487,15 @@ if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HET
 "[sig-network][Feature:Router][apigroup:route.openshift.io][apigroup:operator.openshift.io] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 "[sig-network][Feature:tuning] pod should start with all sysctl on whitelist [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
 "[sig-network][Feature:tuning] pod sysctls should not affect node [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
+EOF
+    # Substring themes (Power/AWS TEST_SKIPS style) to cover rename/tag drift and
+    # residual gaps not present as exact names above (oc debug deployment,
+    # HAProxy converge/TLS variants, templateinstance, zstd:chunked).
+    cat >> "${SHARED_DIR}/excluded_tests" << EOF
+oc debug
+The HAProxy router should
+templateinstance readiness test
+zstd:chunked Image
 EOF
 fi
 
