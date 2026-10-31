@@ -119,6 +119,53 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     terraform destroy -auto-approve || true
 fi
 
+if [[ "$QUAY_STORAGE_PROVIDER" == 'ibmcloud' ]]; then
+    if [[ ! -s "${SHARED_DIR}/terraform.tgz" || ! -s "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET" || ! -s "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE" ]]; then
+        echo "No IBM Cloud COS deploy state found in SHARED_DIR; skipping cleanup." >&2
+    else
+    # The IBM Cloud Terraform provider authenticates via the IBMCLOUD_API_KEY
+    # environment variable. Restore it from the cluster profile (the same key
+    # the deploy step used). This script does not enable command tracing.
+    IBMCLOUD_API_KEY_FILE="${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    if [[ -r "${IBMCLOUD_API_KEY_FILE}" ]]; then
+        IBMCLOUD_API_KEY=$(cat "${IBMCLOUD_API_KEY_FILE}")
+        export IBMCLOUD_API_KEY
+    else
+        echo "WARNING: ${IBMCLOUD_API_KEY_FILE} not found; terraform destroy may fail" >&2
+        IBMCLOUD_API_KEY=""
+    fi
+
+    mkdir -p QUAY_IBMCLOUD_COS && cd QUAY_IBMCLOUD_COS
+    cp "${SHARED_DIR}/terraform.tgz" .
+    tar -xzvf terraform.tgz && ls
+
+    QUAY_COS_BUCKET=$(cat "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET")
+    COS_INSTANCE_NAME=$(cat "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE")
+    echo "Start to destroy IBM Cloud COS bucket ${QUAY_COS_BUCKET} ..."
+
+    export TF_VAR_ibmcloud_api_key="${IBMCLOUD_API_KEY}"
+    export TF_VAR_cos_bucket_name="${QUAY_COS_BUCKET}"
+    export TF_VAR_cos_instance_name="${COS_INSTANCE_NAME}"
+    if [[ -s "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION" ]]; then
+        TF_VAR_cos_region=$(cat "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION")
+        export TF_VAR_cos_region
+    fi
+    terraform init
+    cos_destroy_rc=1
+    for attempt in 1 2 3; do
+        echo "terraform destroy attempt ${attempt}/3 ..." >&2
+        cos_destroy_rc=0
+        terraform destroy -auto-approve || cos_destroy_rc=$?
+        [[ "${cos_destroy_rc}" -eq 0 ]] && break
+        echo "terraform destroy attempt ${attempt} failed (rc=${cos_destroy_rc})" >&2
+        sleep 10
+    done
+    if [[ "${cos_destroy_rc}" -ne 0 ]]; then
+        echo "WARNING: IBM Cloud COS terraform destroy failed after 3 attempts (rc=${cos_destroy_rc}). Resources may be leaked." >&2
+    fi
+    fi
+fi
+
 if [[ "$QUAY_STORAGE_PROVIDER" == 'S3CloudFront' ]]; then
     mkdir -p QUAY_S3CloundFront && cd QUAY_S3CloundFront
     cp "${SHARED_DIR}/terraform.s3cf.tgz" .

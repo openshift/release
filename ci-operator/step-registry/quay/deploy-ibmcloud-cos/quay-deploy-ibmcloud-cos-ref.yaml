@@ -1,0 +1,54 @@
+ref:
+  as: quay-deploy-ibmcloud-cos
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-deploy-ibmcloud-cos-commands.sh
+  timeout: 8h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  documentation: |-
+    Provision an IBM Cloud Object Storage service instance and bucket, then
+    deploy Quay Operator and Quay configured to use IBMCloudStorage distributed
+    storage. The COS resources are created with the IBM Cloud API key from the
+    ibmcloud-quay cluster profile (${CLUSTER_PROFILE_DIR}/ibmcloud-api-key).
+    The bucket name and Terraform state are passed through SHARED_DIR so
+    quay-deprovision (QUAY_STORAGE_PROVIDER=ibmcloud) can remove the resources.
+    Also merges quay-database-{aws-rds,azure-postgres}-config.yaml when present
+    (from quay-database-intg-* steps) and leaves postgres unmanaged.
+  env:
+  - name: DR__RP__CR_COMP_NAME
+    default: "lp-ocp-compat--Quay"
+    documentation: ReportPortal Component Readiness component name for junit remapping
+  - name: MAP_TESTS
+    default: "false"
+    documentation: Specify whether to update the test suite name for reporting tools
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.16"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAY_EXTRA_CONFIG
+    documentation: |-
+      Additional Quay configuration YAML merged on top of the default config.
+      Values provided here override defaults.
+    default: ""
+  - name: ENABLE_BUILD_SUPPORT
+    documentation: |-
+      When "true", deploy Quay with virtual-builder support and unmanaged TLS.
+      Requires quay-provisioning-tls and quay-provisioning-builder to have
+      populated SHARED_DIR first.
+    default: "false"
+  - name: IBMCLOUD_COS_REGION
+    documentation: IBM Cloud region for the COS instance and bucket.
+    default: "us-south"
