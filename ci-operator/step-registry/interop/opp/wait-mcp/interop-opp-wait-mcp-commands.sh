@@ -864,8 +864,11 @@ else:
         echo "Clean poll ${consecutivePasses}/${consecutiveRequired} at ${elapsed}s: ${statusDetail}"
         if (( consecutivePasses >= consecutiveRequired )); then
             echo "MCPs stable after ${elapsed}s (${consecutiveRequired} consecutive clean polls)"
-            AssertClusterHealthy
-            _hgrc=$?
+            # `|| _hgrc=$?` keeps a nonzero gate verdict from tripping
+            # errexit before the bundle collection runs (deep-review
+            # catch: bare `_hgrc=$?` never executes under set -e).
+            _hgrc=0
+            AssertClusterHealthy || _hgrc=$?
             if (( _hgrc != 0 )); then
                 # The cluster converged but the health gate failed: the
                 # bundle is the attribution for that verdict, so collect
