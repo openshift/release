@@ -18,6 +18,22 @@ done
 # Set kubeconfig path
 KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
+cd /eco-ci-cd
+
+# Temporary: apply fix from openshift-kni/eco-ci-cd#XXX (deploy-spoke-ztp-mno
+# version match fails for pre-GA releases because arch=multi nightly builds
+# are named with a "-multi-" infix the hub's native-arch version never has).
+# Copy the image dir to /tmp to get a writable layer, then patch just the one
+# file. Remove once the PR is merged and the image is rebuilt.
+ECO_CI_CD_DIR="/tmp/eco-ci-cd-patched"
+cp -r /eco-ci-cd "${ECO_CI_CD_DIR}"
+FIXED_FILE="playbooks/ran/deploy-spoke-ztp-mno.yaml"
+curl -sf --max-time 30 \
+  "https://raw.githubusercontent.com/eifrach/eco-ci-cd/fix/ztp-mno-multi-arch-release-name-match/${FIXED_FILE}" \
+  -o "${ECO_CI_CD_DIR}/${FIXED_FILE}" || echo "WARNING: failed to apply multi-arch release match fix"
+
+cd "${ECO_CI_CD_DIR}"
+
 echo "Running ZTP deployment for spoke cluster: ${SPOKE_CLUSTER_NAME}"
 ansible-playbook ./playbooks/ran/deploy-spoke-ztp-mno.yaml \
     -i ./inventories/ocp-deployment/build-inventory.py \
