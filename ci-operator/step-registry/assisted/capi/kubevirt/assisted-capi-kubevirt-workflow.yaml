@@ -1,0 +1,23 @@
+workflow:
+  as: assisted-capi-kubevirt
+  steps:
+    cluster_profile: azure-virtualization
+    allow_best_effort_post_steps: true
+    env:
+      COMPUTE_NODE_TYPE: Standard_D8s_v5
+      COMPUTE_NODE_REPLICAS: "3"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: hypershift-kubevirt-install
+    test:
+    - ref: assisted-capi-kubevirt-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+  documentation: |-
+    This workflow provisions a KubeVirt-capable OpenShift management cluster on
+    Azure, installs OpenShift Virtualization, and runs the CAPOA KubeVirt E2E
+    suite against the management-cluster kubeconfig.
+
+    The provider test owns CAPOA and CAPK installation, tenant creation, readiness
+    assertions, and tenant deletion assertions.
