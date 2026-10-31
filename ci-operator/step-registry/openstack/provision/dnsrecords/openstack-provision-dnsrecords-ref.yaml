@@ -8,8 +8,9 @@ ref:
       documentation: |-
         Install topology variant (for example proxy-externallb). When the value
         contains externallb, an api-int DNS record is created alongside api.
-        For externallb, api uses LB_HOSTS FIPs (multi-value RR); api-int uses
-        the machines-net API VIP so nodes can reach MCS/API on-L2.
+        For externallb, api uses LB_HOSTS FIPs (multi-value RR). api-int uses
+        LB_PRIVATE_IPS when present (multi-value RR to LB machines-subnet IPs),
+        otherwise falls back to the API VIP.
   resources:
     requests:
       cpu: 10m
@@ -22,5 +23,6 @@ ref:
     This steps creates the required dns records for the ingress
     and api FIPS. Expects the following to exist ${SHARED_DIR}/API_IP,
     ${SHARED_DIR}/INGRESS_IP, and ${SHARED_DIR}/CLUSTER_NAME. For externallb,
-    api uses ${SHARED_DIR}/LB_HOSTS when present; api-int uses API_IP.
+    api uses ${SHARED_DIR}/LB_HOSTS when present; api-int uses
+    ${SHARED_DIR}/LB_PRIVATE_IPS when present, otherwise API_IP.
     Writes ${SHARED_DIR}/dns_up.json used later for deprovision.
