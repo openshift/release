@@ -1,0 +1,53 @@
+ref:
+  as: agent-qe-baremetal-install-ove-disconnected-konflux-deploy-assisted
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: agent-qe-baremetal-install-ove-disconnected-konflux-deploy-assisted-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 512Mi
+  grace_period: 600
+  timeout: 3h0m0s
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+    - name: AUX_HOST
+      default: ""
+    - name: DISCONNECTED
+      default: "false"
+    - name: architecture
+      default: "amd64"
+      documentation: |-
+        Job architecture. amd64 is sent to assisted-service as x86_64, and arm64 as aarch64.
+    - name: DEPLOY_TARGET
+      default: "onprem"
+      documentation: |-
+        assisted-test-infra deploy target. onprem runs the service with podman on the lab aux host.
+    - name: ASSISTED_TEST_INFRA_IMAGE
+      default: "quay.io/edge-infrastructure/assisted-test-infra:latest"
+      documentation: Image whose working directory is copied to the aux host and used to run make run.
+    - name: SERVICE
+      default: "quay.io/edge-infrastructure/assisted-service:latest"
+      documentation: assisted-service image passed to assisted-test-infra as SERVICE.
+    - name: AGENT_DOCKER_IMAGE
+      default: "quay.io/edge-infrastructure/assisted-installer-agent:latest"
+    - name: CONTROLLER_IMAGE
+      default: "quay.io/edge-infrastructure/assisted-installer-controller:latest"
+    - name: INSTALLER_IMAGE
+      default: "quay.io/edge-infrastructure/assisted-installer:latest"
+    - name: IMAGE_SERVICE
+      default: "quay.io/edge-infrastructure/assisted-image-service:latest"
+    - name: ASSISTED_CONFIG
+      default: ""
+      documentation: |-
+        Extra assisted-test-infra exports, one KEY=VALUE per line. Applied after the generated
+        OS_IMAGES and RELEASE_IMAGES lists, so a line here can replace them.
+  documentation: |-
+    Deploy assisted-service on the lab aux host with assisted-test-infra (make run, DEPLOY_TARGET=onprem).
+    The extracted OVE ISO is the only OS image and is marked type disconnected-iso. The release image
+    is release:latest. The ISO is served from the aux host because the ISO storage host is reachable
+    only through the per-cluster haproxy network namespace, which the image service cannot use.
