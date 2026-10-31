@@ -47,9 +47,17 @@ images:
     dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
   - dockerfile_literal: |
-      FROM base
-      RUN dnf install -y python3-pip
-    from: src
+      FROM src AS source
+      FROM quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-verify@sha256:f1d831a1bc8c7fb071b1924ce39d4bd2817aa98d8a12ea42f61f1a560deb602f
+      USER 0
+      COPY --from=source --chown=1001:0 /go/src/github.com/openshift/hypershift /go/src/github.com/openshift/hypershift
+      RUN chmod -R g+rwX /go/src/github.com/openshift/hypershift
+      WORKDIR /go/src/github.com/openshift/hypershift
+      USER 1001
+    inputs:
+      src:
+        as:
+        - src
     to: custom-verify-src
   - additional_architectures:
     - arm64
@@ -143,15 +151,15 @@ resources:
   verify:
     limits:
       cpu: 4000m
-      memory: 8Gi
+      memory: 16Gi
     requests:
       cpu: 4000m
-      memory: 8Gi
+      memory: 16Gi
 tests:
 - as: verify
   capabilities:
   - arm64
-  commands: make verify-ci
+  commands: make verify
   container:
     from: custom-verify-src
   timeout: 1h30m0s
