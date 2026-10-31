@@ -77,16 +77,9 @@ tests:
   pipeline_run_if_changed: ^ote/
   steps:
     cluster_profile: openshift-org-aws
-    dependencies:
-      EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "3"
-      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
-      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
-      TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]
-      TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: enable-tls-adherence
       cli: latest
@@ -243,7 +236,7 @@ tests:
           latest_revision=${state_lines[0]:-}
           [[ "${latest_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
 
-          if [[ "${baseline_is_noop}" != true ]] && (( latest_revision <= baseline_revision )); then
+          if (( latest_revision < baseline_revision )); then
             return 1
           fi
           revision_has_tls_adherence "${latest_revision}" || return 1
@@ -433,8 +426,26 @@ tests:
           cpu: 1000m
           memory: 400Mi
       timeout: 2h15m0s
-    - ref: openshift-tests-extension-setup-out-of-payload
-    - ref: openshift-e2e-test
+    - as: wmco-tls-adherence-tests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        binary=/tmp/wmco-tests-ext
+        gunzip -c /usr/bin/wmco-tests-ext.gz > "${binary}"
+        chmod +x "${binary}"
+        "${binary}" list tests \
+          --suite windows-machine-config-operator/tls-adherence \
+          --output names
+        "${binary}" run-suite windows-machine-config-operator/tls-adherence \
+          --max-concurrency 1 \
+          --junit-path "${ARTIFACT_DIR}/junit_wmco_tls_adherence.xml"
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 4h30m0s
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: aws-upi-e2e-byoh-ote
