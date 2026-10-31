@@ -865,7 +865,15 @@ else:
         if (( consecutivePasses >= consecutiveRequired )); then
             echo "MCPs stable after ${elapsed}s (${consecutiveRequired} consecutive clean polls)"
             AssertClusterHealthy
-            exit $?
+            _hgrc=$?
+            if (( _hgrc != 0 )); then
+                # The cluster converged but the health gate failed: the
+                # bundle is the attribution for that verdict, so collect
+                # before exiting (preflight review: the doc lists the
+                # health gate among bundle-collecting paths).
+                CollectFailureBundle
+            fi
+            exit ${_hgrc}
         fi
     else
         if (( consecutivePasses > 0 )); then
