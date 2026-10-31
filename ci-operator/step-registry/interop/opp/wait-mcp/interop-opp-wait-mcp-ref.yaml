@@ -30,6 +30,21 @@ ref:
     - UPDATING (oscillating): Hard failure. Ready count is not progressing,
       suggesting nodes may be cycling due to conflicting configurations.
     - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
+
+    Diagnostics (INTEROP-9646): the first Degraded sighting and the final
+    classification emit every non-paused MCP condition (type, status, reason,
+    message) verbatim into the build log and the JUnit failure body, so the
+    decisive evidence (e.g. an ENOSPC writing the internal registry
+    pull-secret) no longer exists only in must-gather. The exit trap preserves
+    the step's exit code (set-once; SIGTERM/SIGINT record 143) and the xtrace
+    bundle is truncated then scrubbed before upload - bounded so the whole
+    failure path fits the 5m termination grace. A phase-0 offline self-test
+    pins the progress-predicate behavior on fixtures extracted from real
+    runs and fails the step (exit 2) if a refactor changes its semantics.
+    Every failure-path oc call is bounded (10s request timeout, 10s process
+    timeout) and the in-loop MCP poll is capped at 60s so a hung apiserver
+    is distinguishable from a slow rollout. Env values are validated before
+    use (exit 2 on non-integer or out-of-range).
   env:
   - default: "3"
     documentation: Number of consecutive clean polls required before declaring stable
@@ -56,6 +71,6 @@ ref:
   grace_period: 5m0s
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 512Mi
   timeout: 6300s
