@@ -7,6 +7,10 @@ base_images:
     name: ocm-cli
     namespace: ci
     tag: latest
+  rhcs-tf-e2e:
+    name: rhcs-tf-e2e
+    namespace: ci
+    tag: latest
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -479,6 +483,20 @@ tests:
       REPLICAS: "2"
       STS: "true"
     workflow: rosa-e2e-classic
+- as: rosa-hcp-tf-e2e-private-staging
+  capabilities:
+  - intranet
+  cron: 0 15 * * 1
+  restrict_network_access: false
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_PROFILE: rosa-hcp-pl
+      LABEL_FILTER: Platform:HCP && !Access:PublicAPI
+      OCM_LOGIN_ENV: staging
+    workflow: rosa-e2e-hcp-terraform-rhcs
 - as: osd-gcp-e2e-staging-stable-4-22
   cron: 30 7 * * *
   steps:
