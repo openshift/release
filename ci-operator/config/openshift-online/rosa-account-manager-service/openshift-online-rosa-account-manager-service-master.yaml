@@ -13,6 +13,26 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  # Warm the Go module and build caches once per run so every test pod starts
+  # from them instead of re-downloading and recompiling. Test pods run as a
+  # random UID in group 0 with HOME=/home/user, so the build cache must live
+  # under that HOME and be group-writable. Each `go test` below mirrors the
+  # flags of a Makefile test target; a mismatch only costs a recompile.
+  # `-exec /bin/true` builds and links every test binary without running it,
+  # and `go clean -testcache` drops the resulting fake passes so test pods
+  # never report a cached result for tests that did not actually run.
+  set -e
+  unset GOFLAGS
+  export GOCACHE=/home/user/.cache/go-build
+  make install
+  go test -exec /bin/true ./pkg/... ./cmd/...
+  go test -exec /bin/true -ldflags -s ./test/integration
+  go test -exec /bin/true -tags=fedramp -ldflags -s ./test/fedramp
+  go test -exec /bin/true -tags=xcm -ldflags -s ./test/xcm
+  go clean -testcache
+  chgrp -R 0 /home/user /go
+  chmod -R g=u /home/user /go
 tests:
 - as: lint
   commands: |
@@ -21,7 +41,7 @@ tests:
     make verify
     make lint
   container:
-    from: src
+    from: test-bin
 - as: unit-test
   capabilities:
   - nested-podman
@@ -37,7 +57,7 @@ tests:
     sleep 5
     make test
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -57,7 +77,7 @@ tests:
     sleep 5
     make test-fedramp
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -77,7 +97,7 @@ tests:
     sleep 5
     make test-xcm
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -101,7 +121,7 @@ tests:
     sleep 5
     make test-integration-shard-0
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -125,7 +145,7 @@ tests:
     sleep 5
     make test-integration-shard-1
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -149,7 +169,7 @@ tests:
     sleep 5
     make test-integration-shard-2
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -173,7 +193,7 @@ tests:
     sleep 5
     make test-integration-shard-3
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -197,7 +217,7 @@ tests:
     sleep 5
     make test-integration-shard-4
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -221,7 +241,7 @@ tests:
     sleep 5
     make test-integration-shard-5
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -242,7 +262,7 @@ tests:
     sleep 5
     make codecov
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   secrets:
   - collection: rosa-account-manager-service
@@ -266,7 +286,7 @@ tests:
     sleep 5
     make codecov
   container:
-    from: src
+    from: test-bin
   nested_podman: true
   postsubmit: true
   secrets:
