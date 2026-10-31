@@ -178,6 +178,10 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
+  fuzz-azure:
+    requests:
+      cpu: "3"
+      memory: 5Gi
   govet:
     requests:
       cpu: "3"
@@ -206,6 +210,61 @@ test_binary_build_commands: |
   # Some agent-based installer tests require nmstatectl
   dnf install -y nmstate
 tests:
+- always_run: false
+  as: fuzz-azure
+  optional: true
+  commands: |
+    set -uo pipefail
+    FUZZTIME="${FUZZ_TIME:-2m}"
+    rc=0
+    run_fuzz() {
+      local pkg="$1" fn="$2" out
+      echo "--- fuzz: $fn ($pkg) ---"
+      # A missing Fuzz target exits 0 with "no fuzz tests to fuzz".
+      out=$(go test "./$pkg" -run='^$' -fuzz="^${fn}$" -fuzztime="${FUZZTIME}" 2>&1) || rc=$?
+      printf '%s\n' "$out"
+      case "$out" in
+        *"no fuzz tests to fuzz"*) rc=1 ;;
+      esac
+    }
+    trap 'find . -path "*/testdata/fuzz/*/*" | while read -r f; do
+            dest="$ARTIFACT_DIR/$(dirname "$f")"; mkdir -p "$dest"; cp "$f" "$dest/"; done' EXIT
+    run_fuzz pkg/destroy/azure                          FuzzGroupFromID
+    run_fuzz pkg/types/azure                            FuzzAddressFamilySubnets
+    run_fuzz pkg/types/azure                            FuzzAzureResourceNames
+    run_fuzz pkg/types/azure                            FuzzSetBaseDomain
+    run_fuzz pkg/types/azure                            FuzzStorageAccountName
+    run_fuzz pkg/types/azure/validation                 FuzzDiskEncryptionSetID
+    run_fuzz pkg/types/azure/validation                 FuzzFindDuplicateTagKeys
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDataDisk
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDataDiskSetup
+    run_fuzz pkg/types/azure/validation                 FuzzValidateDiskEncryption
+    run_fuzz pkg/types/azure/validation                 FuzzValidateEncryptionAtHost
+    run_fuzz pkg/types/azure/validation                 FuzzValidateOSImage
+    run_fuzz pkg/types/azure/validation                 FuzzValidateSecurityProfile
+    run_fuzz pkg/types/azure/validation                 FuzzValidateTag
+    run_fuzz pkg/types/azure/validation                 FuzzValidateUserTags
+    run_fuzz pkg/asset/installconfig/azure              FuzzAcceleratedNetworkingCapability
+    run_fuzz pkg/asset/installconfig/azure              FuzzAzureStackClusterOSImage
+    run_fuzz pkg/asset/installconfig/azure              FuzzAzureStackClusterOSImageSet
+    run_fuzz pkg/asset/installconfig/azure              FuzzInstanceSecurityType
+    run_fuzz pkg/asset/installconfig/azure              FuzzPremiumDiskCapability
+    run_fuzz pkg/asset/installconfig/azure              FuzzWindowsVMFamily
+    run_fuzz pkg/asset/machines/azure                   FuzzBootDiagnosticsObject
+    run_fuzz pkg/asset/machines/azure                   FuzzBootstrapFailureDomain
+    run_fuzz pkg/asset/machines/azure                   FuzzCapzUserTags
+    run_fuzz pkg/asset/machines/azure                   FuzzMachineImage
+    run_fuzz pkg/asset/machines/azure                   FuzzTrimSubscriptionPrefix
+    run_fuzz pkg/asset/manifests/azure                  FuzzGetIPWithinCIDR
+    run_fuzz pkg/asset/manifests/azure                  FuzzSubnetAddressPrefixes
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzCheckIfNewer
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzConvertToSemver
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzMatchesRHELMajor
+    run_fuzz pkg/rhcos/marketplace/azure                FuzzParseAROSKUs
+    exit $rc
+  container:
+    from: src
+  timeout: 2h0m0s
 - as: unit
   commands: |
     go test -coverprofile=/tmp/coverprofile.out ./pkg/...
