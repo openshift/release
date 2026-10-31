@@ -653,11 +653,5 @@ oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
 
 oc adm top pods -n ${HC_NS}-${HC_NAME} || true 
 
-# Unpause the HostedCluster now that the CoreDNS override is in place and
-# conformance setup is complete. This allows CPO to resume normal reconciliation.
-echo "$(date) Unpausing HostedCluster"
-oc patch hostedcluster "${HC_NAME}" -n "${HC_NS}" \
-  --type=merge -p '{"spec":{"pausedUntil":""}}' || true
-
 # --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
