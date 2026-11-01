@@ -6,8 +6,8 @@ workflow:
          mirrors operators and OCP release images to target bastion's disconnected registry,
          deploy MinIO on target bastion, then deploy the SNO spoke on the seed hub (baremetal
          helix58) and the target spoke on the target hub (baremetal helix57) via ZTP.
-    Test: run IBU upgrade and post-upgrade eco-gotests, report results.
-    Post: notify Slack, trigger next job in chain.
+         Generate and mirror the seed image, then run IBU upgrade eco-gotests.
+    Post: upload reports even after test failures, notify Slack, trigger next job in chain.
   steps:
     pre:
     # Seed hub setup — kni-qe-108 deployed at VERSION
@@ -38,10 +38,9 @@ workflow:
     - ref: telcov10n-functional-cnf-ran-ibu-mirror-seed-image
     # # Prepare target SNO, run eco-gotests IBU upgrade suite against target spoke
     - ref: telcov10n-functional-cnf-ran-ibu-eco-gotests-upgrade
-    # # Collect IBU metrics and upload reports to Polarion and Report Portal
-    - ref: telcov10n-functional-cnf-ran-ibu-report
-    # # Send Slack notification
-    - ref: telcov10n-functional-cnf-ran-ibu-send-slack-notification
 
     post:
+    # Collect and upload reports even when the upgrade step fails.
+    - ref: telcov10n-functional-cnf-ran-ibu-report
+    - ref: telcov10n-functional-cnf-ran-ibu-send-slack-notification
     - ref: telcov10n-functional-trigger-job
