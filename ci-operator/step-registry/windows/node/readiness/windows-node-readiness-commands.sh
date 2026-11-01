@@ -5,41 +5,40 @@ set -o errexit
 set -o pipefail
 
 expected_nodes="${WINDOWS_NODE_REPLICAS:-2}"
+deadline_seconds=$((55 * 60))
+start_seconds=${SECONDS}
 
-windows_machinesets="$(
-  oc get machinesets -n openshift-machine-api -o json |
-    jq -r '.items[] | select(.spec.template.metadata.labels["machine.openshift.io/os-id"] == "Windows") | .metadata.name'
-)"
-
-if [[ -z "${windows_machinesets}" ]]; then
-  echo "ERROR: No Windows MachineSets were found"
-  oc get machinesets -n openshift-machine-api -o wide
-  exit 1
-fi
-
-while IFS= read -r machineset; do
-  desired_replicas="$(
-    oc get machineset "${machineset}" -n openshift-machine-api -o jsonpath='{.spec.replicas}'
+while :; do
+  windows_machinesets="$(
+    oc get machinesets -n openshift-machine-api -o json |
+      jq '[.items[] | select(.spec.template.metadata.labels["machine.openshift.io/os-id"] == "Windows") | {desired: (.spec.replicas // 0), ready: (.status.readyReplicas // 0)}]'
   )"
-  echo "Waiting for MachineSet ${machineset} to have ${desired_replicas} ready replicas"
-  oc wait "machineset/${machineset}" -n openshift-machine-api \
-    --for="jsonpath={.status.readyReplicas}=${desired_replicas}" \
-    --timeout=30m
-done <<< "${windows_machinesets}"
 
-echo "Waiting for ${expected_nodes} Windows nodes to become Ready"
-oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=30m
+  total_machinesets="$(jq 'length' <<<"${windows_machinesets}")"
+  if (( total_machinesets == 0 )); then
+    echo "ERROR: No Windows MachineSets were found"
+    exit 1
+  fi
 
-ready_nodes="$(
-  oc get nodes -l kubernetes.io/os=windows --no-headers |
-    awk '$2 == "Ready" || $2 ~ /^Ready,/ { count++ } END { print count + 0 }'
-)"
+  ready_machinesets="$(
+    jq '[.[] | select(.ready >= .desired)] | length' <<<"${windows_machinesets}"
+  )"
 
-if (( ready_nodes < expected_nodes )); then
-  echo "ERROR: Expected ${expected_nodes} Ready Windows nodes, found ${ready_nodes}"
-  oc get nodes -l kubernetes.io/os=windows -o wide
-  exit 1
-fi
+  ready_nodes="$(
+    oc get nodes -l kubernetes.io/os=windows -o json |
+      jq '[.items[] | select((.status.conditions // []) | any(.type == "Ready" and .status == "True"))] | length'
+  )"
 
-echo "Found ${ready_nodes}/${expected_nodes} Ready Windows nodes"
-oc get nodes -l kubernetes.io/os=windows -o wide
+  echo "Windows MachineSets ready: ${ready_machinesets}/${total_machinesets}; Windows nodes Ready: ${ready_nodes}/${expected_nodes}"
+
+  if (( ready_machinesets == total_machinesets && ready_nodes >= expected_nodes )); then
+    exit 0
+  fi
+
+  if (( SECONDS - start_seconds >= deadline_seconds )); then
+    echo "ERROR: Timed out waiting for Windows readiness: MachineSets ${ready_machinesets}/${total_machinesets}, Ready nodes ${ready_nodes}/${expected_nodes}"
+    exit 1
+  fi
+
+  sleep 10
+done

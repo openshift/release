@@ -3,14 +3,34 @@ chain:
   steps:
     - chain: ipi-conf-vsphere 
     - chain: vsphere-provision-bastionhost
-    - chain: mirror-images-payload
+    - chain: mirror-images-by-oc-mirror
     - ref: ovn-conf
     - ref: ovn-conf-hybrid-manifest-with-custom-vxlan-port
     - ref: ipi-conf-mirror
     - ref: ipi-install-install
     - ref: ipi-install-vsphere-registry
     - ref: windows-e2e-operator-test-mirror-images
-    - ref: set-sample-operator-disconnected 
+    - ref: mirror-images-trust-registry-ca
+    - as: disable-default-operatorhub-sources
+      from: cli
+      commands: |-
+        set -euo pipefail
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        oc patch OperatorHub cluster --type json \
+          -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+        for source in redhat-operators certified-operators community-operators; do
+          if oc get catalogsource "${source}" -n openshift-marketplace >/dev/null 2>&1; then
+            oc wait --for=delete "catalogsource/${source}" -n openshift-marketplace --timeout=5m
+          fi
+        done
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+      grace_period: 5m0s
   env:
     - name: REGISTER_MIRROR_REGISTRY_DNS 
       default: "yes"

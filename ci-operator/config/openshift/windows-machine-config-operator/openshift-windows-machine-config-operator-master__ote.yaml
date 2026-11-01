@@ -47,10 +47,11 @@ tests:
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]|\[tls-adherence\]
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup-and-test
@@ -437,6 +438,76 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: gcp-e2e-ote
+  optional: true
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
+  as: azure-e2e-ote
+  optional: true
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
   as: aws-upi-e2e-byoh-ote
   optional: true
   pipeline_run_if_changed: ^ote/
@@ -471,6 +542,7 @@ tests:
     dependencies:
       EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
@@ -494,6 +566,46 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - always_run: false
+  as: vsphere-disconnected-e2e-ote
+  optional: true
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: vsphere-dis-2
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      ENABLE_IDMS: "yes"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      MIRROR_BIN: oc-mirror
+      PAUSE_IMAGE_ORG: test-org
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: windows-e2e-operator-test-mirror-extension
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
+- always_run: false
   as: nutanix-e2e-ote
   cluster: build01
   optional: true
@@ -503,10 +615,11 @@ tests:
     dependencies:
       EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]|\[tls-adherence\]
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: wmco-setup

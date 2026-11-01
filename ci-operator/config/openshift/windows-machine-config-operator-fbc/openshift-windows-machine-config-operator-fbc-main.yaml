@@ -117,6 +117,7 @@ tests:
       EXTENSION_IMAGE: wmco-tests
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       SUB_CHANNEL: stable
@@ -144,6 +145,7 @@ tests:
     dependencies:
       EXTENSION_IMAGE: wmco-tests
     env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       SUB_CHANNEL: stable
@@ -172,6 +174,7 @@ tests:
       EXTENSION_IMAGE: wmco-tests
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       SUB_CHANNEL: stable
@@ -199,6 +202,7 @@ tests:
     dependencies:
       EXTENSION_IMAGE: wmco-tests
     env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       SUB_CHANNEL: stable
@@ -218,6 +222,63 @@ tests:
     - ref: openshift-tests-extension-setup-out-of-payload
     - ref: openshift-e2e-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: nutanix-ipi-ovn-ote
+  cluster: build01
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: nutanix
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-nutanix-windows-machineset
+    - ref: windows-node-readiness
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-nutanix-ovn-hybrid
+- as: vsphere-ipi-proxy-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/proxy
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-vsphere-windows-machineset
+    - ref: windows-node-readiness
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port-proxy
 - as: aws-upi-ovn-ote
   postsubmit: true
   skip_if_only_changed: ^(?:hack|\.tekton)/
@@ -227,6 +288,7 @@ tests:
       EXTENSION_IMAGE: wmco-tests
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       SUB_CHANNEL: stable
@@ -258,6 +320,7 @@ tests:
       EXTENSION_IMAGE: wmco-tests
     env:
       ENABLE_IDMS: "yes"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       MIRROR_BIN: oc-mirror
@@ -274,6 +337,7 @@ tests:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
     test:
+    - ref: windows-e2e-operator-test-mirror-extension
     - ref: openshift-windows-setup-wmco-konflux-disconnected
     - ref: operatorhub-subscribe
     - ref: windows-conf-operator

@@ -30,6 +30,10 @@ registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base
 
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
+# The source image lives in the build farm, so add build-farm credentials to the
+# same auth file used by oc image mirror.
+KUBECONFIG="" oc registry login --to "${new_pull_secret}"
+
 # Mirror operator image from CI namespace in build farm to emphemeral test cluster
 wmco_image_src="registry.apps.build02.vmc.ci.openshift.org/${NAMESPACE}/pipeline"
 wmco_image_dst="${MIRROR_REGISTRY_HOST}/pipeline"
@@ -46,12 +50,6 @@ do
   sleep 5
   ((retries+=1))
 done
-
-# Hand the mirrored WMCO OTE test image to openshift-tests-extension-setup-out-of-payload.
-# The cluster pull secret contains the mirror registry credentials from ipi-conf-mirror.
-mirrored_extension_image="${wmco_image_dst}:wmco-tests"
-echo "${mirrored_extension_image}" > "${SHARED_DIR}/mirrored_extension_image"
-echo "Saved mirrored OTE test image reference to ${SHARED_DIR}/mirrored_extension_image"
 
 idms_content="apiVersion: config.openshift.io/v1\n"
 idms_content+="kind: ImageDigestMirrorSet\n"
@@ -75,6 +73,7 @@ mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022=MIRROR_REGISTRY_PLACEHOLDER
 quay.io/operator-framework/upstream-registry-builder:v1.16.0=MIRROR_REGISTRY_PLACEHOLDER/operator-framework/upstream-registry-builder:v1.16.0
 registry.access.redhat.com/ubi8/ubi-minimal:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ubi-minimal:latest
 registry.access.redhat.com/ubi9/ubi-minimal:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi9/ubi-minimal:latest
+registry.access.redhat.com/ubi9/ubi:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi9/ubi:latest
 registry.access.redhat.com/ubi8/httpd-24:1-299=MIRROR_REGISTRY_PLACEHOLDER/ubi8/httpd-24:1-299
 registry.k8s.io/sig-storage/csi-provisioner:v3.3.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/csi-provisioner:v3.3.0
 registry.k8s.io/sig-storage/livenessprobe:v2.9.0=MIRROR_REGISTRY_PLACEHOLDER/sig-storage/livenessprobe:v2.9.0
