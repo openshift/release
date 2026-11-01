@@ -1,0 +1,90 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM quay.io/ocp-edge-qe/eco-gotests:latest
+      USER 0
+      RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+      RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    to: eco-gotests
+  run_if_changed: x^
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: nfd-qe
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 2 * * *
+  presubmit: true
+  reporter_config:
+    channel: '#kmm-nfd-gpu-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    test:
+    - as: run-nfd-eco-gotests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        export ECO_TEST_FEATURES=nfd
+        export ECO_TEST_LABELS=NFD
+        export ECO_TEST_VERBOSE=true
+        export ECO_TEST_TIMEOUT=12h
+        export ECO_VERBOSE_LEVEL=90
+        export ECO_HWACCEL_NFD_SUBSCRIPTION_NAME=nfd
+        export ECO_HWACCEL_NFD_CATALOG_SOURCE=redhat-operators
+        export ECO_HWACCEL_NFD_CPU_FLAGS_HELPER_IMAGE=quay.io/rh_ee_ggordani/cpuinfo:release-4.19
+        export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}"
+        export ECO_DUMP_FAILED_TESTS=true
+
+        mkdir -p "${ARTIFACT_DIR}"
+        oc version || true
+        oc get nodes -o wide > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
+
+        set +e
+        ./scripts/test-runner.sh
+        test_rc="$?"
+        set -e
+
+        oc get nodefeaturediscoveries.nfd.openshift.io --all-namespaces -o yaml \
+          > "${ARTIFACT_DIR}/nfd-nodefeaturediscoveries.yaml" 2>&1 || true
+        oc get pods --namespace openshift-nfd -o wide \
+          > "${ARTIFACT_DIR}/nfd-pods.txt" 2>&1 || true
+        oc get events --namespace openshift-nfd --sort-by=.lastTimestamp \
+          > "${ARTIFACT_DIR}/nfd-events.txt" 2>&1 || true
+        oc get csv --namespace openshift-nfd -o yaml \
+          > "${ARTIFACT_DIR}/nfd-csvs.yaml" 2>&1 || true
+
+        exit "${test_rc}"
+      from: eco-gotests
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+  timeout: 14h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nfd_ci
