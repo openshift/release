@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Cleans up after rosa-conf-vpc-cni: removes the IRSA IAM role and detaches
+# Cleans up after rosa-conf-aws-vpc-cni: removes the IRSA IAM role and detaches
 # the ECR read-only policy the standard deprovision chain does not know
 # about. All in-cluster changes (the SCCs, the helm release and the tuning
 # config) are removed with the cluster by rosa-cluster-deprovision.
@@ -35,7 +35,7 @@ fi
 export AWS_DEFAULT_REGION="${REGION}"
 
 # ---- Revoke the node-to-node worker SG rule ----
-# Authorized by rosa-conf-vpc-cni so the VPC CNI's native pod traffic can
+# Authorized by rosa-conf-aws-vpc-cni so the VPC CNI's native pod traffic can
 # cross nodes. The worker SG itself is created and deleted with the cluster,
 # but revoke anyway in case it outlives the job: the self-referencing
 # all-protocols rule grants far more than the OVN port set the group was
@@ -55,7 +55,7 @@ if [[ -s "${SHARED_DIR}/aws-vpc-cni-worker-sg-id" ]]; then
 fi
 
 # ---- Detach the ECR read-only policy from the worker role ----
-# Attached by rosa-conf-vpc-cni so the nodes can pull the CNI images from
+# Attached by rosa-conf-aws-vpc-cni so the nodes can pull the CNI images from
 # Amazon's private ECR. The worker role itself is created and deleted by
 # rosa-sts-account-roles-create/delete, but detach anyway in case the role
 # outlives the job (shared account roles): leaving the policy attached grants

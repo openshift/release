@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 # Installs the AWS VPC CNI onto a ROSA HCP cluster that was created with
 # NO_CNI=true (rosa-cluster-provision --no-cni), following the procedure from
-# https://github.com/phbergsmann/rosa-vpc-cni:
+# https://github.com/phbergsmann/rosa-aws-vpc-cni:
 #   1. IRSA role trusting system:serviceaccount:kube-system:aws-node, with the
 #      AWS-managed AmazonEKS_CNI_Policy attached
 #   2. hostaccess/privileged SCCs for the aws-node service account
@@ -129,7 +129,7 @@ if [[ -s "${CLUSTER_PROFILE_DIR}/aws-account-id" ]]; then
 else
   AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 fi
-IAM_ROLE_NAME="${CLUSTER_ID}-vpc-cni"
+IAM_ROLE_NAME="${CLUSTER_ID}-aws-vpc-cni"
 
 # The AWS-managed policy is required: custom policies with tag conditions do
 # not work because the VPC CNI tags ENIs with node.k8s.amazonaws.com/* and the
@@ -156,7 +156,7 @@ cat > "${TRUST_POLICY}" <<EOF
 EOF
 
 # Remember the role for the post steps before creating it: if create-role or
-# attach-role-policy fails, rosa-conf-vpc-cni-role-delete must still be able
+# attach-role-policy fails, rosa-conf-aws-vpc-cni-role-delete must still be able
 # to find and remove it. rosa-aws-sts-hcp-deprovision does not know about it
 # and would leak it.
 echo -n "${IAM_ROLE_NAME}" > "${SHARED_DIR}/aws-vpc-cni-role-name"
@@ -181,7 +181,7 @@ rm -f "${TRUST_POLICY}"
 # only carries ROSAWorkerInstancePolicy (no ecr:*), so nodes cannot pull the
 # images and the aws-node pods stick in ImagePullBackOff. Attach the
 # AWS-managed read-only ECR policy to the job-scoped worker role;
-# rosa-conf-vpc-cni-cleanup detaches it again after the cluster is gone.
+# rosa-conf-aws-vpc-cni-cleanup detaches it again after the cluster is gone.
 # The worker role ARN is recorded by rosa-cluster-provision in the
 # ${SHARED_DIR}/cluster-config artifact (rosa describe cluster -o json does
 # not expose it).
@@ -204,7 +204,7 @@ log "Attached AmazonEC2ContainerRegistryReadOnly to ${WORKER_ROLE_ARN}"
 # the machine CIDR), so cross-node pod TCP is silently dropped and e.g. the
 # rosa-e2e pod-to-service spec times out. Like EKS node groups, allow all
 # traffic between the group's own members (self-referencing rule);
-# rosa-conf-vpc-cni-cleanup revokes it again after the test.
+# rosa-conf-aws-vpc-cni-cleanup revokes it again after the test.
 WORKER_SG_ID=$(aws ec2 describe-security-groups \
   --filters "Name=group-name,Values=${CLUSTER_ID}-default-sg" \
   --query 'SecurityGroups[0].GroupId' --output text)
@@ -237,13 +237,13 @@ cat > "${IP_FORWARD_SPEC}" <<'EOF'
 {
   "profile": [
     {
-      "name": "ip-forward-vpc-cni",
+      "name": "ip-forward-aws-vpc-cni",
       "data": "[main]\nsummary=Enable IP forwarding for AWS VPC CNI\ninclude=openshift-node\n[sysctl]\nnet.ipv4.ip_forward=1\n"
     }
   ],
   "recommend": [
     {
-      "profile": "ip-forward-vpc-cni",
+      "profile": "ip-forward-aws-vpc-cni",
       "priority": 5
     }
   ]

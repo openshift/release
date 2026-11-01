@@ -97,7 +97,7 @@ if [[ -z "${resolved_name}" || -z "${resolved_region:-${REGION}}" ]]; then
 fi
 if [[ "${HOSTED_CP}" == "true" ]]; then topology="hcp"; else topology="classic"; fi
 
-# Optional cni marker: a CNI-swap step that ran earlier (e.g. rosa-conf-vpc-cni,
+# Optional cni marker: a CNI-swap step that ran earlier (e.g. rosa-conf-aws-vpc-cni,
 # ROSAENG-67432) writes ${SHARED_DIR}/cni. Include it so the rebuilt contract
 # does not drop it; heads without a marker publish no cni field.
 cni_marker=""
