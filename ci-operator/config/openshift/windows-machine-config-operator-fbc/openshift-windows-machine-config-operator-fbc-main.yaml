@@ -11,6 +11,10 @@ base_images:
     name: "5.1"
     namespace: ocp
     tag: upi-installer
+  wmco-tests:
+    name: "5.1"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
 build_root:
   image_stream_tag:
     name: release
@@ -104,6 +108,174 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: aws-ipi-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-aws-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-aws-ovn-hybrid
+- as: gcp-ipi-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-gcp-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp-ovn-hybrid
+- as: azure-ipi-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-azure-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-azure-ovn-hybrid
+- as: vsphere-ipi-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-vsphere-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: aws-upi-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    pre:
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest
+    test:
+    - ref: openshift-windows-setup-wmco-konflux
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-aws-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: upi-aws
+- as: vsphere-ipi-disconnected-ovn-ote
+  postsubmit: true
+  skip_if_only_changed: ^(?:hack|\.tekton)/
+  steps:
+    cluster_profile: vsphere-dis-2
+    dependencies:
+      EXTENSION_IMAGE: wmco-tests
+    env:
+      ENABLE_IDMS: "yes"
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      MIRROR_BIN: oc-mirror
+      PAUSE_IMAGE_ORG: test-org
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SUITE: windows-machine-config-operator/smokerun
+      WINDOWS_NODE_REPLICAS: "2"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - ref: openshift-windows-setup-wmco-konflux-disconnected
+    - ref: operatorhub-subscribe
+    - ref: windows-conf-operator
+    - ref: ipi-conf-vsphere-windows-machineset
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
 zz_generated_metadata:
   branch: main
   org: openshift
