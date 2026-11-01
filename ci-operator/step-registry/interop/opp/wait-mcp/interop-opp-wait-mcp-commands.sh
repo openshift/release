@@ -167,9 +167,14 @@ _opp_validate_int() {
   # 010 as octal 8 and errors on 08, so a digit-only regex alone would
   # accept values the typeset -i assignments then misread (preflight
   # review: reject leading zeros except bare "0").
-  if ! [[ "${_raw}" =~ ^(0|[1-9][0-9]*)$ ]] || (( 10#${_raw} < _min )); then
+  # Digit count is capped at nine: bash arithmetic is 64-bit signed, so
+  # oversized digit strings wrap silently (18446744073709551617 wraps
+  # to 1 and would pass the _min check; INT64_MAX overflows the
+  # deadline arithmetic). Largest default here is 5400, so nine digits
+  # is far beyond every legitimate value.
+  if ! [[ "${_raw}" =~ ^(0|[1-9][0-9]*)$ ]] || (( ${#_raw} > 9 )) || (( 10#${_raw} < _min )); then
     echo "FAILURE CLASS: Invalid step input" >&2
-    echo "env ${_name} must be an integer >= ${_min} (got '${_raw}')" >&2
+    echo "env ${_name} must be an integer >= ${_min} and < 10^9 (got '${_raw}')" >&2
     exit 2
   fi
 }
