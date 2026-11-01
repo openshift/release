@@ -66,14 +66,16 @@ else
 fi
 $WAS_TRACING && set -x
 
-# The cluster is not functional yet (nodes NotReady), so use the breakglass
-# admin kubeconfig rather than the customer kubeconfig. The test container
-# ships an ambient KUBECONFIG pointing at the CI namespace service account,
-# which has no rights on the cluster under test — always override it. If no
-# kubeconfig was produced yet, fetch one from the OCM credentials API (the
-# osd-ccs admin-kubeconfig step is not usable here: it requires an ocm-token
-# in the cluster profile, while the rosa profiles carry SSO client
-# credentials).
+# Although rosa-cluster-wait-ready-cluster has passed (the API server answers),
+# no kubeconfig exists in ${SHARED_DIR} yet: rosa-cluster-provision writes
+# none, and in this workflow the first one otherwise appears in
+# rosa-conf-idp-htpasswd (customer kubeconfig), which cannot run until the CNI
+# is in place. Fetch the breakglass admin kubeconfig from the OCM credentials
+# API instead (the osd-ccs admin-kubeconfig step is not usable here: it
+# requires an ocm-token in the cluster profile, while the rosa profiles carry
+# SSO client credentials). The test container also ships an ambient KUBECONFIG
+# pointing at the CI namespace service account, which has no rights on the
+# cluster under test — always override it.
 if [[ ! -s "${SHARED_DIR}/kubeconfig.kubeadmin" && ! -s "${SHARED_DIR}/kubeconfig" ]]; then
   # Do not trace the OCM login.
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
@@ -98,6 +100,9 @@ fi
 if [[ -s "${SHARED_DIR}/kubeconfig.kubeadmin" ]]; then
   export KUBECONFIG="${SHARED_DIR}/kubeconfig.kubeadmin"
 elif [[ -s "${SHARED_DIR}/kubeconfig" ]]; then
+  # Reached when an earlier step already published a (customer or backplane)
+  # kubeconfig but no admin one exists, e.g. a workflow variant running
+  # rosa-cluster-credentials-backplane before this step.
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 else
   log "ERROR: no kubeconfig found in ${SHARED_DIR} (kubeconfig.kubeadmin or kubeconfig)"

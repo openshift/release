@@ -30,6 +30,11 @@ workflow:
     # an ocm-token in the cluster profile, while the rosa profiles carry SSO
     # client credentials) and records cni=aws-vpc-cni in cluster-metadata.json.
     - ref: rosa-conf-aws-vpc-cni
+    # Hosted control plane health (HostedCluster / HostedControlPlane CRs and
+    # the HCP namespace pods on the management cluster), like the other HCP
+    # workflows. Must run after the CNI install: with --no-cni the nodes are
+    # NotReady and the HostedCluster Available condition cannot become True.
+    - ref: rosa-cluster-wait-ready-hosted-cp
     - ref: rosa-cluster-notify-error
     - ref: rosa-cluster-wait-ready-operators
     - ref: rosa-conf-idp-htpasswd
