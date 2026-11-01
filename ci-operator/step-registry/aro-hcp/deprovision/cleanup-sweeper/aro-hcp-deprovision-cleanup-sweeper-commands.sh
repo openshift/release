@@ -34,8 +34,6 @@ fi
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
-go build -o /tmp/cleanup-sweeper ./tooling/cleanup-sweeper
-
 discover_subscription_ids() {
   local -a ids=()
   local file sub_id
@@ -64,7 +62,7 @@ discover_subscription_ids() {
 run_cleanup() {
   local subscription_id="${1}"
   local cmd=(
-    /tmp/cleanup-sweeper
+    cleanup-sweeper
     --workflow "${CLEANUP_SWEEPER_WORKFLOW}"
     --options "${CLEANUP_SWEEPER_WORKFLOW}.subscription-id=${subscription_id}"
   )

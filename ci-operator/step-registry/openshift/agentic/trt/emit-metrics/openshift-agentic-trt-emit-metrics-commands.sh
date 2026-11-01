@@ -68,9 +68,10 @@ for metadata_file in "${METADATA_FILES[@]}"; do
           build_id: $build_id
         }')
 
-    # Add num_review_rounds for review-responder
+    # The autodl loader decodes every row value as a string. A JSON number
+    # here makes it reject the whole file, so the jira_agent row never loads.
     if [[ "${AGENT}" == "trt-review-responder" ]]; then
-        ROW=$(echo "${ROW}" | jq --argjson num_review_rounds "${NUM_REVIEW_ROUNDS}" '. + {num_review_rounds: $num_review_rounds}')
+        ROW=$(echo "${ROW}" | jq --arg num_review_rounds "${NUM_REVIEW_ROUNDS}" '. + {num_review_rounds: $num_review_rounds}')
     fi
 
     ROWS=$(echo "${ROWS}" | jq --argjson row "${ROW}" '. + [$row]')
