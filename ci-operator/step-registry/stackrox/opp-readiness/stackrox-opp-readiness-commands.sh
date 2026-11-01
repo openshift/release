@@ -41,10 +41,12 @@ ACS_SELFTEST="${ACS_SELFTEST:-true}"
 ACS_EXPECTATION="${ACS_EXPECTATION:-}"
 _BUDGET_MARGIN_S=600   # static cross-file check: budget + margin < ref timeout - grace
 
-typeset -i pollInterval="${ACS_POLL_INTERVAL_S}"
-typeset -i waitCap="${ACS_WAIT_TIMEOUT_S}"
-typeset -i budget="${ACS_BUDGET_S}"
-typeset -i _budgetDeadline=$(( $(date +%s) + budget ))
+# Validated and typeset after the carrier/trap machinery is installed, so an
+# invalid value produces an InvalidInput carrier case instead of a silent
+# arithmetic abort with no carrier (fail-closed).
+typeset -i pollInterval=0
+typeset -i waitCap=0
+typeset -i budget=0
 
 # --- JUnit carrier machinery (deploy-acs precedent, D4/D6) -----------------
 _SUITE="lp-interop--OPP--acs-readiness"
@@ -94,12 +96,13 @@ _write_carrier() {
 }
 
 _write_shared_copy() {
-    # D4 channel split: when the ACS state is absent, the SHARED_DIR reporter
-    # copy downgrades the classification case to <skipped/>; the PASSED
-    # absent-by-design case lives in ${ARTIFACT_DIR} only.
+    # D4 channel split: only the absent-by-design case is downgraded in the
+    # SHARED_DIR reporter copy (the PASSED absent-by-design case lives in
+    # ${ARTIFACT_DIR} only). A required-but-absent failure is NEVER downgraded:
+    # the reporter copy must carry the honest <failure> element.
     [[ -n "${SHARED_DIR:-}" ]] || return 0
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    if [[ "${_ACS_STATE}" == "absent" ]]; then
+    if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "absent-by-design" ]]; then
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
             echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"$(( _N_SKIPPED + 1 ))\" time=\"$(( $(date +%s) - _junit_start ))\">"
@@ -149,7 +152,26 @@ _terminate() {
 trap '_terminate TERM' TERM
 trap '_terminate INT' INT
 _jrc=0
-trap '_jrc=$?; set +e; set +x; _finalize; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; set +x; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; _finalize; exit "${_jrc}"' EXIT
+
+# ---------------------------------------------------------------------------
+# Env-seam validation (fail-closed, unconditional - runs even when
+# ACS_SELFTEST=false): a non-positive-integer seam must exit 2 with an
+# InvalidInput carrier case, never an arithmetic abort before the carrier
+# exists.
+# ---------------------------------------------------------------------------
+for _seam in ACS_POLL_INTERVAL_S ACS_WAIT_TIMEOUT_S ACS_BUDGET_S; do
+    if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
+        _add_case "acs-env-invalid" failed "InvalidInput" \
+            "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
+        echo "[readiness] FATAL: invalid ${_seam}='${!_seam}'"
+        exit 2
+    fi
+done
+pollInterval="${ACS_POLL_INTERVAL_S}"
+waitCap="${ACS_WAIT_TIMEOUT_S}"
+budget="${ACS_BUDGET_S}"
+typeset -i _budgetDeadline=$(( $(date +%s) + budget ))
 
 # ---------------------------------------------------------------------------
 # Self-test (D6 named executor): machinery validation, always on
@@ -628,7 +650,7 @@ set +x
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
 roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
-    -o jsonpath='{.data.password}' | base64 -d)"
+    -o jsonpath='{.data.password}' | base64 -d)" || true
 
 if [[ -z "${roxAdminPassword}" ]]; then
     echo "[readiness] FATAL: could not extract roxAdminPassword"
@@ -754,8 +776,9 @@ echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
 # End of credential region (D7)
 set -x
 
-echo "[readiness] All checks passed. ACS is ready for SMOKE tests."
 if (( _assert_rc != 0 )); then
+    echo "[readiness] One or more readiness assertions failed; see ${_CARRIER}"
     exit 1
 fi
+echo "[readiness] All checks passed. ACS is ready for SMOKE tests."
 exit 0
