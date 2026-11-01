@@ -259,7 +259,10 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
     export GOPATH="${GOPATH:-/tmp/prow-analyzer-gopath}"
     _GO_BUILD_ERR="$(mktemp /tmp/prow-analyzer-goerr.XXXXXX)"
     _CLEANUP_FILES="${_CLEANUP_FILES} ${_GO_BUILD_ERR}"
-    if ! (cd "${ANALYZER_CLI_PATH}"/*/ && go build -o prow-analyzer ./cmd/prow-analyzer 2>"${_GO_BUILD_ERR}"); then
+    # -mod=mod overrides a builder-image GOFLAGS=-mod=vendor: the pinned
+    # archive's vendor/modules.txt is stale, and CI golang images default to
+    # vendored builds (rehearsal 2116335159719497728: "inconsistent vendoring").
+    if ! (cd "${ANALYZER_CLI_PATH}"/*/ && go build -mod=mod -o prow-analyzer ./cmd/prow-analyzer 2>"${_GO_BUILD_ERR}"); then
         # Self-diagnosing note line (metadata-only: go toolchain errors carry
         # paths/URLs, never analysis prose or credentials). Spaces become ~ so
         # the key=value result-line grammar stays parseable.
