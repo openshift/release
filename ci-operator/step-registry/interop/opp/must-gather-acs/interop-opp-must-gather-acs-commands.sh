@@ -69,11 +69,13 @@ collect_acs_diagnostics() {
     # (same endpoint roxctl central debug download-diagnostics uses)
     echo "Downloading ACS diagnostic bundle..."
 
-    # Use cluster CA for TLS verification
-    CURL_CA_OPTS=""
-    if [[ -f /var/run/secrets/kubernetes.io/serviceaccount/ca.crt ]]; then
-        CURL_CA_OPTS="--cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    fi
+    # TLS posture: the route certificate is signed by the ingress operator's
+    # CA, not the API-server CA exposed at the serviceaccount mount, so
+    # --cacert against the serviceaccount ca.crt fails verification (HTTP
+    # 000, observed in rehearsal build 2116737836412571648). Match the
+    # readiness step's precedent: curl -sk (insecure), with the mode
+    # disclosed here - this step collects evidence, it does not verify TLS.
+    CURL_TLS_OPTS="-k"
 
     # Pass credentials via temp file to keep them out of /proc/cmdline
     CURL_CFG=$(mktemp)
@@ -82,7 +84,7 @@ collect_acs_diagnostics() {
     printf 'user = "admin:%s"\n' "${ADMIN_PW}" > "${CURL_CFG}"
 
     # shellcheck disable=SC2086
-    HTTP_CODE=$(curl -s --connect-timeout 10 --max-time 120 ${CURL_CA_OPTS} -K "${CURL_CFG}" -w '%{http_code}' \
+    HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
       "https://${CENTRAL_HOST}/v1/debug/diagnostics" \
       -o "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" 2>&1) || {
         echo "WARNING: curl failed to connect to Central."
