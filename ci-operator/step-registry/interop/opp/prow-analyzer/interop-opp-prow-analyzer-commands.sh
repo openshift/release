@@ -274,6 +274,20 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
     ANALYZER_CLI_PATH="$(find "${ANALYZER_CLI_PATH}" -name prow-analyzer -type f | head -1)"
 fi
 
+# Red Hat IT root CA: the MCP endpoint's chain terminates at the internal
+# RH IT root, absent from stock CI image trust stores (rehearsal
+# 2116720842141339648: three CLI attempts failed TLS). When the CA bundle
+# is mounted (GSM ship-help-mcp/ca, same credential group as the token),
+# scope SSL_CERT_FILE to the CLI attempts only: the source fetch
+# (api.github.com) and the sink delivery (Slack webhook) must keep the
+# public roots.
+ANALYZER_CA_FILE="${ANALYZER_CA_FILE:-${ANALYZER_SECRET_TOKEN_FILE%/*}/ca}"
+_SSL_CERT_FILE_WAS_SET=0
+if [ -s "${ANALYZER_CA_FILE}" ] && [ -z "${SSL_CERT_FILE:-}" ]; then
+    export SSL_CERT_FILE="${ANALYZER_CA_FILE}"
+    _SSL_CERT_FILE_WAS_SET=1
+fi
+
 TOKEN="$(cat "${ANALYZER_SECRET_TOKEN_FILE}")"
 CLI_OUT="$(mktemp /tmp/prow-analyzer-cli-out.XXXXXX)"
 CLI_ERR="$(mktemp /tmp/prow-analyzer-cli-err.XXXXXX)"
@@ -323,9 +337,19 @@ attempt_loop() {
         fi
         sleep "${ANALYZER_BACKOFF_SECONDS}"
     done
+    # Self-diagnosing note line on CLI failure (metadata-only: toolchain and
+    # transport errors, never analysis prose or credentials). Rehearsal
+    # 2116720842141339648: three failed attempts were unattributable because
+    # CLI_ERR was deleted by cleanup before anything recorded it.
+    _CLI_DETAIL="$(head -c 160 "${CLI_ERR}" | head -1 | tr ' ' '~')"
+    printf 'OPP-PROW-ANALYZER v=1 stage=note what=cli_failed classification=%s detail=%s\n' \
+        "${classification}" "${_CLI_DETAIL:-no_stderr}"
     _OUTCOME="error"
 }
 attempt_loop
+if [ "${_SSL_CERT_FILE_WAS_SET}" -eq 1 ]; then
+    unset SSL_CERT_FILE
+fi
 
 if [ "${_OUTCOME}" != "success" ]; then
     exit 0
