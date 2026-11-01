@@ -23,9 +23,20 @@ images:
   - dockerfile_path: Dockerfile.microshift
     from: ovn-kubernetes-base
     to: ovn-kubernetes-microshift
+  - build_args:
+    - name: with_ovn_debug_symbols
+      value: "true"
+    dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base-debug
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base-debug
+    to: ovn-kubernetes-debug
 promotion:
   to:
   - disabled: true
+    excluded_images:
+    - ovn-kubernetes-base-debug
+    - ovn-kubernetes-debug
     name: "5.1"
     namespace: ocp
 releases:
@@ -672,6 +683,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-ovn-kubernetes-set-debug-image
     - ref: openshift-qe-installer-aws-provision-bastion
     test:
     - ref: openshift-qe-bgp-setup-udn-bgp
@@ -697,6 +709,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-ovn-kubernetes-set-debug-image
     - ref: openshift-qe-installer-aws-provision-bastion
     test:
     - ref: openshift-qe-bgp-setup-udn-bgp
