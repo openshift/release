@@ -38,6 +38,13 @@ if [[ -z "${EXTENSION_IMAGE:-}" ]]; then
   exit 1
 fi
 
+# A disconnected job may mirror EXTENSION_IMAGE and hand the resulting pull
+# specification to this step through SHARED_DIR.
+if [[ -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+  EXTENSION_IMAGE="$(<"${SHARED_DIR}/mirrored_extension_image")"
+  echo "Using mirrored extension image: ${EXTENSION_IMAGE}"
+fi
+
 # Set defaults for optional variables
 EXTENSION_IMAGESTREAM_NAME="${EXTENSION_IMAGESTREAM_NAME:-${EXTENSION_COMPONENT_NAME}-tests}"
 EXTENSION_ADMISSION_NAME="${EXTENSION_ADMISSION_NAME:-${EXTENSION_COMPONENT_NAME}-extensions}"

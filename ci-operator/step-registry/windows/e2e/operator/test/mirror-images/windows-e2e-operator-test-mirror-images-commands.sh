@@ -47,6 +47,12 @@ do
   ((retries+=1))
 done
 
+# Hand the mirrored WMCO OTE test image to openshift-tests-extension-setup-out-of-payload.
+# The cluster pull secret contains the mirror registry credentials from ipi-conf-mirror.
+mirrored_extension_image="${wmco_image_dst}:wmco-tests"
+echo "${mirrored_extension_image}" > "${SHARED_DIR}/mirrored_extension_image"
+echo "Saved mirrored OTE test image reference to ${SHARED_DIR}/mirrored_extension_image"
+
 idms_content="apiVersion: config.openshift.io/v1\n"
 idms_content+="kind: ImageDigestMirrorSet\n"
 idms_content+="metadata:\n"
