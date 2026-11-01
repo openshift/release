@@ -161,18 +161,30 @@ _run_selftest() {
 # Classification (D4): own query, BEFORE consuming SHARED_DIR
 # ---------------------------------------------------------------------------
 _classify() {
-    typeset out="" items="" attempt=""
+    typeset out="" items="" attempt="" crdlist=""
     typeset -i rc=0
     for attempt in 1 2 3; do
-        if out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
-            items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
-            if (( rc == 0 )); then
-                if (( items > 0 )); then
-                    _ACS_STATE="present"
-                else
-                    _ACS_STATE="absent"
-                fi
+        # CRD existence first, via a list read that succeeds either way: a
+        # missing resource type is a DETERMINISTIC absence (no Central can
+        # exist without the CRD), not a transient read failure. This is the
+        # 5.x lane reality: no ACS operator is installed, so the centrals
+        # query itself errors ("the server doesn't have a resource type") -
+        # observed in rehearsal build 2116735878033313792.
+        if crdlist="$(oc get crd -o name 2>/dev/null)" && [[ -n "${crdlist}" ]]; then
+            if ! printf '%s\n' "${crdlist}" | grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$'; then
+                _ACS_STATE="absent"
                 return 0
+            fi
+            if out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+                items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
+                if (( rc == 0 )); then
+                    if (( items > 0 )); then
+                        _ACS_STATE="present"
+                    else
+                        _ACS_STATE="absent"
+                    fi
+                    return 0
+                fi
             fi
         fi
         rc=0
