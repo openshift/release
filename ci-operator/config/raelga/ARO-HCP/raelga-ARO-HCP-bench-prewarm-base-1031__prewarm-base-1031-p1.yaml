@@ -1,0 +1,68 @@
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-nested-podman-ci@sha256:c6b313815eb9cf885459135b6ca984cd25fb3cb22a6318906f7a9ac8d4f06bdd
+canonical_go_repository: github.com/Azure/ARO-HCP
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+tests:
+- always_run: false
+  as: integration
+  capabilities:
+  - nested-podman
+  - arm64
+  cluster: build11
+  disable_pod_scaler: true
+  nested_podman: true
+  optional: true
+  run_if_changed: ^$
+  steps:
+    test:
+    - as: integration
+      commands: |-
+        set -euo pipefail
+        set -x
+        expected_sha=927c11033ff4aa2c67f95da9b7544021d1e75876
+        actual_sha=$(git rev-parse HEAD)
+        mkdir -p "${ARTIFACT_DIR}/prewarm-bench"
+        printf '%s\n' "expected_sha=${expected_sha}" "actual_sha=${actual_sha}" "branch=bench-prewarm-base-1031" "variant=prewarm-base-1031-p1" > "${ARTIFACT_DIR}/prewarm-bench/source.txt"
+        if [[ "${actual_sha}" != "${expected_sha}" ]]; then
+          echo "Refusing benchmark: checkout HEAD differs from frozen SHA" >&2
+          exit 1
+        fi
+        export GOPATH=/opt/app-root
+        export PATH="${PATH}:${GOPATH}/bin"
+        go install gotest.tools/gotestsum@v1.13.0
+        go version > "${ARTIFACT_DIR}/prewarm-bench/environment.txt"
+        cleanup() {
+          local status=$?
+          trap - EXIT
+          set +e
+          test-integration/hack/stop-cosmos-emulator.sh > "${ARTIFACT_DIR}/prewarm-bench/stop-cosmos.log" 2>&1
+          printf 'test_exit_status=%s\n' "${status}" > "${ARTIFACT_DIR}/prewarm-bench/exit-status.txt"
+          exit "${status}"
+        }
+        trap cleanup EXIT
+        test-integration/hack/start-cosmos-emulator.sh
+        start_s=$(date +%s)
+        test-integration/hack/test-integration.sh
+        end_s=$(date +%s)
+        echo "integration_script_seconds=$((end_s - start_s))" >> "${ARTIFACT_DIR}/prewarm-bench/exit-status.txt"
+      from: src
+      grace_period: 30s
+      nested_podman: true
+      resources:
+        requests:
+          cpu: "6"
+          memory: 4Gi
+zz_generated_metadata:
+  branch: bench-prewarm-base-1031
+  org: raelga
+  repo: ARO-HCP
+  variant: prewarm-base-1031-p1
