@@ -1,25 +1,209 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euxo pipefail
+shopt -s inherit_errexit
 
 # ---------------------------------------------------------------------------
-# ACS OPP Readiness Gate
+# ACS OPP Readiness Gate (INTEROP-9647 PR-A, team review revision 3 D4-D8)
 #
 # Verifies that ACS Central and SecuredCluster are operational before
 # running SMOKE tests.  Discovers namespaces dynamically via CRs.
 # Writes credentials and connection details to $SHARED_DIR for
 # downstream steps.
 #
+# Contract (fail-closed):
+#   ACS_EXPECTATION   required | absent-by-design   (unset/other => exit 2)
+#   Classification (own query, before any SHARED_DIR consumption):
+#     present  - Central CR(s) exist (0-exit oc get, >=1 item)
+#     absent   - Central CR list empty on a successful read (0-exit, 0 items)
+#     unknown  - read failed after 3 attempts => FAILED, exit != 0
+#   Carrier junit lp-interop--OPP--acs-readiness is emitted on EVERY exit
+#   path: one classification case (self-describing name), six assertion
+#   cases, one acs-preflight-selftest case.  A hard SIGKILL leaves the
+#   pre-seeded failing carrier on disk (never green).
+#   Exit codes: 0 pass / absent-by-design; 1 assertion failure or
+#   acs-required-but-absent; 2 invalid input; 3 acs-state-indeterminate.
+#
 # Dependencies: oc, curl, python3 (all present in the `cli` image).
 # ---------------------------------------------------------------------------
 
-if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
+if [[ -f "${SHARED_DIR:-}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
 
-typeset -i pollInterval=30
-typeset -i timeout=900
-typeset -i elapsed=0
-typeset -i iteration=0
+ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+mkdir -p "${ARTIFACT_DIR}"
+
+# --- Env seams (D6) --------------------------------------------------------
+ACS_POLL_INTERVAL_S="${ACS_POLL_INTERVAL_S:-30}"
+ACS_WAIT_TIMEOUT_S="${ACS_WAIT_TIMEOUT_S:-900}"
+ACS_BUDGET_S="${ACS_BUDGET_S:-3300}"
+ACS_SELFTEST="${ACS_SELFTEST:-true}"
+ACS_EXPECTATION="${ACS_EXPECTATION:-}"
+_BUDGET_MARGIN_S=600   # static cross-file check: budget + margin < ref timeout - grace
+
+typeset -i pollInterval="${ACS_POLL_INTERVAL_S}"
+typeset -i waitCap="${ACS_WAIT_TIMEOUT_S}"
+typeset -i budget="${ACS_BUDGET_S}"
+typeset -i _budgetDeadline=$(( $(date +%s) + budget ))
+
+# --- JUnit carrier machinery (deploy-acs precedent, D4/D6) -----------------
+_SUITE="lp-interop--OPP--acs-readiness"
+_CLASSNAME="lp-interop.OPP.acs-readiness"
+_CARRIER="${ARTIFACT_DIR}/junit_${_SUITE}.xml"
+_junit_start=$(date +%s)
+declare -a _CASES=()
+declare -i _N_FAILURES=0 _N_SKIPPED=0 _N_TOTAL=0 _FINALIZED=0
+_ACS_STATE="unclassified"
+_CLASSIFICATION_CASE=""
+
+_xesc() {
+    python3 -c 'import sys, xml.sax.saxutils as x; sys.stdout.write(x.escape(sys.argv[1]))' "$1"
+}
+
+_add_case() {
+    # name status(failed|skipped|passed) type message
+    typeset name="$1" status="$2" type="${3:-}" msg="${4:-}"
+    typeset body=""
+    if [[ "${status}" == "failed" ]]; then
+        _N_FAILURES+=1
+        body="<failure message=\"$(_xesc "${msg}")\" type=\"$(_xesc "${type}")\">$(_xesc "${msg}")</failure>"
+    elif [[ "${status}" == "skipped" ]]; then
+        _N_SKIPPED+=1
+        body="<skipped message=\"$(_xesc "${msg}")\"/>"
+    fi
+    _CASES+=("<testcase name=\"$(_xesc "${name}")\" classname=\"${_CLASSNAME}\">${body}</testcase>")
+    _N_TOTAL+=1
+}
+
+_add_classification() {
+    # D4: self-describing classification case name
+    _CLASSIFICATION_CASE="$1"
+    _add_case "$@"
+}
+
+_write_carrier() {
+    {
+        echo '<?xml version="1.0" encoding="UTF-8"?>'
+        echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"${_N_SKIPPED}\" time=\"$(( $(date +%s) - _junit_start ))\">"
+        typeset c=""
+        for c in "${_CASES[@]:-}"; do
+            [[ -n "${c}" ]] && echo "  ${c}"
+        done
+        echo '</testsuite>'
+    } > "${_CARRIER}" 2>/dev/null || true
+}
+
+_write_shared_copy() {
+    # D4 channel split: when the ACS state is absent, the SHARED_DIR reporter
+    # copy downgrades the classification case to <skipped/>; the PASSED
+    # absent-by-design case lives in ${ARTIFACT_DIR} only.
+    [[ -n "${SHARED_DIR:-}" ]] || return 0
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    if [[ "${_ACS_STATE}" == "absent" ]]; then
+        {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"$(( _N_SKIPPED + 1 ))\" time=\"$(( $(date +%s) - _junit_start ))\">"
+            typeset c=""
+            for c in "${_CASES[@]:-}"; do
+                [[ -n "${c}" ]] || continue
+                if [[ "${c}" == *"<testcase name=\"${_CLASSIFICATION_CASE}\""* ]]; then
+                    echo "  <testcase name=\"${_CLASSIFICATION_CASE}\" classname=\"${_CLASSNAME}\"><skipped/></testcase>"
+                else
+                    echo "  ${c}"
+                fi
+            done
+            echo '</testsuite>'
+        } > "${SHARED_DIR}/junit/junit_${_SUITE}.xml" 2>/dev/null || true
+    else
+        cp "${_CARRIER}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    fi
+}
+
+_finalize() {
+    (( _FINALIZED )) && return 0
+    _FINALIZED=1
+    _write_carrier
+    _write_shared_copy
+}
+
+# Pre-seed a default-failing carrier: a hard SIGKILL before classification
+# leaves a failing artifact on disk (never green; D6 / 9525 contract).
+_ACS_STATE="unknown"
+_add_classification "acs-state-indeterminate" failed "PreSeed" "carrier pre-seed: step exited before classification completed (SIGKILL guard)"
+_write_carrier
+_CASES=()
+_N_FAILURES=0 _N_SKIPPED=0 _N_TOTAL=0
+_CLASSIFICATION_CASE=""
+_ACS_STATE="unclassified"
+
+_terminate() {
+    typeset sig="$1"
+    if [[ "${_ACS_STATE}" == "unclassified" ]]; then
+        _ACS_STATE="unknown"
+        _add_classification "acs-state-indeterminate" failed "StepTerminated" "terminated by ${sig} before classification completed"
+    else
+        _add_case "step-terminated" failed "StepTerminated" "terminated by ${sig} after classification (state=${_ACS_STATE})"
+    fi
+    exit 143
+}
+trap '_terminate TERM' TERM
+trap '_terminate INT' INT
+_jrc=0
+trap '_jrc=$?; set +e; set +x; _finalize; exit "${_jrc}"' EXIT
+
+# ---------------------------------------------------------------------------
+# Self-test (D6 named executor): machinery validation, always on
+# ---------------------------------------------------------------------------
+_run_selftest() {
+    typeset -i st_rc=0
+    [[ -w "${ARTIFACT_DIR}" ]] || { echo "[selftest] FAIL: ARTIFACT_DIR not writable"; st_rc=1; }
+    command -v oc >/dev/null 2>&1 || { echo "[selftest] FAIL: oc not found"; st_rc=1; }
+    command -v python3 >/dev/null 2>&1 || { echo "[selftest] FAIL: python3 not found"; st_rc=1; }
+    command -v curl >/dev/null 2>&1 || { echo "[selftest] FAIL: curl not found"; st_rc=1; }
+    [[ "${pollInterval}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_POLL_INTERVAL_S must be > 0"; st_rc=1; }
+    [[ "${waitCap}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_WAIT_TIMEOUT_S must be > 0"; st_rc=1; }
+    [[ "${budget}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_BUDGET_S must be > 0"; st_rc=1; }
+    if (( st_rc == 0 )); then
+        _add_case "acs-preflight-selftest" passed
+    else
+        _add_case "acs-preflight-selftest" failed "SelfTest" "acs-preflight-selftest failed: machinery validation"
+    fi
+    return "${st_rc}"
+}
+
+# ---------------------------------------------------------------------------
+# Classification (D4): own query, before any SHARED_DIR consumption
+# ---------------------------------------------------------------------------
+_classify() {
+    typeset out="" items="" attempt=""
+    typeset -i rc=0
+    for attempt in 1 2 3; do
+        if out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+            items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
+            if (( rc == 0 )); then
+                if (( items > 0 )); then
+                    _ACS_STATE="present"
+                else
+                    _ACS_STATE="absent"
+                fi
+                return 0
+            fi
+        fi
+        rc=0
+        sleep $(( attempt * 2 ))
+    done
+    _ACS_STATE="unknown"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Budget-bounded wait (D6): global in-script budget across all waits
+# ---------------------------------------------------------------------------
+_budget_remaining() {
+    typeset -i rem=$(( _budgetDeadline - $(date +%s) ))
+    (( rem < 0 )) && rem=0
+    echo "${rem}"
+}
 
 function WaitFor () {
     typeset description="$1"
@@ -31,9 +215,17 @@ function WaitFor () {
         shift
     fi
 
-    elapsed=0
-    iteration=0
-    echo "[readiness] Waiting for: ${description}"
+    typeset -i elapsed=0
+    typeset -i iteration=0
+    typeset -i cap=waitCap
+    typeset -i rem
+    rem="$(_budget_remaining)"
+    (( rem < cap )) && cap=rem
+    if (( cap == 0 )); then
+        echo "[readiness] BUDGET EXHAUSTED before waiting for: ${description}"
+        return 1
+    fi
+    echo "[readiness] Waiting for: ${description} (cap ${cap}s, budget remaining $(_budget_remaining)s)"
     while true; do
         if "${checkFn}" "$@"; then
             echo "[readiness] OK: ${description}"
@@ -41,16 +233,21 @@ function WaitFor () {
         fi
         elapsed=$((elapsed + pollInterval))
         iteration=$((iteration + 1))
-        if [[ "${elapsed}" -ge "${timeout}" ]]; then
-            echo "[readiness] TIMEOUT after ${timeout}s waiting for: ${description}"
+        if [[ "${elapsed}" -ge "${cap}" ]]; then
+            echo "[readiness] TIMEOUT after ${elapsed}s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
+            return 1
+        fi
+        rem="$(_budget_remaining)"
+        if (( rem <= 0 )); then
+            echo "[readiness] BUDGET EXHAUSTED while waiting for: ${description}"
             return 1
         fi
         # Every 5th iteration, dump periodic diagnostics if a function is provided
         if [[ -n "${diagnosticsFn}" ]] && (( iteration % 5 == 0 )); then
-            echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, ${elapsed}/${timeout}s) ---"
+            echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, ${elapsed}/${cap}s) ---"
             "${diagnosticsFn}" || true
         fi
-        echo "[readiness]   ...retrying in ${pollInterval}s (${elapsed}/${timeout}s)"
+        echo "[readiness]   ...retrying in ${pollInterval}s (${elapsed}/${cap}s, budget remaining ${rem}s)"
         sleep "${pollInterval}"
     done
     true
@@ -290,29 +487,59 @@ function PeriodicOperatorDiagnostics () {
 }
 
 # ---------------------------------------------------------------------------
-# Failure diagnostics: allowlisted operator status on discovery timeout
+# Main flow
 # ---------------------------------------------------------------------------
-function CentralDiscoveryFailureDiagnostics () {
-    echo "[readiness] === Failure diagnostics ==="
 
-    echo "[readiness] --- StackRox/RHACS Subscriptions ---"
-    SubscriptionStatus || echo "[readiness]   (none)"
+# Fail-closed expectation validation (D4)
+case "${ACS_EXPECTATION}" in
+    required|absent-by-design)
+        echo "[readiness] ACS_EXPECTATION=${ACS_EXPECTATION}"
+        ;;
+    *)
+        _ACS_STATE="unknown"
+        _add_classification "acs-expectation-invalid" failed "InvalidInput" \
+            "ACS_EXPECTATION must be 'required' or 'absent-by-design' (got: '${ACS_EXPECTATION:-unset}'); fail-closed"
+        echo "[readiness] FATAL: invalid ACS_EXPECTATION '${ACS_EXPECTATION:-unset}'"
+        exit 2
+        ;;
+esac
 
-    echo "[readiness] --- StackRox/RHACS CSVs ---"
-    CsvStatus || echo "[readiness]   (none)"
+if [[ "${ACS_SELFTEST}" != "false" ]]; then
+    if ! _run_selftest; then
+        exit 2
+    fi
+fi
 
-    echo "[readiness] --- StackRox/RHACS operator pods ---"
-    OperatorPodStatus || echo "[readiness]   (none)"
+# Classification before any SHARED_DIR consumption (D4)
+_classify
+echo "[readiness] ACS state classified: ${_ACS_STATE}"
 
-    echo "[readiness] --- InstallPlans ---"
-    InstallPlanStatus || echo "[readiness]   (none)"
+if [[ "${_ACS_STATE}" == "unknown" ]]; then
+    _add_classification "acs-state-indeterminate" failed "Classification" \
+        "acs-unclassified:central-query/read failed after 3 attempts; never classified as absent without a successful read"
+    exit 3
+fi
 
-    echo "[readiness] --- Central CRs in any state ---"
-    CentralStatus || echo "[readiness]   No Central CRs found at all"
+if [[ "${_ACS_STATE}" == "absent" ]]; then
+    # All six assertion cases are emitted on every exit path (D4), skipped
+    # when the state is absent.
+    typeset _a=""
+    for _a in central-crd securedcluster-crd central-route central-api-insecure-tls policies-loaded sensor-ready; do
+        _add_case "${_a}" skipped "StateAbsent" "state=absent: assertion not evaluated"
+    done
+    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+        _add_classification "acs-required-but-absent" failed "Classification" \
+            "acs-central-not-created: Central CR absent on a successful read while ACS_EXPECTATION=required"
+        echo "[readiness] Central CR absent but required by ACS_EXPECTATION"
+        exit 1
+    fi
+    _add_classification "acs-absent-by-design" passed
+    echo "[readiness] Central CR absent by design (ACS_EXPECTATION=absent-by-design)"
+    exit 0
+fi
 
-    echo "[readiness] === End failure diagnostics ==="
-}
-
+# --- state=present: run the six assertions ---------------------------------
+_add_classification "acs-present" passed
 PreFlightDiagnostics
 
 # ---------------------------------------------------------------------------
@@ -337,17 +564,42 @@ function DiscoverScNs () {
 typeset centralNs=""
 typeset scNs=""
 
+typeset -i _assert_rc=0
+
+if oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+    _add_case "central-crd" passed
+else
+    _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+    _assert_rc=1
+fi
+
+if oc get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+    _add_case "securedcluster-crd" passed
+else
+    _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+    _assert_rc=1
+fi
+
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
-    CentralDiscoveryFailureDiagnostics
+    _add_case "central-route" failed "Assertion" "central namespace discovery failed (budget remaining $(_budget_remaining)s)"
+    _add_case "central-api-insecure-tls" failed "Assertion" "central namespace discovery failed"
+    _add_case "policies-loaded" failed "Assertion" "central namespace discovery failed"
+    _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery not reached"
     exit 1
 fi
 echo "[readiness] Central namespace: ${centralNs}"
 
-WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs
+if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
+    _add_case "central-route" skipped "StateAbsent" "securedcluster namespace discovery failed; route check not reached"
+    _add_case "central-api-insecure-tls" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "policies-loaded" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
+    exit 1
+fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 
 # ---------------------------------------------------------------------------
-# Check 1: Central route exists
+# Check: Central route exists
 # ---------------------------------------------------------------------------
 typeset centralUrl=""
 
@@ -358,12 +610,21 @@ function CheckCentralRoute () {
     true
 }
 
-WaitFor "Central route" CheckCentralRoute
+if WaitFor "Central route" CheckCentralRoute; then
+    _add_case "central-route" passed
+else
+    _add_case "central-route" failed "Assertion" "Central route not found in ${centralNs} (budget remaining $(_budget_remaining)s)"
+    _assert_rc=1
+fi
 echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
-# Extract ROX_ADMIN_PASSWORD before API checks
+# Credential region (D7): set +x bracket spans every credential
+# read/check/use/write below -- no set -x may be active at any of these
+# sites (static ordering check enforces this).
 # ---------------------------------------------------------------------------
+set +x
+
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
 roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
@@ -371,12 +632,16 @@ roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
 
 if [[ -z "${roxAdminPassword}" ]]; then
     echo "[readiness] FATAL: could not extract roxAdminPassword"
+    _add_case "central-api-insecure-tls" failed "Assertion" "central-htpasswd secret empty or missing in ${centralNs}"
+    _add_case "policies-loaded" skipped "StateAbsent" "no credentials; API checks not reached"
+    _add_case "sensor-ready" skipped "StateAbsent" "no credentials"
     exit 1
 fi
 echo "[readiness] roxAdminPassword extracted successfully"
 
 # ---------------------------------------------------------------------------
-# Check 2: Central API health (authenticated v1/metadata)
+# Check: Central API health (authenticated v1/metadata; curl -sk — the
+# assertion case is named for its mode per D4)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
     typeset httpCode=""
@@ -387,10 +652,15 @@ function CheckCentralApi () {
     true
 }
 
-WaitFor "Central API health (v1/metadata)" CheckCentralApi
+if WaitFor "Central API health (v1/metadata)" CheckCentralApi; then
+    _add_case "central-api-insecure-tls" passed
+else
+    _add_case "central-api-insecure-tls" failed "Assertion" "Central API v1/metadata not healthy (curl -sk, budget remaining $(_budget_remaining)s)"
+    _assert_rc=1
+fi
 
 # ---------------------------------------------------------------------------
-# Check 3: At least 1 secured cluster connected
+# Check: At least 1 secured cluster connected
 # ---------------------------------------------------------------------------
 function CheckClustersConnected () {
     typeset clusterCount=""
@@ -401,10 +671,10 @@ function CheckClustersConnected () {
     true
 }
 
-WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected
+WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected || true
 
 # ---------------------------------------------------------------------------
-# Check 4: Sensor pods Running (detect OOMKilled)
+# Check: Sensor pods Running (detect OOMKilled)
 # ---------------------------------------------------------------------------
 function CheckSensorPods () {
     typeset podCount=""
@@ -447,10 +717,15 @@ for pod in d.get('items',[]):
     true
 }
 
-WaitFor "sensor pods Running in ${scNs}" CheckSensorPods
+if WaitFor "sensor pods Running in ${scNs}" CheckSensorPods; then
+    _add_case "sensor-ready" passed
+else
+    _add_case "sensor-ready" failed "Assertion" "sensor pods not Ready in ${scNs} (budget remaining $(_budget_remaining)s)"
+    _assert_rc=1
+fi
 
 # ---------------------------------------------------------------------------
-# Check 5: Default policies loaded (count > 80)
+# Check: Default policies loaded (count > 80)
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
     typeset policyCount=""
@@ -462,15 +737,25 @@ function CheckPoliciesLoaded () {
     true
 }
 
-WaitFor "default policies loaded (>80)" CheckPoliciesLoaded
+if WaitFor "default policies loaded (>80)" CheckPoliciesLoaded; then
+    _add_case "policies-loaded" passed
+else
+    _add_case "policies-loaded" failed "Assertion" "default policies not loaded (>80 expected; budget remaining $(_budget_remaining)s)"
+    _assert_rc=1
+fi
 
 echo "[readiness] Writing connection details to SHARED_DIR..."
 
 echo "${roxAdminPassword}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
 echo "${centralUrl}"       > "${SHARED_DIR}/CENTRAL_URL"
-
 echo "${centralNs}"  > "${SHARED_DIR}/CENTRAL_NS"
 echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
 
+# End of credential region (D7)
+set -x
+
 echo "[readiness] All checks passed. ACS is ready for SMOKE tests."
-true
+if (( _assert_rc != 0 )); then
+    exit 1
+fi
+exit 0
