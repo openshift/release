@@ -10,6 +10,10 @@ The initial job follows the existing `cnv-dev-preview-konflux` development lane:
 from [CNV CI's version mapping](https://github.com/openshift-cnv/cnv-ci/blob/master/version-mapping.json)
 on every run. The mapping is updated independently of this configuration. An
 explicit `CNV_CATALOG_IMAGE` overrides it for a reproducible rehearsal.
+The selected mapping must contain a non-empty image pullspec. A missing, null,
+or malformed entry fails catalog resolution before a CatalogSource is created.
+If publication of the development catalog is broken, restore the mapping or
+explicitly select a valid development image for the rehearsal.
 
 ## Flow
 
