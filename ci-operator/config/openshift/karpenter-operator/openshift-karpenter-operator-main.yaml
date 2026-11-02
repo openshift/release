@@ -40,6 +40,9 @@ resources:
     requests:
       cpu: 200m
       memory: 400Mi
+  test-schema:
+    requests:
+      memory: 1Gi
   verify:
     limits:
       memory: 8Gi
@@ -106,6 +109,14 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-azure-aks-e2e
+- as: test-schema
+  commands: |
+    export GOCACHE=/tmp/go-cache
+    export GOPROXY=https://proxy.golang.org
+    make test-schema
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify
   commands: |
     export GOCACHE=/tmp/
