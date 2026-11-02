@@ -276,8 +276,11 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
     if ! (cd "${ANALYZER_CLI_PATH}"/*/ && go build -mod=mod -o prow-analyzer ./cmd/prow-analyzer 2>"${_GO_BUILD_ERR}"); then
         # Self-diagnosing note line (metadata-only: go toolchain errors carry
         # paths/URLs, never analysis prose or credentials). Spaces become ~ so
-        # the key=value result-line grammar stays parseable.
-        _GO_DETAIL="$(head -c 200 "${_GO_BUILD_ERR}" | head -1 | tr ' ' '~')"
+        # the key=value result-line grammar stays parseable. Skip go module
+        # progress lines first (CodeRabbit r4429697363): with an empty module
+        # cache Go prints "go: downloading ..." before any failure, and
+        # head -1 would report the progress message instead of the error.
+        _GO_DETAIL="$(grep -vE '^go: (downloading|finding|fetching)' "${_GO_BUILD_ERR}" 2>/dev/null | grep -m1 . | head -c 200 | tr ' ' '~')"
         printf 'OPP-PROW-ANALYZER v=1 stage=note what=compile_failed detail=%s\n' "${_GO_DETAIL:-no_stderr}"
         _OUTCOME="error"; _GATE="compile_failed"
         exit 0
