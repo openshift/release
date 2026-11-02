@@ -19,6 +19,10 @@ base_images:
     name: recert
     namespace: edge-infrastructure
     tag: latest
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -44,8 +48,6 @@ promotion:
   to:
   - name: "5.1"
     namespace: ocp-kni
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -331,6 +333,77 @@ tests:
       PROJECT_NAME: lifecycle-agent
       SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk --severity-threshold=high
     workflow: openshift-ci-security
+- always_run: false
+  as: tls-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-lifecycle-agent-operator-bundle-pipeline
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
+      OO_PACKAGE: lifecycle-agent
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-lifecycle-agent
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: wait-lca-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for LCA operator to restart after TLS profile change..."
+        oc rollout status deployment lifecycle-agent-controller-manager -n openshift-lifecycle-agent --timeout=300s
+        echo "LCA operator restarted with new TLS profile"
+        oc get pods -n openshift-lifecycle-agent
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- as: tls-scan-periodic
+  cron: 0 3 * * 5
+  reporter_config:
+    channel: '#telco-platform-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: '@channel Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-lifecycle-agent-operator-bundle-pipeline
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
+      OO_PACKAGE: lifecycle-agent
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-lifecycle-agent
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - ref: tls-13
+    - as: wait-lca-tls-restart
+      cli: latest
+      commands: |
+        echo "Waiting for LCA operator to restart after TLS profile change..."
+        oc rollout status deployment lifecycle-agent-controller-manager -n openshift-lifecycle-agent --timeout=300s
+        echo "LCA operator restarted with new TLS profile"
+        oc get pods -n openshift-lifecycle-agent
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

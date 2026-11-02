@@ -19,8 +19,6 @@ promotion:
   - disabled: true
     name: "5.1"
     namespace: ocp
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   initial:
     integration:
@@ -58,6 +56,21 @@ tests:
     - as: test
       cli: latest
       commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:

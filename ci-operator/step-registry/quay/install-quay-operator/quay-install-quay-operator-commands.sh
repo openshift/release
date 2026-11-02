@@ -6,8 +6,13 @@ set -o pipefail
 
 OO_INSTALL_NAMESPACE=openshift-operators
 
-SOURCE=redhat-operators
-SOURCE_NAMESPACE=openshift-marketplace
+SOURCE=${QUAY_OPERATOR_SOURCE:-redhat-operators}
+SOURCE_NAMESPACE=${QUAY_OPERATOR_SOURCE_NAMESPACE:-openshift-marketplace}
+
+CHANNEL_SPEC=""
+if [ -n "${QUAY_OPERATOR_CHANNEL-}" ]; then
+    CHANNEL_SPEC="  channel: $QUAY_OPERATOR_CHANNEL"
+fi
 
 if [ -n "${QUAY_OPERATOR_INDEX_IMAGE-}" ]; then
     INDEX_IMAGE_DIGEST=$(oc image info --show-multiarch "$QUAY_OPERATOR_INDEX_IMAGE" -o json | jq -r 'if type=="array" then .[0].listDigest else .digest end')
@@ -30,6 +35,15 @@ EOF
     SOURCE_NAMESPACE=$OO_INSTALL_NAMESPACE
 fi
 
+CONFIG_SPEC=""
+if [[ "${QUAY_OPERATOR_STS}" == "true" ]]; then
+    ROLE_ARN=$(cat "${SHARED_DIR}/STS_ROLE_ARN")
+    CONFIG_SPEC="  config:
+    env:
+    - name: ROLEARN
+      value: $ROLE_ARN"
+fi
+
 SUB=$(
     cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -42,6 +56,8 @@ spec:
   name: quay-operator 
   source: $SOURCE
   sourceNamespace: $SOURCE_NAMESPACE
+$CHANNEL_SPEC
+$CONFIG_SPEC
 EOF
 )
 

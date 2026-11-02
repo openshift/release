@@ -4,7 +4,7 @@ set -euo pipefail
 
 CI_FOLDER_ID="$(<"${CLUSTER_PROFILE_DIR}/ci-folder-id")"
 BILLING_ACCOUNT_ID="$(<"${CLUSTER_PROFILE_DIR}/billing-account-id")"
-GCP_REGION="${GKE_REGION:-us-central1}"
+GCP_REGION="${GKE_REGION:-northamerica-northeast2}"
 RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
 
 retry_with_backoff() {

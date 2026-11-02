@@ -7,8 +7,6 @@ images:
   items:
   - dockerfile_path: Containerfile
     to: aws-nuke-cf
-prowgen:
-  enable_secrets_store_csi_driver: true
 resources:
   '*':
     limits:
@@ -21,11 +19,13 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      CI_COMPONENT_IMAGE: aws-nuke-cf
+      CI_IMAGE_1: aws-nuke-cf
     env:
-      ROSA_REGIONAL_QUAY_DEST_REPO: quay.io/rrp-dev-ci/aws-nuke-cf
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/aws-nuke-cf
     test:
-    - ref: rosa-hyperfleet-image-push
+    - ref: rosa-seaplane-image-push
 zz_generated_metadata:
   branch: main
   org: openshift-online

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A newer promotion may supersede this postsubmit before status publication.
+# Ordinary presubmits still run the lifecycle, even though they skip status publication.
+if [[ -e "${SHARED_DIR}/gcp-hcp-environment-status-superseded" ]]; then
+  echo "Skipping HostedCluster lifecycle for a superseded promotion"
+  exit 0
+fi
+
 echo "=== GCP HCP HC Lifecycle Validation ==="
 echo ""
 
@@ -17,10 +24,10 @@ if [[ ! -x "/usr/bin/test-e2e" ]]; then
 fi
 
 # Verify required SHARED_DIR files exist
-for f in api-endpoint oidc-endpoint customer-project-id region region-project-id; do
+for f in api-endpoint oidc-endpoint customer-project-id region; do
   if [[ ! -s "${SHARED_DIR}/${f}" ]]; then
     echo "ERROR: ${f} not found or empty in SHARED_DIR"
-    echo "The gcp-hcp-tf-provision step must write this file"
+    echo "A workflow pre-step must write this file"
     exit 1
   fi
 done
@@ -34,9 +41,9 @@ fi
 echo "Configuring gcphcpctl with the WIF credential..."
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
-# Reuse the service account configured for WIF for the activation workflow,
-# public API bootstrap, and gcphcpctl lifecycle requests. The WIF auth step
-# uses this same value to construct wif-cred.json.
+# Record the WIF service account for the optional authorization bootstrap.
+# The INT job skips bootstrap and uses this identity for Platform API requests.
+# The WIF auth step also uses it to construct wif-cred.json.
 WIF_CONFIG="${CLUSTER_PROFILE_DIR}/wif-config.json"
 if [[ ! -r "${WIF_CONFIG}" ]]; then
   echo "ERROR: WIF configuration not found or unreadable: ${WIF_CONFIG}"
@@ -101,20 +108,113 @@ wait_for_platform_api() {
 if ! wait_for_platform_api; then
   echo ""
   echo "=== gcphcpctl API readiness diagnostics ==="
-  echo "API endpoint: $(cat "${SHARED_DIR}/api-endpoint")"
-  echo "Customer project: $(cat "${SHARED_DIR}/customer-project-id")"
+  echo "Configured customer project: $(cat "${SHARED_DIR}/customer-project-id")"
   echo "DNS lookup:"
   getent hosts "$(sed -E 's#https?://([^/]+)/?.*#\1#' "${SHARED_DIR}/api-endpoint")" || true
   exit 1
 fi
 
+resolve_hc_version() {
+  local catalog resolved_version
+  HC_VERSION_MINOR="${HC_VERSION_MINOR-5.0}"
+  HC_CHANNEL_GROUP="${HC_CHANNEL_GROUP-candidate}"
+
+  if [[ ! "${HC_VERSION_MINOR}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "ERROR: HC_VERSION_MINOR must be an exact major.minor" >&2
+    return 1
+  fi
+  if [[ ! "${HC_CHANNEL_GROUP}" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "ERROR: HC_CHANNEL_GROUP must be a nonempty channel-group name" >&2
+    return 1
+  fi
+  if [[ -n "${HC_VERSION:-}" && "${HC_VERSION:-}" != "${HC_VERSION_MINOR}."* ]]; then
+    echo "ERROR: HC_VERSION must start with ${HC_VERSION_MINOR}." >&2
+    return 1
+  fi
+
+  # Version listing uses WIF authentication but is exempt from customer namespace
+  # authorization. The lifecycle's authorization bootstrap still runs in Ginkgo.
+  echo "Resolving advertised HC version for ${HC_VERSION_MINOR} / ${HC_CHANNEL_GROUP}..."
+  # API readiness can precede the version-sync controller's first catalog update.
+  local deadline=$((SECONDS + 1200))
+  local request_timeout wait_seconds
+  while (( SECONDS < deadline )); do
+    request_timeout=$((deadline - SECONDS))
+    if (( request_timeout <= 0 )); then
+      break
+    fi
+    if (( request_timeout > 30 )); then
+      request_timeout=30
+    fi
+    if ! catalog="$(timeout --kill-after=5s "${request_timeout}s" /usr/bin/gcphcpctl versions list -o json)"; then
+      echo "ERROR: Advertised-version request failed or timed out" >&2
+      return 1
+    fi
+
+    # Retry catalogs without a match; JSON parsing/query errors fail immediately.
+    if ! resolved_version="$(jq -sr \
+      --arg minor "${HC_VERSION_MINOR}" \
+      --arg channel "${HC_CHANNEL_GROUP}" \
+      --arg exact "${HC_VERSION:-}" '
+      if length == 1 and (.[0] | type == "object") and (.[0].items | type == "array")
+      then .[0].items
+      else error("Expected one version catalog with an items array")
+      end
+      | map(select(
+          (.metadata.name | startswith($minor + ".")) and
+          (.spec.channelGroups | index($channel) != null) and
+          ($exact == "" or .metadata.name == $exact)))
+      | last
+      | .metadata.name // empty
+    ' <<<"${catalog}")"; then
+      echo "ERROR: Invalid version catalog; refusing a minor, channel, or pinned-version fallback" >&2
+      return 1
+    fi
+
+    if [[ -n "${resolved_version}" ]]; then
+      # Freeze the first successful selection for the entire lifecycle.
+      export HC_VERSION="${resolved_version}" HC_CHANNEL_GROUP
+      jq -n --arg version "${HC_VERSION}" --arg minor "${HC_VERSION_MINOR}" \
+        --arg channel "${HC_CHANNEL_GROUP}" \
+        '{version: $version, minor: $minor, channelGroup: $channel}' \
+        > "${ARTIFACT_DIR}/hc-version-selection.json"
+      return 0
+    fi
+
+    wait_seconds=$((deadline - SECONDS))
+    if (( wait_seconds <= 0 )); then
+      break
+    fi
+    if (( wait_seconds > 30 )); then
+      wait_seconds=30
+    fi
+    echo "No matching version advertised yet; waiting ${wait_seconds}s for catalog synchronization..."
+    sleep "${wait_seconds}"
+  done
+
+  echo "ERROR: No advertised version matched minor ${HC_VERSION_MINOR} / channel ${HC_CHANNEL_GROUP} / override ${HC_VERSION:-<none>} within 20 minutes" >&2
+  return 1
+}
+
+resolve_hc_version
+
 echo "Configuration:"
-echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
-echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
-echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
-echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
+echo "  HC minor:           ${HC_VERSION_MINOR}"
+echo "  HC version:         ${HC_VERSION}"
+echo "  Channel group:      ${HC_CHANNEL_GROUP}"
 echo ""
+
+# A persistent customer project is authorized once outside CI. Verify that
+# access before --setup-infra can create customer-project IAM and networking.
+if [[ "${GCPHCPCTL_AUTHZ_BOOTSTRAP:-true}" == "false" ]]; then
+  echo "Checking pre-provisioned customer API access..."
+  if ! /usr/bin/gcphcpctl cluster list -o json > /dev/null; then
+    echo "ERROR: Cannot list clusters in the customer project through the Platform API"
+    echo "Verify one-time customer namespace activation and a cluster-admin RoleBinding for the WIF identity outside this job"
+    exit 1
+  fi
+fi
 
 # The Ginkgo test reads SHARED_DIR files directly via resolveConfig().
 # GCPHCPCTL_PATH points to the binary baked into the test image.
@@ -122,6 +222,7 @@ export GCPHCPCTL_PATH="/usr/bin/gcphcpctl"
 
 # Run Ginkgo v2 test binary
 echo "Running HC lifecycle validation tests..."
+touch "${SHARED_DIR}/gcp-hcp-e2e-tests-started"
 /usr/bin/test-e2e \
   --ginkgo.v \
   --ginkgo.no-color \

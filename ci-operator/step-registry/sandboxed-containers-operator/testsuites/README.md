@@ -17,17 +17,19 @@ the others. That work is split across two engines:
   (this repo). Holds the Prow/ci-operator definitions and step registry. All of the
   wiring for this feature lives here.
 - **Test execution engine — [`openshift-tests-private`](https://github.com/openshift/openshift-tests-private)
-  (OTP)**. Provides the automated suites and the `openshift-extended-test` step that
-  the `test:` phase runs. It **must remain unchanged** so that the existing test
-  setup still completes as before — this feature adds to `post`, it does not touch
-  `test:`.
+  (OTP)**. Originally provided the automated suites via the `openshift-extended-test`
+  step that ran in the `test:` phase. At the time this feature was designed, that step
+  **had to remain unchanged** so the existing test setup still completed as before —
+  the new suites were added to `post` without touching `test:`. OTP has since been
+  **removed** from the `test:` phase entirely (it now runs only
+  `sandboxed-containers-operator-testsuites-gate`); the `post`-phase design below is
+  unaffected by that removal.
 
 Design decisions that follow from that intent:
 
-- **The new chain runs first in `post`.** The `test:` phase and its
-  `openshift-extended-test` step are left exactly as they are; the extra suites are
-  layered on afterward so a failing suite can never interfere with the primary test
-  run's setup or result.
+- **The new chain runs first in `post`,** independent of whatever runs in `test:` —
+  the suites are layered on afterward so a failing suite can never interfere with the
+  primary test run's setup or result.
 - **Suites do not block each other on pass / error / skip.** This is the whole point
   — one repository's suite failing must not prevent another's from running. Achieved
   with `best_effort` in `post` (see below).
@@ -114,7 +116,7 @@ workflow:
     - ref: cucushift-installer-wait
       ...
     test:
-    - chain: sandboxed-containers-operator-test         # gate + openshift-extended-test
+    - chain: sandboxed-containers-operator-test         # testsuites-gate
 ```
 
 ## Adding a suite

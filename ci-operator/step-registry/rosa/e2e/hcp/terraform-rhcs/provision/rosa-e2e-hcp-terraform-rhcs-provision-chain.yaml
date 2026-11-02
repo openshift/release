@@ -1,0 +1,43 @@
+chain:
+  as: rosa-e2e-hcp-terraform-rhcs-provision
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: CLUSTER_PROFILE
+    default: ""
+    documentation: |-
+      Name of the terraform-provider-rhcs cluster profile to provision, from
+      tests/ci/profiles/tf_hcp_cluster_profiles.yml (e.g. rosa-hcp-ad, rosa-hcp-pl,
+      rosa-hcp-full, rosa-hcp-encryption, rosa-hcp-network). Mandatory: the provider's
+      day1-prepare suite fails when it is empty. This is the Terraform head's equivalent
+      of the per-feature env vars the OCM and rosa-CLI heads take, and it is what
+      determines the feature flags the published contract reports.
+  - name: WAIT_OPERATORS
+    default: "true"
+    documentation: |-
+      Wait for cluster operators to become ready before the chain completes. Defaults to
+      true here (the provider ref defaults to false) because the validation tail asserts
+      against a settled cluster.
+  steps:
+  - ref: rhcs-e2e-setup
+  - ref: rosa-e2e-terraform-rhcs-publish-contract
+  documentation: >-
+    Provisions a ROSA HCP cluster with the terraform-provider-rhcs day1 flow and publishes the
+    SHARED_DIR provisioner-to-validator contract (cluster-id, cluster-metadata.json) defined in
+    ROSAENG-67580. This is the Terraform "head" of the provision x validate matrix (ROSAENG-308 /
+    ROSAENG-67583), a sibling of rosa-e2e-hcp-ocm-provision and rosa-e2e-hcp-rosa-cli-provision; the
+    validation tail is provisioner-agnostic.
+
+    Unlike its siblings the chain does not pre-provision a VPC or an STS OIDC config: the selected
+    Terraform profile builds its own account roles, OIDC config, VPC and subnets, so
+    aws-provision-vpc-shared and rosa-sts-oidc-config-create must NOT be chained in front of it.
+
+    Two constraints come with it. First, rhcs-e2e-setup runs `from: rhcs-tf-e2e`, a pipeline image
+    built only by terraform-redhat/terraform-provider-rhcs, so a consuming config must build or
+    import that image. Second, the cluster exists only in the terraform state that rhcs-e2e-setup
+    saves to ${SHARED_DIR}/statefiles.tar.gz: tear it down with rhcs-e2e-teardown, never with
+    rosa-cluster-deprovision, or the cluster and its AWS resources will leak.
+
+    The Terraform day1 flow publishes no customer-plane kubeconfig (every HCP profile sets
+    admin_enabled: false), so run rosa-backplane-login between this chain and
+    rosa-e2e-validate-customer, which falls back to bp-kubeconfig.

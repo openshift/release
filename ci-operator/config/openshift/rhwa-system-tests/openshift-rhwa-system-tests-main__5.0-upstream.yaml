@@ -16,8 +16,6 @@ build_root:
     name: builder
     namespace: konveyor
     tag: ubi9-v1.27
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -52,6 +50,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: medik8s-deploy-odf-dev-catalog
@@ -64,6 +63,12 @@ tests:
         else
           # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
           export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+        if [[ -f "${SHARED_DIR}/injector_image" ]]; then
+          export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; upstream jobs skip that chain.
+          export SBR_INJECTOR_IMAGE=registry.access.redhat.com/ubi9/ubi:latest
         fi
         make run-tests
       env:
@@ -96,6 +101,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test
@@ -138,6 +144,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: ssh-bastion
@@ -181,6 +188,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: medik8s-aws-credentials
@@ -224,6 +232,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test
@@ -266,6 +275,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test
@@ -310,6 +320,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: medik8s-deploy-odf-dev-catalog
@@ -353,6 +364,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test
@@ -394,6 +406,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: ssh-bastion
@@ -436,6 +449,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - ref: medik8s-aws-credentials
@@ -478,6 +492,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test
@@ -519,6 +534,7 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: e2e-test

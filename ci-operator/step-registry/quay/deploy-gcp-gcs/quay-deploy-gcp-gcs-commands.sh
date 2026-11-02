@@ -4,11 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
+
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
-        typeset -a _fURL=()
-        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
-        "${_fURL[@]}" \
+        curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
 fi
@@ -70,7 +70,6 @@ function on_exit() {
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-gcp__quay-tests-deploy-quay-gcp.xml || true
   fi
   write_quay_install_junit "${ec}"
-  [[ -n "${YQ_TMPDIR:-}" ]] && rm -rf "${YQ_TMPDIR}" || true
   exit "${ec}"
 }
 trap on_exit EXIT
@@ -124,11 +123,6 @@ function print_failing_pod_logs() {
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
-#Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
@@ -148,9 +142,16 @@ function new_gcs_bucket_name() {
   printf 'quayprowci-gcp-%s\n' "${suffix}"
 }
 
-#Copy GCP auth.json from mounted secret to the terraform working directory
-mkdir -p QUAY_GCP && cd QUAY_GCP
-cp /var/run/quay-qe-gcp-secret/auth.json .
+#Use the GCP service-account credential and project from the gcp-quay-qe cluster
+#profile (${CLUSTER_PROFILE_DIR}/gce.json + openshift_gcp_project) so the storage
+#bucket is created with the same credentials/project as the cluster. This replaces
+#the previously mounted quay-tests/gcp auth.json.
+mkdir -p /tmp/QUAY_GCP && cd /tmp/QUAY_GCP
+cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
+GCP_PROJECT="$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")"
+# Region comes from the Boskos lease (same value ipi-conf-gcp uses for the cluster),
+# so the storage bucket is created in the same region as the deployed cluster.
+GCP_REGION="${LEASED_RESOURCE}"
 
 cat >>variables.tf <<EOF
 variable "gcp_storage_bucket" {
@@ -162,14 +163,14 @@ cat >>create_gcp_storage_bucket.tf <<EOF
 provider "google" {
   credentials = file("auth.json")
 
-  project = "openshift-qe"
-  region  = "us-central1"
-  zone    = "us-central1-c"
+  project = "${GCP_PROJECT}"
+  region  = "${GCP_REGION}"
+  zone    = "${GCP_REGION}-c"
 }
 
 resource "google_storage_bucket" "quaygcp" {
   name          = var.gcp_storage_bucket
-  location      = "US"
+  location      = "${GCP_REGION}"
   force_destroy = true
 }
 EOF
@@ -294,7 +295,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -302,8 +302,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -344,25 +342,17 @@ FEATURE_MAILING: false
 FEATURE_OTEL_TRACING: false
 EOF
 
-# Fetch yq once into a private temp dir: used below to merge config
-# fragments and to strip operator-managed keys, which now run
-# unconditionally.
-YQ_TMPDIR="$(mktemp -d)"
-YQ="${YQ_TMPDIR}/yq"
-curl -sLf "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-	-o "${YQ}" && chmod +x "${YQ}"
-
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
-# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# not '*', so a fragment's lists extend the defaults instead of replacing them).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
 	local fragment="$1"
-	if ! "${YQ}" e 'true' "${fragment}" >/dev/null 2>&1; then
+	if ! yq e 'true' "${fragment}" >/dev/null 2>&1; then
 		echo "ERROR: ${fragment} is not valid YAML" >&2
 		exit 1
 	fi
-	"${YQ}" eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
+	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
 # Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
@@ -388,7 +378,7 @@ fi
 # injects those values; leaving them in configBundleSecret blocks rollout.
 # Runs unconditionally now: a no-op on the defaults block when no overlay
 # above added any of these keys.
-"${YQ}" -i '
+yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
 		.FEATURE_SECURITY_NOTIFICATIONS,
@@ -498,9 +488,6 @@ for i in $(seq 1 90); do
     QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi

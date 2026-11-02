@@ -3,13 +3,15 @@ base_images:
     name: tls-scanner
     namespace: tls-scanner
     tag: tls-scanner-tool
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
     namespace: konveyor
     tag: ubi9-v1.27
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     candidate:
@@ -23,40 +25,50 @@ resources:
       memory: 1000Mi
 tests:
 - as: tls13-adherence-all
+  capabilities:
+  - intranet
   cron: 0 10 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: openshift-workload-availability
-      OCP_VERSION: "50"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
       PQC_CHECK: "false"
       SCAN_NAMESPACE: openshift-workload-availability
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
     test:
-    - ref: medik8s-catalogsource
-    - ref: medik8s-operator-subscribe
+    - chain: medik8s-setup
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws
 - as: tls-pqc-readiness-all
+  capabilities:
+  - intranet
   cron: 0 10 * * 3
   steps:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       INSTALL_NAMESPACE: openshift-workload-availability
-      OCP_VERSION: "50"
+      OCP_VERSION: "500"
       OO_CHANNEL: stable
       OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
       PQC_CHECK: "true"
       SCAN_NAMESPACE: openshift-workload-availability
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
     test:
-    - ref: medik8s-catalogsource
-    - ref: medik8s-operator-subscribe
+    - chain: medik8s-setup
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: ipi-aws

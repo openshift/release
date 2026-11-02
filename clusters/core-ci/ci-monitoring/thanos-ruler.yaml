@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: thanos-ruler-alertmanager-ca
+  namespace: ci-monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    service.beta.openshift.io/inject-cabundle: "true"
+---
+apiVersion: monitoring.thanos.io/v1alpha1
+kind: ThanosRuler
+metadata:
+  name: ci-metrics
+  namespace: ci-monitoring
+spec:
+  replicas: 2
+  alertLabelDrop:
+  - rule_replica
+  ruleConfigSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: thanos-operator
+  queryLabelSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: thanos-operator
+  additionalEnv:
+  - name: SSL_CERT_FILE
+    value: /etc/alertmanager-ca/service-ca.crt
+  - name: AWS_ROLE_ARN
+    valueFrom:
+      secretKeyRef:
+        key: role-arn
+        name: thanos-aws-credentials
+  - name: AWS_WEB_IDENTITY_TOKEN_FILE
+    value: /var/run/secrets/aws/token
+  additionalVolumeMounts:
+  - mountPath: /etc/alertmanager-ca
+    name: alertmanager-ca
+    readOnly: true
+  - mountPath: /var/run/secrets/aws
+    name: aws-token
+    readOnly: true
+  additionalVolumes:
+  - name: alertmanager-ca
+    configMap:
+      name: thanos-ruler-alertmanager-ca
+      items:
+      - key: service-ca.crt
+        path: service-ca.crt
+  - name: aws-token
+    projected:
+      sources:
+      - serviceAccountToken:
+          audience: sts.amazonaws.com
+          expirationSeconds: 3600
+          path: token
+  alertmanagerURL: "https://alertmanager-operated.ci-monitoring.svc.cluster.local:9093"
+  evaluationInterval: 1m
+  securityContext: {}
+  storage:
+    size: 1Gi
+  resourceRequirements:
+    requests:
+      cpu: 1m
+      memory: 15Mi
+  logFormat: logfmt
+  imagePullPolicy: IfNotPresent
+  rulerMode:
+    type: Stateful
+    stateful:
+      retention: 2h
+      objectStorageConfig:
+        name: thanos-object-storage
+        key: thanos.yaml

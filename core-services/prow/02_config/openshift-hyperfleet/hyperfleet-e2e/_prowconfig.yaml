@@ -1,3 +1,14 @@
+slack_reporter_configs:
+  openshift-hyperfleet/hyperfleet-e2e:
+    channel: '#hyperfleet-e2e-status'
+    job_states_to_report:
+    - failure
+    - error
+    job_types_to_report:
+    - postsubmit
+    report_template: |-
+      {{if eq .Spec.Job "branch-ci-openshift-hyperfleet-hyperfleet-e2e-main-images-images"}}:rotating_light: *{{.Spec.Job}}* ended with *{{.Status.State}}*. `ci/hyperfleet-e2e:latest` was not updated, so the nightlies keep testing the previous image. Rerun this job only if it is the newest main postsubmit. If a later merge already promoted, do nothing: rerunning an older run puts its older commit back on `latest`.{{else}}:x: *{{.Spec.Job}}* ended with *{{.Status.State}}*.{{end}}
+      Details: <{{.Status.URL}}|View logs>
 tide:
   queries:
   - labels:

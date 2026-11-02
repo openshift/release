@@ -6,7 +6,6 @@ images:
     to: rosa-clients
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|renovate\.json)$|^(?:docs|\.github|\.tekton)(?:/|$)
 prowgen:
-  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -71,6 +70,8 @@ tests:
     env:
       PROJECT_NAME: rosa
       SNYK_ENABLE_DEPS_SCAN: "true"
+      SNYK_PRE_EXECUTION_HOOK_CMD: unset GOFLAGS GOROOT && export GOTOOLCHAIN=auto
+        && go mod tidy && go mod vendor
     workflow: openshift-ci-security
 - as: govulncheck
   commands: |

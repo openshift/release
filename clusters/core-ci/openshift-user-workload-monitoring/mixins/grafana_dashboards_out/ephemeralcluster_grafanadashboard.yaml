@@ -24,90 +24,346 @@ spec:
        "links": [ ],
        "panels": [
           {
-             "aliasColors": { },
-             "bars": false,
-             "dashLength": 10,
-             "dashes": false,
              "datasource": "prometheus",
-             "description": "sum(ephemeralcluster_count)",
-             "fill": 1,
-             "fillGradient": 0,
+             "description": "Estimated total transitions into Initializing or Provisioning over the selected time range. A cluster progressing from Initializing to Provisioning within this time range contributes one transition to each phase. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
              "gridPos": {
-                "h": 9,
-                "w": 24,
+                "h": 5,
+                "w": 8,
                 "x": 0,
                 "y": 0
              },
              "id": 2,
-             "legend": {
-                "alignAsTable": true,
-                "avg": false,
-                "current": true,
-                "max": true,
-                "min": true,
-                "rightSide": true,
-                "show": true,
-                "sideWidth": 350,
-                "total": false,
-                "values": true
-             },
-             "lines": true,
-             "linewidth": 1,
              "links": [ ],
-             "nullPointMode": "null",
-             "percentage": false,
-             "pointradius": 5,
-             "points": false,
-             "renderer": "flot",
-             "repeat": null,
-             "seriesOverrides": [ ],
-             "spaceLength": 10,
-             "stack": false,
-             "steppedLine": false,
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
              "targets": [
                 {
-                   "expr": "sum(ephemeralcluster_count{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"})",
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"Initializing|Provisioning\"}[${__range}])) or vector(0)",
                    "format": "time_series",
+                   "instant": true,
                    "intervalFactor": 2,
                    "legendFormat": "total",
                    "refId": "A"
                 }
              ],
-             "thresholds": [ ],
-             "timeFrom": null,
-             "timeShift": null,
-             "title": "Total Ephemeral Clusters",
-             "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "value_type": "individual"
-             },
-             "type": "graph",
-             "xaxis": {
-                "buckets": null,
-                "mode": "time",
-                "name": null,
-                "show": true,
-                "values": [ ]
-             },
-             "yaxes": [
-                {
-                   "format": "short",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
-                },
-                {
-                   "format": "short",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
+             "title": "Initializing / Provisioning (~${display_range})",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Estimated total transitions into the named phases over the selected time range. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
                 }
-             ]
+             },
+             "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 8,
+                "y": 0
+             },
+             "id": 3,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"Ready\"}[${__range}])) or vector(0)",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "total",
+                   "refId": "A"
+                }
+             ],
+             "title": "Ready (~${display_range})",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Estimated total transitions into the named phases over the selected time range. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
+             "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 0
+             },
+             "id": 4,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"InitializationFailed|ProvisioningFailed\"}[${__range}])) or vector(0)",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "total",
+                   "refId": "A"
+                }
+             ],
+             "title": "Initialization / Provisioning failures (~${display_range})",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Estimated total transitions into the named phases over the selected time range. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
+             "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 0,
+                "y": 5
+             },
+             "id": 5,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"Deprovisioning\"}[${__range}])) or vector(0)",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "total",
+                   "refId": "A"
+                }
+             ],
+             "title": "Deprovisioning (~${display_range})",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Estimated total transitions into the named phases over the selected time range. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
+             "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 8,
+                "y": 5
+             },
+             "id": 6,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"Deprovisioned\"}[${__range}])) or vector(0)",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "total",
+                   "refId": "A"
+                }
+             ],
+             "title": "Deprovisioned (~${display_range})",
+             "transparent": false,
+             "type": "stat"
+          },
+          {
+             "datasource": "prometheus",
+             "description": "Estimated total transitions into the named phases over the selected time range. Exact time range: ${__from:date} - ${__to:date}. The duration in the title is approximate.",
+             "fieldConfig": {
+                "defaults": {
+                   "decimals": 0,
+                   "links": [ ],
+                   "mappings": [ ],
+                   "min": 0,
+                   "thresholds": {
+                      "mode": "absolute",
+                      "steps": [
+                         {
+                            "color": "blue",
+                            "value": null
+                         }
+                      ]
+                   },
+                   "unit": "none"
+                }
+             },
+             "gridPos": {
+                "h": 5,
+                "w": 8,
+                "x": 16,
+                "y": 5
+             },
+             "id": 7,
+             "links": [ ],
+             "options": {
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                   "calcs": [
+                      "lastNotNull"
+                   ],
+                   "fields": "",
+                   "values": false
+                }
+             },
+             "pluginVersion": "7",
+             "targets": [
+                {
+                   "expr": "sum(increase(ephemeralcluster_phase_transitions_total{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"DeprovisioningFailure\"}[${__range}])) or vector(0)",
+                   "format": "time_series",
+                   "instant": true,
+                   "intervalFactor": 2,
+                   "legendFormat": "total",
+                   "refId": "A"
+                }
+             ],
+             "title": "Deprovisioning failures (~${display_range})",
+             "transparent": false,
+             "type": "stat"
           },
           {
              "aliasColors": { },
@@ -122,9 +378,9 @@ spec:
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 9
+                "y": 10
              },
-             "id": 3,
+             "id": 8,
              "legend": {
                 "alignAsTable": true,
                 "avg": false,
@@ -202,16 +458,16 @@ spec:
              "dashLength": 10,
              "dashes": false,
              "datasource": "prometheus",
-             "description": "Time from cluster creation to ClusterReady condition across all workflows",
+             "description": "Time from cluster creation to ClusterReady condition broken down by selected label",
              "fill": 1,
              "fillGradient": 0,
              "gridPos": {
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 18
+                "y": 19
              },
-             "id": 4,
+             "id": 9,
              "legend": {
                 "alignAsTable": true,
                 "avg": false,
@@ -239,38 +495,38 @@ spec:
              "steppedLine": false,
              "targets": [
                 {
-                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p50",
+                   "legendFormat": "p50 - {{${group_by}}}",
                    "refId": "A"
                 },
                 {
-                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p90",
+                   "legendFormat": "p90 - {{${group_by}}}",
                    "refId": "B"
                 },
                 {
-                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p95",
+                   "legendFormat": "p95 - {{${group_by}}}",
                    "refId": "C"
                 },
                 {
-                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p99",
+                   "legendFormat": "p99 - {{${group_by}}}",
                    "refId": "D"
                 }
              ],
              "thresholds": [ ],
              "timeFrom": null,
              "timeShift": null,
-             "title": "Provisioning Duration - Overall (seconds)",
+             "title": "Provisioning Duration by \"${group_by}\" (seconds)",
              "tooltip": {
                 "shared": true,
                 "sort": 0,
@@ -309,16 +565,16 @@ spec:
              "dashLength": 10,
              "dashes": false,
              "datasource": "prometheus",
-             "description": "Time from TestCompleted to ProwJobCompleted condition across all workflows",
+             "description": "Time from TestCompleted to ProwJobCompleted condition broken down by selected label",
              "fill": 1,
              "fillGradient": 0,
              "gridPos": {
                 "h": 9,
                 "w": 24,
                 "x": 0,
-                "y": 27
+                "y": 28
              },
-             "id": 5,
+             "id": 10,
              "legend": {
                 "alignAsTable": true,
                 "avg": false,
@@ -346,252 +602,38 @@ spec:
              "steppedLine": false,
              "targets": [
                 {
-                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p50",
+                   "legendFormat": "p50 - {{${group_by}}}",
                    "refId": "A"
                 },
                 {
-                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p90",
+                   "legendFormat": "p90 - {{${group_by}}}",
                    "refId": "B"
                 },
                 {
-                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p95",
+                   "legendFormat": "p95 - {{${group_by}}}",
                    "refId": "C"
                 },
                 {
-                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket[5m])) by (le))",
+                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{konflux_cluster=~\"${konflux_cluster}\",konflux_tenant=~\"${konflux_tenant}\",cluster_profile=~\"${cluster_profile}\",workflow=~\"${workflow}\",phase=~\"${phase}\"}[5m])) by (le, ${group_by}))",
                    "format": "time_series",
                    "intervalFactor": 2,
-                   "legendFormat": "p99",
+                   "legendFormat": "p99 - {{${group_by}}}",
                    "refId": "D"
                 }
              ],
              "thresholds": [ ],
              "timeFrom": null,
              "timeShift": null,
-             "title": "Deprovisioning Duration - Overall (seconds)",
-             "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "value_type": "individual"
-             },
-             "type": "graph",
-             "xaxis": {
-                "buckets": null,
-                "mode": "time",
-                "name": null,
-                "show": true,
-                "values": [ ]
-             },
-             "yaxes": [
-                {
-                   "format": "s",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
-                },
-                {
-                   "format": "s",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
-                }
-             ]
-          },
-          {
-             "aliasColors": { },
-             "bars": false,
-             "dashLength": 10,
-             "dashes": false,
-             "datasource": "prometheus",
-             "description": "Time from cluster creation to ClusterReady condition broken down by workflow",
-             "fill": 1,
-             "fillGradient": 0,
-             "gridPos": {
-                "h": 9,
-                "w": 24,
-                "x": 0,
-                "y": 36
-             },
-             "id": 6,
-             "legend": {
-                "alignAsTable": true,
-                "avg": false,
-                "current": true,
-                "max": true,
-                "min": true,
-                "rightSide": true,
-                "show": true,
-                "sideWidth": 350,
-                "total": false,
-                "values": true
-             },
-             "lines": true,
-             "linewidth": 1,
-             "links": [ ],
-             "nullPointMode": "null",
-             "percentage": false,
-             "pointradius": 5,
-             "points": false,
-             "renderer": "flot",
-             "repeat": null,
-             "seriesOverrides": [ ],
-             "spaceLength": 10,
-             "stack": false,
-             "steppedLine": false,
-             "targets": [
-                {
-                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p50 - {{workflow}}",
-                   "refId": "A"
-                },
-                {
-                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p90 - {{workflow}}",
-                   "refId": "B"
-                },
-                {
-                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p95 - {{workflow}}",
-                   "refId": "C"
-                },
-                {
-                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_provisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p99 - {{workflow}}",
-                   "refId": "D"
-                }
-             ],
-             "thresholds": [ ],
-             "timeFrom": null,
-             "timeShift": null,
-             "title": "Provisioning Duration by Workflow (seconds)",
-             "tooltip": {
-                "shared": true,
-                "sort": 0,
-                "value_type": "individual"
-             },
-             "type": "graph",
-             "xaxis": {
-                "buckets": null,
-                "mode": "time",
-                "name": null,
-                "show": true,
-                "values": [ ]
-             },
-             "yaxes": [
-                {
-                   "format": "s",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
-                },
-                {
-                   "format": "s",
-                   "label": null,
-                   "logBase": 1,
-                   "max": null,
-                   "min": "0",
-                   "show": true
-                }
-             ]
-          },
-          {
-             "aliasColors": { },
-             "bars": false,
-             "dashLength": 10,
-             "dashes": false,
-             "datasource": "prometheus",
-             "description": "Time from TestCompleted to ProwJobCompleted condition broken down by workflow",
-             "fill": 1,
-             "fillGradient": 0,
-             "gridPos": {
-                "h": 9,
-                "w": 24,
-                "x": 0,
-                "y": 45
-             },
-             "id": 7,
-             "legend": {
-                "alignAsTable": true,
-                "avg": false,
-                "current": true,
-                "max": true,
-                "min": true,
-                "rightSide": true,
-                "show": true,
-                "sideWidth": 350,
-                "total": false,
-                "values": true
-             },
-             "lines": true,
-             "linewidth": 1,
-             "links": [ ],
-             "nullPointMode": "null",
-             "percentage": false,
-             "pointradius": 5,
-             "points": false,
-             "renderer": "flot",
-             "repeat": null,
-             "seriesOverrides": [ ],
-             "spaceLength": 10,
-             "stack": false,
-             "steppedLine": false,
-             "targets": [
-                {
-                   "expr": "histogram_quantile(0.5, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p50 - {{workflow}}",
-                   "refId": "A"
-                },
-                {
-                   "expr": "histogram_quantile(0.90000000000000002, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p90 - {{workflow}}",
-                   "refId": "B"
-                },
-                {
-                   "expr": "histogram_quantile(0.94999999999999996, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p95 - {{workflow}}",
-                   "refId": "C"
-                },
-                {
-                   "expr": "histogram_quantile(0.98999999999999999, sum(increase(ephemeralcluster_deprovisioning_duration_seconds_bucket{workflow=~\"${workflow}\"}[5m])) by (le, workflow))",
-                   "format": "time_series",
-                   "intervalFactor": 2,
-                   "legendFormat": "p99 - {{workflow}}",
-                   "refId": "D"
-                }
-             ],
-             "thresholds": [ ],
-             "timeFrom": null,
-             "timeShift": null,
-             "title": "Deprovisioning Duration by Workflow (seconds)",
+             "title": "Deprovisioning Duration by \"${group_by}\" (seconds)",
              "tooltip": {
                 "shared": true,
                 "sort": 0,
@@ -740,7 +782,7 @@ spec:
                 },
                 "hide": 0,
                 "includeAll": false,
-                "label": "Total Ephemeral Clusters broken down by",
+                "label": "Break down by",
                 "multi": false,
                 "name": "group_by",
                 "options": [
@@ -768,6 +810,21 @@ spec:
                 "query": "konflux_cluster,konflux_tenant,cluster_profile,workflow,phase",
                 "refresh": 0,
                 "type": "custom"
+             },
+             {
+                "auto": true,
+                "auto_count": 1,
+                "auto_min": "1ms",
+                "current": {
+                   "text": "auto",
+                   "value": "$__auto_interval_display_range"
+                },
+                "hide": 2,
+                "label": null,
+                "name": "display_range",
+                "query": "1s",
+                "refresh": 2,
+                "type": "interval"
              }
           ]
        },

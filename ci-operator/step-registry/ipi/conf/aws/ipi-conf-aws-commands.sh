@@ -125,8 +125,14 @@ else
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
   # region.
+  # Let the AWS CLI filter and count instead of piping its output into
+  # 'grep -q': grep exits on the first match, the CLI dies with a broken
+  # pipe (exit 120), and with pipefail the check always reported "no".
   IS_M6A_REGION="no"
-  if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
+  m6a_offerings=$(aws ec2 describe-instance-type-offerings --region "${REGION}" \
+    --filters "Name=instance-type,Values=m6a.*" \
+    --query 'length(InstanceTypeOfferings)' --output json || echo 0)
+  if [[ "${m6a_offerings}" -gt 0 ]]; then
     IS_M6A_REGION="yes"
   fi
 

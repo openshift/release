@@ -40,8 +40,6 @@ promotion:
   to:
   - namespace: ols
     tag: latest
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -69,9 +67,15 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
-  commands: GOFLAGS="-mod=readonly" make test --warn-undefined-variables
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/token 2>/dev/null || cat /tmp/secret/CODECOV_TOKEN)
+    GOFLAGS="-mod=readonly" make test --warn-undefined-variables
   container:
     from: src
+  secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-operator-codecov-token
+    mount_path: /tmp/secret
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: bundle-e2e-4-16
   cluster_claim:
@@ -111,7 +115,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -123,7 +127,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -179,7 +183,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -191,7 +195,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -247,7 +251,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -259,7 +263,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -315,7 +319,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -327,7 +331,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -383,7 +387,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -395,7 +399,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -453,7 +457,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -465,7 +469,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:
@@ -521,7 +525,7 @@ tests:
         export GOFLAGS="-mod=readonly"
 
         export LLM_PROVIDER=openai
-        export LLM_MODEL=gpt-5.4-mini
+        export LLM_MODEL=gpt-6-luna
         export LLM_TOKEN=$(cat /var/run/openai/token)
         export CONDITION_TIMEOUT=600
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
@@ -533,7 +537,7 @@ tests:
         export AZUREOPENAI_ENTRA_ID_CLIENT_SECRET=$(cat /var/run/azureopenai-entra-id/client_secret)
         export LLM_TOKEN=$(cat ${AZUREOPENAI_PROVIDER_KEY_PATH})
         export LLM_PROVIDER="azure_openai"
-        export LLM_MODEL="gpt-4o-mini"
+        export LLM_MODEL="gpt-6-luna"
         echo "starting tests for $LLM_PROVIDER $LLM_MODEL"
         make test-e2e
       credentials:

@@ -1,0 +1,77 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: PrometheusAgent
+metadata:
+  name: prometheus-agent
+  namespace: ci-monitoring
+spec:
+  mode: StatefulSet
+  replicas: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  serviceAccountName: prometheus-agent
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: custom-prometheus-operator
+  externalLabels:
+    clusterName: core-ci
+  remoteWrite:
+    - url: "https://thanos-receive.core.ci.devcluster.openshift.com:19291/api/v1/receive"
+      queueConfig:
+        sampleAgeLimit: 10m
+      tlsConfig:
+        ca:
+          secret:
+            name: thanos-remote-write-tls
+            key: ca.crt
+        cert:
+          secret:
+            name: thanos-remote-write-tls
+            key: client.crt
+        keySecret:
+          name: thanos-remote-write-tls
+          key: client.key
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-agent
+  namespace: ci-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-custom-agent
+rules:
+- apiGroups: [""]
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-custom-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-custom-agent
+subjects:
+- kind: ServiceAccount
+  name: prometheus-agent
+  namespace: ci-monitoring

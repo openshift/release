@@ -1,0 +1,28 @@
+# promtool unit tests for ghproxy-running-out-github-tokens-in-a-hour (login
+# variant). Exercises the inverted min_over_time hysteresis + the
+# github_user_info login join: a projected quota below the fire threshold keeps
+# the alert firing.
+rule_files:
+  - .rendered-rules.yaml
+tests:
+  - interval: 1m
+    input_series:
+      # flat usage -> deriv()==0, so projected value == usage == 50 (< 100 and < 150)
+      - series: 'github_token_usage{ratelimit_resource="core", token_hash="h1"}'
+        values: "50x30"
+      - series: 'github_user_info{login="openshift-ci-robot", token_hash="h1"}'
+        values: "1x30"
+      - series: 'github_token_reset{ratelimit_resource="core", token_hash="h1"}'
+        values: "3600x30"
+    alert_rule_test:
+      # projection ~50 stays below both thresholds; for:5m -> firing
+      - eval_time: 25m
+        alertname: ghproxy-running-out-github-tokens-in-a-hour
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              ratelimit_resource: core
+              token_hash: h1
+              login: openshift-ci-robot
+            exp_annotations:
+              message: 'openshift-ci-robot may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'

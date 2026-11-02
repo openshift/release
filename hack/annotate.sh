@@ -53,11 +53,11 @@ retry() {
 function annotate() {
 	local namespace="$1"
 	local name="$2"
-	local private="${4:-}" # empty string by default
+	local dir="${4:-}" # empty string by default
 	local conf="${base}/core-services/release-controller/_releases/release-$3"
 
-	if [[ -n "${private}" ]]; then
-		conf="${base}/core-services/release-controller/_releases/priv/release-$3"
+	if [[ -n "${dir}" ]]; then
+		conf="${base}/core-services/release-controller/_releases/${dir}/release-$3"
 	fi
 
 	if [[ -s "${conf}" ]]; then
@@ -67,7 +67,7 @@ function annotate() {
 		# If this is a configuration for a private release controller, enforce that all ProwJob
 		# names include "priv". This attempts to ensure that no on introduces a ProwJob without
 		# "hidden: true" to the verification steps of embargoed release payloads.
-		if [[ -n "${private}" ]]; then
+		if [[ "${dir}" == "priv" ]]; then
 			local nonpriv_hits=$(cat ${conf} | jq -r '.verify | keys[] as $k | (.[$k] | .prowJob.name)' | grep -v priv)
 			if [[ -n "${nonpriv_hits}" ]]; then
 				echo "${conf} contains prowJob name without 'priv' substring ; Please use naming convention to ensure embargoed releases are not tested publicly."
@@ -106,11 +106,11 @@ for release in ${releases[@]}; do
 	annotate "ocp-ppc64le" "${release}-art-assembly-art23398-ppc64le" "konflux-ocp-${release}-art23398-ppc64le.json"
 	annotate "ocp-arm64" "${release}-art-assembly-art23398-arm64" "konflux-ocp-${release}-art23398-arm64.json"
 
-	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
-	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
-	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
-	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "private"
-	annotate "ocp-multi-priv" "${release}-art-latest-multi-priv" "ocp-${release}-multi.json" "private"
+	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "priv"
+	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "priv"
+	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "priv"
+	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "priv"
+	annotate "ocp-multi-priv" "${release}-art-latest-multi-priv" "ocp-${release}-multi.json" "priv"
 
 done
 
@@ -162,6 +162,6 @@ annotate "ocp-arm64" "5-dev-preview-arm64" "ocp-5-dev-preview-arm64.json"
 annotate "ocp-multi" "5-dev-preview-multi" "ocp-5-dev-preview-multi.json"
 
 # HyperShift release streams
-annotate "hypershift" "hypershift-operator-main-nightly" "hcp-main.json"
+annotate "hypershift" "hypershift-operator-main-nightly" "hcp-main.json" "hypershift"
 
 exit $global_failure

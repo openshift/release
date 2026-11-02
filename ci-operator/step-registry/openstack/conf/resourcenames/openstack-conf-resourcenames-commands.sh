@@ -15,7 +15,7 @@ declare -A external_network=(
 	['openstack-vh-mecha-central']='external'
 	['openstack-nfv']='intel-dpdk'
 	['openstack-hwoffload']='external'
-	['openstack-nerc-dev']='provider'
+	['openstack-rackspace']='PUBLICNET'
 )
 
 declare -A controlplane_flavor=(
@@ -24,7 +24,7 @@ declare -A controlplane_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge'
 	['openstack-hwoffload']='m1.xlarge'
-	['openstack-nerc-dev']='cpu-su.4'
+	['openstack-rackspace']='gp.0.4.16'
 )
 
 declare -A controlplane_flavor_alternate=(
@@ -32,6 +32,7 @@ declare -A controlplane_flavor_alternate=(
 	['openstack-vh-mecha-central']='m1.xlarge.2'
 	['openstack-nfv']='m1.xlarge.2'
 	['openstack-hwoffload']='m1.xlarge.2'
+	['openstack-rackspace']='gp.0.4.16'
 )
 
 declare -A compute_flavor=(
@@ -40,7 +41,7 @@ declare -A compute_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
 	['openstack-hwoffload']='m1.xlarge'
-	['openstack-nerc-dev']='cpu-su.4'
+	['openstack-rackspace']='gp.0.4.8'
 )
 
 declare -A compute_azs=(
@@ -49,7 +50,7 @@ declare -A compute_azs=(
 	['openstack-vh-mecha-central']=''
 	['openstack-nfv']=''
 	['openstack-hwoffload']=''
-	['openstack-nerc-dev']='nova'
+	['openstack-rackspace']=''
 )
 
 declare -A bastion_flavor=(
@@ -58,7 +59,7 @@ declare -A bastion_flavor=(
 	['openstack-vh-mecha-central']='m1.small'
 	['openstack-nfv']='m1.small'
 	['openstack-hwoffload']='m1.small'
-	['openstack-nerc-dev']='cpu-su.4'
+	['openstack-rackspace']='gp.0.1.2'
 )
 
 if [[ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]]; then

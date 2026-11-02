@@ -32,3 +32,5 @@ if [[ -n "${ARO_HCP_SLOT_MANAGER_LEASE_WAIT_INTERVAL:-}" ]]; then
 fi
 
 ./test/aro-hcp-tests slot-manager acquire "${slot_manager_args[@]}"
+
+cp "${SHARED_DIR}/aro-hcp-slot-state.yaml" "${ARTIFACT_DIR}/aro-hcp-slot-state.yaml"

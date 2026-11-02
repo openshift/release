@@ -24,9 +24,9 @@ ref:
     On MCP timeout, classifies the failure mode:
     - DEGRADED: Hard failure. One or more MCPs have Degraded=True, indicating
       a product interop issue where policies caused nodes to enter a bad state.
-    - UPDATING (progressing): Non-blocking. Ready count is monotonically
-      increasing but rollout was too slow for the timeout. Exits 0 and
-      runs the health gate before continuing.
+    - UPDATING (progressing): Hard failure. Ready count is increasing but
+      the rollout exceeded the timeout. Runs the health gate for diagnostics,
+      then exits 1 without continuing to downstream steps.
     - UPDATING (oscillating): Hard failure. Ready count is not progressing,
       suggesting nodes may be cycling due to conflicting configurations.
     - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
@@ -46,11 +46,14 @@ ref:
   - default: "1200"
     documentation: Seconds to extend the deadline when MCP ready count is progressing (default 20 min per extension)
     name: MCP_WAIT_PROGRESS_EXTENSION
+  - default: "30"
+    documentation: Poll interval in seconds for checking MCP status. Increase for slower clusters.
+    name: MCP_POLL_INTERVAL
   - default: "3600"
     documentation: Max seconds to wait for all non-paused MCPs to stabilize (default 60 min)
     name: MCP_WAIT_TIMEOUT
   from: cli
-  grace_period: 1m
+  grace_period: 5m0s
   resources:
     requests:
       cpu: 100m

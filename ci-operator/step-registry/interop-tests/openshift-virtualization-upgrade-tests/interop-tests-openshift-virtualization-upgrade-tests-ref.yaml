@@ -7,6 +7,9 @@ ref:
     interop-tests-openshift-virtualization-upgrade-prep step; uses the CI Operator-guaranteed
     CNV_TARGET_VERSION env default when the file is absent.
     Network upgrade tests are excluded via --ignore=tests/network/.
+    When the installed (source) CNV is below 4.22, tests/infrastructure/vm_template/ is also
+    ignored: those tests create VirtualMachineTemplate resources before the CNV upgrade,
+    and template.kubevirt.io is not available before CNV 4.22.
   from: openshift-virtualization-tests-sshpass
   commands: interop-tests-openshift-virtualization-upgrade-tests-commands.sh
   timeout: 4h0m0s
@@ -54,6 +57,15 @@ ref:
   - name: MAP_TESTS
     default: "false"
     documentation: Specify whether to update the test suite name for reporting tools
+  - name: LP_IO__CR_COMP_PREFIX
+    default: "lp-interop--CNV--ACM+Virt"
+    documentation: |-
+      Declared on this step only. When MAP_TESTS is true, this step prepends
+      the value to the original pytest suite name. The published name is
+      "<LP_IO__CR_COMP_PREFIX>--<original suite>". Do not set this in the job
+      env: that injects it into the ACM steps in the same job. DR__RP__CR_COMP_NAME
+      stays on the job for mpiit-data-router-reporter and the ACM suite prefix.
+      The merge and copy to SHARED_DIR still run when MAP_TESTS is false.
   - name: CNV_TARGET_MAJOR_MINOR
     default: "4.21"
     documentation: |-

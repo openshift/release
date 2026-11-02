@@ -1,3 +1,8 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.54.2
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -9,7 +14,6 @@ images:
   - dockerfile_path: Dockerfile
     to: rosa-marketplace-release-generator
 prowgen:
-  enable_secrets_store_csi_driver: true
   private: true
 resources:
   '*':
@@ -24,9 +28,10 @@ tests:
   container:
     from: bin
 - as: lint
-  commands: make lint
+  commands: HOME=/tmp golangci-lint run --new-from-rev=HEAD~ --verbose --timeout=5m
+    --config .golangci.yml
   container:
-    from: src
+    from: golangci-lint
 zz_generated_metadata:
   branch: main
   org: openshift-online

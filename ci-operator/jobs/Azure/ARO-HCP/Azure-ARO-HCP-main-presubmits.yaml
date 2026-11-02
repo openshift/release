@@ -1,6 +1,112 @@
 presubmits:
   Azure/ARO-HCP:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build08
+    context: ci/prow/alert-gate
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-alert-gate
+    optional: true
+    rerun_command: /test alert-gate
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=alert-gate
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )alert-gate,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -19,6 +125,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -111,7 +218,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/baseimage-generator-go-smoke-test
     decorate: true
     decoration_config:
@@ -125,7 +232,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-baseimage-generator-go-smoke-test
     rerun_command: /test baseimage-generator-go-smoke-test
-    run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile$|\.ci-operator\.yaml$)
+    run_if_changed: ^(dev-infrastructure/openshift-ci/(Dockerfile|Makefile|smoke-test\.sh|versions\.mk)$|\.bingo/|\.ci-operator\.yaml$|go\.work$)
     spec:
       containers:
       - args:
@@ -180,7 +287,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/baseimage-generator-images
     decorate: true
     decoration_config:
@@ -194,7 +301,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-baseimage-generator-images
     rerun_command: /test baseimage-generator-images
-    run_if_changed: ^(dev-infrastructure/openshift-ci/Dockerfile(\.nested-podman)?$|\.bingo/|\.ci-operator\.yaml$)
+    run_if_changed: ^(dev-infrastructure/openshift-ci/(Dockerfile(\.nested-podman)?|Makefile|smoke-test\.sh|versions\.mk)$|\.bingo/|\.ci-operator\.yaml$|go\.work$)
     spec:
       containers:
       - args:
@@ -355,6 +462,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -447,7 +555,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/capz-e2e-dev
     decorate: true
     decoration_config:
@@ -460,6 +568,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - tooling/aro-hcp-exporter/Dockerfile
       timeout: 4h0m0s
     labels:
@@ -559,7 +668,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/capz-e2e-images
     decorate: true
     decoration_config:
@@ -572,6 +681,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - tooling/aro-hcp-exporter/Dockerfile
     labels:
       ci-operator.openshift.io/variant: capz-e2e
@@ -640,6 +750,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -727,117 +838,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )config-change-detection,?($|\s.*)
   - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build11
-    context: ci/prow/e2e-canada-swift
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - admin/Dockerfile
-      - backend/Dockerfile
-      - fleet/Dockerfile
-      - frontend/Dockerfile
-      - hcp-recovery/Dockerfile
-      - image-sync/oc-mirror/Dockerfile
-      - kube-applier/Dockerfile
-      - mgmt-agent/Dockerfile
-      - sessiongate/Dockerfile
-      - test/Containerfile.e2e
-      - tooling/aro-hcp-exporter/Dockerfile
-      - tooling/tenant-quota/Dockerfile
-    labels:
-      capability/arm64: arm64
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-e2e-canada-swift
-    optional: true
-    rerun_command: /test e2e-canada-swift
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=e2e-canada-swift
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-canada-swift,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build12
+    cluster: build08
     context: ci/prow/e2e-images
     decorate: true
     decoration_config:
@@ -893,7 +898,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: ^(?:action\.yml|(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
+      pipeline_skip_if_only_changed: ^(?:action\.yml|(.*/)?(CODE)?OWNERS(_ALIASES)?|LICENSE|(?:demo|docs)/.*|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:cursor|devcontainer|github|vscode)/.*|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|.*\.md$)$
     branches:
     - ^main$
     - ^main-
@@ -911,6 +916,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1016,6 +1022,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1122,6 +1129,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1228,6 +1236,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1316,69 +1325,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-parallel-slow,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build12
-    context: ci/prow/image-updater-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: image-updater
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-image-updater-images
-    rerun_command: /test image-updater-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=image-updater
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )image-updater-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build12
-    context: ci/prow/images
+    cluster: build08
+    context: ci/prow/grafana-preview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -1391,85 +1343,17 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=aro-hcp-e2e-tests
-        - --target=aro-hcp-e2e-tools
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build11
-    context: ci/prow/integration
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - admin/Dockerfile
-      - backend/Dockerfile
-      - fleet/Dockerfile
-      - frontend/Dockerfile
-      - hcp-recovery/Dockerfile
-      - image-sync/oc-mirror/Dockerfile
-      - kube-applier/Dockerfile
-      - mgmt-agent/Dockerfile
-      - sessiongate/Dockerfile
-      - test/Containerfile.e2e
-      - tooling/aro-hcp-exporter/Dockerfile
-      - tooling/tenant-quota/Dockerfile
-    labels:
-      capability/arm64: arm64
-      capability/nested-podman: nested-podman
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-integration
-    rerun_command: /test integration
+    name: pull-ci-Azure-ARO-HCP-main-grafana-preview
+    optional: true
+    rerun_command: /test grafana-preview
+    run_if_changed: ^observability/grafana-dashboards/
     spec:
       containers:
       - args:
@@ -1481,7 +1365,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=integration
+        - --target=grafana-preview
         command:
         - ci-operator
         env:
@@ -1546,7 +1430,134 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )grafana-preview,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build08
+    context: ci/prow/image-updater-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: image-updater
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-image-updater-images
+    rerun_command: /test image-updater-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=image-updater
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )image-updater-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build08
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=aro-hcp-e2e-tests
+        - --target=aro-hcp-e2e-tools
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1566,6 +1577,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1680,6 +1692,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1781,6 +1794,121 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/integration-e2e-parallel-all
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      capability/arm64: arm64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-integration-e2e-parallel-all
+    optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-int'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
+    rerun_command: /test integration-e2e-parallel-all
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=integration-e2e-parallel-all
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integration-e2e-parallel-all,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/integration-e2e-parallel-ocp-fast
     decorate: true
     decoration_config:
@@ -1794,6 +1922,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -1900,6 +2029,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2006,6 +2136,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2094,6 +2225,121 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )integration-e2e-parallel-ocp-stable,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
+    context: ci/prow/integration-e2e-parallel-slow
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      capability/arm64: arm64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-integration-e2e-parallel-slow
+    optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-int'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
+    rerun_command: /test integration-e2e-parallel-slow
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=integration-e2e-parallel-slow
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )integration-e2e-parallel-slow,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -2112,6 +2358,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2199,112 +2446,6 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build11
-    context: ci/prow/mega-linter
-    decorate: true
-    decoration_config:
-      sparse_checkout_files:
-      - admin/Dockerfile
-      - backend/Dockerfile
-      - fleet/Dockerfile
-      - frontend/Dockerfile
-      - hcp-recovery/Dockerfile
-      - image-sync/oc-mirror/Dockerfile
-      - kube-applier/Dockerfile
-      - mgmt-agent/Dockerfile
-      - sessiongate/Dockerfile
-      - test/Containerfile.e2e
-      - tooling/aro-hcp-exporter/Dockerfile
-      - tooling/tenant-quota/Dockerfile
-    labels:
-      capability/arm64: arm64
-      capability/nested-podman: nested-podman
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-Azure-ARO-HCP-main-mega-linter
-    rerun_command: /test mega-linter
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --target=mega-linter
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )mega-linter,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
     - ^main$
@@ -2323,6 +2464,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2429,6 +2571,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2522,6 +2665,199 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/podman-integration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/arm64: arm64
+      capability/nested-podman: nested-podman
+      ci-operator.openshift.io/variant: podman
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-podman-integration
+    rerun_command: /test podman-integration
+    skip_if_only_changed: ^(?:docs/.*|.*\.md|(.*/)?(CODE)?OWNERS(_ALIASES)?|LICENSE|\.github/.*|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml))$
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=integration
+        - --variant=podman
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )podman-integration,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
+    context: ci/prow/podman-mega-linter
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/arm64: arm64
+      capability/nested-podman: nested-podman
+      ci-operator.openshift.io/variant: podman
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-podman-mega-linter
+    rerun_command: /test podman-mega-linter
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=mega-linter
+        - --variant=podman
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )podman-mega-linter,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/prod-canary-arm-endpoint-e2e-parallel
     decorate: true
     decoration_config:
@@ -2535,6 +2871,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2649,6 +2986,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2763,6 +3101,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2877,6 +3216,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -2983,6 +3323,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3097,6 +3438,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3190,6 +3532,121 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build11
+    context: ci/prow/prod-e2e-parallel-slow
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      capability/arm64: arm64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-prod-e2e-parallel-slow
+    optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-prod'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
+    rerun_command: /test prod-e2e-parallel-slow
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=prod-e2e-parallel-slow
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )prod-e2e-parallel-slow,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
     context: ci/prow/secrets-validation
     decorate: true
     decoration_config:
@@ -3203,6 +3660,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3309,6 +3767,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3423,6 +3882,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3537,6 +3997,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3651,6 +4112,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3765,6 +4227,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3871,6 +4334,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -3985,6 +4449,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -4073,6 +4538,121 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )stage-e2e-parallel-ocp-stable,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build11
+    context: ci/prow/stage-e2e-parallel-slow
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - admin/Dockerfile
+      - backend/Dockerfile
+      - fleet/Dockerfile
+      - frontend/Dockerfile
+      - hcp-recovery/Dockerfile
+      - image-sync/oc-mirror/Dockerfile
+      - kube-applier/Dockerfile
+      - mgmt-agent/Dockerfile
+      - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
+      - test/Containerfile.e2e
+      - tooling/aro-hcp-exporter/Dockerfile
+      - tooling/tenant-quota/Dockerfile
+    labels:
+      capability/arm64: arm64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-stage-e2e-parallel-slow
+    optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-failures-stg'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
+    rerun_command: /test stage-e2e-parallel-slow
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --target=stage-e2e-parallel-slow
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stage-e2e-parallel-slow,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -4091,6 +4671,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile
@@ -4196,6 +4777,7 @@ presubmits:
       - kube-applier/Dockerfile
       - mgmt-agent/Dockerfile
       - sessiongate/Dockerfile
+      - swift-recorder/Dockerfile
       - test/Containerfile.e2e
       - tooling/aro-hcp-exporter/Dockerfile
       - tooling/tenant-quota/Dockerfile

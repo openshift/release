@@ -1,0 +1,27 @@
+ref:
+  as: gcp-hcp-cleanup-on-demand
+  from: gcp-hcp-e2e-tests
+  commands: gcp-hcp-cleanup-on-demand-commands.sh
+  env:
+  - name: E2E_TARGET_CUSTOMER_PROJECT_ID
+    documentation: Customer project configured for this on-demand job
+  - name: E2E_TARGET_REGION
+    documentation: Region configured for this on-demand job
+  - name: E2E_TARGET_API_ENDPOINT
+    documentation: Platform API endpoint configured for this on-demand job
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 60m0s
+  grace_period: 5m0s
+  best_effort: true
+  documentation: |-
+    Verifies cleanup after every on-demand HostedCluster test, including a
+    successful Ginkgo run. Waits for the exact per-run nodepool and cluster to
+    disappear, removes any remaining worker VMs with matching cluster and infra
+    labels or metadata in the customer project, then destroys the test network
+    and IAM.
+    Never targets regional or management projects. Best effort lets the final
+    status step run even after a cleanup failure; that step fails the job and
+    commit status when cleanup was not verified.

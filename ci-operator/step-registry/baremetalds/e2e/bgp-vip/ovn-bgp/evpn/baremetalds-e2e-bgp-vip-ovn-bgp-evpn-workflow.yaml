@@ -1,0 +1,67 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip-ovn-bgp-evpn
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+      - ref: ovn-shared-to-local-gateway-mode-migration
+      - ref: baremetalds-e2e-ovn-bgp-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+      - ref: baremetalds-e2e-bgp-vip-ovn-bgp-verify
+      - ref: baremetalds-e2e-bgp-vip-ovn-bgp-evpn-verify
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    Coexistence lane for BGP-based VIP management (enhancement 1982) and
+    OVN-Kubernetes EVPN. Builds on baremetalds-e2e-bgp-vip-ovn-bgp: a
+    dual-stack baremetal IPI cluster is installed via dev-scripts with
+    BGP_VIP_MANAGEMENT=true (API/ingress VIPs advertised to a top-of-rack FRR
+    speaker by kube-vip + frr-k8s static pods on the control plane instead of
+    keepalived), the cluster is switched to local gateway mode (a hard
+    requirement of OVN-Kubernetes EVPN), and the OVN BGP pre step deploys the
+    external FRR route reflector on the baremetal bridge and enables
+    routeAdvertisements.
+
+    Flow: ofcir/dev-scripts install -> local gateway migration -> ovn-bgp pre
+    (route reflector, RA) -> bgp-vip verify -> ovn-bgp coexistence verify ->
+    evpn control-plane verify -> ovn-kubernetes OTE conformance suite.
+
+    EVPN functional coverage comes from the ovn-kubernetes OTE suite
+    (TEST_SUITE=ovn-kubernetes/conformance/parallel, extension shipped in the
+    payload's ovn-kubernetes image). Its baremetal infraprovider drives the
+    same route reflector container over SSH to build per-test EVPN fabrics
+    (Layer3 IP-VRF and Layer2 MAC-VRF, random and shared VTEPs, reachability
+    and isolation, VTEP API validation) - the same tests the
+    e2e-metal-ipi-core-networking-dualstack-bgp-lgw-ote lane runs, here on a
+    cluster whose control plane runs the frr-k8s static pods. The small
+    evpn-verify step before it asserts the one thing that suite does not: the
+    per-node EVPN FRRConfiguration is merged by the frr-k8s *static pod* on a
+    control plane node and its l2vpn-evpn session is Established, and - with
+    EVPN live - every control plane eBGP session to the ToR still is and the
+    VIPs are still advertised and answering. The cluster is dual-stack but the
+    VXLAN underlay is IPv4-only; IPv6 EVPN is not asserted.
+
+    Security notes (mirroring the baremetalds-e2e-ovn-bgp-* lanes this
+    composes): EXTRA_MG_ARGS=--host-network only makes the post-run
+    must-gather pod use host networking so diagnostics can be collected even
+    when the pod-network path under test is broken. All privileged FRR,
+    bridge/VXLAN and agnhost work - by the pre step, by the verify step and
+    by the OTE suite - runs on the ephemeral CI hypervisor (the equinix packet
+    host, discarded after the job), not on the cluster; it emulates the
+    external EVPN fabric. The verify step's test namespace is labelled
+    privileged only so a pod can be pinned by nodeName onto a control plane
+    node, and is deleted at the end of the step.

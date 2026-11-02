@@ -228,8 +228,10 @@ ca_output_tmp="$(mktemp "${SHARED_DIR}/.mirror_registry_ca.crt.XXXXXX")"
 creds_output_tmp="$(mktemp "${SHARED_DIR}/.mirror_registry_creds.XXXXXX")"
 endpoint_output_tmp="$(mktemp "${SHARED_DIR}/.mirror_registry_url.XXXXXX")"
 
+# A generated ssl.cert is a leaf signed by rootCA.pem; a user-supplied or older
+# install has no rootCA.pem, so trust ssl.cert itself.
 ssh "${ssh_options[@]}" "${bastion_user}@${bastion_public_dns}" \
-    "sudo cat /var/lib/quay/ssl.cert" > "${ca_output_tmp}"
+    "if sudo test -f /var/lib/quay/rootCA.pem; then sudo cat /var/lib/quay/rootCA.pem; else sudo cat /var/lib/quay/ssl.cert; fi" > "${ca_output_tmp}"
 ssh "${ssh_options[@]}" "${bastion_user}@${bastion_public_dns}" \
     "sudo cat /var/lib/quay/auth/admin-password" > "${admin_password_file}"
 

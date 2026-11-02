@@ -47,7 +47,7 @@ EXTRA_VARS="${EXTRA_VARS} scope=${SCOPE}"
 if [[ $SCOPE == "Reboot" ]]; then
     EXTRA_VARS="${EXTRA_VARS} run_reboot_tests_only=true"
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=container"
-    EXTRA_VARS="${EXTRA_VARS} scope=container"
+    EXTRA_VARS="${EXTRA_VARS} scope=reboot"
 else
     EXTRA_VARS="${EXTRA_VARS} topology_manager_scope=${SCOPE}"
 fi
@@ -97,7 +97,7 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_
 echo "Copy junit test reports to shared directory for reporter step"
 if ls ${ARTIFACT_DIR}/tests/junit/*.xml 1> /dev/null 2>&1; then
     echo "Copy junit test reports to shared directory for reporter step"
-	 cp -v "${ARTIFACT_DIR}"/tests/junit/*.xml "${SHARED_DIR}/" 2>/dev/null
+	tar -czvf "${SHARED_DIR}/${SCOPE}_junit.tar.gz"  -C "${ARTIFACT_DIR}/tests/junit" .
     touch "${SHARED_DIR}/gotest-completed"
 else
     echo "No junit test reports found to copy to SHARED_DIR"

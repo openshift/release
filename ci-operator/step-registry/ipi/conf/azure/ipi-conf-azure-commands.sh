@@ -190,8 +190,30 @@ fi
 if [[ -n "${IP_FAMILY:-}" ]]; then
   echo "Configuring Azure dual-stack networking with IP_FAMILY: ${IP_FAMILY}"
   patch_dualstack="${SHARED_DIR}/install-config-dualstack.yaml.patch"
-  
-  cat > "${patch_dualstack}" << EOF
+
+  # For IPv6Primary, IPv6 addresses must be listed first
+  if [[ "${IP_FAMILY}" == "DualStackIPv6Primary" ]]; then
+    cat > "${patch_dualstack}" << EOF
+platform:
+  azure:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: fd00::/56
+  - cidr: 10.0.0.0/16
+  clusterNetwork:
+  - cidr: fd01::/56
+    hostPrefix: 64
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  serviceNetwork:
+  - fd02::/112
+  - 172.30.0.0/16
+EOF
+  else
+    # DualStackIPv4Primary or default - IPv4 addresses listed first
+    cat > "${patch_dualstack}" << EOF
 platform:
   azure:
     ipFamily: ${IP_FAMILY}
@@ -209,6 +231,8 @@ networking:
   - 172.30.0.0/16
   - fd02::/112
 EOF
+  fi
+
   yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
   cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
   echo "Dual-stack networking configuration added to install-config.yaml"

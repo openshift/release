@@ -23,9 +23,9 @@ images:
         paths:
         - destination_dir: src
           source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-api
+    optional: true
     to: podman-test
 prowgen:
-  enable_secrets_store_csi_driver: true
   expose: true
   private: true
 resources:
@@ -44,25 +44,24 @@ tests:
     test:
     - ref: hyperfleet-risk-scorer
 - as: lint
-  capabilities:
-  - nested-podman
   commands: |
-    export PATH=$PATH:$(go env GOPATH)/bin
-    make generate-all
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    unset GOFLAGS
     make lint
   container:
-    from: podman-test
-  nested_podman: true
+    from: src
 - as: unit
-  capabilities:
-  - nested-podman
   commands: |
-    export PATH=$PATH:$(go env GOPATH)/bin
-    make generate
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    unset GOFLAGS
     make test
   container:
-    from: podman-test
-  nested_podman: true
+    from: src
 - as: verify-migrations
   commands: |
     make verify-migrations

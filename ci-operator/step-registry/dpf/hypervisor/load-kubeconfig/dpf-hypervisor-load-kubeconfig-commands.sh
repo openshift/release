@@ -1,6 +1,11 @@
 #!/bin/bash
 
 set -euo pipefail
+
+if [[ -f "${SHARED_DIR}/skip-work-steps" ]]; then
+  echo "Skipping work step: skip-work-steps marker is present."
+  exit 0
+fi
 shopt -s inherit_errexit
 
 # Configuration
@@ -8,7 +13,7 @@ REMOTE_HOST=$(cat ${CLUSTER_PROFILE_DIR}/remote-host)
 CLUSTER_NAME=$(cat "${CLUSTER_PROFILE_DIR}/cluster-name")
 REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/${CLUSTER_NAME}/ci/last-openshift-dpf-dir.sh"
 
-echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
+echo "Setting up SSH access to DPF hypervisor"
 
 # Prepare SSH key from Vault (add trailing newline if missing)
 echo "Configuring SSH private key..."
@@ -17,14 +22,14 @@ echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
-SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
+SSH_OPTS="-q -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=QUIET -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 # Test SSH connection
-echo "Testing SSH connection to ${REMOTE_HOST}..."
+echo "Testing SSH connection to DPF hypervisor..."
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
     echo "SSH setup complete and tested successfully"
 else
-    echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
+    echo "ERROR: Failed to connect to DPF hypervisor"
     exit 1
 fi
 

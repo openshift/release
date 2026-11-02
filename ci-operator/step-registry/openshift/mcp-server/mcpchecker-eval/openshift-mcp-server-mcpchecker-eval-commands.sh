@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+export GOLANG_VER="1.27.0"
+# `GOBIN` is optional in the build environment; default to Go's install bin.
+if [[ -z "${GOBIN:-}" ]]; then
+    GOBIN="$(go env GOPATH)/bin"
+fi
+export GOBIN
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export MCP_EVAL_KUBECONFIG="${KUBECONFIG}"
 
@@ -23,7 +29,19 @@ export MCP_CONFIG_DIR=dev/config/mcp-configs
 
 trap 'make stop-server || true' EXIT
 
-GOFLAGS='' make mcpchecker
+# TODO: if we can get RH golang releases in line with pace upstream, remove this
+GOFLAGS='' go install golang.org/dl/go${GOLANG_VER}@latest
+GOFLAGS='' ${GOBIN}/go${GOLANG_VER} download
+
+# The mcpchecker Make target uses the default `go`; invoke the downloaded
+# toolchain directly so the install definitely uses the requested version.
+MCPCHECKER_TOOLS_DIR="$(pwd)/_output/tools/bin"
+MCPCHECKER_VERSION="${MCPCHECKER_VERSION:-latest}"
+MCPCHECKER_GO="${GOBIN}/go${GOLANG_VER}"
+mkdir -p "${MCPCHECKER_TOOLS_DIR}"
+GOFLAGS='' GOBIN="${MCPCHECKER_TOOLS_DIR}" \
+    "${MCPCHECKER_GO}" install \
+    "github.com/mcpchecker/mcpchecker/cmd/mcpchecker@${MCPCHECKER_VERSION}"
 
 # CI pods expose in-cluster env (build farm). Without forcing kubeconfig,
 # the MCP server auto-selects in-cluster and gets RBAC denials. Unset the

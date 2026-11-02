@@ -1,0 +1,36 @@
+ref:
+  as: medik8s-source-upgrade
+  from: source-upgrade-test-runner
+  cli: latest
+  commands: medik8s-source-upgrade-commands.sh
+  nested_podman: true
+  env:
+  - name: SOURCE_OPERATOR
+    default: ""
+    documentation: Operator to build and upgrade (nhc, sbr, snr, far, mdr, or nmo).
+  - name: SYSTEM_TESTS_REF
+    default: main
+    documentation: rhwa-system-tests branch, tag, or commit SHA; main continuously validates current tests.
+  - name: CONSOLE_PLUGIN_IMAGE
+    default: quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-console-5-8@sha256:44e630966d208fa22a32e7e0c0858c4b18cd63fc63a926417d4639027be92870
+    documentation: NHC 5.8 console from the supplied FBC, pinned at its public IDMS mirror; candidate bundle only, ignored by other operators.
+  - name: MUST_GATHER_IMAGE
+    default: quay.io/redhat-user-workloads/rhwa-tenant/node-healthcheck-operator/nhc-must-gather-5-8@sha256:e0f3962ac2a1033bce98d96cbe3e99273e9176b84b02c9bbab9a13d88e18bdb9
+    documentation: NHC 5.8 must-gather from the supplied FBC, pinned at its public IDMS mirror; candidate bundle only, ignored by other operators.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  documentation: |-
+    Builds the operator checkout selected by Prow, its bundle, and an FBC using
+    make dev-olm-catalog-push with Podman. Publishes temporary images to ttl.sh,
+    verifies the bundle/version, and runs the selected rhwa-system-tests ref's
+    tier:upgrade-operator tests. The runner's SDK must match the operator Makefile's
+    pin. SBR also builds its agent; NHC supplies pinned related images.
+    Version/image and configuration-preservation checks remain enabled.
+    Candidate images are directly pullable, so no release IDMS is applied.
+    SBR does not require ODF and does not perform storage-based remediation;
+    FAR does not fence machines. The NHC test uses oc-debug to stop a worker's
+    kubelet; NHC detects the unhealthy worker and requests remediation through
+    SNR, whose agent reboots the worker. The SNR test also remediates a worker,
+    and NMO drains a worker.

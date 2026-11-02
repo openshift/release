@@ -1,7 +1,7 @@
 ref:
   as: distributed-tracing-tests-opentelemetry-upstream
   from: obs-tests-runner
-  timeout: 3h0m0s
+  timeout: 3h30m0s
   grace_period: 2m0s
   commands: distributed-tracing-tests-opentelemetry-upstream-commands.sh
   resources:
@@ -9,12 +9,26 @@ ref:
       cpu: "1"
       memory: 3Gi
   env:
+  - name: RUN_TESTS
+    default: ""
+    documentation: |-
+      Space separated chainsaw test directories of the operator repository to run, relative to the repository root,
+      for example "tests/e2e/smoke-deletion tests/e2e-crd-validations tests/e2e-sidecar". Exactly these directories
+      run; a directory that does not exist fails the job. Empty (the default) runs the full suite, minus SKIP_TESTS.
+      Exactly one of RUN_TESTS and SKIP_TESTS must be set: both, or neither, fail the job.
   - name: SKIP_TESTS
     default: ""
-    documentation: "Space seperated test cases to skip from the test run. Example tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation"
+    documentation: |-
+      Space separated test directories, relative to the repository and under tests/, that are removed from the full
+      suite before it runs, for example "tests/e2e/smoke-ip-families tests/e2e-otel/*aws*". Globs are allowed. An entry
+      that does not start with tests/, or contains "..", is reported and ignored. The full-suite jobs set it to the tests
+      that cannot run on their OpenShift version, platform or architecture. Not used with RUN_TESTS.
   - name: TARGETALLOCATOR_IMG
     default: ""
-    documentation: The OpenTelemetry Target Allocator image used in testing.
+    documentation: The OpenTelemetry Target Allocator image used by the operator in testing. Filled from the opentelemetry-target-allocator pipeline image.
+  - name: OPERATOR_IMG
+    default: ""
+    documentation: The OpenTelemetry Operator image that must run in the test. Filled from the opentelemetry-operator pipeline image and checked against the installed operator.
   - name: OPERATOROPAMPBRIDGE_IMG
     default: ""
     documentation: The OpenTelemetry Opampbridge image used in testing.
@@ -37,6 +51,8 @@ ref:
     default: ""
     documentation: The OpenTelemetry Apache HTTPD auto-instrumentation image used in testing.
   dependencies:
+  - name: "opentelemetry-operator"
+    env: OPERATOR_IMG
   - name: "opentelemetry-target-allocator"
     env: TARGETALLOCATOR_IMG
   - name: "opentelemetry-opampbridge"
@@ -54,17 +70,31 @@ ref:
   - name: "opentelemetry-instrumentation-apache-httpd"
     env: INSTRUMENTATION_APACHE_HTTPD_IMG
   documentation: |-
-    The distributed-tracing-tests-opentelemetry-upstream step executes the OpenTelemetry Operator Upstream tests.
-    
+    The distributed-tracing-tests-opentelemetry-upstream step runs the OpenTelemetry Operator e2e tests of the upstream
+    main branch against an operator that was installed from a bundle built in the same CI run. The same step serves the
+    quick pre-merge job (RUN_TESTS names a small set of critical tests) and the full jobs of the OpenShift versions
+    (SKIP_TESTS removes what cannot run on that version).
+
+    The tests are taken from the pull request source that is baked into the obs-tests-runner image
+    (tests/e2e-openshift/Dockerfile), plus the additional OpenTelemetry tests (tests/e2e-otel) that the step clones from the
+    main branch of openshift/distributed-tracing-qe, because the upstream repository does not have them.
+
+    The operator is pointed at the target allocator and OpAMP bridge images built in the same run. The tests of the OpAMP
+    bridge use the bridge server image of the run. The instrumentation tests run with the auto-instrumentation images of
+    the run: once for a job with RUN_TESTS, twice for the full suite (first with the default images of the operator).
+
+    One chainsaw run with the sidecar selector of the OpenShift version runs the selected tests, then
+    e2e-metadata-filters (the filter variables are set on the operator first), then, for the full suite, the automatic
+    RBAC tests (the operator is granted the permissions that the tests need and is restarted; it adds a finalizer to
+    the collectors afterwards, hence they run late), then e2e-openshift-tls-profile last because it triggers a MachineConfig
+    rollout. The operator runs with the default collector image and with PHP auto-instrumentation enabled, which the
+    OpenShift bundle does not enable. JUnit files are written to the artifacts directory and copied to SHARED_DIR for the
+    openshift-observability-qe-agent post step.
+
     This step requires the following pipeline images to be built:
-    - opentelemetry-target-allocator: OpenTelemetry Target Allocator component image
-    - opentelemetry-opampbridge: OpenTelemetry OpAMP Bridge component image  
-    - opamp-bridge-server: Test server image for OpAMP Bridge testing
-    - opentelemetry-instrumentation-java: Auto-instrumentation image for Java applications
-    - opentelemetry-instrumentation-nodejs: Auto-instrumentation image for Node.js applications
-    - opentelemetry-instrumentation-python: Auto-instrumentation image for Python applications
-    - opentelemetry-instrumentation-dotnet: Auto-instrumentation image for .NET applications
-    - opentelemetry-instrumentation-apache-httpd: Auto-instrumentation image for Apache HTTPD
-    
-    These images are built from the corresponding directories in the opentelemetry-operator repository
-    and are passed to the operator during testing via command-line arguments. 
+    - obs-tests-runner: test runner image that contains the operator repository in /tmp/opentelemetry-operator
+    - opentelemetry-operator: the Operator image, which must be the image of the installed operator
+    - opentelemetry-target-allocator: the Target Allocator image
+    - opentelemetry-opampbridge: the OpAMP Bridge image
+    - opamp-bridge-server: the test server image for the OpAMP Bridge tests
+    - opentelemetry-instrumentation-java, -nodejs, -python, -dotnet, -apache-httpd: the auto-instrumentation images

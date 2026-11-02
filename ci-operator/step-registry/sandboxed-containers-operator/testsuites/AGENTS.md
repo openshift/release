@@ -38,13 +38,12 @@ do). Without it, `best_effort` is ignored and a failing suite blocks the rest.
 
 ### Gate
 
-The post suites run in `post`, which ci-operator executes **even when `pre` (setup)
+The testsuites steps run in `post`, which ci-operator executes **even when `pre` (setup)
 failed** — so without a guard they run against a broken cluster and emit a flood of
 meaningless failures. The guard is the `testsuites-gate` step (at the component
-root, `testsuites-gate/`): it runs in the **`test` phase** (via the shared
-`sandboxed-containers-operator-test` chain, before `openshift-extended-test`) and
-creates the file `${SHARED_DIR}/testsuites_gate`. Each post suite skips when that
-file is absent.
+root, `testsuites-gate/`): it is the sole step in the **`test` phase**'s shared
+`sandboxed-containers-operator-test` chain and creates the file
+`${SHARED_DIR}/testsuites_gate`. Each post suite skips when that file is absent.
 
 This leans on a ci-operator behaviour: **a failed `pre` step skips the entire `test`
 phase**, so the gate step never runs, the file is never created, and every post suite

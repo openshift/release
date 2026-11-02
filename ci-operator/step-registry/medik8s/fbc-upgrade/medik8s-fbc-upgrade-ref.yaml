@@ -1,0 +1,49 @@
+ref:
+  as: medik8s-fbc-upgrade
+  from: fbc-upgrade-test-runner
+  cli: latest
+  commands: medik8s-fbc-upgrade-commands.sh
+  env:
+  - name: FBC_OPERATOR
+    default: ""
+    documentation: Operator suite to run (nhc, sbr, snr, far, mdr, or nmo).
+  - name: SYSTEM_TESTS_REF
+    default: main
+    documentation: rhwa-system-tests branch, tag, or commit SHA; main continuously validates current tests.
+  - name: FBC_CATALOG_MODE
+    default: latest-build
+    documentation: latest-build (default) discovers the newest complete public main build; provided uses configured images; latest-stage reads the current stage index.
+  - name: FBC_BUILD_REPOSITORY
+    default: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500
+    documentation: Public Quay repository to discover builds from in latest-build mode.
+  - name: FBC_STAGE_IMAGE
+    default: registry.stage.redhat.io/redhat/redhat-operator-index:v5.0
+    documentation: Stage index tag for latest-stage mode; its registry credentials must already be in the cluster pull secret.
+  - name: FBC_CATALOG_IMAGE
+    default: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:e999cbe4fb3604d66ee71c9927827c2a88852b1456cb274ff1d673f1db9ce8fd
+    documentation: |-
+      Used only in provided mode: public Konflux FBC from source commit 8c9972727d69b2abf9312ddc9e9b270aaf67597c.
+      Update the embedded IDMS and per-job controller digests together with this image.
+  - name: FBC_CANDIDATE_VERSION
+    default: "5.8.0"
+    documentation: Exact candidate CSV version in provided mode; discovery modes read the selected channel head's version.
+  - name: FBC_CANDIDATE_IMAGE
+    default: ""
+    documentation: Digest-pinned controller pullspec in provided mode; discovery modes read it from the selected bundle.
+  - name: FBC_CANDIDATE_MIRROR
+    default: ""
+    documentation: Public Quay controller mirror in provided mode; discovery modes select a pullable mirror from the selected release's IDMS.
+  - name: FBC_CHANNEL
+    default: stable
+    documentation: Catalog channel used for the GA baseline and candidate upgrade.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  documentation: |-
+    Runs one operator's merged tier:upgrade-operator test against a supplied RHWA FBC.
+    Applies release mirrors through the Go test, installs GA from redhat-operators,
+    upgrades the Subscription, and verifies version, image, persistent configuration,
+    and the operator-specific lifecycle. No source images are built. Use a disposable
+    cluster: some suites reboot or drain workers. See the README for operator-specific
+    coverage and prerequisites.

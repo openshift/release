@@ -10,6 +10,15 @@ log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# Private clusters ship proxy-conf.sh (written by rosa-cluster-credentials-backplane)
+# so e2e.test reaches the backplane-routed MC/SC APIs through the corp proxy.
+# No-op for public clusters.
+if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  log "Private cluster detected, sourcing proxy configuration"
+  # shellcheck disable=SC1091
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Platform plane validates from the management cluster kubeconfig produced by
 # rosa-backplane-login. Without it there is nothing to validate here.
 MC_KUBECONFIG_FILE="${SHARED_DIR}/mc-kubeconfig"
@@ -34,6 +43,28 @@ fi
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 export CLUSTER_ID OCM_ENV="${OCM_LOGIN_ENV}"
+
+# OCM credentials for the suite's BeforeSuite (config.Load requires OCM_TOKEN or
+# OCM_CLIENT_ID/OCM_CLIENT_SECRET to open the SDK connection; specs also query OCM
+# directly). Read from the cluster profile, never echoed. Mirrors rosa-e2e-test.
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+SUITE_OCM_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  export OCM_CLIENT_ID="${SSO_CLIENT_ID}"
+  export OCM_CLIENT_SECRET="${SSO_CLIENT_SECRET}"
+elif [[ -n "${SUITE_OCM_TOKEN}" ]]; then
+  export OCM_TOKEN="${SUITE_OCM_TOKEN}"
+else
+  log "ERROR: no OCM credentials found in cluster profile (sso-client-id/secret or ocm-token)"
+  exit 1
+fi
 
 # Self-select feature assertions from the frozen contract metadata (ROSAENG-67580).
 META="${SHARED_DIR}/cluster-metadata.json"

@@ -12,8 +12,6 @@ build_root:
     name: builder
     namespace: konveyor
     tag: ubi9-v1.27
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -51,6 +49,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -62,6 +61,7 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        [[ -f "${SHARED_DIR}/injector_image" ]] && export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
         [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
         make run-tests
       env:

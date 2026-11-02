@@ -1,6 +1,11 @@
 ref:
   as: quay-gather
-  from: cli
+  cli: latest
+  # quay-deploy-tools is cli plus jq, which tested-images.json needs.
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
   commands: quay-gather-commands.sh
   # The step traps SIGTERM so an aborted job still gets the gather summary and,
   # when nothing was collected, the EMPTY-GATHER marker. prow's entrypoint
@@ -45,6 +50,16 @@ ref:
 
     Per-namespace artifacts are written under <namespace>/, with container logs in
     <namespace>/logs/<pod>-<container>.log.
+
+    tested-images.json records what the run tested, for release-readiness: the
+    catalog requested and resolved (from quay-enable-catalogsource-art), the
+    Subscription channel, the QuayRegistry version, the installed CSV and its bundle
+    image from the pinned catalog, and per role the image each operator or Quay
+    component pod requested (source "pod") and each operand image the CSV ships
+    (source "csv-related", which covers the builder images no pod runs). The
+    requested digest is the join key; imageID is recorded as a diagnostic only.
+    Fields that could not be read are null and listed in "missing", with
+    "complete": false. Its schema is a contract: change it additively only.
 
     Jaeger traces are gathered separately by quay-gather-jaeger-traces, which needs
     a port-forward and a deployed-Jaeger marker.

@@ -12,8 +12,6 @@ build_root:
     name: builder
     namespace: konveyor
     tag: ubi9-v1.27
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -36,7 +34,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: far-operator
-      ECO_TEST_LABELS: '!tier:upgrade'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
       MEDIK8S_PACKAGES: fence-agents-remediation
@@ -50,6 +49,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -75,14 +75,15 @@ tests:
 - as: e2e-far-weekly-aws-disconnected
   capabilities:
   - intranet
-  cron: '@yearly'
+  cron: 0 12 * * 4
   steps:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: far-operator
-      ECO_TEST_LABELS: '!tier:upgrade'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
       MEDIK8S_PACKAGES: fence-agents-remediation
@@ -96,6 +97,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -119,6 +121,107 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
 - always_run: false
+  as: e2e-far-nhc-interop-aws-disconnected
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MEDIK8S_PACKAGES: fence-agents-remediation,node-healthcheck-operator
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-far-nhc-interop-aws-disconnected
+      TEST_STEPS: e2e-test
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-aws-credentials
+    - ref: medik8s-disconnected-allow-node-ssh
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+- as: e2e-far-nhc-interop-weekly-aws-disconnected
+  capabilities:
+  - intranet
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: operator:far && operator:nhc && tier:interop
+      ECO_TEST_VERBOSE: "true"
+      ENABLE_IDMS: "yes"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MEDIK8S_PACKAGES: fence-agents-remediation,node-healthcheck-operator
+      OCP_VERSION: "422"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-far-nhc-interop-weekly-aws-disconnected
+      TEST_STEPS: e2e-test
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
+    test:
+    - ref: medik8s-lib
+    - ref: medik8s-disconnected-catalogsource
+    - ref: medik8s-operator-subscribe
+    - ref: medik8s-aws-credentials
+    - ref: medik8s-disconnected-allow-node-ssh
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
   as: e2e-snr-aws-disconnected
   capabilities:
   - intranet
@@ -129,6 +232,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -143,6 +248,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -157,6 +263,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -174,6 +281,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -188,6 +297,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -202,6 +312,7 @@ tests:
       env:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
       from: src
       resources:
         requests:
@@ -236,6 +347,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -247,6 +359,7 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        [[ -f "${SHARED_DIR}/injector_image" ]] && export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
         [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
         make run-tests
       env:
@@ -286,6 +399,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -297,6 +411,7 @@ tests:
         [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
         [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
         [[ -f "${SHARED_DIR}/must_gather_image" ]] && export MUST_GATHER_IMAGE=$(cat "${SHARED_DIR}/must_gather_image")
+        [[ -f "${SHARED_DIR}/injector_image" ]] && export SBR_INJECTOR_IMAGE=$(cat "${SHARED_DIR}/injector_image")
         [[ -f "${SHARED_DIR}/sbr_watchdog_debug_image" ]] && export SBR_WATCHDOG_DEBUG_IMAGE=$(cat "${SHARED_DIR}/sbr_watchdog_debug_image")
         make run-tests
       env:
@@ -321,7 +436,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: nhc-operator
-      ECO_TEST_LABELS: '!tier:fresh-install && !tier:upgrade-operator && !tier:upgrade-cluster'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -336,6 +452,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource
@@ -368,7 +485,8 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.xlarge
       ECO_TEST_FEATURES: nhc-operator
-      ECO_TEST_LABELS: '!tier:fresh-install && !tier:upgrade-operator && !tier:upgrade-cluster'
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
       ENABLE_IDMS: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
@@ -383,6 +501,7 @@ tests:
       - observers-resource-watch
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post-disconnected
     test:
     - ref: medik8s-lib
     - ref: medik8s-disconnected-catalogsource

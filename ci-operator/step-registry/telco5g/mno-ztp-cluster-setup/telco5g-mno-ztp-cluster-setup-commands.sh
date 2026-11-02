@@ -30,7 +30,7 @@ BM_WORKERS=${BM_WORKERS:-1}
 VIRT_WORKERS=${VIRT_WORKERS:-2}
 
 # Use latest stable version for mgmt cluster
-MGMT_VERSION=4.21
+MGMT_VERSION=4.22
 MGMT_RELEASE=stable
 
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
@@ -326,7 +326,7 @@ cat << EOF > ~/fetch-kubeconfig.yml
 
   - name: Save the original of the ZTP kubeconfig
     fetch:
-      src: /home/kni/.kube/hcp_config_${CLUSTER_NAME}
+      src: /home/kni/.kube/ztp_config_${CLUSTER_NAME}
       dest: $SHARED_DIR/kubeconfig.original
       flat: yes
 
@@ -388,7 +388,6 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e sno_release=$MGMT_RELEASE \
     -e ztp_tag=$T5CI_VERSION \
     -e ztp_release=$T5CI_JOB_ZTP_RELEASE_TYPE \
-    -e ztphub_wait_install_timeout=90 \
     -e ztphub_app_autosync=true \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \

@@ -3,7 +3,14 @@ chain:
   steps:
   - as: dump
     cli: latest
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      group: ops/hypershift-ci-jobs-self-managed-azure
+      collection: hypershift-team
     env:
+    - name: AZURE_CREDS
+      default: /etc/hypershift-ci-jobs-self-managed-azure/credentials.json
+      documentation: "Azure identity used to collect worker boot diagnostics. Requires VM read and retrieveBootDiagnosticsData/action on worker resource groups."
     - name: HYPERSHIFT_PLATFORM
       default: ""
       documentation: "The cloud platform for the self-managed clusters (e.g. azure). Set in the workflow env block."
@@ -20,6 +27,6 @@ chain:
     resources:
       requests:
         cpu: 100m
-    timeout: 15m0s
+    timeout: 30m0s
   - ref: hypershift-debug
   - ref: hypershift-k8sgpt

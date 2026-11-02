@@ -7,13 +7,15 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "5.0"
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-5.0
-prowgen:
-  enable_secrets_store_csi_driver: true
 releases:
   latest:
     release:
@@ -32,6 +34,7 @@ tests:
   postsubmit: true
   run_if_changed: ^v11\.0/
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -82,20 +85,6 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
-- as: nutanix-ipi-ovn-winc
-  postsubmit: true
-  run_if_changed: ^v11\.0/
-  steps:
-    cluster_profile: nutanix
-    env:
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 zz_generated_metadata:
   branch: main
   org: openshift

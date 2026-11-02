@@ -21,13 +21,24 @@ promotion:
   - namespace: ci
     tag: latest
     tag_by_commit: true
-prowgen:
-  enable_secrets_store_csi_driver: true
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: deployment-validation
+  skip_if_only_changed: ^docs/|\.md$|^\.github/
+  steps:
+    env:
+      CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier0
+      MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_API_IMAGE_TAG: latest
+      MULTISTAGE_PARAM_OVERRIDE_NAMESPACE_PREFIX: e2e
+      MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG: latest
+      REGION: us-central1-a
+    workflow: openshift-hyperfleet-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet

@@ -1,0 +1,39 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: che-operator-update
+  steps:
+    cluster_profile: che-aws
+    env:
+      BASE_DOMAIN: crw-qe.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_NODE_COUNT: "1"
+    test:
+    - as: test
+      cli: latest
+      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: 7.126.x
+  org: eclipse-che
+  repo: che-operator
+  variant: v22

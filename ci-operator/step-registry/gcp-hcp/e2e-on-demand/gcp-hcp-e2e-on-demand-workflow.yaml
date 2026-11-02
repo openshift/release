@@ -1,0 +1,34 @@
+workflow:
+  as: gcp-hcp-e2e-on-demand
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: gcp-hcp-update-environment-status
+    - ref: hypershift-gcp-wif-auth
+    - ref: gcp-hcp-on-demand-config
+    test:
+    - ref: gcp-hcp-verify-hc-lifecycle
+    post:
+    - ref: gcp-hcp-cleanup-on-demand
+    - ref: gcp-hcp-finalize-environment-status
+  documentation: |-
+    Runs the HC lifecycle test against an existing long-running GCP HCP
+    environment. WIF authenticates the job; the config step supplies the
+    environment's API, OIDC, region, and customer project details. The CI
+    identity must be authorized for the persistent customer project outside
+    this workflow. Before the first run in each environment, activate the
+    customer namespace once through the regional activate-project workflow
+    and grant the WIF identity cluster-admin through the public API. The CI
+    job itself does not invoke the regional workflow.
+    Ginkgo captures diagnostics on failure and cleans test resources. After
+    every run, including a successful test, the post step verifies that the
+    exact test nodepool, worker VMs, and HostedCluster are absent and retries
+    network and IAM teardown in the customer project. A cleanup failure fails
+    the job and deployed-commit status. This workflow does not gather or
+    preserve failed HCs.
+    Promotion-branch postsubmits publish a separate HC lifecycle status on the
+    pushed sector commit. They wait for Terraform and ArgoCD deployment checks
+    on that commit to become successful before testing. A commit superseded
+    before status publication skips the lifecycle; a branch change after the
+    pending status is posted fails the result. Requested presubmits run the
+    lifecycle test without changing deployed-commit statuses.

@@ -56,6 +56,8 @@ typeset sourceKubeconfig="${MTV_SOURCE_SPOKE_KUBECONFIG}"
 typeset destKubeconfig="${MTV_DEST_SPOKE_KUBECONFIG}"
 typeset targetNs="${MTV_TEST_VM_TARGET_NAMESPACE}"
 typeset diagDir=""
+typeset sourceProvider="${MTV_SOURCE_PROVIDER}"
+typeset destinationProvider="${MTV_DESTINATION_PROVIDER}"
 
 # VmName — return the VM name for a 1-based index.
 # When vmCount=1 returns MTV_TEST_VM_NAME unchanged (backward compat).
@@ -113,18 +115,42 @@ function ResolveSpokeKubeconfigs () {
     [[ -r "${destKubeconfig}" ]]
 }
 
+# ResolveProviderName — read a provider name resolved by p2p-mtv-wait-acm-providers from
+# SHARED_DIR/mtv-acm-provider-name-<spokeIndex> when the caller did not pin an explicit name.
+function ResolveProviderName () {
+    typeset -n _out="${1:?}"; (($#)) && shift
+    typeset spokeIndex="${1:?}"; (($#)) && shift
+    typeset sharedFile="${SHARED_DIR}/mtv-acm-provider-name-${spokeIndex}"
+
+    [[ -n "${_out}" ]] && return 0
+    [[ -s "${sharedFile}" ]] || {
+        printf 'ERROR: no provider name for spoke index %s (set MTV_SOURCE_PROVIDER/' "${spokeIndex}" >&2
+        printf 'MTV_DESTINATION_PROVIDER, or run p2p-mtv-wait-acm-providers first)\n' >&2
+        return 1
+    }
+    _out="$(tr -d '[:space:]' < "${sharedFile}")"
+}
+
+# ResolveProviderNames — fill in sourceProvider/destinationProvider from ACM discovery
+# (p2p-mtv-wait-acm-providers), keyed by the same spoke index used for kubeconfig resolution,
+# unless MTV_SOURCE_PROVIDER/MTV_DESTINATION_PROVIDER pinned them explicitly.
+function ResolveProviderNames () {
+    ResolveProviderName sourceProvider "${sourceSpokeIndex}"
+    ResolveProviderName destinationProvider "${destSpokeIndex}"
+}
+
 # DumpDiagnostics — write MTV and VM state to ARTIFACT_DIR on failure.
 function DumpDiagnostics () {
     [[ -n "${ARTIFACT_DIR}" ]] || return 0
     diagDir="${ARTIFACT_DIR}/mtv-live-migration${migrationSuffix}-diagnostics"
     mkdir -p "${diagDir}"
-    HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_NAMESPACE}" \
+    HubOc get plan,migration,networkmap,storagemap,provider -n "${MTV_PROVIDER_NAMESPACE}" \
         > "${diagDir}/hub-mtv-resources.txt" 2>&1 || true
-    HubOc describe "plan/${MTV_PLAN_NAME}" -n "${MTV_NAMESPACE}" \
+    HubOc describe "plan/${MTV_PLAN_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
         > "${diagDir}/plan-describe.txt" 2>&1 || true
-    HubOc describe "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+    HubOc describe "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
         > "${diagDir}/migration-describe.txt" 2>&1 || true
-    HubOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' \
+    HubOc get events -n "${MTV_PROVIDER_NAMESPACE}" --sort-by='.lastTimestamp' \
         > "${diagDir}/hub-mtv-events.txt" 2>&1 || true
 
     typeset -i k
@@ -168,7 +194,7 @@ function OnError () {
 # WaitProviderReady — gate until MTV Provider is Ready.
 function WaitProviderReady () {
     typeset providerName="${1:?}"; (($#)) && shift
-    HubOc wait "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    HubOc wait "provider/${providerName}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 }
 
@@ -176,7 +202,7 @@ function WaitProviderReady () {
 function WaitMapReady () {
     typeset kind="${1:?}"; (($#)) && shift
     typeset name="${1:?}"; (($#)) && shift
-    HubOc wait "${kind}/${name}" -n "${MTV_NAMESPACE}" \
+    HubOc wait "${kind}/${name}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 }
 
@@ -230,7 +256,7 @@ function PreflightVmStorageMapped () {
     typeset -i i
     typeset vmName vmSc scUid mapJson mapped
 
-    mapJson="$(HubOc get "storagemap/${MTV_STORAGE_MAP_NAME}" -n "${MTV_NAMESPACE}" -o json)"
+    mapJson="$(HubOc get "storagemap/${MTV_STORAGE_MAP_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" -o json)"
 
     for (( i = 1; i <= vmCount; i++ )); do
         vmName="$(VmName "${i}")"
@@ -248,8 +274,8 @@ function PreflightVmStorageMapped () {
 
 # PreflightHub — providers and maps must be Ready before Plan creation.
 function PreflightHub () {
-    WaitProviderReady "${MTV_SOURCE_PROVIDER}"
-    WaitProviderReady "${MTV_DESTINATION_PROVIDER}"
+    WaitProviderReady "${sourceProvider}"
+    WaitProviderReady "${destinationProvider}"
     WaitMapReady networkmap "${MTV_NETWORK_MAP_NAME}"
     WaitMapReady storagemap "${MTV_STORAGE_MAP_NAME}"
 }
@@ -363,7 +389,7 @@ function MigrationPipelinePhase () {
     typeset stepName="${1:?}"; (($#)) && shift
     typeset migJson phase
 
-    migJson="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" -o json || true)"
+    migJson="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" -o json || true)"
     [[ -n "${migJson}" ]] || return 0
 
     phase="$(jq -r --arg vm "${vmName}" --arg step "${stepName}" \
@@ -428,7 +454,7 @@ function RefreshProviderInventory () {
     typeset ts
 
     ts="$(date -u +%s)"
-    HubOc annotate "provider/${providerName}" -n "${MTV_NAMESPACE}" \
+    HubOc annotate "provider/${providerName}" -n "${MTV_PROVIDER_NAMESPACE}" \
         "forklift.konveyor.io/inventory-refresh=${ts}" --overwrite
 }
 
@@ -436,11 +462,11 @@ function RefreshProviderInventory () {
 function RefreshProvidersForLivePlan () {
     [[ "${MTV_PLAN_TYPE}" != "live" ]] && return 0
 
-    RefreshProviderInventory "${MTV_SOURCE_PROVIDER}"
-    RefreshProviderInventory "${MTV_DESTINATION_PROVIDER}"
-    HubOc wait "provider/${MTV_SOURCE_PROVIDER}" -n "${MTV_NAMESPACE}" \
+    RefreshProviderInventory "${sourceProvider}"
+    RefreshProviderInventory "${destinationProvider}"
+    HubOc wait "provider/${sourceProvider}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}"
-    HubOc wait "provider/${MTV_DESTINATION_PROVIDER}" -n "${MTV_NAMESPACE}" \
+    HubOc wait "provider/${destinationProvider}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PROVIDER_INVENTORY_REFRESH_WAIT}"
 }
 
@@ -483,9 +509,9 @@ function ApplyPlan () {
 
     planJson="$(jq -cn \
         --arg planName "${MTV_PLAN_NAME}" \
-        --arg ns "${MTV_NAMESPACE}" \
-        --arg srcProvider "${MTV_SOURCE_PROVIDER}" \
-        --arg dstProvider "${MTV_DESTINATION_PROVIDER}" \
+        --arg ns "${MTV_PROVIDER_NAMESPACE}" \
+        --arg srcProvider "${sourceProvider}" \
+        --arg dstProvider "${destinationProvider}" \
         --arg tgtNs "${targetNs}" \
         --arg netMap "${MTV_NETWORK_MAP_NAME}" \
         --arg storMap "${MTV_STORAGE_MAP_NAME}" \
@@ -518,7 +544,7 @@ function ApplyPlan () {
 
 # WaitPlanReady — wait for Plan Ready condition.
 function WaitPlanReady () {
-    HubOc wait "plan/${MTV_PLAN_NAME}" -n "${MTV_NAMESPACE}" \
+    HubOc wait "plan/${MTV_PLAN_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
         --for=condition=Ready --timeout="${MTV_PLAN_READY_TIMEOUT}"
 }
 
@@ -528,7 +554,7 @@ function ApplyMigration () {
     # consistent with ApplyNetworkMap / ApplyStorageMap / ApplyPlan.
     jq -cn \
         --arg migName  "${MTV_MIGRATION_NAME}" \
-        --arg ns       "${MTV_NAMESPACE}" \
+        --arg ns       "${MTV_PROVIDER_NAMESPACE}" \
         --arg planName "${MTV_PLAN_NAME}" \
         '{
             "apiVersion": "forklift.konveyor.io/v1beta1",
@@ -558,7 +584,7 @@ function ParseOcWaitDurationSeconds () {
 
 # PrintMigrationPipeline — log migration VM pipeline phases.
 function PrintMigrationPipeline () {
-    HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+    HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
         -o jsonpath='{range .status.vms[*]}{.name}{"\n"}{range .pipeline[*]}  {.name}: {.phase}{"\n"}{end}{"\n"}{end}' \
         || true
 }
@@ -571,17 +597,17 @@ function WaitMigrationSucceeded () {
     deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_MIGRATION_TIMEOUT}")))
 
     while (( SECONDS < deadline )); do
-        succeededStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        succeededStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
-        failedStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        failedStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' || true)"
-        msg="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+        msg="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].message}' || true)"
 
         [[ "${succeededStatus}" == "True" ]] && return 0
 
         if [[ "${failedStatus}" == "True" ]]; then
-            HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+            HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}' \
                 1>&2 || true
             PrintMigrationPipeline 1>&2
@@ -785,6 +811,7 @@ typeset -i cclmStepRc=0
     trap OnError ERR
 
     ResolveSpokeKubeconfigs
+    ResolveProviderNames
     targetNs="${targetNs:-${MTV_TEST_VM_NAMESPACE}}"
 
     [[ "${MTV_PLAN_TYPE}" == "live" || "${MTV_PLAN_TYPE}" == "cold" ]]
@@ -814,10 +841,10 @@ typeset -i cclmStepRc=0
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
         {
-            HubOc get "plan/${MTV_PLAN_NAME}" "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" -o wide
-            HubOc get "plan/${MTV_PLAN_NAME}" -n "${MTV_NAMESPACE}" \
+            HubOc get "plan/${MTV_PLAN_NAME}" "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" -o wide
+            HubOc get "plan/${MTV_PLAN_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
-            HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_NAMESPACE}" \
+            HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}{.type}{": "}{.status}{" — "}{.message}{"\n"}{end}'
             PrintMigrationPipeline
             typeset -i m

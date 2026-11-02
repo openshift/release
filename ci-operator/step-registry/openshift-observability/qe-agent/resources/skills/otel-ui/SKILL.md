@@ -20,19 +20,19 @@ The files arrive as `qe-agent-junit-<N>.xml`: tell them apart by the `<testsuite
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`, written by the test step at exit:
+Read `${SHARED_DIR}/qe-agent-context.json`, written by the test step at exit (premerge or upstream variant):
 
 ```json
 {
-  "step_script_ref": "distributed-tracing/tests/opentelemetry-ui/upstream/distributed-tracing-tests-opentelemetry-ui-upstream-commands.sh",
+  "step_script_ref": "distributed-tracing/tests/opentelemetry-ui/premerge/distributed-tracing-tests-opentelemetry-ui-premerge-commands.sh",
   "has_test_failures": true,
   "env": {}
 }
 ```
 
-- `step_script_ref` — path relative to `ci-operator/step-registry/`
+- `step_script_ref` — path relative to `ci-operator/step-registry/`; always use the value from the file, not a hard-coded path. Premerge and upstream differ in where the tests come from (Step 0b) but write the same shape
 
-Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Before `chainsaw test` is **setup** (proxy file, console URL, kubeadmin password file, `git clone`); the `chainsaw test` command is the **test execution**.
+Fetch `https://raw.githubusercontent.com/openshift/release/main/ci-operator/step-registry/<step_script_ref>`. Before `chainsaw test` is **setup** (proxy file, console URL, kubeadmin password file, clone or copy); the `chainsaw test` command is the **test execution**.
 
 ## Step 0a — Verify Cluster Stability
 
@@ -40,7 +40,7 @@ Mandatory, before Step 0b. Read `/tmp/qe-agent-modules/cluster-stability.md` and
 
 ## Step 0b — Re-establish the Test Environment
 
-Clone the tests, this is the repo root: `git clone --depth 1 --branch main https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-qe` (the step takes the tests from the main branch). The environment of the script (proxy file, console URL, kubeadmin password file, `CI=true`) is set up in Step 3. Verify the operator is installed and `Succeeded` (`oc get csv -n opentelemetry-operator-system`); do not reinstall it. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
+`step_script_ref` (Step 0) names premerge or upstream. Premerge: tests are baked into this pod at `/tmp/opentelemetry-operator` (like the `otel` skill) — `cp -R /tmp/opentelemetry-operator /tmp/otel-tests`; `UI_TEST_ROOT=/tmp/otel-tests`. Upstream: `git clone --depth 1 --branch main https://github.com/openshift/distributed-tracing-qe.git /tmp/distributed-tracing-qe`; `UI_TEST_ROOT=/tmp/distributed-tracing-qe`. `TEST_DIR=${UI_TEST_ROOT}/tests/e2e-otel-ui/collector-dashboard`. Env setup (proxy file, console URL, password file, `CI=true`) is Step 3. Verify the operator is `Succeeded` (`oc get csv -n opentelemetry-operator-system`); do not reinstall. If `qe-agent-context.json` is missing, infer the suite from the JUnit prefix, skip the rerun, and diagnose from the JUnit content and cluster state.
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
@@ -54,16 +54,17 @@ If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name a
 
 ## Step 2 — Locate Test Source Files
 
-The repo root is the clone from Step 0b. `TEST_DIR=tests/e2e-otel-ui/collector-dashboard`, `TEST_SRC=${TEST_DIR}/ui/specs/collector-dashboard.spec.ts` (one serial `describe`; the case title after `›` locates the test with `grep -n`). Supporting files: `ui/pages/collector-dashboard.page.ts` (`PANELS` with titles and legend templates, selectors), `ui/support/console-login.ts`, `ui/support/env.ts`; fixtures `00-*` (user workload monitoring), `01-otel-collector.yaml` (`cluster-collector` with a `debug` and an always-failing `otlp/unreachable` exporter, plus an idle `second` collector), `02-generate-telemetry.yaml` (Jobs `telemetrygen-traces`, `-metrics`, `-logs`, 15 minutes), `03-*` (RBAC), `check_metrics.sh`. The operator source of the change under test is in `/tmp/opentelemetry-operator` (copied into the agent image; the dashboard is built in `internal/openshift/dashboards/`): read it for the product side of a diagnosis, and reuse it in Step 4a only if it has a `.git` directory. It is a copy of the CI clone, with the history but no `origin` remote: skip the fetches of Step 4a for it.
+`UI_TEST_ROOT` and `TEST_DIR` are set in Step 0b. `TEST_SRC=${TEST_DIR}/ui/specs/collector-dashboard.spec.ts` (one serial `describe`; the case title after `›` locates the test with `grep -n`). Supporting files: `ui/pages/collector-dashboard.page.ts` (`PANELS` with titles and legend templates, selectors), `ui/support/console-login.ts`, `ui/support/env.ts`; fixtures `00-*` (user workload monitoring), `01-otel-collector.yaml` (`cluster-collector` with a `debug` and an always-failing `otlp/unreachable` exporter, plus an idle `second` collector), `02-generate-telemetry.yaml` (Jobs `telemetrygen-traces`, `-metrics`, `-logs`, 15 minutes), `03-*` (RBAC), `check_metrics.sh`. The operator source of the change under test is in `/tmp/opentelemetry-operator` (copied into the agent image; the dashboard is built in `internal/openshift/dashboards/`): read it for the product side of a diagnosis, and reuse it in Step 4a only if it has a `.git` directory. It is a copy of the CI clone, with the history but no `origin` remote: skip the fetches of Step 4a for it.
 
 ---
 
 ## Step 3 — Rerun the Failing Tests
 
-This pod has the same Node.js, Chromium, chainsaw and `oc` as the test step, so the specs run here. Each bash call is a fresh shell: write the environment once and source it in every block.
+This pod has the same Node.js, Chromium, chainsaw and `oc` as the test step, so the specs run here. Each bash call is a fresh shell: write the environment once (substitute the real `UI_TEST_ROOT`/`TEST_DIR`, the heredoc is quoted) and source it in every block.
 
 ```bash
 cat > /tmp/otel-ui-env.sh <<'EOF'
+export UI_TEST_ROOT="<from Step 0b>" TEST_DIR="<from Step 0b>"
 [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && source "${SHARED_DIR}/proxy-conf.sh"
 export KUBEADMIN_PASSWORD_FILE="${KUBEADMIN_PASSWORD_FILE:-${SHARED_DIR}/kubeadmin-password}"  # the tests read it, never print it
 export BASE_URL="https://$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')"
@@ -80,7 +81,7 @@ for ns in $(oc get namespaces --no-headers -o custom-columns=:metadata.name | gr
   oc delete namespace "$ns" --ignore-not-found
 done
 oc delete clusterrole,clusterrolebinding chainsaw-otel-ui-metrics-api --ignore-not-found  # not removed with the namespace
-cd /tmp/distributed-tracing-qe && ARTIFACT_DIR="${RUN_DIR}" chainsaw test --config .chainsaw.yaml --skip-delete \
+cd "${UI_TEST_ROOT}" && ARTIFACT_DIR="${RUN_DIR}" chainsaw test --config .chainsaw.yaml --skip-delete \
   --report-name junit_rerun_otel_ui --report-path "${RUN_DIR}" --report-format XML --test-dir tests/e2e-otel-ui/collector-dashboard
 ```
 
@@ -108,7 +109,7 @@ done < /tmp/exprs.txt
 ```bash
 source /tmp/otel-ui-env.sh; RUN=2   # then 3 and 4
 NS=$(oc get opentelemetrycollector -A --field-selector metadata.name=cluster-collector -o jsonpath='{.items[0].metadata.namespace}')
-cd /tmp/distributed-tracing-qe/tests/e2e-otel-ui/collector-dashboard/ui
+cd "${TEST_DIR}/ui"
 OTEL_UI_NAMESPACE="${NS}" OTEL_UI_DATA_TIMEOUT_SECONDS=120 ARTIFACT_DIR="${ARTIFACT_DIR}/otel-ui-rerun${RUN}" \
   npx playwright test -g "<unique part of the failing case title>" --retries=0
 ```
@@ -142,25 +143,9 @@ fi
 oc get pods -n openshift-user-workload-monitoring
 ```
 
-### Failure text → cause
+### Failure signals and known dashboard behaviour
 
-| Signal | Check | Likely classification |
-|---|---|---|
-| Login: timeout on `#inputUsername` or `[data-test="username"]`; `No kubeadmin password file` | console and authentication operators, console pods, `curl -sk -o /dev/null -w '%{http_code}' https://<console host>/` | login page changed: `TEST_ISSUE`; console or OAuth down: `PRODUCT_BUG`; missing password file: `JOB_CONFIG` |
-| `ConfigMap openshift-config-managed/opentelemetry-collector not found` | `OPENSHIFT_CREATE_DASHBOARD` in the CSV, operator restarts, operator logs | flag unset in the bundle: `JOB_CONFIG`; flag set, operator running, ConfigMap missing: `PRODUCT_BUG`; operator restarted meanwhile: see `CLUSTER_INSTABILITY` below |
-| ConfigMap label or `title` assertion | the ConfigMap label and `.title` in `otel.json` | intended rename: `TEST_ISSUE`; unintended: `PRODUCT_BUG` |
-| Observe, Dashboards, `dashboard-dropdown` or picker option not found | ConfigMap label, `monitoring-plugin` pods, console plugins (`oc get consoles.operator.openshift.io cluster -o jsonpath='{.spec.plugins}'`) | console UI change: `TEST_ISSUE`; plugin not running: `PRODUCT_BUG` |
-| row not visible, `toHaveCount(3)` | rows and panels in `otel.json` against the spec | dashboard changed on purpose: `TEST_ISSUE`; broken JSON: `PRODUCT_BUG` |
-| `No datapoints found.`, legend missing, `toPass` timeout on a panel; or Chainsaw `Timed out after … waiting for series` | Step 3 query counts | series absent: data path (user workload monitoring pods, ServiceMonitor `*-monitoring-collector`, `enableMetrics`, telemetrygen logs); collector metric names no longer match the dashboard queries (for example a `_total` suffix): `PRODUCT_BUG`. Series present: compare `legendFormat` in `otel.json` with `PANELS`: changed `TEST_ISSUE`, same `PRODUCT_BUG` (console rendering) |
-| `metric exporter` dropdown missing `otlp/unreachable` | `otelcol_exporter_send_failed_metric_points` in the counts | the always-failing exporter no longer fails: `TEST_ISSUE` (fixture) |
-| collector instance or namespace filter | Service names `<cr>-collector-monitoring` | Service renamed by the operator: `PRODUCT_BUG`, else `TEST_ISSUE` |
-| `ImagePullBackOff` of `telemetrygen` or the collector | pod events, registry reachability | `JOB_CONFIG` |
-
-### Known dashboard behaviour (verified on OCP 4.22, operator 0.158)
-
-- **Metrics Exported vs Failed / second** is empty until `otelcol_exporter_send_failed_metric_points` exists (the `metric exporter` variable is built from it, so the console sends `undefined` queries). The fixture avoids it with the failing `otlp/unreachable` exporter. Do not file this again as new unless that series exists and the panel is still empty.
-- The `dropped` series of both Processor panels cannot exist (the memory limiter has no dropped metric); `refused` series may be absent (they can be missing until a refusal happens). The specs do not assert them.
-- The dashboard is offered only for All Projects, panels render lazily, and a first-time user gets a welcome dialog: the spec handles all three.
+Read `references/dashboard-diagnosis.md`: the failure-signal-to-check-to-classification table, and known dashboard quirks (verified on OCP 4.22, operator 0.158) that are not bugs by themselves.
 
 ### Product Bug indicators
 Classify as `PRODUCT_BUG` when the operator, the collector metrics or the console itself misbehaved:
@@ -226,7 +211,7 @@ Mandatory. Follow "Incident note" in `/tmp/qe-agent-modules/analysis-summary.md`
 
 ## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
 
-The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the step `distributed-tracing-tests-opentelemetry-ui-upstream` and the job `opentelemetry-ui-tests` (variant `upstream-ui-ocp-4.22-amd64`) are in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/`.
+The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the job is `e2e-ui-ocp-4-22` in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/` — branch `rhosdt-0.158` variant `art-build` for premerge, branch `main` variant `upstream` for upstream; use whichever matches `step_script_ref`.
 
 ---
 
@@ -239,7 +224,7 @@ Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.
 ## Notes for CI context
 
 - The cluster is already provisioned with the OpenTelemetry operator built from the change under test. The `chainsaw-*` namespace of the original run is already gone; run 1 of Step 3 creates a new one and leaves it (`--skip-delete`)
-- The qe-agent runs in a fresh pod — `/tmp/` is empty at start; Step 0b clones the tests
+- The qe-agent runs in a fresh pod — `/tmp/` is empty at start; Step 0b sets up the tests
 - `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `chainsaw`, `yq`, `jq`, `curl`, `git`, Node.js, npm and Chromium (`PLAYWRIGHT_BROWSERS_PATH`) are in PATH: do not run `npx playwright install`
 - The tests read `KUBEADMIN_PASSWORD_FILE` themselves for the console login: never `cat` or print it, and never put it in a command
 - All output goes to `$ARTIFACT_DIR` (GCS) or `$SHARED_DIR`; do not copy large files to `$SHARED_DIR` (1 MiB Secret limit)

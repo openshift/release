@@ -32,7 +32,6 @@ promotion:
   - name: "5.2"
     namespace: ocp-priv
 prowgen:
-  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -71,6 +70,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
 - always_run: false
@@ -79,6 +79,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - always_run: false
@@ -100,11 +101,21 @@ tests:
       TEST_SUITE: cluster-network-operator/conformance/serial
     workflow: openshift-e2e-aws-core-networking-bastion
 - always_run: false
+  as: e2e-aws-core-networking-disruptive-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: cluster-network-operator/conformance/disruptive
+    workflow: openshift-e2e-aws-core-networking-bastion
+- always_run: false
   as: e2e-aws-ovn-upgrade
   pipeline_skip_if_only_changed: ^(docs|\.vscode)/|\.md$|^(\.gitignore|\.gitattributes|\.golangci\.yaml|OWNERS|OWNERS_ALIASES|LICENSE|sample-.*\.yaml)$
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -118,6 +129,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
 - always_run: false
@@ -126,6 +138,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
 - always_run: false
@@ -135,6 +148,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
 - always_run: false
@@ -144,6 +158,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
 - always_run: false
@@ -178,6 +193,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
@@ -307,6 +323,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
       OS_IMAGE_STREAM: rhel-10
@@ -318,6 +335,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-ovn-serial
@@ -362,7 +380,7 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+    make golangci-lint
   container:
     clone: true
     from: golangci-lint
@@ -402,6 +420,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - always_run: false
@@ -410,6 +429,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
@@ -425,6 +445,7 @@ tests:
   steps:
     cluster_profile: aws-perfscale
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
@@ -442,6 +463,7 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
@@ -458,6 +480,7 @@ tests:
   steps:
     cluster_profile: aws-perfscale
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "120"
       COMPUTE_NODE_TYPE: m5.xlarge
@@ -475,6 +498,7 @@ tests:
   steps:
     cluster_profile: aws-perfscale-qe
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
@@ -572,6 +596,28 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: cluster-network-operator/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: cluster-network-operator/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-metal-ipi-ovn-secondary-encap
   capabilities:
   - intranet
@@ -585,6 +631,7 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
       TEST_TIMEOUT: "60"

@@ -14,23 +14,47 @@ ref:
     ODF is Available on both spokes; creating StorageMap too early causes StorageRefNotValid.
 
     This is the return-leg companion to p2p-mtv-create-migration-maps. Default source/destination
-    are reversed (spoke-2 as source, spoke-1 as destination) and map names carry a "-return" suffix
-    to coexist alongside the forward maps in the same openshift-mtv namespace.
+    spoke indices are reversed (spoke index 2 as source, spoke index 1 as destination) and map
+    names carry a "-return" suffix to coexist alongside the forward maps in the same namespace.
+
+    MTV_SOURCE_PROVIDER/MTV_DESTINATION_PROVIDER default to empty, in which case the provider
+    names are resolved from ${SHARED_DIR}/mtv-acm-provider-name-<MTV_SOURCE_SPOKE_INDEX|
+    MTV_DEST_SPOKE_INDEX> written by p2p-mtv-wait-acm-providers. Set either var explicitly to
+    pin a provider name instead (e.g. for manually registered providers).
 
     Annotates both providers for inventory refresh (unless MTV_SKIP_INVENTORY_REFRESH=true),
     applies maps, waits for Ready, and appends to ${ARTIFACT_DIR}/mtv-migration-maps-status.txt.
 
     Hub kubeconfig is KUBECONFIG from ci-operator.
   env:
-  - name: MTV_NAMESPACE
-    default: "openshift-mtv"
-    documentation: Namespace where MTV operator and map CRs live.
+  - name: MTV_PROVIDER_NAMESPACE
+    default: "mtv-integrations"
+    documentation: |-
+      Namespace where the Provider/NetworkMap/StorageMap CRs live. This is ACM's
+      mtv-integrations namespace (where ACM creates "<cluster>-mtv" Provider objects), not the
+      MTV operator install namespace (openshift-mtv) — keep the two separate.
   - name: MTV_SOURCE_PROVIDER
-    default: "spoke-2"
-    documentation: Source MTV Provider CR name for the return leg (migration origin).
+    default: ""
+    documentation: |-
+      Source MTV Provider CR name for the return leg (migration origin). Empty resolves to
+      ${SHARED_DIR}/mtv-acm-provider-name-<MTV_SOURCE_SPOKE_INDEX> (written by
+      p2p-mtv-wait-acm-providers). Set explicitly to override.
   - name: MTV_DESTINATION_PROVIDER
-    default: "spoke-1"
-    documentation: Destination MTV Provider CR name for the return leg (migration target).
+    default: ""
+    documentation: |-
+      Destination MTV Provider CR name for the return leg (migration target). Empty resolves to
+      ${SHARED_DIR}/mtv-acm-provider-name-<MTV_DEST_SPOKE_INDEX> (written by
+      p2p-mtv-wait-acm-providers). Set explicitly to override.
+  - name: MTV_SOURCE_SPOKE_INDEX
+    default: "2"
+    documentation: |-
+      1-based spoke index used to resolve MTV_SOURCE_PROVIDER from SHARED_DIR when it is
+      empty (return leg: spoke-2 is the source).
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "1"
+    documentation: |-
+      1-based spoke index used to resolve MTV_DESTINATION_PROVIDER from SHARED_DIR when it is
+      empty (return leg: spoke-1 is the destination).
   - name: MTV_NETWORK_MAP_NAME
     default: "spoke-network-map-return"
     documentation: NetworkMap metadata.name for the return leg.

@@ -291,6 +291,38 @@ import_orphaned_firestore() {
   return 1
 }
 
+# A failed apply can leave resources in the remote state before Terraform has
+# produced its normal outputs. Preserve the folder ID when that happens so the
+# cleanup step can delete the per-run folder before it clears the workspace.
+parse_folder_id() {
+  awk -F= '$1 ~ /^[[:space:]]*folder_id[[:space:]]*$/ { value=$2; gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); gsub(/^"|"$/, "", value); print value; exit }'
+}
+
+recover_partial_folder_id() {
+  local folder_id=""
+
+  log "Attempting to recover E2E folder ID from partial Terraform state..."
+
+  # Prefer the root output when Terraform recorded it despite the failed apply.
+  folder_id=$(terraform output -json 2>>"${LOG}" | \
+    jq -er '.region.value.folder_id | strings | select(length > 0)' 2>>"${LOG}" || true)
+
+  # Root outputs are not guaranteed after a partial apply, but the folder
+  # resource itself is already present in remote state if it was created.
+  if [[ -z "${folder_id}" ]]; then
+    folder_id=$(terraform state show -no-color module.region.google_folder.region 2>>"${LOG}" | \
+      parse_folder_id || true)
+  fi
+
+  if [[ -z "${folder_id}" ]]; then
+    log "WARNING: Could not recover E2E folder ID from partial Terraform state"
+    return 1
+  fi
+
+  printf '%s\n' "${folder_id}" > "${SHARED_DIR}/region-folder-id"
+  log "Recovered E2E folder ID: ${folder_id}"
+}
+
 MAX_APPLY_ATTEMPTS=5
 apply_attempt=1
 apply_wait=30
@@ -318,6 +350,7 @@ while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
     log "Error details:"
     log "${non_transient}"
     log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    recover_partial_folder_id || true
     exit 1
   fi
 
@@ -336,6 +369,7 @@ while (( apply_attempt <= MAX_APPLY_ATTEMPTS )); do
   else
     log "ERROR: Terraform apply failed after ${MAX_APPLY_ATTEMPTS} attempts"
     log "Check TFC workspace: https://app.terraform.io/app/${TFC_ORG}/workspaces/${WORKSPACE_NAME}"
+    recover_partial_folder_id || true
     exit 1
   fi
 done
@@ -362,6 +396,7 @@ fi
 # Write individual outputs to SHARED_DIR for downstream steps
 jq -r '.region.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-project-id"
 jq -r '.region.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-cluster-name"
+jq -r '.region.value.folder_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-folder-id"
 jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-project-id"
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"
@@ -379,7 +414,7 @@ if [[ -n "${INFRA_ID}" ]]; then
 fi
 
 # Validate critical outputs were written (early writes + terraform outputs)
-for output_file in region region-project-id region-cluster-name mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
+for output_file in region region-project-id region-cluster-name region-folder-id mc-project-id mc-cluster-name mc-cluster-endpoint customer-project-id api-endpoint oidc-endpoint workspace-name run-id; do
   if [[ ! -s "${SHARED_DIR}/${output_file}" ]]; then
     log "ERROR: Output file ${output_file} is empty or missing"
     exit 1
@@ -389,6 +424,7 @@ done
 log ""
 log "=== Provision Complete ==="
 log "  Region Project:   $(<${SHARED_DIR}/region-project-id)"
+log "  Region Folder:    $(<${SHARED_DIR}/region-folder-id)"
 log "  MC Project:       $(<${SHARED_DIR}/mc-project-id)"
 log "  MC Cluster:       $(<${SHARED_DIR}/mc-cluster-name)"
 log "  TFC Workspace:    ${WORKSPACE_NAME}"

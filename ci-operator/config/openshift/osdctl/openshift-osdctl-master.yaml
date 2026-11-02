@@ -9,39 +9,41 @@ base_images:
     tag: golang-1.23
 build_root:
   from_repository: true
-prowgen:
-  enable_secrets_store_csi_driver: true
 resources:
   '*':
+    limits:
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  go mod download
 tests:
 - as: lint
   commands: |
-    make lint
+    GOMAXPROCS=2 make lint
   container:
-    from: src
+    from: test-bin
 - as: format
   commands: |
     make format
   container:
-    from: src
+    from: test-bin
 - as: test
   commands: |
     make test
   container:
-    from: src
+    from: test-bin
 - as: build
   commands: |
-    make ci-build
+    SINGLE_TARGET=true make ci-build
   container:
-    from: src
+    from: test-bin
 - as: verify-docs
   commands: |
     make verify-docs
   container:
-    from: src
+    from: test-bin
 zz_generated_metadata:
   branch: master
   org: openshift

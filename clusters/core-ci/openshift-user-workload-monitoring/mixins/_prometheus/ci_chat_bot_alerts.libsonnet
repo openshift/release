@@ -23,7 +23,7 @@
         rules: [
           {
             alert: 'ciChatBotError',
-            expr: 'rate(cluster_bot_error_rate[5m]) > 0',
+            expr: 'rate(cluster_bot_error_rate[30m]) > 0',
             labels: {
               severity: 'critical',
               team: 'crt',

@@ -32,14 +32,9 @@ pids=()
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   CURRENT_RENDEZVOUS_NODE="$RENDEZVOUS_NODE"
   if [ "$CURRENT_RENDEZVOUS_NODE" = "yes" ]; then
-    RENDEZVOUS_IP=$(echo "$bmhost" | jq -r '.ip')
+    RENDEZVOUS_IP=$(echo "$bmhost" | jq -r "$([[ ${ipv4_enabled:-false} == true ]] && echo '.ip' || echo '.ipv6')")
     echo "${RENDEZVOUS_IP}" >"${SHARED_DIR}"/node-zero-ip.txt
     RENDEZVOUS_NODE="no"
-    # Workaround until this bug is fixed OCPBUGS-63475
-    vendor=$(echo "$bmhost" | jq -r '.vendor')
-    if [ "$vendor" = "hpe" ]; then
-      sed -E -i ':a;N;$!ba;s/\.rendezvous_node\(\)[[:space:]]*\n[[:space:]]*\.select_ip\(\)/.non_rendezvous_node(self.rendezvous_ip)/g' agent-tui/tui_driver/driver.py
-    fi
   fi
   IP_ADDRESS="$(echo "$bmhost" | jq -r '.ip')/22"
   SERVER_ADDRESS="192.168.80.1"

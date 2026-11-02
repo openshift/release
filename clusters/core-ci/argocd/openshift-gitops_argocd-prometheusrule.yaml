@@ -10,6 +10,7 @@ spec:
     - alert: ArgoCDApplicationControllerNotFullyReady
       expr: kube_statefulset_status_replicas_ready{namespace="openshift-gitops",statefulset="openshift-gitops-application-controller"} < kube_statefulset_replicas{namespace="openshift-gitops",statefulset="openshift-gitops-application-controller"}
       for: 10m
+      keep_firing_for: 3m
       labels:
         severity: critical
       annotations:
@@ -17,6 +18,7 @@ spec:
     - alert: ArgoCDServerUnavailable
       expr: kube_deployment_status_replicas_available{namespace="openshift-gitops",deployment="openshift-gitops-server"} < 1
       for: 10m
+      keep_firing_for: 3m
       labels:
         severity: critical
       annotations:
@@ -24,17 +26,18 @@ spec:
     - alert: ArgoCDRepoServerUnavailable
       expr: kube_deployment_status_replicas_available{namespace="openshift-gitops",deployment="openshift-gitops-repo-server"} < 1
       for: 10m
+      keep_firing_for: 3m
       labels:
         severity: critical
       annotations:
         message: The Argo CD repo-server deployment has had no available replicas for at least 10 minutes.
     - alert: ArgoCDSyncFailures
-      expr: sum(increase(argocd_app_sync_total{namespace="openshift-gitops",phase=~"Error|Failed"}[15m])) > 0
+      expr: sum(increase(argocd_app_sync_total{namespace="openshift-gitops",phase=~"Error|Failed"}[30m])) > 0
       for: 1m
       labels:
         severity: warning
       annotations:
-        message: Argo CD reported one or more failed application sync operations in the last 15 minutes.
+        message: Argo CD reported one or more failed application sync operations in the last 30 minutes.
     - alert: ArgoCDApplicationNotSyncedOrHealthy
       expr: |
         sum(
@@ -43,12 +46,24 @@ spec:
           (argocd_app_info{namespace="openshift-gitops",health_status!="Healthy"} == 1)
         ) > 0
       for: 5m
+      keep_firing_for: 5m
       labels:
         severity: warning
       annotations:
         message: 'Argo CD has {{ $value }} application(s) that are not Synced and/or not Healthy on core-ci.'
     - alert: ArgoCDApplicationControllerFrequentRestarts
-      expr: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="openshift-gitops",container="argocd-application-controller",pod=~"openshift-gitops-application-controller-.*"}[30m])) > 2
+      expr: |
+        max_over_time(
+          (
+            sum by (pod) (
+              increase(kube_pod_container_status_restarts_total{namespace="openshift-gitops",container="argocd-application-controller",pod=~"openshift-gitops-application-controller-.*"}[30m])
+            )
+          )[30m:1m]
+        ) > 2
+        and
+        sum by (pod) (
+          increase(kube_pod_container_status_restarts_total{namespace="openshift-gitops",container="argocd-application-controller",pod=~"openshift-gitops-application-controller-.*"}[30m])
+        ) > 1
       for: 10m
       labels:
         severity: warning
@@ -57,6 +72,7 @@ spec:
     - alert: ArgoCDApplicationControllerOOMKilled
       expr: max by (pod) (kube_pod_container_status_last_terminated_reason{namespace="openshift-gitops",container="argocd-application-controller",reason="OOMKilled",pod=~"openshift-gitops-application-controller-.*"}) == 1
       for: 10m
+      keep_firing_for: 5m
       labels:
         severity: warning
       annotations:

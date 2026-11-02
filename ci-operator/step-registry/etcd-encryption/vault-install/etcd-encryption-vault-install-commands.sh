@@ -364,6 +364,7 @@ EOF
   fi
 
   echo "Waiting for ICSP to propagate to nodes..."
+  oc wait machineconfigpool/master --for=condition=Updating=True --timeout=2m || true
   oc wait machineconfigpool/master --for=condition=Updated=True --timeout=10m
   oc wait machineconfigpool/worker --for=condition=Updated=True --timeout=10m
 }
@@ -668,7 +669,10 @@ unseal_vault() {
   # Secrets are optional at pod start and do not hot-reload into running pods.
   # Read the key from the API and pass it to vault operator unseal directly.
   unseal_key="$(read_vault_unseal_key "${namespace}")"
-  vault_exec "${namespace}" "${pod_name}" vault operator unseal "${unseal_key}" >/dev/null
+  vault_operator_unseal() {
+    vault_exec "${namespace}" "${pod_name}" vault operator unseal "${unseal_key}" >/dev/null
+  }
+  wait_until "Vault operator unseal on ${pod_name}" 5 5 vault_operator_unseal
   unset unseal_key
 }
 
@@ -754,7 +758,10 @@ initialize_or_unseal_vault() {
   [[ $- == *x* ]] && was_tracing=true
   set +x
   local init_json
-  init_json="$(vault_exec "${namespace}" "${pod_name}" vault operator init -key-shares=1 -key-threshold=1 -format=json)"
+  vault_operator_init() {
+    init_json="$(vault_exec "${namespace}" "${pod_name}" vault operator init -key-shares=1 -key-threshold=1 -format=json)" && [[ -n "${init_json}" ]]
+  }
+  wait_until "Vault operator init on ${pod_name}" 5 5 vault_operator_init
   store_vault_init_secrets "${namespace}" "${init_json}"
   unset init_json
   if [[ "${was_tracing}" == true ]]; then
@@ -769,7 +776,7 @@ initialize_or_unseal_vault() {
   # container picks up the real VAULT_TOKEN. This is separate from the earlier
   # StatefulSet restart that mounts the service-CA TLS certificate.
   echo "Recreating ${pod_name} so init secrets mount and VAULT_TOKEN is refreshed..."
-  oc delete pod "${pod_name}" -n "${namespace}" --wait=false
+  oc delete pod "${pod_name}" -n "${namespace}" --ignore-not-found --wait=true
   wait_for_vault_pod_created "${namespace}" "${pod_name}"
   oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
   wait_for_vault_listener "${namespace}" "${pod_name}"
@@ -779,10 +786,12 @@ initialize_or_unseal_vault() {
 restart_vault_statefulset() {
   local namespace="$1"
   local release_name="$2"
+  local pod_name="${release_name}-0"
 
   echo "Restarting StatefulSet ${release_name} to mount service-CA TLS..."
   oc patch statefulset "${release_name}" -n "${namespace}" --type merge -p \
     "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"vault.hashicorp.com/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}"
+  oc delete pod "${pod_name}" -n "${namespace}" --ignore-not-found --wait=true
 }
 
 describe_vault_workload() {

@@ -340,6 +340,10 @@ function prepare_next_steps() {
         echo "The process - $copy_kubeconfig_pid is not existing any more"
     fi
   fi
+  if [[ -v spot_fallback_pid ]] && ps -p $spot_fallback_pid &> /dev/null; then
+    echo "Kill the spot instances fallback monitor - $spot_fallback_pid"
+    kill $spot_fallback_pid
+  fi
 
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -781,10 +785,84 @@ function inject_spot_instance_config() {
 
   if $found; then
     echo "Enabled AWS Spot instances for ${mtype}"
+    if [[ "${mtype}" == "workers" ]]; then
+      spot_workers_enabled=true
+    fi
   else
     echo "ERROR: Spot instances were requested for ${mtype}, but no such manifests were found!"
     exit 1
   fi
+}
+
+# spot_instances_fallback_monitor runs in the background during the install and
+# falls back to on-demand instances for MachineSets whose spot workers can't be
+# provisioned. A spot Machine that keeps failing to launch for lack of spot
+# capacity (seen on two consecutive polls), or that went Failed because its spot
+# instance disappeared (reclaimed or not fulfilled), gets its MachineSet's
+# spotMarketOptions removed and is then deleted, so the MachineSet replaces it
+# with an on-demand instance. Machines failing for other reasons are left alone.
+# MachineSets without problems keep using spot instances. The Machine is saved to
+# ${ARTIFACT_DIR}/spot-fallback before deletion.
+# PARAMS:
+# $1: Path to the install directory
+function spot_instances_fallback_monitor() {
+  local dir=${1}
+  local oc_mapi=(oc --kubeconfig="${dir}/auth/kubeconfig" --request-timeout=30s -n openshift-machine-api)
+  local capacity_errors='InsufficientInstanceCapacity|InsufficientCapacity|SpotMaxPriceTooLow|MaxSpotInstanceCountExceeded|capacity-not-available'
+  # A spot instance that is gone (reclaimed or not fulfilled) turns its Machine Failed with this error
+  # (capitalized and with a trailing dot in older releases, e.g. 4.12)
+  local reclaim_errors="can't find created instance"
+  local poll=0 machine machineset phase spot errors reason machineset_spot
+  local -A capacity_error_poll=() reported=()
+  set +o errexit
+
+  while [ ! -s "${dir}/auth/kubeconfig" ]; do
+    sleep 10
+  done
+  echo "spot-fallback: watching spot worker Machines, will fall back to on-demand if spot capacity is unavailable"
+  mkdir -p "${ARTIFACT_DIR}/spot-fallback"
+
+  while true; do
+    sleep 30
+    poll=$((poll+1))
+    while IFS='|' read -r machine machineset phase spot; do
+      # Only act on Machines created from a spot template
+      [[ -n "${machine}" && -n "${machineset}" && -n "${spot}" && "${phase}" != "Deleting" ]] || continue
+
+      errors=$("${oc_mapi[@]}" get machine "${machine}" \
+          -o jsonpath='{.status.errorMessage}{"\n"}{.status.providerStatus.conditions[?(@.type=="MachineCreation")].message}' 2>/dev/null)
+      reason=""
+      if [[ "${phase}" == "Failed" ]]; then
+        if grep -qiE "${reclaim_errors}|${capacity_errors}" <<< "${errors}"; then
+          reason="Machine is Failed due to spot (instance reclaimed or not fulfilled)"
+        elif [[ -z "${reported[${machine}]:-}" ]]; then
+          reported[${machine}]=true
+          echo "spot-fallback: $(date -u +%T) Machine ${machine} is Failed for a reason unrelated to spot capacity, leaving it alone"
+        fi
+      elif grep -qiE "${capacity_errors}" <<< "${errors}"; then
+        # Machine API retries on its own, so act only if the error persists on consecutive polls
+        if [[ "${capacity_error_poll[${machine}]:-}" == "$((poll-1))" ]]; then
+          reason="no spot capacity"
+        else
+          echo "spot-fallback: $(date -u +%T) Machine ${machine}: no spot capacity, will fall back to on-demand if it persists"
+        fi
+        capacity_error_poll[${machine}]=${poll}
+      fi
+      [[ -n "${reason}" ]] || continue
+
+      echo "spot-fallback: $(date -u +%T) Machine ${machine}: ${reason}; switching MachineSet ${machineset} to on-demand instances"
+      # Never delete the Machine unless its MachineSet is known to be on-demand, or its replacement would be spot again
+      machineset_spot=$("${oc_mapi[@]}" get machineset "${machineset}" \
+          -o jsonpath='{.spec.template.spec.providerSpec.value.spotMarketOptions}') || continue
+      if [[ -n "${machineset_spot}" ]]; then
+        "${oc_mapi[@]}" patch machineset "${machineset}" --type=json \
+            -p '[{"op":"remove","path":"/spec/template/spec/providerSpec/value/spotMarketOptions"}]' || continue
+      fi
+      "${oc_mapi[@]}" get machine "${machine}" -o yaml > "${ARTIFACT_DIR}/spot-fallback/machine-${machine}.yaml"
+      "${oc_mapi[@]}" delete machine "${machine}" --wait=false
+    done < <("${oc_mapi[@]}" get machines -l machine.openshift.io/cluster-api-machineset \
+        -o jsonpath='{range .items[*]}{.metadata.name}{"|"}{.metadata.labels.machine\.openshift\.io/cluster-api-machineset}{"|"}{.status.phase}{"|"}{.spec.providerSpec.value.spotMarketOptions}{"\n"}{end}' 2>/dev/null)
+  done
 }
 
 function get_arch() {
@@ -1099,6 +1177,9 @@ do
     if [[ -v copy_kubeconfig_pid ]]; then
       kill $copy_kubeconfig_pid
     fi
+    if [[ -v spot_fallback_pid ]]; then
+      kill $spot_fallback_pid
+    fi
 
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
@@ -1109,6 +1190,10 @@ do
   refresh_create_cluster_install_lease || true
   copy_kubeconfig_minimal "${dir}" &
   copy_kubeconfig_pid=$!
+  if [[ "${spot_workers_enabled:-}" == 'true' && "${SPOT_INSTANCES_FALLBACK:-}" == 'true' ]]; then
+    spot_instances_fallback_monitor "${dir}" &
+    spot_fallback_pid=$!
+  fi
   ${INSTALLER_BINARY} --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"

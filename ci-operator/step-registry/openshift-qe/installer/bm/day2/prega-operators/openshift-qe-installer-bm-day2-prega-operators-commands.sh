@@ -5,6 +5,16 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server.
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
+  set +x
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+  set -x
+fi
+
 PREGA_BUILD_SERVER_IP=$(cat ${CLUSTER_PROFILE_DIR}/prega_build_server)
 # Disable xtrace: reading Quay access token
 set +x
@@ -20,7 +30,7 @@ get_idms_manifest() {
   # Disable xtrace: curl requests use QUAY_ACCESS_TOKEN in Authorization header
   set +x
   DIGEST=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg tag "$OCP_VERSION" '.tags[] | select(.name == $tag) | .manifest_digest' | head -1)
-  OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag) | .name' | sort -u)
+  OPERATOR_PREGA_VERSION=$(curl -s -H "Authorization: Bearer ${QUAY_ACCESS_TOKEN}" ${QUAY_URL} | jq -r --arg digest "$DIGEST" --arg tag "$OCP_VERSION" '.tags[] | select(.manifest_digest == $digest and .name != $tag and (.name | test("[0-9]{8}T[0-9]{6}"))) | .name' | sort -u)
   set -x
   if [[ -z "${OPERATOR_PREGA_VERSION}" ]]; then
     echo "OPERATOR_PREGA_VERSION could not be resolved from Quay; falling back to OCP_VERSION: ${OCP_VERSION}"
@@ -87,11 +97,20 @@ if [ ${OCP_BUILD} == "dev" ]; then
     image: quay.io/prega/prega-operator-index:${OPERATOR_PREGA_VERSION}
     sourceType: grpc
     displayName: Openshift Pre-GA Operators
+    grpcPodConfig:
+      securityContextConfig: restricted
 EOF
 
   echo "Waiting for CatalogSource to be ready"
   sleep 300
-  kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s
+  if ! kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY catalogsource/prega-operator-index -n openshift-marketplace --timeout=300s; then
+    echo "CatalogSource prega-operator-index did not become READY"
+    oc get catalogsource prega-operator-index -n openshift-marketplace -o yaml || true
+    oc get pods -n openshift-marketplace -o wide || true
+    oc describe pods -n openshift-marketplace -l olm.catalogSource=prega-operator-index || true
+    oc get events -n openshift-marketplace --sort-by='.lastTimestamp' | tail -80 || true
+    exit 1
+  fi
   echo "CatalogSource is ready"
   oc get catalogsources.operators.coreos.com -n openshift-marketplace
   oc get packagemanifests.packages.operators.coreos.com

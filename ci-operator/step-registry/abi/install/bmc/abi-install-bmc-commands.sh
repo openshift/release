@@ -113,9 +113,16 @@ function VCD-Eject () {
     typeset bmcInfo="${1:?}"; (($#)) && shift
     typeset bmcURL="${1:?}"; (($#)) && shift
     typeset bmcMgrId="${1:?}"; (($#)) && shift
-    RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
-        "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
-        -d '{}' || true
+    {
+        RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+            "Managers/${bmcMgrId}/VirtualMedia/CD" |
+        jq -e '.Inserted == true' 1> /dev/null
+    } && {
+        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+            "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
+            -d '{}' ||
+        true
+    }
     true
 }
 
