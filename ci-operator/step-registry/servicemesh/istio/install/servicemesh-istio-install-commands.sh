@@ -12,6 +12,16 @@ export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
 
+# ISTIO_VERSION can be e.g. "v1.24.5" or "v1.31-latest"
+istio_version_at_least() {
+  local required_major="$1" required_minor="$2" version major minor
+  version="${ISTIO_VERSION#v}"
+  major="${version%%.*}"
+  minor="${version#*.}"
+  minor="${minor%%[-.]*}"
+  [[ "${major}" -gt "${required_major}" ]] || [[ "${major}" -eq "${required_major}" && "${minor}" -ge "${required_minor}" ]]
+}
+
 # login for interop
 if test -f ${SHARED_DIR}/kubeadmin-password
 then
@@ -140,7 +150,7 @@ spec:
   port:
     targetPort: api
 EOF
-oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/minio --timeout 150s || (oc describe -n ${TEMPO_NAMESPACE} deployment/minio; oc describe pods -n ${TEMPO_NAMESPACE}; exit 1)
+oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/minio --timeout 360s || (oc describe -n ${TEMPO_NAMESPACE} deployment/minio; oc describe pods -n ${TEMPO_NAMESPACE}; exit 1)
 MINIO_HOST=$(oc get route minio-route -n ${TEMPO_NAMESPACE} -o=jsonpath='{.spec.host}')
 
 oc apply -n ${TEMPO_NAMESPACE} -f - <<EOF
@@ -170,8 +180,8 @@ spec:
   storageSize: 1Gi
 EOF
 
-oc -n ${TEMPO_NAMESPACE} wait --for condition=Ready TempoStack/sample --timeout 150s || (oc describe -n ${TEMPO_NAMESPACE} TempoStack/sample; oc describe pods -n ${TEMPO_NAMESPACE}; exit 1)
-oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/tempo-sample-compactor --timeout 150s || (oc describe -n ${TEMPO_NAMESPACE} deployment/tempo-sample-compactor; exit 1)
+oc -n ${TEMPO_NAMESPACE} wait --for condition=Ready TempoStack/sample --timeout 240s || (oc describe -n ${TEMPO_NAMESPACE} TempoStack/sample; oc describe pods -n ${TEMPO_NAMESPACE}; exit 1)
+oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/tempo-sample-compactor --timeout 240s || (oc describe -n ${TEMPO_NAMESPACE} deployment/tempo-sample-compactor; exit 1)
 
 echo "Exposing Jaeger UI route (will be used in kiali ui)"
 oc apply -n ${TEMPO_NAMESPACE} -f - <<EOF
@@ -237,18 +247,36 @@ metadata:
   name: default
 spec:
   namespace: ${ISTIO_NAMESPACE}
+  profile: openshift
   values:
     global:
       defaultPodDisruptionBudget:
         enabled: false
+      # To ensure proxy scales on a node with sufficient CPU/memory.
+      proxy:
+        resources:
+          requests:
+            cpu: 1m
+            memory: 1Mi
+      proxy_init:
+        resources:
+          requests:
+            cpu: 1m
+            memory: 1Mi
     meshConfig:
       extensionProviders:
       - name: otel
         opentelemetry:
           port: 4317
           service: otel-collector.${OTEL_NAMESPACE}.svc.cluster.local
+    # disable autoscale because during kiali testing the operator creates more pods however the cluster doesn't have insufficient cpu/memory
     pilot:
       autoscaleEnabled: false
+      # To ensure istiod scales on a node with sufficient CPU/memory, set resource requests. This prevents issues where a newer istiod might not start after an IstioCR patch, as observed during Kiali Cypress execution.
+      resources:
+        requests:
+          cpu: 1m
+          memory: 1Mi
   version: ${ISTIO_VERSION}
 EOF
 oc wait --for condition=Ready -n istio-system istio/default --timeout 120s || (oc describe -n istio-system istio/default; oc describe pods -n istio-system; exit 1)
@@ -314,6 +342,8 @@ spec:
     pod_labels:
       sidecar.istio.io/inject: 'false'
   external_services:
+    istio:
+      validation_reconcile_interval: 5s
     grafana:
       enabled: false
     prometheus:
@@ -338,6 +368,7 @@ spec:
   istio_namespace: istio-system
   server:
     write_timeout: 60
+  version: ${KIALI_VERSION}
   # kiali regression tests are failing with cache enabled. See https://redhat-internal.slack.com/archives/CHR7P722J/p1770620651384959
   kiali_internal:
     graph_cache:
@@ -347,6 +378,13 @@ spec:
 EOF
 oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} kiali/kiali; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
 oc annotate route kiali haproxy.router.openshift.io/timeout=60s -n ${ISTIO_NAMESPACE}
+
+if istio_version_at_least 1 30; then
+  # for istio 1.30+, we need to set external_services.tracing.use_waypoint_name to true
+  echo "Setting external_services.tracing.use_waypoint_name=true (istio >= 1.30)..."
+  oc patch kiali kiali -n ${ISTIO_NAMESPACE} --type=merge -p '{"spec":{"external_services":{"tracing":{"use_waypoint_name":true}}}}'
+  oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} kiali/kiali; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
+fi
 
 echo "=== Enabling user-monitoring workflow"
 wget -N https://raw.githubusercontent.com/kiali/kiali/${KIALI_VERSION}/hack/use-openshift-prometheus.sh
@@ -375,11 +413,23 @@ oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPA
 
 echo "Installing Kiali OSSMC CR..."
 
+OSSMC_INTERNAL_SPEC=""
+OSSMC_INTERNAL_SCHEMA=$(oc get crd ossmconsoles.kiali.io -o jsonpath='{.spec.versions[?(@.storage==true)].schema.openAPIV3Schema.properties.spec.properties.internal}' 2>/dev/null || true)
+if [[ -n "${OSSMC_INTERNAL_SCHEMA}" ]]; then
+  echo "OSSMConsole CRD supports spec.internal; enabling techPreview on first apply"
+  OSSMC_INTERNAL_SPEC=$'  internal:\n    techPreview: true'
+else
+  echo "OSSMConsole CRD does not include spec.internal; applying without it"
+fi
+
 oc apply -n ${ISTIO_NAMESPACE} -f - <<EOF
 apiVersion: kiali.io/v1alpha1
 kind: OSSMConsole
 metadata:
   name: ossmconsole
+spec:
+  version: ${KIALI_VERSION}
+${OSSMC_INTERNAL_SPEC}
 EOF
 
 oc wait --for=condition=Successful OSSMConsole ossmconsole --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} OSSMConsole ossmconsole; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
