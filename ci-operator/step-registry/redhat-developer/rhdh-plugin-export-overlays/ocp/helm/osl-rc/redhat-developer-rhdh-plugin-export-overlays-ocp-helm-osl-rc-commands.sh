@@ -346,8 +346,6 @@ approve_initial_install_plan "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_STA
 wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
-# Keep the Helm values compatible with the RHDH 1.x chart.
-export E2E_TEST_UTILS_VERSION=1.10.3
 OVERLAYS_COMMIT=b1320a680060f03ccaf7c88405125589e38f3fc4
 OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
 git init "${WORKDIR}/rhdh-plugin-export-overlays"
