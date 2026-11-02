@@ -111,7 +111,8 @@ semodule_package -o /tmp/e2e-node-kubelet.pp -m /tmp/e2e-node-kubelet.mod
 sudo semodule -i /tmp/e2e-node-kubelet.pp
 
 # RuntimeClass/PodOverhead tests expect a "test-handler" runtime handler, as on upstream node e2e images.
-CRUN_PATH=\$(sudo sh -c 'command -v crun')
+# CRI-O's playbook installs crun from source into /usr/local/bin, which is not in sudo's secure_path.
+CRUN_PATH=\$(sudo sh -c 'PATH=/usr/local/bin:\$PATH command -v crun') || { echo "crun not found" >&2; exit 1; }
 sudo tee /etc/crio/crio.conf.d/99-test-handler.conf <<CONF
 [crio.runtime.runtimes.test-handler]
 runtime_path = "\${CRUN_PATH}"
