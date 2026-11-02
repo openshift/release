@@ -17,7 +17,7 @@ shopt -s inherit_errexit
 #     absent   - Central CR list empty on a successful read (0-exit, 0 items)
 #     unknown  - read failed after 3 attempts => FAILED, exit != 0
 #   Carrier junit lp-interop--OPP--acs-readiness is emitted on EVERY exit
-#   path: one classification case (self-describing name), six assertion
+#   path: one classification case (self-describing name), seven assertion
 #   cases, one acs-preflight-selftest case.  A hard SIGKILL leaves the
 #   pre-seeded failing carrier on disk (never green).
 #   Exit codes: 0 pass / absent-by-design; 1 assertion failure or
@@ -557,10 +557,10 @@ if [[ "${_ACS_STATE}" == "unknown" ]]; then
 fi
 
 if [[ "${_ACS_STATE}" == "absent" ]]; then
-    # All six assertion cases are emitted on every exit path (D4), skipped
+    # All seven assertion cases are emitted on every exit path (D4), skipped
     # when the state is absent.
     typeset _a=""
-    for _a in central-crd securedcluster-crd central-route central-api-insecure-tls policies-loaded sensor-ready; do
+    for _a in central-crd securedcluster-crd central-route central-api-insecure-tls clusters-connected policies-loaded sensor-ready; do
         _add_case "${_a}" skipped "StateAbsent" "state=absent: assertion not evaluated"
     done
     if [[ "${ACS_EXPECTATION}" == "required" ]]; then
@@ -619,6 +619,7 @@ fi
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
     _add_case "central-route" failed "Assertion" "central namespace discovery failed (budget remaining $(_budget_remaining)s)"
     _add_case "central-api-insecure-tls" failed "Assertion" "central namespace discovery failed"
+    _add_case "clusters-connected" failed "Assertion" "central namespace discovery failed"
     _add_case "policies-loaded" failed "Assertion" "central namespace discovery failed"
     _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery not reached"
     exit 1
@@ -628,6 +629,7 @@ echo "[readiness] Central namespace: ${centralNs}"
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     _add_case "central-route" skipped "StateAbsent" "securedcluster namespace discovery failed; route check not reached"
     _add_case "central-api-insecure-tls" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "clusters-connected" skipped "StateAbsent" "securedcluster namespace discovery failed"
     _add_case "policies-loaded" skipped "StateAbsent" "securedcluster namespace discovery failed"
     _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
     exit 1
@@ -669,6 +671,7 @@ roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
 if [[ -z "${roxAdminPassword}" ]]; then
     echo "[readiness] FATAL: could not extract roxAdminPassword"
     _add_case "central-api-insecure-tls" failed "Assertion" "central-htpasswd secret empty or missing in ${centralNs}"
+    _add_case "clusters-connected" skipped "StateAbsent" "no credentials; API checks not reached"
     _add_case "policies-loaded" skipped "StateAbsent" "no credentials; API checks not reached"
     _add_case "sensor-ready" skipped "StateAbsent" "no credentials"
     exit 1
@@ -707,7 +710,12 @@ function CheckClustersConnected () {
     true
 }
 
-WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected || true
+if WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected; then
+    _add_case "clusters-connected" passed
+else
+    _add_case "clusters-connected" failed "Assertion" "no secured cluster connected (v1/clusters) (budget remaining $(_budget_remaining)s)"
+    _assert_rc=1
+fi
 
 # ---------------------------------------------------------------------------
 # Check: Sensor pods Running (detect OOMKilled)
