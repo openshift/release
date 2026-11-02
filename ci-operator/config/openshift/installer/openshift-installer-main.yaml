@@ -245,14 +245,12 @@ tests:
     }
     trap copy_new_fuzz_corpus EXIT
     run_fuzz() {
-      local pkg="$1" fn="$2" out fuzz_rc
+      local pkg="$1" fn="$2" out
       echo "--- fuzz: $fn ($pkg) ---"
-      # A missing Fuzz target exits 0 with "no fuzz tests to fuzz".
       out=$(mktemp)
-      go test "./$pkg" -run='^$' -fuzz="^${fn}$" -parallel="$FUZZ_WORKERS" -fuzztime="$FUZZ_DURATION" 2>&1 | tee "$out"
-      fuzz_rc=${PIPESTATUS[0]}
-      if (( fuzz_rc != 0 )); then rc=$fuzz_rc; fi
-      if grep -Fq "no fuzz tests to fuzz" "$out"; then rc=1; fi
+      go test "./$pkg" -run='^$' -fuzz="^${fn}$" -parallel="$FUZZ_WORKERS" -fuzztime="$FUZZ_DURATION" 2>&1 | tee "$out" || rc=1
+      # Go may exit 0 when a target or all test files are missing.
+      if grep -Fq "no fuzz tests to fuzz" "$out" || grep -Fq "[no test files]" "$out"; then rc=1; fi
       rm -f "$out"
     }
     run_fuzz pkg/destroy/azure                          FuzzGroupFromID
