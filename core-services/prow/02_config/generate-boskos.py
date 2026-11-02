@@ -352,6 +352,7 @@ CONFIG = {
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
+    'aro-hcp-stg-shard1-slot': {},
     'aro-hcp-stg-westus3-shard0-slot': {},
     'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
@@ -899,6 +900,8 @@ for i in range(4):
     CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(1):
+    CONFIG['aro-hcp-stg-shard1-slot']['aro-hcp-stg-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(52):
