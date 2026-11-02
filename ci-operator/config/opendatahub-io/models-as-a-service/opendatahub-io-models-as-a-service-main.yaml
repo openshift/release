@@ -58,15 +58,29 @@ tests:
       cli: latest
       commands: |
         set -euo pipefail
+        TOOL_BIN="${HOME}/bin"
+        mkdir -p "${TOOL_BIN}"
+        export PATH="${TOOL_BIN}:${PATH}"
         if ! command -v kubectl >/dev/null 2>&1 && command -v oc >/dev/null 2>&1; then
-          ln -sf "$(command -v oc)" /usr/local/bin/kubectl
+          ln -sf "$(command -v oc)" "${TOOL_BIN}/kubectl"
         fi
         if ! command -v jq >/dev/null 2>&1; then
-          yum install -y --nodocs jq
+          if [[ "$(id -u)" -eq 0 ]]; then
+            yum install -y --nodocs jq
+          else
+            curl -fsSL -o "${TOOL_BIN}/jq" "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64"
+            chmod +x "${TOOL_BIN}/jq"
+          fi
         fi
         if ! command -v kustomize >/dev/null 2>&1; then
-          curl -fsSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.7.0
-          install -m 0755 kustomize /usr/local/bin/kustomize
+          if oc kustomize -h >/dev/null 2>&1; then
+            printf '%s\n' '#!/bin/sh' 'exec oc kustomize "$@"' > "${TOOL_BIN}/kustomize"
+            chmod +x "${TOOL_BIN}/kustomize"
+          else
+            curl -fsSL -o /tmp/kustomize.tgz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.0/kustomize_v5.7.0_linux_amd64.tar.gz"
+            tar -xzf /tmp/kustomize.tgz -C "${TOOL_BIN}" kustomize
+            chmod +x "${TOOL_BIN}/kustomize"
+          fi
         fi
         export MAAS_API_IMAGE="${MAAS_API_IMAGE}"
         export MAAS_CONTROLLER_IMAGE="${MAAS_CONTROLLER_IMAGE}"
