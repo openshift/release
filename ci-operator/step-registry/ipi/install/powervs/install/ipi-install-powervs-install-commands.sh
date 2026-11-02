@@ -1053,6 +1053,20 @@ for POWERVM_RMC_YAML in powervm-rmc-namespace.yaml powervm-rmc-serviceaccount.ya
   fi
 done
 
+# Sets up the ethtool machineconfig for the master nodes
+ETHTOOL_MASTER_YAML="${SHARED_DIR}/99-master-ethtool-nm.yaml"
+if [ -f "${ETHTOOL_MASTER_YAML}" ]; then
+  echo "Saving ${ETHTOOL_MASTER_YAML} to the install directory..."
+  cp ${ETHTOOL_MASTER_YAML} "${dir}/manifests"
+fi
+
+# Sets up the ethtool machineconfig for the worker nodes
+ETHTOOL_WORKER_YAML="${SHARED_DIR}/99-worker-ethtool-nm.yaml"
+if [ -f "${ETHTOOL_WORKER_YAML}" ]; then
+  echo "Saving ${ETHTOOL_WORKER_YAML} to the install directory..."
+  cp ${ETHTOOL_WORKER_YAML} "${dir}/manifests"
+fi
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
