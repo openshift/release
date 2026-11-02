@@ -181,6 +181,7 @@ spec:
     registryPoll:
       interval: 45m
 EOF
+  echo "CatalogSource image: ${KUADRANT_CATALOG_SOURCE_IMAGE}"
   echo "Waiting for CatalogSource ${KUADRANT_SOURCE} to be READY ..."
   catalog_ready=false
   for _ in $(seq 1 60); do
@@ -199,6 +200,10 @@ EOF
     oc get events -n "${KUADRANT_SOURCE_NS}" --sort-by='.lastTimestamp' >&2 || true
     exit 1
   fi
+  echo "=== ${KUADRANT_SUBSCRIPTION_NAME} channels in ${KUADRANT_SOURCE} ==="
+  oc get packagemanifest "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_SOURCE_NS}" \
+    -o jsonpath='{range .status.channels[*]}{.name}{" currentCSV="}{.currentCSV}{"\n"}{end}' 2>/dev/null \
+    || oc get packagemanifest -n "${KUADRANT_SOURCE_NS}" || true
 else
   echo "=== Using downstream operator catalog ${KUADRANT_SOURCE} (${KUADRANT_SOURCE_NS}) ==="
 fi
@@ -263,6 +268,18 @@ if [[ "${KUADRANT_CHANNEL}" == "!default" ]]; then
 fi
 
 wait_for_csv "${KUADRANT_NAMESPACE}" "${KUADRANT_SUBSCRIPTION_NAME}" "${RHCL_STARTING_CSV}"
+
+installed_csv="$(oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" \
+  -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+RHCL_REQUIRED_CSV_PREFIX="${RHCL_REQUIRED_CSV_PREFIX:-}"
+echo "Installed CSV: ${installed_csv:-<none>} (required prefix: ${RHCL_REQUIRED_CSV_PREFIX:-<none>})"
+if [[ -n "${RHCL_REQUIRED_CSV_PREFIX}" && "${installed_csv}" != "${RHCL_REQUIRED_CSV_PREFIX}"* ]]; then
+  echo "ERROR: RHCL must install ${RHCL_REQUIRED_CSV_PREFIX}* ; got ${installed_csv:-<none>}" >&2
+  oc get csv -n "${KUADRANT_NAMESPACE}" >&2 || true
+  oc get subscription "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_NAMESPACE}" -o yaml >&2 || true
+  oc get packagemanifest "${KUADRANT_SUBSCRIPTION_NAME}" -n "${KUADRANT_SOURCE_NS}" -o yaml >&2 || true
+  exit 1
+fi
 
 echo "=== Waiting for the operator deployments (kuadrant, authorino, limitador, dns) ==="
 oc wait --for=condition=Available deployment --all -n "${KUADRANT_NAMESPACE}" --timeout=300s || true
