@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
+canonical_go_repository: github.com/Azure/ARO-HCP
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+test_binary_build_commands: make test-compile
+tests:
+- always_run: false
+  as: verify
+  capabilities:
+  - arm64
+  disable_pod_scaler: true
+  optional: true
+  run_if_changed: ^$
+  steps:
+    test:
+    - as: verify
+      commands: |-
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        set -o xtrace
+        unset GOFLAGS
+        make verify-vendor
+        make verify
+      from: src
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+zz_generated_metadata:
+  branch: bench-prewarm-base-1031
+  org: raelga
+  repo: ARO-HCP
+  variant: verify-base-p2
