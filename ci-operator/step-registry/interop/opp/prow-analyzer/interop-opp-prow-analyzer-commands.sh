@@ -556,9 +556,11 @@ SINK_RC=0
 if [ -z "${WEBHOOK_URL}" ]; then
     SINK_RC=99
 else
-    python3 - "$PAYLOAD_FILE" "$WEBHOOK_URL" "$SINK_STATUS_FILE" <<'PYEOF' || SINK_RC=$?
-import json, sys, urllib.request
-payload_file, url, status_file = sys.argv[1], sys.argv[2], sys.argv[3]
+    OPP_SINK_WEBHOOK_URL="${WEBHOOK_URL}" \
+    python3 - "$PAYLOAD_FILE" "$SINK_STATUS_FILE" <<'PYEOF' || SINK_RC=$?
+import json, os, sys, urllib.request
+payload_file, status_file = sys.argv[1], sys.argv[2]
+url = os.environ["OPP_SINK_WEBHOOK_URL"]
 text = open(payload_file).read()
 body = json.dumps({"text": text}).encode()
 req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
