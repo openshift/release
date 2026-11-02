@@ -1,0 +1,48 @@
+workflow:
+  as: rosa-e2e-hcp-terraform-rhcs-encryption
+  steps:
+    env:
+      CLUSTER_PROFILE: rosa-hcp-encryption
+      WAIT_OPERATORS: "true"
+    pre:
+    # Terraform head (ROSAENG-308): the rosa-hcp-encryption profile provisions
+    # an HCP cluster with etcd / storage encryption backed by a customer-managed
+    # KMS key and publishes the SHARED_DIR contract (cluster-id,
+    # cluster-metadata.json, ROSAENG-67580). It builds its own account roles,
+    # OIDC config and VPC, so no aws-provision-vpc-shared /
+    # rosa-sts-oidc-config-create in front of it.
+    - chain: rosa-e2e-hcp-terraform-rhcs-provision
+    # The Terraform day1 flow publishes no customer kubeconfig (admin_enabled:
+    # false on every HCP profile); rosa-e2e-validate-customer falls back to the
+    # bp-kubeconfig published here.
+    - ref: rosa-backplane-login
+    test:
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    # The cluster exists only in the terraform state saved to
+    # ${SHARED_DIR}/statefiles.tar.gz: tear it down with rhcs-e2e-teardown,
+    # never with rosa-cluster-deprovision, or the cluster and its AWS resources
+    # will leak.
+    - ref: rhcs-e2e-teardown
+      best_effort: true
+  documentation: |-
+    The Terraform/KMS-encryption row of the ROSAENG-308 provision x validate
+    matrix (ROSAENG-63351): the terraform-provider-rhcs day1 head provisions an
+    HCP cluster with the rosa-hcp-encryption profile (etcd / storage encryption
+    with a customer-managed KMS key) and publishes the SHARED_DIR contract,
+    then the shared, provisioner-agnostic validation tail
+    (rosa-e2e-validate-customer, rosa-e2e-validate-platform) runs; the
+    customer-features specs assert the KMS configuration end to end.
+
+    Two constraints come from the head: rhcs-e2e-setup runs
+    `from: rhcs-tf-e2e`, an image built only by
+    terraform-redhat/terraform-provider-rhcs, so this workflow is consumed by a
+    job in that repo's configuration (which also imports rosa-e2e from
+    ci:latest for the validation steps); and teardown must be rhcs-e2e-teardown
+    (terraform state), not rosa-cluster-deprovision.
+
+    The platform plane requires corp-network reachability: run this workflow
+    only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).

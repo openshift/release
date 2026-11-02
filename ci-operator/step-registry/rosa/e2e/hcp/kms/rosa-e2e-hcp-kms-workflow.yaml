@@ -1,0 +1,57 @@
+workflow:
+  as: rosa-e2e-hcp-kms
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "3"
+      ETCD_ENCRYPTION: "true"
+      STORAGE_ENCRYPTION: "true"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    # The customer-managed KMS key consumed by rosa-cluster-provision via
+    # ${SHARED_DIR}/aws_kms_key_arn (ETCD_ENCRYPTION adds
+    # --etcd-encryption-kms-arn, STORAGE_ENCRYPTION adds
+    # --enable-customer-managed-key --kms-key-arn).
+    - ref: rosa-sts-kms-key-create
+    - chain: rosa-cluster-provision
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
+    # has provisioned the cluster.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
+    # backplane (ROSAENG-67580).
+    - ref: rosa-backplane-login
+    test:
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    # Delete the KMS key only after the cluster is gone: it is referenced by
+    # the etcd encryption config and the EBS volumes until then.
+    - ref: rosa-sts-kms-key-delete
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The KMS-encryption row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-63351): the rosa-CLI head provisions an HCP cluster with etcd
+    encryption and EBS storage encryption backed by a customer-managed KMS key
+    (rosa-sts-kms-key-create), then runs the shared, provisioner-agnostic
+    validation tail (rosa-e2e-validate-customer, rosa-e2e-validate-platform),
+    whose customer-features specs assert the KMS configuration end to end.
+
+    The platform plane requires corp-network reachability: run this workflow
+    only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).
