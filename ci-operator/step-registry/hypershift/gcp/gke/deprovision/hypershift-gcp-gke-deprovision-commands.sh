@@ -193,9 +193,17 @@ if [[ "${DNS_CLEANUP_FAILED}" == "false" ]]; then
   # so this also covers guests that only partially came up.
   DNS_FILTER="${HC_INFRA_ID}|${HOSTED_CLUSTER_NAME}"
   if [[ -s "${SHARED_DIR}/cluster-manifests.json" ]]; then
+    # Capture before the loop: a process substitution would hide jq's exit status, so a
+    # malformed manifest would silently drop the guest names and leak their DNS records.
+    if ! guest_names=$(jq -r '.clusters[]?.name // empty' "${SHARED_DIR}/cluster-manifests.json"); then
+      echo "WARNING: failed to parse ${SHARED_DIR}/cluster-manifests.json - guest DNS records may be left behind"
+      guest_names=""
+    fi
     while IFS= read -r guest_name; do
-      [[ -n "${guest_name}" ]] && DNS_FILTER+="|${guest_name}"
-    done < <(jq -r '.clusters[]?.name // empty' "${SHARED_DIR}/cluster-manifests.json")
+      if [[ -n "${guest_name}" ]]; then
+        DNS_FILTER+="|${guest_name}"
+      fi
+    done <<< "${guest_names}"
   fi
 
   echo "Cleaning up DNS records for ${DNS_FILTER}..."
