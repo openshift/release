@@ -647,6 +647,28 @@ EOF
   # an existing multi-zone list, leaving stale zones (without the dedicated
   # host) in place for the installer to schedule workers into.
   zone="${zone}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.zones = [ strenv(zone) ])' "${CONFIG}"
+
+  # If the dedicated host landed in a fallback zone outside the control
+  # plane's configured zones, the cluster would end up spanning an extra AZ
+  # (the control plane's zones plus the dedicated host's zone), increasing
+  # cross-AZ data transfer costs. Merge the dedicated host's zone into the
+  # control plane's zone list -- keeping the original zone count -- so the
+  # control plane follows the dedicated host instead of adding a new AZ.
+  mapfile -t CONTROL_PLANE_ZONES < <(yq-v4 '.controlPlane.platform.aws.zones[]' "${CONFIG}")
+  if [[ ${#CONTROL_PLANE_ZONES[@]} -gt 0 ]] && ! printf '%s\n' "${CONTROL_PLANE_ZONES[@]}" | grep -qxF "${zone}"; then
+    echo "Dedicated host zone '${zone}' is outside the control plane's zones (${CONTROL_PLANE_ZONES[*]}); merging it in to avoid spreading the cluster across an extra AZ."
+    zone="${zone}" yq-v4 -i '.controlPlane.platform.aws.zones = [ strenv(zone) ]' "${CONFIG}"
+    for cp_zone in "${CONTROL_PLANE_ZONES[@]}"; do
+      if [[ $(yq-v4 '.controlPlane.platform.aws.zones | length' "${CONFIG}") -ge ${#CONTROL_PLANE_ZONES[@]} ]]; then
+        break
+      fi
+      if [[ "${cp_zone}" == "${zone}" ]]; then
+        continue
+      fi
+      cp_zone="${cp_zone}" yq-v4 -i '.controlPlane.platform.aws.zones += [ strenv(cp_zone) ]' "${CONFIG}"
+    done
+    echo "Control plane zones now: $(yq-v4 -o=json '.controlPlane.platform.aws.zones' "${CONFIG}" | jq -c .)"
+  fi
 fi
 
 # Configure dual-stack networking if IP_FAMILY is set
