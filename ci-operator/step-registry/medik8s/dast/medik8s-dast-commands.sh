@@ -138,6 +138,8 @@ spec:
           readOnly: true
         - name: trivy-cache
           mountPath: /trivy-cache
+        - name: tmp
+          mountPath: /tmp
         args:
         - k8s
         - --include-namespaces
@@ -165,6 +167,8 @@ spec:
         secret:
           secretName: trivy-kubeconfig
       - name: trivy-cache
+        emptyDir: {}
+      - name: tmp
         emptyDir: {}
 EOF
 
