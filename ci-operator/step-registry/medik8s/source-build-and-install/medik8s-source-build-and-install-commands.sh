@@ -55,19 +55,21 @@ esac
 exec > >(tee "$ARTIFACT_DIR/$SOURCE_OPERATOR-source-build-and-install.log") 2>&1
 
 resolve_peer_bundles() {
-  if [[ "$PEER_BUNDLES" == "__default__" ]]; then
+  local resolved="$PEER_BUNDLES"
+  if [[ "$resolved" == "__default__" ]]; then
     case "$SOURCE_OPERATOR" in
       nhc)
-        PEER_BUNDLES="self-node-remediation=quay.io/medik8s/self-node-remediation-operator-bundle:latest"
+        resolved="self-node-remediation=quay.io/medik8s/self-node-remediation-operator-bundle:latest"
         ;;
       snr|mdr)
-        PEER_BUNDLES="node-healthcheck-operator=quay.io/medik8s/node-healthcheck-operator-bundle:latest"
+        resolved="node-healthcheck-operator=quay.io/medik8s/node-healthcheck-operator-bundle:latest"
         ;;
       *)
-        PEER_BUNDLES=""
+        resolved=""
         ;;
     esac
   fi
+  echo "$resolved"
 }
 
 prepare_runtime() {
@@ -318,14 +320,15 @@ default_peer_bundle_image() {
 }
 
 install_peers() {
-  resolve_peer_bundles
-  if [[ -z "$PEER_BUNDLES" ]]; then
+  local peer_list
+  peer_list="$(resolve_peer_bundles)"
+  if [[ -z "$peer_list" ]]; then
     echo '==> No peer bundles to install'
     return 0
   fi
 
   local entry pkg image
-  IFS=',' read -r -a peer_entries <<< "$PEER_BUNDLES"
+  IFS=',' read -r -a peer_entries <<< "$peer_list"
   for entry in "${peer_entries[@]}"; do
     [[ -z "$entry" ]] && continue
     if [[ "$entry" == *"="* ]]; then
