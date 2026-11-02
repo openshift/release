@@ -1,0 +1,90 @@
+# Namespace for CAPCE (CAP Customer Experience) CI automation service accounts.
+# Used by ASSERT to pull PR-built component images from registry.ci.openshift.org.
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Automation ServiceAccounts for CAPCE ASSERT testing platform
+    openshift.io/display-name: CAPCE ASSERT
+  name: capce
+---
+# ServiceAccount whose token ASSERT uses to pull PR images.
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: image-puller
+  namespace: capce
+---
+# Grant image-pull rights in the ocp namespace (promoted/stable images).
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-ocp
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+# Grant image-pull rights in openshift-console (PR images for console component).
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-console
+  namespace: openshift-console
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+# Grant image-pull rights in openshift-operator-lifecycle-manager (PR images for OLM).
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-olm
+  namespace: openshift-operator-lifecycle-manager
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+# Grant the rover group rights to read the SA token and manage credentials.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-admins-binding
+  namespace: capce
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: capce-assert-ocp-pull-token
+    namespace: capce
