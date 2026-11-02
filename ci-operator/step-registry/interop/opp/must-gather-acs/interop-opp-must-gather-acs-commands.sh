@@ -118,6 +118,7 @@ collect_acs_diagnostics || true
 #   20 — cross-artifact agreement assertion failed (captures disagree)
 #   21 — evidence probe sanity assertion failed (a required artifact is
 #        missing or unparseable)
+#        (when several assertions fail, the highest code is reported)
 #   22 — removal-predicate fixture self-test failed (self-test mode only)
 
 set +e
@@ -299,6 +300,8 @@ print(json.dumps(result, indent=2))
 else
   if echo "${CR_OUTPUT}" | grep -qi "not found"; then
     echo "No Central CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07-central-cr.json"
+  elif echo "${CR_OUTPUT}" | grep -qi "doesn't have a resource type"; then
+    echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07-central-cr.json"
   else
     echo "QUERY FAILED (rc=${CR_RC}): ${CR_OUTPUT}" > "${EVIDENCE_DIR}/07-central-cr.json"
   fi
@@ -329,6 +332,8 @@ print(json.dumps(result, indent=2))
 else
   if echo "${SC_OUTPUT}" | grep -qi "not found"; then
     echo "No SecuredCluster CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
+  elif echo "${SC_OUTPUT}" | grep -qi "doesn't have a resource type"; then
+    echo "CRD_ABSENT: securedclusters.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   else
     echo "QUERY FAILED (rc=${SC_RC}): ${SC_OUTPUT}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   fi
@@ -353,7 +358,12 @@ for ch in data.get("status", {}).get("channels", []):
         "name": ch.get("name"),
         "currentCSV": ch.get("currentCSV")
     })
-print(json.dumps({"name": data["metadata"]["name"], "channels": channels}, indent=2))
+print(json.dumps({
+    "name": data["metadata"]["name"],
+    "catalogSource": data.get("status", {}).get("catalogSource"),
+    "catalogSourceNamespace": data.get("status", {}).get("catalogSourceNamespace"),
+    "channels": channels,
+}, indent=2))
 ' > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json" 2>&1 || \
     echo "probe_error: packagemanifest parse failed" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
 else
@@ -372,8 +382,9 @@ oc get packagemanifest -n openshift-marketplace -o name > "${EVIDENCE_DIR}/08-al
 #      always null on these objects; the compliance verdict is the field
 #      that answers "was the policy reconciled".
 echo "[9/10] ACM policies..."
-oc get policy -A -o json 2>/dev/null | \
-  python3 -c '
+if oc get crd policies.policy.open-cluster-management.io >/dev/null 2>&1; then
+  oc get policy -A -o json 2>/dev/null | \
+    python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -387,9 +398,13 @@ for i in data.get("items", []):
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/09-policies.json" 2>&1 || \
-  echo "probe_error: policy query failed" > "${EVIDENCE_DIR}/09-policies.json"
-oc get configurationpolicy -A -o json 2>/dev/null | \
-  python3 -c '
+    echo "probe_error: policy query failed" > "${EVIDENCE_DIR}/09-policies.json"
+else
+  echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
+fi
+if oc get crd configurationpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
+  oc get configurationpolicy -A -o json 2>/dev/null | \
+    python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -403,7 +418,10 @@ for i in data.get("items", []):
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/10-configpolicies.json" 2>&1 || \
-  echo "probe_error: configurationpolicy query failed" > "${EVIDENCE_DIR}/10-configpolicies.json"
+    echo "probe_error: configurationpolicy query failed" > "${EVIDENCE_DIR}/10-configpolicies.json"
+else
+  echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
+fi
 
 # 10. ACM CSV version and governance-policy-addon-controller image ref —
 #     the removal predicate keys on the ACM build carrying
@@ -445,23 +463,73 @@ from pathlib import Path
 
 ev = Path(sys.argv[1])
 
-def load(name):
-    try:
-        return json.loads((ev / name).read_text())
-    except Exception:
-        return None
+def probe(name):
+    """Classify an evidence file without collapsing failure into absence.
 
-ops = load("01-operatorpolicy.json") or []
-subs = load("03-subscription.json") or []
-csvs = load("05-csv.json") or []
-central = load("07-central-cr.json") or []
-acm = load("11-acm-csv-addon-controller.json") or []
+    Returns (status, data) with status one of:
+      ok            — parsed JSON (data carries it)
+      absent        — successful query, resource/type genuinely absent
+      query_failed  — QUERY FAILED / probe_error marker
+      unparseable   — neither of the above and not valid JSON
+      missing       — file not written
+    A failed query must never read as an empty capture: the report then
+    says unknown, not absent (follow-up 1)."""
+    p = ev / name
+    try:
+        raw = p.read_text()
+    except Exception:
+        return "missing", None
+    if raw.startswith("QUERY FAILED") or raw.startswith("probe_error:"):
+        return "query_failed", None
+    if (raw.startswith("CRD_ABSENT") or raw.startswith("No ")
+            or raw.startswith("ABSENT:")):
+        return "absent", None
+    try:
+        return "ok", json.loads(raw)
+    except Exception:
+        return "unparseable", None
+
+def as_list(name):
+    status, data = probe(name)
+    if status == "ok" and isinstance(data, list):
+        return status, data
+    return status, []
+
+ops_s, ops = as_list("01-operatorpolicy.json")
+subs_s, subs = as_list("03-subscription.json")
+csvs_s, csvs = as_list("05-csv.json")
+central_s, central = as_list("07-central-cr.json")
+acm_s, acm = as_list("11-acm-csv-addon-controller.json")
+pm_s, pm = probe("08-packagemanifest-rhacs.json")
+pm_ok = pm_s == "ok" and isinstance(pm, dict)
 
 rhacs_subs = [s for s in subs if s.get("name") == "rhacs-operator"]
-rhacs_csvs = [c for c in csvs if c.get("name", "").startswith("rhacs-operator.v")]
+sub = rhacs_subs[0] if len(rhacs_subs) == 1 else None
+sub_source = sub.get("source") if sub else None
+sub_namespace = sub.get("namespace") if sub else None
+
+# Effective catalog source of the subscription (follow-up 2): spec.source
+# (adopted subscriptions keep theirs); fall back to the catalog of the
+# packagemanifest whose channel resolves the subscription's currentCSV.
+effective_source = sub_source
+if effective_source is None and sub is not None and pm_ok:
+    for ch in pm.get("channels") or []:
+        if ch.get("currentCSV") and ch.get("currentCSV") == sub.get("currentCSV"):
+            effective_source = pm.get("catalogSource")
+            break
+
+# CSVs: exclude OLM copies (reason Copied) and bind to the subscription
+# namespace — name-only counting accepted same-named packages from
+# another catalog (follow-up 2).
+rhacs_csvs = [
+    c for c in csvs
+    if c.get("name", "").startswith("rhacs-operator.v")
+    and c.get("reason") != "Copied"
+    and (sub_namespace is None or c.get("namespace") == sub_namespace)
+]
 rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
 
-sub_channel = rhacs_subs[0].get("channel") if len(rhacs_subs) == 1 else None
+sub_channel = sub.get("channel") if sub else None
 op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
 op_channel = op_spec.get("channel")
 op_compliant = None
@@ -472,10 +540,19 @@ if rhacs_op:
         for c in conds
     )
 
-central_present = bool(central) and isinstance(central, list) and len(central) > 0
-central_available = any(
-    (c.get("available") or {}).get("status") == "True" for c in central
-) if central_present else False
+# Central presence: unknown (not absent) when the capture failed —
+# distinct report values for query-failed vs resource-absent (follow-up 1).
+if central_s == "ok":
+    central_present = bool(central) and len(central) > 0
+    central_available = any(
+        (c.get("available") or {}).get("status") == "True" for c in central
+    ) if central_present else False
+elif central_s == "absent":
+    central_present = False
+    central_available = False
+else:
+    central_present = None
+    central_available = None
 
 acm_version = None
 addon_images = []
@@ -484,13 +561,39 @@ for a in acm:
         acm_version = a["version"]
     addon_images += a.get("governancePolicyAddonControllerImages") or []
 
+# Catalog binding (follow-up 2): the packagemanifest that provides the
+# package must live in the subscription's effective catalog source. With
+# no packagemanifest at all, a CSV's catalog origin is unverifiable —
+# fail closed rather than accept it on name alone.
+if pm_ok and effective_source is not None:
+    csv_catalog_matches_subscription = pm.get("catalogSource") == effective_source
+elif pm_s == "absent" and rhacs_csvs:
+    csv_catalog_matches_subscription = False
+else:
+    csv_catalog_matches_subscription = None
+
+# The predicate is computable only when every input is definitively
+# classified (present or absent); query failures make it unknown.
+inputs_classified = (
+    all(st in ("ok", "absent")
+        for st in (ops_s, subs_s, csvs_s, central_s, acm_s))
+    and pm_s in ("ok", "absent")
+)
+
 terms = {
-    "central_present": str(central_present).lower(),
-    "central_available": str(central_available).lower(),
+    "central_query": central_s,
+    "central_present": (str(central_present).lower()
+                        if central_present is not None else "unknown"),
+    "central_available": (str(central_available).lower()
+                          if central_available is not None else "unknown"),
     "rhacs_subscription_count": str(len(rhacs_subs)),
     "rhacs_subscription_channel": sub_channel or "unknown",
+    "rhacs_subscription_source": effective_source or "unknown",
     "rhacs_csv_count": str(len(rhacs_csvs)),
     "rhacs_csv_name": rhacs_csvs[0]["name"] if rhacs_csvs else "unknown",
+    "csv_catalog_matches_subscription": (
+        str(csv_catalog_matches_subscription).lower()
+        if csv_catalog_matches_subscription is not None else "unknown"),
     "operatorpolicy_present": str(bool(rhacs_op)).lower(),
     "operatorpolicy_compliant": (str(op_compliant).lower()
                                   if op_compliant is not None else "unknown"),
@@ -498,16 +601,22 @@ terms = {
     "acm_csv_version": acm_version or "unknown",
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"),
+    "predicate_inputs_classified": str(inputs_classified).lower(),
 }
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
-# subscription with a matching channel and a Succeeded CSV. The two-run
-# aggregation and the named-build comparison live in the ticket rule.
+# subscription with a matching channel, a non-copied CSV in the
+# subscription namespace, and the package resolvable in the
+# subscription's effective catalog source. The two-run aggregation and
+# the named-build comparison live in the ticket rule.
 terms["removal_preconditions_met"] = str(
-    terms["operatorpolicy_compliant"] == "true"
+    inputs_classified
+    and terms["operatorpolicy_compliant"] == "true"
     and terms["rhacs_subscription_count"] == "1"
     and terms["rhacs_csv_count"] == "1"
     and terms["rhacs_subscription_channel"] != "unknown"
     and terms["rhacs_subscription_channel"] == terms["operatorpolicy_spec_channel"]
+    and terms["rhacs_subscription_source"] != "unknown"
+    and terms["csv_catalog_matches_subscription"] == "true"
 ).lower()
 
 out = ev / "acs-central-status.properties"
@@ -525,20 +634,24 @@ write_status_properties
 # A query failure must never read as absence, and captures that describe the
 # same cluster state must agree. These assertions fail the step (exit 20/21)
 # so the disagreement is visible in finished.json — job color is not the
-# signal (this step is best_effort).
+# signal (this step is best_effort). Failure aggregation: the highest
+# failure code is reported — a later failing check never overwrites an
+# earlier one, and an unexpected python exit is normalized to 21 so it
+# cannot masquerade as a disagreement (20).
 run_assertions() {
-  local failed=0
-  # (a) No evidence file may carry a probe_error marker.
+  local failed=0 rc
+  # (a) No evidence file may carry a probe_error or QUERY FAILED marker —
+  #     a failed query must never read as a clean pass (follow-up 1).
   for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
-    if grep -q "^probe_error:" "${f}" 2>/dev/null; then
-      echo "ASSERTION FAILURE (21): ${f} carries a probe_error marker — evidence incomplete"
+    if grep -qE "^(probe_error:|QUERY FAILED)" "${f}" 2>/dev/null; then
+      echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker — evidence incomplete"
       failed=21
     fi
   done
   # (b) Packagemanifest agreement: if the full list names rhacs-operator,
   #     the per-package capture must classify it present (valid JSON with a
   #     name field), and vice versa.
-  python3 - "${EVIDENCE_DIR}" <<'PYEOF' || failed=20
+  python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
 import json, sys
 from pathlib import Path
 ev = Path(sys.argv[1])
@@ -561,7 +674,7 @@ if listed != present:
     sys.exit(20)
 PYEOF
   # (c) Subscription capture must be OLM objects, not ACM's CRD.
-  python3 - "${EVIDENCE_DIR}" <<'PYEOF' || failed=21
+  python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
 import json, sys
 from pathlib import Path
 ev = Path(sys.argv[1])
@@ -581,10 +694,11 @@ PYEOF
 # computation against embedded TRUE and FALSE fixtures. Run by setting
 # ACS_EVIDENCE_SELF_TEST=1 (used in the PR rehearsal; exit 22 on failure).
 self_test() {
-  local tmp
+  local tmp _st_failed=0
   tmp=$(mktemp -d)
-  # TRUE fixture: OperatorPolicy compliant, one subscription+CSV, matching
-  # channel. FALSE fixture: no OperatorPolicy (today's 5.0 state).
+  # Shared TRUE-fixture base: OperatorPolicy compliant, one subscription
+  # (source redhat-operators) with one non-copied CSV in its namespace,
+  # matching channel, and the packagemanifest in the subscribed catalog.
   cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
 [{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
   "spec": {"subscriptionName": "rhacs-operator",
@@ -599,30 +713,69 @@ FIXTURE
   "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown",
   "conditions": [], "channel": "stable", "source": "redhat-operators"}]
 FIXTURE
-  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded"}]' > "${tmp}/05-csv.json"
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
   echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
   echo '[{"name": "advanced-cluster-management.v2.17.4", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
 
-  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
-  local true_val
-  true_val=$(grep '^removal_preconditions_met=' "${tmp}/acs-central-status.properties" | cut -d= -f2)
-  if [[ "${true_val}" != "true" ]]; then
-    echo "SELF-TEST FAILURE (22): TRUE fixture evaluated removal_preconditions_met=${true_val}"
-    rm -rf "${tmp}"
-    return 22
-  fi
+  _term() {
+    grep "^$1=" "${tmp}/acs-central-status.properties" | cut -d= -f2
+  }
+  _expect() {
+    local val
+    val=$(_term "$1")
+    if [[ "${val}" != "$2" ]]; then
+      echo "SELF-TEST FAILURE (22): $1=${val:-<unset>}, expected $2"
+      _st_failed=1
+    fi
+  }
 
-  # FALSE fixture: empty OperatorPolicy (current gated state).
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect removal_preconditions_met true
+  _expect predicate_inputs_classified true
+
+  # Follow-up 1, acceptance (a): a failed Central query must not read as
+  # absence — distinct report values for denied vs absent.
+  echo "QUERY FAILED (rc=1): simulated API denial" > "${tmp}/07-central-cr.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect central_query query_failed
+  _expect central_present unknown
+  _expect removal_preconditions_met false
+
+  # Follow-up 1, acceptance (b): a genuinely absent resource type reports
+  # absence — a different value from the denied case.
+  echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${tmp}/07-central-cr.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect central_query absent
+  _expect central_present false
+
+  # Follow-up 2, acceptance: the package present only in a non-subscribed
+  # catalog fails the precondition.
+  echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
+  echo '{"name": "rhacs-operator", "catalogSource": "community-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect csv_catalog_matches_subscription false
+  _expect removal_preconditions_met false
+
+  # Follow-up 2 (Copied CSV): a copied CSV in another namespace must not
+  # count toward the precondition.
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "policies", "phase": "Succeeded", "reason": "Copied"}]' > "${tmp}/05-csv.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect rhacs_csv_count 0
+  _expect removal_preconditions_met false
+
+  # FALSE fixture: no OperatorPolicy (today's 5.0 state).
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
   echo '[]' > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
-  local false_val
-  false_val=$(grep '^removal_preconditions_met=' "${tmp}/acs-central-status.properties" | cut -d= -f2)
-  if [[ "${false_val}" != "false" ]]; then
-    echo "SELF-TEST FAILURE (22): FALSE fixture evaluated removal_preconditions_met=${false_val}"
+  _expect removal_preconditions_met false
+
+  if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE fixture -> true; FALSE fixture -> false"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }

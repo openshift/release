@@ -17,30 +17,46 @@ ref:
   - name: ACS_EVIDENCE_SELF_TEST
     default: "0"
     documentation: |-
-      Set to "1" to run the removal-predicate fixture self-test instead of a
-      cluster capture: the step evaluates the per-run removal-precondition
-      terms against embedded TRUE and FALSE fixtures and exits 22 if either
-      evaluates wrongly. Used to validate the detector in rehearsals (a
-      detector never observed TRUE is not actionable).
+      Set to "1" to run the removal-predicate fixture self-test. The test
+      runs AFTER the cluster captures (they still execute first — this is a
+      detector-validation mode, not a capture-free mode): the step evaluates
+      the per-run removal-precondition terms against embedded fixtures
+      (TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, and
+      FALSE) and exits 22 if any classifies wrongly. Used to validate the
+      detector in rehearsals (a detector never observed TRUE is not
+      actionable).
   documentation: |-
     Downloads ACS/StackRox diagnostic bundle via the Central API and captures
     OLM lifecycle evidence (INTEROP-9525) for debugging operator installation
     failures on OCP 5.0/5.1. The OLM evidence section runs independently of
-    ACS diagnostics — it collects OperatorPolicy (spec + conditions),
-    CatalogSource, OLM Subscription (fully-qualified
-    subscriptions.operators.coreos.com — with ACM installed the bare kind
-    resolves to ACM's CRD), InstallPlan, CSV, Central/SecuredCluster CRs,
-    PackageManifest, ACM policy compliance verdicts, and the ACM CSV version
-    with the governance-policy-addon-controller image ref, even when ACS is
-    not yet installed.
+    ACS diagnostics — it collects, with the exact fields each artifact
+    carries: OperatorPolicy (spec subscription target/channel, full
+    status.conditions), CatalogSource (spec.image, status.connectionState),
+    OLM Subscription (fully-qualified subscriptions.operators.coreos.com —
+    with ACM installed the bare kind resolves to ACM's CRD; spec
+    channel/source, status currentCSV/state/conditions), InstallPlan (phase,
+    conditions), CSV (phase, reason, message — the operator-reported
+    condition text, not the full conditions array), Central CR (specName,
+    status, the Available condition only), SecuredCluster CR (status only),
+    PackageManifest (channels, catalogSource), ACM policy compliance
+    verdicts (conditions, compliant, per-cluster status), and the ACM CSV
+    version with the governance-policy-addon-controller image ref, even when
+    ACS is not yet installed.
 
     Capture contract: every query is classified present | absent |
-    probe_error (a query failure is never rendered as absence); both 08-*
-    packagemanifest files are always written; cross-artifact agreement
-    assertions run at the end and fail the step with exit code 20
-    (disagreement) or 21 (probe sanity). The per-run removal-precondition
-    terms are written to olm-evidence/acs-central-status.properties; the
-    two-run aggregation is a ticket-level rule, not computed here. This step
-    is best_effort, so finished.json (not job color) is the failure signal.
-    Durable authority for the classification and predicate:
-    opp-interop-testing docs/design/acs-deploy-evidence.md.
+    probe_error/QUERY FAILED — a query failure is never rendered as absence
+    (a not-registered CRD renders as CRD_ABSENT, an API error as QUERY
+    FAILED, and the status properties report unknown, not absent, for a
+    failed capture); both 08-* packagemanifest files are always written;
+    cross-artifact agreement assertions run at the end and fail the step
+    with exit code 20 (disagreement) or 21 (probe sanity; when several fire,
+    the highest code is reported). The per-run removal-precondition terms
+    are written to olm-evidence/acs-central-status.properties, including the
+    catalog-source binding of the subscription (a same-named package in a
+    non-subscribed catalog does not satisfy the precondition); the two-run
+    aggregation is a ticket-level rule, not computed here. Signal surfaces:
+    the evidence JSONs, the properties file, and the step exit code in
+    finished.json — this step emits no JUnit XML of its own, and it is
+    best_effort, so job color is not the signal. Durable authority for the
+    classification and predicate: opp-interop-testing
+    docs/design/acs-deploy-evidence.md.
