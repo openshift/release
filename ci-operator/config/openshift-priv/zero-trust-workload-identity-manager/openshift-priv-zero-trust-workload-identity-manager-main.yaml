@@ -120,6 +120,35 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
+  as: e2e-operator-tls
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: ztwim-deploy-spire-operands
+    - as: test
+      cli: latest
+      commands: make test-e2e-tls
+      dependencies:
+      - env: TLS_SCANNER_IMAGE
+        name: tls-scanner-tool
+      env:
+      - default: "50"
+        name: SCAN_LIMIT_IPS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h50m0s
+    workflow: optional-operators-ci-operator-sdk-aws
+  timeout: 5h0m0s
+- always_run: false
   as: tls-scanner
   optional: true
   steps:

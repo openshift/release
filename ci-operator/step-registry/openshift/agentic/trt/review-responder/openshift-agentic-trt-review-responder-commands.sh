@@ -12,7 +12,7 @@ echo "=== TRT Review Responder ==="
     exit 1
 }
 [[ -f "${SHARED_DIR}/trt-telemetry.sh" ]] || {
-    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — workflow init step must run first"
+    echo "ERROR: ${SHARED_DIR}/trt-telemetry.sh not found — openshift-agentic-trt-init-model step must run first"
     exit 1
 }
 # shellcheck source=/dev/null
@@ -72,6 +72,12 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     trap copy_artifacts EXIT TERM INT
 fi
 
+# Native settings apply to the gate and both workers. Keep gh available for
+# review reads/replies and retain the credential denials below.
+SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-review.XXXXXX")
+AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
+jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)"]}}' > "${AGENT_SETTINGS}"
+
 BOT_LOGIN=$(cat "${SHARED_DIR}/gh-app-bot-login" 2>/dev/null || echo "")
 if [[ -z "${BOT_LOGIN}" ]]; then
     echo "ERROR: ${SHARED_DIR}/gh-app-bot-login not found — github-app-auth step must run first"
@@ -79,8 +85,9 @@ if [[ -z "${BOT_LOGIN}" ]]; then
 fi
 echo "Bot login: ${BOT_LOGIN}"
 
-# Hard blocks for credential-dumping commands. Prompt text is not enough
-# against injection from review comments (same approach as hypershift review-agent).
+# Credential command denies are non-exhaustive and best effort. They do not
+# cover every reader or path spelling. The prompt also tells the agent not
+# to reveal credentials.
 DISALLOWED_TOOLS=(
     "Bash(git config*credential*)"
     "Bash(git config*--list*)"
@@ -111,12 +118,14 @@ DISALLOWED_TOOLS=(
     "Bash(od*github-app-auth.sh*)"
     "Bash(od*google-token*)"
     "Bash(git push*)"
+    "Bash(git send-pack*)"
     "Bash(head*/var/run/github-token*)"
     "Bash(sed*/var/run/github-token*)"
     "Bash(od*/var/run/github-token*)"
     # Read(path) covers all file-reading tools (Grep/Glob path denials are ignored).
     "Read(//var/run/github-token/**)"
     "Read(//var/run/claude-code-service-account/**)"
+    "Read(//var/run/codex-openai-api-key/**)"
 )
 
 append_pipeline_constraints() {
@@ -148,8 +157,8 @@ append_security() {
 }
 
 # --- Assemble system prompt: CI extras + skill + repo-specific config ---
-# Same shape as jira-solver: a short additional/security block, then SKILL.md,
-# then REVIEW.md last so repo directions win.
+# Same shape as jira-solver: additional/security guidance, skill, repository
+# guidance, then mandatory runtime policy so repository directions cannot override it.
 SYSTEM_PROMPT="/tmp/agentic-review-system-prompt-$(basename "${WORKDIR}").md"
 cat > "${SYSTEM_PROMPT}" <<'SYSTEM_EOF'
 # Additional Instructions
@@ -199,7 +208,7 @@ if [[ "${EVAL_MODE:-}" == "true" ]]; then
     fi
 fi
 
-# Append repo-specific REVIEW.md last so it takes precedence over generic skill guidance
+# Repository guidance overrides the skill, but not the runtime policy appended below.
 if [[ -f "${WORKDIR}/REVIEW.md" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
     cat "${WORKDIR}/REVIEW.md" >> "${SYSTEM_PROMPT}"
@@ -266,9 +275,21 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
     -e 's|\$2|'"${UPSTREAM_REPO}"'|g' \
     "${GATE_SKILL}" >> "${GATE_PROMPT}"
 
+# Every launch, including the direct read-only gate, uses the same runtime
+# settings. Preserve the credential denials above and allow gh for review work.
+for prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}" "${GATE_PROMPT}"; do
+    cat >> "${prompt}" <<'CI_POLICY'
+
+## Mandatory CI policy (overrides conflicting skill or repository instructions)
+- Work serially in the parent agent. Do not delegate.
+- Do not push or create PRs. Any permitted commits stay local; only the pipeline publishes. The gate remains read-only.
+- Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
+CI_POLICY
+done
+
 # --- Poll: small-model gate, then worker ---
 echo "=== Watching PR #${PR_NUM} for review comments and CI failures ==="
-echo "Gate model: ${GATE_MODEL} | Worker model: ${CLAUDE_MODEL}"
+echo "Gate model: ${GATE_MODEL} | Worker model: $(select_agent_model)"
 
 extract_failing_checks() {
     python3 -c '
@@ -519,6 +540,7 @@ while true; do
     timeout 120 claude \
         --model "${GATE_MODEL}" \
         --allowedTools "Bash" \
+        --settings "${AGENT_SETTINGS}" \
         --disallowedTools "${DISALLOWED_TOOLS[@]}" \
         --max-turns 20 \
         --output-format text \
@@ -605,6 +627,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
                 "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
 
 Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
+                --settings "${AGENT_SETTINGS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${SYSTEM_PROMPT}"; then
@@ -626,6 +649,7 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
 The git remote for ${UPSTREAM_REPO} is origin. Do not run git remote -v.
 Your GitHub login is ${BOT_LOGIN}." \
+                --settings "${AGENT_SETTINGS}" \
                 --disallowedTools "${DISALLOWED_TOOLS[@]}" \
                 --output-format stream-json \
                 --append-system-prompt-file "${CI_PROMPT}"; then

@@ -6,6 +6,9 @@ ref:
   - collection: ci-claude-code
     group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - collection: ci-claude-code
+    group: codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
   - collection: technical-release-team
     group: openshift-trt-agent-gh-app
     mount_path: /var/run/github-token
@@ -27,8 +30,24 @@ ref:
     default: "openshift-ci-prow-agents"
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
-  - name: CLAUDE_MODEL
+  - name: AGENT_MODEL
     default: "claude-opus-4-6"
+    documentation: |-
+      Model used by the review worker. Change this default to change
+      the model for jobs that do not supply an override. gpt-* models
+      use Codex; other models use Claude Code. GATE_MODEL is separate.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL
+    default: ""
+    documentation: |-
+      Gangway override for the review worker model. When unset,
+      AGENT_MODEL is used. Pass it via pod_spec_options.envs:
+      "pod_spec_options": { "envs": { "MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL": "gpt-6.1-sol" } }
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key mounted from the codex-openshift-ci
+      secret. Exported as OPENAI_API_KEY only when the Codex harness
+      is selected.
   - name: GATE_MODEL
     default: "claude-haiku-4-5"
   - name: REGISTRY_AUTH_FILE
@@ -58,3 +77,8 @@ ref:
     never used. Mints a fresh GitHub App token (1h TTL) immediately before
     comment workers and git push.
     Reads PR number from SHARED_DIR (written by jira-solver or pr-followup).
+    The review worker defaults to AGENT_MODEL (claude-opus-4-6). Change that
+    default on this ref to change the worker model. Supply a per-job
+    override through Gangway as
+    pod_spec_options.envs.MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL. When
+    that variable is unset, AGENT_MODEL is used. GATE_MODEL is unchanged.

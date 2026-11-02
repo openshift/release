@@ -3,8 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-go build -o /tmp/cleanup-sweeper ./tooling/cleanup-sweeper
-
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-dev"
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
@@ -17,10 +15,10 @@ if [[ "${JOB_TYPE:-}" != periodic ]]; then
   dry_run=true
 fi
 
-/tmp/cleanup-sweeper ci-certificates \
+cleanup-sweeper --workflow=certificates \
+  --policy="${CERTIFICATE_CLEANUP_POLICY}" \
   --dry-run="${dry_run}" \
-  --min-age="${CERTIFICATE_CLEANUP_MIN_AGE}" \
-  --max-deletions="${CERTIFICATE_CLEANUP_MAX_DELETIONS}" \
-  --max-purges="${CERTIFICATE_CLEANUP_MAX_PURGES}" \
-  --workers="${CERTIFICATE_CLEANUP_WORKERS}" \
+  --options="certificates.max-deletions=${CERTIFICATE_CLEANUP_MAX_DELETIONS}" \
+  --options="certificates.max-purges=${CERTIFICATE_CLEANUP_MAX_PURGES}" \
+  --parallelism="${CERTIFICATE_CLEANUP_PARALLELISM}" \
   --timeout="${CERTIFICATE_CLEANUP_TIMEOUT}"

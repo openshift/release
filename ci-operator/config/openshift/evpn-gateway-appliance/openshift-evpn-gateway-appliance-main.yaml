@@ -1,4 +1,16 @@
 base_images:
+  centos-stream10:
+    name: centos
+    namespace: openshift
+    tag: stream10
+  metallb-frr:
+    name: "4.22"
+    namespace: ocp
+    tag: metallb-frr
+  prometheus-node-exporter:
+    name: "4.22"
+    namespace: ocp
+    tag: prometheus-node-exporter
   ubi-python:
     name: ubi-python-312
     namespace: ocp
@@ -10,6 +22,11 @@ images:
   - dockerfile_path: Dockerfile.ci
     from: ubi-python
     to: ansible-test-runner
+releases:
+  latest:
+    integration:
+      name: "5.1"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -22,6 +39,21 @@ tests:
   commands: make verify OFFLINE=1
   container:
     from: ansible-test-runner
+- as: e2e
+  skip_if_only_changed: ^plans/|\.md$|^LICENSE$|(^|/)OWNERS$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_AMI: ami-0da467f007dfebd6b
+      EC2_INSTANCE_TYPE: m6i.xlarge
+      EC2_REGION: us-west-2
+      REGION: us-west-2
+    post:
+    - ref: aws-deprovision-stacks
+    pre:
+    - chain: openshift-image-based-infra-aws-ec2
+    test:
+    - ref: openshift-evpn-gateway-appliance-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

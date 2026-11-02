@@ -36,21 +36,47 @@ if [[ -n "${TEST_SKIPS:-}" ]]; then
     TESTS="${FILTERED_TESTS}"
 fi
 
-# Run the filtered tests
-echo "${TESTS}" | openshift-tests run \
-    --monitor "watch-namespaces" \
-    --max-parallel-tests 1 \
-    -f - \
-    -o "${ARTIFACT_DIR}/e2e.log" \
-    --junit-dir "${ARTIFACT_DIR}/junit"
-
-# IRI tests must not be skipped on this platform.
-junit=$(ls "${ARTIFACT_DIR}"/junit/junit_e2e_*.xml 2>/dev/null) || {
-    echo "ERROR: no junit_e2e_*.xml file found"
-    exit 1
+select_tests() {
+    local tests
+    tests="$(printf '%s\n' "${TESTS}" | grep -E "$1" || true)"
+    printf '%s\n' "${tests}"
 }
-skipped=$(sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' ${junit} | head -1)
-if [[ "${skipped}" -gt 0 ]]; then
-    echo "ERROR: ${skipped} IRI test(s) were skipped"
-    exit 1
-fi
+
+PARALLEL="$(select_tests parallel)"
+SERIAL="$(select_tests serial)"
+DISRUPTIVE="$(select_tests Disruptive)"
+
+run_tests() {
+    local suite="$1" tests="$2"
+    local -a parallelism=(--max-parallel-tests 5)
+    if [[ -z "${tests}" ]]; then
+        echo "No NoRegistryClusterInstall tests selected for ${suite}"
+        return
+    fi
+    if [[ "${suite}" != parallel ]]; then
+        parallelism=(--max-parallel-tests 1)
+    fi
+
+    echo "${tests}" | openshift-tests run \
+        --monitor "watch-namespaces" \
+        "${parallelism[@]}" \
+        -f - \
+        -o "${ARTIFACT_DIR}/e2e-${suite}.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit/${suite}"
+
+    junit_files=("${ARTIFACT_DIR}/junit/${suite}"/junit_e2e_*.xml)
+    if [[ ! -f "${junit_files[0]}" ]]; then
+        echo "ERROR: no junit_e2e_*.xml file found for ${suite}"
+        exit 1
+    fi
+    while IFS= read -r skipped; do
+        if [[ "${skipped}" -gt 0 ]]; then
+            echo "ERROR: ${skipped} IRI test(s) were skipped in ${suite}"
+            exit 1
+        fi
+    done < <(sed -n 's/.*skipped="\([0-9]*\)".*/\1/p' "${junit_files[@]}")
+}
+
+run_tests parallel "${PARALLEL}"
+run_tests serial "${SERIAL}"
+run_tests disruptive "${DISRUPTIVE}"

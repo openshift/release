@@ -74,6 +74,15 @@ tests:
   container:
     from: src
 - always_run: false
+  as: e2e-aws-customnoupgrade-clusterapioperator-feature
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_GATES: '["ClusterAPIOperator=true","CRDCompatibilityRequirementOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-aws-capi-techpreview
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -178,6 +187,8 @@ tests:
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: hypershift-aws
+    env:
+      CI_TESTS_RUN: ^(TestCreateCluster|TestUpgradeControlPlane|TestNodePool)$
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-vsphere-staticip-ipam-ovn

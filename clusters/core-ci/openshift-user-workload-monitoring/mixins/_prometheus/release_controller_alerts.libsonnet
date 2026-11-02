@@ -23,7 +23,7 @@
         rules: [
           {
             alert: 'releaseControllerBugzillaError',
-            expr: 'rate(release_controller_bugzilla_errors_total[5m]) > 0',
+            expr: 'rate(release_controller_bugzilla_errors_total[30m]) > 0',
             labels: {
               severity: 'critical',
               team: 'crt',
@@ -39,7 +39,7 @@
         rules: [
           {
             alert: 'releaseControllerJiraError',
-            expr: 'rate(release_controller_jira_errors_total[5m]) > 0',
+            expr: 'rate(release_controller_jira_errors_total[30m]) > 0',
             labels: {
               severity: 'critical',
               team: 'crt',

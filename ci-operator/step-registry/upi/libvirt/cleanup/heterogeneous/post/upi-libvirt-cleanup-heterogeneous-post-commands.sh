@@ -56,6 +56,7 @@ resolve_expected_additional_bridge() {
   case "${LEASED_RESOURCE}" in
     libvirt-s390x-vpn-amd64-0-0) printf '%s\n' "ocp1-amd" ;;
     libvirt-s390x-vpn-amd64-0-1) printf '%s\n' "ocp3-amd" ;;
+    libvirt-s390x-arm64-0-0|libvirt-s390x-vpn-arm64-0-0|*-arm64-0-0) printf '%s\n' "ocp2-arm" ;;
     *) printf '%s\n' "" ;;
   esac
 }
@@ -308,4 +309,10 @@ if [ -n "${CONFLICTING_DOMAINS_P}" ] || [ -n "${CONFLICTING_VOLUMES_P}" ] || [ -
   exit 1
 fi
 
-echo "Post-cleanup completed cleanly for lease ${LEASED_RESOURCE} across primary and additional hypervisors."
+# Shared by pre (symlink) and post; label the phase from the invoking script path.
+cleanup_phase="Cleanup"
+case "${BASH_SOURCE[0]:-$0}" in
+  *-pre-commands.sh|*heterogeneous/pre/*) cleanup_phase="Pre-cleanup" ;;
+  *-post-commands.sh|*heterogeneous/post/*) cleanup_phase="Post-cleanup" ;;
+esac
+echo "${cleanup_phase} completed cleanly for lease ${LEASED_RESOURCE} across primary and additional hypervisors."

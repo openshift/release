@@ -65,7 +65,7 @@ spec:
           readOnly: true
       containers:
       - name: statusreconciler
-        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20261007-6ed406f29
+        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20261023-0d9737ca2
         imagePullPolicy: IfNotPresent
         args:
         - --dry-run=false
@@ -82,6 +82,7 @@ spec:
         # Keep git-sync's published link (jobs) in the path. Never point the
         # recursive job loader at the git-sync root containing .git/.worktrees.
         - --job-config-path=/etc/jobs/git/jobs/ci-operator/jobs
+        - --job-config-path=/etc/jobs/efs
         - --projected-token-file=/var/sa-token/token
         env:
         - name: GITHUB_APP_ID
@@ -103,8 +104,6 @@ spec:
           readOnly: true
         - name: release
           mountPath: /var/repo
-        - name: combined-jobs
-          mountPath: /etc/jobs
         - name: job-configs
           mountPath: /etc/jobs/efs
           readOnly: true
@@ -175,8 +174,6 @@ spec:
       - name: release
         emptyDir: {}
       - name: jobs-git
-        emptyDir: {}
-      - name: combined-jobs
         emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:

@@ -1,0 +1,75 @@
+base_images:
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+binary_build_commands: make linux-amd64
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-5.0
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.22"
+  latest:
+    release:
+      channel: candidate
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: platform-none-vsphere-upgrade
+  cron: 0 9 1,15 * *
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
+      OPCT_RUN_MODE: upgrade
+    workflow: opct-test-platform-none-vsphere
+  timeout: 8h0m0s
+- as: platform-external-vsphere-upgrade
+  cron: 0 11 1,15 * *
+  reporter_config:
+    channel: '#forum-opct-updates'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :workflow::external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      OPCT_RUN_MODE: upgrade
+      PLATFORM_NAME: vsphere
+    workflow: opct-test-platform-external-vsphere
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: opct
+  variant: 5.0-upgrade-from-4.22

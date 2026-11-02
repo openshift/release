@@ -21,8 +21,8 @@ The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
 3. `quay-sts-install` installs the PR-built Quay Operator bundle in
    `openshift-operators` with AllNamespaces mode, adds the workload role as the
    operator's `ROLEARN`, and waits for the updated deployment.
-4. `quay-sts-test` verifies state and operator configuration, then invokes
-   `make test-e2e-sts` from the operator PR source. The Chainsaw test validates
+4. `quay-test-chainsaw` with `CHAINSAW_SUITE=sts` invokes `make test-e2e-sts`
+   from the operator PR source. The Chainsaw test validates
    the CredentialRequest and projected-token configuration and exercises Quay
    image push, pull, and repository mirroring.
 5. `ipi-aws-post-manual-oidc-sts` destroys the cluster and removes the OIDC and
@@ -57,8 +57,13 @@ kubeconfigs, or credential values.
 `quay-sts-tools` is built by the Quay Operator ci-operator configuration from
 UBI Python 3.11 with `boto3==1.35.99`; `cli: latest` supplies `oc` where needed.
 The test step runs from `src-oc`, which contains the PR source, Go, make, curl,
-base64, `oc`, and pinned crane v0.20.3 and gojq v0.12.17 binaries for the source
-Chainsaw test. The operator Makefile supplies Chainsaw.
+base64 and `oc`; it installs pinned crane v0.20.3 and gojq v0.12.17 (as `jq`) at
+run time. The operator Makefile supplies Chainsaw.
+
+The Quay Operator 5.0 ODF nightly (`aws-odf-nightly`) runs the same suite with
+`QUAY_OPERATOR_STS=true`: `quay-install-quay-operator` sets `ROLEARN` on the
+Subscription, and `quay-test-chainsaw` runs the STS suite before the e2e and
+destructive suites.
 
 Building `src-oc` requires access to the pinned Go module sources before cluster
 provisioning starts. The running job requires network access to the cluster API,

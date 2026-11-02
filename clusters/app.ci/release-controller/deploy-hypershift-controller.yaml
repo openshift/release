@@ -85,6 +85,7 @@ spec:
         - --period=30s
         - --root=/tmp/git-sync
         - --max-failures=3
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         env:
@@ -99,6 +100,9 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /usr/bin/release-controller
         - --release-namespace=hypershift
@@ -161,6 +165,7 @@ spec:
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         env:
@@ -171,6 +176,9 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       serviceAccountName: release-controller
       volumes:
       - configMap:
@@ -179,6 +187,9 @@ spec:
         name: config
       - emptyDir: {}
         name: release
+      - configMap:
+          name: release-controller-sparse-checkout
+        name: sparse-checkout
       - name: oauth
         secret:
           defaultMode: 420

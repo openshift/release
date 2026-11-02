@@ -53,7 +53,7 @@ function leaseLookup () {
 }
 
 # Resolve the infra-owned VXLAN bridge on the additional hypervisor.
-# Prefer lease vxlan.additional-bridge; then VXLAN_ADDITIONAL_BRIDGE; then
+# Prefer lease 'vxlan.additional-bridge'; then VXLAN_ADDITIONAL_BRIDGE; then
 # known lease→bridge mappings for VPN hetero slots.
 resolve_additional_bridge() {
   local bridge
@@ -64,13 +64,14 @@ resolve_additional_bridge() {
   fi
 
   if [[ -n "${VXLAN_ADDITIONAL_BRIDGE:-}" ]]; then
-    echo "WARN: lease '${LEASED_RESOURCE}' missing vxlan.additional-bridge; using VXLAN_ADDITIONAL_BRIDGE=${VXLAN_ADDITIONAL_BRIDGE}" >&2
+    echo "WARN: lease '${LEASED_RESOURCE}' missing 'vxlan.additional-bridge'; using environment variable VXLAN_ADDITIONAL_BRIDGE=${VXLAN_ADDITIONAL_BRIDGE}" >&2
     printf '%s\n' "${VXLAN_ADDITIONAL_BRIDGE}"
     return 0
   fi
 
-  # Last-resort infra VXLAN bridges when leases.yaml omits vxlan.additional-bridge.
-  # Observed VPN amd64 wiring: ...-0-0 → ocp1-amd, ...-0-1 → ocp3-amd.
+  # Last-resort infra VXLAN bridges when leases.yaml omits 'vxlan.additional-bridge'.
+  # Observed VPN wiring: amd64 ...-0-0 → ocp1-amd, ...-0-1 → ocp3-amd;
+  # arm64 (profile libvirt-s390x-vpn-arm64 leases as libvirt-s390x-arm64-0-0) → ocp2-arm.
   case "${LEASED_RESOURCE}" in
     libvirt-s390x-vpn-amd64-0-0)
       bridge="ocp1-amd"
@@ -78,19 +79,22 @@ resolve_additional_bridge() {
     libvirt-s390x-vpn-amd64-0-1)
       bridge="ocp3-amd"
       ;;
+    libvirt-s390x-arm64-0-0|libvirt-s390x-vpn-arm64-0-0|*-arm64-0-0)
+      bridge="ocp2-arm"
+      ;;
     *)
       bridge=""
       ;;
   esac
 
   if [[ -n "${bridge}" ]]; then
-    echo "WARN: lease '${LEASED_RESOURCE}' missing vxlan.additional-bridge; using known mapping → ${bridge}" >&2
+    echo "WARN: lease '${LEASED_RESOURCE}' missing 'vxlan.additional-bridge'; using known mapping → ${bridge}" >&2
     printf '%s\n' "${bridge}"
     return 0
   fi
 
   echo "ERROR: Couldn't resolve additional-host VXLAN bridge for '${LEASED_RESOURCE}'" >&2
-  echo "ERROR: Set vxlan.additional-bridge in the cluster-profile lease secret, or set VXLAN_ADDITIONAL_BRIDGE." >&2
+  echo "ERROR: Set 'vxlan.additional-bridge' in the cluster-profile lease secret, or set the environment variable VXLAN_ADDITIONAL_BRIDGE in the job definition." >&2
   return 1
 }
 

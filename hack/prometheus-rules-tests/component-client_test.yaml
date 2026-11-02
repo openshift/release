@@ -1,0 +1,33 @@
+# promtool unit tests for component-failed-to-construct-a-client.
+# Verifies the added for:5m entry debounce and keep_firing_for:15m resolve-side
+# hysteresis (bridges pod-restart gaps instead of flapping).
+rule_files:
+  - .rendered-rules.yaml
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'kubernetes_failed_client_creations{service="component-x"}'
+        values: "0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"
+    alert_rule_test:
+      # >0 from t=2m; for:5m -> fires at t=7m
+      - eval_time: 7m
+        alertname: component-failed-to-construct-a-client
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: component-x
+            exp_annotations:
+              message: 'Component component-x failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.'
+      # drops to 0 at t=10m; keep_firing_for:15m holds it firing through t=20m
+      - eval_time: 20m
+        alertname: component-failed-to-construct-a-client
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: component-x
+            exp_annotations:
+              message: 'Component component-x failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.'
+      # keep_firing_for ends at t=25m (10m + 15m) -> resolved by t=27m
+      - eval_time: 27m
+        alertname: component-failed-to-construct-a-client
+        exp_alerts: []

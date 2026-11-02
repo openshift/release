@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+readonly status_context="${E2E_STATUS_CONTEXT:-e2e/platform}"
 readonly target_org="openshift-online"
 readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
@@ -75,14 +76,14 @@ fi
 
 readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
 printf '%s\n' "${tested_sha}" >"${tested_sha_path}"
-payload="$(jq -cn --arg target_url "${target_url}" '{
+payload="$(jq -cn --arg target_url "${target_url}" --arg context "${status_context}" '{
   state: "pending",
-  context: "e2e/platform",
+  context: $context,
   description: "GCP HCP platform E2E test is running",
   target_url: $target_url
 }')"
 
-echo "Posting pending e2e/platform status to ${target_org}/${target_repo}@${tested_sha}"
+echo "Posting pending ${status_context} status to ${target_org}/${target_repo}@${tested_sha}"
 curl \
   --fail-with-body \
   --silent \
@@ -99,4 +100,4 @@ curl \
   --data "${payload}" \
   "https://api.github.com/repos/${target_org}/${target_repo}/statuses/${tested_sha}" \
   >/dev/null
-echo "GitHub accepted the pending e2e/platform status"
+echo "GitHub accepted the pending ${status_context} status"
