@@ -5,6 +5,12 @@ if [ "$ENABLEPEERPODS" != "true" ]; then
     exit 0
 fi
 
+# Restricted-network runs: source the bastion proxy so az CLI calls reach the
+# Azure API (no-op for connected runs).
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Switch to a directory with rw permission
 cd /tmp || exit 1
 
