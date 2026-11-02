@@ -205,8 +205,10 @@ _classify() {
         # exist without the CRD), not a transient read failure. This is the
         # 5.x lane reality: no ACS operator is installed, so the centrals
         # query itself errors ("the server doesn't have a resource type") -
-        # observed in rehearsal build 2116735878033313792.
-        if crdlist="$(oc get crd -o name 2>/dev/null)" && [[ -n "${crdlist}" ]]; then
+        # observed in rehearsal build 2116735878033313792. A successful read
+        # with an EMPTY list is the same deterministic absence (the CRD is
+        # simply not there), so only the read's success is gated here.
+        if crdlist="$(oc get crd -o name 2>/dev/null)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 return 0
