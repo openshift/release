@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capce-assert-ocp-prow-trigger-token
+  annotations:
+    openshift.io/description: Service Accounts for capce-assert-ocp-prow-trigger-token
+    openshift.io/display-name: capce-assert-ocp-prow-trigger-token CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: periodic-job-bot
+  namespace: capce-assert-ocp-prow-trigger-token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-token-secret
+  namespace: capce-assert-ocp-prow-trigger-token
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: secret-owner
+  namespace: capce-assert-ocp-prow-trigger-token
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: secret-owner-capce-assert-ocp-prow-trigger-token
+  namespace: capce-assert-ocp-prow-trigger-token
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: capce-assert-ocp-prow-trigger-token
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner
