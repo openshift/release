@@ -110,12 +110,12 @@ metadata:
   namespace: ${DAST_NS}
 spec:
   backoffLimit: 0
+  activeDeadlineSeconds: 600
   template:
     spec:
       restartPolicy: Never
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -168,14 +168,19 @@ spec:
         emptyDir: {}
 EOF
 
+# Start the scan deadline before following logs to enforce the 600s limit end-to-end.
+deadline=$((SECONDS + 600))
+
 log "Streaming DAST scan output..."
-oc logs job/"$JOB_NAME" -n "$DAST_NS" -f 2>/dev/null || true
+remaining=$((deadline - SECONDS))
+if (( remaining > 0 )); then
+    timeout "${remaining}s" oc logs job/"$JOB_NAME" -n "$DAST_NS" -f 2>/dev/null || true
+fi
 
 # Poll for Complete or Failed — oc wait --for=condition=Complete alone blocks the full
 # timeout when the Job fails (findings found), giving a misleading 10-minute delay.
 log "Waiting for DAST job to complete (max 600s)..."
 job_state=""
-deadline=$((SECONDS + 600))
 while (( SECONDS < deadline )); do
     if [[ "$(oc get job "$JOB_NAME" -n "$DAST_NS" \
             -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" == "True" ]]; then
@@ -187,6 +192,19 @@ while (( SECONDS < deadline )); do
     fi
     sleep 10
 done
+
+# Check once more after deadline for Job condition propagation (avoid race near deadline).
+if [[ "$job_state" == "" ]]; then
+    sleep 5
+    if [[ "$(oc get job "$JOB_NAME" -n "$DAST_NS" \
+            -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" == "True" ]]; then
+        job_state=complete
+    elif [[ "$(oc get job "$JOB_NAME" -n "$DAST_NS" \
+            -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}')" == "True" ]]; then
+        job_state=failed
+    fi
+fi
+
 if [[ "$job_state" != "complete" ]]; then
     log "ERROR: DAST job ended with state '${job_state:-timeout}' (findings or scan error)"
     oc get job "$JOB_NAME" -n "$DAST_NS" -o jsonpath='{.status}' | python3 -m json.tool || true
