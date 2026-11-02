@@ -17,8 +17,19 @@ set -uo pipefail
 READONLY_PREFIX="OPP-PROW-ANALYZER"
 : "${JOB_NAME:=unset-job}"
 : "${BUILD_ID:=unset-build}"
-# CI layout (cucushift precedent): a step's own artifacts are ${ARTIFACT_DIR}; sibling steps' artifact dirs live under its parent. Derived, overridable; a missing tree degrades to config_error in main, never an abort.
-ARTIFACT_BASE_DIR="${ARTIFACT_BASE_DIR:-${ARTIFACT_DIR:+${ARTIFACT_DIR}/..}}"
+# CI layout (empirical, rehearsal 2116774308557623296, PR 88057): a step's
+# own $ARTIFACT_DIR is <artifacts-root>/<test>/<step>/artifacts; the
+# framework writes the per-step finished.json marker and build logs into
+# <step>/ itself, and sibling steps' dirs live under <test>/. The default
+# base is therefore the test dir, two levels up from the step's
+# $ARTIFACT_DIR; the earlier one-level-up derivation pointed at the
+# analyzer's own step dir, so the admission gate saw only its own empty
+# artifact dir and every run read as analyze:no_evidence (CodeRabbit
+# r4426804531). Derived, overridable; a missing tree degrades to
+# config_error in main, never an abort.
+if [ -z "${ARTIFACT_BASE_DIR:-}" ] && [ -n "${ARTIFACT_DIR:-}" ]; then
+    ARTIFACT_BASE_DIR="$(dirname "$(dirname "${ARTIFACT_DIR}")")"
+fi
 : "${SHARED_DIR:=/tmp}"
 SHIP_HELP_MCP_URL="${SHIP_HELP_MCP_URL:-${ANALYZER_MCP_URL:-https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp}}"
 ANALYZER_MCP_URL="${SHIP_HELP_MCP_URL}"
