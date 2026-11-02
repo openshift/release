@@ -1,0 +1,27 @@
+ref:
+  as: rosa-operator-push-cpo-image
+  from: rosa-aws-cli
+  commands: rosa-operator-push-cpo-image-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - collection: rosa-e2e
+    group: quay-io-rosa-ci
+    mount_path: /var/run/quay-credentials
+  dependencies:
+  - name: hypershift
+    env: CPO_SRC_IMAGE
+  env:
+  - name: CPO_QUAY_REPO
+    default: quay.io/rosa-ci/control-plane-operator
+    documentation: Private Quay repository for temporary PR-built control-plane-operator images.
+  documentation: |-
+    Mirrors the PR-built control-plane-operator image from the CI registry to the private,
+    ROSA-owned quay.io/rosa-ci/control-plane-operator repository. The follow-up annotation step
+    adds the Quay credential to the HostedCluster pull secret before applying the image override.
+
+    This step runs only when JOB_SPEC contains an openshift/hypershift PR. It writes the immutable
+    destination pullspec to ${SHARED_DIR}/cpo-image for rosa-operator-override-cpo-image.
