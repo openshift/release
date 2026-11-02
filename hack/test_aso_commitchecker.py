@@ -1,5 +1,12 @@
+"""Opt-in container integration checks: run `make test-aso-commitchecker`.
+
+Requires Podman and the pinned rehearsal image; ordinary unittest discovery skips
+these checks unless RUN_ASO_COMMITCHECKER_TESTS=1 is explicitly supplied.
+"""
+
 import copy
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -14,6 +21,8 @@ CONFIG = ROOT / "ci-operator/config/openshift/azure-service-operator/openshift-a
 IMAGE = "quay.io/openshift/ci@sha256:1e87dd1e2913c0d5ae68d8694ec987d97894ed73a5fc40953f6b199f717d9315"
 
 
+@unittest.skipUnless(os.environ.get("RUN_ASO_COMMITCHECKER_TESTS") == "1",
+                     "Container integration test; run make test-aso-commitchecker")
 class ASOCommitcheckerTests(unittest.TestCase):
     def setUp(self):
         self.checkout = Path(tempfile.mkdtemp())
