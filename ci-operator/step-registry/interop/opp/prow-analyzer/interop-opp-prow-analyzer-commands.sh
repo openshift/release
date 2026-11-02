@@ -352,9 +352,19 @@ attempt_loop() {
     # transport errors, never analysis prose or credentials). Rehearsal
     # 2116720842141339648: three failed attempts were unattributable because
     # CLI_ERR was deleted by cleanup before anything recorded it.
-    _CLI_DETAIL="$(head -c 160 "${CLI_ERR}" | head -1 | tr ' ' '~')"
+    # Fixed-vocabulary diagnostic only (CodeRabbit r4434581019, Major
+    # Security): the pinned CLI can carry MCP response bodies in its stderr
+    # on HTTP errors, so raw stderr never reaches the public log.
+    _CLI_DETAIL="cli_error"
+    if [ ! -s "${CLI_ERR}" ]; then
+        _CLI_DETAIL="no_stderr"
+    elif grep -qiE 'certificate signed by unknown authority|x509:' "${CLI_ERR}" 2>/dev/null; then
+        _CLI_DETAIL="tls_unknown_authority"
+    elif grep -qiE 'connection refused|no route to host|i/o timeout' "${CLI_ERR}" 2>/dev/null; then
+        _CLI_DETAIL="network_unreachable"
+    fi
     printf 'OPP-PROW-ANALYZER v=1 stage=note what=cli_failed classification=%s detail=%s\n' \
-        "${classification}" "${_CLI_DETAIL:-no_stderr}"
+        "${classification}" "${_CLI_DETAIL}"
     _OUTCOME="error"
 }
 attempt_loop
