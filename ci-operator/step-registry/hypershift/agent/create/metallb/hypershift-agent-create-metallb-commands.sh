@@ -174,6 +174,13 @@ spec:
   type: LoadBalancer
 EOF
 
+# The Nutanix flow verifies the VIP and the run-owned tunnel in the next step.
+# Waiting for the ClusterVersion here can deadlock while the ingress canary
+# cannot yet reach the newly allocated VIP.
+if [[ -f "${SHARED_DIR}/nutanix_ingress_tunnel_state.json" ]]; then
+  exit 0
+fi
+
 echo "Wait HostedCluster ready..."
 until \
   oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do

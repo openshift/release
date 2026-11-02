@@ -3,8 +3,8 @@ workflow:
   documentation: |-
     Runs HyperShift conformance against an Agent HostedCluster whose NodePool workers are
     Nutanix VMs booted from the MCE InfraEnv discovery ISO. The existing baremetal-backed management
-    cluster and MCE setup remain unchanged; Nutanix VMs host only guest workers. The ingress VIP
-    is derived from the selected Nutanix subnet rather than supplied by the scheduling job. A dedicated
+    cluster and MCE setup remain unchanged; Nutanix VMs host guest workers and a lease-owned
+    ingress tunnel gateway. The ingress VIP is derived from the selected Nutanix subnet. A dedicated
     baremetal dnsmasq serves the workers through MAC-matched NMStateConfigs in the InfraEnv ISO;
     the shared Nutanix subnet's DHCP options remain unchanged.
   steps:
@@ -17,6 +17,7 @@ workflow:
     pre:
     - ref: hypershift-mce-agent-nutanix-context
     - chain: baremetalds-ofcir-pre
+    - ref: hypershift-mce-agent-nutanix-ingress-tunnel-setup
     - ref: enable-qe-catalogsource
     - ref: deploy-konflux-operator
     - chain: hypershift-mce-agent-lvm
@@ -32,6 +33,7 @@ workflow:
     - ref: gather-extra
     - ref: gather-audit-logs
     - chain: hypershift-mce-agent-destroy
+    - ref: hypershift-mce-agent-nutanix-ingress-tunnel-cleanup
     - ref: hypershift-mce-agent-nutanix-destroy
     - ref: hypershift-mce-agent-nutanix-worker-dns-cleanup
     - ref: baremetalds-devscripts-gather

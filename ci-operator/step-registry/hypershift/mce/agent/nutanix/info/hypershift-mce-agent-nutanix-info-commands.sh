@@ -33,6 +33,20 @@ for file in nutanix_worker_names nutanix_worker_macs.json nutanix_worker_vms.tsv
   fi
 done
 
+if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
+  jq '{lease,vip,subnetUUID,gatewayName,gatewayUUID,gatewayTaskUUID,gatewayIP,imageName,imageUUID,imageTaskUUID,interface,port,routeCIDR,firewallZone,stage}' \
+    "$SHARED_DIR/nutanix_ingress_tunnel_state.json" \
+    > "$ARTIFACT_DIR/nutanix-ingress-tunnel-state.json" || true
+  if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_ssh_config" ]]; then
+    ssh -F "$SHARED_DIR/nutanix_ingress_tunnel_ssh_config" nutanix-ingress-gateway \
+      'sudo journalctl --no-pager -u hypershift-nutanix-ingress-firewall.service -n 200' \
+      > "$ARTIFACT_DIR/nutanix-ingress-tunnel-gateway-journal.txt" 2>&1 || true
+    ssh -F "$SHARED_DIR/nutanix_ingress_tunnel_ssh_config" nutanix-ingress-gateway \
+      'sudo nft list table ip hcp_nutanix_ingress_tunnel' \
+      > "$ARTIFACT_DIR/nutanix-ingress-tunnel-gateway-nft.txt" 2>&1 || true
+  fi
+fi
+
 if [[ -s "$SHARED_DIR/nutanix_context.sh" ]]; then
   source "$SHARED_DIR/nutanix_context.sh"
   if [[ -s "$SHARED_DIR/vm_uuids.txt" ]]; then
@@ -49,6 +63,19 @@ fi
 if [[ -f "$SHARED_DIR/packet-conf.sh" ]]; then
   source "$SHARED_DIR/packet-conf.sh"
   ssh "${SSHOPTS[@]}" "root@$IP" 'sudo podman logs --tail=500 external-squid 2>&1' > "$ARTIFACT_DIR/nutanix-squid.log" 2>&1 || true
+  if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
+    tunnel_interface=$(jq -r '.interface // empty' "$SHARED_DIR/nutanix_ingress_tunnel_state.json")
+    tunnel_vip=$(jq -r '.vip // empty' "$SHARED_DIR/nutanix_ingress_tunnel_state.json")
+    if [[ "$tunnel_interface" =~ ^wgnx[0-9a-f]{8}$ && "$tunnel_vip" =~ ^[0-9.]+$ ]]; then
+      ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- "$tunnel_interface" "$tunnel_vip" <<'EOF' \
+        > "$ARTIFACT_DIR/nutanix-ingress-tunnel-host.txt" 2>&1 || true
+systemctl --no-pager status "hypershift-nutanix-ingress-tunnel-$1.service"
+ip -4 route get "$2"
+wg show "$1" latest-handshakes
+wg show "$1" transfer
+EOF
+    fi
+  fi
   if [[ -s "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
     dns_cluster=$(jq -r '.cluster' "$SHARED_DIR/nutanix_worker_dns_state.json")
     if [[ "$dns_cluster" =~ ^[a-z0-9-]+$ ]]; then
