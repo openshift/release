@@ -122,15 +122,23 @@ export CYPRESS_USERNAME=${OCP_CRED_USR}
 export CYPRESS_PASSWD=${OCP_CRED_PSW}
 export CYPRESS_AUTH_PROVIDER="kube:admin"
 
+# disable colored output so ANSI escape sequences don't pollute CI build logs
+export NO_COLOR=1
+export FORCE_COLOR=0
 # for flaky tests
 export CYPRESS_RETRIES=2
 export TEST_GROUP="(@core-1 or @core-2) and @smoke and not @skip-ossmc and not @skip-lpinterop"
-yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
+
+corepack enable
+hash -r
+# Use corepack yarn so package.json packageManager wins over /usr/bin/yarn (classic)
+corepack yarn install || corepack yarn install # try this 2 times as we often seen network issues during this step
+corepack yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 # save screenshots from the 1st run
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
 
 # merge all reports together
-yarn cypress:combine:reports
+corepack yarn cypress:combine:reports
 
 echo "Copying result xml and screenshots to ${ARTIFACT_DIR}"
 # the file name must start with 'junit'
