@@ -135,7 +135,7 @@ spec:
           mountPath: /etc/git-sync-config
           readOnly: true
       # Second git-sync: sparse checkout of ONLY ci-operator/jobs, feeding the
-      # /etc/jobs union (job-config-path). Kept separate from the full /var/repo
+      # /etc/jobs/git job-config path. Kept separate from the full /var/repo
       # checkout above so core-services never lands under --job-config-path.
       - name: git-sync-jobs-init
         resources:
@@ -169,6 +169,7 @@ spec:
         # Keep git-sync's published link (jobs) in the path. Never point the
         # recursive job loader at the git-sync root containing .git/.worktrees.
         - --job-config-path=/etc/jobs/git/jobs/ci-operator/jobs
+        - --job-config-path=/etc/jobs/efs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -218,8 +219,6 @@ spec:
           mountPath: /tmp
         - name: release
           mountPath: /var/repo
-        - name: combined-jobs
-          mountPath: /etc/jobs
         - name: job-configs
           mountPath: /etc/jobs/efs
           readOnly: true
@@ -316,8 +315,6 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: jobs-git
-        emptyDir: {}
-      - name: combined-jobs
         emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:

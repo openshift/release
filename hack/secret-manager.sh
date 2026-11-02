@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 GCLOUD_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-gcloud"
 SSO_AUTH_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-dex"
+IMAGE_CHECK_STAMP="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-image-check"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 IMAGE="${SECRET_MANAGER_IMAGE:-quay.io/openshift/ci-public:ci_secret-manager_latest}"
 
@@ -55,6 +56,13 @@ if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
     CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
     chmod -R a+rX "$GCLOUD_CONFIG_PATH"
     update_image_if_stale
+    touch "$IMAGE_CHECK_STAMP"
+fi
+
+# Other commands check for a newer image at most once a day.
+if [ "${1:-}" != "login" ] && [ -z "$(find "$IMAGE_CHECK_STAMP" -mmin -1440 2>/dev/null)" ]; then
+    update_image_if_stale
+    touch "$IMAGE_CHECK_STAMP"
 fi
 
 tty_flags=()

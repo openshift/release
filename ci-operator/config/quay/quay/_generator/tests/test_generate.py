@@ -606,6 +606,22 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
 
 
+@pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
+def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
+    results, _retired = generate_all()
+    name = f"quay-quay-redhat-{quay}__aws-ocp{ocp.replace('.', '')}-e2e-legacy.yaml"
+    config = {filename: cfg for _group, filename, cfg in results}[name]
+    assert "images" not in config
+    assert config["releases"]["latest"]["candidate"]["version"] == ocp
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    env = test["steps"]["env"]
+    assert env["QUAY_VERSION"] == quay
+    assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
+    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+
+
 def test_master_presubmit_expands_all_clouds() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}

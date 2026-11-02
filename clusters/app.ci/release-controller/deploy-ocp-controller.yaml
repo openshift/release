@@ -162,6 +162,7 @@ spec:
         - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
@@ -173,6 +174,9 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /usr/bin/release-controller
         - --release-namespace=ocp
@@ -255,6 +259,7 @@ spec:
         - --one-time=true
         - --depth=1
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
@@ -262,6 +267,9 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /bin/bash
         - -c
@@ -291,6 +299,9 @@ spec:
         name: config
       - emptyDir: {}
         name: release
+      - configMap:
+          name: release-controller-sparse-checkout
+        name: sparse-checkout
       - name: oauth
         secret:
           defaultMode: 420
