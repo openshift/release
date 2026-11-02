@@ -662,6 +662,69 @@ spec:
           effect: NoSchedule
 EOF
 
+# Added machineconfig to disable NIC offloads to overcome hairpinning.
+# A udev rule disables the offloads on env2 and env3 whenever the interface is added.
+ETHTOOL_DISPATCHER_B64="$(base64 <<'DISPEOF' | tr -d '\n'
+#!/bin/bash
+if [[ "$2" == "up" && ( "$1" == "env2" || "$1" == "env3" ) ]]; then
+  echo "multi-arch-installer: turning off tx/rx-checksumming on $1"
+  ethtool --show-offload "$1" | grep check
+  /sbin/ethtool --offload "$1" tx-checksumming off
+  /sbin/ethtool --show-offload "$1" | grep check
+  /sbin/ethtool --offload "$1" rx-checksumming off
+  ethtool --show-offload "$1" | grep check
+fi
+if systemctl is-failed NetworkManager-wait-online; then
+  echo "multi-arch-installer: restarting wait-online"
+  systemctl restart NetworkManager-wait-online
+fi
+DISPEOF
+)"
+
+echo "Saving 99-master-ethtool-nm yaml config..."
+cat > "${SHARED_DIR}/99-master-ethtool-nm.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-master-ethtool-nm
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+        - filesystem: root
+          path: /etc/NetworkManager/dispatcher.d/99-ethtool-offload
+          mode: 0755
+          overwrite: true
+          contents:
+            source: data:text/plain;charset=utf-8;base64,${ETHTOOL_DISPATCHER_B64}
+EOF
+
+echo "Saving 99-worker-ethtool-nm yaml config..."
+cat > "${SHARED_DIR}/99-worker-ethtool-nm.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-worker-ethtool-nm
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+        - filesystem: root
+          path: /etc/NetworkManager/dispatcher.d/99-ethtool-offload
+          mode: 0755
+          overwrite: true
+          contents:
+            source: data:text/plain;charset=utf-8;base64,${ETHTOOL_DISPATCHER_B64}
+EOF
+
 echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
 read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
 echo "count = ${#PARAMETERS[*]}"
