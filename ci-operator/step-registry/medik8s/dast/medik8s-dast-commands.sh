@@ -17,6 +17,9 @@ NAMESPACE_CREATED=false
 collect_artifacts() {
     log "Collecting DAST artifacts..."
     {
+        # Capture pod details before they are lost to namespace deletion
+        oc describe pod -l job-name="$JOB_NAME" -n "$DAST_NS" 2>&1 | tee "${ARTIFACT_DIR}/dast-pod-describe.txt" || true
+        oc get pod -l job-name="$JOB_NAME" -n "$DAST_NS" -o yaml > "${ARTIFACT_DIR}/dast-pod.yaml" 2>&1 || true
         oc get job "$JOB_NAME" -n "$DAST_NS" -o yaml 2>/dev/null \
             > "${ARTIFACT_DIR}/dast-job.yaml" || true
         oc logs job/"$JOB_NAME" -n "$DAST_NS" 2>/dev/null \
