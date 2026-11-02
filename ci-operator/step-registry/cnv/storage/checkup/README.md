@@ -78,14 +78,36 @@ to the same expectations object. Keep the snapshot/restore entries when adding
 backend requirements: the job supplies the complete object. Review and adapt
 this policy when cascading to a release with a different checkup result schema.
 
+### Timeout budgets
+
 Timeout inputs accept positive durations in hours, minutes, or seconds. The VMI
 timeout must be shorter than the checkup timeout, which must be shorter than the
-Job deadline. The Job deadline is capped at 900 seconds to leave five minutes of
-the registry step for setup and reporting. Invalid timeouts and result expressions
-are rejected before creating checkup resources. Failed API reads retain the last
+Job deadline. The Job deadline is capped at 7500 seconds to leave five minutes of
+the 130-minute registry step for setup and reporting. Invalid timeouts and result
+expressions are rejected before creating checkup resources. Failed API reads retain the last
 complete result document so that a failing JUnit report can still be written.
 Job status reads retry transient API failures until the Job deadline and retain
 the last complete Job document in the artifacts.
+
+The shared defaults remain three minutes per VMI operation, ten minutes for the
+checkup, and 900 seconds for the Job. The AWS source job supplies longer budgets:
+
+| Input | AWS value |
+| --- | --- |
+| `CHECKUP_VMI_TIMEOUT` | `30m` |
+| `CHECKUP_TIMEOUT` | `2h` |
+| `CHECKUP_JOB_TIMEOUT_SECONDS` | `7500` (125 minutes) |
+
+The first clone of a freshly imported golden image can wait for an EBS snapshot.
+In the AWS rehearsal, the snapshot was not ready during artifact collection and
+the snapshotter was still polling roughly twelve minutes after creation,
+exceeding both the default boot and overall checkup deadlines.
+[AWS documents that snapshot creation is asynchronous](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-creating-snapshot.html)
+and can take hours. These bounded AWS budgets allow a longer observation window;
+a passing rehearsal is still needed to establish that they are sufficient.
+The parent job retains its five-hour limit, including installation and teardown.
+
+### Collected artifacts
 
 Artifacts include the installed CSV, cloud, selected class/provisioner, product
 versions, result ConfigMap, validation details, JUnit, workload state, checkup
