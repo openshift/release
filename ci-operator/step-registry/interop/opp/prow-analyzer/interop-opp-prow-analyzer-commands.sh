@@ -393,9 +393,22 @@ _CLEANUP_FILES="${_CLEANUP_FILES} ${PAYLOAD_FILE}"
 } > "${PAYLOAD_FILE}"
 PAYLOAD_CHARS="$(wc -c < "${PAYLOAD_FILE}" | tr -d ' ')"
 if [ "${PAYLOAD_CHARS}" -gt "${ANALYZER_PAYLOAD_LIMIT}" ]; then
-    head -c "${ANALYZER_PAYLOAD_LIMIT}" "${PAYLOAD_FILE}" > "${PAYLOAD_FILE}.trunc"
-    printf '\n[truncated=true]' >> "${PAYLOAD_FILE}.trunc"
-    mv "${PAYLOAD_FILE}.trunc" "${PAYLOAD_FILE}"
+    # Truncate at a UTF-8 character boundary and reserve space for the
+    # truncation marker (CodeRabbit r4426804565): a byte-level `head -c` cut
+    # can split a multibyte character, and the sink-side open().read() then
+    # raises a decode error, so a long analysis would receive no delivery.
+    python3 - "${PAYLOAD_FILE}" "${ANALYZER_PAYLOAD_LIMIT}" <<'PYEOF'
+import sys
+path, limit = sys.argv[1], int(sys.argv[2])
+with open(path, "rb") as f:
+    data = f.read()
+marker = b"\n[truncated=true]"
+cut = max(limit - len(marker), 0)
+while cut > 0 and (data[cut] & 0xC0) == 0x80:
+    cut -= 1
+with open(path, "wb") as f:
+    f.write(data[:cut] + marker)
+PYEOF
     PAYLOAD_CHARS="$(wc -c < "${PAYLOAD_FILE}" | tr -d ' ')"
 fi
 _PAYLOAD_CHARS="${PAYLOAD_CHARS}"
