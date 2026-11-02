@@ -19,7 +19,7 @@ set -o errexit -o nounset -o pipefail
 
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-openshift-workload-availability}"
 OO_INSTALL_TIMEOUT_MINUTES="${OO_INSTALL_TIMEOUT_MINUTES:-10}"
-PEER_BUNDLES="${PEER_BUNDLES:-__default__}"
+PEER_BUNDLES="${PEER_BUNDLES-__default__}"
 
 case "$SOURCE_OPERATOR" in
   nhc)
@@ -61,7 +61,7 @@ resolve_peer_bundles() {
       nhc)
         resolved="self-node-remediation=quay.io/medik8s/self-node-remediation-operator-bundle:latest"
         ;;
-      snr|mdr)
+      snr|mdr|far)
         resolved="node-healthcheck-operator=quay.io/medik8s/node-healthcheck-operator-bundle:latest"
         ;;
       *)
