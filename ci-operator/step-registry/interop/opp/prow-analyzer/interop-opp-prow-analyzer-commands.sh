@@ -17,19 +17,25 @@ set -uo pipefail
 READONLY_PREFIX="OPP-PROW-ANALYZER"
 : "${JOB_NAME:=unset-job}"
 : "${BUILD_ID:=unset-build}"
-# CI layout (empirical, rehearsal 2116774308557623296, PR 88057): a step's
-# own $ARTIFACT_DIR is <artifacts-root>/<test>/<step>/artifacts; the
-# framework writes the per-step finished.json marker and build logs into
-# <step>/ itself, and sibling steps' dirs live under <test>/. The default
-# base is therefore the test dir, two levels up from the step's
-# $ARTIFACT_DIR; the earlier one-level-up derivation pointed at the
-# analyzer's own step dir, so the admission gate saw only its own empty
-# artifact dir and every run read as analyze:no_evidence (CodeRabbit
-# r4426804531). Derived, overridable; a missing tree degrades to
-# config_error in main, never an abort.
-if [ -z "${ARTIFACT_BASE_DIR:-}" ] && [ -n "${ARTIFACT_DIR:-}" ]; then
-    ARTIFACT_BASE_DIR="$(dirname "$(dirname "${ARTIFACT_DIR}")")"
-fi
+# Evidence source (empirical, rehearsal 2117256157000110080, PR 88057):
+# each step pod owns an ISOLATED emptyDir, so the <test>/<step>/ tree the
+# admission gate needs does not exist in this container at all - the
+# two-levels-up derivation from $ARTIFACT_DIR resolved to / in production
+# and the gate read analyze:no_evidence on a red run (the earlier
+# one-level-up form had the same flaw, CodeRabbit r4426804531; both
+# derivations modeled the GCS layout as the container layout). The
+# production medium is the build's public GCS bucket: the per-step
+# artifact syncer uploads <test>/<step>/ trees - including each step's
+# finished.json marker - as steps complete, so by the time this post step
+# runs, the earlier steps are visible there. ARTIFACT_BASE_DIR remains an
+# EXPLICIT local override (dry-run matrix, local fixtures); it is never
+# derived from ARTIFACT_DIR.
+GCS_BUCKET="${GCS_BUCKET:-test-platform-results-public}"
+GCS_API_ROOT="${GCS_API_ROOT:-https://storage.googleapis.com/storage/v1/b/${GCS_BUCKET}/o}"
+GCS_MEDIA_ROOT="${GCS_MEDIA_ROOT:-https://storage.googleapis.com/${GCS_BUCKET}}"
+GCS_LIST_TIMEOUT="${GCS_LIST_TIMEOUT:-60}"
+GCS_POLL_ATTEMPTS="${GCS_POLL_ATTEMPTS:-3}"
+GCS_POLL_INTERVAL="${GCS_POLL_INTERVAL:-15}"
 : "${SHARED_DIR:=/tmp}"
 SHIP_HELP_MCP_URL="${SHIP_HELP_MCP_URL:-${ANALYZER_MCP_URL:-https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp}}"
 ANALYZER_MCP_URL="${SHIP_HELP_MCP_URL}"
@@ -126,32 +132,165 @@ EOF
 }
 
 # ---------------------------------------------------------------- admission gate
-# Three-way (design doc section 3): analyze on failure signal / no evidence /
-# unparseable evidence; skip only on the green conjunction.
+# Three-way vocabulary (design doc section 3) plus one honest degradation
+# label: analyze on failure signal / no evidence / unparseable evidence;
+# skip only on the green conjunction; analyze:runtime_tree_unavailable
+# when no step-like evidence could be READ AT ALL (never a false
+# no_evidence - an unreadable tree is not evidence of absence).
+# Local override first (explicit ARTIFACT_BASE_DIR), else the build's
+# public GCS tree over HTTPS.
+gcs_prefix_for_job() {
+    if [ -n "${ARTIFACT_GCS_PREFIX:-}" ]; then
+        printf '%s' "${ARTIFACT_GCS_PREFIX}"
+        return 0
+    fi
+    local org_repo="openshift_release"
+    if [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
+        org_repo="${REPO_OWNER}_${REPO_NAME}"
+    fi
+    local pr=""
+    case "${JOB_NAME}" in
+        rehearse-[0-9]*-*)
+            pr="${JOB_NAME#rehearse-}"; pr="${pr%%-*}"
+            printf 'pr-logs/pull/%s/%s/%s/%s' "${org_repo}" "${pr}" "${JOB_NAME}" "${BUILD_ID}"
+            ;;
+        *)
+            printf 'logs/%s/%s' "${JOB_NAME}" "${BUILD_ID}"
+            ;;
+    esac
+}
+
+# gcs_list_build_objects <prefix> <outfile>: object names, one per line,
+# paginated; returns non-zero when the listing itself fails.
+gcs_list_build_objects() {
+    local prefix="$1" out="$2" token=""
+    : > "${out}"
+    while :; do
+        if [ -n "${token}" ]; then
+            set -- --data-urlencode "pageToken=${token}"
+        else
+            set --
+        fi
+        curl -fsSL -G --max-time "${GCS_LIST_TIMEOUT}" "${GCS_API_ROOT}" \
+            --data-urlencode "prefix=${prefix}" \
+            --data-urlencode "maxResults=1000" \
+            "$@" -o "${out}.page" || return 1
+        if ! python3 - "${out}.page" "${out}" > "${out}.token" <<'PYEOF'
+import json, sys
+page, out = sys.argv[1], sys.argv[2]
+try:
+    d = json.load(open(page))
+except Exception:
+    sys.exit(3)
+with open(out, "a") as f:
+    for item in d.get("items", []):
+        f.write(item["name"] + "\n")
+print(d.get("nextPageToken", ""))
+PYEOF
+        then
+            return 1
+        fi
+        token="$(cat "${out}.token")"
+        [ -z "${token}" ] && break
+    done
+    return 0
+}
+
+gcs_fetch_object() { # <object-name> <outfile>
+    curl -fsSL --max-time "${GCS_LIST_TIMEOUT}" "${GCS_MEDIA_ROOT}/$1" -o "$2"
+}
+
+_MARKER_RE='(^|/)finished\.json$'
+_JUNIT_RE='(^|/)(junit_[^/]*|TEST-[^/]*)\.xml$|/junit/[^/]*\.xml$'
+
 gate_evaluate() {
     local step_dir junit tally any_junit=0 any_unparseable=0
     local total_failures=0 all_markers_passed=1 saw_marker=0
-    for step_dir in "${ARTIFACT_BASE_DIR}"/*/; do
-        [ -d "${step_dir}" ] || continue
-        if [ -f "${step_dir}finished.json" ]; then
-            saw_marker=1
-            if grep -q '"passed":[[:space:]]*false' "${step_dir}finished.json" 2>/dev/null; then
-                all_markers_passed=0
-            fi
+    local listing obj fetched attempt saw_step_like=0
+    if [ -n "${ARTIFACT_BASE_DIR:-}" ]; then
+        # explicit local override: the original scan semantics. A base that
+        # cannot be scanned at all is runtime_tree_unavailable; a scanned
+        # base with no step-like children is genuinely no_evidence.
+        if [ ! -d "${ARTIFACT_BASE_DIR}" ]; then
+            printf 'analyze:runtime_tree_unavailable'
+            return 0
         fi
-        while IFS= read -r junit; do
-            [ -f "${junit}" ] || continue
-            any_junit=1
-            tally="$(sum_junit_failures "${junit}")"
-            if [ "${tally}" = "unparseable" ]; then
-                any_unparseable=1
-            else
-                total_failures=$(( total_failures + tally ))
+        for step_dir in "${ARTIFACT_BASE_DIR}"/*/; do
+            [ -d "${step_dir}" ] || continue
+            if [ -f "${step_dir}finished.json" ]; then
+                saw_marker=1; saw_step_like=1
+                if grep -q '"passed":[[:space:]]*false' "${step_dir}finished.json" 2>/dev/null; then
+                    all_markers_passed=0
+                fi
             fi
-        done <<EOF
+            while IFS= read -r junit; do
+                [ -f "${junit}" ] || continue
+                any_junit=1; saw_step_like=1
+                tally="$(sum_junit_failures "${junit}")"
+                if [ "${tally}" = "unparseable" ]; then
+                    any_unparseable=1
+                else
+                    total_failures=$(( total_failures + tally ))
+                fi
+            done <<EOF
 $(find "${step_dir}" -maxdepth 3 -type f \( -name 'junit_*.xml' -o -name 'TEST-*.xml' -o -path '*/junit/*.xml' \) 2>/dev/null)
 EOF
-    done
+        done
+    else
+        # production: the build's public GCS tree over HTTPS. Bounded poll:
+        # the per-step syncer uploads progressively, and earlier steps
+        # should already be visible when this post step starts.
+        listing="$(mktemp /tmp/prow-analyzer-listing.XXXXXX)"
+        _CLEANUP_FILES="${_CLEANUP_FILES} ${listing}"
+        local prefix; prefix="$(gcs_prefix_for_job)"
+        for attempt in 1 2 3 4 5; do
+            [ "${attempt}" -gt "${GCS_POLL_ATTEMPTS}" ] && break
+            if gcs_list_build_objects "${prefix}/artifacts" "${listing}" \
+               && grep -qE "${_MARKER_RE}|${_JUNIT_RE}" "${listing}"; then
+                saw_step_like=1
+                break
+            fi
+            [ "${attempt}" -lt "${GCS_POLL_ATTEMPTS}" ] && sleep "${GCS_POLL_INTERVAL}"
+        done
+        if [ "${saw_step_like}" -eq 0 ]; then
+            printf 'analyze:runtime_tree_unavailable'
+            return 0
+        fi
+        while IFS= read -r obj; do
+            [ -z "${obj}" ] && continue
+            saw_marker=1
+            fetched="$(mktemp /tmp/prow-analyzer-marker.XXXXXX)"
+            _CLEANUP_FILES="${_CLEANUP_FILES} ${fetched}"
+            if ! gcs_fetch_object "${obj}" "${fetched}"; then
+                # an unreadable marker is neither a pass nor a failure
+                # signal: it denies green proof and reads as unparseable
+                any_unparseable=1
+            elif grep -q '"passed":[[:space:]]*false' "${fetched}" 2>/dev/null; then
+                all_markers_passed=0
+            fi
+        done <<EOF
+$(grep -E "${_MARKER_RE}" "${listing}")
+EOF
+        while IFS= read -r obj; do
+            [ -z "${obj}" ] && continue
+            any_junit=1
+            fetched="$(mktemp /tmp/prow-analyzer-junit.XXXXXX)"
+            _CLEANUP_FILES="${_CLEANUP_FILES} ${fetched}"
+            if gcs_fetch_object "${obj}" "${fetched}"; then
+                tally="$(sum_junit_failures "${fetched}")"
+                if [ "${tally}" = "unparseable" ]; then
+                    any_unparseable=1
+                else
+                    total_failures=$(( total_failures + tally ))
+                fi
+            else
+                # an unreadable junit is not green proof either
+                any_unparseable=1
+            fi
+        done <<EOF
+$(grep -E "${_JUNIT_RE}" "${listing}")
+EOF
+    fi
     if [ "${total_failures}" -gt 0 ]; then
         printf 'analyze:failure_signal'
         return 0
@@ -210,12 +349,9 @@ extract_analysis_block() {
 emit_skeleton
 
 ARTIFACT_SNAPSHOT_EPOCH="$(date -u +%s)"
-# graceful degradation: no artifacts tree readable means no admission gate can
-# run; report it as metadata and stay green (best-effort contract).
-if [ -z "${ARTIFACT_BASE_DIR}" ] || [ ! -d "${ARTIFACT_BASE_DIR}" ]; then
-    _OUTCOME="config_error"; _GATE="artifact_base_dir_absent"
-    exit 0
-fi
+# graceful degradation moved into the gate: an unreadable evidence source
+# labels analyze:runtime_tree_unavailable (never a false no_evidence) and
+# still proceeds toward analysis - skip stays reserved for green proof.
 
 if [ "${ANALYZER_VERIFY_ONLY}" = "1" ]; then
     if verify_source; then
