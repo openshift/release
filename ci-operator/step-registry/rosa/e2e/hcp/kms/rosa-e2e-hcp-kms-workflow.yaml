@@ -31,8 +31,10 @@ workflow:
     - ref: rosa-e2e-validate-customer
     - ref: rosa-e2e-validate-platform
     post:
+    # Not best-effort: if the deprovision fails, abort the post chain so the
+    # KMS key below is not scheduled for deletion while the cluster still
+    # references it.
     - chain: rosa-cluster-deprovision
-      best_effort: true
     # Delete the KMS key only after the cluster is gone: it is referenced by
     # the etcd encryption config and the EBS volumes until then.
     - ref: rosa-sts-kms-key-delete
