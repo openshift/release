@@ -50,7 +50,7 @@ fi
 ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
   "$lease" "$vip" "$iface" "$port" "$firewall_zone" <<'REMOTE'
 set -euo pipefail
-lease=$1 vip=$2 iface=$3 port=$4 expected_zone=$5
+lease=$1 vip=$2 iface=$3 port=$4 expected_zone=${5:-}
 state_dir=/etc/hypershift-nutanix-ingress-tunnel
 marker="$state_dir/$iface.state"
 config="/etc/wireguard/$iface.conf"

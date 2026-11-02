@@ -437,7 +437,7 @@ host_zone=$(ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
   "$gateway_tunnel_ip" "$gateway_public" "$gateway_ip" "$firewall_zone_override" <<'REMOTE'
 set -euo pipefail
 umask 077
-lease=$1 vip=$2 iface=$3 port=$4 host_tunnel=$5 gateway_tunnel=$6 peer_public=$7 gateway_ip=$8 zone_override=$9
+lease=$1 vip=$2 iface=$3 port=$4 host_tunnel=$5 gateway_tunnel=$6 peer_public=$7 gateway_ip=$8 zone_override=${9:-}
 state_dir=/etc/hypershift-nutanix-ingress-tunnel
 marker="$state_dir/$iface.state"
 read -r marker_lease marker_vip marker_iface marker_port marker_zone < "$marker"
