@@ -82,10 +82,11 @@ this policy when cascading to a release with a different checkup result schema.
 
 Timeout inputs accept positive durations in hours, minutes, or seconds. The VMI
 timeout must be shorter than the checkup timeout, which must be shorter than the
-Job deadline. The Job deadline is capped at 7500 seconds to leave five minutes of
-the 130-minute registry step for setup and reporting. Invalid timeouts and result
-expressions are rejected before creating checkup resources. Failed API reads retain the last
-complete result document so that a failing JUnit report can still be written.
+Job deadline. The Job deadline is capped at 2100 seconds to leave five minutes of
+the 40-minute registry step for setup and reporting. Invalid timeouts and result
+expressions are rejected before creating checkup resources. Failed API reads
+retain the last complete result document so that a failing JUnit report can
+still be written.
 Job status reads retry transient API failures until the Job deadline and retain
 the last complete Job document in the artifacts.
 
@@ -94,17 +95,21 @@ checkup, and 900 seconds for the Job. The AWS source job supplies longer budgets
 
 | Input | AWS value |
 | --- | --- |
-| `CHECKUP_VMI_TIMEOUT` | `30m` |
-| `CHECKUP_TIMEOUT` | `2h` |
-| `CHECKUP_JOB_TIMEOUT_SECONDS` | `7500` (125 minutes) |
+| `CHECKUP_VMI_TIMEOUT` | `20m` |
+| `CHECKUP_TIMEOUT` | `30m` |
+| `CHECKUP_JOB_TIMEOUT_SECONDS` | `2100` (35 minutes) |
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the AWS rehearsal, the snapshot was not ready during artifact collection and
 the snapshotter was still polling roughly twelve minutes after creation,
 exceeding both the default boot and overall checkup deadlines.
-[AWS documents that snapshot creation is asynchronous](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-creating-snapshot.html)
-and can take hours. These bounded AWS budgets allow a longer observation window;
-a passing rehearsal is still needed to establish that they are sufficient.
+[AWS documents that snapshot creation is asynchronous](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-creating-snapshot.html).
+The 20-minute operation limit allows time beyond the observed polling window;
+the 30-minute overall limit bounds the complete checkup, including any subsequent
+failures. These are trial budgets: the failed rehearsal does not establish the
+snapshot's completion time. A passing run is needed to measure and tune them.
+If the snapshot remains unready at the operation deadline, investigate its EBS
+state and controller events before increasing the budget again.
 The parent job retains its five-hour limit, including installation and teardown.
 
 ### Collected artifacts
