@@ -207,7 +207,7 @@ _classify() {
         # query itself errors ("the server doesn't have a resource type") -
         # observed in rehearsal build 2116735878033313792.
         if crdlist="$(oc get crd -o name 2>/dev/null)" && [[ -n "${crdlist}" ]]; then
-            if ! printf '%s\n' "${crdlist}" | grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$'; then
+            if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 return 0
             fi
