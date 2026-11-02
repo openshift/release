@@ -59,7 +59,7 @@ _ACS_STATE="unclassified"
 _CLASSIFICATION_CASE=""
 
 _xesc() {
-    python3 -c 'import sys, xml.sax.saxutils as x; sys.stdout.write(x.escape(sys.argv[1]))' "$1"
+    python3 -c 'import sys, xml.sax.saxutils as x; sys.stdout.write(x.escape(sys.argv[1], {chr(34): "&quot;"}))' "$1"
 }
 
 _add_case() {
