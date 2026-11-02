@@ -28,7 +28,10 @@ EXPECTED_VERSION="${POSTGRESQL_VERSION}"
 # Explicit instance name, generated and persisted to SHARED_DIR before apply
 # (see the identifiers block below): a step killed mid-apply would otherwise
 # leave an instance whose name is only knowable from post-apply outputs.
-QUAY_GCP_SQL_INSTANCE_NAME="quay-postgres-prow${RANDOM}"
+# secrets.token_hex (same pattern as the password) keeps the name project-
+# unique per job: bash $RANDOM is only 15 bits and Cloud SQL instance names
+# must be unique per project.
+QUAY_GCP_SQL_INSTANCE_NAME="quay-postgres-prow$(python3 -c 'import secrets; print(secrets.token_hex(6))')"
 
 # The cluster's GCP project and service-account key from the gcp-quay-qe
 # cluster profile - the same source quay-deploy-gcp-gcs uses.
