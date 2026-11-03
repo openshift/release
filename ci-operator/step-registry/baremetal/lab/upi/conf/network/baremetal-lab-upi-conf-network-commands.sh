@@ -14,48 +14,80 @@ if [ -n "${PRIMARY_NET}" ]; then
  fi
 fi
 
-if [[ "${ipv4_enabled:-false}" == "true" ]]; then
-  PRIMARY_NET_CLUSTER="cidr: 10.128.0.0/14
-    hostPrefix: 23"
-  PRIMARY_NET_SERVICE="172.30.0.0/16"
-  PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
-fi
-
-if [[ "${ipv6_enabled:-false}" == "true" ]]; then
-  PRIMARY_NET_CLUSTER="cidr: fd02::/48
-    hostPrefix: 64"
-  PRIMARY_NET_SERVICE="fd03::/112"
-  PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_V6_CIDR}"
-fi
+clusterNetwork=()
+serviceNetwork=()
+machineNetwork=()
+EXTERNAL_PRIMARY_IPv4_NET_MACHINE=$(<"${CLUSTER_PROFILE_DIR}/external_ipv4_net")
+EXTERNAL_PRIMARY_IPv6_NET_MACHINE=$(<"${CLUSTER_PROFILE_DIR}/external_ipv6_net")
 
 case "${PRIMARY_NET}" in
 ipv6)
-  SECONDARY_NET_CLUSTER="cidr: 10.128.0.0/14
-    hostPrefix: 23"
-  SECONDARY_NET_SERVICE="172.30.0.0/16"
-  SECONDARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
+  clusterNetwork+=("  - cidr: fd02::/48
+    hostPrefix: 64")
+  serviceNetwork+=("  - fd03::/112")
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_V6_CIDR}")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv6_NET_MACHINE}")
+  fi
+  # Add IPv4 Stack as Secondary
+  clusterNetwork+=("  - cidr: 10.128.0.0/14
+    hostPrefix: 23")
+  serviceNetwork+=("  - 172.30.0.0/16")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv4_NET_MACHINE}")
+  fi
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_CIDR}")
   ;;
 ipv4)
-  PRIMARY_NET_CLUSTER="cidr: 10.128.0.0/14
-    hostPrefix: 23"
-  PRIMARY_NET_SERVICE="172.30.0.0/16"
-  PRIMARY_NET_MACHINE="cidr: ${INTERNAL_NET_CIDR}"
-  SECONDARY_NET_CLUSTER="cidr: fd02::/48
-    hostPrefix: 64"
-  SECONDARY_NET_SERVICE="fd03::/112"
-  SECONDARY_NET_MACHINE="cidr: ${INTERNAL_NET_V6_CIDR}"
+  clusterNetwork+=("  - cidr: 10.128.0.0/14
+    hostPrefix: 23")
+  serviceNetwork+=("  - 172.30.0.0/16")
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_CIDR}")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv4_NET_MACHINE}")
+  fi
+  # Add IPv6 Stack as Secondary
+  clusterNetwork+=("  - cidr: fd02::/48
+    hostPrefix: 64")
+  serviceNetwork+=("  - fd03::/112")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv6_NET_MACHINE}")
+  fi
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_V6_CIDR}")
   ;;
+
+"")
+if [[ "${ipv4_enabled}" == "true" ]]; then
+  clusterNetwork+=("  - cidr: 10.128.0.0/14
+    hostPrefix: 23")
+  serviceNetwork+=("  - 172.30.0.0/16")
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_CIDR}")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv4_NET_MACHINE}")
+  fi
+fi
+if [[ "${ipv6_enabled}" == "true" ]]; then
+  clusterNetwork+=("  - cidr: fd02::/48
+    hostPrefix: 64")
+  serviceNetwork+=("  - fd03::/112")
+  machineNetwork+=("  - cidr: ${INTERNAL_NET_V6_CIDR}")
+  if [ "${MULTIPLE_MACHINE_NETWORK:-false}" = "true" ]; then
+    machineNetwork+=("  - cidr: ${EXTERNAL_PRIMARY_IPv6_NET_MACHINE}")
+  fi
+fi
+;;
 esac
 
+(
+IFS=$'\n'
 cat > "${SHARED_DIR}/network_patch_install_config.yaml" <<EOF
 networking:
   clusterNetwork:
-  ${PRIMARY_NET_CLUSTER:+- ${PRIMARY_NET_CLUSTER}}
-  ${SECONDARY_NET_CLUSTER:+- ${SECONDARY_NET_CLUSTER}}
+${clusterNetwork[*]:+"${clusterNetwork[*]}"}
   serviceNetwork:
-  ${PRIMARY_NET_SERVICE:+- ${PRIMARY_NET_SERVICE}}
-  ${SECONDARY_NET_SERVICE:+- ${SECONDARY_NET_SERVICE}}
+${serviceNetwork[*]:+"${serviceNetwork[*]}"}
   machineNetwork:
-  ${PRIMARY_NET_MACHINE:+- ${PRIMARY_NET_MACHINE}}
-  ${SECONDARY_NET_MACHINE:+- ${SECONDARY_NET_MACHINE}}
+${machineNetwork[*]:+"${machineNetwork[*]}"}
 EOF
+)
+echo "Patch file created successfully."
