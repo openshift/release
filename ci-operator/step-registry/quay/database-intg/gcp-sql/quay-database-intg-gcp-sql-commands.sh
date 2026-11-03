@@ -62,6 +62,24 @@ if [[ ! "${GCP_SQL_REGION}" =~ ^[a-z]+-[a-z]+[0-9]$ ]]; then
   exit 1
 fi
 
+# The cluster's VPC: the installer names it <infraID>-network. The database
+# gets a private IP in that network (Private Service Access) so pod-to-database
+# traffic stays on the VPC. The public-IP path egresses through Cloud NAT,
+# whose port exhaustion under the suite's connection churn drops SYNs - every
+# connection paid a constant multi-second retransmit ladder (rehearsals
+# 2117248575602692096 and 2117513887786995712, identical with 4 and 8 vCPU
+# tiers), which throttled the e2e suite into its 2h timeout.
+if [[ ! -r "${SHARED_DIR}/metadata.json" ]]; then
+  echo "ERROR: ${SHARED_DIR}/metadata.json not found; cannot resolve the cluster network." >&2
+  exit 1
+fi
+CLUSTER_INFRA_ID=$(jq -r .infraID "${SHARED_DIR}/metadata.json")
+if [[ -z "${CLUSTER_INFRA_ID}" || "${CLUSTER_INFRA_ID}" == "null" ]]; then
+  echo "ERROR: could not read infraID from ${SHARED_DIR}/metadata.json." >&2
+  exit 1
+fi
+CLUSTER_NETWORK_NAME="${CLUSTER_INFRA_ID}-network"
+
 echo "Provisioning Google Cloud SQL PostgreSQL (${DB_VERSION}) in region ${GCP_SQL_REGION}..."
 
 mkdir -p QUAY_GCPSQL && cd QUAY_GCPSQL
@@ -124,6 +142,29 @@ variable "database_password" {
 EOF
 
 cat >>create_gcp_sql.tf <<EOF
+data "google_compute_network" "cluster_network" {
+  name = "${CLUSTER_NETWORK_NAME}"
+}
+
+# Private Service Access: reserve a range in the cluster's network and peer
+# it with Google's service networking, which is what lets the Cloud SQL
+# instance hold a private IP there. The peering and range are destroyed by
+# the deprovision step before the installer deletes the network.
+resource "google_compute_global_address" "private_ip_range" {
+  name          = "${QUAY_GCP_SQL_INSTANCE_NAME}-psa"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  # Auto-selected by GCP to avoid overlapping the cluster's subnets.
+  prefix_length = 20
+  network       = data.google_compute_network.cluster_network.id
+}
+
+resource "google_service_networking_connection" "private_service_access" {
+  network                 = data.google_compute_network.cluster_network.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
+}
+
 provider "google" {
   credentials = file("auth.json")
   project = "${GCP_PROJECT}"
@@ -135,6 +176,10 @@ resource "google_sql_database_instance" "instance" {
   database_version = var.database_version
   region           = var.region
   deletion_protection = false
+  # Private IP in the cluster's network (see the Private Service Access
+  # resources above): no public IP, no Cloud NAT on the connection path.
+  network = data.google_compute_network.cluster_network.id
+  depends_on = [google_service_networking_connection.private_service_access]
 
   settings {
     tier = var.tier
@@ -149,12 +194,8 @@ resource "google_sql_database_instance" "instance" {
     disk_type         = "PD_SSD"
 
     ip_configuration {
-      ipv4_enabled    = true
+      ipv4_enabled    = false
       ssl_mode = "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"
-      authorized_networks {
-        name  = "allow-all"
-        value = "0.0.0.0/0"
-      }
     }
   }
 }
@@ -176,8 +217,8 @@ resource "google_sql_ssl_cert" "postgres_client_cert" {
   instance    = google_sql_database_instance.instance.name
 }
 
-output "quay_db_public_ip" {
-  value = google_sql_database_instance.instance.public_ip_address
+output "quay_db_private_ip" {
+  value = google_sql_database_instance.instance.private_ip_address
 }
 
 output "client_cert" {
@@ -214,6 +255,7 @@ export TF_VAR_database_password="${GCP_POSTGRESQL_PASSWORD}"
 echo "${QUAY_GCP_SQL_INSTANCE_NAME}" > "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME"
 echo "${GCP_SQL_REGION}" > "${SHARED_DIR}/QUAY_DB_GCP_REGION"
 echo "${GCP_PROJECT}" > "${SHARED_DIR}/QUAY_DB_GCP_PROJECT"
+echo "${CLUSTER_NETWORK_NAME}" > "${SHARED_DIR}/QUAY_DB_GCP_NETWORK"
 
 terraform init
 tf_apply_rc=0
@@ -228,8 +270,8 @@ if [[ "${tf_apply_rc}" -ne 0 ]]; then
   exit "${tf_apply_rc}"
 fi
 
-QUAY_DB_PUBLIC_IP=$(terraform output -raw quay_db_public_ip)
-echo "${QUAY_DB_PUBLIC_IP}" > "${SHARED_DIR}/gsql_db_public_ip"
+QUAY_DB_PRIVATE_IP=$(terraform output -raw quay_db_private_ip)
+echo "${QUAY_DB_PRIVATE_IP}" > "${SHARED_DIR}/gsql_db_private_ip"
 echo "Google Cloud SQL provisioning completed"
 
 # Extract SSL certificates
@@ -288,7 +330,7 @@ resource "postgresql_extension" "pg_trgm" {
 }
 EOF
 
-export TF_VAR_quay_db_host="${QUAY_DB_PUBLIC_IP}"
+export TF_VAR_quay_db_host="${QUAY_DB_PRIVATE_IP}"
 export TF_VAR_db_username="${GCP_POSTGRESQL_USERNAME}"
 export TF_VAR_db_password="${GCP_POSTGRESQL_PASSWORD}"
 export TF_VAR_expected_version="${EXPECTED_VERSION}"
@@ -315,7 +357,7 @@ DB_CONNECTION_ARGS:
   sslcert: /.postgresql/postgresql.crt
   sslkey: /.postgresql/postgresql.key
   threadlocals: true
-DB_URI: postgresql://${DB_URI_USER}:${DB_URI_PASS}@${QUAY_DB_PUBLIC_IP}:5432/${GCP_POSTGRESQL_DBNAME}?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt
+DB_URI: postgresql://${DB_URI_USER}:${DB_URI_PASS}@${QUAY_DB_PRIVATE_IP}:5432/${GCP_POSTGRESQL_DBNAME}?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt
 EOF
 
 echo "Google Cloud SQL provisioning completed successfully"
