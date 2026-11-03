@@ -230,11 +230,38 @@ prepare_prow_screenshot_handoff() {
     export PROW_SCREENSHOT_URL_PREFIX
 }
 
+append_prow_screenshot_handoff() {
+    cat >> "$1" <<EOF
+PROW_SCREENSHOT_DIR: \`${PROW_SCREENSHOT_DIR}\`
+PROW_SCREENSHOT_URL_PREFIX: \`${PROW_SCREENSHOT_URL_PREFIX:-unavailable}\`
+
+EOF
+}
+
 copy_prow_screenshot_artifacts() {
     [[ -d "${PROW_SCREENSHOT_DIR:-}" ]] || return 0
     local destination="${ARTIFACT_DIR}/screenshots"
     mkdir -p "${destination}"
-    cp -a "${PROW_SCREENSHOT_DIR}/." "${destination}/"
+    python3 - "${PROW_SCREENSHOT_DIR}" "${destination}" <<'PY'
+import pathlib
+import re
+import shutil
+import sys
+
+source = pathlib.Path(sys.argv[1])
+destination = pathlib.Path(sys.argv[2])
+safe_name = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]png", re.IGNORECASE)
+
+for candidate in source.iterdir():
+    if (
+        not safe_name.fullmatch(candidate.name)
+        or candidate.is_symlink()
+        or not candidate.is_file()
+    ):
+        print(f"WARNING: ignoring unsafe screenshot artifact: {candidate.name}", file=sys.stderr)
+        continue
+    shutil.copy2(candidate, destination / candidate.name)
+PY
 }
 
 replace_prow_screenshot_markers() {
@@ -254,14 +281,16 @@ import sys
 markdown_path = pathlib.Path(sys.argv[1])
 screenshot_dir = pathlib.Path(sys.argv[2])
 url_prefix = sys.argv[3].rstrip("/")
-pattern = re.compile(r"prow-artifact://screenshots/([A-Za-z0-9][A-Za-z0-9._-]*)")
+pattern = re.compile(r'''prow-artifact://screenshots/([^\s)\]}>"']+)''')
+safe_name = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]png", re.IGNORECASE)
 text = markdown_path.read_text()
 
 
 def replace(match):
     name = match.group(1)
-    if not (screenshot_dir / name).is_file():
-        print(f"WARNING: screenshot marker references missing artifact: {name}", file=sys.stderr)
+    candidate = screenshot_dir / name
+    if not safe_name.fullmatch(name) or candidate.is_symlink() or not candidate.is_file():
+        print(f"WARNING: screenshot marker references unsafe or missing artifact: {name}", file=sys.stderr)
         return match.group(0)
     return f"{url_prefix}/{name}"
 

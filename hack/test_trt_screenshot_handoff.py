@@ -274,10 +274,18 @@ class TrtScreenshotHandoffTest(unittest.TestCase):
         screenshot_dir = self.workdir / "artifacts/screenshots"
         screenshot_dir.mkdir(parents=True)
         (screenshot_dir / "dashboard.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        outside = self.root / "outside.png"
+        outside.write_bytes(b"outside")
+        (screenshot_dir / "linked.png").symlink_to(outside)
         markdown = self.root / "pr.md"
         markdown.write_text(
             "![dashboard](prow-artifact://screenshots/dashboard.png)\n"
+            "![dashboard-again](prow-artifact://screenshots/dashboard.png)\n"
             "![missing](prow-artifact://screenshots/missing.png)\n"
+            "![nested](prow-artifact://screenshots/dashboard.png/escape)\n"
+            "![traversal](prow-artifact://screenshots/../dashboard.png)\n"
+            "![encoded](prow-artifact://screenshots/dashboard.png%2Fescape)\n"
+            "![linked](prow-artifact://screenshots/linked.png)\n"
         )
         self.shell(
             textwrap.dedent(
@@ -302,19 +310,58 @@ class TrtScreenshotHandoffTest(unittest.TestCase):
             "artifacts/screenshots/dashboard.png"
         )
         content = markdown.read_text()
-        self.assertIn(expected, content)
+        self.assertEqual(2, content.count(expected))
         self.assertIn("prow-artifact://screenshots/missing.png", content)
+        self.assertIn("prow-artifact://screenshots/dashboard.png/escape", content)
+        self.assertIn("prow-artifact://screenshots/../dashboard.png", content)
+        self.assertIn("prow-artifact://screenshots/dashboard.png%2Fescape", content)
+        self.assertIn("prow-artifact://screenshots/linked.png", content)
+
+    def test_artifact_copy_rejects_nested_invalid_and_symlink_files(self):
+        screenshot_dir = self.workdir / "artifacts/screenshots"
+        screenshot_dir.mkdir(parents=True)
+        screenshot = screenshot_dir / "capture.png"
+        screenshot.write_bytes(b"first")
+        (screenshot_dir / "notes.txt").write_text("not an image")
+        nested = screenshot_dir / "nested"
+        nested.mkdir()
+        (nested / "hidden.png").write_bytes(b"nested")
+        outside = self.root / "outside.png"
+        outside.write_bytes(b"outside")
+        (screenshot_dir / "linked.png").symlink_to(outside)
+
+        body = textwrap.dedent(
+            f"""
+            source "{self.telemetry}"
+            prepare_prow_screenshot_handoff openshift-agentic-trt-jira-solver
+            copy_prow_screenshot_artifacts
+            """
+        )
+        self.shell(body)
+        destination = self.artifacts / "screenshots"
+        self.assertEqual(b"first", (destination / "capture.png").read_bytes())
+        self.assertEqual(["capture.png"], sorted(path.name for path in destination.iterdir()))
+
+        screenshot.write_bytes(b"second")
+        self.shell(body)
+        self.assertEqual(b"second", (destination / "capture.png").read_bytes())
 
     def test_presubmit_prefix_uses_public_pr_artifact_path(self):
+        review_prompt = self.root / "review-prompt.md"
+        ci_prompt = self.root / "ci-prompt.md"
         result = self.shell(
             textwrap.dedent(
                 f"""
                 source "{self.telemetry}"
                 prepare_prow_screenshot_handoff openshift-agentic-trt-review-responder
+                append_prow_screenshot_handoff "$REVIEW_PROMPT"
+                append_prow_screenshot_handoff "$CI_PROMPT"
                 printf '%s\n' "$PROW_SCREENSHOT_URL_PREFIX"
                 """
             ),
             extra_env={
+                "REVIEW_PROMPT": str(review_prompt),
+                "CI_PROMPT": str(ci_prompt),
                 "JOB_NAME": "pull-ci-openshift-sippy-main-agentic",
                 "BUILD_ID": "67890",
                 "JOB_NAME_SAFE": "pull-ci-openshift-sippy-main-agentic",
@@ -337,6 +384,11 @@ class TrtScreenshotHandoffTest(unittest.TestCase):
             "openshift-agentic-trt-review-responder/artifacts/screenshots"
         )
         self.assertEqual(expected, result.stdout.strip())
+        expected_dir = self.workdir / "artifacts/screenshots"
+        for prompt in (review_prompt, ci_prompt):
+            content = prompt.read_text()
+            self.assertIn(f"PROW_SCREENSHOT_DIR: `{expected_dir}`", content)
+            self.assertIn(f"PROW_SCREENSHOT_URL_PREFIX: `{expected}`", content)
 
     def test_eval_mode_does_not_advertise_unpublished_url(self):
         result = self.shell(
@@ -363,7 +415,7 @@ class TrtScreenshotHandoffTest(unittest.TestCase):
             self.assertIn("copy_prow_screenshot_artifacts", script)
             self.assertIn("Do not run the upload-screenshot skill", script)
         self.assertIn("replace_prow_screenshot_markers", solver)
-        self.assertGreaterEqual(review.count('append_screenshot_handoff "'), 2)
+        self.assertGreaterEqual(review.count('append_prow_screenshot_handoff "'), 2)
         self.assertIn('"Bash(gh *)"', solver)
         self.assertIn('"Bash(gh release*)"', review)
 
