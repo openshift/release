@@ -177,11 +177,15 @@ fi
 #    connection pools to the external database.
 # Removing the user/database from state lets the instance deletion cascade
 # everything: dropping a whole instance ignores active sessions and object
-# ownership, unlike individual user/database deletion.
-if terraform state list | grep -q "google_sql_user"; then
+# ownership, unlike individual user/database deletion. Exact-address matches
+# against the captured state_list: an unanchored grep would also match
+# google_sql_database_instance.instance (so a state holding only the instance
+# would fail the rm under errexit and leak it), and a grep -q pipeline can
+# SIGPIPE terraform under pipefail.
+if grep -qx 'google_sql_user.users' <<<"${state_list}"; then
   terraform state rm google_sql_user.users
 fi
-if terraform state list | grep -q "google_sql_database"; then
+if grep -qx 'google_sql_database.database' <<<"${state_list}"; then
   terraform state rm google_sql_database.database
 fi
 
