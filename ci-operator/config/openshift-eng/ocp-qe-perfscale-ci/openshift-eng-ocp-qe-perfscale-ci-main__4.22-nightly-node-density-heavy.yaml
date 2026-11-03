@@ -45,6 +45,7 @@ tests:
     - ref: openshift-qe-workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
 - as: gcp-etcd-fips-24nodes
   cron: 0 0 12 * *
   steps:
@@ -56,11 +57,12 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-- always_run: false
-  as: azure-multi-24nodes
+  timeout: 7h0m0s
+- as: azure-multi-24nodes
+  cron: 0 1 12,26 * *
   steps:
     allow_skip_on_success: true
-    cluster_profile: azure-qe
+    cluster_profile: azure-perfscale-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
@@ -68,6 +70,7 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASE_DOMAIN_RESOURCE_GROUP: os4-common
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
@@ -82,10 +85,11 @@ tests:
     - ref: workers-scale
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
 - as: baremetal-multi-3nodes
   capabilities:
   - intranet
-  cron: 0 0 26 * *
+  cron: 19 0 26 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
@@ -102,9 +106,24 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
-- always_run: false
-  as: ibmcloud-24nodes
-  optional: true
+  timeout: 8h0m0s
+- as: vsphere-24nodes
+  cron: 0 3 5 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      BURST: "5"
+      PODS_PER_NODE: "100"
+      QPS: "5"
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 8h0m0s
+- as: ibmcloud-24nodes
+  cron: 0 2 5 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
@@ -116,11 +135,10 @@ tests:
     - chain: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-ibmcloud-ipi-ovn
   timeout: 8h0m0s
-- always_run: false
-  as: nutanix-24nodes
+- as: nutanix-24nodes
   capabilities:
   - sshd-bastion
-  optional: true
+  cron: 0 4 5 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: nutanix-qe-zone
@@ -137,10 +155,11 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - chain: openshift-qe-node-density-heavy
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
-- always_run: false
-  as: baremetal-3nodes
+  timeout: 8h0m0s
+- as: baremetal-3nodes
   capabilities:
   - intranet
+  cron: 0 5 5 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
@@ -154,8 +173,9 @@ tests:
     test:
     - chain: openshift-qe-node-density-heavy
     workflow: baremetal-lab-upi
-- always_run: false
-  as: aws-3nodes-1500ppn
+  timeout: 8h0m0s
+- as: aws-3nodes-1500ppn
+  cron: 0 6 5 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
