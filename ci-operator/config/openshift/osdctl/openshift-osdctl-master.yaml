@@ -16,32 +16,34 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  go mod download
 tests:
 - as: lint
   commands: |
     GOMAXPROCS=2 make lint
   container:
-    from: src
+    from: test-bin
 - as: format
   commands: |
     make format
   container:
-    from: src
+    from: test-bin
 - as: test
   commands: |
     make test
   container:
-    from: src
+    from: test-bin
 - as: build
   commands: |
     SINGLE_TARGET=true make ci-build
   container:
-    from: src
+    from: test-bin
 - as: verify-docs
   commands: |
     make verify-docs
   container:
-    from: src
+    from: test-bin
 zz_generated_metadata:
   branch: master
   org: openshift

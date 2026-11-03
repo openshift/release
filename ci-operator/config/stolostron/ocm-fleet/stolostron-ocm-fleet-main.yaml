@@ -1,0 +1,187 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
+    to: ocm-fleet-server
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.local
+    from: ocm-fleet-server
+    to: ocm-fleet-server-local
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.web
+    to: ocm-fleet-web
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.aio
+    from: ocm-fleet-server-local
+    inputs:
+      ocm-fleet-web:
+        as:
+        - ${WEB_IMAGE}
+    to: ocm-fleet
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror-server
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server
+    env:
+      IMAGE_REPO: ocm-fleet-server
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-image-mirror-local
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
+    env:
+      IMAGE_REPO: ocm-fleet-server-local
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-image-mirror-web
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-web
+    env:
+      IMAGE_REPO: ocm-fleet-web
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-image-mirror-aio
+  capabilities:
+  - arm64
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet
+    env:
+      IMAGE_REPO: ocm-fleet
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-merge-image-mirror-server
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: ocm-fleet-server
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-merge-image-mirror-local
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: ocm-fleet-server-local
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-merge-image-mirror-web
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-web
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: ocm-fleet-web
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: pr-merge-image-mirror-aio
+  capabilities:
+  - arm64
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet
+    env:
+      ALSO_TAG_LATEST: "true"
+      IMAGE_REPO: ocm-fleet
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: republish-server-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server
+    env:
+      IMAGE_REPO: ocm-fleet-server
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: republish-local-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-server-local
+    env:
+      IMAGE_REPO: ocm-fleet-server-local
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: republish-web-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet-web
+    env:
+      IMAGE_REPO: ocm-fleet-web
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+- as: republish-aio-latest
+  capabilities:
+  - arm64
+  cron: 30 2,8,14,20 * * *
+  retry:
+    attempts: 3
+    interval: 1h
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ocm-fleet
+    env:
+      IMAGE_REPO: ocm-fleet
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-fleet-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: ocm-fleet

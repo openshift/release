@@ -9,7 +9,7 @@ source <(curl -fsSL "https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs
 
 CNV_IIB_CATALOG_NAME=cnv-iib-catalog
 CNV_CATALOG_SOURCE=${CNV_CATALOG_SOURCE:-redhat-operators}
-CNV_CATALOG_IMAGE=${CNV_CATALOG_IMAGE:-} # IIB
+CNV_CATALOG_IMAGE="${MULTISTAGE_PARAM_OVERRIDE_CNV_CATALOG_IMAGE:-${CNV_CATALOG_IMAGE:-}}" # IIB
 CNV_HYPERCONVERGED_NAME=kubevirt-hyperconverged
 CNV_INSTALL_NAMESPACE=openshift-cnv
 CNV_OPERATOR_CHANNEL="${CNV_OPERATOR_CHANNEL:-stable}"
@@ -97,7 +97,7 @@ function apply_brew_idms() {
 
 ### MAIN ###################################################################################
 
-env::hash | grep "^CNV_" | sort
+env::hash | grep -e "^CNV_" -e "^HCO_" | sort
 
 if [[ -n $CNV_CATALOG_IMAGE ]]; then
   CNV_CATALOG_SOURCE=${CNV_IIB_CATALOG_NAME}

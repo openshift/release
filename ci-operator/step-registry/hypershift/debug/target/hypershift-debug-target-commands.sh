@@ -1,0 +1,1 @@
+../hypershift-debug-commands.sh

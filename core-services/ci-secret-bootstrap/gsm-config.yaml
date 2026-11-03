@@ -2460,7 +2460,7 @@ bundles:
     targets:
       - cluster: build01  # todo: change to cluster_groups: [non_app_ci]
         namespace: ci
-  
+
   - name: hypershift-workload-credentials
     gsm_secrets:
       - collection: test-platform-infra
@@ -6033,6 +6033,54 @@ bundles:
         group: quay--dot--io-pull-secret
         registry_url: quay.io
       - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: test-platform-infra
+      fields:
+      - as: insights-live.yaml
+        name: insights-live--dot--yaml
+      group: insights-ci-account
+    - collection: test-platform-infra
+      fields:
+      - as: ops-mirror.pem
+        name: cert-key--dot--pem
+      group: mirror--dot--openshift--dot--com
+    - collection: cluster-secrets-odf-ibmcloud
+      group: ibmcloud
+    name: cluster-secrets-odf-ibmcloud
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
         group: quay--dot--io/multi-arch
         registry_url: quay.io/multi-arch
       - auth_field: auth
@@ -7771,6 +7819,62 @@ bundles:
       - name: ssh-publickey
       group: openstack
     name: cluster-secrets-openstack-vh-mecha-central
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: test-platform-infra
+      fields:
+      - as: insights-live.yaml
+        name: insights-live--dot--yaml
+      group: insights-ci-account
+    - collection: shiftstack-secrets
+      fields:
+      - as: .awscred
+        name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-rackspace
+    - collection: shiftstack-secrets
+      fields:
+      - name: ssh-privatekey
+      - name: ssh-publickey
+      group: ci-job-ssh-key
+    name: cluster-secrets-openstack-rackspace
     sync_to_cluster: true
     targets:
     - cluster_groups:
@@ -10617,7 +10721,20 @@ bundles:
         registry_url: registry.redhat.io
     gsm_secrets:
     - collection: quay-tests
+      group: ccm-apikey
+    - collection: quay-tests
+      group: csi-apikey
+    - collection: quay-tests
+      fields:
+      - as: ibmcloud-api-key
+        name: api-key
       group: ibmcloud
+    - collection: quay-tests
+      group: ingress-apikey
+    - collection: quay-tests
+      group: iro-apikey
+    - collection: quay-tests
+      group: mao-apikey
     - collection: quay-tests
       group: ssh
     name: cluster-secrets-ibmcloud-quay
@@ -11953,7 +12070,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: openshift-crt-sonar-tokens
     gsm_secrets:
       - collection: crt
@@ -12151,7 +12268,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: release-watcher-bot-token
     gsm_secrets:
       - collection: crt
@@ -13004,40 +13121,6 @@ bundles:
         fields:
           - url
           - token
-    sync_to_cluster: true
-    targets:
-      - cluster: app.ci
-        namespace: ci
-      - cluster: core-ci
-        namespace: ci
-
-  - name: alert-proxy-alertmanager-webhook
-    gsm_secrets:
-      - collection: test-platform-infra
-        group: alert-proxy-alertmanager-webhook
-        fields:
-          - url
-          - token
-    sync_to_cluster: true
-    targets:
-      - cluster: app.ci
-        namespace: ci
-      - cluster: core-ci
-        namespace: ci
-      # Alertmanager reads the bearer token from this secret via
-      # http_config.authorization.credentials_file, so it must also exist in the
-      # namespace the Alertmanager pods run in.
-      - cluster: app.ci
-        namespace: openshift-user-workload-monitoring
-      - cluster: core-ci
-        namespace: ci-monitoring
-
-  - name: alert-proxy-forwarder
-    gsm_secrets:
-      - collection: test-platform-infra
-        group: alert-proxy-forwarder
-        fields:
-          - hmac_secret
     sync_to_cluster: true
     targets:
       - cluster: app.ci
@@ -13923,6 +14006,42 @@ bundles:
       - cluster: core-ci
         namespace: ci
 
+  - name: ops-alert-dashboard-config
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ops-alert-dashboard
+        fields:
+          - name: config
+            as: config.yaml
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci
+
+  - name: ops-alert-dashboard-session
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: ops-alert-dashboard
+        fields:
+          - name: session-secret
+            as: session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: core-ci
+        namespace: ci
+
+  - name: dispatcher-dashboard-oauth
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: dispatcher-dashboard-oauth
+        fields:
+          - name: session-secret
+            as: session_secret
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+
   - name: prowjob-dispatcher-control
     gsm_secrets:
       - collection: test-platform-infra
@@ -13933,6 +14052,8 @@ bundles:
     sync_to_cluster: true
     targets:
       - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
         namespace: ci
 
   - name: slack-credentials-dptp-bot
@@ -13952,6 +14073,17 @@ bundles:
       - cluster: core-ci
         namespace: ship-status
       - cluster: core-ci
+        namespace: ci
+
+  - name: slack-bot-jira-automation
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: slack-bot-jira-automation
+        fields:
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
         namespace: ci
 
   - name: slack-credentials-dptp-bot-alpha
@@ -14421,8 +14553,6 @@ bundles:
           - github-redirect-uri
     sync_to_cluster: true
     targets:
-      - cluster: app.ci
-        namespace: ci
       - cluster: core-ci
         namespace: ci
 
@@ -15135,7 +15265,6 @@ bundles:
         group: dex
         fields:
           - gsm-cli-id
-          - gsm-cli-secret
     sync_to_cluster: true
     targets:
       - cluster: app.ci

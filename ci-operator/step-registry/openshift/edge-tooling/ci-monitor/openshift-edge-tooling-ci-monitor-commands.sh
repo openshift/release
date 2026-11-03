@@ -118,6 +118,11 @@ copy_artifacts() {
         latest_html=$(ls -t "${report_dir}"/*.html 2>/dev/null | head -1)
         if [[ -n "${latest_html}" ]]; then
             cp "${latest_html}" "${ARTIFACT_DIR}/edge-ci-monitor-summary.html"
+            # Use the summary belonging to this report, not an older run.
+            local sippy_summary="${latest_html%.html}.sippy-summary.json"
+            if [[ -r "${sippy_summary}" ]]; then
+                cp "${sippy_summary}" "${SHARED_DIR}/sippy-summary.json"
+            fi
         fi
         cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
     fi

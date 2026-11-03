@@ -17,14 +17,17 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: aws-load-balancer-operator
+  skip_if_only_changed: ^renovate\.json$
 operator:
   bundles:
   - as: aws-load-balancer-operator-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^renovate\.json$
   - as: aws-load-balancer-operator-bundle-index
     base_index: operator-index
     dockerfile_path: bundle.Dockerfile
+    skip_if_only_changed: ^renovate\.json$
   substitutions:
   - pullspec: openshift.io/aws-load-balancer-operator:latest
     with: pipeline:aws-load-balancer-operator
@@ -50,6 +53,7 @@ tests:
   commands: make verify
   container:
     from: src
+  skip_if_only_changed: ^renovate\.json$
 - as: unit
   commands: |
     export XDG_CACHE_HOME=/tmp/.cache
@@ -57,9 +61,9 @@ tests:
     make test
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
 - as: fips-image-scan
-  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
   steps:
     dependencies:
       SCAN_IMAGE: aws-load-balancer-operator
@@ -67,7 +71,7 @@ tests:
     - ref: fips-check-image-scan
 - always_run: false
   as: e2e-aws-operator
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -99,7 +103,7 @@ tests:
     workflow: aws-load-balancer-install
 - always_run: false
   as: e2e-aws-fips-operator
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -132,7 +136,7 @@ tests:
           cpu: 100m
     workflow: aws-load-balancer-install
 - as: e2e-aws-rosa-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
   steps:
     cluster_profile: rosa-e2e-03
     dependencies:
@@ -161,7 +165,7 @@ tests:
     workflow: aws-load-balancer-install-rosa
 - always_run: false
   as: e2e-aws-proxy-operator
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^renovate\.json$
   steps:
     cluster_profile: openshift-org-aws
     env:

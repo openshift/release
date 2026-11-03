@@ -4,6 +4,19 @@ ref:
   from: dev-scripts
   grace_period: 10m 
   commands: agent-e2e-compact-ipv4-iso-no-registry-validation-commands.sh
+  env:
+  - name: FIPS_MODE
+    default: "false"
+    documentation: |-
+      Whether this job builds a FIPS-enabled OVE ISO. When true, the cluster
+      must have been installed with fips and both MachineConfigPools must
+      render FIPS-enabled configs. When false, FIPS must be absent.
+
+      A FIPS job must set this on the step itself, in addition to setting
+      FIPS_MODE inside DEVSCRIPTS_CONFIG. DEVSCRIPTS_CONFIG is consumed by
+      dev-scripts when building the ISO and does not reach this step, so
+      setting it there alone leaves this check expecting a non-FIPS cluster
+      and failing the job.
   resources:
     requests:
       cpu: 100m

@@ -1,0 +1,63 @@
+base_images:
+  # baremetalds-e2e provisions the cluster via baremetalds-devscripts-setup,
+  # which runs from the dev-scripts image.
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+tests:
+- timeout: 8h0m0s
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      # Override the workflow's DEVSCRIPTS_CONFIG (must re-list IP_STACK). Dual-stack
+      # gives the cluster IPv4 egress for registry pulls, and VM_EXTRADISKS attaches
+      # extra virtio disks to every node VM so LVMS has a device to consume. On
+      # dev-scripts the extra disks appear as /dev/vda and /dev/vdb.
+      # Worker sizing, bounded by the equinix-ocp-metal host budget: the pool's
+      # servers are 2x Xeon Silver 4210 (40 hardware threads) with 128GiB RAM,
+      # and the 3 default 16GiB masters already commit 48GiB. The dev-scripts
+      # default (4 vCPU / 16Gi) is too small to schedule managed Quay -- quay-app
+      # requests 2 CPU + 8Gi per replica (x2), clair-app 2 CPU + 2Gi (x2), plus
+      # mirror and the managed postgres/clair-postgres/redis pods (~10 CPU / 26Gi
+      # of requests overall). 8 vCPU / 20Gi workers keep the totals at 48 vCPU /
+      # 108GiB: enough per worker for a quay-app + clair + DB stack, without
+      # overcommitting host memory (a 3x32Gi layout OOM-killed a worker VM
+      # mid-run: the guests' page caches filled their allocations and the host
+      # hit global OOM).
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NUM_WORKERS=3
+        WORKER_VCPU=8
+        WORKER_MEMORY=20480
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=100G
+      # LVMS: build a default dynamic StorageClass (lvms-vg1) from /dev/vdb. Quay's
+      # managed Postgres/Clair/Redis PVCs need a default StorageClass, which the
+      # baremetalds dev-scripts cluster does not provide out of the box. Install the
+      # operator from a dedicated lvms-catalogsource (created by the lvms-catalogsource
+      # step) rather than redhat-operators, which is not reliably healthy at pre time.
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_CLUSTER_DEVICE_PATH: /dev/vdb
+      LVM_CLUSTER_WIPE_DEVICE: "true"
+      REQUIRED_DEFAULT_STORAGECLASS: lvms-vg1
+    pre:
+    - chain: baremetalds-ofcir-pre
+    # Install LVMS and set lvms-vg1 as the default StorageClass before Quay deploys.
+    - ref: lvms-catalogsource
+    - ref: operatorhub-subscribe-lvm-operator
+    - ref: storage-create-lvm-cluster
+    - ref: storage-conf-storageclass-set-default-storageclass
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: baremetalds-ofcir-post
+    # Dual-stack (IP_STACK=v4v6) so the cluster can pull operator-catalog images
+    # over IPv4; a v6-only cluster has no egress to quay.io/registry.redhat.io.
+    workflow: baremetalds-e2e-ovn-dualstack

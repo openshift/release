@@ -7,6 +7,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   annotations:
     argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
   name: dex
@@ -14,6 +16,8 @@ metadata:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   annotations:
     cert-manager.io/cluster-issuer: cert-issuer
   name: dex
@@ -40,6 +44,7 @@ kind: Deployment
 metadata:
   creationTimestamp: null
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: dex
   name: dex
   namespace: dex
@@ -143,9 +148,9 @@ spec:
             secretEnv: VAULT_SECRET_MANAGER_SECRET
           - idEnv: GSM_CLI_ID
             name: gsm-cli
+            public: true
             redirectURIs:
             - http://127.0.0.1:8085/callback
-            secretEnv: GSM_CLI_SECRET
           - idEnv: APPS-ENGINEERING-ID
             name: apps-engineering
             redirectURIs:
@@ -528,11 +533,6 @@ spec:
             secretKeyRef:
               key: gsm-cli-id
               name: gsm-cli-dex-secret
-        - name: GSM_CLI_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: gsm-cli-secret
-              name: gsm-cli-dex-secret
         image: ghcr.io/dexidp/dex:v2.31.0
         name: dex
         ports:
@@ -559,6 +559,8 @@ status: {}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: dex
   namespace: dex
 spec:
@@ -570,6 +572,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: dex
   namespace: dex
 spec:
@@ -585,6 +589,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: dex
   name: dex
   namespace: dex
@@ -592,6 +597,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: dex
 rules:
 - apiGroups:
@@ -610,6 +617,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: dex
 roleRef:
   apiGroup: rbac.authorization.k8s.io

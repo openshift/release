@@ -98,6 +98,7 @@ tests:
     cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "6"
     test:
     - as: test
       cli: latest
@@ -126,6 +127,30 @@ tests:
     - as: test
       cli: latest
       commands: make e2e-deployment
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      - env: CONTENT_IMAGE_FROM_CI
+        name: testcontent
+      - env: OPENSCAP_IMAGE_FROM_CI
+        name: testopenscap
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-prerelease
+  run_if_changed: ^(tests/e2e/(prerelease|framework)/|version/version\.go|version\.Makefile)
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-22
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-prerelease
       dependencies:
       - env: IMAGE_FROM_CI
         name: compliance-operator

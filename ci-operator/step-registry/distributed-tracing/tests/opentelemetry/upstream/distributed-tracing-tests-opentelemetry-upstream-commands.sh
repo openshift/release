@@ -241,13 +241,15 @@ instrumentation_env=(
 )
 
 # Point the operator at the target allocator and OpAMP bridge images built in this CI run. The collector image is the
-# default of the operator. PHP auto-instrumentation is not enabled in the OpenShift bundle and the PHP tests of
-# tests/e2e-instrumentation fail without it, so enable it. A job that names its tests (RUN_TESTS) runs them once, with
-# the auto-instrumentation images built in this CI run; the full suite runs the instrumentation tests twice (see below).
+# default of the operator. PHP and Ruby auto-instrumentation are not enabled in the OpenShift bundle and the PHP and Ruby
+# tests of tests/e2e-instrumentation fail without it, so enable them. A job that names its tests (RUN_TESTS) runs them
+# once, with the auto-instrumentation images built in this CI run; the full suite runs the instrumentation tests twice
+# (see below).
 operator_env=(
   "RELATED_IMAGE_TARGET_ALLOCATOR=${TARGETALLOCATOR_IMG}"
   "RELATED_IMAGE_OPERATOR_OPAMP_BRIDGE=${OPERATOROPAMPBRIDGE_IMG}"
   "ENABLE_PHP_AUTO_INSTRUMENTATION=true"
+  "ENABLE_RUBY_AUTO_INSTRUMENTATION=true"
 )
 if [[ -n "${RUN_TESTS:-}" ]]; then
   operator_env+=("${instrumentation_env[@]}")

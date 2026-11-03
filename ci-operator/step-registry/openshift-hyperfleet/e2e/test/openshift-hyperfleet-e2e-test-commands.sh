@@ -11,6 +11,8 @@ log(){
 }
 
 HYPERFLEET_API_URL=$(cat "${SHARED_DIR}/hyperfleet_api_url")
+AUTH_MODE=$(cat "${SHARED_DIR}/auth_mode")
+export AUTH_MODE
 
 cp -r /e2e/ /tmp/
 
@@ -81,10 +83,6 @@ export API_CHART_PATH="${API_CHART_PATH:-charts}"
 
 # JWT authentication via K8s TokenRequest API
 # The E2E framework acquires a JWT at startup using the SA token
-export HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME="${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME:-default}"
-export HYPERFLEET_IDENTITY_TOKENREQUEST_NAMESPACE="${NAMESPACE}"
-export HYPERFLEET_IDENTITY_EXPECTEDIDENTITY="system:serviceaccount:${NAMESPACE}:${HYPERFLEET_IDENTITY_TOKENREQUEST_SERVICEACCOUNTNAME}"
-
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_CREDENTIALS_PATH}/hcm-hyperfleet-e2e.json"
 
 # Copy test binary to writable working directory so ginkgo workers inherit
