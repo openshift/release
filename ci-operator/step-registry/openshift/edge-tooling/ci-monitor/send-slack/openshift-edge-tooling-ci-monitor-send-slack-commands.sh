@@ -104,6 +104,31 @@ else
     fi
 fi
 
+# The payload monitor counts every distinct Sippy job/release with at least
+# three runs and relative change < -50%, independently of AI target selection.
+# A null count means Sippy data was unavailable for that release.
+SIPPY_SUMMARY="${SHARED_DIR}/sippy-summary.json"
+if [[ -r "${SIPPY_SUMMARY}" ]] && jq -e '
+    type == "object" and length > 0 and
+    all(.[]; . == null or (type == "number" and . >= 0 and . == floor))
+    ' "${SIPPY_SUMMARY}" >/dev/null 2>&1; then
+    SIPPY_COUNT=$(jq '[.[] | select(. != null)] | add // 0' "${SIPPY_SUMMARY}")
+    SIPPY_AVAILABLE=$(jq '[.[] | select(. != null)] | length' "${SIPPY_SUMMARY}")
+    SIPPY_UNAVAILABLE=$(jq -r 'to_entries | map(select(.value == null) | .key) | join(", ")' "${SIPPY_SUMMARY}")
+    if [[ "${SIPPY_AVAILABLE}" -eq 0 ]]; then
+        MESSAGE+="${NL}:warning: Sippy test job drop counts unavailable."
+    elif [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
+        MESSAGE+="${NL}:chart_with_downwards_trend: At least *${SIPPY_COUNT}* Sippy test job(s) have a pass-rate drop of more than 50%."
+    else
+        MESSAGE+="${NL}:chart_with_downwards_trend: *${SIPPY_COUNT}* Sippy test job(s) have a pass-rate drop of more than 50%."
+    fi
+    if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
+        MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
+    fi
+else
+    MESSAGE+="${NL}:warning: Sippy test job drop counts unavailable."
+fi
+
 MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
 
 # ---------------------------------------------------------------------------
