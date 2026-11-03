@@ -942,7 +942,7 @@ echo "$platformSpec" > "${SHARED_DIR}"/platform.json
 # poolName is internal bookkeeping (see failureDomains above) and is not part
 # of the installer's VSphereFailureDomain schema, so strip it before this gets
 # spliced into install-config.yaml's platform.vsphere section.
-echo "$platformSpec" | jq -r 'del(.failureDomains[].poolName)' | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+echo "$platformSpec" | jq -r 'del(.failureDomains[]?.poolName)' | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
 
 # Save reserved networks for later use
 if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
