@@ -22,7 +22,9 @@ and sample values are retained; no test-wide quantile or cross-member aggregatio
 is substituted. Query families cover WAL fsync, backend commits, peer roundtrips,
 node disk read/write/flush counters and timing, disk IO time and CPU counters.
 Node-exporter queries join `kube_node_role` to select control-plane nodes, not
-workers. Missing role mappings, optional disk flush metrics or scrape targets
+workers. Selectors additionally restrict etcd targets to `openshift-etcd` and
+node-exporter targets to `openshift-monitoring`, excluding similarly named jobs
+in workload namespaces. Missing role mappings, optional disk flush metrics or scrape targets
 produce empty results with actionable status files rather than a zero measurement.
 
 Use `rate(node_disk_read_time_seconds_total[1m]) /
@@ -42,10 +44,16 @@ gaps without retaining arbitrary API error bodies.
 `gather-audit-logs` additionally writes `audit-server-failures/entries.jsonl`
 after securing the original audit archive. Only server-side ResponseComplete
 5xx metadata in the suite window plus margins is selected: Audit-ID, verb,
-pod object coordinates, timestamps, server status and etcd/total latency annotations.
-Other resources retain only resource/subresource, never object names that could
-identify users or tokens. Archive creation failure leaves the original gathered
+pod object coordinates in the suite's `e2e-*` namespace convention, timestamps,
+server status and etcd/total latency annotations. Pods outside that convention
+and other resources retain only resource/subresource, never arbitrary workload
+namespace/name or object names that could identify users or tokens. This naming
+filter is data minimization for CI diagnostics, not a general privacy guarantee
+for arbitrary clusters. Archive creation failure leaves the original gathered
 logs in place instead of deleting them.
+Without conformance markers, a failed must-gather returns its original status
+after successful archiving and source cleanup. Marked runs retain the existing
+best-effort summary and actionable failure gap.
 Request/response bodies, identities, arbitrary annotations and response messages
 are excluded. Decode/gather failures and an entirely missing input set are flagged;
 partial member absence still requires checking the retained archive's coverage.
@@ -59,6 +67,10 @@ an exact client-ID match. Multiple candidates must remain ambiguous. The server'
 recorded status is not a status the client necessarily received; audit annotations
 are not HTTP response headers. This index deliberately does not rewrite JUnit or
 the original context-deadline error.
+Opaque Audit-IDs and control-plane member/peer labels and archive-member paths
+remain for exact correlation and coverage review. They are already present in
+the existing complete CI audit/TSDB artifacts; the new artifacts are not a
+privacy boundary or a replacement for their existing publication policy.
 
 An inline test-message enhancement belongs in the client test runner/PodClient
 source, not in release configuration: preserve the original wrapped error, log

@@ -24,7 +24,8 @@ function summarize_audit_failures() {
           select(.requestReceivedTimestamp >= $start and .requestReceivedTimestamp < $end) |
           {auditID, verb, stage, requestReceivedTimestamp, stageTimestamp,
            serverCode: .responseStatus.code,
-           object: ((.objectRef // {}) | if .resource == "pods" then
+           object: ((.objectRef // {}) | if .resource == "pods" and
+             ((.namespace // "") | test("^e2e-[a-z0-9-]+$")) then
              {resource, namespace, name, subresource} else {resource, subresource} end),
            etcdLatency: .annotations["apiserver.latency.k8s.io/etcd"],
            totalLatency: .annotations["apiserver.latency.k8s.io/total"],
@@ -92,4 +93,7 @@ if [[ -f ${SHARED_DIR}/conformance-start ]]; then
     echo 'Audit must-gather failed; summary/archive may be incomplete. Check gather logs and retained member coverage.' >> "${ARTIFACT_DIR}/audit-server-failures/gap.txt"
   fi
 fi
-rm -rf "${ARTIFACT_DIR}/audit-logs"
+rm -rf "${ARTIFACT_DIR}/audit-logs" || exit $?
+if [[ ! -f ${SHARED_DIR}/conformance-start ]]; then
+  exit "${audit_gather_status}"
+fi

@@ -49,6 +49,7 @@ class GatherFixture(unittest.TestCase):
                               check=True, capture_output=True, text=True)
 
     def _metrics(self, response, failed=False, pods="pod/prometheus-k8s-0"):
+        """Run the delivered helper with deterministic clock and API command doubles."""
         self._command("date", "echo 1793671200\n")
         self._command("oc", 'printf "%s\\n" "$@" >> "$ARTIFACT_DIR/calls"\n'
                      + ("exit 1\n" if failed else "cat <<'RESPONSE'\n"
@@ -62,6 +63,7 @@ class GatherTests(GatherFixture):
     """Historical metrics and original suite-error behavior."""
 
     def test_history_preserves_window_labels_buckets_and_coverage(self):
+        """Keep raw series identity and explicitly evaluation-based coverage metadata."""
         response = {"status": "success", "data": {"resultType": "matrix", "result": [
             {"metric": {"__name__": "etcd_network_peer_round_trip_time_seconds_bucket",
                         "instance": "member", "To": "peer", "le": "0.1",
@@ -156,6 +158,7 @@ class GatherTests(GatherFixture):
         self.assertFalse((output / "prometheus-k8s-0/wal.json.gz").exists())
 
     def test_replicas_members_and_peers_are_not_aggregated(self):
+        """Keep each replica, member and peer independent through serialization."""
         series = [{"metric": {"__name__": "etcd_network_peer_round_trip_time_seconds_count",
                               "instance": member, "To": peer},
                    "values": [[1793669100, "1"]]}
@@ -173,6 +176,7 @@ class GatherTests(GatherFixture):
 
     @unittest.skipUnless(os.environ.get("PROMTOOL"), "set PROMTOOL to test real PromQL")
     def test_promql_control_plane_histograms_and_scrape_semantics(self):
+        """Evaluate delivered selectors, role joins, resets and lookback with promtool."""
         self._metrics({"status": "success", "data": {"resultType": "matrix", "result": []}})
         queries = [line.removeprefix("query=") for line in
                    (self.artifacts / "calls").read_text().splitlines()
@@ -190,7 +194,8 @@ class GatherTests(GatherFixture):
                                          "etcd_network_peer_round_trip_time_seconds"]):
             for member, peer in [("member-a", "peer-b"), ("member-b", "peer-a")]:
                 for suffix in ["bucket", "count", "sum"]:
-                    labels = f'{metric}_{suffix}{{job="etcd",instance="{member}"'
+                    labels = (f'{metric}_{suffix}{{job="etcd",namespace="openshift-etcd",'
+                              f'instance="{member}"')
                     if family == 2:
                         labels += f',To="{peer}"'
                     if suffix == "bucket":
@@ -210,7 +215,8 @@ class GatherTests(GatherFixture):
                     ["node_disk_flush_requests_total", "node_disk_flush_requests_time_seconds_total"],
                     ["node_cpu_seconds_total"]], start=3):
                 for metric in metrics:
-                    labels = f'{metric}{{job="node-exporter",instance="{node}"'
+                    labels = (f'{metric}{{job="node-exporter",namespace="openshift-monitoring",'
+                              f'instance="{node}"')
                     labels += ',cpu="0",mode="idle"}' if family == 7 else ',device="nvme0n1"}'
                     if node == "worker-a":
                         series.append({"series": labels, "values": "900 910 920"})
@@ -221,12 +227,22 @@ class GatherTests(GatherFixture):
         checks += [{"expr": queries[3], "eval_time": "60s", "exp_samples": [
             dict(sample, value=2) for sample in expected[3]]},
             {"expr": queries[3], "eval_time": "6m15s", "exp_samples": []},
-            {"expr": 'timestamp(node_disk_reads_completed_total{instance="master-a"})',
+            {"expr": 'timestamp(node_disk_reads_completed_total{instance="master-a",'
+             'namespace="openshift-monitoring"})',
              "eval_time": "45s", "exp_samples": [{"labels":
-                 '{job="node-exporter",instance="master-a",device="nvme0n1"}', "value": 30}]},
-            {"expr": 'resets(node_disk_reads_completed_total{instance="master-a"}[1m])',
+                 '{job="node-exporter",namespace="openshift-monitoring",'
+                 'instance="master-a",device="nvme0n1"}', "value": 30}]},
+            {"expr": 'resets(node_disk_reads_completed_total{instance="master-a",'
+             'namespace="openshift-monitoring"}[1m])',
              "eval_time": "60s", "exp_samples": [{"labels":
-                 '{job="node-exporter",instance="master-a",device="nvme0n1"}', "value": 1}]}]
+                 '{job="node-exporter",namespace="openshift-monitoring",'
+                 'instance="master-a",device="nvme0n1"}', "value": 1}]}]
+        series.extend([{"series": 'etcd_disk_wal_fsync_duration_seconds_count{job="etcd",'
+                       'namespace="fixture-private-workload",instance="fixture-workload"}',
+                       "values": "900 910 920"},
+                       {"series": 'node_disk_reads_completed_total{job="node-exporter",'
+                        'namespace="fixture-private-workload",instance="master-a"}',
+                        "values": "900 910 920"}])
         fixture = self.base / "promql.json"
         fixture.write_text(json.dumps({"rule_files": [], "evaluation_interval": "15s",
             "tests": [{"interval": "30s", "input_series": series,
@@ -269,6 +285,7 @@ class GatherTests(GatherFixture):
         self.assertIn("RBAC", (self.artifacts / "metrics/etcd-history/gap.txt").read_text())
 
     def test_suite_success_and_monitor_only_skip_preserve_windows(self):
+        """Preserve successful and monitor-only override exits while writing markers."""
         self._command("oc", "echo fixture\n")
         script = REPOSITORY / ("ci-operator/step-registry/rosa/aws/sts/conformance/"
                                "test/rosa-aws-sts-conformance-test-commands.sh")
@@ -289,6 +306,7 @@ class AuditTests(GatherFixture):
     """Sanitized server evidence and archive retention."""
 
     def test_audit_summary_is_server_evidence_not_client_response(self):
+        """Select only in-window server failures without copying audit bodies."""
         logs = self.artifacts / "audit-logs/image/audit_logs/kube-apiserver"
         logs.mkdir(parents=True)
         record = {"auditID": "fixture-audit-id", "stage": "ResponseComplete", "verb": "get",
@@ -311,6 +329,10 @@ class AuditTests(GatherFixture):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["serverCode"], 500)
         self.assertEqual(entries[0]["etcdLatency"], "29.499204475s")
+        self.assertEqual(entries[0]["object"]["namespace"], "e2e-pods-fixture")
+        self.assertEqual(entries[0]["object"]["name"], "fixture-pod")
+        self.assertEqual(entries[0]["auditID"], "fixture-audit-id")
+        self.assertTrue(entries[0]["auditMember"].endswith("member-audit.log.gz"))
         self.assertIn("not a client HTTP response", entries[0]["correlation"])
         self.assertNotIn("DO_NOT_RETAIN", text)
 
@@ -318,6 +340,42 @@ class AuditTests(GatherFixture):
         (self.artifacts / "audit-logs").mkdir()
         self._run_function(AUDIT, "summarize_audit_failures")
         self.assertIn("No audit", (self.artifacts / "audit-server-failures/gap.txt").read_text())
+
+    def test_non_e2e_pod_coordinates_are_not_retained(self):
+        """Keep correlation metadata but omit arbitrary workload object identifiers."""
+        logs = self.artifacts / "audit-logs"
+        logs.mkdir()
+        record = {"auditID": "fixture-correlation-id", "stage": "ResponseComplete",
+                  "responseStatus": {"code": 500},
+                  "requestReceivedTimestamp": "2026-11-03T01:48:00Z",
+                  "objectRef": {"resource": "pods", "namespace": "fixture-private-workload",
+                                "name": "FIXTURE_PRIVATE_POD"}}
+        (logs / "member-audit.log").write_text(json.dumps(record), encoding="utf-8")
+        self._run_function(AUDIT, "summarize_audit_failures")
+        text = (self.artifacts / "audit-server-failures/entries.jsonl").read_text()
+        self.assertNotIn("fixture-private-workload", text)
+        self.assertNotIn("FIXTURE_PRIVATE_POD", text)
+        self.assertEqual(json.loads(text)["auditID"], "fixture-correlation-id")
+
+    def test_unmarked_gather_preserves_exit_status_and_archive_cleanup(self):
+        """An unmarked gather reports failure after archiving and cleaning sources."""
+        (self.shared / "conformance-start").unlink()
+        configuration = self.base / "kubeconfig"
+        configuration.touch()
+        for exit_code in [0, 7]:
+            with self.subTest(exit_code=exit_code):
+                self._command("oc", 'if [[ "$*" == *--help* ]]; then exit 0; fi\n'
+                    'mkdir -p "$ARTIFACT_DIR/audit-logs"\n'
+                    'echo "{}" > "$ARTIFACT_DIR/audit-logs/fixture-audit.log"\n'
+                    f'exit {exit_code}\n')
+                completed = subprocess.run(["bash", str(AUDIT)], env=dict(
+                    self.environment, KUBECONFIG=str(configuration)), check=False,
+                    capture_output=True, text=True)
+                self.assertEqual(completed.returncode, exit_code)
+                self.assertFalse((self.artifacts / "audit-logs").exists())
+                self.assertFalse((self.artifacts / "audit-server-failures").exists())
+                with tarfile.open(self.artifacts / "audit-logs.tar.gz") as archive:
+                    self.assertIn("./fixture-audit.log", archive.getnames())
 
     def test_non_pod_object_names_are_not_retained(self):
         logs = self.artifacts / "audit-logs"

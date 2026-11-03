@@ -30,14 +30,14 @@ function gather_etcd_history() (
     mkdir -p "${destination}/${prompod}"
     for family in wal backend peer disk-read disk-write disk-io disk-flush cpu; do
       case ${family} in
-        wal) query='{__name__=~"etcd_disk_wal_fsync_duration_seconds_(bucket|count|sum)",job="etcd"}' ;;
-        backend) query='{__name__=~"etcd_disk_backend_commit_duration_seconds_(bucket|count|sum)",job="etcd"}' ;;
-        peer) query='{__name__=~"etcd_network_peer_round_trip_time_seconds_(bucket|count|sum)",job="etcd"}' ;;
-        disk-read) query='{__name__=~"node_disk_(read_time_seconds_total|reads_completed_total)",job="node-exporter"}' ;;
-        disk-write) query='{__name__=~"node_disk_(write_time_seconds_total|writes_completed_total)",job="node-exporter"}' ;;
-        disk-io) query='{__name__=~"node_disk_io_time_(seconds_total|weighted_seconds_total)",job="node-exporter"}' ;;
-        disk-flush) query='{__name__=~"node_disk_flush_requests_(total|time_seconds_total)",job="node-exporter"}' ;;
-        cpu) query='node_cpu_seconds_total{job="node-exporter"}' ;;
+        wal) query='{__name__=~"etcd_disk_wal_fsync_duration_seconds_(bucket|count|sum)",job="etcd",namespace="openshift-etcd"}' ;;
+        backend) query='{__name__=~"etcd_disk_backend_commit_duration_seconds_(bucket|count|sum)",job="etcd",namespace="openshift-etcd"}' ;;
+        peer) query='{__name__=~"etcd_network_peer_round_trip_time_seconds_(bucket|count|sum)",job="etcd",namespace="openshift-etcd"}' ;;
+        disk-read) query='{__name__=~"node_disk_(read_time_seconds_total|reads_completed_total)",job="node-exporter",namespace="openshift-monitoring"}' ;;
+        disk-write) query='{__name__=~"node_disk_(write_time_seconds_total|writes_completed_total)",job="node-exporter",namespace="openshift-monitoring"}' ;;
+        disk-io) query='{__name__=~"node_disk_io_time_(seconds_total|weighted_seconds_total)",job="node-exporter",namespace="openshift-monitoring"}' ;;
+        disk-flush) query='{__name__=~"node_disk_flush_requests_(total|time_seconds_total)",job="node-exporter",namespace="openshift-monitoring"}' ;;
+        cpu) query='node_cpu_seconds_total{job="node-exporter",namespace="openshift-monitoring"}' ;;
       esac
       if [[ ${family} == disk-* || ${family} == cpu ]]; then
         query+=' and on(instance) label_replace(kube_node_role{role=~"master|control-plane"}, "instance", "$1", "node", "(.*)")'
