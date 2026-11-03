@@ -1410,7 +1410,8 @@ if __name__ == "__main__":
     patch_dns_delegate()
     patch_oidc()
     patch_trlp_auth()
-    patch_trlp_15_compat()
+    # Do not no-op RFC 0021 reservation or force stream=false. Latest testsuite
+    # main plus mockserver:9.0.0 is what QE asked to re-run for 200/timeout reds.
     patch_xfcc()
 PY
 

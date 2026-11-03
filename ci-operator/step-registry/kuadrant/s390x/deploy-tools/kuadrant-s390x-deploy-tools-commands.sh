@@ -222,7 +222,16 @@ spec:
         ports:
         - containerPort: 1080
           name: http
+        resources:
+          requests:
+            cpu: 500m
+            memory: 200Mi
+          limits:
+            cpu: "1"
+            memory: 300Mi
         env:
+        - name: JAVA_TOOL_OPTIONS
+          value: -Xmx220m
         - name: MOCKSERVER_INITIALIZATION_JSON_PATH
           value: /config/mockserver/echo_expectation.json
         volumeMounts:
