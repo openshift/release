@@ -669,6 +669,8 @@ def classify(evidence, roles):
         first = records[0]
         for outcome in tallies:
             tallies[outcome] += first['counts'][outcome]
+    evidence['testcase_total'] = sum(
+        records[0]['testcase_count'] for records in seen_digests.values())
     reasons = []
 
     # FAIL: authoritative failure, or failure inside an unrecognized dir
@@ -689,7 +691,12 @@ def classify(evidence, roles):
     be_failed = sorted(step for step, m in markers.items()
                         if roles.get(step) in ('test-best-effort', 'post-phase')
                         and failed(m))
-    if junit_red or be_failed:
+    # PWF needs positive evidence that the authoritative test steps ran;
+    # absent/aborted authoritative markers route to UNVERIFIED instead.
+    authoritative_ok = all(
+        (markers.get(s) or {}).get('result') == 'SUCCESS'
+        for s, r in roles.items() if r == 'test-authoritative')
+    if junit_red or (be_failed and authoritative_ok):
         if junit_red:
             reasons.append('test_failures:%d' % tallies['failed'])
             reasons.append('test_errored:%d' % tallies['error'])
@@ -812,6 +819,12 @@ def mode_scan():
     base = os.environ.get('ARTIFACT_BASE_DIR') or os.path.join(
         artifact_dir, '..', '..')
     base = os.path.normpath(base)
+    if base == os.sep:
+        # the ../.. fallback from /logs/artifacts resolves to /; a scan root
+        # must never be the filesystem root (every child fails containment)
+        emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
+                           ['base_invalid_root'])
+        return
     if not os.path.isdir(base):
         emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
                            ['base_unresolvable'])
@@ -848,7 +861,7 @@ def mode_scan():
     report = {
         'state': state, 'test': evidence['test'], 'tallies': tallies,
         'skip_ratio': (round(tallies['skipped'] / (
-            tallies['skipped'] + evidence.get('testcase_total', 0) or 1), 4)
+            evidence.get('testcase_total', 0) or 1), 4)
             if tallies['skipped'] else None),
         'reason': reasons, 'degraded': evidence['degraded'],
         'unrecognized_dirs': evidence['unrecognized_dirs'],
@@ -993,8 +1006,10 @@ def compose(report, rehearsal=False):
                 % (VERSION, digest)), digest
 
     footer, digest = footer_for(content)
-    if len(content) > TEXT_CAP - len(footer):
-        content = content[:TEXT_CAP - len(footer)] + '...[truncated]'
+    trunc_marker = '...[truncated]'
+    if len(content) > TEXT_CAP - len(footer) - len(trunc_marker):
+        content = content[:TEXT_CAP - len(footer) - len(trunc_marker)] \
+            + trunc_marker
         footer, digest = footer_for(content)
     text = content + footer
     body = json.dumps({FIELD: text})
@@ -1220,7 +1235,7 @@ def main():
                     delivered, http, outcome, diag = post(url, body)
                     reasons.append(outcome)
                     delivery.update(outcome=outcome, **diag)
-                    if delivered and key_path:
+                    if delivered == '1' and key_path:
                         try:
                             with open(key_path, 'w') as handle:
                                 handle.write(http)
