@@ -17,7 +17,7 @@ cat > "$fixture/root/dev-scripts/common.sh" <<'COMMON'
 NUM_MASTERS=2
 NUM_WORKERS=0
 NUM_EXTRA_WORKERS=0
-MASTER_HOSTNAME_FORMAT=master-%d
+MASTER_HOSTNAME_FORMAT=${MASTER_FORMAT:-master-%d}
 WORKER_HOSTNAME_FORMAT=worker-%d
 BAREMETAL_NETWORK_NAME=fixture
 BOOTSTRAP_PROVISIONING_IP=172.22.0.2
@@ -32,10 +32,14 @@ cat > "$fixture/bin/ssh" <<'SSH'
 #!/bin/bash
 set -eu
 printf 'ssh %s\n' "$*" >> "$CALLS"
-while [[ "$1" == -o ]]; do shift 2; done
+no_stdin=false
+while [[ "$1" == -o || "$1" == -n ]]; do
+    if [[ "$1" == -n ]]; then no_stdin=true; shift; else shift 2; fi
+done
 destination=$1
 shift
 if [[ "$destination" == core@* ]]; then
+    if [[ "${CASE:-}" == stdin-drain && "$no_stdin" == false ]]; then cat >/dev/null; fi
     if [[ "${CASE:-}" == unreachable && "$destination" == core@192.168.111.80 ]]; then exit 255; fi
     if [[ "$*" == *podman*ps* ]]; then
         if [[ "${CASE:-}" == probe-error ]]; then exit 125; fi
@@ -50,6 +54,7 @@ if [[ "$destination" == core@* ]]; then
     exit
 fi
 if [[ "$*" == 'bash -' ]]; then
+    [[ "$no_stdin" == false ]] || exit 0
     cd "$FIXTURE/root"
     sed "s@/root/dev-scripts@FIXTURE_ROOT@g; s@/tmp/@FIXTURE_TMP/@g; s@/tmp @FIXTURE_TMP @g; s@\"/tmp\"@\"FIXTURE_TMP\"@g; s@/var/log/@FIXTURE_LOG/@g; s@FIXTURE_ROOT@$FIXTURE/root/dev-scripts@g; s@FIXTURE_TMP@$FIXTURE/tmp@g; s@FIXTURE_LOG@$FIXTURE/var/log@g" | bash
 else exit 99; fi
@@ -58,9 +63,13 @@ cat > "$fixture/bin/scp" <<'SCP'
 #!/bin/bash
 set -eu
 echo "scp $*" >> "$CALLS"
+if [[ ( "${HANG_TRANSFER:-}" == agent || "${HANG_TRANSFER:-}" == both ) && "$*" == *agent-gather* ]] ||
+   [[ ( "${HANG_TRANSFER:-}" == optional || "${HANG_TRANSFER:-}" == both ) && "$*" == *installation-logs.tar* ]]; then
+    trap '' TERM
+    sleep 2
+fi
 case "$*" in
-*installation-logs.tar*) exit 1 ;;
-*agent-gather*)
+*agent-gather*|*installation-logs.tar*)
     source=${1#*:}
     source=${source/\/root\/dev-scripts/$FIXTURE/root/dev-scripts}
     mapfile -t matches < <(compgen -G "$source")
@@ -74,7 +83,9 @@ SCP
 cat > "$fixture/bin/timeout" <<'TIMEOUT'
 #!/bin/bash
 set -eu
+printf 'timeout %s\n' "$*" >> "$CALLS"
 if [[ "$1" == -s ]]; then shift 3; else shift 2; fi
+if [[ "$1" == scp ]]; then exec /usr/bin/timeout --kill-after=0.05 0.05 "$@"; fi
 exec "$@"
 TIMEOUT
 cat > "$fixture/bin/sudo" <<'SUDO'
@@ -136,6 +147,34 @@ for scenario in static unreachable probe-error absent missing conflict ipv6 malf
     echo "PASS generic $scenario"
 done
 
+review_failures=0
+export AGENT_SCENARIO=TNF_IPV4
+printf '192.168.111.80 master-0\n192.168.111.81 master-1\n' > "$fixture/root/dev-scripts/ocp/ostest/hosts"
+export CASE=stdin-drain
+echo 1 > "$fixture/root/dev-scripts/logs/installer-status.txt"
+: > "$CALLS"
+bash "$generic" > "$fixture/stdin-drain.log" 2>&1
+if grep -q 'host=master-1 podman_etcd=present' "$fixture/stdin-drain.log" &&
+   [[ $(grep -c 'sudo chown' "$CALLS") == 2 ]]; then
+    echo 'PASS nested SSH preserves script stdin through probes and SOS'
+else
+    echo 'FAIL nested SSH consumed script stdin' >&2
+    review_failures=$((review_failures + 1))
+fi
+echo 0 > "$fixture/root/dev-scripts/logs/installer-status.txt"
+export CASE=redact-names MASTER_FORMAT=PRIVATE_NODE_%d
+printf 'abc PRIVATE_NODE_0\n192.168.111.81 PRIVATE_NODE_1\n' > "$fixture/root/dev-scripts/ocp/ostest/hosts"
+bash "$generic" > "$fixture/redact-names.log" 2>&1
+if ! grep -q PRIVATE_NODE "$fixture/redact-names.log" &&
+   grep -q 'node_index=0 address=unknown' "$fixture/redact-names.log" &&
+   grep -q 'host=master-1 podman_etcd=present' "$fixture/redact-names.log"; then
+    echo 'PASS diagnostic identifiers use stable indices'
+else
+    echo 'FAIL diagnostic identifiers expose raw node names' >&2
+    review_failures=$((review_failures + 1))
+fi
+unset MASTER_FORMAT
+
 cat > "$fixture/bin/make" <<'MAKE'
 #!/bin/bash
 if [[ "${DROP_ARCHIVE:-0}" == 0 ]]; then
@@ -162,6 +201,38 @@ for combination in 0:0 2:0 124:0 0:1 2:1; do
     grep -q 'Optional installation logs unavailable' "$fixture/agent-$status.log"
     echo "PASS agent publication collection=$status missing_archive=$DROP_ARCHIVE"
 done
+
+mkdir -p "$fixture/root/dev-scripts/ocp/ostest"
+tar -cf "$fixture/root/dev-scripts/ocp/ostest/installation-logs.tar" -C "$fixture/root/dev-scripts/logs" installer-status.txt
+for transfer in agent optional both; do
+    export HANG_TRANSFER=$transfer DROP_ARCHIVE=0 MAKE_STATUS=0
+    [[ "$transfer" != both ]] || export MAKE_STATUS=124
+    export ARTIFACT_DIR="$fixture/transfer-$transfer"
+    mkdir "$ARTIFACT_DIR"
+    : > "$CALLS"
+    result=0
+    /usr/bin/timeout --kill-after=0.1 1 bash "$agent" > "$fixture/transfer-$transfer.log" 2>&1 || result=$?
+    expected=0
+    [[ "$transfer" != agent ]] || expected=137
+    [[ "$transfer" != both ]] || expected=124
+    if [[ "$result" == "$expected" ]] &&
+       grep -q 'Agent collection exit' "$fixture/transfer-$transfer.log" &&
+       grep -q installation-logs.tar "$CALLS" &&
+       grep -q 'timeout -s 9 15m ssh' "$CALLS" &&
+       [[ $(grep -c 'timeout --kill-after=5s 5m scp' "$CALLS") == 2 ]]; then
+        if [[ "$transfer" == agent ]]; then
+            test -f "$ARTIFACT_DIR/installation-logs.tar"
+        elif [[ "$transfer" == optional ]]; then
+            tar -tJf "$ARTIFACT_DIR/agent-gather-fallback-master-0.tar.xz" | grep -q installer-status.txt
+            grep -q 'Optional installation logs unavailable (exit 137)' "$fixture/transfer-$transfer.log"
+        fi
+        echo "PASS bounded transfer $transfer with independent publication/status"
+    else
+        echo "FAIL unbounded transfer $transfer" >&2
+        review_failures=$((review_failures + 1))
+    fi
+done
+unset HANG_TRANSFER
 
 python3 - "$repo" <<'PYTHON'
 from pathlib import Path
@@ -200,3 +271,4 @@ for version in ('5.0', '5.1'):
             assert definition(ref, 'ref')['from'] == 'dev-scripts'
         print(f'PASS consumer {version} {name}')
 PYTHON
+((review_failures == 0))
