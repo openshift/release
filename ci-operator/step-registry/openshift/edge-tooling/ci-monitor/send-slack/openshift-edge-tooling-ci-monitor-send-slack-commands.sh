@@ -74,6 +74,25 @@ version_summary() {
 }
 
 # ---------------------------------------------------------------------------
+# Read Sippy counts before choosing the status header.
+# The payload monitor counts every distinct Sippy job/release with at least
+# three runs and relative change < -50%, independently of AI target selection.
+# A null count means Sippy data was unavailable for that release.
+# ---------------------------------------------------------------------------
+SIPPY_COUNT=0
+SIPPY_AVAILABLE=0
+SIPPY_UNAVAILABLE=""
+SIPPY_SUMMARY="${SHARED_DIR}/sippy-summary.json"
+if [[ -r "${SIPPY_SUMMARY}" ]] && jq -e '
+    type == "object" and length > 0 and
+    all(.[]; . == null or (type == "number" and . >= 0 and . == floor))
+    ' "${SIPPY_SUMMARY}" >/dev/null 2>&1; then
+    SIPPY_COUNT=$(jq '[.[] | select(. != null)] | add // 0' "${SIPPY_SUMMARY}")
+    SIPPY_AVAILABLE=$(jq '[.[] | select(. != null)] | length' "${SIPPY_SUMMARY}")
+    SIPPY_UNAVAILABLE=$(jq -r 'to_entries | map(select(.value == null) | .key) | join(", ")' "${SIPPY_SUMMARY}")
+fi
+
+# ---------------------------------------------------------------------------
 # Compose the Slack message
 # ---------------------------------------------------------------------------
 NL=$'\n'
@@ -82,8 +101,13 @@ if [[ "${DATA_AVAILABLE}" != "true" ]]; then
     ICON=":warning:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — Data unavailable. Please investigate the artifacts."
 elif [[ "${BLOCKING_COUNT}" -eq 0 ]] && [[ "${INFORMING_COUNT}" -eq 0 ]]; then
-    ICON=":large_green_circle:"
-    MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing jobs found."
+    if [[ "${SIPPY_AVAILABLE}" -gt 0 ]] && [[ "${SIPPY_COUNT}" -eq 0 ]]; then
+        ICON=":large_green_circle:"
+        MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing jobs found."
+    else
+        ICON=":warning:"
+        MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing payload jobs found."
+    fi
 elif [[ "${BLOCKING_COUNT}" -eq 0 ]]; then
     ICON=":large_yellow_circle:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing blocking jobs."
@@ -104,29 +128,15 @@ else
     fi
 fi
 
-# The payload monitor counts every distinct Sippy job/release with at least
-# three runs and relative change < -50%, independently of AI target selection.
-# A null count means Sippy data was unavailable for that release.
-SIPPY_SUMMARY="${SHARED_DIR}/sippy-summary.json"
-if [[ -r "${SIPPY_SUMMARY}" ]] && jq -e '
-    type == "object" and length > 0 and
-    all(.[]; . == null or (type == "number" and . >= 0 and . == floor))
-    ' "${SIPPY_SUMMARY}" >/dev/null 2>&1; then
-    SIPPY_COUNT=$(jq '[.[] | select(. != null)] | add // 0' "${SIPPY_SUMMARY}")
-    SIPPY_AVAILABLE=$(jq '[.[] | select(. != null)] | length' "${SIPPY_SUMMARY}")
-    SIPPY_UNAVAILABLE=$(jq -r 'to_entries | map(select(.value == null) | .key) | join(", ")' "${SIPPY_SUMMARY}")
-    if [[ "${SIPPY_AVAILABLE}" -eq 0 ]]; then
-        MESSAGE+="${NL}:warning: Sippy test job drop counts unavailable."
-    elif [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
-        MESSAGE+="${NL}:chart_with_downwards_trend: At least *${SIPPY_COUNT}* Sippy test job(s) have a pass-rate drop of more than 50%."
-    else
-        MESSAGE+="${NL}:chart_with_downwards_trend: *${SIPPY_COUNT}* Sippy test job(s) have a pass-rate drop of more than 50%."
-    fi
-    if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
-        MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
-    fi
-else
+if [[ "${SIPPY_AVAILABLE}" -eq 0 ]]; then
     MESSAGE+="${NL}:warning: Sippy test job drop counts unavailable."
+elif [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
+    MESSAGE+="${NL}:chart_with_downwards_trend: At least *${SIPPY_COUNT}* Sippy job/release pair(s) have a pass-rate drop of more than 50%."
+else
+    MESSAGE+="${NL}:chart_with_downwards_trend: *${SIPPY_COUNT}* Sippy job/release pair(s) have a pass-rate drop of more than 50%."
+fi
+if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
+    MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
 fi
 
 MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
