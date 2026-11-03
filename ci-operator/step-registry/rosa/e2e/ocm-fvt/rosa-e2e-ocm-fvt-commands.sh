@@ -382,24 +382,102 @@ if [[ "${OCM_FVT_SERVICE:-}" == "osdfm" ]]; then
 fi
 
 echo "=== ocmci image digest ==="
-podman pull \
-  --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
-  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest
 [[ $- == *x* ]] && WAS_TRACING_DIGEST=true || WAS_TRACING_DIGEST=false
 set +x
-image_digest="$(podman inspect \
-  --format '{{index .RepoDigests 0}}' \
-  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest 2>/dev/null)" || image_digest=""
-image_digest="${image_digest##*@}"
-if [[ "${image_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-  printf '%s\n' "${image_digest}"
-  (
-    umask 022
-    python3 "${ocm_fvt_helpers}" digest "${ARTIFACT_DIR}/ocm-fvt-image-digest.txt" "${image_digest}"
-  ) 2>/dev/null || echo "WARNING: failed to persist ocmci image digest"
-else
-  echo "WARNING: failed to get ocmci image digest"
+runner_repository=quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests
+runner_image_id="$(podman pull --quiet \
+  --authfile /usr/local/cs-qe-credentials/.dockerconfigjson \
+  "${runner_repository}:latest")"
+if [[ ! "${runner_image_id}" =~ ^(sha256:)?[0-9a-f]{64}$ ]]; then
+  echo "ERROR: pulled runner image ID is unavailable; refusing unbound execution"
+  exit 1
 fi
+runner_image_id="sha256:${runner_image_id#sha256:}"
+image_inspection="$(timeout 10s podman inspect --type image \
+  --format '{"image_id":{{json .ID}},"manifest_digest":{{json .Digest}},"repo_digests":{{json .RepoDigests}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"source":{{json (index .Config.Labels "org.opencontainers.image.source")}}}' \
+  "${runner_image_id}" 2>/dev/null | head -c 16385)" || image_inspection=""
+(
+  umask 022
+  timeout 10s python3 - "${ARTIFACT_DIR}" "${runner_image_id}" "${runner_repository}" 3<<<"${image_inspection}" <<'PY'
+import json
+import os
+import re
+import sys
+
+directory, image_id, repository = sys.argv[1:]
+report = {
+    "executed_image_id": image_id,
+    "inspection_status": "unknown_unavailable",
+    "digest": "unknown",
+    "digest_status": "unknown_unavailable",
+    "org.opencontainers.image.revision": "unknown",
+    "revision_status": "unknown_unavailable",
+    "org.opencontainers.image.source": "unknown",
+    "source_status": "unknown_unavailable",
+    "label_semantics": "image_metadata_not_executable_attestation",
+}
+with os.fdopen(3) as inspection:
+    raw = inspection.read(16386)
+try:
+    if len(raw) > 16384:
+        report["inspection_status"] = "unknown_response_limit"
+    elif raw.strip():
+        data = json.loads(raw)
+        inspected_id = data.get("image_id", "")
+        if isinstance(inspected_id, str) and re.fullmatch(r"(?:sha256:)?[0-9a-f]{64}", inspected_id):
+            inspected_id = "sha256:" + inspected_id[-64:]
+        if inspected_id != image_id:
+            report["inspection_status"] = "unknown_identity_mismatch"
+        else:
+            report["inspection_status"] = "observed"
+            digests = data.get("repo_digests")
+            matches = {value[len(repository) + 1:] for value in digests
+                       if isinstance(value, str) and re.fullmatch(
+                           re.escape(repository) + r"@sha256:[0-9a-f]{64}", value)} if isinstance(digests, list) else set()
+            manifest_digest = data.get("manifest_digest")
+            if isinstance(manifest_digest, str) and manifest_digest in matches:
+                matches = {manifest_digest}
+            report["digest_status"] = "observed" if len(matches) == 1 else "unknown_missing_invalid_or_ambiguous"
+            if len(matches) == 1:
+                report["digest"] = matches.pop()
+                report["immutable_ref"] = repository + "@" + report["digest"]
+            revision = data.get("revision")
+            report["revision_status"] = "unknown_missing_or_invalid"
+            if isinstance(revision, str) and re.fullmatch(r"[0-9a-f]{40}", revision):
+                report["org.opencontainers.image.revision"] = revision
+                report["revision_status"] = "observed"
+            source = data.get("source")
+            report["source_status"] = "unknown_missing_or_unapproved"
+            if source in ("https://github.com/openshift-online/rosa-backend-tests",
+                          "https://github.com/openshift-online/rosa-backend-tests.git"):
+                report["org.opencontainers.image.source"] = source
+                report["source_status"] = "observed"
+except (ValueError, TypeError, AttributeError):
+    report["inspection_status"] = "unknown_invalid_response"
+
+
+def persist(name, contents):
+    try:
+        descriptor = os.open(os.path.join(directory, name),
+                             os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+        with os.fdopen(descriptor, "w") as artifact:
+            artifact.write(contents + "\n")
+    except OSError:
+        return False
+    return True
+
+
+if not persist("ocm-fvt-runner-provenance.json", json.dumps(report, sort_keys=True)):
+    print("WARNING: failed to persist ocm-fvt runner provenance")
+if report["digest_status"] == "observed":
+    print(report["digest"])
+    if not persist("ocm-fvt-image-digest.txt", report["digest"]):
+        print("WARNING: failed to persist ocmci image digest")
+else:
+    print("WARNING: failed to get ocmci image digest")
+PY
+) 2>/dev/null || echo "WARNING: failed to collect ocm-fvt runner provenance"
+unset image_inspection
 $WAS_TRACING_DIGEST && set -x
 echo "=========================="
 
@@ -409,11 +487,12 @@ exit_code=0
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
 podman run \
+  --pull=never \
   "${podman_args[@]}" \
   "${aao_kubeconfig_env[@]}" \
   "${dr_aws_creds_env[@]}" \
   "${zero_egress_env[@]}" \
-  quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
+  "${runner_image_id}" \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
