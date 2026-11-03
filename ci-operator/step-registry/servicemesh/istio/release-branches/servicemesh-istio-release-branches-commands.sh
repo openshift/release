@@ -21,9 +21,10 @@ git fetch --no-tags midstream '+refs/heads/release-*:refs/remotes/midstream/rele
 issues=$(gh api --paginate --slurp "repos/${repo}/issues?state=open&per_page=100" | jq 'add')
 
 failed=0
-while IFS= read -r source; do
-  [[ ${source} =~ ^refs/remotes/midstream/release-([0-9]+\.[0-9]+)$ ]] || continue
-  release_line=${BASH_REMATCH[1]}
+# Only these y-stream lines are supported, regardless of other midstream branches.
+for release_line in 1.30 1.31; do
+  source="refs/remotes/midstream/release-${release_line}"
+  git show-ref --verify --quiet "${source}" || continue
   # List tag names without fetching their histories; exclude prereleases and patch zero.
   tag=$(git ls-remote --tags --refs upstream "refs/tags/${release_line}.*" |
     awk -F/ '$3 ~ /^[0-9]+\.[0-9]+\.[1-9][0-9]*$/ {print $3}' |
@@ -60,5 +61,5 @@ while IFS= read -r source; do
 
 The daily OSSM release-branch job did not create ${target}. Sync the y-stream branch with upstream; the next daily run will retry."
   gh issue create --repo "${repo}" --title "${title}" --body "${body}"
-done < <(git for-each-ref --format='%(refname)' refs/remotes/midstream/)
+done
 exit "${failed}"
