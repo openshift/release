@@ -532,8 +532,6 @@ write_review_metrics() {
         --arg pr_url "${pr_url}" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
         --argjson num_review_rounds "${review_rounds}" \
-        --argjson num_rebases "${rebases}" \
-        --argjson num_retests "${retests}" \
         --argjson iteration "${iteration}" \
         --argjson idle_streak "${idle_streak}" \
         --argjson phase_durations "$(jq -n --argjson review "${phase_review_duration}" '{review: $review}')" \
@@ -545,8 +543,6 @@ write_review_metrics() {
           pr_url: $pr_url,
           upstream_repo: $upstream_repo,
           num_review_rounds: $num_review_rounds,
-          num_rebases: $num_rebases,
-          num_retests: $num_retests,
           iteration: $iteration,
           idle_streak: $idle_streak,
           phase_durations: $phase_durations
@@ -614,15 +610,12 @@ post_retests() {
         echo "WARNING: failed to request /retest"
         return 1
     fi
-    retests=$(( retests + 1 ))
     echo "Requested /retest"
 }
 
 iteration=0
 idle_streak=0
 review_rounds=0
-rebases=0
-retests=0
 PHASE_REVIEW_START=$(date +%s)
 PREV_FAILING='[]'
 PREV_HEAD=""
@@ -803,10 +796,6 @@ Your GitHub login is ${BOT_LOGIN}." \
                 else
                     # CI reruns on the pushed HEAD, so retests would be wasted.
                     echo "Branch changed; skipping retests."
-                    if jq -e 'any(.[]; .bucket == "rebase")' <<< "${extracted}" >/dev/null && \
-                       history_rewritten; then
-                        rebases=$(( rebases + 1 ))
-                    fi
                 fi
                 if [[ "${ci_evaluated}" == "true" ]] && \
                    ! printf '%s\n' "${ci_key}" > "${EVALUATED_CI_FILE}"; then
