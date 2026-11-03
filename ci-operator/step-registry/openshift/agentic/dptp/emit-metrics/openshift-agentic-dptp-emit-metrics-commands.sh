@@ -31,6 +31,7 @@ ANALYZED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Build rows array from all metadata files
 ROWS="[]"
 for metadata_file in "${METADATA_FILES[@]}"; do
+    cp "${metadata_file}" "${ARTIFACT_DIR}/"
     METADATA=$(cat "${metadata_file}")
     AGENT=$(echo "${METADATA}" | jq -r '.agent')
     PHASE=$(echo "${METADATA}" | jq -r '.phase')
@@ -117,17 +118,19 @@ if [[ "${AGENT}" == "dptp-jira-solver" ]]; then
     PHASE_SOLVE=$(echo "${PHASE_DURATIONS}" | jq -r '.solve // 0')
     PHASE_PR=$(echo "${PHASE_DURATIONS}" | jq -r '.pr // 0')
     TOTAL_DURATION=$(( PHASE_SETUP + PHASE_SOLVE + PHASE_PR ))
-    CLAUDE_EXIT=$(echo "${METADATA}" | jq -r '.claude_exit // 0')
+    AGENT_EXIT=$(echo "${METADATA}" | jq -r '.agent_exit // .claude_exit // 0')
+    AGENT_NAME="Claude"
+    [[ $(echo "${METADATA}" | jq -r '.harness // "claude-code"') == codex ]] && AGENT_NAME="Codex"
 
     FAILURE_COUNT=0
     TIMEOUT_CASE=""
-    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    if [[ "${AGENT_EXIT}" -eq 124 ]]; then
         FAILURE_COUNT=1
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_SOLVE}\">
-    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} ${AGENT_NAME} should complete in a reasonable time\" time=\"${PHASE_SOLVE}\">
+    <failure message=\"${AGENT_NAME} timed out.\">${AGENT_NAME} exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
     else
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_SOLVE}\"/>"
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} ${AGENT_NAME} should complete in a reasonable time\" time=\"${PHASE_SOLVE}\"/>"
     fi
 
     # 3 phase testcases + 1 timeout testcase = 4 total
