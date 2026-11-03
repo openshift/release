@@ -1,0 +1,89 @@
+ref:
+  as: openshift-qe-microshift-perf-init
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  commands: openshift-qe-microshift-perf-init-commands.sh
+  env:
+  - name: ITERATIONS
+    default: '3'
+    documentation: Number of fresh-install iterations, 1 through 5. Default three; consistency analysis belongs
+      to perf-tools.
+  - name: COLD_WINDOW
+    default: '1800'
+    documentation: Cold idle window in seconds, before any workload.
+  - name: WARM_WINDOW
+    default: '1800'
+    documentation: Warm idle window in seconds, after workloads and cleanup.
+  - name: SETTLE_SECONDS
+    default: '600'
+    documentation: Idle seconds between density sweeps and pod-network tests.
+  - name: CYCLE_BUDGET_SECONDS
+    default: '115200'
+    documentation: Total job budget in seconds (32h), including initialization/provisioning.
+  - name: MIN_ITERATION_BUDGET_SECONDS
+    default: '21600'
+    documentation: Do not start another iteration with less than this remaining budget (6h).
+  - name: E2E_REPO
+    default: https://github.com/cloud-bulldozer/e2e-benchmarking.git
+    documentation: Upstream wrapper repository; a fork URL is allowed for dependency rehearsal.
+  - name: E2E_VERSION
+    default: master
+    documentation: Upstream branch head resolved once. Must contain QPS_LIST sweep support; a fork/review commit remains an explicit override until merged.
+  - name: KUBE_BURNER_VERSION
+    default: latest
+    documentation: Latest public release resolved once by init via the validated GitHub releases/latest HEAD redirect; a concrete version/tag is an explicit pin.
+  - name: METRICS_PROFILE_REPO
+    default: https://github.com/kube-burner/kube-burner-ocp.git
+    documentation: Repository supplying cmd/config/metrics-profiles/microshift-metrics.yml.
+  - name: METRICS_PROFILE_REVISION
+    default: main
+    documentation: Upstream profile branch head resolved once; explicit branches/tags/commits remain supported.
+  - name: NETPERF_VERSION
+    default: latest
+    documentation: Latest public release resolved once by init via the validated GitHub releases/latest HEAD redirect; the concrete tag is passed to the wrapper. Explicit tags remain pins.
+  - name: NETPERF_TIMEOUT_SECONDS
+    default: '7200'
+    documentation: Bound for network-perf-v2 full-run.yaml in seconds.
+  - name: SWEEP_SLEEP
+    default: '30'
+    documentation: Idle seconds between QPS points, passed to the upstream sweep.
+  - name: SWEEP_CLEANUP_TIMEOUT
+    default: '300'
+    documentation: Namespace cleanup bound in seconds, passed to the upstream sweep.
+  - name: PERF_ES_URL
+    default: ''
+    documentation: Optional HTTPS ES endpoint without credentials. Otherwise read the existing secret host file.
+  - name: PERF_ES_INDEX
+    default: microshift-perf-v1
+    documentation: Dedicated Ansible measurements index; native records retain their tool indexes.
+  - name: KUBE_BURNER_ES_INDEX
+    default: ripsaw-kube-burner
+    documentation: Native kube-burner metrics index.
+  - name: ES_SECRETS_PATH
+    default: /secret
+    documentation: Existing ocp-qe-perfscale-es-creds mount. Missing/unwritable credentials mean local-only operation.
+  - name: PERF_RC
+    default: ''
+    documentation: Pinned release/RC label; defaults to the PR SHA or configured product version.
+  - name: MICROSHIFT_PROMETHEUS_URL
+    default: ''
+    documentation: Prometheus override; normally uses deploy handoff for the bastion.
+  - name: MODEL
+    default: R640
+    documentation: Scale Lab model used by self-sched. Recorded once, lowercased, as the hardware class (with
+      platform BareMetal) on every Ansible measurement, the write probe and the cycle manifest.
+  timeout: 10m0s
+  grace_period: 4m0s
+  documentation: Require Python >= 3.9, resolve tools and identity, and probe optional ES writes once before reserving hardware.
+    Stages private helpers for the cycle.
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret

@@ -113,7 +113,8 @@ run_remote_capture() {
 # Temp files that may hold credentials or partial output; removed on every
 # exit path, after the child that might still write to them is stopped.
 remove_temp_files() {
-  rm -f "${capture_tmp:-}" "${quads_curl_cfg:-}" "${inventory_file:-}" "${gate_script:-}"
+  [[ -z ${perf_vars:-} ]] || rm -f "$perf_vars.tmp"
+  rm -f "${capture_tmp:-}" "${quads_curl_cfg:-}" "${inventory_file:-}" "${gate_script:-}" "${perf_vars:-}"
 }
 
 # Bounded cleanup of the current background child and its process group:
@@ -565,6 +566,33 @@ if [[ "${PROMETHEUS_LOGGING}" == "true" ]]; then
   run_remote ssh ${SSH_ARGS} root@${bastion} "systemctl disable --now prometheus 2>/dev/null || true"
 fi
 
+# Full perf cycles assign iteration 1's result directory before installation.
+# The default deployment path is unchanged. Secrets live outside the result directory.
+if [[ ${PERF_CYCLE:-false} == true ]]; then
+  perf_remote_vars="${microshift_repo}/ansible/.perf-install-vars.json"
+  perf_remote_credentials="${microshift_repo}/ansible/.perf-es-credentials.json"
+  # Handoff only non-secret source/deployment parameters for reinstalling the same PR.
+  jq -n --arg deploy_sha "$(sha256sum "${BASH_SOURCE[0]}" | cut -d' ' -f1)" --arg repo "$microshift_repo" --arg inventory "$ANSIBLE_INVENTORY" --arg playbook "$ANSIBLE_PLAYBOOK" --arg vg "$VG_NAME" --arg disk "$LVM_DISK" --arg version "${pr_microshift_version:-${MICROSHIFT_VERSION}}" \
+    --argjson build "$BUILD_FROM_PR" --arg revision "$PULL_PULL_SHA" --arg refspec "$microshift_git_refspec" \
+    '{deployment_script_sha256:$deploy_sha,automation_repo:$repo,ansible_inventory:$inventory,ansible_playbook:$playbook,install_vars:({microshift_version:$version,vg_name:$vg,lvm_disk:$disk,prometheus_logging:true,install_microshift:true,build_microshift:$build} |
+      if $build then . + {microshift_git_revision:$revision,microshift_git_refspec:$refspec} else . end)}' > "${SHARED_DIR}/microshift-perf-deploy.json"
+  perf_vars=$(mktemp)
+  jq --arg version "${pr_microshift_version:-${MICROSHIFT_VERSION}}" \
+    '.perf_extra_metadata.version=$version' "${SHARED_DIR}/microshift-perf-install-vars.json" > "$perf_vars"
+  if jq -e '.enabled' "${SHARED_DIR}/microshift-perf-es-status.json" >/dev/null; then
+    set +x
+    jq --arg credentials "$perf_remote_credentials" --arg url "$(jq -r .endpoint "${SHARED_DIR}/microshift-perf-es-credentials.json")" \
+      '. + {perf_es_credentials_file:$credentials,perf_es_url:$url}' "$perf_vars" > "$perf_vars.tmp"
+    mv "$perf_vars.tmp" "$perf_vars"
+    run_remote scp -q ${SSH_ARGS} "${SHARED_DIR}/microshift-perf-es-credentials.json" "root@${bastion}:$perf_remote_credentials"
+    run_remote ssh ${SSH_ARGS} "root@${bastion}" "chmod 600 '$perf_remote_credentials'"
+    set -x
+  fi
+  run_remote scp -q ${SSH_ARGS} "$perf_vars" "root@${bastion}:$perf_remote_vars"
+  rm -f "$perf_vars"
+
+fi
+
 # Run ansible playbook
 run_remote ssh ${SSH_ARGS} root@${bastion} "
    set -e
@@ -573,6 +601,11 @@ run_remote ssh ${SSH_ARGS} root@${bastion} "
 
    microshift_version_arg='${MICROSHIFT_VERSION}'
    source_build_args=()
+   perf_args=()
+   if [[ '${PERF_CYCLE:-false}' == 'true' ]]; then
+     perf_args=(-e '@${microshift_repo}/ansible/.perf-install-vars.json')
+     trap 'rm -f ${microshift_repo}/ansible/.perf-es-credentials.json ${microshift_repo}/ansible/.perf-install-vars.json' EXIT HUP INT TERM
+   fi
    if [[ '${BUILD_FROM_PR}' == 'true' ]]; then
      microshift_version_arg='${pr_microshift_version}'
      source_build_args=(
@@ -593,6 +626,7 @@ run_remote ssh ${SSH_ARGS} root@${bastion} "
        -e "vg_name=${VG_NAME}" \
        -e "lvm_disk=${LVM_DISK}" \
        \"\${source_build_args[@]}\" \
+       \"\${perf_args[@]}\" \
        -v | tee /tmp/ansible-microshift-deploy-$(date +%s).log
    else
      echo 'ERROR: Ansible playbook ${ANSIBLE_PLAYBOOK} not found'
