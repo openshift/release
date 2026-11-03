@@ -17,7 +17,7 @@ EXTRA = REPOSITORY / "ci-operator/step-registry/gather/extra/gather-extra-comman
 AUDIT = REPOSITORY / "ci-operator/step-registry/gather/audit-logs/gather-audit-logs-commands.sh"
 
 
-class GatherTests(unittest.TestCase):
+class GatherFixture(unittest.TestCase):
     """Exercise delivered command scripts with offline command doubles."""
 
     def setUp(self):
@@ -56,6 +56,10 @@ class GatherTests(unittest.TestCase):
                         + "\nRESPONSE\n"))
         self._run_function(EXTRA, "gather_etcd_history", "prometheus='" + pods + "'; ")
         return self.artifacts / "metrics/etcd-history"
+
+
+class GatherTests(GatherFixture):
+    """Historical metrics and original suite-error behavior."""
 
     def test_history_preserves_window_labels_buckets_and_coverage(self):
         response = {"status": "success", "data": {"resultType": "matrix", "result": [
@@ -167,6 +171,68 @@ class GatherTests(unittest.TestCase):
             self.assertEqual([item["metric"]["To"] for item in retained],
                              ["peer-b", "peer-a"])
 
+    @unittest.skipUnless(os.environ.get("PROMTOOL"), "set PROMTOOL to test real PromQL")
+    def test_promql_control_plane_histograms_and_scrape_semantics(self):
+        self._metrics({"status": "success", "data": {"resultType": "matrix", "result": []}})
+        queries = [line.removeprefix("query=") for line in
+                   (self.artifacts / "calls").read_text().splitlines()
+                   if line.startswith("query=")]
+        self.assertEqual(len(queries), 8)
+        series = []
+        expected = [[] for query in queries]
+
+        def add_series(labels, family):
+            series.append({"series": labels, "values": "100 110 2"})
+            expected[family].append({"labels": labels, "value": 110})
+
+        for family, metric in enumerate(["etcd_disk_wal_fsync_duration_seconds",
+                                         "etcd_disk_backend_commit_duration_seconds",
+                                         "etcd_network_peer_round_trip_time_seconds"]):
+            for member, peer in [("member-a", "peer-b"), ("member-b", "peer-a")]:
+                for suffix in ["bucket", "count", "sum"]:
+                    labels = f'{metric}_{suffix}{{job="etcd",instance="{member}"'
+                    if family == 2:
+                        labels += f',To="{peer}"'
+                    if suffix == "bucket":
+                        for bound in ["0.1", "+Inf"]:
+                            add_series(labels + f',le="{bound}"' + "}", family)
+                    else:
+                        add_series(labels + "}", family)
+        for node, roles in [("master-a", ["master", "control-plane"]),
+                            ("master-b", ["control-plane"]), ("worker-a", ["worker"])]:
+            for role in roles:
+                series.append({"series": f'kube_node_role{{job="kube-state-metrics",'
+                               f'node="{node}",role="{role}"}}', "values": "1 1 1"})
+            for family, metrics in enumerate([
+                    ["node_disk_read_time_seconds_total", "node_disk_reads_completed_total"],
+                    ["node_disk_write_time_seconds_total", "node_disk_writes_completed_total"],
+                    ["node_disk_io_time_seconds_total", "node_disk_io_time_weighted_seconds_total"],
+                    ["node_disk_flush_requests_total", "node_disk_flush_requests_time_seconds_total"],
+                    ["node_cpu_seconds_total"]], start=3):
+                for metric in metrics:
+                    labels = f'{metric}{{job="node-exporter",instance="{node}"'
+                    labels += ',cpu="0",mode="idle"}' if family == 7 else ',device="nvme0n1"}'
+                    if node == "worker-a":
+                        series.append({"series": labels, "values": "900 910 920"})
+                    else:
+                        add_series(labels, family)
+        checks = [{"expr": query, "eval_time": "45s", "exp_samples": samples}
+                  for query, samples in zip(queries, expected)]
+        checks += [{"expr": queries[3], "eval_time": "60s", "exp_samples": [
+            dict(sample, value=2) for sample in expected[3]]},
+            {"expr": queries[3], "eval_time": "6m15s", "exp_samples": []},
+            {"expr": 'timestamp(node_disk_reads_completed_total{instance="master-a"})',
+             "eval_time": "45s", "exp_samples": [{"labels":
+                 '{job="node-exporter",instance="master-a",device="nvme0n1"}', "value": 30}]},
+            {"expr": 'resets(node_disk_reads_completed_total{instance="master-a"}[1m])',
+             "eval_time": "60s", "exp_samples": [{"labels":
+                 '{job="node-exporter",instance="master-a",device="nvme0n1"}', "value": 1}]}]
+        fixture = self.base / "promql.json"
+        fixture.write_text(json.dumps({"rule_files": [], "evaluation_interval": "15s",
+            "tests": [{"interval": "30s", "input_series": series,
+                       "promql_expr_test": checks}]}), encoding="utf-8")
+        subprocess.run([os.environ["PROMTOOL"], "test", "rules", str(fixture)], check=True)
+
     def test_missing_end_is_bounded_by_current_time(self):
         (self.shared / "conformance-end").unlink()
         output = self._metrics({"status": "success", "data": {
@@ -202,6 +268,26 @@ class GatherTests(unittest.TestCase):
         self._run_function(EXTRA, "gather_etcd_history")
         self.assertIn("RBAC", (self.artifacts / "metrics/etcd-history/gap.txt").read_text())
 
+    def test_suite_success_and_monitor_only_skip_preserve_windows(self):
+        self._command("oc", "echo fixture\n")
+        script = REPOSITORY / ("ci-operator/step-registry/rosa/aws/sts/conformance/"
+                               "test/rosa-aws-sts-conformance-test-commands.sh")
+        for exit_code in [0, 7]:
+            with self.subTest(exit_code=exit_code):
+                self._command("openshift-tests",
+                    f"echo 'failed due to a MonitorTest failure'\nexit {exit_code}\n")
+                environment = dict(self.environment, NAMESPACE="fixture", TEST_SUITE="fixture",
+                                   SKIP_MONITOR_TEST="true")
+                completed = subprocess.run(["bash", str(script)], env=environment,
+                    check=False, capture_output=True, text=True)
+                self.assertEqual(completed.returncode, 0)
+                self.assertTrue((self.shared / "conformance-start").exists())
+                self.assertTrue((self.shared / "conformance-end").exists())
+
+
+class AuditTests(GatherFixture):
+    """Sanitized server evidence and archive retention."""
+
     def test_audit_summary_is_server_evidence_not_client_response(self):
         logs = self.artifacts / "audit-logs/image/audit_logs/kube-apiserver"
         logs.mkdir(parents=True)
@@ -232,6 +318,33 @@ class GatherTests(unittest.TestCase):
         (self.artifacts / "audit-logs").mkdir()
         self._run_function(AUDIT, "summarize_audit_failures")
         self.assertIn("No audit", (self.artifacts / "audit-server-failures/gap.txt").read_text())
+
+    def test_non_pod_object_names_are_not_retained(self):
+        logs = self.artifacts / "audit-logs"
+        logs.mkdir()
+        record = {"stage": "ResponseComplete", "responseStatus": {"code": 500},
+                  "requestReceivedTimestamp": "2026-11-03T01:48:00Z",
+                  "objectRef": {"resource": "users", "name": "DO_NOT_RETAIN"}}
+        (logs / "member-audit.log").write_text(json.dumps(record), encoding="utf-8")
+        self._run_function(AUDIT, "summarize_audit_failures")
+        text = (self.artifacts / "audit-server-failures/entries.jsonl").read_text()
+        self.assertIn('"resource":"users"', text)
+        self.assertNotIn("DO_NOT_RETAIN", text)
+
+    def test_failed_archive_does_not_delete_original_logs(self):
+        self._command("oc", "exit 0\n")
+        self._command("tar", "exit 1\n")
+        logs = self.artifacts / "audit-logs"
+        logs.mkdir()
+        (logs / "member-audit.log").write_text("fixture", encoding="utf-8")
+        configuration = self.base / "kubeconfig"
+        configuration.touch()
+        completed = subprocess.run(["bash", str(AUDIT)], env=dict(
+            self.environment, KUBECONFIG=str(configuration)), check=False,
+            capture_output=True, text=True)
+        self.assertEqual(completed.returncode, 1)
+        self.assertTrue((logs / "member-audit.log").exists())
+        self.assertIn("leaving gathered logs", completed.stderr)
 
     def test_failed_audit_gather_preserves_archive_and_records_gap(self):
         self._command("oc", 'if [[ "$*" == *--help* ]]; then exit 0; fi\n'

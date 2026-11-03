@@ -42,7 +42,10 @@ gaps without retaining arbitrary API error bodies.
 `gather-audit-logs` additionally writes `audit-server-failures/entries.jsonl`
 after securing the original audit archive. Only server-side ResponseComplete
 5xx metadata in the suite window plus margins is selected: Audit-ID, verb,
-object coordinates, timestamps, server status and etcd/total latency annotations.
+pod object coordinates, timestamps, server status and etcd/total latency annotations.
+Other resources retain only resource/subresource, never object names that could
+identify users or tokens. Archive creation failure leaves the original gathered
+logs in place instead of deleting them.
 Request/response bodies, identities, arbitrary annotations and response messages
 are excluded. Decode/gather failures and an entirely missing input set are flagged;
 partial member absence still requires checking the retained archive's coverage.
@@ -66,3 +69,7 @@ invent headers, change timeouts or retry policies, or replace the original error
 
 Offline fixtures: `make test-etcd-gather`. Full repository and CI validation are
 separate from these focused tests.
+Set `PROMTOOL=/path/to/promtool` to additionally evaluate the delivered PromQL
+against fixtures with control-plane/worker role labels, duplicate role series,
+per-member/per-peer histograms, counter resets, staleness and scrape timestamps.
+Without it the real-evaluator test is explicitly skipped, not passed.

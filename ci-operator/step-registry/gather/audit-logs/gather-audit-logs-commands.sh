@@ -24,7 +24,8 @@ function summarize_audit_failures() {
           select(.requestReceivedTimestamp >= $start and .requestReceivedTimestamp < $end) |
           {auditID, verb, stage, requestReceivedTimestamp, stageTimestamp,
            serverCode: .responseStatus.code,
-           object: ((.objectRef // {}) | {resource, namespace, name, subresource}),
+           object: ((.objectRef // {}) | if .resource == "pods" then
+             {resource, namespace, name, subresource} else {resource, subresource} end),
            etcdLatency: .annotations["apiserver.latency.k8s.io/etcd"],
            totalLatency: .annotations["apiserver.latency.k8s.io/total"],
            auditMember: $member,
@@ -81,7 +82,10 @@ fi
 
 audit_gather_status=0
 oc adm must-gather $MUST_GATHER_IMAGE $VOLUME_PERCENTAGE_FLAG --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs || audit_gather_status=$?
-tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .
+if ! tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .; then
+  echo 'Audit archive creation failed; leaving gathered logs in audit-logs for artifact retention.' >&2
+  exit 1
+fi
 if [[ -f ${SHARED_DIR}/conformance-start ]]; then
   summarize_audit_failures
   if (( audit_gather_status != 0 )); then
