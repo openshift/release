@@ -710,6 +710,11 @@ wait_for_localnet_multi_vmis_running() {
 # booted, which means ignition completed. VMs that are still early in boot are
 # protected by the grace period rather than being re-rolled underneath
 # themselves.
+#
+# The replacement VMI gets a new virt-launcher pod and a new logical switch
+# port, so its OVN DHCP options do not survive the re-roll. Only call this from
+# wait_for_localnet_multi_vmis_booted, which reattaches them at the top of the
+# next round; calling it anywhere else strands the guest without a lease.
 recover_stuck_localnet_multi_vmis() {
   local multi_ns="$1"
   local grace_seconds="${2:-600}"
@@ -741,34 +746,151 @@ recover_stuck_localnet_multi_vmis() {
   return 0
 }
 
-# wait_for_localnet_multi_vmis_booted waits for every worker VMI to report
-# AgentConnected, re-rolling any that get stuck, and gives up after a bounded
-# number of recovery rounds rather than looping forever.
+# localnet_multi_joined_node_count counts Ready nodes in the hosted cluster.
+#
+# This is the signal that matters. AgentConnected only proves the guest OS
+# booted far enough to start the qemu guest agent; it says nothing about kubelet
+# starting, reaching the hosted API, or registering. The guest kubeconfig is
+# written immediately before ensure_localnet_multi_worker_networking runs, so
+# the real node count is available here.
+localnet_multi_joined_node_count() {
+  local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  [[ -r "${kubeconfig}" ]] || { echo 0; return 0; }
+  oc --kubeconfig "${kubeconfig}" get nodes --no-headers --request-timeout=15s 2>/dev/null \
+    | awk '$2 ~ /^Ready/ {n++} END {print n+0}'
+}
+
+# localnet_multi_agent_connected_count reports how many guests have booted.
+# Kept as the explanatory signal: it separates "the guest never booted" from
+# "the guest booted but never became a node", which are different failures with
+# different owners.
+localnet_multi_agent_connected_count() {
+  oc get vmi -n "$1" --request-timeout=15s \
+    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="AgentConnected")].status}{"\n"}{end}' 2>/dev/null \
+    | grep -c '^True$' || true
+}
+
+# dump_localnet_multi_diagnostics prints enough state to tell apart the failure
+# modes this step has actually hit, so the build log explains itself instead of
+# requiring a live cluster afterwards.
+dump_localnet_multi_diagnostics() {
+  local multi_ns="$1"
+  local guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local vmi agent launcher
+
+  echo ""
+  echo "================ localnet-multi failure diagnostics ================"
+
+  echo "--- VMIs / VMs / virt-launcher pods ---"
+  oc get vmi,vm -n "${multi_ns}" -o wide --request-timeout=30s || true
+  oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher -o wide --request-timeout=30s || true
+
+  echo "--- DataVolumes / PVCs (rules out storage) ---"
+  oc get dv,pvc -n "${multi_ns}" -o wide --request-timeout=30s || true
+
+  # A KubevirtMachine with no spec.providerID, whose conditions are frozen at
+  # creation time, means capi-provider is not reconciling at all -- read its log
+  # below rather than looking at the guests.
+  echo "--- KubevirtMachine / Machine ---"
+  oc get kubevirtmachine -n "${multi_ns}" --request-timeout=30s \
+    -o custom-columns=NAME:.metadata.name,READY:.status.ready,PROVIDERID:.spec.providerID || true
+  oc get kubevirtmachine -n "${multi_ns}" --request-timeout=30s \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.conditions[*]}{.type}={.status}({.reason})@{.lastTransitionTime}{" "}{end}{"\n"}{end}' || true
+  oc get machine -n "${multi_ns}" -o wide --request-timeout=30s || true
+
+  echo "--- capi-provider (cluster-api-provider-kubevirt) ---"
+  oc get pods -n "${multi_ns}" -o wide --request-timeout=30s 2>/dev/null \
+    | grep -E 'capi-provider|cluster-api' || true
+  oc logs -n "${multi_ns}" deploy/capi-provider --tail=120 --request-timeout=30s 2>&1 | tail -120 || true
+
+  echo "--- NodePool conditions that are False ---"
+  oc get nodepool -A --request-timeout=30s \
+    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{range .status.conditions[?(@.status=="False")]}{"  "}{.type}: {.reason}: {.message}{"\n"}{end}{end}' || true
+
+  echo "--- recent events ---"
+  oc get events -n "${multi_ns}" --sort-by=.lastTimestamp --request-timeout=30s 2>/dev/null | tail -40 || true
+
+  # The guest console is the only place that separates "no DHCP lease" from
+  # "ignition failed" from "kubelet never started". Only dump it for guests that
+  # have not booted, to keep the build log bounded.
+  echo "--- guest console log for VMIs without AgentConnected ---"
+  for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+    agent=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
+    [[ "${agent}" == "True" ]] && continue
+    launcher=$(oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher -o name 2>/dev/null \
+      | grep -- "virt-launcher-${vmi}-" | head -1)
+    [[ -n "${launcher}" ]] || continue
+    echo "  === console: ${vmi} (${launcher}) ==="
+    oc logs -n "${multi_ns}" "${launcher}" -c guest-console-log --tail=150 2>&1 | tail -150 || true
+  done
+
+  echo "--- hosted cluster nodes / CSRs ---"
+  if [[ -r "${guest_kubeconfig}" ]]; then
+    oc --kubeconfig "${guest_kubeconfig}" get nodes -o wide --request-timeout=30s || true
+    oc --kubeconfig "${guest_kubeconfig}" get csr --request-timeout=30s 2>/dev/null | tail -20 || true
+  else
+    echo "  (no guest kubeconfig at ${guest_kubeconfig})"
+  fi
+  echo "===================================================================="
+  echo ""
+}
+
+# wait_for_localnet_multi_vmis_booted waits for the hosted cluster to reach its
+# full node count, re-rolling guests that never boot, bounded by max_rounds.
+#
+# An empty network_count means "do not touch OVN DHCP" -- correct for the
+# external DHCP topology, where dnsmasq on the secondary bridge serves leases.
 wait_for_localnet_multi_vmis_booted() {
   local multi_ns="$1"
-  local max_rounds="${2:-3}"
-  local grace="${3:-600}"
-  local round attempt booted
+  local network_count="${2:-}"
+  local max_rounds="${3:-3}"
+  local grace="${4:-600}"
+  local round attempt joined=0 booted=0 launcher_nodes
 
   for round in $(seq 1 "${max_rounds}"); do
+    # Reattach OVN DHCP options at the start of every round. Deleting a VMI
+    # gives the replacement a new virt-launcher pod and therefore a brand-new
+    # logical switch port; the dhcpv4_options configured earlier belonged to the
+    # port that went away with the old pod. Without this, a re-rolled guest
+    # boots onto a port with no DHCP configuration and can never get a lease --
+    # which turned a slow guest into a permanently dead one.
+    if [[ -n "${network_count}" ]]; then
+      launcher_nodes=$(get_localnet_multi_launcher_nodes "${multi_ns}")
+      if [[ -n "${launcher_nodes// /}" ]]; then
+        echo "Round ${round}: (re)attaching OVN DHCP on node(s): ${launcher_nodes}"
+        configure_localnet_multi_dhcp_on_nodes "${multi_ns}" "${network_count}" "${launcher_nodes}" || true
+      fi
+    fi
+
     for attempt in $(seq 1 60); do
-      booted=$(oc get vmi -n "${multi_ns}" \
-        -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="AgentConnected")].status}{"\n"}{end}' 2>/dev/null \
-        | grep -c '^True$' || true)
-      if [[ "${booted}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
-        echo "All ${booted} worker guests booted (guest agent connected)"
+      joined=$(localnet_multi_joined_node_count)
+      if [[ "${joined}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+        echo "All ${joined} worker nodes joined the hosted cluster"
         return 0
       fi
       if [[ $((attempt % 6)) -eq 0 ]]; then
-        echo "  ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted (round ${round}/${max_rounds}, attempt ${attempt}/60)"
+        booted=$(localnet_multi_agent_connected_count "${multi_ns}")
+        echo "  ${joined}/${HYPERSHIFT_NODE_COUNT} nodes joined, ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted" \
+             "(round ${round}/${max_rounds}, attempt ${attempt}/60)"
       fi
       sleep 10
     done
-    echo "Round ${round}: ${booted}/${HYPERSHIFT_NODE_COUNT} guests booted; checking for stuck VMIs"
+
+    booted=$(localnet_multi_agent_connected_count "${multi_ns}")
+    echo "Round ${round}: ${joined}/${HYPERSHIFT_NODE_COUNT} joined, ${booted}/${HYPERSHIFT_NODE_COUNT} booted;" \
+         "checking for stuck VMIs"
     recover_stuck_localnet_multi_vmis "${multi_ns}" "${grace}"
   done
 
-  echo "WARNING: only ${booted}/${HYPERSHIFT_NODE_COUNT} worker guests booted after ${max_rounds} recovery rounds"
+  booted=$(localnet_multi_agent_connected_count "${multi_ns}")
+  echo "ERROR: only ${joined}/${HYPERSHIFT_NODE_COUNT} worker nodes joined" \
+       "(${booted}/${HYPERSHIFT_NODE_COUNT} guests booted) after ${max_rounds} recovery rounds"
+  if [[ "${booted}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
+    echo "NOTE: every guest booted, so the guests are not the problem -- they are not" \
+         "becoming nodes. Look at capi-provider and the KubevirtMachine state below."
+  fi
+  dump_localnet_multi_diagnostics "${multi_ns}"
   return 1
 }
 
@@ -827,13 +949,13 @@ ensure_localnet_multi_worker_networking() {
   # renew_localnet_multi_dhcp_for_running_vmis "${multi_ns}" "${network_count}" \
   #   || echo "WARNING: DHCP renewal reported a failure on one or more worker VMIs"
 
-  # Wait for the guests to actually boot, re-rolling any that got stuck. This
+  # Wait for the guests to become nodes, re-rolling any that never boot. This
   # replaces verify_localnet_multi_worker_routes, which shelled out to
   # "virtctl guest-exec" — not a virtctl subcommand, so it grepped the resulting
   # error string for a route, found none and reported default_route=MISSING for
-  # every VMI whether or not anything was wrong. AgentConnected is a real signal:
-  # it requires the guest to have completed ignition and booted.
-  if ! wait_for_localnet_multi_vmis_booted "${multi_ns}"; then
+  # every VMI whether or not anything was wrong. network_count is threaded in so
+  # each round can reattach DHCP options to the current logical switch ports.
+  if ! wait_for_localnet_multi_vmis_booted "${multi_ns}" "${network_count}"; then
     return 1
   fi
   return 0
@@ -1600,13 +1722,14 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_
   }
 elif [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "external" ]]; then
   # With external DHCP the VMs should already have correct networking, so just
-  # confirm the guests booted, re-rolling any left in emergency mode by a
-  # transient ignition failure.
+  # confirm the guests became nodes, re-rolling any left in emergency mode by a
+  # transient ignition failure. The empty network_count keeps the wait off OVN
+  # DHCP: dnsmasq on the secondary bridge owns leases in this topology.
   MULTI_NAMESPACE="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
   echo "Verifying worker VMI networking (external DHCP mode)..."
   if [[ "${LOCALNET_MULTI_VERIFY_DEFAULT_ROUTE:-true}" == "true" ]]; then
-    wait_for_localnet_multi_vmis_booted "${MULTI_NAMESPACE}" || {
-      echo "WARNING: not all worker guests booted; the NodePool will be short of nodes" >&2
+    wait_for_localnet_multi_vmis_booted "${MULTI_NAMESPACE}" "" || {
+      echo "WARNING: not all worker nodes joined; the NodePool will be short of nodes" >&2
     }
   fi
 fi

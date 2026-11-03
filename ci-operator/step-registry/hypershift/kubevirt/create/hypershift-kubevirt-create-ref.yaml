@@ -146,10 +146,16 @@ ref:
       default: "true"
       documentation: |-
         When true, verify worker VMI networking after the HostedCluster reports Available.
-        Verification is now a boot check: every worker VMI must report AgentConnected, which
-        the guest can only do once ignition has completed, and VMIs that are Running without
-        it are re-rolled. The previous in-guest route check ran through "virtctl guest-exec",
-        which is not a virtctl subcommand, and has been disabled.
+        Verification waits for HYPERSHIFT_NODE_COUNT Ready nodes in the hosted cluster, using
+        the guest kubeconfig written by the preceding step; AgentConnected is reported
+        alongside it so the log distinguishes "the guest never booted" from "the guest booted
+        but never became a node". VMIs that are Running without a guest agent past the grace
+        period are re-rolled, and OVN DHCP options are reattached before each round because a
+        re-rolled VMI lands on a new logical switch port. On failure the step dumps
+        capi-provider logs, KubevirtMachine conditions, VMI/DataVolume/PVC state, namespace
+        events and the console log of every guest that did not boot. The previous in-guest
+        route check ran through "virtctl guest-exec", which is not a virtctl subcommand, and
+        has been disabled.
     - name: LOCALNET_MULTI_DHCP_MODE
       default: "ovn"
       documentation: |-
