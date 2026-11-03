@@ -56,9 +56,19 @@ def mock_artifact_command(command, arguments, base, case):
 
 
 def mock_image_inspection(case):
+    """Emit projected metadata, including malformed byte and digest fixtures."""
     data = {"image_id": IMAGE_ID, "manifest_digest": DIGEST,
             "repo_digests": [IMAGE_REPOSITORY + "@" + DIGEST],
             "revision": REVISION, "source": SOURCE}
+    if case == "invalid-utf8-inspect":
+        payload = json.dumps(data).encode("utf-8").replace(REVISION.encode("ascii"), b"\xff" + REVISION.encode("ascii"))
+        os.write(sys.stdout.fileno(), payload)
+        return 0
+    if case == "multibyte-boundary-inspect":
+        prefix = (json.dumps(data)[:-1] + ', "unrelated":"' + SECRET).encode("utf-8")
+        payload = prefix + b"a" * (16384 - len(prefix)) + '\u20ac"}'.encode("utf-8")
+        os.write(sys.stdout.fileno(), payload)
+        return 0
     if case == "invalid-digest":
         data["repo_digests"] = [SECRET]
     elif case == "ambiguous-digest":
@@ -287,6 +297,36 @@ class ArtifactMetadataTests(ArtifactFixture):
         self.run_step("root-symlink")
         self.assertEqual(self.metadata()["output"]["type"], stat.S_IFLNK)
         self.assertNotIn("results", self.metadata()["output"])
+
+
+class RunnerInspectionEncodingTests(ArtifactFixture):
+    """Exercise fail-closed byte decoding through the delivered launcher."""
+
+    def check_undecodable_inspection(self, case, exit_code, expected_status):
+        """Require explicit unknown artifacts without changing the suite result."""
+        self.run_step(case, exit_code)
+        data = self.provenance()
+        self.assertEqual(data["inspection_status"], expected_status)
+        self.assertEqual(data["digest"], "unknown")
+        self.assertEqual(data["org.opencontainers.image.revision"], "unknown")
+        self.assertEqual(data["org.opencontainers.image.source"], "unknown")
+        self.assertFalse((self.artifacts / "ocm-fvt-image-digest.txt").exists())
+
+    def test_invalid_utf8_preserves_success(self):
+        """Reject undecodable bytes even inside an otherwise valid revision."""
+        self.check_undecodable_inspection("invalid-utf8-inspect", 0, "unknown_invalid_response")
+
+    def test_invalid_utf8_preserves_failure(self):
+        """Keep the failing suite exit when inspection bytes cannot decode."""
+        self.check_undecodable_inspection("invalid-utf8-inspect", 42, "unknown_invalid_response")
+
+    def test_multibyte_boundary_preserves_success(self):
+        """Classify a byte-cap split UTF-8 character as a response limit."""
+        self.check_undecodable_inspection("multibyte-boundary-inspect", 0, "unknown_response_limit")
+
+    def test_multibyte_boundary_preserves_failure(self):
+        """Keep a failing suite exit when the byte cap splits UTF-8."""
+        self.check_undecodable_inspection("multibyte-boundary-inspect", 42, "unknown_response_limit")
 
 
 class RunnerProvenanceTests(ArtifactFixture):

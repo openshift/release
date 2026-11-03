@@ -416,13 +416,13 @@ report = {
     "source_status": "unknown_unavailable",
     "label_semantics": "image_metadata_not_executable_attestation",
 }
-with os.fdopen(3) as inspection:
-    raw = inspection.read(16386)
 try:
+    with os.fdopen(3, "rb") as inspection:
+        raw = inspection.read(16386)
     if len(raw) > 16384:
         report["inspection_status"] = "unknown_response_limit"
     elif raw.strip():
-        data = json.loads(raw)
+        data = json.loads(raw.decode("utf-8"))
         inspected_id = data.get("image_id", "")
         if isinstance(inspected_id, str) and re.fullmatch(r"(?:sha256:)?[0-9a-f]{64}", inspected_id):
             inspected_id = "sha256:" + inspected_id[-64:]
