@@ -5,6 +5,25 @@ set -o errexit
 set -o pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
+# shellcheck disable=SC2154
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "ERROR: Step failed at line $LINENO with exit code $rc"; fi' EXIT
+
+ssh_retry() {
+  local retries=3 delay=10
+  for ((i=1; i<=retries; i++)); do
+    if "$@"; then return 0; fi
+    if ((i < retries)); then
+      echo "Attempt $i/$retries failed, retrying in ${delay}s..."
+      sleep "$delay"
+      delay=$((delay * 2))
+    else
+      echo "Attempt $i/$retries failed"
+    fi
+  done
+  echo "All $retries attempts failed"
+  return 1
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -70,7 +89,7 @@ export LCA_GIT_REPO="https://github.com/openshift-kni/lifecycle-agent"
 export LCA_GIT_BRANCH="${LCA_GIT_BRANCH:-main}"
 export SEED_VERSION="${SEED_VERSION}"
 export IP_STACK="${IP_STACK}"
-export UPGRADE_TIMEOUT="60m"
+export UPGRADE_TIMEOUT="${UPGRADE_TIMEOUT:-60m}"
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
 # pending, both during installation and e2e tests.
@@ -151,8 +170,8 @@ EOF
 
 chmod +x ${SHARED_DIR}/upgrade_from_seed.sh
 
-echo "Transfering upgrade script..."
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/upgrade_from_seed.sh $ssh_host_ip:$remote_workdir
+echo "Transferring upgrade script..."
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/upgrade_from_seed.sh" "${ssh_host_ip}:${remote_workdir}"
 
 echo "Upgrading target cluster..."
-ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/upgrade_from_seed.sh"
+ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "${remote_workdir}/upgrade_from_seed.sh"
