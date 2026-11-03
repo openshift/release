@@ -679,8 +679,15 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
     add_failure_domain=1
   fi
 
+  # poolName carries VCM's own status.poolInfo[].name verbatim (or status.name
+  # for a single-pool lease) so consumers can look up this failure domain's
+  # govc_<pool>.sh by the same string VCM used to create it. VCM lowercases
+  # the datacenter/cluster segments when composing that name (e.g. datacenter
+  # "wldn-120-DC" becomes "wldn-120-dc" in the pool name), but topology.datacenter
+  # below keeps the original case, so reconstructing the pool name from
+  # server+datacenter+cluster is not reliable.
   if [[ $add_failure_domain == 1 ]] ; then
-    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${shortName}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
+    platformSpec=$(echo "${platformSpec}" | jq -r '.failureDomains += [{"server": "'"${server}"'", "name": "'"${shortName}"'", "poolName": "'"${RESOURCE_POOL}"'", "zone": "'"${zone}"'", "region": "'"${region}"'", "server": "'"${server}"'", "topology": {"resourcePool": "'"${resource_pool}"'", "computeCluster": "'"${cluster}"'", "datacenter": "'"${datacenter}"'", "datastore": "'"${datastore}"'", "networks": ["'"${network}"'"]}}]')
   fi
 
   # Add / Update vCenter list
@@ -932,7 +939,10 @@ done
 
 log "writing the platform spec"
 echo "$platformSpec" > "${SHARED_DIR}"/platform.json
-echo "$platformSpec" | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
+# poolName is internal bookkeeping (see failureDomains above) and is not part
+# of the installer's VSphereFailureDomain schema, so strip it before this gets
+# spliced into install-config.yaml's platform.vsphere section.
+echo "$platformSpec" | jq -r 'del(.failureDomains[].poolName)' | jq -r yamlify2 | sed --expression='s/^/    /g' > "${SHARED_DIR}"/platform.yaml
 
 # Save reserved networks for later use
 if [[ "${RESERVE_EXTRA_NETWORK:-}" == "true" ]]; then
