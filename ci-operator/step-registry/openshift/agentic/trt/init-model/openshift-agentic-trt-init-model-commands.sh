@@ -194,111 +194,6 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-init-model.sh"
 
-prow_public_artifact_prefix() {
-    local step_name=$1
-    [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]] || return 1
-    local job_path=logs
-    if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
-        local org repo pull job_spec
-        job_spec=${JOB_SPEC:-'{}'}
-        org=$(jq -r '.refs.org // empty' <<<"${job_spec}") || return 1
-        repo=$(jq -r '.refs.repo // empty' <<<"${job_spec}") || return 1
-        pull=$(jq -r '.refs.pulls[0].number // empty' <<<"${job_spec}") || return 1
-        [[ -n "${org}" && -n "${repo}" && -n "${pull}" ]] || return 1
-        job_path="pr-logs/pull/${org}_${repo}/${pull}"
-    fi
-    printf '%s\n' "https://gcs.ci.openshift.org/gcs/test-platform-results-public/${job_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/artifacts/screenshots"
-}
-
-# Screenshots remain ordinary Prow artifacts. The worker writes a stable
-# marker into Markdown and the pipeline replaces it with the deterministic
-# public-mirror URL before publishing a PR. No agent-side release or push is
-# needed, and the URL becomes live after Prow uploads the step artifacts.
-prepare_prow_screenshot_handoff() {
-    local step_name=$1
-    PROW_SCREENSHOT_DIR="${WORKDIR}/artifacts/screenshots"
-    mkdir -p "${PROW_SCREENSHOT_DIR}"
-    export PROW_SCREENSHOT_DIR
-    # Playwright MCP honors this for automatically named screenshots. Both
-    # Claude and Codex inherit it when they start the project MCP server.
-    PLAYWRIGHT_MCP_OUTPUT_DIR="${PROW_SCREENSHOT_DIR}"
-    export PLAYWRIGHT_MCP_OUTPUT_DIR
-    PROW_SCREENSHOT_URL_PREFIX=""
-    if [[ "${EVAL_MODE:-}" != "true" ]]; then
-        PROW_SCREENSHOT_URL_PREFIX=$(prow_public_artifact_prefix "${step_name}" || true)
-    fi
-    export PROW_SCREENSHOT_URL_PREFIX
-}
-
-append_prow_screenshot_handoff() {
-    cat >> "$1" <<EOF
-PROW_SCREENSHOT_DIR: \`${PROW_SCREENSHOT_DIR}\`
-PROW_SCREENSHOT_URL_PREFIX: \`${PROW_SCREENSHOT_URL_PREFIX:-unavailable}\`
-
-EOF
-}
-
-copy_prow_screenshot_artifacts() {
-    [[ -d "${PROW_SCREENSHOT_DIR:-}" ]] || return 0
-    local destination="${ARTIFACT_DIR}/screenshots"
-    mkdir -p "${destination}"
-    python3 - "${PROW_SCREENSHOT_DIR}" "${destination}" <<'PY'
-import pathlib
-import re
-import shutil
-import sys
-
-source = pathlib.Path(sys.argv[1])
-destination = pathlib.Path(sys.argv[2])
-safe_name = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]png", re.IGNORECASE)
-
-for candidate in source.iterdir():
-    if (
-        not safe_name.fullmatch(candidate.name)
-        or candidate.is_symlink()
-        or not candidate.is_file()
-    ):
-        print(f"WARNING: ignoring unsafe screenshot artifact: {candidate.name}", file=sys.stderr)
-        continue
-    shutil.copy2(candidate, destination / candidate.name)
-PY
-}
-
-replace_prow_screenshot_markers() {
-    local markdown_file=$1
-    [[ -s "${markdown_file}" ]] || return 0
-    if [[ -z "${PROW_SCREENSHOT_URL_PREFIX:-}" ]]; then
-        if grep -q 'prow-artifact://screenshots/' "${markdown_file}"; then
-            echo "WARNING: screenshot markers remain because the public Prow artifact URL is unavailable" >&2
-        fi
-        return 0
-    fi
-    python3 - "${markdown_file}" "${PROW_SCREENSHOT_DIR}" "${PROW_SCREENSHOT_URL_PREFIX}" <<'PY'
-import pathlib
-import re
-import sys
-
-markdown_path = pathlib.Path(sys.argv[1])
-screenshot_dir = pathlib.Path(sys.argv[2])
-url_prefix = sys.argv[3].rstrip("/")
-pattern = re.compile(r'''prow-artifact://screenshots/([^\s)\]}>"']+)''')
-safe_name = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]png", re.IGNORECASE)
-text = markdown_path.read_text()
-
-
-def replace(match):
-    name = match.group(1)
-    candidate = screenshot_dir / name
-    if not safe_name.fullmatch(name) or candidate.is_symlink() or not candidate.is_file():
-        print(f"WARNING: screenshot marker references unsafe or missing artifact: {name}", file=sys.stderr)
-        return match.group(0)
-    return f"{url_prefix}/{name}"
-
-
-markdown_path.write_text(pattern.sub(replace, text))
-PY
-}
-
 append_codex_prefix_rule() {
     local rules_file=$1
     local justification=$2
@@ -494,6 +389,31 @@ prepare_codex_home() {
     trap codex_home_cleanup EXIT
 }
 
+configure_codex_upload_screenshot_skill() {
+    local plugin_root="/opt/ai-helpers/plugins/github"
+    local source="${plugin_root}/skills/upload-screenshot"
+    local target="${HOME}/.agents/skills/upload-screenshot"
+    [[ -f "${source}/SKILL.md" && -f "${source}/upload_screenshot.sh" ]] || {
+        echo "ERROR: upload-screenshot skill not found at ${source}" >&2
+        return 1
+    }
+    mkdir -p "$(dirname "${target}")" || return 1
+    if [[ -L "${target}" ]]; then
+        [[ "$(readlink -f "${target}")" == "$(readlink -f "${source}")" ]] || {
+            echo "ERROR: ${target} points to an unexpected skill" >&2
+            return 1
+        }
+    elif [[ -e "${target}" ]]; then
+        echo "ERROR: refusing to replace existing Codex skill at ${target}" >&2
+        return 1
+    else
+        ln -s "${source}" "${target}" || return 1
+    fi
+    # The existing skill uses this plugin-root contract to locate its helper.
+    CLAUDE_PLUGIN_ROOT="${plugin_root}"
+    export CLAUDE_PLUGIN_ROOT
+}
+
 codex_project_mcp_is_allowed() {
     local server=$1
     [[ " ${ALLOWED_TOOLS:-} " == *" mcp__${server}__"* ]]
@@ -623,6 +543,7 @@ agentic_ci() {
         prepare_codex_home || return 1
         exclude_codex_from_worktree
         ensure_codex || return 1
+        configure_codex_upload_screenshot_skill || return 1
         configure_codex_project_mcp || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then

@@ -58,7 +58,6 @@ START_BRANCH=$(git branch --show-current)
 START_COMMIT=$(git rev-parse HEAD)
 
 mkdir -p "${WORKDIR}/artifacts"
-prepare_prow_screenshot_handoff openshift-agentic-trt-jira-solver
 
 # Keep pipeline-owned publication metadata outside the target checkout so it
 # cannot be swept into the solution commit with repository changes.
@@ -81,13 +80,11 @@ rm -f -- "${PR_BODY_FILE}"
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        copy_prow_screenshot_artifacts
         for artifact in "${WORKDIR}/artifacts/"*; do
-            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" || \
-                  "${artifact}" == "${PROW_SCREENSHOT_DIR}" ]]; then
+            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
                 continue
             fi
-            cp -a "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
         done
         if [[ -f "${PR_BODY_FILE}" ]]; then
             cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
@@ -113,8 +110,8 @@ $(cat "${ISSUE_JSON}")
 ## Additional Instructions
 
 - Write the PR description to \`${PR_BODY_FILE}\`.
-- Do not use the \`gh\` CLI or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
-- For browser evidence with Playwright MCP, call \`browser_take_screenshot\` without a filename; \`PLAYWRIGHT_MCP_OUTPUT_DIR\` saves the automatically named PNG under \`${PROW_SCREENSHOT_DIR}\`. Other capture tools must also write PNG files there. Confirm the file exists, then use \`prow-artifact://screenshots/<basename>.png\` in the PR description. Do not run the upload-screenshot skill: it creates a GitHub release, while this job keeps publication pipeline-owned. The pipeline replaces valid markers with hosted Prow artifact URLs.
+- Do not invoke the \`gh\` CLI directly or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
+- For browser evidence, capture the image with the Playwright MCP server, then invoke the \`upload-screenshot\` skill on the saved file. That established helper is the only permitted agent-side GitHub publication: it uploads a screenshot prerelease to \`${FORK_REPO}\` using the injected fork token and returns markdown for the PR description. Do not run \`gh release\` yourself or publish branches, commits, or PRs.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
@@ -157,7 +154,7 @@ cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
 - Work serially in the parent agent. Do not delegate.
-- Follow jira-solve --ci: commit locally; do not push or use gh. Only the pipeline publishes.
+- Follow jira-solve --ci: commit locally; do not push or invoke gh directly. The upload-screenshot skill is the only exception and may publish screenshot assets to the configured fork; only the pipeline publishes branches and PRs.
 - Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
 CI_POLICY
 
@@ -171,7 +168,7 @@ agentic_ci --timeout 5400 \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Work serially without delegation. Commit locally; do not push or use gh. The pipeline publishes. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
+Work serially without delegation. Commit locally; do not push or invoke gh directly. The upload-screenshot skill may publish screenshot assets to ${FORK_REPO}; the pipeline publishes the branch and PR. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
     --settings "${AGENT_SETTINGS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
@@ -180,7 +177,7 @@ Work serially without delegation. Commit locally; do not push or use gh. The pip
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
     agentic_ci --timeout 600 \
-        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or use gh; only the pipeline publishes. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
+        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the upload-screenshot skill may publish screenshot assets to ${FORK_REPO}, and only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
         --continue \
         --settings "${AGENT_SETTINGS}" \
         --output-format stream-json \
@@ -267,7 +264,6 @@ Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
-replace_prow_screenshot_markers "${PR_BODY_FILE}"
 
 BASE_ARGS=()
 if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
