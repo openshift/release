@@ -25,86 +25,94 @@ CLUSTER = "a" * 32
 SECRET = "FIXTURE_SECRET_MUST_NOT_APPEAR"
 
 
+def mock_curl(base, case, arguments):
+    if case == "download-failure":
+        print(SECRET, file=sys.stderr)
+        return 1
+    destination = Path(arguments[arguments.index("-o") + 1])
+    if destination.name == "ocm":
+        shutil.copyfile(base / "bin/ocm", destination)
+        if case == "missing-tool":
+            destination.write_text("#!/nonexistent-fixture-interpreter\n", encoding="utf-8")
+            (base / "bin/ocm").unlink()
+    else:
+        data = (base / "bin/ocm-backplane").read_bytes()
+        with tarfile.open(destination, "w:gz") as archive:
+            entry = tarfile.TarInfo("ocm-backplane")
+            entry.size = len(data)
+            entry.mode = 0o700
+            if case == "archive-symlink":
+                entry.type = tarfile.SYMTYPE
+                entry.linkname = str(base / "outside")
+                entry.size = 0
+                archive.addfile(entry)
+            else:
+                archive.addfile(entry, io.BytesIO(data))
+    return 0
+
+
+def mock_ocm(base, case, arguments):
+    if arguments[0] == "login":
+        if case == "timeout":
+            time.sleep(25)
+        print(SECRET)
+        return int(case == "login-failure")
+    path = arguments[1]
+    if case == "api-failure":
+        print(SECRET, file=sys.stderr)
+        return 1
+    if case == "oversized":
+        print("x" * (2 * 1024 * 1024))
+        return 0
+    if case == "invalid-json":
+        print(SECRET)
+        return 0
+    if "?" in path:
+        manifest = json.loads((base / "shared/ocm-fvt-diagnostic-identity.json").read_text())
+        created = manifest["started"] if case != "old-match" else manifest["started"] - 1
+        if case == "fractional-finish":
+            created = int(manifest["finished"]) + 0.5
+        cluster = {"id": CLUSTER, "name": "fixture-run-name", "creation_timestamp":
+                   datetime.datetime.fromtimestamp(created, datetime.timezone.utc).isoformat()}
+        if case == "replacement-cluster":
+            cluster["id"] = "b" * 32
+        print(json.dumps({"total": 2 if case == "ambiguous-match" else 1, "items": [cluster]}))
+    elif path.endswith("/resources/live"):
+        print(json.dumps({"cluster_id": CLUSTER, "resources": {
+            "gcp-observation": json.dumps({"kind": "ProjectClaim", "spec": {"projectReferenceCRLink": {
+                "name": SECRET, "namespace": SECRET}},
+                "status": {"state": "Error", "message": SECRET,
+                           "conditions": [{"type": "Error", "status": "True", "reason": "ReconcileError",
+                                           "message": SECRET}]}}),
+            "reference": json.dumps({"kind": "ProjectReference", "spec": {"projectClaimCRLink": {"name": "", "namespace": ""}},
+                                      "status": {"state": "Verification"}}),
+            SECRET: json.dumps({"kind": "Secret", "data": {"token": SECRET}})}}))
+    elif path.endswith("/credentials"):
+        if case == "missing-access":
+            return 1
+        print(json.dumps({"kubeconfig": "apiVersion: v1\nkind: Config\n"}))
+    else:
+        print(json.dumps({"id": CLUSTER, "state": "error" if case == "terminal" else "pending",
+                          "provision_status": "PendingProject", "message": SECRET}))
+    return 0
+
+
 def mock(command, arguments):
     base = Path(os.environ["FIXTURE_DIR"])
     case = os.environ["FIXTURE_CASE"]
-    with (base / "calls").open("a") as calls:
+    with (base / "calls").open("a", encoding="utf-8") as calls:
         calls.write(command + " " + ("login" if arguments[:1] == ["login"] else " ".join(arguments)) + "\n")
     if command == "curl":
-        if case == "download-failure":
-            print(SECRET, file=sys.stderr)
-            return 1
-        destination = Path(arguments[arguments.index("-o") + 1])
-        if destination.name == "ocm":
-            shutil.copyfile(base / "bin/ocm", destination)
-            if case == "missing-tool":
-                destination.write_text("#!/nonexistent-fixture-interpreter\n")
-                (base / "bin/ocm").unlink()
-        else:
-            data = (base / "bin/ocm-backplane").read_bytes()
-            with tarfile.open(destination, "w:gz") as archive:
-                entry = tarfile.TarInfo("ocm-backplane")
-                entry.size = len(data)
-                entry.mode = 0o700
-                if case == "archive-symlink":
-                    entry.type = tarfile.SYMTYPE
-                    entry.linkname = str(base / "outside")
-                    entry.size = 0
-                    archive.addfile(entry)
-                else:
-                    archive.addfile(entry, io.BytesIO(data))
-        return 0
+        return mock_curl(base, case, arguments)
     if command == "ocm":
-        if arguments[0] == "login":
-            if case == "timeout":
-                time.sleep(25)
-            print(SECRET)
-            return int(case == "login-failure")
-        path = arguments[1]
-        if case == "api-failure":
-            print(SECRET, file=sys.stderr)
-            return 1
-        if case == "oversized":
-            print("x" * (2 * 1024 * 1024))
-            return 0
-        if case == "invalid-json":
-            print(SECRET)
-            return 0
-        if "?" in path:
-            manifest = json.loads((base / "shared/ocm-fvt-diagnostic-identity.json").read_text())
-            created = manifest["started"] if case != "old-match" else manifest["started"] - 1
-            if case == "fractional-finish":
-                created = int(manifest["finished"]) + 0.5
-            cluster = {"id": CLUSTER, "name": "fixture-run-name", "creation_timestamp":
-                       datetime.datetime.fromtimestamp(created, datetime.timezone.utc).isoformat()}
-            if case == "replacement-cluster":
-                cluster["id"] = "b" * 32
-            print(json.dumps({"total": 2 if case == "ambiguous-match" else 1, "items": [cluster]}))
-        elif path.endswith("/resources/live"):
-            print(json.dumps({"cluster_id": CLUSTER, "resources": {
-                "gcp-observation": json.dumps({"kind": "ProjectClaim", "spec": {"projectReferenceCRLink": {
-                    "name": SECRET, "namespace": SECRET}},
-                    "status": {"state": "Error", "message": SECRET,
-                               "conditions": [{"type": "Error", "status": "True", "reason": "ReconcileError",
-                                               "message": SECRET}]}}),
-                "reference": json.dumps({"kind": "ProjectReference", "spec": {"projectClaimCRLink": {"name": "", "namespace": ""}},
-                                          "status": {"state": "Verification"}}),
-                SECRET: json.dumps({"kind": "Secret", "data": {"token": SECRET}})}}))
-        elif path.endswith("/credentials"):
-            if case == "missing-access":
-                return 1
-            print(json.dumps({"kubeconfig": "apiVersion: v1\nkind: Config\n"}))
-        else:
-            print(json.dumps({"id": CLUSTER, "state": "error" if case == "terminal" else "pending",
-                              "provision_status": "PendingProject", "message": SECRET}))
-        return 0
+        return mock_ocm(base, case, arguments)
     if command == "ocm-backplane":
         return int(case in ("missing-access", "credential-fallback"))
     if command == "tar":
         if case == "tar-timeout":
-            descendant = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
-            (base / "descendant-pid").write_text(str(descendant.pid))
-            time.sleep(25)
+            with subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"]) as descendant:
+                (base / "descendant-pid").write_text(str(descendant.pid))
+                time.sleep(25)
             return 0
         os.execv("/usr/bin/tar", ["tar", *arguments])
     if command == "oc":
@@ -131,7 +139,7 @@ def mock(command, arguments):
 
 
 class CollectorTests(unittest.TestCase):
-    def run_fixture(self, case="normal", ids=CLUSTER, manifest=False, tracing=False, handoff=None):
+    def run_fixture(self, case="normal", ids=CLUSTER, manifest=False, *, tracing=False):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             for name in ("bin", "shared", "artifacts", "credentials", "tmp"):
@@ -147,8 +155,8 @@ class CollectorTests(unittest.TestCase):
             if manifest:
                 data = {"run": "1", "job": "fixture", "names": ["fixture-run-name"], "ids": [CLUSTER], "outcome": "ok",
                         "started": int(time.time()) - 5, "finished": int(time.time())}
-                if handoff is not None:
-                    data = dict(handoff)
+                if isinstance(manifest, dict):
+                    data = dict(manifest)
                 if case == "name-only":
                     data["ids"] = []
                 if case == "unscoped":
@@ -185,7 +193,7 @@ class CollectorTests(unittest.TestCase):
                     "    ticks = iter([0, 451])\n    time.monotonic = lambda: next(ticks, 451)\n")
                 environment["PYTHONPATH"] = str(base)
             result = subprocess.run(["bash", *(["-x"] if tracing else []), str(delivered)],
-                                    env=environment, capture_output=True, text=True, timeout=40)
+                                    env=environment, capture_output=True, text=True, timeout=40, check=False)
             self.assertEqual(result.returncode, 0, result.stderr)
             artifacts = {path.name: json.loads(path.read_text()) for path in
                          (base / "artifacts/cluster-diagnostics").iterdir()}
@@ -314,10 +322,10 @@ class ProducerHandoffTests(producer.ArtifactFixture):
         self.assertIsInstance(manifest["finished"], float)
         self.assertLessEqual(manifest["started"], manifest["finished"])
         collector = CollectorTests()
-        artifacts, _ = collector.run_fixture(ids=None, manifest=True, handoff=manifest)
+        artifacts, _ = collector.run_fixture(ids=None, manifest=manifest)
         self.assertEqual(artifacts["collection-outcome.json"]["identity"], "unique_run_name")
         for case in ("unscoped", "wrong-job"):
-            artifacts, calls = collector.run_fixture(case, ids=None, manifest=True, handoff=manifest)
+            artifacts, calls = collector.run_fixture(case, ids=None, manifest=manifest)
             self.assertEqual(artifacts["collection-outcome.json"]["reason"], "unscoped_identity")
             self.assertNotIn("/resources/live", calls)
 
@@ -326,7 +334,7 @@ class ProducerHandoffTests(producer.ArtifactFixture):
         self.run_step("multi-cluster", exit_code=42)
         manifest = json.loads((self.shared / "ocm-fvt-diagnostic-identity.json").read_text())
         self.assertEqual(len(manifest["ids"]), 2)
-        artifacts, calls = CollectorTests().run_fixture(manifest=True, handoff=manifest)
+        artifacts, calls = CollectorTests().run_fixture(manifest=manifest)
         self.assertEqual(artifacts["collection-outcome.json"]["collector"], "incomplete")
         self.assertNotIn("/resources/live", calls)
 
