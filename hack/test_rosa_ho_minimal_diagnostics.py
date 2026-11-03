@@ -31,6 +31,10 @@ if command == "timeout":
         stream.write(" ".join(args[:3]) + "\n")
     if mode == "timeout" and "60s" in args:
         sys.exit(124)
+    if mode == "output_limit" and "60s" in args:
+        payload = json.dumps({"schemaVersion":1, "outcome":"complete", "padding":"do-not-retain"})
+        sys.stdout.write(payload + " " * (262145 - len(payload)))
+        sys.exit(0)
     os.execv("/usr/bin/timeout", ["timeout"] + args)
 if command == "sleep":
     sys.exit(0)
@@ -76,6 +80,10 @@ with open(os.environ["REQUESTS"], "a") as stream:
     stream.write(path + "\n")
 if mode == "permission":
     print("do-not-retain permission body", file=sys.stderr)
+    sys.exit(1)
+if mode == "error_with_body":
+    print(json.dumps({"items":[], "message":"do-not-retain"}))
+    print("do-not-retain API error", file=sys.stderr)
     sys.exit(1)
 if mode == "blocked_request":
     time.sleep(30)
@@ -429,6 +437,47 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         self.assertLess(time.monotonic() - start, 3)
         self.assertEqual(self.bundle()["failure"], "collector_failed")
         self.assertIn("-k 2s 60s", Path(self.environment["TIMEOUTS"]).read_text())
+
+    def test_final_output_limit_never_persists_child_payload(self):
+        result = self.run_script("rosa-e2e-test", status=23, mode="output_limit", tracing=True)
+        self.assertEqual(result.returncode, 23)
+        bundle = self.bundle()
+        self.assert_schema(bundle)
+        self.assertEqual(bundle["outcome"], "failed")
+        self.assertEqual(bundle["failure"], "invalid_output")
+        self.assertNotIn("do-not-retain", result.stdout + result.stderr)
+        self.assertEqual([path.name for path in self.artifacts.iterdir()], ["ho-minimal-diagnostics.json"])
+
+    def test_api_error_body_is_not_success_or_artifact_data(self):
+        result = self.run_script("rosa-e2e-test", status=23, mode="error_with_body", tracing=True)
+        self.assertEqual(result.returncode, 23)
+        bundle = self.bundle()
+        self.assert_schema(bundle)
+        self.assertEqual(bundle["outcome"], "partial")
+        self.assertEqual(bundle["categories"]["target"]["outcome"], "request_failed")
+        self.assertFalse(bundle["categories"]["catalogDeployment"]["items"])
+        self.assertNotIn("do-not-retain", result.stdout + result.stderr)
+
+    def test_executable_projected_configmap_sibling_contract(self):
+        projection = self.commands / "..fixture"
+        projection.mkdir()
+        (self.commands / "..data").symlink_to(projection.name)
+        for key in SCRIPTS:
+            (self.commands / key).rename(projection / key)
+            (projection / key).chmod(0o777)
+            (self.commands / key).symlink_to("..data/" + key)
+        for key, phase in ((HELPER, "post"), ("rosa-hypershift-operator-deploy", "deploy"), ("rosa-hypershift-operator-verify-hcp-health", "verify")):
+            with self.subTest(key=key):
+                result = subprocess.run([str(self.commands / key)], env=self.environment, capture_output=True, text=True, timeout=20, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                bundle = self.bundle()
+                self.assert_schema(bundle)
+                self.assertEqual(bundle["phase"], phase)
+                self.assertTrue(bundle["categories"]["catalogDeployment"]["items"])
+        result = self.run_script("rosa-e2e-test", status=23)
+        self.assertEqual(result.returncode, 23)
+        self.assertEqual(self.bundle()["phase"], "test")
+        self.assertTrue(self.bundle()["categories"]["catalogPods"]["items"])
 
     def test_configmap_mount_keys_and_workflow_contract(self):
         for key, path in SCRIPTS.items():
