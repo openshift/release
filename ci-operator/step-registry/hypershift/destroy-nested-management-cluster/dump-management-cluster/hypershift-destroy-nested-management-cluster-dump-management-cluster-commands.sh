@@ -9,7 +9,16 @@ fi
 # Fail fast so only a fully sanitized and verified archive is published.
 set -e
 
-CLUSTER_NAME="$(printf '%s' "${PROW_JOB_ID}" | sha256sum | cut -c-10)-mgmt"
+CLUSTER_NAME_PREFIX="$(printf '%s' "${PROW_JOB_ID}" | sha256sum | cut -c-10)"
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+    echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+    exit 1
+  fi
+  CLUSTER_NAME="${CLUSTER_NAME_PREFIX}-${HYPERSHIFT_CLUSTER_ROLE}-mgmt"
+else
+  CLUSTER_NAME="${CLUSTER_NAME_PREFIX}-mgmt"
+fi
 # Keep raw dump files outside ARTIFACT_DIR until sanitization and archive
 # verification succeed.
 DUMP_WORK_DIR="$(mktemp -d /tmp/hypershift-dump.XXXXXX)"

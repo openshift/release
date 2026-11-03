@@ -97,6 +97,8 @@ assert_contains "${gitleaks_diagnostic}" "synthetic gitleaks diagnostic"
 step_ref="${step_dir}/hypershift-destroy-nested-management-cluster-dump-management-cluster-ref.yaml"
 [[ -s "${step_ref}" ]] || fail "dump step reference is missing"
 step_name="$(yq -r '.ref.as' "${step_ref}")" || fail "dump step name could not be read"
+yq -e '.ref.env[] | select(.name == "HYPERSHIFT_CLUSTER_ROLE" and .default == "")' \
+  "${step_ref}" > /dev/null || fail "dump step ref does not declare the cluster role parameter"
 command_name="$(yq -r '.ref.commands' "${step_ref}")" || fail "dump step command could not be read"
 [[ "${command_name}" == "${step_name}-commands.sh" ]] || fail "dump step command name does not match its ref name"
 command_file="${step_dir}/${command_name}"
@@ -107,6 +109,8 @@ metadata_path="${step_ref#${repo_root}/ci-operator/step-registry/}"
 jq -e --arg path "${metadata_path}" '.path == $path' "${step_metadata}" > /dev/null || fail "dump step metadata path does not match its ref path"
 chain_file="${repo_root}/ci-operator/step-registry/hypershift/destroy-nested-management-cluster/hypershift-destroy-nested-management-cluster-chain.yaml"
 assert_contains "${chain_file}" "ref: ${step_name}"
+yq -e '.chain.env[] | select(.name == "HYPERSHIFT_CLUSTER_ROLE" and .default == "")' \
+  "${chain_file}" > /dev/null || fail "destroy chain does not define the cluster role parameter"
 bash -n "${command_file}" || fail "dump step command script has invalid shell syntax"
 assert_gitleaks_status "${command_file}" 0 "${work_dir}/gitleaks-command-source.log"
 assert_gitleaks_status "${BASH_SOURCE[0]}" 0 "${work_dir}/gitleaks-test-source.log"
@@ -827,12 +831,17 @@ make_fake_runner() {
 #!/usr/bin/env bash
 set -euo pipefail
 output_dir=""
+cluster_name=""
 for argument in "$@"; do
   case "${argument}" in
     --artifact-dir=*) output_dir="${argument#*=}" ;;
+    --name=*) cluster_name="${argument#*=}" ;;
   esac
 done
 [[ -n "${output_dir}" ]]
+if [[ -n "${FAKE_HYPERSHIFT_CLUSTER_NAME_FILE:-}" ]]; then
+  printf '%s\n' "${cluster_name}" > "${FAKE_HYPERSHIFT_CLUSTER_NAME_FILE}"
+fi
 mkdir -p "${output_dir}"
 cp -R "${FIXTURE_DIR}/." "${output_dir}/"
 provider_fixture_dir="${FIXTURE_DIR}.providers/${CLOUD_PROVIDER:-}"
@@ -896,9 +905,13 @@ validate_structured_files() {
 run_dir="${work_dir}/normal-run"
 make_fake_runner "${run_dir}"
 artifact_dir="${run_dir}/artifacts"
+aws_cluster_name_file="${run_dir}/cluster-name"
+expected_cluster_name_prefix="$(printf '%s' 'redaction-test' | sha256sum | cut -c-10)"
 if ! (
   cd "${run_dir}"
-  FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${artifact_dir}" PROW_JOB_ID=redaction-test \
+  FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${artifact_dir}" \
+    FAKE_HYPERSHIFT_CLUSTER_NAME_FILE="${aws_cluster_name_file}" \
+    PROW_JOB_ID=redaction-test HYPERSHIFT_CLUSTER_ROLE= \
     HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=AWS bash "${command_file}"
 ) 2> "${run_dir}/stderr.log"; then
   cat "${run_dir}/stderr.log" >&2
@@ -909,6 +922,8 @@ fi
 if grep -Fq 'awk:' "${run_dir}/stderr.log"; then
   fail "AWS sanitizer emitted awk diagnostics"
 fi
+[[ "$(cat "${aws_cluster_name_file}")" == "${expected_cluster_name_prefix}-mgmt" ]] || \
+  fail "AWS dump did not target the default management cluster name"
 
 archive="${artifact_dir}/artifacts.tar.gz"
 [[ -s "${archive}" ]] || fail "sanitized archive was not published"
@@ -1084,9 +1099,12 @@ assert_not_contains "${extract_dir}" "sibling-key-two"
 azure_run_dir="${work_dir}/azure-run"
 make_fake_runner "${azure_run_dir}"
 azure_artifact_dir="${azure_run_dir}/artifacts"
+azure_cluster_name_file="${azure_run_dir}/cluster-name"
 if ! (
   cd "${azure_run_dir}"
-  FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${azure_artifact_dir}" PROW_JOB_ID=redaction-test \
+  FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${azure_artifact_dir}" \
+    FAKE_HYPERSHIFT_CLUSTER_NAME_FILE="${azure_cluster_name_file}" \
+    PROW_JOB_ID=redaction-test HYPERSHIFT_CLUSTER_ROLE=fixture-role \
     HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=Azure bash "${command_file}"
 ) 2> "${azure_run_dir}/stderr.log"; then
   cat "${azure_run_dir}/stderr.log" >&2
@@ -1095,6 +1113,8 @@ fi
 if grep -Fq 'awk:' "${azure_run_dir}/stderr.log"; then
   fail "Azure sanitizer emitted awk diagnostics"
 fi
+[[ "$(cat "${azure_cluster_name_file}")" == "${expected_cluster_name_prefix}-fixture-role-mgmt" ]] || \
+  fail "Azure dump did not target the role-specific management cluster name"
 azure_archive="${azure_artifact_dir}/artifacts.tar.gz"
 [[ -s "${azure_archive}" ]] || fail "Azure sanitized archive was not published"
 tar -tzf "${azure_archive}" > "${work_dir}/azure-archive-list.txt" || fail "Azure archive listing failed"
@@ -1106,6 +1126,24 @@ assert_gitleaks_status "${azure_extract_dir}" 0 "${work_dir}/gitleaks-azure-clea
 [[ -f "${azure_extract_dir}/output/cluster-scoped-resources/core/provider-Azure.yaml" && ! -e "${azure_extract_dir}/output/cluster-scoped-resources/core/provider-AWS.yaml" ]] || fail "Azure provider-specific fixture selection failed"
 yq -e '.metadata.labels.provider == "Azure"' "${azure_extract_dir}/output/cluster-scoped-resources/core/provider-Azure.yaml" > /dev/null || fail "Azure provider fixture was not retained"
 cmp -s "${extract_dir}/output/cluster-scoped-resources/core/nodes.yaml" "${azure_extract_dir}/output/cluster-scoped-resources/core/nodes.yaml" || fail "shared sanitization differs between provider runs"
+
+# The same role format as setup and destroy must be enforced before collection.
+invalid_role_run_dir="${work_dir}/invalid-role-run"
+make_fake_runner "${invalid_role_run_dir}"
+invalid_role_artifact_dir="${invalid_role_run_dir}/artifacts"
+invalid_role_name_file="${invalid_role_run_dir}/cluster-name"
+if (
+  cd "${invalid_role_run_dir}"
+  FIXTURE_DIR="${fixture_dir}" ARTIFACT_DIR="${invalid_role_artifact_dir}" \
+    FAKE_HYPERSHIFT_CLUSTER_NAME_FILE="${invalid_role_name_file}" \
+    PROW_JOB_ID=redaction-test HYPERSHIFT_CLUSTER_ROLE=invalid_role \
+    HYPERSHIFT_NAMESPACE=clusters CLOUD_PROVIDER=AWS bash "${command_file}"
+) 2> "${invalid_role_run_dir}/stderr.log"; then
+  fail "dump step accepted an invalid cluster role"
+fi
+assert_contains "${invalid_role_run_dir}/stderr.log" \
+  "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens"
+[[ ! -e "${invalid_role_name_file}" ]] || fail "dump step invoked hypershift for an invalid cluster role"
 
 # Verify semantic content on BOTH extracted archives, not just tar readability.
 # Collect all three findings so one parser failure cannot mask the others.
