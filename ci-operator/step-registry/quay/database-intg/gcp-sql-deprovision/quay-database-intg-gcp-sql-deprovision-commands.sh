@@ -137,7 +137,19 @@ echo "Destroying Google Cloud SQL database..."
 export TF_VAR_database_password="${TF_VAR_database_password:-dummypass}"
 
 terraform init
-state_list="$(terraform state list)" || { echo "ERROR: terraform state list failed on the archived state." >&2; exit 1; }
+if ! state_list="$(terraform state list)"; then
+  # The archive can be config-only (apply interrupted before Terraform
+  # wrote state): with a persisted instance identifier, fall through to
+  # identifier cleanup instead of aborting; without one there is nothing
+  # to fall back to.
+  if [[ -f "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME" ]]; then
+    echo "terraform state list failed on the archived state; treating it as empty." >&2
+    state_list=""
+  else
+    echo "ERROR: terraform state list failed on the archived state." >&2
+    exit 1
+  fi
+fi
 echo "${state_list}"
 
 # The archive can predate the instance: a step that died during apply still
