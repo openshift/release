@@ -175,8 +175,10 @@ if [[ "${ALIGN_INSTALLER_TO_PAYLOAD:-false}" == "true" && -n "${OPENSHIFT_INSTAL
   fi
   # Match the executable basename: the version output prints the binary as
   # invoked ("openshift-install" from PATH, "/tmp/openshift-install" when
-  # extracted from a custom payload).
-  INSTALLER_VERSION="$(${INSTALLER_BINARY} version | awk '{sub(/^.*\//, "", $1); if (!found && $1 == "openshift-install") {print $2; found=1}}')"
+  # extracted from a custom payload). Guard the probe with || true: an empty
+  # version falls through to the mismatch branch and extracts the payload's
+  # installer (safe default) instead of aborting the step under errexit.
+  INSTALLER_VERSION="$(${INSTALLER_BINARY} version | awk '{sub(/^.*\//, "", $1); if (!found && $1 == "openshift-install") {print $2; found=1}}' || true)"
   # The image's upi-installer reports "v1.4.22-ec5..." (installer repo EC
   # build); a payload-extracted installer reports the payload version
   # "4.21.40...". Normalize both to X.Y.
