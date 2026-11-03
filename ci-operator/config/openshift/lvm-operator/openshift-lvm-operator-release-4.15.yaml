@@ -11,7 +11,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-binary_build_commands: make build build-vgmanager
+binary_build_commands: GOFLAGS="-mod=readonly" make build
 build_root:
   image_stream_tag:
     name: builder
@@ -82,12 +82,13 @@ resources:
       cpu: "2"
       memory: 4Gi
 test_binary_build_commands: |
-  go mod vendor
+  GOFLAGS="-mod=readonly" go mod download
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
 - as: precommit-check
   commands: |
+    export GOFLAGS="-mod=readonly"
     export SKIP=no-commit-to-branch
     export GOMEMLIMIT=3500MiB
     export GOGC=50
@@ -98,7 +99,7 @@ tests:
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make test
+    GOFLAGS="-mod=readonly" make test
   container:
     from: test-bin
   secret:
@@ -109,7 +110,7 @@ tests:
 - as: post-unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make test
+    GOFLAGS="-mod=readonly" make test
   container:
     from: test-bin
   postsubmit: true
@@ -131,7 +132,7 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: make e2e
+      commands: GOFLAGS="-mod=readonly" make e2e
       from: test-bin
       resources:
         requests:
@@ -151,7 +152,7 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: DISK_INSTALL=true make e2e
+      commands: DISK_INSTALL=true GOFLAGS="-mod=readonly" make e2e
       from: test-bin
       resources:
         requests:
