@@ -1,0 +1,36 @@
+ref:
+  as: enmaas-provision-rds
+  from: cli
+  commands: enmaas-provision-rds-commands.sh
+  grace_period: 15m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: RDS_INSTANCE_CLASS
+    default: "db.t3.medium"
+    documentation: |-
+      RDS instance class for the PostgreSQL database.
+  - name: RDS_ENGINE_VERSION
+    default: "16"
+    documentation: |-
+      PostgreSQL major engine version for the RDS instance. RDS selects the current default minor version.
+  - name: RDS_ALLOCATED_STORAGE
+    default: "20"
+    documentation: |-
+      Allocated storage in GB for the RDS instance.
+  - name: RDS_MASTER_USERNAME
+    default: "enmaas_admin"
+    documentation: |-
+      Master username for the RDS PostgreSQL instance.
+  - name: RDS_DB_NAME
+    default: "enmaas"
+    documentation: |-
+      Name of the default database to create on the RDS instance.
+  documentation: |-
+    Provisions an Amazon RDS PostgreSQL instance for the EnMaaS stack.
+    Reads VPC and subnet information from SHARED_DIR (written by the
+    aws-provision-vpc-shared step), creates a DB subnet group and security
+    group, launches the RDS instance, and writes connection details to
+    SHARED_DIR for downstream steps.

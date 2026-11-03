@@ -715,6 +715,29 @@ tests:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts-hcp-mp
+- as: enmaas-perftest
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CLUSTER_SECTOR: perf2
+      COMPUTE_MACHINE_TYPE: m6i.4xlarge
+      ENMAAS_BRANCH: main
+      ENMAAS_ENV: staging
+      MP_MACHINE_TYPE: m6i.8xlarge
+      MP_REPLICAS: "2"
+      MULTI_AZ: "true"
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    post:
+    - ref: enmaas-deprovision-rds
+    - chain: rosa-aws-sts-hcp-deprovision
+    - ref: send-results-to-reportportal
+    test:
+    - ref: enmaas-provision-rds
+    - chain: enmaas-setup
+    - ref: enmaas-run-perftest
+    workflow: rosa-aws-sts-hcp-mp
 zz_generated_metadata:
   branch: main
   org: openshift-eng
