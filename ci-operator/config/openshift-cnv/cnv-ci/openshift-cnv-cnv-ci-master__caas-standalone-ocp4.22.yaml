@@ -1,0 +1,143 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: e2e-azure-pod-networking
+  cron: 0 6 * * 2
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: azure-virtualization
+    env:
+      AZURE_COMPUTE_DISK_SIZE: "150"
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D16ads_v6
+      ODF_BACKEND_STORAGE_CLASS: managed-csi
+      ODF_VOLUME_SIZE: "200"
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-osdisk-disksize
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    test:
+    - ref: hypershift-kubevirt-install-odf
+    - as: install-cnv
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_cnv
+      env:
+      - default: "4.22"
+        name: CNV_VERSION
+      - default: "true"
+        name: PRODUCTION_RELEASE
+      - default: "4.22"
+        name: OCP_VERSION
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 2h0m0s
+    - as: deploy-caas-standalone
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/deploy-caas-standalone.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 1h0m0s
+    - as: create-caas-tenant
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/create-caas-tenant.sh
+        cp "${ARTIFACT_DIR}/tenant-kubeconfig" "${SHARED_DIR}/tenant-kubeconfig"
+      env:
+      - default: tenant-admin
+        documentation: Project-admin identity used to provision the CAAS tenant.
+        name: TENANT_ADMIN_USER
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 3h0m0s
+    - as: add-caas-tenant-workers
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        TENANT_KUBECONFIG="${SHARED_DIR}/tenant-kubeconfig" ./hack/add-caas-tenant-workers.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 2h0m0s
+    - as: tenant-conformance-minimal
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/tenant-kubeconfig"
+        openshift-tests run openshift/conformance/parallel/minimal \
+          --provider '{"type":"baremetal"}' \
+          -o "${ARTIFACT_DIR}/e2e.log" \
+          --junit-dir "${ARTIFACT_DIR}/junit"
+      from: tests
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: "3"
+          memory: 600Mi
+      timeout: 4h0m0s
+    - as: delete-caas-tenant
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/delete-caas-tenant.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 45m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift-cnv
+  repo: cnv-ci
+  variant: caas-standalone-ocp4.22
