@@ -1,0 +1,64 @@
+workflow:
+  as: rosa-e2e-hcp-terraform-rhcs
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+    pre:
+    # Terraform head (ROSAENG-67583): provisions via the
+    # terraform-provider-rhcs day1 flow selected by CLUSTER_PROFILE and
+    # publishes the SHARED_DIR contract (cluster-id, cluster-metadata.json).
+    # It builds its own account roles, OIDC config and VPC, so no
+    # aws-provision-vpc-shared / rosa-sts-oidc-config-create in front of it.
+    # WAIT_OPERATORS defaults to true in the chain: the validation tail
+    # asserts against a settled cluster.
+    - chain: rosa-e2e-hcp-terraform-rhcs-provision
+    # The Terraform day1 flow publishes no customer-plane kubeconfig (HCP
+    # profiles set admin_enabled: false), so log into backplane first:
+    # bp-kubeconfig is the customer-plane fallback for
+    # rosa-e2e-validate-customer, mc/sc-kubeconfig feed the platform plane.
+    - ref: rosa-backplane-login
+    test:
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    - ref: rosa-gap-analysis-api-resources-and-crd
+      best_effort: true
+    - ref: rosa-gap-analysis-critical-alerts
+      best_effort: true
+    - ref: rosa-gap-analysis-cluster-install-delete-metrics
+      best_effort: true
+    # Terraform teardown only: the cluster exists in the terraform state that
+    # rhcs-e2e-setup saved to ${SHARED_DIR}/statefiles.tar.gz. Never use
+    # rosa-cluster-deprovision / rosa-e2e-cleanup-vpc / aws-deprovision-stacks
+    # here — the TF profile built its own account roles, OIDC config and VPC,
+    # and the state-driven teardown removes them; the rosa variants would leak
+    # or double-delete.
+    - ref: rhcs-e2e-teardown
+      best_effort: true
+    - chain: rosa-gather-hcp-diagnostics
+      best_effort: true
+  documentation: |-
+    The Terraform row of the ROSAENG-308 provision x validate matrix: the
+    terraform-provider-rhcs head (rosa-e2e-hcp-terraform-rhcs-provision,
+    feature set selected by the CLUSTER_PROFILE env, e.g. rosa-hcp-pl for
+    PrivateLink — ROSAENG-63350) feeding the shared, provisioner-agnostic
+    validation tail (rosa-e2e-validate-customer,
+    rosa-e2e-validate-platform), a sibling of the rosa-CLI and OCM heads.
+
+    rosa-backplane-login sits between the head and the tail because the TF
+    day1 flow publishes no customer-plane kubeconfig: bp-kubeconfig is the
+    validate-customer fallback and mc/sc-kubeconfig feed the platform plane.
+    For PrivateLink clusters (rosa-hcp-pl) the bp-kubeconfig is also how the
+    customer plane reaches the API server, which is not publicly reachable.
+
+    Teardown is state-driven (rhcs-e2e-teardown): the cluster and all of its
+    AWS resources (account roles, OIDC config, VPC) exist only in the
+    terraform state saved to ${SHARED_DIR}/statefiles.tar.gz.
+
+    Consuming configs must build or import the rhcs-tf-e2e image that
+    rhcs-e2e-setup / rhcs-e2e-teardown run from (built only by
+    terraform-redhat/terraform-provider-rhcs). The platform plane (and the
+    backplane-based customer plane) requires corp-network reachability: run
+    this workflow only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).
