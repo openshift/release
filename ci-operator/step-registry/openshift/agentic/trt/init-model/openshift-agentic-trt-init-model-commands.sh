@@ -194,11 +194,6 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-init-model.sh"
 
-# Keep workflow skills provisioned by the image while giving each process its
-# own mutable Codex home (parallel eval cases must not share login or config).
-# Only skill/plugin content is copied; credentials and user config are not.
-TRT_CODEX_HOME_SEED="${TRT_CODEX_HOME_SEED:-${CODEX_HOME:-${HOME}/.codex}}"
-
 prow_public_artifact_prefix() {
     local step_name=$1
     [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]] || return 1
@@ -224,11 +219,22 @@ prepare_prow_screenshot_handoff() {
     PROW_SCREENSHOT_DIR="${WORKDIR}/artifacts/screenshots"
     mkdir -p "${PROW_SCREENSHOT_DIR}"
     export PROW_SCREENSHOT_DIR
+    # Playwright MCP honors this for automatically named screenshots. Both
+    # Claude and Codex inherit it when they start the project MCP server.
+    PLAYWRIGHT_MCP_OUTPUT_DIR="${PROW_SCREENSHOT_DIR}"
+    export PLAYWRIGHT_MCP_OUTPUT_DIR
     PROW_SCREENSHOT_URL_PREFIX=""
     if [[ "${EVAL_MODE:-}" != "true" ]]; then
         PROW_SCREENSHOT_URL_PREFIX=$(prow_public_artifact_prefix "${step_name}" || true)
     fi
     export PROW_SCREENSHOT_URL_PREFIX
+}
+
+copy_prow_screenshot_artifacts() {
+    [[ -d "${PROW_SCREENSHOT_DIR:-}" ]] || return 0
+    local destination="${ARTIFACT_DIR}/screenshots"
+    mkdir -p "${destination}"
+    cp -a "${PROW_SCREENSHOT_DIR}/." "${destination}/"
 }
 
 replace_prow_screenshot_markers() {
@@ -447,12 +453,6 @@ prepare_codex_home() {
     fi
     CODEX_HOME=$(mktemp -d /tmp/codex-home.XXXXXX) || return 1
     export CODEX_HOME
-    local seeded
-    for seeded in skills plugins; do
-        if [[ -d "${TRT_CODEX_HOME_SEED}/${seeded}" ]]; then
-            cp -a "${TRT_CODEX_HOME_SEED}/${seeded}" "${CODEX_HOME}/" || return 1
-        fi
-    done
     CODEX_HOME_CLEANUP_INSTALLED=1
     local previous quoted
     previous=$(trap -p EXIT || true)
@@ -520,49 +520,6 @@ configure_codex_project_mcp() {
                 ;;
         esac
     done < <(jq -r '.mcpServers | keys[]' "${config}")
-    : > "${marker}"
-}
-
-# Sippy enables the public ai-helpers GitHub plugin in its repository settings.
-# Install its skills through agentic-ci's Codex compatibility path. The local,
-# filtered marketplace remains under CODEX_HOME because Codex records its path.
-configure_codex_project_plugins() {
-    local settings="${WORKDIR}/.claude/settings.json"
-    local helpers_root="${AI_HELPERS_ROOT:-/opt/ai-helpers}"
-    local source_marketplace="${helpers_root}/.claude-plugin/marketplace.json"
-    local marker="${CODEX_HOME}/.trt-project-plugins-ready"
-    [[ -f "${marker}" ]] && return 0
-    if [[ ! -f "${settings}" ]] || ! jq -e '.enabledPlugins["github@ai-helpers"] == true' "${settings}" >/dev/null 2>&1; then
-        : > "${marker}"
-        return 0
-    fi
-    if [[ ! -f "${source_marketplace}" || ! -d "${helpers_root}/plugins/github" ]]; then
-        echo "ERROR: github@ai-helpers is enabled but its public plugin source is unavailable" >&2
-        return 1
-    fi
-    local marketplace_root="${CODEX_HOME}/marketplaces/trt-ai-helpers"
-    mkdir -p "${marketplace_root}/.claude-plugin" "${marketplace_root}/plugins"
-    cp -a "${helpers_root}/plugins/github" "${marketplace_root}/plugins/" || return 1
-    if ! jq '.plugins |= map(select(.name == "github"))' "${source_marketplace}" \
-        > "${marketplace_root}/.claude-plugin/marketplace.json"; then
-        return 1
-    fi
-    if ! jq -e '.plugins | length == 1 and .[0].name == "github"' \
-        "${marketplace_root}/.claude-plugin/marketplace.json" >/dev/null; then
-        echo "ERROR: github plugin is missing from the ai-helpers marketplace" >&2
-        return 1
-    fi
-    PLUGIN_SKILLS_MANIFEST="${CODEX_HOME}/plugin-skills.manifest.json" \
-        agentic-ci install-plugins --harness codex \
-        --marketplace-json "${marketplace_root}/.claude-plugin/marketplace.json" \
-        --manifest "${CODEX_HOME}/plugin-skills.manifest.json" || return 1
-    local skill_dir
-    if ! skill_dir=$(AGENT_TOOL=codex \
-        PLUGIN_SKILLS_MANIFEST="${CODEX_HOME}/plugin-skills.manifest.json" \
-        agentic-ci skill-dir upload-screenshot) || [[ -z "${skill_dir}" ]]; then
-        echo "ERROR: github@ai-helpers did not provision upload-screenshot for Codex" >&2
-        return 1
-    fi
     : > "${marker}"
 }
 
@@ -638,7 +595,6 @@ agentic_ci() {
         exclude_codex_from_worktree
         ensure_codex || return 1
         configure_codex_project_mcp || return 1
-        configure_codex_project_plugins || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then
             if [[ ! -r "${settings_file}" ]]; then
@@ -704,9 +660,8 @@ agentic_ci() {
     return $rc
 }
 
-# Token totals come from Codex response.completed events. Dollar amounts accept
-# legacy codex.cost.usage and PR #490's agentic_ci.codex.cost.usage. Identical
-# points under both names are de-duplicated. Prints JSON:
+# Token totals come from Codex response.completed events. Dollar amounts come
+# from codex.cost.usage when agentic-ci has written that metric. Prints JSON:
 #   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
 codex_otel_usage() {
     local otel_path=$1
@@ -727,8 +682,6 @@ models = defaultdict(lambda: {
 version = ""
 session_id = ""
 cost_from_metric = False
-cost_series = {}
-unstamped_cost_points = defaultdict(lambda: [0, 0])
 
 
 def attribute_value(value):
@@ -790,10 +743,7 @@ with open(path) as handle:
             for resource in payload.get("resourceMetrics", []):
                 for scope in resource.get("scopeMetrics", []):
                     for metric in scope.get("metrics", []):
-                        if metric.get("name") not in {
-                            "codex.cost.usage",
-                            "agentic_ci.codex.cost.usage",
-                        }:
+                        if metric.get("name") != "codex.cost.usage":
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
                         for point in data.get("dataPoints", []):
@@ -802,30 +752,8 @@ with open(path) as handle:
                                 continue
                             attrs = point_attributes(point)
                             model = str(attrs.get("model") or "unknown")
-                            start = str(point.get("startTimeUnixNano") or "")
-                            end = str(point.get("timeUnixNano") or "")
-                            if start:
-                                try:
-                                    end_order = int(end)
-                                except (TypeError, ValueError):
-                                    end_order = -1
-                                # Both accepted names describe the same cumulative
-                                # series. Keep its latest point, preferring the new
-                                # agentic-ci-owned metric when timestamps tie.
-                                priority = int(metric.get("name") == "agentic_ci.codex.cost.usage")
-                                key = (model, start)
-                                candidate = (end_order, priority, amount)
-                                if candidate[:2] >= cost_series.get(key, (-1, -1, 0))[:2]:
-                                    cost_series[key] = candidate
-                                continue
-                            # A legacy point without cumulative timestamps cannot
-                            # be associated with a series. Preserve distinct points
-                            # but collapse an exact old/new duplicate.
-                            identity = (model, amount, end)
-                            name_index = int(
-                                metric.get("name") == "agentic_ci.codex.cost.usage"
-                            )
-                            unstamped_cost_points[identity][name_index] += 1
+                            models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+                            cost_from_metric = True
             continue
         if "/v1/logs" not in record_path:
             continue
@@ -858,16 +786,6 @@ with open(path) as handle:
                     models[model]["output"] += as_int(attrs, "output_token_count")
                     models[model]["cache_read"] += as_int(attrs, "cached_token_count")
                     models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
-
-for (model, _start), (_end, _priority, amount) in cost_series.items():
-    models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
-for (model, amount, _end), name_counts in unstamped_cost_points.items():
-    # Retain repeated points from either metric while collapsing matching
-    # legacy/new copies. Without timestamps there is no stronger series key.
-    models[model]["cost"] = round(
-        models[model].get("cost", 0) + amount * max(name_counts), 6
-    )
-cost_from_metric = bool(cost_series or unstamped_cost_points)
 
 print(json.dumps({
     "version": version,

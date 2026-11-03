@@ -169,9 +169,9 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
-.PHONY: test-trt-codex-setup
-test-trt-codex-setup:
-	python3 -m unittest -v hack.test_trt_codex_setup
+.PHONY: test-trt-screenshot-handoff
+test-trt-screenshot-handoff:
+	python3 -m unittest -v hack.test_trt_screenshot_handoff
 
 validate-step-registry: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest

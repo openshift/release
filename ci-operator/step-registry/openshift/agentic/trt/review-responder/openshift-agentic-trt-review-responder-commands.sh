@@ -63,7 +63,13 @@ prepare_prow_screenshot_handoff openshift-agentic-trt-review-responder
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
-        cp -a "${WORKDIR}/artifacts/"* "${ARTIFACT_DIR}/" 2>/dev/null || true
+        copy_prow_screenshot_artifacts
+        for artifact in "${WORKDIR}/artifacts/"*; do
+            if [[ "${artifact}" == "${PROW_SCREENSHOT_DIR}" ]]; then
+                continue
+            fi
+            cp -a "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+        done
         podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
         if [[ -d "${HOME}/.claude/projects" ]]; then
             echo "Archiving Claude session logs..."
@@ -137,7 +143,7 @@ append_pipeline_constraints() {
 - Do not check out or pull the PR branch — you are already on it.
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
 - Do not amend commits. Create new commits so the pipeline can fast-forward push.
-- For browser evidence, save PNG files with simple names under the PROW_SCREENSHOT_DIR provided in the prompt and link them with the provided PROW_SCREENSHOT_URL_PREFIX. Do not run the upload-screenshot skill; it creates a GitHub release and only the pipeline may publish artifacts or branch changes.
+- For browser evidence with Playwright MCP, call browser_take_screenshot without a filename; PLAYWRIGHT_MCP_OUTPUT_DIR saves the automatically named PNG under PROW_SCREENSHOT_DIR. Other capture tools must also write PNG files there. Confirm the file exists, then link its basename with PROW_SCREENSHOT_URL_PREFIX. If that prefix is unavailable, do not invent a hosted URL. Do not run the upload-screenshot skill; it creates a GitHub release and only the pipeline may publish artifacts or branch changes.
 EOF
 }
 

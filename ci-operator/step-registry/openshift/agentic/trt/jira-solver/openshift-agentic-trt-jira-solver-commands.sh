@@ -81,8 +81,10 @@ rm -f -- "${PR_BODY_FILE}"
 if [[ "${EVAL_MODE:-}" != "true" ]]; then
     copy_artifacts() {
         echo "Copying artifacts..."
+        copy_prow_screenshot_artifacts
         for artifact in "${WORKDIR}/artifacts/"*; do
-            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
+            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" || \
+                  "${artifact}" == "${PROW_SCREENSHOT_DIR}" ]]; then
                 continue
             fi
             cp -a "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
@@ -112,7 +114,7 @@ $(cat "${ISSUE_JSON}")
 
 - Write the PR description to \`${PR_BODY_FILE}\`.
 - Do not use the \`gh\` CLI or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
-- For browser evidence, save PNG files with simple names under \`${PROW_SCREENSHOT_DIR}\` and use \`prow-artifact://screenshots/<name>.png\` in the PR description. Do not run the upload-screenshot skill: it creates a GitHub release, while this job keeps publication pipeline-owned. The pipeline replaces valid markers with hosted Prow artifact URLs.
+- For browser evidence with Playwright MCP, call \`browser_take_screenshot\` without a filename; \`PLAYWRIGHT_MCP_OUTPUT_DIR\` saves the automatically named PNG under \`${PROW_SCREENSHOT_DIR}\`. Other capture tools must also write PNG files there. Confirm the file exists, then use \`prow-artifact://screenshots/<basename>.png\` in the PR description. Do not run the upload-screenshot skill: it creates a GitHub release, while this job keeps publication pipeline-owned. The pipeline replaces valid markers with hosted Prow artifact URLs.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
