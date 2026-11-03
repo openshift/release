@@ -6,44 +6,24 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-capture_health() {
-  local phase="${1}" resource output
-  if [[ ! -f "${MC_KUBECONFIG}" ]]; then
-    echo "WARN: Cannot collect ${phase} health diagnostics without the MC kubeconfig" >&2
-    return 0
-  fi
-  if [[ -z "${ARTIFACT_DIR:-}" ]] || ! mkdir -p "${ARTIFACT_DIR}/ho-health"; then
-    echo "WARN: Cannot create ${phase} health diagnostics directory" >&2
-    return 0
-  fi
-  for resource in hostedclusters nodepools; do
-    output="${ARTIFACT_DIR}/ho-health/${phase}-${resource}.json"
-    if KUBECONFIG="${MC_KUBECONFIG}" oc get "${resource}" -A -o json --request-timeout=15s \
-      | jq --arg captured_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg phase "${phase}" \
-        '{capturedAt: $captured_at, phase: $phase, items: [.items[] | {
-          apiVersion, kind, metadata: {name: .metadata.name, namespace: .metadata.namespace,
-            generation: .metadata.generation},
-          conditions: [.status.conditions[]? | {type, status, reason, message,
-            lastTransitionTime, observedGeneration}]}]}' > "${output}.tmp"; then
-      if ! mv "${output}.tmp" "${output}"; then
-        echo "WARN: Cannot save ${phase} ${resource} health diagnostics" >&2
+if [[ "${HO_MINIMAL_DIAGNOSTICS:-false}" == true ]]; then
+  gather_ho_on_exit() {
+    local original_status=$? temporary=''
+    set +x
+    if ! HO_DIAGNOSTIC_PHASE=verify bash "${BASH_SOURCE[0]%/*}/rosa-hypershift-operator-gather-minimal" >/dev/null 2>&1; then
+      if ! { [[ -n "${ARTIFACT_DIR:-}" ]] && mkdir -p "${ARTIFACT_DIR}" && temporary=$(mktemp "${ARTIFACT_DIR}/.ho-minimal.XXXXXX") &&
+        printf '%s\n' '{"schemaVersion":1,"outcome":"failed","failure":"helper_unavailable","truncated":false}' > "${temporary}" &&
+        mv -f "${temporary}" "${ARTIFACT_DIR}/ho-minimal-diagnostics.json"; } 2>/dev/null; then
+        [[ -z "${temporary}" ]] || rm -f "${temporary}" 2>/dev/null || true
+        echo 'HO minimum diagnostics: artifact write failed' >&2
       fi
-    else
-      echo "WARN: Cannot collect ${phase} ${resource} health diagnostics" >&2
-      rm -f "${output}.tmp" || true
     fi
-  done
-  return 0
-}
+    exit "${original_status}"
+  }
+  trap gather_ho_on_exit EXIT
+fi
 
 MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
-capture_health_on_exit() {
-  local exit_status=$?
-  capture_health after-verification
-  exit "${exit_status}"
-}
-
-trap capture_health_on_exit EXIT
 
 if [[ ! -f "${MC_KUBECONFIG}" ]]; then
   echo "No MC kubeconfig found at ${MC_KUBECONFIG}, cannot verify HCP health"
