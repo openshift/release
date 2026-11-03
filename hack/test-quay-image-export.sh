@@ -31,6 +31,7 @@ oc() {
             jq -e '.auths["build.example"].auth == "unit-source" and .auths["quay.io"].auth == "unit-destination" and (.auths | has("unrelated.example") | not)' "$auth_file" >/dev/null || return 9
             [[ "$(stat -c %a "$auth_file")" == 600 ]] || return 9
             [[ "$(stat -c %a "$(dirname "$auth_file")")" == 700 ]] || return 9
+            printf '%s\n' "$auth_file" >"$CASE_DIR/mirror-auth-path"
             [[ "$4" == --keep-manifest-list && "$5" == "$QUAY_EXPORT_SOURCE" && "$6" == "$QUAY_EXPORT_DESTINATION" ]] || return 9
             [[ "$SCENARIO" != mirror-failure ]] || return 8
             if [[ "$SCENARIO" == interrupted ]]; then
@@ -42,6 +43,12 @@ oc() {
             fi
             ;;
         'image info')
+            [[ "$#" == 7 ]] || return 9
+            [[ "$3" == "--registry-config=$(cat "$CASE_DIR/mirror-auth-path")" ]] || return 9
+            [[ "$4" == --show-multiarch && "$5" == -o && "$6" == json && "$7" == "$QUAY_EXPORT_DESTINATION" ]] || return 9
+            local auth_file="${3#--registry-config=}"
+            [[ -r "$auth_file" ]] || return 9
+            jq -e '.auths["build.example"].auth == "unit-source" and .auths["quay.io"].auth == "unit-destination" and (.auths | has("unrelated.example") | not)' "$auth_file" >/dev/null || return 9
             if [[ "$SCENARIO" == test-cluster-kubeconfig ]]; then
                 [[ "${KUBECONFIG:-}" == "$CASE_DIR/test-cluster.kubeconfig" ]] || return 12
                 printf '%s\n' 'preserved' >"$CASE_DIR/info-kubeconfig"
