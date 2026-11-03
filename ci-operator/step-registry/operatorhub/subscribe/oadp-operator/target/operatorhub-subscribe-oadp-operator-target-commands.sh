@@ -1,0 +1,1 @@
+../operatorhub-subscribe-oadp-operator-commands.sh

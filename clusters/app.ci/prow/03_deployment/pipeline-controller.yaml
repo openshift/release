@@ -2,6 +2,8 @@
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: pipeline-controller
   namespace: ci
 spec:
@@ -19,6 +21,7 @@ metadata:
   namespace: ci
   name: pipeline-controller
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: pipeline-controller
   annotations:
@@ -130,8 +133,6 @@ spec:
               readOnly: true
             - name: release
               mountPath: /var/repo
-            - name: combined-jobs
-              mountPath: /etc/jobs
             - name: job-configs
               mountPath: /etc/jobs/efs
               readOnly: true
@@ -199,8 +200,6 @@ spec:
         - name: release
           emptyDir: {}
         - name: jobs-git
-          emptyDir: {}
-        - name: combined-jobs
           emptyDir: {}
         - name: job-configs
           persistentVolumeClaim:

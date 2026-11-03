@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+    echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+    exit 1
+  fi
+  export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+  if [[ ! -s "${KUBECONFIG}" ]]; then
+    echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+    exit 1
+  fi
+fi
+
 if [[ -z "${OADP_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1

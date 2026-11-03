@@ -5,6 +5,8 @@ set -o pipefail
 set -o xtrace
 
 export AZURE_TOKEN_CREDENTIALS=prod
+# Build with the vendored dependencies committed in this checkout.
+export GOFLAGS=-mod=vendor
 
 # Validate configurations
 if ! make validate-config; then

@@ -1,4 +1,8 @@
 base_images:
+  kube-rbac-proxy:
+    name: "5.2"
+    namespace: ocp
+    tag: kube-rbac-proxy
   linuxptp-daemon:
     name: "5.2"
     namespace: ocp
@@ -29,6 +33,8 @@ operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:.*
+    with: pipeline:kube-rbac-proxy
   - pullspec: quay.io/openshift/origin-ptp-operator:.*
     with: pipeline:ptp-operator
   - pullspec: quay.io/openshift/origin-ptp:.*
@@ -121,6 +127,107 @@ tests:
         oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
         echo "PTP operator and daemon restarted with new TLS profile"
         oc get pods -n openshift-ptp
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-scanner-run
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: tls-curve-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-ptp
+      SCANNER_CPU: "2"
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: telco5g-ptp-tls-prepare-aws
+    - as: verify-ptp-proxy-curve-support
+      cli: latest
+      commands: |
+        set -euo pipefail
+        help=''
+        exec_succeeded=false
+        for _ in $(seq 1 30); do
+          if help=$(oc exec -n openshift-ptp daemonset/linuxptp-daemon -c kube-rbac-proxy -- /usr/bin/kube-rbac-proxy --help 2>&1); then
+            exec_succeeded=true
+            break
+          fi
+          echo "Waiting for a linuxptp-daemon pod that accepts exec."
+          sleep 10
+        done
+        if [[ "${exec_succeeded}" != "true" ]]; then
+          echo "Unable to inspect kube-rbac-proxy command-line support."
+          oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='desired={.status.desiredNumberScheduled} ready={.status.numberReady} available={.status.numberAvailable} proxyImage={.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}{"\n"}' || true
+          exit 1
+        fi
+        if ! grep -q -- '--tls-curve-preferences' <<< "${help}"; then
+          echo "The installed kube-rbac-proxy image does not support TLS curve preferences."
+          oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}{"\n"}'
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: tls-13
+    - ref: tls-groups-configure
+    - as: wait-ptp-tls-curve-restart
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # SecP384r1MLKEM1024 is IANA group 4589; kube-rbac-proxy takes decimal IDs.
+        expected_curve_arg='--tls-curve-preferences=4589'
+        configured=false
+        for attempt in $(seq 1 60); do
+          args=$(oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='{range .spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].args[*]}{@}{"\n"}{end}')
+          curve_present=false
+          min_tls_present=false
+          if grep -Fxq -- "${expected_curve_arg}" <<< "${args}"; then
+            curve_present=true
+          fi
+          if grep -Fxq -- '--tls-min-version=VersionTLS13' <<< "${args}"; then
+            min_tls_present=true
+          fi
+          if [[ "${curve_present}" == "true" && "${min_tls_present}" == "true" ]]; then
+            configured=true
+            break
+          fi
+          echo "Waiting for PTP daemon TLS reconciliation; required arguments present: curve=${curve_present}, minTLS13=${min_tls_present}"
+          if [[ "${attempt}" == "18" ]]; then
+            echo "Restarting the PTP operator so it re-reads the current cluster TLS profile."
+            oc rollout restart deployment ptp-operator -n openshift-ptp
+            oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+          fi
+          sleep 10
+        done
+        if [[ "${configured}" != "true" ]]; then
+          echo "PTP daemon did not apply the requested TLS curve. Verify StrictAllComponents and operator curve support."
+          oc get apiserver cluster -o jsonpath='tlsProfileType={.spec.tlsSecurityProfile.type} groups={.spec.tlsSecurityProfile.custom.groups} minTLSVersion={.spec.tlsSecurityProfile.custom.minTLSVersion} tlsAdherence={.spec.tlsAdherence}{"\n"}' || true
+          oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='generation={.metadata.generation} observedGeneration={.status.observedGeneration} desired={.status.desiredNumberScheduled} updated={.status.updatedNumberScheduled} ready={.status.numberReady} available={.status.numberAvailable} unavailable={.status.numberUnavailable} proxyImage={.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}{"\n"}' || true
+          exit 1
+        fi
+        oc rollout status deployment ptp-operator -n openshift-ptp --timeout=300s
+        oc rollout status daemonset linuxptp-daemon -n openshift-ptp --timeout=400s
+        oc wait pod -n openshift-ptp -l app=linuxptp-daemon --for=condition=Ready --timeout=400s
+        echo "PTP daemon rollout completed with the requested TLS curve"
+        oc get daemonset linuxptp-daemon -n openshift-ptp -o jsonpath='generation={.metadata.generation} observedGeneration={.status.observedGeneration} desired={.status.desiredNumberScheduled} updated={.status.updatedNumberScheduled} ready={.status.numberReady} available={.status.numberAvailable}{"\n"}'
       from: cli
       resources:
         requests:

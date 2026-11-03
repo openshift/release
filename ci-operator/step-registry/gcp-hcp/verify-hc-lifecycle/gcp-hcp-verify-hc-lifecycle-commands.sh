@@ -114,16 +114,95 @@ if ! wait_for_platform_api; then
   exit 1
 fi
 
+resolve_hc_version() {
+  local catalog resolved_version
+  HC_VERSION_MINOR="${HC_VERSION_MINOR-5.0}"
+  HC_CHANNEL_GROUP="${HC_CHANNEL_GROUP-candidate}"
+
+  if [[ ! "${HC_VERSION_MINOR}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+    echo "ERROR: HC_VERSION_MINOR must be an exact major.minor" >&2
+    return 1
+  fi
+  if [[ ! "${HC_CHANNEL_GROUP}" =~ ^[a-z][a-z0-9-]*$ ]]; then
+    echo "ERROR: HC_CHANNEL_GROUP must be a nonempty channel-group name" >&2
+    return 1
+  fi
+  if [[ -n "${HC_VERSION:-}" && "${HC_VERSION:-}" != "${HC_VERSION_MINOR}."* ]]; then
+    echo "ERROR: HC_VERSION must start with ${HC_VERSION_MINOR}." >&2
+    return 1
+  fi
+
+  # Version listing uses WIF authentication but is exempt from customer namespace
+  # authorization. The lifecycle's authorization bootstrap still runs in Ginkgo.
+  echo "Resolving advertised HC version for ${HC_VERSION_MINOR} / ${HC_CHANNEL_GROUP}..."
+  # API readiness can precede the version-sync controller's first catalog update.
+  local deadline=$((SECONDS + 1200))
+  local request_timeout wait_seconds
+  while (( SECONDS < deadline )); do
+    request_timeout=$((deadline - SECONDS))
+    if (( request_timeout <= 0 )); then
+      break
+    fi
+    if (( request_timeout > 30 )); then
+      request_timeout=30
+    fi
+    if ! catalog="$(timeout --kill-after=5s "${request_timeout}s" /usr/bin/gcphcpctl versions list -o json)"; then
+      echo "ERROR: Advertised-version request failed or timed out" >&2
+      return 1
+    fi
+
+    # Retry catalogs without a match; JSON parsing/query errors fail immediately.
+    if ! resolved_version="$(jq -sr \
+      --arg minor "${HC_VERSION_MINOR}" \
+      --arg channel "${HC_CHANNEL_GROUP}" \
+      --arg exact "${HC_VERSION:-}" '
+      if length == 1 and (.[0] | type == "object") and (.[0].items | type == "array")
+      then .[0].items
+      else error("Expected one version catalog with an items array")
+      end
+      | map(select(
+          (.metadata.name | startswith($minor + ".")) and
+          (.spec.channelGroups | index($channel) != null) and
+          ($exact == "" or .metadata.name == $exact)))
+      | last
+      | .metadata.name // empty
+    ' <<<"${catalog}")"; then
+      echo "ERROR: Invalid version catalog; refusing a minor, channel, or pinned-version fallback" >&2
+      return 1
+    fi
+
+    if [[ -n "${resolved_version}" ]]; then
+      # Freeze the first successful selection for the entire lifecycle.
+      export HC_VERSION="${resolved_version}" HC_CHANNEL_GROUP
+      jq -n --arg version "${HC_VERSION}" --arg minor "${HC_VERSION_MINOR}" \
+        --arg channel "${HC_CHANNEL_GROUP}" \
+        '{version: $version, minor: $minor, channelGroup: $channel}' \
+        > "${ARTIFACT_DIR}/hc-version-selection.json"
+      return 0
+    fi
+
+    wait_seconds=$((deadline - SECONDS))
+    if (( wait_seconds <= 0 )); then
+      break
+    fi
+    if (( wait_seconds > 30 )); then
+      wait_seconds=30
+    fi
+    echo "No matching version advertised yet; waiting ${wait_seconds}s for catalog synchronization..."
+    sleep "${wait_seconds}"
+  done
+
+  echo "ERROR: No advertised version matched minor ${HC_VERSION_MINOR} / channel ${HC_CHANNEL_GROUP} / override ${HC_VERSION:-<none>} within 20 minutes" >&2
+  return 1
+}
+
+resolve_hc_version
+
 echo "Configuration:"
-if [[ -s "${SHARED_DIR}/api-endpoint" ]]; then
-  echo "  API endpoint:       $(cat "${SHARED_DIR}/api-endpoint")"
-fi
-if [[ -s "${SHARED_DIR}/oidc-endpoint" ]]; then
-  echo "  OIDC endpoint:      $(cat "${SHARED_DIR}/oidc-endpoint")"
-fi
 echo "  Customer project:   $(cat "${SHARED_DIR}/customer-project-id")"
-echo "  HC version:         ${HC_VERSION:-5.0.0-ec.6}"
-echo "  Channel group:      ${HC_CHANNEL_GROUP:-candidate}"
+echo "  HC minor:           ${HC_VERSION_MINOR}"
+echo "  HC version:         ${HC_VERSION}"
+echo "  Channel group:      ${HC_CHANNEL_GROUP}"
 echo ""
 
 # A persistent customer project is authorized once outside CI. Verify that

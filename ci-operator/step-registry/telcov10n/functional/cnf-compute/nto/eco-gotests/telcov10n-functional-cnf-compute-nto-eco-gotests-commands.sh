@@ -118,15 +118,14 @@ echo "Copy junit test reports to artifacts directory"
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":"${REPORT_DIR}/*.xml" "${ARTIFACT_DIR}/junit_eco_gotests/"
 
-echo "Create junit-named copies in ARTIFACT_DIR for reporter compatibility"
+echo "Rename junit reports with junit_ prefix for reporter compatibility"
 for xml_file in "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml; do
-  echo "xml_file: ${xml_file}"
   if [[ -f "${xml_file}" ]]; then
     basename_file=$(basename "${xml_file}")
-    # Prepend junit_ to any XML filename
+    [[ "${basename_file}" == junit_* ]] && continue
     junit_name="junit_${basename_file}"
-    cp -v "${xml_file}" "${ARTIFACT_DIR}/junit_eco_gotests/${junit_name}"
-    echo "Created junit copy: ${basename_file} -> ${junit_name}"
+    mv -v "${xml_file}" "${ARTIFACT_DIR}/junit_eco_gotests/${junit_name}"
+    echo "Renamed: ${basename_file} -> ${junit_name}"
   fi
 done
 

@@ -5,6 +5,7 @@ metadata:
   name: sinker
   namespace: ci
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: sinker
 spec:
@@ -65,13 +66,14 @@ spec:
           readOnly: true
       containers:
       - name: sinker
-        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20261007-6ed406f29
+        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20261103-43ed23400
         args:
         - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
         # Keep git-sync's published link (jobs) in the path. Never point the
         # recursive job loader at the git-sync root containing .git/.worktrees.
         - --job-config-path=/etc/jobs/git/jobs/ci-operator/jobs
+        - --job-config-path=/etc/jobs/efs
         - --projected-token-file=/var/sa-token/token
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
@@ -85,8 +87,6 @@ spec:
         - name: release
           mountPath: /var/repo
           readOnly: true
-        - name: combined-jobs
-          mountPath: /etc/jobs
         - name: job-configs
           mountPath: /etc/jobs/efs
           readOnly: true
@@ -149,8 +149,6 @@ spec:
         emptyDir: {}
       - name: jobs-git
         emptyDir: {}
-      - name: combined-jobs
-        emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:
           claimName: job-configs-nfs
@@ -174,6 +172,7 @@ kind: Service
 metadata:
   namespace: ci
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: sinker
   name: sinker

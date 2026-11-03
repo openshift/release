@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: appset-cluster-app-ci
   namespace: openshift-gitops
 spec:
@@ -25,6 +27,26 @@ spec:
           kind: PersistentVolumeClaim
           jsonPointers:
             - /spec/volumeName
+        - group: apps
+          kind: Deployment
+          jqPathExpressions:
+            - .spec.template.spec.containers[].image
+        - kind: Namespace
+          jqPathExpressions:
+            - .metadata.labels["kubernetes.io/metadata.name"]
+            - .metadata.labels["pod-security.kubernetes.io/audit"]
+            - .metadata.labels["pod-security.kubernetes.io/audit-version"]
+            - .metadata.labels["pod-security.kubernetes.io/warn"]
+            - .metadata.labels["pod-security.kubernetes.io/warn-version"]
+            - .metadata.annotations["openshift.io/sa.scc.mcs"]
+            - .metadata.annotations["openshift.io/sa.scc.supplemental-groups"]
+            - .metadata.annotations["openshift.io/sa.scc.uid-range"]
+        - group: image.openshift.io
+          kind: ImageStreamTag
+          jqPathExpressions:
+            - .metadata
+            - .image
+            - .generation
       project: app-ci
       source:
         directory:
@@ -44,3 +66,15 @@ spec:
           - PruneLast=true
           - RespectIgnoreDifferences=true
           - ServerSideApply=true
+  templatePatch: |
+    {{- if eq .path.basename "supplemental-ci-images" }}
+    metadata:
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=false
+    spec:
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+    {{- end }}

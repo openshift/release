@@ -53,7 +53,41 @@ tests:
       commands: |
         set -euo pipefail
 
-        oc apply --server-side -k manifests/overlays/manager
+        # The progression NetworkPolicy only permits metrics traffic from a
+        # controller pod labelled app.kubernetes.io/component=controller. The
+        # generic manager overlay uses component=manager, so render a targeted
+        # CI overlay that aligns the Trainer Deployment and Service selectors
+        # with the RHAI label before the resources are first created.
+        manager_overlay="$(mktemp -d manifests/overlays/tls-scan-manager.XXXXXX)"
+        cat > "${manager_overlay}/kustomization.yaml" <<'EOF'
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+        - ../manager
+        patches:
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: kubeflow-trainer-controller-manager
+          patch: |-
+            - op: replace
+              path: /spec/selector/matchLabels/app.kubernetes.io~1component
+              value: controller
+            - op: replace
+              path: /spec/template/metadata/labels/app.kubernetes.io~1component
+              value: controller
+        - target:
+            version: v1
+            kind: Service
+            name: kubeflow-trainer-controller-manager
+          patch: |-
+            - op: replace
+              path: /spec/selector/app.kubernetes.io~1component
+              value: controller
+        EOF
+
+        oc apply --server-side -k "${manager_overlay}"
 
         # The ODH controller image resolves the OpenShift cluster TLS profile
         # at startup and watches it for changes.
@@ -91,7 +125,59 @@ tests:
         - kind: ServiceAccount
           name: kubeflow-trainer-controller-manager
           namespace: kubeflow-system
+        ---
+        # The generic manager overlay does not include the RHAI progression
+        # permissions from manifests/rhoai/rbac_progression_patch.yaml. Grant
+        # them additively for this E2E job instead of modifying the shared
+        # tls-scanner-run step.
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-rhai-e2e
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-rhai-e2e
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-rhai-e2e
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
         EOF
+
+        # Fail immediately if the controller cannot start its NetworkPolicy
+        # informer or read pods for progression tracking.
+        controller_sa="system:serviceaccount:kubeflow-system:kubeflow-trainer-controller-manager"
+        oc auth can-i list pods --all-namespaces --as="${controller_sa}"
+        oc auth can-i list networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i watch networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i create networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
 
         oc -n kubeflow-system set image \
           deployment/kubeflow-trainer-controller-manager \
@@ -115,14 +201,18 @@ tests:
         oc -n kubeflow-system rollout status \
           deployment/kubeflow-trainer-controller-manager --timeout=10m
 
-        # The manager overlay also installs JobSet. Wait for all control-plane
-        # workloads so the E2E suite does not race its controller or webhooks.
+        # The Trainer manager overlay applies the separate JobSet controller.
+        # Wait for both controller deployments before starting the E2E suite.
         oc -n kubeflow-system wait --for=condition=Available \
           deployment --all --timeout=10m
-        oc -n kubeflow-system wait --for=condition=Ready \
-          pod --all --timeout=10m
 
         oc apply --server-side -k manifests/overlays/runtimes
+
+        # The Flux runtime is an E2E-only example and is not included in the
+        # default runtimes overlay. Trainer's standard E2E setup installs it
+        # separately before running the suite.
+        oc apply --server-side -f examples/flux/flux-runtime.yaml
+        oc get clustertrainingruntime/flux-distributed
 
         # The builder image defaults to -mod=vendor, but Trainer does not
         # vendor its dependencies.

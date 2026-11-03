@@ -55,7 +55,7 @@ images:
     - arm64
     dockerfile_literal: |
       FROM hypershift-operator
-      RUN yum install -y jq && yum clean all
+      RUN yum install -y jq httpd-tools && yum clean all
     from: hypershift-operator
     to: hypershift-cli
 promotion:
@@ -141,7 +141,7 @@ tests:
   commands: make verify-ci
   container:
     from: custom-verify-src
-  timeout: 1h0m0s
+  timeout: 1h30m0s
 - as: unit
   capabilities:
   - arm64
@@ -283,6 +283,17 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
+  as: e2e-v2-aws-backuprestore-cross-cluster
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore-cross-cluster
 - always_run: false
   as: e2e-kubevirt-metal-ovn-backuprestore
   capabilities:
@@ -563,15 +574,7 @@ tests:
   optional: true
   steps:
     cluster_profile: hypershift-aks
-    env:
-      HYPERSHIFT_AZURE_FIPS: "true"
-      TEST_SKIPS: 'etcd leader changes are not excessive\| In-tree Volumes \[Driver:
-        azure-disk\]\| In-tree Volumes \[Driver: azure-file\]\| FIPS TestFIPS'
-      TEST_SUITE: openshift/conformance/parallel/minimal
-    test:
-    - ref: hypershift-hostedcluster-fips-check
-    - chain: hypershift-conformance
-    workflow: hypershift-azure-aks-conformance
+    workflow: hypershift-azure-aks-conformance-fips-encryption
 - as: security
   capabilities:
   - arm64
@@ -723,7 +726,7 @@ tests:
   steps:
     cluster_profile: hypershift-gcp
     env:
-      GKE_REGION: us-central1
+      GKE_REGION: northamerica-northeast2
       GKE_RELEASE_CHANNEL: stable
     workflow: hypershift-gcp-gke-e2e-v2
 - always_run: false

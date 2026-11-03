@@ -6,12 +6,20 @@
         rules: [
           {
             alert: 'prow-pod-crashlooping',
-            expr: 'increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 20',
+            expr: |||
+              increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h]) > 10
+              and
+              max_over_time(
+                increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci",clusterName="core-ci"}[1h])[30m:]
+              ) > 20
+            |||,
             'for': '10m',
             labels: {
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 1 hour.'
             },
           },
@@ -19,6 +27,7 @@
             alert: 'NonKubeContainerWaiting',
             expr: 'max by (namespace, pod, container) (kube_pod_container_status_waiting_reason{namespace!~"(openshift-.*|kube-.*|default)",job="kube-state-metrics",clusterName="core-ci"} > 0)',
             'for': '1h',
+            'keep_firing_for': '15m',
             labels: {
               severity: 'warning',
             },
@@ -29,32 +38,46 @@
           },
           {
             alert: 'prow-job-backlog-growing',
-            expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
+            expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[30m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[30m])) > 0',
             'for': '10m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.'
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
+              message: 'The number of triggered Prow jobs that have not yet started running has been growing (net positive) over the past 30 minutes.'
             },
           },
           {
             alert: 'Controller backlog is not being drained',
-            expr: 'workqueue_depth{name=~"crier.*|plank"} > 100',
+            expr: |||
+              workqueue_depth{name=~"crier.*|plank"} > 80
+              and
+              max_over_time(workqueue_depth{name=~"crier.*|plank"}[20m:]) > 100
+            |||,
             'for': '20m',
             labels: {
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'red',
+              ops_category: 'ci_platform',
               message: 'The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>'
             },
           },
           {
             alert: 'TriggeredButPendingJobs',
             expr: |||
-              sum by (job_name) (
-                increase(prowjob_state_transitions{state="triggered"}[15m])
-                - increase(prowjob_state_transitions{state="pending"}[15m])
+              sum by (job_name) (increase(prowjob_state_transitions{state="triggered"}[15m]))
+              - sum by (job_name) (increase(prowjob_state_transitions{state="pending"}[15m]))
+              > 10
+              and
+              max_over_time(
+                (
+                  sum by (job_name) (increase(prowjob_state_transitions{state="triggered"}[15m]))
+                  - sum by (job_name) (increase(prowjob_state_transitions{state="pending"}[15m]))
+                )[20m:]
               ) > 20
             |||,
             'for': '10m',
@@ -62,16 +85,21 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'There are {{ $value }} jobs that have been triggered but are still pending, indicating potential scheduling or resource constraints. Investigate pending Prow jobs. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=TriggeredButPendingJobs|Prometheus>.',
             }
           },
           {
             alert: 'TriggeredProwJobsPileup',
             expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak',
             }
@@ -79,6 +107,7 @@
           {
             alert: 'SchedulingProwJobsPileup',
             expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
+            'keep_firing_for': '10m',
             labels: {
               severity: 'warning',
             },
