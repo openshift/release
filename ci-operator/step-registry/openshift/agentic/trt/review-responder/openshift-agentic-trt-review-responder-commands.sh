@@ -571,15 +571,16 @@ history_rewritten() {
 # comments since the head commit, so it holds across follow-up jobs.
 RETEST_LIMIT="${RETEST_LIMIT:-2}"
 
-# Returns nonzero when a required step fails (unreadable classifications,
-# comment history, or the /retest post) so the caller can retry this CI state.
+# Returns nonzero when reading comment history or posting /retest fails, so
+# the caller can retry this CI state. Missing or invalid worker output skips
+# retests instead: rerunning the worker would not fix it.
 post_retests() {
     local classification_file=$1 checks=$2 head=$3
     local count eligible since
 
     if [[ ! -s "${classification_file}" ]]; then
-        echo "WARNING: CI classification file is missing or empty."
-        return 1
+        echo "WARNING: CI classification file is missing or empty; skipping retests."
+        return 0
     fi
     # The classification file is agent output: only Prow checks the gate
     # reported as failing count.
@@ -590,8 +591,8 @@ post_retests() {
             and (.classification == "flake" or .classification == "infrastructure")
             and (.name | type == "string" and startswith("ci/prow/"))
             and (.name | IN($failing[])))' "${classification_file}"); then
-        echo "WARNING: CI classification file is not a valid JSON array."
-        return 1
+        echo "WARNING: CI classification file is not a valid JSON array; skipping retests."
+        return 0
     fi
     [[ "${eligible}" == "true" ]] || return 0
 
