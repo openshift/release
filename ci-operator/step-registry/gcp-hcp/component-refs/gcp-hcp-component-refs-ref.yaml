@@ -31,10 +31,17 @@ ref:
     optional and manually triggered).
 
     Waits up to PR_IMAGES_WAIT_TIMEOUT in total for the components' images to be
-    published to PR_IMAGES_REPOSITORY (tagged with the commit SHA by the
-    component's Konflux publish-pr-images check), then fails with a clear
-    message if they are missing. Lookup errors other than "not found" (e.g. no
-    read access) fail immediately.
+    published to PR_IMAGES_REPOSITORY, tagged with the short (7-character)
+    commit SHA by the component's Konflux publish-pr-images check, then fails
+    with a clear message if they are missing. Lookup errors other than "not
+    found" (e.g. no read access) fail immediately.
+
+    Tag contract: this step checks the short-SHA tag, so every deployed
+    component's ArgoCD template must deploy that same tag — e.g. with
+    $ARGOCD_APP_REVISION_SHORT, as gecko's and kube-applier-gcp's templates do
+    in gcp-hcp-infra. Nothing enforces this across repos; a component whose
+    chart deploys a different tag (the full SHA, "latest", ...) would pass this
+    check yet pull a different image than the one just verified to exist.
 
     The repository-to-component and component-to-image mappings
     (component_for_repo, images_for_component) are not read from gcp-hcp-infra's
