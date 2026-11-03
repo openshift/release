@@ -87,6 +87,7 @@ cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override-upgrade.yaml"
 export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 unset GOFLAGS
+export TEMPLATIZE_USE_PREBUILT=1
 
 # Prepare svc cluster access for the test harness (customer tests run below).
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
