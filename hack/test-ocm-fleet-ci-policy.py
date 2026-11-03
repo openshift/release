@@ -91,6 +91,7 @@ class CIPolicyTest(unittest.TestCase):
     def test_unconditional_branch_protection_requires_github_actions(self):
         config = load(f"core-services/prow/02_config/{REPO}/_prowconfig.yaml")
         branch = config["branch-protection"]["orgs"]["stolostron"]["repos"]["ocm-fleet"]["branches"]["main"]
+        self.assertIs(branch.get("protect"), True)
         self.assertEqual(set(branch["required_status_checks"]["contexts"]), {"CI", "E2E"})
 
 
