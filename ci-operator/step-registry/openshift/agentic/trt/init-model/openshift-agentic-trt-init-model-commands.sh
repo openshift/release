@@ -407,7 +407,13 @@ configure_codex_upload_screenshot_skill() {
         echo "ERROR: refusing to replace existing Codex skill at ${target}" >&2
         return 1
     else
-        ln -s "${source}" "${target}" || return 1
+        if ! ln -s "${source}" "${target}" 2>/dev/null; then
+            # A parallel process may have created the same link first.
+            [[ -L "${target}" && "$(readlink -f "${target}")" == "$(readlink -f "${source}")" ]] || {
+                echo "ERROR: failed to link upload-screenshot skill at ${target}" >&2
+                return 1
+            }
+        fi
     fi
     # The existing skill uses this plugin-root contract to locate its helper.
     CLAUDE_PLUGIN_ROOT="${plugin_root}"
