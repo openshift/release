@@ -95,9 +95,14 @@ variable "region" {
 }
 
 variable "tier" {
-  # 4 vCPUs / 15GB RAM: with the 2 vCPU tier the full e2e suite hit the 2h
-  # step timeout on DB-bound pages (mirrors the AWS db.m5.xlarge sizing fix).
-  default = "db-custom-4-15360"
+  # 8 vCPUs / 30GB RAM. The 2 vCPU tier hit the 2h step timeout on DB-bound
+  # pages; 4 vCPUs then still throttled the full suite - Cloud SQL
+  # connection setup stalled under the suite's churn (rehearsal
+  # 2117248575602692096: psycopg2.connect timeouts across all Quay workers,
+  # 14s /health/instance) since new connections on the public-IP path are
+  # rate-limited per instance. Cloud SQL connection throughput scales with
+  # vCPU/memory, so double the tier to clear that ceiling.
+  default = "db-custom-8-30720"
 }
 
 variable "database_version" {
