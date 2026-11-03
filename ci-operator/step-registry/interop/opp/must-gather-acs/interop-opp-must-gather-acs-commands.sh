@@ -202,7 +202,12 @@ echo "[${TIMESTAMP}] Starting OLM evidence capture..."
 #    distinguish "CRD absent" from "zero objects", so the CRD is probed
 #    first and an explicit CRD_ABSENT marker is written when missing.
 echo "[1/10] OperatorPolicy..."
-if oc get crd operatorpolicies.operator.management.openshift.io >/dev/null 2>&1; then
+# Three-way CRD guard (capture contract): the CRD exists → capture;
+# lookup fails NotFound → CRD_ABSENT; fails for any other reason →
+# probe_error — a permission or API error must never render as absence.
+OP_CRD_OUTPUT=$(oc get crd operatorpolicies.operator.management.openshift.io 2>&1)
+OP_CRD_RC=$?
+if [[ ${OP_CRD_RC} -eq 0 ]]; then
   oc get operatorpolicy -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
@@ -226,8 +231,10 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/01-operatorpolicy.json" 2>&1 || \
     echo "probe_error: operatorpolicy query failed" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
-else
+elif echo "${OP_CRD_OUTPUT}" | grep -qi "not found"; then
   echo "CRD_ABSENT: operatorpolicies.operator.management.openshift.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+else
+  echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC}): ${OP_CRD_OUTPUT}" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 fi
 
 # 2. CatalogSource — capture name, status.connectionState, spec.image
@@ -444,7 +451,11 @@ oc get packagemanifest -n openshift-marketplace -o name > "${EVIDENCE_DIR}/08-al
 #      always null on these objects; the compliance verdict is the field
 #      that answers "was the policy reconciled".
 echo "[9/10] ACM policies..."
-if oc get crd policies.policy.open-cluster-management.io >/dev/null 2>&1; then
+# Three-way CRD guard (capture contract): exists → capture; NotFound →
+# CRD_ABSENT; any other failure → probe_error (never render as absence).
+POLICY_CRD_OUTPUT=$(oc get crd policies.policy.open-cluster-management.io 2>&1)
+POLICY_CRD_RC=$?
+if [[ ${POLICY_CRD_RC} -eq 0 ]]; then
   oc get policy -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
@@ -465,10 +476,14 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/09-policies.json" 2>&1 || \
     echo "probe_error: policy query failed" > "${EVIDENCE_DIR}/09-policies.json"
-else
+elif echo "${POLICY_CRD_OUTPUT}" | grep -qi "not found"; then
   echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
+else
+  echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC}): ${POLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/09-policies.json"
 fi
-if oc get crd configurationpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
+CONFIGPOLICY_CRD_OUTPUT=$(oc get crd configurationpolicies.policy.open-cluster-management.io 2>&1)
+CONFIGPOLICY_CRD_RC=$?
+if [[ ${CONFIGPOLICY_CRD_RC} -eq 0 ]]; then
   oc get configurationpolicy -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
@@ -485,8 +500,10 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/10-configpolicies.json" 2>&1 || \
     echo "probe_error: configurationpolicy query failed" > "${EVIDENCE_DIR}/10-configpolicies.json"
-else
+elif echo "${CONFIGPOLICY_CRD_OUTPUT}" | grep -qi "not found"; then
   echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
+else
+  echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC}): ${CONFIGPOLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/10-configpolicies.json"
 fi
 
 # 10. ACM CSV version and governance-policy-addon-controller image ref —
@@ -646,21 +663,26 @@ inputs_classified = (
     and pm_s in ("ok", "absent")
 )
 
+# Per-term values follow the Central rule (follow-up 1): a query
+# failure reads as unknown, never as confirmed absence (false/0).
 terms = {
     "central_query": central_s,
     "central_present": (str(central_present).lower()
                         if central_present is not None else "unknown"),
     "central_available": (str(central_available).lower()
                           if central_available is not None else "unknown"),
-    "rhacs_subscription_count": str(len(rhacs_subs)),
+    "rhacs_subscription_count": (str(len(rhacs_subs))
+                                 if subs_s in ("ok", "absent") else "unknown"),
     "rhacs_subscription_channel": sub_channel or "unknown",
     "rhacs_subscription_source": effective_source or "unknown",
-    "rhacs_csv_count": str(len(rhacs_csvs)),
+    "rhacs_csv_count": (str(len(rhacs_csvs))
+                        if csvs_s in ("ok", "absent") else "unknown"),
     "rhacs_csv_name": rhacs_csvs[0]["name"] if rhacs_csvs else "unknown",
     "csv_catalog_matches_subscription": (
         str(csv_catalog_matches_subscription).lower()
         if csv_catalog_matches_subscription is not None else "unknown"),
-    "operatorpolicy_present": str(bool(rhacs_op)).lower(),
+    "operatorpolicy_present": (str(bool(rhacs_op)).lower()
+                               if ops_s in ("ok", "absent") else "unknown"),
     "operatorpolicy_compliant": (str(op_compliant).lower()
                                   if op_compliant is not None else "unknown"),
     "operatorpolicy_spec_channel": op_channel or "unknown",
@@ -836,6 +858,22 @@ FIXTURE
   echo '[]' > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect removal_preconditions_met false
+
+  # Follow-up 1 (per-term gating): a failed ops/subs/csvs query must not
+  # read as confirmed absence in the report terms — unknown, not false/0.
+  # A genuinely absent (CRD not registered) OperatorPolicy still reads false.
+  echo "probe_error: subscription query failed" > "${tmp}/03-subscription.json"
+  echo "probe_error: csv query failed" > "${tmp}/05-csv.json"
+  echo "probe_error: operatorpolicy query failed" > "${tmp}/01-operatorpolicy.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_present unknown
+  _expect rhacs_subscription_count unknown
+  _expect rhacs_csv_count unknown
+  _expect predicate_inputs_classified false
+  _expect removal_preconditions_met false
+  echo "CRD_ABSENT: operatorpolicies.operator.management.openshift.io not registered on this cluster" > "${tmp}/01-operatorpolicy.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_present false
 
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
