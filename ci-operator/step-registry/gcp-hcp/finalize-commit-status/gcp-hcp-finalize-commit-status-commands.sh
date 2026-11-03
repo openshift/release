@@ -8,6 +8,12 @@ readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
+readonly skip_status_path="${SHARED_DIR}/gcp-hcp-skip-commit-status"
+
+if [[ -e "${skip_status_path}" ]]; then
+  echo "This run does not test a commit of ${target_org}/${target_repo}; skipping the ${status_context} commit status"
+  exit 0
+fi
 
 if [[ ! -s "${tested_sha_path}" ]]; then
   echo "ERROR: tested commit SHA is missing or empty" >&2
