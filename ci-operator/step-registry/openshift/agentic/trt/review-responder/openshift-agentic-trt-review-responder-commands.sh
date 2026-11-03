@@ -244,7 +244,7 @@ This is CI mode (--ci): NEVER ask interactive questions or wait for user input. 
 CI_EOF
 append_pipeline_constraints "${CI_PROMPT}"
 cat >> "${CI_PROMPT}" <<'CI_EOF'
-- Exception: when the failing checks include an entry with `"bucket": "rebase"`, rebase the branch as described in Step 0b of the CI Failure Process. That rebase is the only permitted history rewrite; the pipeline publishes it with a lease.
+- Exception: when the failing checks include an entry with `"bucket": "rebase"`, rebase the branch as the CI Failure Process describes. That rebase is the only permitted history rewrite; the pipeline publishes it with a lease.
 - After triage, write a JSON array to the classification file named in your task, one object per failing check you classified: `{"name": "<check name>", "classification": "<pr_caused|infrastructure|pre_existing|flake|out_of_scope>"}`. Write `[]` when there are none. The pipeline retests flake and infrastructure failures; do not retest them yourself.
 CI_EOF
 append_security "${CI_PROMPT}" "triaging CI failures for this PR" \
@@ -477,17 +477,16 @@ push_current_branch() {
     fi
     rm -f "${push_log}"
 
-    if git merge-base --is-ancestor "${EXPECTED_REMOTE_HEAD}" HEAD; then
+    history_rc=0
+    history_rewritten || history_rc=$?
+    if [[ "${history_rc}" -eq 1 ]]; then
         echo "ERROR: refusing lease push because local history was not rewritten"
         note_push_failure
         return 1
-    else
-        history_rc=$?
-        if [[ "${history_rc}" -ne 1 ]]; then
-            echo "ERROR: unable to verify whether local history was rewritten"
-            note_push_failure
-            return 1
-        fi
+    elif [[ "${history_rc}" -ne 0 ]]; then
+        echo "ERROR: unable to verify whether local history was rewritten"
+        note_push_failure
+        return 1
     fi
 
     if ! read_pr_head; then
@@ -558,61 +557,65 @@ write_review_metrics() {
     finalize_session_metrics review
 }
 
+# Returns 0 when HEAD rewrote EXPECTED_REMOTE_HEAD's history, 1 when HEAD
+# fast-forwards it, and 2 when that cannot be determined.
 history_rewritten() {
     local rc=0
     git merge-base --is-ancestor "${EXPECTED_REMOTE_HEAD}" HEAD || rc=$?
-    [[ "${rc}" -eq 1 ]]
+    case "${rc}" in
+        0) return 1 ;;
+        1) return 0 ;;
+        *) return 2 ;;
+    esac
 }
 
-# Retest checks the CI worker classified as flake or infrastructure, at most
-# RETEST_LIMIT times per check per HEAD. The cap counts this bot's /test
+# Post /retest when the CI worker classified a failing Prow check as flake or
+# infrastructure, at most RETEST_LIMIT times per HEAD. Prow reruns every
+# failing job. The limit is best effort: it counts this bot's /retest
 # comments since the head commit, so it holds across follow-up jobs.
 RETEST_LIMIT="${RETEST_LIMIT:-2}"
 
+# Returns nonzero when a required step fails (unreadable classifications,
+# comment history, or the /retest post) so the caller can retry this CI state.
 post_retests() {
     local classification_file=$1 checks=$2 head=$3
-    local count job jobs posted since
+    local count eligible since
 
     if [[ ! -s "${classification_file}" ]]; then
-        echo "No CI classification file; skipping retests."
-        return 0
+        echo "WARNING: CI classification file is missing or empty."
+        return 1
     fi
     # The classification file is agent output: only Prow checks the gate
-    # reported as failing are eligible.
-    if ! jobs=$(jq -r --argjson checks "${checks}" '
+    # reported as failing count.
+    if ! eligible=$(jq --argjson checks "${checks}" '
         [$checks[] | select(.state != "LABEL") | .name] as $failing
-        | if type == "array" then .[] else error("not an array") end
-        | select(type == "object" and (.classification == "flake" or .classification == "infrastructure"))
-        | .name | strings
-        | select(IN($failing[]))
-        | select(test("^ci/prow/[A-Za-z0-9][A-Za-z0-9._-]*$"))
-        | ltrimstr("ci/prow/")' "${classification_file}" | sort -u); then
-        echo "WARNING: invalid CI classification file; skipping retests."
-        return 0
+        | if type == "array" then . else error("not an array") end
+        | any(.[]; type == "object"
+            and (.classification == "flake" or .classification == "infrastructure")
+            and (.name | type == "string" and startswith("ci/prow/"))
+            and (.name | IN($failing[])))' "${classification_file}"); then
+        echo "WARNING: CI classification file is not a valid JSON array."
+        return 1
     fi
-    [[ -n "${jobs}" ]] || return 0
+    [[ "${eligible}" == "true" ]] || return 0
 
     if ! since=$(gh api "repos/${UPSTREAM_REPO}/commits/${head}" --jq '.commit.committer.date') || \
-       ! posted=$(gh api --paginate "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments?since=${since}&per_page=100" | \
+       ! count=$(gh api --paginate "repos/${UPSTREAM_REPO}/issues/${PR_NUM}/comments?since=${since}&per_page=100" | \
            jq -s --arg bot "${BOT_LOGIN}" --arg since "${since}" \
-           '[add // [] | .[] | select(.user.login == $bot and .created_at >= $since) | .body | gsub("^\\s+|\\s+$"; "")]'); then
-        echo "WARNING: unable to count previous retests; skipping retests."
+           '[add // [] | .[] | select(.user.login == $bot and .created_at >= $since and (.body | gsub("^\\s+|\\s+$"; "")) == "/retest")] | length'); then
+        echo "WARNING: unable to count previous retests."
+        return 1
+    fi
+    if [[ "${count}" -ge "${RETEST_LIMIT}" ]]; then
+        echo "Retest limit reached for HEAD ${head}."
         return 0
     fi
-
-    while IFS= read -r job; do
-        count=$(jq --arg body "/test ${job}" '[.[] | select(. == $body)] | length' <<< "${posted}")
-        if [[ "${count}" -ge "${RETEST_LIMIT}" ]]; then
-            echo "Retest limit reached for ${job} on HEAD ${head}."
-            continue
-        fi
-        if gh pr comment "${PR_NUM}" --repo "${UPSTREAM_REPO}" --body "/test ${job}"; then
-            retests=$(( retests + 1 ))
-            echo "Requested /test ${job}"
-        else
-            echo "WARNING: failed to request /test ${job}"
-        fi
-    done <<< "${jobs}"
+    if ! gh pr comment "${PR_NUM}" --repo "${UPSTREAM_REPO}" --body "/retest"; then
+        echo "WARNING: failed to request /retest"
+        return 1
+    fi
+    retests=$(( retests + 1 ))
+    echo "Requested /retest"
 }
 
 iteration=0
@@ -791,11 +794,12 @@ Your GitHub login is ${BOT_LOGIN}." \
             echo "WARNING: at least one worker failed; leaving the branch unpushed."
         elif push_current_branch; then
             if [[ "${ci_worker_succeeded}" == "true" ]]; then
-                if ! printf '%s\n' "${ci_key}" > "${EVALUATED_CI_FILE}"; then
-                    echo "WARNING: failed to record evaluated CI; it may be re-evaluated."
-                fi
+                ci_evaluated=true
                 if [[ "$(git rev-parse HEAD)" == "${EXPECTED_REMOTE_HEAD}" ]]; then
-                    post_retests "${CLASSIFICATION_FILE}" "${extracted}" "${current_head}"
+                    if ! post_retests "${CLASSIFICATION_FILE}" "${extracted}" "${current_head}"; then
+                        ci_evaluated=false
+                        echo "WARNING: retests did not complete; leaving this CI state pending for retry."
+                    fi
                 else
                     # CI reruns on the pushed HEAD, so retests would be wasted.
                     echo "Branch changed; skipping retests."
@@ -803,6 +807,10 @@ Your GitHub login is ${BOT_LOGIN}." \
                        history_rewritten; then
                         rebases=$(( rebases + 1 ))
                     fi
+                fi
+                if [[ "${ci_evaluated}" == "true" ]] && \
+                   ! printf '%s\n' "${ci_key}" > "${EVALUATED_CI_FILE}"; then
+                    echo "WARNING: failed to record evaluated CI; it may be re-evaluated."
                 fi
             fi
         else
