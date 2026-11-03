@@ -76,6 +76,8 @@ def mock_ocm(base, case, arguments):
                    datetime.datetime.fromtimestamp(created, datetime.timezone.utc).isoformat()}
         if case == "replacement-cluster":
             cluster["id"] = "b" * 32
+        if case.startswith("timestamp:"):
+            cluster["creation_timestamp"] = case.removeprefix("timestamp:")
         print(json.dumps({"total": 2 if case == "ambiguous-match" else 1, "items": [cluster]}))
     elif path.endswith("/resources/live"):
         print(json.dumps({"cluster_id": CLUSTER, "resources": {
@@ -248,6 +250,36 @@ class CollectorTests(unittest.TestCase):
         artifacts, _ = self.run_fixture("fractional-finish", ids=None, manifest=True)
         self.assertEqual(artifacts["collection-outcome.json"]["identity"], "unique_run_name")
 
+    def test_rfc3339_fraction_lengths_and_timezones(self):
+        whole = datetime.datetime.fromtimestamp(int(time.time()) - 2, datetime.timezone.utc)
+        prefix = whole.strftime("%Y-%m-%dT%H:%M:%S")
+        manifest = {"run": "1", "job": "fixture", "names": ["fixture-run-name"], "ids": [CLUSTER],
+                    "outcome": "ok", "started": int(whole.timestamp()) - 1, "finished": int(whole.timestamp()) + 1}
+        timestamps = [prefix + "Z", prefix + "+00:00",
+                      (whole + datetime.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S") + "+01:00"]
+        timestamps.extend(prefix + "." + "1" * length + "Z" for length in range(1, 10))
+        for timestamp in timestamps:
+            with self.subTest(timestamp=timestamp):
+                artifacts, _ = self.run_fixture("timestamp:" + timestamp, ids=None, manifest=manifest)
+                self.assertEqual(artifacts["collection-outcome.json"]["identity"], "unique_run_name")
+
+    def test_timestamp_rejection_and_nanosecond_window_boundary(self):
+        second = int(time.time()) - 2
+        prefix = datetime.datetime.fromtimestamp(second, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        manifest = {"run": "1", "job": "fixture", "names": ["fixture-run-name"], "ids": [CLUSTER],
+                    "outcome": "ok", "started": second, "finished": second + 0.5}
+        timestamps = [prefix, prefix + ".Z", prefix + ".1234567890Z", prefix + "+00:60",
+                      prefix + "+24:00", prefix.replace("T", " ") + "Z", prefix + "Zjunk",
+                      "2026-02-30T00:00:00Z", "2000-01-01T00:00:00Z", "2099-01-01T00:00:00Z",
+                      prefix + ".500000001Z"]
+        for timestamp in timestamps:
+            with self.subTest(timestamp=timestamp):
+                artifacts, calls = self.run_fixture("timestamp:" + timestamp, ids=None, manifest=manifest)
+                self.assertEqual(artifacts["collection-outcome.json"]["reason"], "unscoped_creation_time")
+                self.assertNotIn("/resources/live", calls)
+        artifacts, _ = self.run_fixture("timestamp:" + prefix + ".500000000Z", ids=None, manifest=manifest)
+        self.assertEqual(artifacts["collection-outcome.json"]["identity"], "unique_run_name")
+
     def test_tool_archive_cannot_supply_symlink_executable(self):
         artifacts, calls = self.run_fixture("archive-symlink")
         self.assertEqual(artifacts["collection-outcome.json"]["reason"], "invalid_tool_archive")
@@ -309,6 +341,24 @@ class CollectorTests(unittest.TestCase):
 
 
 class ProducerHandoffTests(producer.ArtifactFixture):
+    def test_utf8_recording_under_ascii_locale(self):
+        output = self.artifacts / "utf8-recordings"
+        recording = output / "profile" / "cluster.ini"
+        recording.parent.mkdir(parents=True)
+        snippet = self.script.read_text(encoding="utf-8").split(
+            'python3 - "${ocm_fvt_output}" "${SHARED_DIR}" "${ocm_fvt_started}" <<\'PY\' 2>/dev/null || true\n',
+            1)[1].split("\nPY", 1)[0]
+        for content, expected in (("Name=fixture-run-name\nID=" + CLUSTER + "\nNote=caf\u00e9\n", "ok"),
+                                  ("Name=fixture-run-name\nID=" + CLUSTER + "\nNote=", "invalid_or_incomplete_recording")):
+            data = content.encode("utf-8")
+            recording.write_bytes(data if expected == "ok" else data + b"\xff")
+            subprocess.run([sys.executable, "-X", "utf8=0", "-", str(output), str(self.shared), str(int(time.time()) - 1)],
+                           input=snippet, encoding="utf-8", capture_output=True, check=True,
+                           env={"LC_ALL": "C", "PYTHONCOERCECLOCALE": "0", "PYTHONUTF8": "0"})
+            manifest = json.loads((self.shared / "ocm-fvt-diagnostic-identity.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["outcome"], expected)
+            self.assertEqual(manifest["ids"], [CLUSTER] if expected == "ok" else [])
+
     def mock_producer(self):
         executable = self.bin / "podman"
         executable.write_text(f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" --mock podman "$@"\n')
