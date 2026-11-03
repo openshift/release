@@ -117,6 +117,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfdu6": {"port": 64413, "ip": "10.6.105.200", "hvip": "192.168.17.2"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -127,7 +130,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -155,12 +158,15 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: echo "DEBUG - cluster held, not released"
+    #command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
     BASTION_ENV=false
 fi
+# DEBUG - pinned cnfdu6 is in upstreambil, reachable only through the bastion
+BASTION_ENV=true
 
 if $BASTION_ENV; then
 # Run on upstream lab with bastion
