@@ -194,6 +194,75 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-init-model.sh"
 
+# Keep workflow skills provisioned by the image while giving each process its
+# own mutable Codex home (parallel eval cases must not share login or config).
+# Only skill/plugin content is copied; credentials and user config are not.
+TRT_CODEX_HOME_SEED="${TRT_CODEX_HOME_SEED:-${CODEX_HOME:-${HOME}/.codex}}"
+
+prow_public_artifact_prefix() {
+    local step_name=$1
+    [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]] || return 1
+    local job_path=logs
+    if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
+        local org repo pull
+        org=$(jq -r '.refs.org // empty' <<<"${JOB_SPEC:-{}}") || return 1
+        repo=$(jq -r '.refs.repo // empty' <<<"${JOB_SPEC:-{}}") || return 1
+        pull=$(jq -r '.refs.pulls[0].number // empty' <<<"${JOB_SPEC:-{}}") || return 1
+        [[ -n "${org}" && -n "${repo}" && -n "${pull}" ]] || return 1
+        job_path="pr-logs/pull/${org}_${repo}/${pull}"
+    fi
+    printf '%s\n' "https://gcs.ci.openshift.org/gcs/test-platform-results-public/${job_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/artifacts/screenshots"
+}
+
+# Screenshots remain ordinary Prow artifacts. The worker writes a stable
+# marker into Markdown and the pipeline replaces it with the deterministic
+# public-mirror URL before publishing a PR. No agent-side release or push is
+# needed, and the URL becomes live after Prow uploads the step artifacts.
+prepare_prow_screenshot_handoff() {
+    local step_name=$1
+    PROW_SCREENSHOT_DIR="${WORKDIR}/artifacts/screenshots"
+    mkdir -p "${PROW_SCREENSHOT_DIR}"
+    export PROW_SCREENSHOT_DIR
+    PROW_SCREENSHOT_URL_PREFIX=""
+    if [[ "${EVAL_MODE:-}" != "true" ]]; then
+        PROW_SCREENSHOT_URL_PREFIX=$(prow_public_artifact_prefix "${step_name}" || true)
+    fi
+    export PROW_SCREENSHOT_URL_PREFIX
+}
+
+replace_prow_screenshot_markers() {
+    local markdown_file=$1
+    [[ -s "${markdown_file}" ]] || return 0
+    if [[ -z "${PROW_SCREENSHOT_URL_PREFIX:-}" ]]; then
+        if grep -q 'prow-artifact://screenshots/' "${markdown_file}"; then
+            echo "WARNING: screenshot markers remain because the public Prow artifact URL is unavailable" >&2
+        fi
+        return 0
+    fi
+    python3 - "${markdown_file}" "${PROW_SCREENSHOT_DIR}" "${PROW_SCREENSHOT_URL_PREFIX}" <<'PY'
+import pathlib
+import re
+import sys
+
+markdown_path = pathlib.Path(sys.argv[1])
+screenshot_dir = pathlib.Path(sys.argv[2])
+url_prefix = sys.argv[3].rstrip("/")
+pattern = re.compile(r"prow-artifact://screenshots/([A-Za-z0-9][A-Za-z0-9._-]*)")
+text = markdown_path.read_text()
+
+
+def replace(match):
+    name = match.group(1)
+    if not (screenshot_dir / name).is_file():
+        print(f"WARNING: screenshot marker references missing artifact: {name}", file=sys.stderr)
+        return match.group(0)
+    return f"{url_prefix}/{name}"
+
+
+markdown_path.write_text(pattern.sub(replace, text))
+PY
+}
+
 append_codex_prefix_rule() {
     local rules_file=$1
     local justification=$2
@@ -372,12 +441,17 @@ codex_home_cleanup() {
 }
 
 prepare_codex_home() {
-    if [[ -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
+    if [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" && -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
         return 0
     fi
     CODEX_HOME=$(mktemp -d /tmp/codex-home.XXXXXX) || return 1
     export CODEX_HOME
-    [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" ]] && return 0
+    local seeded
+    for seeded in skills plugins; do
+        if [[ -d "${TRT_CODEX_HOME_SEED}/${seeded}" ]]; then
+            cp -a "${TRT_CODEX_HOME_SEED}/${seeded}" "${CODEX_HOME}/" || return 1
+        fi
+    done
     CODEX_HOME_CLEANUP_INSTALLED=1
     local previous quoted
     previous=$(trap -p EXIT || true)
@@ -388,6 +462,107 @@ prepare_codex_home() {
         CODEX_HOME_PREVIOUS_EXIT_CMD=$(eval "printf '%s' ${quoted}")
     fi
     trap codex_home_cleanup EXIT
+}
+
+codex_project_mcp_is_allowed() {
+    local server=$1
+    [[ " ${ALLOWED_TOOLS:-} " == *" mcp__${server}__"* ]]
+}
+
+# Codex does not consume the Claude-compatible project .mcp.json directly.
+# Register only servers already allowed by the job's ALLOWED_TOOLS contract;
+# this keeps unrelated or interactive project servers disabled.
+configure_codex_project_mcp() {
+    local config="${WORKDIR}/.mcp.json"
+    local marker="${CODEX_HOME}/.trt-project-mcp-ready"
+    [[ -f "${marker}" ]] && return 0
+    [[ -f "${config}" ]] || { : > "${marker}"; return 0; }
+    if ! jq -e '.mcpServers | type == "object"' "${config}" >/dev/null 2>&1; then
+        echo "ERROR: invalid project MCP configuration: ${config}" >&2
+        return 1
+    fi
+    local server type command url key value
+    local -a args env_args
+    while IFS= read -r server; do
+        [[ "${server}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "ERROR: unsafe MCP server name in ${config}" >&2
+            return 1
+        }
+        codex_project_mcp_is_allowed "${server}" || continue
+        type=$(jq -r --arg server "${server}" '.mcpServers[$server].type // (if .mcpServers[$server].url then "http" else "stdio" end)' "${config}")
+        case "${type}" in
+            stdio)
+                command=$(jq -r --arg server "${server}" '.mcpServers[$server].command // empty' "${config}")
+                [[ -n "${command}" ]] || {
+                    echo "ERROR: allowed MCP server ${server} has no command" >&2
+                    return 1
+                }
+                mapfile -t args < <(jq -r --arg server "${server}" '.mcpServers[$server].args[]?' "${config}")
+                env_args=()
+                while IFS=$'\t' read -r key value; do
+                    [[ -n "${key}" ]] || continue
+                    env_args+=(--env "${key}=${value}")
+                done < <(jq -r --arg server "${server}" '.mcpServers[$server].env // {} | to_entries[] | [.key, (.value | tostring)] | @tsv' "${config}")
+                codex mcp add "${server}" "${env_args[@]}" -- "${command}" "${args[@]}" || return 1
+                ;;
+            http)
+                url=$(jq -r --arg server "${server}" '.mcpServers[$server].url // empty' "${config}")
+                [[ -n "${url}" ]] || {
+                    echo "ERROR: allowed MCP server ${server} has no URL" >&2
+                    return 1
+                }
+                codex mcp add "${server}" --url "${url}" || return 1
+                ;;
+            *)
+                echo "ERROR: unsupported MCP transport for ${server}: ${type}" >&2
+                return 1
+                ;;
+        esac
+    done < <(jq -r '.mcpServers | keys[]' "${config}")
+    : > "${marker}"
+}
+
+# Sippy enables the public ai-helpers GitHub plugin in its repository settings.
+# Install its skills through agentic-ci's Codex compatibility path. The local,
+# filtered marketplace remains under CODEX_HOME because Codex records its path.
+configure_codex_project_plugins() {
+    local settings="${WORKDIR}/.claude/settings.json"
+    local helpers_root="${AI_HELPERS_ROOT:-/opt/ai-helpers}"
+    local source_marketplace="${helpers_root}/.claude-plugin/marketplace.json"
+    local marker="${CODEX_HOME}/.trt-project-plugins-ready"
+    [[ -f "${marker}" ]] && return 0
+    if [[ ! -f "${settings}" ]] || ! jq -e '.enabledPlugins["github@ai-helpers"] == true' "${settings}" >/dev/null 2>&1; then
+        : > "${marker}"
+        return 0
+    fi
+    if [[ ! -f "${source_marketplace}" || ! -d "${helpers_root}/plugins/github" ]]; then
+        echo "ERROR: github@ai-helpers is enabled but its public plugin source is unavailable" >&2
+        return 1
+    fi
+    local marketplace_root="${CODEX_HOME}/marketplaces/trt-ai-helpers"
+    mkdir -p "${marketplace_root}/.claude-plugin" "${marketplace_root}/plugins"
+    cp -a "${helpers_root}/plugins/github" "${marketplace_root}/plugins/" || return 1
+    if ! jq '.plugins |= map(select(.name == "github"))' "${source_marketplace}" \
+        > "${marketplace_root}/.claude-plugin/marketplace.json"; then
+        return 1
+    fi
+    if ! jq -e '.plugins | length == 1 and .[0].name == "github"' \
+        "${marketplace_root}/.claude-plugin/marketplace.json" >/dev/null; then
+        echo "ERROR: github plugin is missing from the ai-helpers marketplace" >&2
+        return 1
+    fi
+    PLUGIN_SKILLS_MANIFEST="${CODEX_HOME}/plugin-skills.manifest.json" \
+        agentic-ci install-plugins --harness codex \
+        --marketplace-json "${marketplace_root}/.claude-plugin/marketplace.json" \
+        --manifest "${CODEX_HOME}/plugin-skills.manifest.json" || return 1
+    local skill_dir
+    if ! skill_dir=$(AGENT_TOOL=codex \
+        PLUGIN_SKILLS_MANIFEST="${CODEX_HOME}/plugin-skills.manifest.json" \
+        agentic-ci skill-dir upload-screenshot) || [[ -z "${skill_dir}" ]]; then
+        echo "ERROR: github@ai-helpers did not provision upload-screenshot for Codex" >&2
+        return 1
+    fi
+    : > "${marker}"
 }
 
 agentic_ci() {
@@ -461,6 +636,8 @@ agentic_ci() {
         prepare_codex_home || return 1
         exclude_codex_from_worktree
         ensure_codex || return 1
+        configure_codex_project_mcp || return 1
+        configure_codex_project_plugins || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then
             if [[ ! -r "${settings_file}" ]]; then
@@ -526,8 +703,9 @@ agentic_ci() {
     return $rc
 }
 
-# Token totals come from Codex response.completed events. Dollar amounts come
-# from codex.cost.usage when agentic-ci has written that metric. Prints JSON:
+# Token totals come from Codex response.completed events. Dollar amounts accept
+# legacy codex.cost.usage and PR #490's agentic_ci.codex.cost.usage. Identical
+# points under both names are de-duplicated. Prints JSON:
 #   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
 codex_otel_usage() {
     local otel_path=$1
@@ -548,6 +726,7 @@ models = defaultdict(lambda: {
 version = ""
 session_id = ""
 cost_from_metric = False
+cost_points = set()
 
 
 def attribute_value(value):
@@ -609,7 +788,10 @@ with open(path) as handle:
             for resource in payload.get("resourceMetrics", []):
                 for scope in resource.get("scopeMetrics", []):
                     for metric in scope.get("metrics", []):
-                        if metric.get("name") != "codex.cost.usage":
+                        if metric.get("name") not in {
+                            "codex.cost.usage",
+                            "agentic_ci.codex.cost.usage",
+                        }:
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
                         for point in data.get("dataPoints", []):
@@ -618,6 +800,15 @@ with open(path) as handle:
                                 continue
                             attrs = point_attributes(point)
                             model = str(attrs.get("model") or "unknown")
+                            identity = (
+                                model,
+                                amount,
+                                str(point.get("startTimeUnixNano") or ""),
+                                str(point.get("timeUnixNano") or ""),
+                            )
+                            if identity in cost_points:
+                                continue
+                            cost_points.add(identity)
                             models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
                             cost_from_metric = True
             continue

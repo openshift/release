@@ -58,6 +58,7 @@ START_BRANCH=$(git branch --show-current)
 START_COMMIT=$(git rev-parse HEAD)
 
 mkdir -p "${WORKDIR}/artifacts"
+prepare_prow_screenshot_handoff openshift-agentic-trt-jira-solver
 
 # Keep pipeline-owned publication metadata outside the target checkout so it
 # cannot be swept into the solution commit with repository changes.
@@ -84,7 +85,7 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
             if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
                 continue
             fi
-            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+            cp -a "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
         done
         if [[ -f "${PR_BODY_FILE}" ]]; then
             cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
@@ -111,6 +112,7 @@ $(cat "${ISSUE_JSON}")
 
 - Write the PR description to \`${PR_BODY_FILE}\`.
 - Do not use the \`gh\` CLI or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
+- For browser evidence, save PNG files with simple names under \`${PROW_SCREENSHOT_DIR}\` and use \`prow-artifact://screenshots/<name>.png\` in the PR description. Do not run the upload-screenshot skill: it creates a GitHub release, while this job keeps publication pipeline-owned. The pipeline replaces valid markers with hosted Prow artifact URLs.
 - Do not modify CI configuration or generated files.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
@@ -263,6 +265,7 @@ Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
 printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+replace_prow_screenshot_markers "${PR_BODY_FILE}"
 
 BASE_ARGS=()
 if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
