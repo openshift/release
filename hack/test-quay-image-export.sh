@@ -12,6 +12,10 @@ oc() {
     printf '%s\n' 'unit-test-sensitive-output' >&2
     case "$1 $2" in
         'registry login')
+            if [[ "$SCENARIO" == test-cluster-kubeconfig && -v KUBECONFIG ]]; then
+                printf '%s\n' 'inherited-test-cluster-kubeconfig' >"$CASE_DIR/login-misuse"
+                return 11
+            fi
             [[ "$SCENARIO" != login-failure ]] || return 7
             printf '%s\n' '{"auths":{"build.example":{"auth":"unit-source"},"quay.io":{"auth":"old"}}}' >"${3#--to=}"
             if [[ "$SCENARIO" == merge-failure ]]; then
@@ -19,6 +23,10 @@ oc() {
             fi
             ;;
         'image mirror')
+            if [[ "$SCENARIO" == test-cluster-kubeconfig ]]; then
+                [[ "${KUBECONFIG:-}" == "$CASE_DIR/test-cluster.kubeconfig" ]] || return 12
+                printf '%s\n' 'preserved' >"$CASE_DIR/mirror-kubeconfig"
+            fi
             local auth_file="${3#--registry-config=}"
             jq -e '.auths["build.example"].auth == "unit-source" and .auths["quay.io"].auth == "unit-destination" and (.auths | has("unrelated.example") | not)' "$auth_file" >/dev/null || return 9
             [[ "$(stat -c %a "$auth_file")" == 600 ]] || return 9
@@ -34,6 +42,10 @@ oc() {
             fi
             ;;
         'image info')
+            if [[ "$SCENARIO" == test-cluster-kubeconfig ]]; then
+                [[ "${KUBECONFIG:-}" == "$CASE_DIR/test-cluster.kubeconfig" ]] || return 12
+                printf '%s\n' 'preserved' >"$CASE_DIR/info-kubeconfig"
+            fi
             [[ "$SCENARIO" != info-failure ]] || return 8
             case "$SCENARIO" in
                 invalid-digest) printf '%s\n' '{"digest":"invalid"}' ;;
@@ -71,6 +83,7 @@ run_case() {
         destination-credentials) export QUAY_EXPORT_DESTINATION='quay.io/user:password@org/image:tag' ;;
         destination-digest) export QUAY_EXPORT_DESTINATION="quay.io/org/image@$TEST_DIGEST" ;;
         digest-source) export QUAY_EXPORT_SOURCE="build.example/ci/image@$TEST_DIGEST" ;;
+        test-cluster-kubeconfig) export KUBECONFIG="$CASE_DIR/test-cluster.kubeconfig" ;;
     esac
     if [[ "$scenario" == inherited-tracing ]]; then
         bash -x "$script" >"$CASE_DIR/stdout" 2>"$CASE_DIR/stderr" || status=$?
@@ -80,6 +93,12 @@ run_case() {
     [[ "$status" == "$expected_status" ]] || { printf 'FAIL %s: status %s\n' "$scenario" "$status"; return 1; }
     [[ "$(wc -l <"$CASE_DIR/calls")" == "$expected_calls" ]]
     [[ -z "$(find "$TMPDIR" -mindepth 1 -print -quit)" ]]
+    if [[ "$scenario" == test-cluster-kubeconfig ]]; then
+        [[ "$KUBECONFIG" == "$CASE_DIR/test-cluster.kubeconfig" ]]
+        [[ ! -e "$CASE_DIR/login-misuse" ]]
+        grep -Fxq preserved "$CASE_DIR/mirror-kubeconfig"
+        grep -Fxq preserved "$CASE_DIR/info-kubeconfig"
+    fi
     if grep -Eq 'unit-test-sensitive-output|unit-source|unit-destination|unit-unrelated|password' "$CASE_DIR/stdout" "$CASE_DIR/stderr"; then
         printf 'FAIL %s: sensitive output\n' "$scenario"
         return 1
@@ -107,3 +126,4 @@ run_case invalid-digest 1 3
 run_case missing-digest 1 3
 run_case terminated 143 2
 run_case interrupted 130 2
+run_case test-cluster-kubeconfig 0 3

@@ -23,7 +23,7 @@ trap 'exit 143' TERM
 
 jq -e '(.auths["quay.io"].auth | type == "string" and length > 0)' \
     "$QUAY_EXPORT_AUTH_FILE" >/dev/null 2>&1 || fail 'destination auth must contain auths["quay.io"].auth'
-oc registry login --to="$work_dir/source-auth.json" >/dev/null 2>&1 || fail 'cannot authenticate to the CI build registry'
+(unset KUBECONFIG; oc registry login --to="$work_dir/source-auth.json") >/dev/null 2>&1 || fail 'cannot authenticate to the CI build registry'
 jq --slurpfile destination "$QUAY_EXPORT_AUTH_FILE" \
     '.auths["quay.io"] = $destination[0].auths["quay.io"] | del(.credsStore, .credHelpers)' \
     "$work_dir/source-auth.json" >"$work_dir/auth.json" 2>/dev/null || fail 'cannot merge registry authentication'

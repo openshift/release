@@ -18,8 +18,11 @@ or credentials are installed by this directory.
 - `ARTIFACT_DIR`: supplied by ci-operator. On success, `quay-image-export.json`
   records the destination, observed SHA-256 digest, and digest pullspec.
 
-The step obtains build-registry authentication with `oc registry login`, retaining
-its source auth entries and adding only the caller's `quay.io` entry. It does not
+The step obtains build-registry authentication with `oc registry login`, running
+only that login with `KUBECONFIG` unset in a subshell so an inherited test-cluster
+context does not select its credentials. The caller's environment is preserved for
+subsequent operations, which use the explicit merged registry config. The merge
+retains source auth entries and adds only the caller's `quay.io` entry. It does not
 copy unrelated destination credentials into the merged config. Auth and inspection
 files stay in a private temporary directory, removed on exit (including errors,
 SIGINT and SIGTERM). As with any process, SIGKILL cannot run cleanup; pod teardown
