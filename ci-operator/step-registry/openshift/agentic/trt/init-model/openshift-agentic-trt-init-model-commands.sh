@@ -389,35 +389,41 @@ prepare_codex_home() {
     trap codex_home_cleanup EXIT
 }
 
-configure_codex_upload_screenshot_skill() {
-    local plugin_root="/opt/ai-helpers/plugins/github"
-    local source="${plugin_root}/skills/upload-screenshot"
-    local target="${HOME}/.agents/skills/upload-screenshot"
-    [[ -f "${source}/SKILL.md" && -f "${source}/upload_screenshot.sh" ]] || {
-        echo "ERROR: upload-screenshot skill not found at ${source}" >&2
-        return 1
-    }
-    mkdir -p "$(dirname "${target}")" || return 1
-    if [[ -L "${target}" ]]; then
-        [[ "$(readlink -f "${target}")" == "$(readlink -f "${source}")" ]] || {
-            echo "ERROR: ${target} points to an unexpected skill" >&2
+configure_codex_project_plugins() {
+    local settings="${WORKDIR}/.claude/settings.json"
+    local github_enabled=false
+    if [[ -e "${settings}" || -L "${settings}" ]]; then
+        if [[ ! -r "${settings}" ]]; then
+            echo "ERROR: project plugin settings are unreadable: ${settings}" >&2
             return 1
-        }
-    elif [[ -e "${target}" ]]; then
-        echo "ERROR: refusing to replace existing Codex skill at ${target}" >&2
-        return 1
-    else
-        if ! ln -s "${source}" "${target}" 2>/dev/null; then
-            # A parallel process may have created the same link first.
-            [[ -L "${target}" && "$(readlink -f "${target}")" == "$(readlink -f "${source}")" ]] || {
-                echo "ERROR: failed to link upload-screenshot skill at ${target}" >&2
-                return 1
-            }
+        fi
+        if ! github_enabled=$(jq -r '
+          if type != "object" then error("settings must be an object")
+          elif (has("enabledPlugins") | not) then false
+          elif (.enabledPlugins | type) != "object" then error("enabledPlugins must be an object")
+          elif (.enabledPlugins | has("github@ai-helpers") | not) then false
+          elif (.enabledPlugins["github@ai-helpers"] | type) != "boolean" then error("plugin state must be boolean")
+          else .enabledPlugins["github@ai-helpers"]
+          end
+        ' "${settings}"); then
+            echo "ERROR: invalid project plugin settings: ${settings}" >&2
+            return 1
         fi
     fi
-    # The existing skill uses this plugin-root contract to locate its helper.
-    CLAUDE_PLUGIN_ROOT="${plugin_root}"
-    export CLAUDE_PLUGIN_ROOT
+
+    if [[ "${github_enabled}" == true ]]; then
+        if ! codex plugin marketplace add /opt/ai-helpers >/dev/null 2>&1; then
+            echo "ERROR: failed to add the ai-helpers Codex plugin marketplace" >&2
+            return 1
+        fi
+        if ! codex plugin add github@ai-helpers >/dev/null 2>&1; then
+            echo "ERROR: failed to install the github@ai-helpers Codex plugin" >&2
+            return 1
+        fi
+    elif ! codex plugin remove github@ai-helpers >/dev/null 2>&1; then
+        echo "ERROR: failed to disable the github@ai-helpers Codex plugin" >&2
+        return 1
+    fi
 }
 
 codex_project_mcp_is_allowed() {
@@ -655,7 +661,7 @@ agentic_ci() {
         prepare_codex_home || return 1
         exclude_codex_from_worktree
         ensure_codex || return 1
-        configure_codex_upload_screenshot_skill || return 1
+        configure_codex_project_plugins || return 1
         configure_codex_project_mcp || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then
