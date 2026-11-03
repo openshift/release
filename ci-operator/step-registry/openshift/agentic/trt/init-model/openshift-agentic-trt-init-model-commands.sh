@@ -419,26 +419,50 @@ codex_project_mcp_is_allowed() {
     [[ " ${ALLOWED_TOOLS:-} " == *" mcp__${server}__"* ]]
 }
 
+codex_project_mcp_url_is_safe() {
+    python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+try:
+    url = urlsplit(sys.argv[1])
+except ValueError:
+    sys.exit(1)
+if url.scheme not in {"http", "https"} or not url.hostname:
+    sys.exit(1)
+if url.username is not None or url.password is not None or url.query or url.fragment:
+    sys.exit(1)
+PY
+}
+
 # Codex does not consume the Claude-compatible project .mcp.json directly.
 # Register only servers already allowed by the job's ALLOWED_TOOLS contract;
 # this keeps unrelated or interactive project servers disabled.
-configure_codex_project_mcp() {
+_configure_codex_project_mcp() {
     local config="${WORKDIR}/.mcp.json"
-    local marker="${CODEX_HOME}/.trt-project-mcp-ready"
-    [[ -f "${marker}" ]] && return 0
-    [[ -f "${config}" ]] || { : > "${marker}"; return 0; }
-    if ! jq -e '.mcpServers | type == "object"' "${config}" >/dev/null 2>&1; then
+    local state="${CODEX_HOME}/.trt-project-mcp-state.json"
+    local config_hash="absent" fingerprint
+    if [[ -f "${config}" ]]; then
+        config_hash=$(sha256sum "${config}" | cut -d' ' -f1) || return 1
+    fi
+    fingerprint=$(printf '%s\0%s' "${config_hash}" "${ALLOWED_TOOLS:-}" | sha256sum | cut -d' ' -f1) || return 1
+    if [[ -f "${state}" ]] && jq -e --arg fingerprint "${fingerprint}" \
+        '.fingerprint == $fingerprint' "${state}" >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ -f "${config}" ]] && ! jq -e '.mcpServers | type == "object"' "${config}" >/dev/null 2>&1; then
         echo "ERROR: invalid project MCP configuration: ${config}" >&2
         return 1
     fi
-    local server type command url key value
-    local -a args env_args
+    local server type command url value previous servers_json state_tmp
+    local -a args env_args servers=()
     while IFS= read -r server; do
         [[ "${server}" =~ ^[A-Za-z0-9._-]+$ ]] || {
             echo "ERROR: unsafe MCP server name in ${config}" >&2
             return 1
         }
         codex_project_mcp_is_allowed "${server}" || continue
+        servers+=("${server}")
         type=$(jq -r --arg server "${server}" '.mcpServers[$server].type // (if .mcpServers[$server].url then "http" else "stdio" end)' "${config}")
         case "${type}" in
             stdio)
@@ -447,29 +471,111 @@ configure_codex_project_mcp() {
                     echo "ERROR: allowed MCP server ${server} has no command" >&2
                     return 1
                 }
-                mapfile -t args < <(jq -r --arg server "${server}" '.mcpServers[$server].args[]?' "${config}")
-                env_args=()
-                while IFS=$'\t' read -r key value; do
-                    [[ -n "${key}" ]] || continue
-                    env_args+=(--env "${key}=${value}")
-                done < <(jq -r --arg server "${server}" '.mcpServers[$server].env // {} | to_entries[] | [.key, (.value | tostring)] | @tsv' "${config}")
-                codex mcp add "${server}" "${env_args[@]}" -- "${command}" "${args[@]}" || return 1
+                if ! jq -e --arg server "${server}" '
+                  (.mcpServers[$server].args // []) as $args
+                  | (.mcpServers[$server].env // {}) as $env
+                  | ($args | type == "array"
+                    and all(.[]; type == "string" and index("\u0000") == null))
+                    and ($env | type == "object"
+                      and all(to_entries[];
+                        (.key | test("^[A-Za-z_][A-Za-z0-9_]*$"))
+                        and (.value | type == "string" and index("\u0000") == null)))
+                ' "${config}" >/dev/null; then
+                    echo "ERROR: invalid arguments or environment for MCP server ${server}" >&2
+                    return 1
+                fi
                 ;;
             http)
                 url=$(jq -r --arg server "${server}" '.mcpServers[$server].url // empty' "${config}")
-                [[ -n "${url}" ]] || {
-                    echo "ERROR: allowed MCP server ${server} has no URL" >&2
+                if [[ -z "${url}" ]] || ! codex_project_mcp_url_is_safe "${url}"; then
+                    echo "ERROR: allowed MCP server ${server} has an invalid or credential-bearing URL" >&2
                     return 1
-                }
-                codex mcp add "${server}" --url "${url}" || return 1
+                fi
                 ;;
             *)
                 echo "ERROR: unsupported MCP transport for ${server}: ${type}" >&2
                 return 1
                 ;;
         esac
-    done < <(jq -r '.mcpServers | keys[]' "${config}")
-    : > "${marker}"
+    done < <(if [[ -f "${config}" ]]; then jq -r '.mcpServers | keys[]' "${config}"; fi)
+
+    if [[ -f "${state}" ]]; then
+        while IFS= read -r previous; do
+            [[ "${previous}" =~ ^[A-Za-z0-9._-]+$ ]] || continue
+            codex mcp remove "${previous}" >/dev/null 2>&1 || true
+        done < <(jq -r '.servers[]?' "${state}" 2>/dev/null || true)
+    fi
+
+    for server in "${servers[@]}"; do
+        type=$(jq -r --arg server "${server}" '.mcpServers[$server].type // (if .mcpServers[$server].url then "http" else "stdio" end)' "${config}")
+        case "${type}" in
+            stdio)
+                command=$(jq -r --arg server "${server}" '.mcpServers[$server].command' "${config}")
+                args=()
+                while IFS= read -r -d '' value; do
+                    args+=("${value}")
+                done < <(python3 - "${config}" "${server}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    server = json.load(handle)["mcpServers"][sys.argv[2]]
+for value in server.get("args", []):
+    sys.stdout.buffer.write(value.encode() + b"\0")
+PY
+)
+                env_args=()
+                while IFS= read -r -d '' value; do
+                    env_args+=(--env "${value}")
+                done < <(python3 - "${config}" "${server}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    server = json.load(handle)["mcpServers"][sys.argv[2]]
+for key, value in server.get("env", {}).items():
+    sys.stdout.buffer.write(key.encode() + b"=" + value.encode() + b"\0")
+PY
+)
+                if ! codex mcp add "${server}" "${env_args[@]}" -- "${command}" "${args[@]}" >/dev/null 2>&1; then
+                    echo "ERROR: failed to register stdio MCP server ${server}" >&2
+                    return 1
+                fi
+                ;;
+            http)
+                url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}")
+                if ! codex mcp add "${server}" --url "${url}" >/dev/null 2>&1; then
+                    echo "ERROR: failed to register HTTP MCP server ${server}" >&2
+                    return 1
+                fi
+                ;;
+        esac
+    done
+
+    servers_json='[]'
+    if [[ ${#servers[@]} -gt 0 ]]; then
+        servers_json=$(printf '%s\n' "${servers[@]}" | jq -R . | jq -s .) || return 1
+    fi
+    state_tmp=$(mktemp "${CODEX_HOME}/.trt-project-mcp-state.XXXXXX") || return 1
+    if ! jq -n --arg fingerprint "${fingerprint}" --argjson servers "${servers_json}" \
+        '{fingerprint: $fingerprint, servers: $servers}' > "${state_tmp}"; then
+        rm -f "${state_tmp}"
+        return 1
+    fi
+    mv "${state_tmp}" "${state}"
+}
+
+configure_codex_project_mcp() {
+    local restore_xtrace=false rc=0
+    if [[ $- == *x* ]]; then
+        restore_xtrace=true
+        set +x
+    fi
+    _configure_codex_project_mcp || rc=$?
+    if ${restore_xtrace}; then
+        set -x
+    fi
+    return "${rc}"
 }
 
 agentic_ci() {
