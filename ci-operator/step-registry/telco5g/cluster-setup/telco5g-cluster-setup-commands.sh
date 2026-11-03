@@ -155,7 +155,8 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: echo "DEBUG - cluster held, not released"
+    #command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
