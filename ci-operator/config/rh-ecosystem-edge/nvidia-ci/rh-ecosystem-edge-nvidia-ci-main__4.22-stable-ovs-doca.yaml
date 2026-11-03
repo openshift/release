@@ -1,0 +1,225 @@
+base_images:
+  centos:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  rhel-coreos-base:
+    name: "4.22"
+    namespace: ocp
+    tag: rhel-coreos
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: nvidia-ci
+  - dockerfile_literal: |
+      # doca-openvswitch requires `unbound`, which lives in RHEL's
+      # BaseOS/AppStream repos -- unreachable from this build (no RHEL
+      # entitlement here, and neither the DOCA repo nor EPEL carry it).
+      # Predownload it (and its own deps) from CentOS Stream 9, which
+      # tracks RHEL9 closely and needs no entitlement, then install the
+      # local rpms in the RHCOS stage below instead of resolving them from
+      # a live repo there.
+      FROM quay.io/centos/centos:stream9 AS build
+      RUN dnf -y install dnf-utils && \
+          dnf download --resolve --destdir=/rpms unbound
+
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+      COPY --from=build /rpms/*.rpm /tmp/rpms/
+
+      # DOCA version is pinned (always 3.4.1); only the RHEL major varies,
+      # depending on which OCP version's RHCOS this gets layered onto. Detect
+      # it from the base image itself (same technique the old runtime build
+      # step used), so the DOCA repo and EPEL rpm always match this config's
+      # base image without needing a hardcoded major version bumped by hand
+      # for every future OCP branch.
+      #
+      # NOTE: linux.mellanox.com/public/repo/doca/3.4.1/ only publishes
+      # rhel9 and rhel10 trees (no rhel8) as of this writing -- if this
+      # config is ever branched onto a RHEL8-based RHCOS (older OCP), this
+      # pinned version won't resolve and will need revisiting.
+      #
+      # The arch, unlike the RHEL major, is deliberately hardcoded: this is
+      # the x86_64 variant, and arm64 gets its own config rather than a
+      # runtime switch here. It has to agree with `namespace: ocp` (the
+      # x86_64 payload) above and with OCP_ARCH=amd64 below -- ipi-conf-aws
+      # derives the AWS instance types *from* that arch (amd64 -> m6a/m6i,
+      # arm64 -> m6g), not the reverse, so the arch is the knob and the
+      # instance type follows. OCP_ARCH is pinned there rather than left to
+      # ipi-conf-aws's own "amd64" default so both halves of that agreement
+      # are stated outright; note it cannot be commented at its own site,
+      # since `make ci-operator-config` strips comments from the env map.
+      #
+      # When the arm64 variant is written: the DOCA repo's directories are
+      # not the Linux arch names. aarch64 is published as "arm64-sbsa"; an
+      # "aarch64" path is a 404.
+      RUN source /etc/os-release && \
+          RHEL_MAJOR="${VERSION_ID%%.*}" && \
+          echo "Detected RHEL major version: ${RHEL_MAJOR}" && \
+          cat > /etc/yum.repos.d/doca.repo <<EOF && \
+          dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-${RHEL_MAJOR}.noarch.rpm
+      [doca]
+      name=DOCA Online Repo
+      baseurl=https://linux.mellanox.com/public/repo/doca/3.4.1/rhel${RHEL_MAJOR}/x86_64/
+      enabled=1
+      gpgcheck=0
+      EOF
+
+      # Undocumented workaround: the doca package install fails partway through
+      # without this directory present.
+      RUN mkdir -p /var/opt
+
+      # libibverbs/rdma-core are part of the immutable base ostree commit and
+      # must go through rpm-ostree's override mechanism rather than plain dnf.
+      RUN rpm-ostree override replace libibverbs rdma-core --experimental --from repo='doca'
+
+      # doca-openvswitch replaces the stock, version-suffixed Fast Datapath
+      # package (e.g. openvswitch3.5); the glob avoids hardcoding its exact
+      # version so this stays correct across RHCOS releases.
+      RUN dnf -y --nogpgcheck install /tmp/rpms/*.rpm && \
+          dnf -y remove 'openvswitch[0-9]*' && \
+          dnf -y install doca-openvswitch && \
+          dnf -y install mft && \
+          rm -rf /etc/yum.repos.d/doca.repo /tmp/rpms
+
+      # doca-openvswitch pulls in collectx-clxapi as a transitive dependency
+      # (it provides libclx_api.so.1, which ovs-vswitchd links against and
+      # needs even just to answer `--version`, which ovsdb-server.service
+      # calls out to on every start to stamp external-ids:ovs-version).
+      # collectx-clxapi installs into /opt/mellanox/collectx, and /opt is a
+      # symlink to /var/opt on ostree-based RHCOS -- the same `mkdir -p
+      # /var/opt` above exists only because that symlink target doesn't
+      # exist yet at this point in the build. So this ~60MB of real shared
+      # library payload physically lands under /var, exactly like the OVS
+      # runtime directories below -- but unlike those, this is not empty
+      # state a tmpfiles `d` rule can recreate; it's actual binary content
+      # that `ostree container commit` discarding /var would permanently
+      # lose, leaving ovs-vswitchd unable to load and, in turn,
+      # ovsdb-server.service's version-stamping step failing.
+      # Stash a copy under /usr, which does survive the commit as part of
+      # the base ostree layer, and restore it from there at boot.
+      RUN mkdir -p /usr/lib/doca-collectx-payload && \
+          cp -a /var/opt/mellanox /usr/lib/doca-collectx-payload/mellanox
+
+      # Restoring it is done from ovsdb-server.service rather than from a
+      # tmpfiles.d `C` (copy) rule, for two reasons.
+      #
+      # First, putting the file back is not by itself sufficient.
+      # collectx-clxapi installs outside the default search path and ships
+      # /etc/ld.so.conf.d/clx-api.conf to cover that, so libclx_api.so.1 is
+      # found via /etc/ld.so.cache -- not by scanning the directory. /etc is
+      # preserved across the commit, so the cache built at image-build time
+      # persists onto the node, but any ldconfig run while the library is
+      # missing silently drops the entry, after which restoring only the
+      # file still fails with this exact error until ldconfig runs again.
+      # Verified locally: remove the file, run ldconfig, restore the file --
+      # `ovs-vswitchd --version` keeps failing until ldconfig is re-run.
+      # So the cache has to be rebuilt after the restore, which a tmpfiles
+      # rule cannot do.
+      #
+      # Second, a tmpfiles `C` rule has to win a boot-ordering race against
+      # whatever else touches /var and the linker cache;
+      # systemd-tmpfiles-setup runs Before=sysinit.target, far ahead of OVS.
+      # An ExecStartPre depends on no ordering at all: it runs at the one
+      # moment the library is actually needed. RHCOS already ships a drop-in
+      # on this same unit (10-ovsdb-restart.conf), so the mechanism is known
+      # to work here. The restore is conditional so it is a no-op on any
+      # boot where /var/opt/mellanox is already intact.
+      RUN mkdir -p /etc/systemd/system/ovsdb-server.service.d && \
+          cat > /etc/systemd/system/ovsdb-server.service.d/10-doca-collectx-restore.conf <<'EOF'
+      [Service]
+      ExecStartPre=/bin/sh -c '[ -e /var/opt/mellanox/collectx/lib/libclx_api.so.1 ] || { mkdir -p /var/opt && cp -a /usr/lib/doca-collectx-payload/mellanox /var/opt/mellanox; }'
+      ExecStartPre=/sbin/ldconfig
+      EOF
+
+      # doca-openvswitch carries /run/openvswitch, /var/log/openvswitch and
+      # /var/lib/openvswitch{,/pki} as plain rpm payload and ships no
+      # tmpfiles.d entry -- the stock FDP openvswitch3.x removed above is
+      # what covered this in base RHCOS. `ostree container commit` below
+      # discards /var, and /run is tmpfs, so on a layered image all four are
+      # simply absent at first boot: ovsdb-server then fails with EACCES on
+      # /var/lib/openvswitch/.conf.db.~lock~, gives up after 5 restarts, and
+      # takes openvswitch -> ovs-vswitchd -> nmstate -> ovs-configuration ->
+      # crio -> kubelet down with it, so the node never joins.
+      #
+      # ovsdb-server.service's ExecStartPre chowns only
+      # /etc/openvswitch /run/openvswitch /var/log/openvswitch -- never
+      # /var/lib/openvswitch -- so that one must be created with the right
+      # owner up front. RHCOS runs OVS as openvswitch:hugetlbfs (set in
+      # /etc/sysconfig/openvswitch, also shipped by doca-openvswitch), not
+      # the root:root of default.conf. Modes and owners below are exactly
+      # the package's own, so this only restores what /var's removal dropped.
+      RUN cat > /usr/lib/tmpfiles.d/doca-openvswitch.conf <<'EOF'
+      d /run/openvswitch         0755 root        root      -
+      d /var/log/openvswitch     0750 root        root      -
+      d /var/lib/openvswitch     0750 openvswitch hugetlbfs -
+      d /var/lib/openvswitch/pki 0750 openvswitch hugetlbfs -
+      EOF
+
+      # No offload is configured here on purpose: this cluster has no
+      # DOCA-capable NIC. Both switches default to off -- with an empty
+      # other_config, ovs-vswitchd logs "DOCA Disabled - Use
+      # other_config:doca-init to enable" and never enables the flow API
+      # (that needs other_config:hw-offload=true) -- so the DOCA-enabled
+      # binary runs the plain kernel datapath, identical to stock OVS, with
+      # no extra unit needed to disable anything.
+
+      RUN ostree container commit
+    inputs:
+      centos:
+        as:
+        - quay.io/centos/centos:stream9
+      rhel-coreos-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    to: rhel-coreos
+  run_if_changed: x^
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-nodes-check
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      OCP_ARCH: amd64
+    test:
+    - ref: ovs-doca-validate-node-package
+    - as: get-nodes
+      cli: latest
+      commands: |
+        # Print node roles (master/worker) grouped by count; do not print node
+        # names (hostnames can leak internal AWS data into CI logs).
+        echo "Node roles:"
+        oc get nodes --no-headers | awk '{print $3}' | sort | uniq -c
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-stable-ovs-doca
