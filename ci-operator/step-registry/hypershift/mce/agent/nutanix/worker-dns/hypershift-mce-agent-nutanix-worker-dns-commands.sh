@@ -136,7 +136,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=$dnsmasq_binary --no-daemon --conf-file=$config_file
+# Keep TCP clients in child processes so an idle client cannot block DNS for workers.
+ExecStart=$dnsmasq_binary --keep-in-foreground --conf-file=$config_file
 RuntimeMaxSec=26h
 
 [Install]
