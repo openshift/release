@@ -1231,6 +1231,14 @@ def main():
                         delivery['proc_leak_check'] = 'FAIL'
                     else:
                         delivery['proc_leak_check'] = 'ok'
+    if dry_run and not os.environ.get('SLACK_REPORTER_DUMP_FILE') \
+            and os.environ.get('ARTIFACT_DIR'):
+        # probe vehicle: the dry-run dump defaults into the step's own
+        # artifact dir (GCS-uploaded) when no explicit path is given;
+        # write_dump still path-validates against the realpath'd
+        # ARTIFACT_DIR, so the default can never escape it.
+        os.environ['SLACK_REPORTER_DUMP_FILE'] = os.path.join(
+            os.environ['ARTIFACT_DIR'], 'slack-reporter-dump.json')
     if os.environ.get('SLACK_REPORTER_DUMP_FILE') and text is not None:
         dump_error = write_dump(report, text)
         if dump_error:
