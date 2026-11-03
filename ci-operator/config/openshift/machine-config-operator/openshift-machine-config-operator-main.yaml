@@ -479,6 +479,26 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
+  as: e2e-metal-ipi-ovn-ipv4-debug
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - as: pivot-skip-debug
+      cli: latest
+      commands: |
+        export PATH=/tmp/:$PATH
+        echo "WAITING FOR DEBUG..."
+        while [ ! -f "/tmp/continue" ]; do sleep 10; done
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
   as: e2e-azure
   optional: true
   steps:
