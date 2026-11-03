@@ -358,7 +358,9 @@ oc create serviceaccount tester-sa-2 -n default 2>/dev/null || true
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2 >/dev/null
 export AUTH_TOKEN
 AUTH_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
-bash ./run-e2e.sh -w orchestrator --workers=1 || TEST_EXIT=$?
+# Preserve the namespace for Prow's must-gather post-step.
+# "1" is truthy to Playwright but does not match the reporter's strict CI=="true" check.
+CI=1 bash ./run-e2e.sh -w orchestrator --workers=1 || TEST_EXIT=$?
 
 if [[ -d playwright-report && -n "${ARTIFACT_DIR:-}" ]]; then
     cp -a playwright-report "${ARTIFACT_DIR}/"
