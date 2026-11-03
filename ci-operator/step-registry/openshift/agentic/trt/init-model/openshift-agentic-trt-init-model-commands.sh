@@ -545,7 +545,10 @@ _configure_codex_project_mcp() {
     if [[ -f "${state}" ]]; then
         while IFS= read -r previous; do
             [[ "${previous}" =~ ^[A-Za-z0-9._-]+$ ]] || continue
-            codex mcp remove "${previous}" >/dev/null 2>&1 || true
+            if ! codex mcp remove "${previous}" </dev/null >/dev/null 2>&1; then
+                echo "ERROR: failed to remove managed MCP server ${previous}" >&2
+                return 1
+            fi
         done < <(jq -r '.servers[]?' "${state}" 2>/dev/null || true)
     fi
 
@@ -587,7 +590,8 @@ PY
                 ;;
             http)
                 url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}")
-                if ! codex mcp add "${server}" --url "${url}" >/dev/null 2>&1; then
+                if ! timeout --kill-after=5s 60s codex mcp add "${server}" --url "${url}" \
+                    </dev/null >/dev/null 2>&1; then
                     echo "ERROR: failed to register HTTP MCP server ${server}" >&2
                     return 1
                 fi
