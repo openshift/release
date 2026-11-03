@@ -8,14 +8,12 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
 
-CLUSTER_NAME=$(oc get infrastructure cluster -o json | jq -r '.status.apiServerURL' | awk -F. '{print $2}')
-echo "Cluster: ${CLUSTER_NAME}"
+INFRA_ID=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+echo "Infra ID: ${INFRA_ID}"
 
-VPC=$(aws ec2 describe-instances \
-  --filters "Name=tag:Name,Values=${CLUSTER_NAME}-*" \
-  --query 'Reservations[0].Instances[0].VpcId' --output text)
+VPC=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=${INFRA_ID}-vpc" --query 'Vpcs[0].VpcId' --output text)
 if [[ -z "${VPC}" || "${VPC}" == "None" ]]; then
-  echo "ERROR: could not find the VPC for cluster ${CLUSTER_NAME}" >&2
+  echo "ERROR: could not find the VPC for cluster ${INFRA_ID}" >&2
   exit 1
 fi
 echo "VPC: ${VPC}"
