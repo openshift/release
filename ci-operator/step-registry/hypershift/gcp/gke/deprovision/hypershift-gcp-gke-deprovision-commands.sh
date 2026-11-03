@@ -195,7 +195,18 @@ if [[ "${DNS_CLEANUP_FAILED}" == "false" ]]; then
   if [[ -s "${SHARED_DIR}/cluster-manifests.json" ]]; then
     # Capture before the loop: a process substitution would hide jq's exit status, so a
     # malformed manifest would silently drop the guest names and leak their DNS records.
-    if ! guest_names=$(jq -r '.clusters[]?.name // empty' "${SHARED_DIR}/cluster-manifests.json"); then
+    # The shape check matters too: a bare '.clusters[]?.name' exits 0 with no output when
+    # .clusters is missing or not an array, or when an entry has no name, which would skip
+    # the guest names without tripping the failure branch below.
+    if ! guest_names=$(jq -r '
+      if (.clusters | type) != "array" then
+        error(".clusters must be an array")
+      elif any(.clusters[]; (.name? | if type != "string" then true else length == 0 end)) then
+        error("every cluster must have a non-empty string name")
+      else
+        .clusters[].name
+      end
+    ' "${SHARED_DIR}/cluster-manifests.json"); then
       echo "ERROR: failed to parse ${SHARED_DIR}/cluster-manifests.json - guest DNS records may be left behind"
       guest_names=""
       # Guest names are missing from the filter, so their records survive this cleanup.
