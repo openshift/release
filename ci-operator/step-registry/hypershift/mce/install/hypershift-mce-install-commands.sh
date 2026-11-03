@@ -141,6 +141,11 @@ if [[ -f "${CILIUM_MCE_POLICY}" ]]; then
   oc apply -f "${CILIUM_MCE_POLICY}"
 fi
 
+CILIUM_HCP_CLI_DOWNLOAD_POLICY="${SHARED_DIR}/cilium-network-policy-hcp-cli-download-allow-remote-nodes.yaml"
+if [[ -f "${CILIUM_HCP_CLI_DOWNLOAD_POLICY}" ]]; then
+  oc apply -f "${CILIUM_HCP_CLI_DOWNLOAD_POLICY}"
+fi
+
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
