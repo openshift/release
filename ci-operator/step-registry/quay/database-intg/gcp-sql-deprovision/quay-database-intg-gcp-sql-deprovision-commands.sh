@@ -39,17 +39,31 @@ if [[ -z "${GCP_SQL_REGION}" ]]; then
   [[ "${GCP_SQL_REGION}" =~ ^[a-z]+-[a-z]+[0-9]$ ]] || GCP_SQL_REGION=""
 fi
 
+# The cluster network the database's Private Service Access peering lives in:
+# persisted by the provisioning step, derived from the installer's metadata
+# otherwise. The peering must be destroyed before ipi-deprovision deletes
+# the network, so the identifier fallback cleans it up too.
+GCP_CLUSTER_NETWORK=""
+if [[ -f "${SHARED_DIR}/QUAY_DB_GCP_NETWORK" ]]; then
+  GCP_CLUSTER_NETWORK="$(cat "${SHARED_DIR}/QUAY_DB_GCP_NETWORK")"
+fi
+if [[ -z "${GCP_CLUSTER_NETWORK}" && -r "${SHARED_DIR}/metadata.json" ]]; then
+  GCP_CLUSTER_NETWORK="$(jq -r .infraID "${SHARED_DIR}/metadata.json" 2>/dev/null || true)-network"
+fi
+
 mkdir -p terraform_quay_gcp_sql && cd terraform_quay_gcp_sql
 
 has_db_identifiers=false
-if [[ -f "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME" || -f "${SHARED_DIR}/gsql_db_public_ip" || -s "${SHARED_DIR}/client-cert.pem" ]]; then
+if [[ -f "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME" || -f "${SHARED_DIR}/gsql_db_private_ip" || -s "${SHARED_DIR}/client-cert.pem" ]]; then
   has_db_identifiers=true
 fi
 
 # Fallback for a missing/lost Terraform archive: reconstruct a minimal config
 # and terraform-import the instance by its persisted name, then destroy it.
 # Mirrors the identifier fallback in the AWS/Azure deprovision steps. Deleting
-# the instance cascades its databases, users, and client certificates.
+# the instance cascades its databases, users, and client certificates, and
+# the Private Service Access range/peering are removed with it - the peering
+# must be gone before ipi-deprovision deletes the cluster network.
 cleanup_by_identifiers() {
   local instance_name=""
   if [[ -f "${SHARED_DIR}/QUAY_DB_GCP_INSTANCE_NAME" ]]; then
@@ -57,6 +71,12 @@ cleanup_by_identifiers() {
   fi
   if [[ -z "${instance_name}" || -z "${GCP_PROJECT}" || -z "${GCP_SQL_REGION}" ]]; then
     echo "ERROR: DB instance, project, or region identifier missing; cannot import." >&2
+    return 1
+  fi
+  if [[ -z "${GCP_CLUSTER_NETWORK}" ]]; then
+    echo "ERROR: cluster network name unknown (no QUAY_DB_GCP_NETWORK file and no metadata.json);" >&2
+    echo "       cannot clean up the Private Service Access peering, which may block the" >&2
+    echo "       installer's network deletion and need manual removal." >&2
     return 1
   fi
   echo "Reconstructing Terraform config and importing instance ${instance_name} for cleanup..." >&2
@@ -67,35 +87,57 @@ provider "google" {
   region  = "${GCP_SQL_REGION}"
 }
 
-# Minimal stand-in for the provisioning config: after terraform import the
-# resource values come from the state, so only the identity matters.
+# Minimal stand-ins for the provisioning config: after terraform import the
+# resource values come from the state, so only the identity matters. The
+# Private Service Access range and peering are declared so their imported
+# state can be destroyed; the peering removal clears the way for the
+# installer's network deletion.
 resource "google_sql_database_instance" "instance" {
   name             = "${instance_name}"
   database_version = "POSTGRES_17"
   region           = "${GCP_SQL_REGION}"
   deletion_protection = false
+  # Destroy order: the instance must go before the peering/range it uses.
+  depends_on = [google_service_networking_connection.private_service_access]
+}
+
+resource "google_compute_global_address" "private_ip_range" {
+  name          = "${instance_name}-psa"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 20
+}
+
+resource "google_service_networking_connection" "private_service_access" {
+  network                 = "projects/${GCP_PROJECT}/global/networks/${GCP_CLUSTER_NETWORK}"
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
 }
 EOF
   cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
   terraform init || return 1
-  # Import the instance by its persisted name. Only a confirmed "remote
-  # object does not exist" counts as nothing to clean up: any other import
-  # failure (transient API error, bad credentials) must fail the step so
-  # manual cleanup is flagged instead of silently reported as success.
+  # Import by persisted identifiers. Only a confirmed "remote object does not
+  # exist" counts as nothing to clean up: any other import failure (transient
+  # API error, bad credentials) must fail the step so manual cleanup is
+  # flagged instead of silently reported as success.
   local import_log
   import_log="$(mktemp)"
-  if terraform import google_sql_database_instance.instance "${GCP_PROJECT}/${instance_name}" >"${import_log}" 2>&1; then
-    echo "Imported google_sql_database_instance.instance (${instance_name})."
-  elif grep -qE "Cannot import non-existent remote object|googleapi: Error 404" "${import_log}"; then
-    echo "Instance ${instance_name} not found in project ${GCP_PROJECT}; nothing to clean up."
-    rm -f "${import_log}"
-    return 0
-  else
-    echo "ERROR: terraform import failed for instance ${instance_name}; the instance may still exist and need manual cleanup:" >&2
-    cat "${import_log}" >&2
-    rm -f "${import_log}"
-    return 1
-  fi
+  import_resource() {
+    local address="$1" id="$2"
+    if terraform import "${address}" "${id}" >"${import_log}" 2>&1; then
+      echo "Imported ${address} (${id})."
+    elif grep -qE "Cannot import non-existent remote object|googleapi: Error 404" "${import_log}"; then
+      echo "${address} (${id}) not found; nothing to clean up."
+    else
+      echo "ERROR: terraform import failed for ${address}; it may still exist and need manual cleanup:" >&2
+      cat "${import_log}" >&2
+      rm -f "${import_log}"
+      return 1
+    fi
+  }
+  import_resource google_sql_database_instance.instance "${GCP_PROJECT}/${instance_name}" || { rm -f "${import_log}"; return 1; }
+  import_resource google_compute_global_address.private_ip_range "projects/${GCP_PROJECT}/global/addresses/${instance_name}-psa" || { rm -f "${import_log}"; return 1; }
+  import_resource google_service_networking_connection.private_service_access "projects/${GCP_PROJECT}/global/networks/${GCP_CLUSTER_NETWORK}:servicenetworking.googleapis.com" || { rm -f "${import_log}"; return 1; }
   rm -f "${import_log}"
   # A failing state list must not be read as an empty state.
   local state_list
@@ -103,10 +145,14 @@ EOF
     echo "ERROR: terraform state list failed after import." >&2
     return 1
   fi
-  if ! grep -q google_sql_database_instance <<<"${state_list}"; then
-    echo "ERROR: instance missing from Terraform state after a successful import." >&2
-    return 1
+  if [[ -z "${state_list}" ]]; then
+    echo "Instance, range, and peering not found; nothing to clean up."
+    return 0
   fi
+  # Destroy whatever imported: the instance (if present) first, then the
+  # Private Service Access peering and range. Destroying the connection
+  # while the instance still exists would fail, so keep the declared
+  # dependency order and let terraform sequence it.
   terraform destroy -auto-approve
 }
 
