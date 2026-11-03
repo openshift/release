@@ -80,11 +80,13 @@ JOB_KEYS = {
     "skip_if_only_changed",
     "fips",
     "storage",
+    "auth_mode",
     "upgrade_from",
     "ocp_channel",
     "sts",
     "database",
 }
+AUTH_MODES = ("oidc",)
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
 GENERATED_HEADER = """\
@@ -378,6 +380,17 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             run_if_changed = _job_str_field(job, "run_if_changed", where)
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
             fips = _job_bool_field(job, "fips", where) or False
+            auth_mode = _job_str_field(job, "auth_mode", where)
+            if auth_mode is not None:
+                if auth_mode not in AUTH_MODES:
+                    raise ValueError(f"{where}.auth_mode must be one of {AUTH_MODES}")
+                if test != "e2e-install" or kind != "periodic":
+                    raise ValueError(
+                        f"{where}.auth_mode is only valid for test: e2e-install, kind: periodic"
+                    )
+                # Only quay-deploy-aws-s3 merges the IdP auth config fragment.
+                if any((storage or STORAGE_BY_CLOUD.get(cloud)) != "s3" for cloud in clouds):
+                    raise ValueError(f"{where}.auth_mode requires s3 storage")
             sts = _job_bool_field(job, "sts", where)
             if sts is not None and "aws" not in clouds:
                 raise ValueError(f"{where}.sts is only valid when clouds include aws")
@@ -488,6 +501,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         fips=fips,
                         sts=cloud == "aws" and sts is not False,
                         storage_override=storage,
+                        auth_mode=auth_mode,
                         upgrade_from=upgrade_from,
                         database=database,
                         ocp_channel=ocp_channel or "stable",

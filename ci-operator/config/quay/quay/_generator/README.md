@@ -177,6 +177,7 @@ Per job, `quay[].jobs[]`:
 | `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
 | `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp`, `libvirt`, or `baremetal`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
+| `auth_mode` | `oidc`, periodic `e2e-install` on s3 storage (`quay-deploy-aws-s3`) only; absent means Database auth. Inserts `quay-deploy-rhbk` right after `quay-deploy-jaeger` and drops `@auth:OIDC` from `PLAYWRIGHT_GREP_INVERT` so those specs run. The derived `as` gets an `-oidc` suffix (after any `-fips`); the filename does not change, so the row shares its non-auth sibling's file. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
 | `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
 

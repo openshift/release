@@ -87,6 +87,10 @@ class Cell:
     sts: bool = False
     storage_override: str | None = None
     database: bool = False
+    # IdP auth lane for e2e-install: "oidc" inserts quay-deploy-rhbk after
+    # quay-deploy-jaeger and un-inverts that mode's @auth tag. None means
+    # Database auth (the default lane).
+    auth_mode: str | None = None
     # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
     # channels, and branches are derived from quay_version + upgrade_from, so a row
     # needs only this one field.
@@ -204,7 +208,11 @@ class Cell:
         if self.kind == "periodic":
             parts.append(str(self.source))
         base = "-".join(parts)
-        return f"{base}-fips" if self.fips else base
+        if self.fips:
+            base = f"{base}-fips"
+        if self.auth_mode:
+            base = f"{base}-{self.auth_mode}"
+        return base
 
     @property
     def filename(self) -> str:
@@ -240,6 +248,7 @@ class Cell:
             "kind": self.kind,
             "layout": self.layout,
             "fips": self.fips,
+            "auth_mode": self.auth_mode,
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
         }
