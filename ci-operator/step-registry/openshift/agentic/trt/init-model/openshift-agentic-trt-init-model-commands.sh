@@ -392,12 +392,13 @@ prepare_codex_home() {
 configure_codex_project_plugins() {
     local settings="${WORKDIR}/.claude/settings.json"
     local github_enabled=false
+    unset CLAUDE_PLUGIN_ROOT
     if [[ -e "${settings}" || -L "${settings}" ]]; then
         if [[ ! -r "${settings}" ]]; then
             echo "ERROR: project plugin settings are unreadable: ${settings}" >&2
             return 1
         fi
-        if ! github_enabled=$(jq -r '
+        if ! github_enabled=$(jq -er '
           if type != "object" then error("settings must be an object")
           elif (has("enabledPlugins") | not) then false
           elif (.enabledPlugins | type) != "object" then error("enabledPlugins must be an object")
@@ -405,6 +406,7 @@ configure_codex_project_plugins() {
           elif (.enabledPlugins["github@ai-helpers"] | type) != "boolean" then error("plugin state must be boolean")
           else .enabledPlugins["github@ai-helpers"]
           end
+          | tostring
         ' "${settings}"); then
             echo "ERROR: invalid project plugin settings: ${settings}" >&2
             return 1
@@ -416,10 +418,39 @@ configure_codex_project_plugins() {
             echo "ERROR: failed to add the ai-helpers Codex plugin marketplace" >&2
             return 1
         fi
-        if ! codex plugin add github@ai-helpers >/dev/null 2>&1; then
+        local plugin_json plugin_root cache_root script
+        if ! plugin_json=$(codex plugin add github@ai-helpers --json 2>/dev/null); then
             echo "ERROR: failed to install the github@ai-helpers Codex plugin" >&2
             return 1
         fi
+        if ! plugin_root=$(jq -er '
+          select(.pluginId == "github@ai-helpers")
+          | .installedPath
+          | select(type == "string" and length > 0)
+        ' <<<"${plugin_json}"); then
+            echo "ERROR: Codex did not report the installed github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        if ! plugin_root=$(realpath -e -- "${plugin_root}") \
+            || ! cache_root=$(realpath -e -- "${CODEX_HOME}/plugins/cache"); then
+            echo "ERROR: Codex reported an invalid github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        case "${plugin_root}" in
+            "${cache_root}"/*) ;;
+            *)
+                echo "ERROR: Codex installed github@ai-helpers outside its native plugin cache" >&2
+                return 1
+                ;;
+        esac
+        script="${plugin_root}/skills/upload-screenshot/upload_screenshot.sh"
+        if [[ ! -f "${script}" || ! -x "${script}" ]]; then
+            echo "ERROR: installed github@ai-helpers is missing the upload-screenshot helper" >&2
+            return 1
+        fi
+        # Codex shell tools inherit this process environment. The compatibility
+        # variable is required by the existing Claude-authored skill command.
+        export CLAUDE_PLUGIN_ROOT="${plugin_root}"
     elif ! codex plugin remove github@ai-helpers >/dev/null 2>&1; then
         echo "ERROR: failed to disable the github@ai-helpers Codex plugin" >&2
         return 1
