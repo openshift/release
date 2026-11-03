@@ -64,8 +64,35 @@ assert_gitleaks_status() {
   else
     actual_status=$?
   fi
-  [[ "${actual_status}" -eq "${expected_status}" ]] || fail "Gitleaks scan returned an unexpected status"
+  if [[ "${actual_status}" -ne "${expected_status}" ]]; then
+    printf 'Gitleaks scan of %s returned status %s; expected %s\n' \
+      "${input}" "${actual_status}" "${expected_status}" >&2
+    if [[ -r "${log_file}" ]]; then
+      # The scan above uses --redact=100, so its findings are redacted in CI output.
+      cat "${log_file}" >&2
+    else
+      printf 'Gitleaks output log is unavailable: %s\n' "${log_file}" >&2
+    fi
+    fail "Gitleaks scan returned an unexpected status"
+  fi
 }
+
+# A status mismatch must print the captured scanner output before EXIT cleanup
+# removes it. The fake scanner message contains no fixture or credential data.
+gitleaks_diagnostic_dir="${work_dir}/gitleaks-diagnostic-test"
+mkdir -p "${gitleaks_diagnostic_dir}"
+gitleaks_diagnostic="${work_dir}/gitleaks-diagnostic-test.stderr"
+if (
+  trap 'rm -rf -- "${gitleaks_diagnostic_dir}"' EXIT
+  gitleaks() { printf '%s\n' 'synthetic gitleaks diagnostic'; }
+  assert_gitleaks_status "${BASH_SOURCE[0]}" 2 "${gitleaks_diagnostic_dir}/scan.log"
+) > "${gitleaks_diagnostic}" 2>&1; then
+  fail "Gitleaks status-mismatch diagnostic unexpectedly succeeded"
+fi
+[[ ! -e "${gitleaks_diagnostic_dir}" ]] || fail "Gitleaks diagnostic test did not clean its temporary scan directory"
+assert_contains "${gitleaks_diagnostic}" \
+  "Gitleaks scan of ${BASH_SOURCE[0]} returned status 0; expected 2"
+assert_contains "${gitleaks_diagnostic}" "synthetic gitleaks diagnostic"
 
 step_ref="${step_dir}/hypershift-destroy-nested-management-cluster-dump-management-cluster-ref.yaml"
 [[ -s "${step_ref}" ]] || fail "dump step reference is missing"
