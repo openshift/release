@@ -54,6 +54,17 @@ def metric_record(metrics):
     }
 
 
+def multi_scope_metric_record(*metric_groups):
+    return {
+        "path": "/v1/metrics",
+        "payload": {
+            "resourceMetrics": [
+                {"scopeMetrics": [{"metrics": metrics} for metrics in metric_groups]}
+            ]
+        },
+    }
+
+
 def completion_record(model="gpt-6.1-sol"):
     attrs = [
         attribute("app.version", "0.164.0"),
@@ -132,6 +143,7 @@ class TrtCodexSetupTest(unittest.TestCase):
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text(f"---\nname: {skill}\n---\n")
         (seed / "auth.json").write_text("must-not-copy")
+        (seed / "config.toml").write_text("must-not-copy")
         self.shell(
             textwrap.dedent(
                 f"""
@@ -142,6 +154,7 @@ class TrtCodexSetupTest(unittest.TestCase):
                 test -f "$CODEX_HOME/skills/implementation/SKILL.md"
                 test -f "$CODEX_HOME/skills/validation/SKILL.md"
                 test ! -e "$CODEX_HOME/auth.json"
+                test ! -e "$CODEX_HOME/config.toml"
                 """
             ),
             extra_env={"SEED": str(seed)},
@@ -188,6 +201,32 @@ class TrtCodexSetupTest(unittest.TestCase):
         logged = codex_log.read_text()
         self.assertIn("mcp add playwright -- sh -c npx @playwright/mcp@latest", logged)
         self.assertNotIn("atlassian", logged)
+
+    def test_unsafe_project_mcp_name_is_rejected(self):
+        (self.workdir / ".mcp.json").write_text(
+            json.dumps(
+                {
+                    "mcpServers": {
+                        "bad server": {"command": "sh", "args": ["-c", "true"]},
+                    }
+                }
+            )
+        )
+        codex_home = self.root / "codex-home"
+        codex_home.mkdir()
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            self.shell(
+                textwrap.dedent(
+                    f"""
+                    source "{self.telemetry}"
+                    export CODEX_HOME="$TEST_CODEX_HOME"
+                    export ALLOWED_TOOLS='Bash'
+                    configure_codex_project_mcp
+                    """
+                ),
+                extra_env={"TEST_CODEX_HOME": str(codex_home)},
+            )
+        self.assertIn("unsafe MCP server name", raised.exception.stderr)
 
     def test_enabled_github_plugin_uses_agentic_ci_and_provisions_upload_skill(self):
         helpers = self.root / "ai-helpers"
@@ -281,6 +320,53 @@ class TrtCodexSetupTest(unittest.TestCase):
         )
         self.assertEqual(0.125, self.read_usage(legacy)["models"]["gpt-6.1-sol"]["cost"])
 
+    def test_cost_metrics_use_latest_cumulative_point_per_run_and_model(self):
+        fixture = self.write_jsonl(
+            "cumulative.jsonl",
+            [
+                multi_scope_metric_record(
+                    [
+                        cost_metric("codex.cost.usage", 0.1, start="10", end="20"),
+                        cost_metric("codex.cost.usage", 0.3, start="10", end="40"),
+                        cost_metric("codex.cost.usage", 0.2, start="50", end="60"),
+                    ],
+                    [
+                        cost_metric(
+                            "agentic_ci.codex.cost.usage", 0.3, start="10", end="40"
+                        ),
+                        cost_metric(
+                            "agentic_ci.codex.cost.usage",
+                            0.7,
+                            model="gpt-5",
+                            start="70",
+                            end="80",
+                        ),
+                    ],
+                )
+            ],
+        )
+        usage = self.read_usage(fixture)
+        self.assertEqual(0.5, usage["models"]["gpt-6.1-sol"]["cost"])
+        self.assertEqual(0.7, usage["models"]["gpt-5"]["cost"])
+
+    def test_unstamped_legacy_rows_preserve_repeats_but_dedupe_new_name(self):
+        fixture = self.write_jsonl(
+            "unstamped.jsonl",
+            [
+                multi_scope_metric_record(
+                    [cost_metric("codex.cost.usage", 0.125, start="", end="")],
+                    [
+                        cost_metric("codex.cost.usage", 0.125, start="", end=""),
+                        cost_metric(
+                            "agentic_ci.codex.cost.usage", 0.125, start="", end=""
+                        ),
+                    ],
+                )
+            ],
+        )
+        usage = self.read_usage(fixture)
+        self.assertEqual(0.25, usage["models"]["gpt-6.1-sol"]["cost"])
+
     def test_unknown_price_does_not_fabricate_cost(self):
         fixture = self.write_jsonl("unknown.jsonl", [completion_record("gpt-unknown")])
         usage = self.read_usage(fixture)
@@ -357,21 +443,67 @@ class TrtCodexSetupTest(unittest.TestCase):
         )
         self.assertIn(expected, markdown.read_text())
 
+    def test_presubmit_screenshot_marker_becomes_public_prow_url(self):
+        screenshot_dir = self.workdir / "artifacts" / "screenshots"
+        screenshot_dir.mkdir(parents=True)
+        (screenshot_dir / "review.png").write_bytes(b"png")
+        markdown = self.root / "review.md"
+        markdown.write_text("![review](prow-artifact://screenshots/review.png)\n")
+        self.shell(
+            textwrap.dedent(
+                f"""
+                source "{self.telemetry}"
+                prepare_prow_screenshot_handoff openshift-agentic-trt-review-responder
+                replace_prow_screenshot_markers "$MARKDOWN"
+                """
+            ),
+            extra_env={
+                "MARKDOWN": str(markdown),
+                "JOB_NAME": "pull-ci-openshift-sippy-main-agentic",
+                "BUILD_ID": "67890",
+                "JOB_NAME_SAFE": "pull-ci-openshift-sippy-main-agentic",
+                "JOB_TYPE": "presubmit",
+                "JOB_SPEC": json.dumps(
+                    {
+                        "refs": {
+                            "org": "openshift",
+                            "repo": "sippy",
+                            "pulls": [{"number": 1234}],
+                        }
+                    }
+                ),
+            },
+        )
+        expected = (
+            "https://gcs.ci.openshift.org/gcs/test-platform-results-public/pr-logs/pull/"
+            "openshift_sippy/1234/pull-ci-openshift-sippy-main-agentic/67890/artifacts/"
+            "pull-ci-openshift-sippy-main-agentic/openshift-agentic-trt-review-responder/"
+            "artifacts/screenshots/review.png"
+        )
+        self.assertIn(expected, markdown.read_text())
+
     def test_all_trt_consumers_pin_the_pr_490_merge(self):
-        configs = [
-            REPO / "ci-operator/config/openshift/sippy/openshift-sippy-main__agentic.yaml",
-            REPO
-            / "ci-operator/config/openshift/origin/openshift-origin-main__agentic.yaml",
-            REPO
-            / "ci-operator/config/openshift-eng/ship-status-dash/"
-            "openshift-eng-ship-status-dash-main__agentic.yaml",
-        ]
+        configs = []
+        for config in (REPO / "ci-operator/config").glob("**/*__agentic.yaml"):
+            content = config.read_text()
+            if any(
+                f"workflow: openshift-agentic-trt-{workflow}" in content
+                for workflow in ("jira-solver", "pr-followup")
+            ):
+                configs.append(config)
+        self.assertEqual(3, len(configs))
         for config in configs:
             content = config.read_text()
             self.assertIn(AGENTIC_CI_SHA, content)
             self.assertNotIn("agentic-ci==0.3.48", content)
-        self.assertIn('cp -a "${artifact}"', SOLVER_SCRIPT.read_text())
-        self.assertIn('cp -a "${WORKDIR}/artifacts/"*', REVIEW_SCRIPT.read_text())
+        solver = SOLVER_SCRIPT.read_text()
+        review = REVIEW_SCRIPT.read_text()
+        self.assertIn('cp -a "${artifact}"', solver)
+        self.assertIn('cp -a "${WORKDIR}/artifacts/"*', review)
+        self.assertIn("prepare_prow_screenshot_handoff", solver)
+        self.assertGreaterEqual(review.count('append_screenshot_handoff "'), 2)
+        self.assertIn('"Bash(gh *)"', solver)
+        self.assertIn('"Bash(gh release*)"', review)
 
 
 if __name__ == "__main__":

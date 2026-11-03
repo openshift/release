@@ -204,10 +204,11 @@ prow_public_artifact_prefix() {
     [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && -n "${JOB_NAME_SAFE:-}" ]] || return 1
     local job_path=logs
     if [[ "${JOB_TYPE:-}" == "presubmit" ]]; then
-        local org repo pull
-        org=$(jq -r '.refs.org // empty' <<<"${JOB_SPEC:-{}}") || return 1
-        repo=$(jq -r '.refs.repo // empty' <<<"${JOB_SPEC:-{}}") || return 1
-        pull=$(jq -r '.refs.pulls[0].number // empty' <<<"${JOB_SPEC:-{}}") || return 1
+        local org repo pull job_spec
+        job_spec=${JOB_SPEC:-'{}'}
+        org=$(jq -r '.refs.org // empty' <<<"${job_spec}") || return 1
+        repo=$(jq -r '.refs.repo // empty' <<<"${job_spec}") || return 1
+        pull=$(jq -r '.refs.pulls[0].number // empty' <<<"${job_spec}") || return 1
         [[ -n "${org}" && -n "${repo}" && -n "${pull}" ]] || return 1
         job_path="pr-logs/pull/${org}_${repo}/${pull}"
     fi
@@ -726,7 +727,8 @@ models = defaultdict(lambda: {
 version = ""
 session_id = ""
 cost_from_metric = False
-cost_points = set()
+cost_series = {}
+unstamped_cost_points = defaultdict(lambda: [0, 0])
 
 
 def attribute_value(value):
@@ -800,17 +802,30 @@ with open(path) as handle:
                                 continue
                             attrs = point_attributes(point)
                             model = str(attrs.get("model") or "unknown")
-                            identity = (
-                                model,
-                                amount,
-                                str(point.get("startTimeUnixNano") or ""),
-                                str(point.get("timeUnixNano") or ""),
-                            )
-                            if identity in cost_points:
+                            start = str(point.get("startTimeUnixNano") or "")
+                            end = str(point.get("timeUnixNano") or "")
+                            if start:
+                                try:
+                                    end_order = int(end)
+                                except (TypeError, ValueError):
+                                    end_order = -1
+                                # Both accepted names describe the same cumulative
+                                # series. Keep its latest point, preferring the new
+                                # agentic-ci-owned metric when timestamps tie.
+                                priority = int(metric.get("name") == "agentic_ci.codex.cost.usage")
+                                key = (model, start)
+                                candidate = (end_order, priority, amount)
+                                if candidate[:2] >= cost_series.get(key, (-1, -1, 0))[:2]:
+                                    cost_series[key] = candidate
                                 continue
-                            cost_points.add(identity)
-                            models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
-                            cost_from_metric = True
+                            # A legacy point without cumulative timestamps cannot
+                            # be associated with a series. Preserve distinct points
+                            # but collapse an exact old/new duplicate.
+                            identity = (model, amount, end)
+                            name_index = int(
+                                metric.get("name") == "agentic_ci.codex.cost.usage"
+                            )
+                            unstamped_cost_points[identity][name_index] += 1
             continue
         if "/v1/logs" not in record_path:
             continue
@@ -843,6 +858,16 @@ with open(path) as handle:
                     models[model]["output"] += as_int(attrs, "output_token_count")
                     models[model]["cache_read"] += as_int(attrs, "cached_token_count")
                     models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
+
+for (model, _start), (_end, _priority, amount) in cost_series.items():
+    models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+for (model, amount, _end), name_counts in unstamped_cost_points.items():
+    # Retain repeated points from either metric while collapsing matching
+    # legacy/new copies. Without timestamps there is no stronger series key.
+    models[model]["cost"] = round(
+        models[model].get("cost", 0) + amount * max(name_counts), 6
+    )
+cost_from_metric = bool(cost_series or unstamped_cost_points)
 
 print(json.dumps({
     "version": version,
