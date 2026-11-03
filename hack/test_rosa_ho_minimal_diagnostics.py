@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+"""Exercise HO diagnostic registry scripts with isolated, synthetic CLI fixtures."""
+
 import json
 import os
+from contextlib import ExitStack
 from pathlib import Path
 import shutil
 import signal
@@ -149,11 +152,18 @@ print(json.dumps(result))
 '''
 
 
-class MinimalDiagnosticsTest(unittest.TestCase):
+class DiagnosticsTestCase(unittest.TestCase):
+    """Share mounted-script fixtures and strict sanitized-artifact assertions."""
+
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temporary.cleanup)
-        self.directory = Path(self.temporary.name)
+        """Transfer fixture ownership to unittest cleanup, beyond setUp's context.
+
+        The directory remains available during the test and is also cleaned if
+        a later setup operation or assertion fails.
+        """
+        with ExitStack() as resources:
+            self.directory = Path(resources.enter_context(tempfile.TemporaryDirectory()))
+            self.addCleanup(resources.pop_all().close)
         self.commands = self.directory / "commands"
         self.bin = self.directory / "bin"
         self.shared = self.directory / "shared"
@@ -165,15 +175,16 @@ class MinimalDiagnosticsTest(unittest.TestCase):
             shutil.copyfile(REGISTRY / (path + "-commands.sh"), self.commands / key)
         for name in ("oc", "ocm", "curl", "sleep", "timeout", "mv"):
             executable = self.bin / name
-            executable.write_text(MOCK)
+            executable.write_text(MOCK, encoding="utf-8")
             executable.chmod(0o755)
         for name, value in (("cluster-id", "fixture-id"), ("cluster-name", "fixture-cluster"), ("hs-mc.kubeconfig", "fixture-kubeconfig")):
-            (self.shared / name).write_text(value)
-        (self.profile / "ocm-token").write_text("fixture-placeholder")
+            (self.shared / name).write_text(value, encoding="utf-8")
+        (self.profile / "ocm-token").write_text("fixture-placeholder", encoding="utf-8")
         self.environment = dict(os.environ, PATH=str(self.bin) + ":" + os.environ["PATH"], SHARED_DIR=str(self.shared), ARTIFACT_DIR=str(self.artifacts), CLUSTER_PROFILE_DIR=str(self.profile), HO_MINIMAL_DIAGNOSTICS="true", OCM_LOGIN_ENV="integration", REGION="us-west-2", CLUSTER_SECTOR="fixture-sector", REQUESTS=str(self.directory / "requests"), TIMEOUTS=str(self.directory / "timeouts"))
 
-    def run_script(self, key=HELPER, status=0, mode="normal", enabled=True, tracing=False):
-        environment = dict(self.environment, MODE=mode, ORIGINAL_EXIT=str(status), HO_MINIMAL_DIAGNOSTICS=str(enabled).lower())
+    def run_script(self, key=HELPER, status=0, *, mode="normal", tracing=False):
+        """Execute a real command key with mocked tools and optional Bash tracing."""
+        environment = dict(self.environment, MODE=mode, ORIGINAL_EXIT=str(status))
         launcher = 'function /usr/local/bin/e2e.test() { return "$ORIGINAL_EXIT"; }; source "$1"'
         args = ["bash", "-c", launcher, "fixture"]
         if tracing:
@@ -184,7 +195,8 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         return subprocess.run(args, env=environment, capture_output=True, text=True, timeout=20, check=False)
 
     def bundle(self):
-        text = (self.artifacts / "ho-minimal-diagnostics.json").read_text()
+        """Read the atomic bundle and reject fixture identifiers or leaked payloads."""
+        text = (self.artifacts / "ho-minimal-diagnostics.json").read_text(encoding="utf-8")
         self.assertNotIn("do-not-retain", text)
         self.assertNotIn("fixture-", text)
         self.assertLess(len(text), 262144)
@@ -192,10 +204,11 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         return json.loads(text)
 
     def assert_schema(self, value):
+        """Recursively enforce finite public keys and values, not arbitrary strings."""
         allowed_keys = {
             "schemaVersion", "phase", "outcome", "failure", "truncated", "omissions", "logs", "ocm", "categories", "items",
             "target", "hostedCluster", "hostedControlPlane", "nodePools", "catalogDeployment", "catalogReplicaSets", "catalogPods", "catalogEvents", "operatorDeployment", "operatorReplicaSets", "operatorPods", "operatorEvents",
-            "generation", "observedGeneration", "desired", "current", "updated", "ready", "available", "unavailable", "conditions", "type", "status", "lastTransitionTime", "phase", "assignedNode", "scheduled", "containers", "restartCount", "previous", "state", "exitCode", "signal", "reason", "startedAt", "finishedAt", "count", "firstTimestamp", "lastTimestamp",
+            "generation", "observedGeneration", "desired", "current", "updated", "ready", "available", "unavailable", "conditions", "type", "status", "lastTransitionTime", "assignedNode", "scheduled", "containers", "restartCount", "previous", "state", "exitCode", "signal", "reason", "startedAt", "finishedAt", "count", "firstTimestamp", "lastTimestamp",
         }
         allowed_values = {
             "test", "before_deploy", "deploy", "verify", "post", "complete", "partial", "failed", "unavailable", "request_failed", "invalid_response", "oversized", "invalid_target", "missing_tool", "missing_kubeconfig", "helper_unavailable", "collector_failed", "invalid_output",
@@ -213,13 +226,16 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         else:
             self.assertIsInstance(value, (int, bool, type(None)))
 
+class DiagnosticsCollectionTest(DiagnosticsTestCase):
+    """Verify scoped snapshots, original exits and ordinary collection failures."""
+
     def test_scoped_before_and_after_deploy(self):
         for status in (0, 23):
             with self.subTest(status=status):
                 result = self.run_script("rosa-hypershift-operator-deploy", status=status)
                 self.assertEqual(result.returncode, status, result.stderr)
                 baseline_path = self.artifacts / "ho-before-deploy/ho-minimal-diagnostics.json"
-                baseline_text = baseline_path.read_text()
+                baseline_text = baseline_path.read_text(encoding="utf-8")
                 baseline = json.loads(baseline_text)
                 after = self.bundle()
                 self.assert_schema(baseline)
@@ -236,7 +252,7 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         for mode in ("locked", "match"):
             with self.subTest(mode=mode):
                 self.assertEqual(self.run_script("rosa-hypershift-operator-deploy", mode=mode).returncode, 0)
-                baseline_text = (self.artifacts / "ho-before-deploy/ho-minimal-diagnostics.json").read_text()
+                baseline_text = (self.artifacts / "ho-before-deploy/ho-minimal-diagnostics.json").read_text(encoding="utf-8")
                 baseline = json.loads(baseline_text)
                 self.assert_schema(baseline)
                 self.assertNotIn("fixture-", baseline_text)
@@ -247,7 +263,7 @@ class MinimalDiagnosticsTest(unittest.TestCase):
 
     def test_old_raw_collector_is_removed(self):
         for key in ("rosa-hypershift-operator-deploy", "rosa-hypershift-operator-verify-hcp-health"):
-            script = (self.commands / key).read_text()
+            script = (self.commands / key).read_text(encoding="utf-8")
             self.assertNotIn("capture_health", script)
             self.assertNotIn('"${phase}-${resource}.json"', script)
             self.assertNotIn("--request-timeout=15s", script)
@@ -262,13 +278,13 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         self.assertEqual(bundle["outcome"], "complete")
         categories = bundle["categories"]
         deployment = categories["catalogDeployment"]["items"][0]
-        self.assertEqual(deployment, dict(generation=7, observedGeneration=6, desired=1, current=1, updated=1, ready=0, available=0, unavailable=1))
+        self.assertEqual(deployment, {"generation": 7, "observedGeneration": 6, "desired": 1, "current": 1, "updated": 1, "ready": 0, "available": 0, "unavailable": 1})
         self.assertEqual(len(categories["catalogReplicaSets"]["items"]), 1)
         pod = categories["catalogPods"]["items"][0]
         self.assertEqual(pod["scheduled"], "False")
         self.assertEqual(pod["containers"][0]["previous"]["exitCode"], 137)
         self.assertEqual(categories["catalogEvents"]["items"][0]["count"], 2)
-        requests = Path(self.environment["REQUESTS"]).read_text().splitlines()
+        requests = Path(self.environment["REQUESTS"]).read_text(encoding="utf-8").splitlines()
         self.assertLessEqual(len(requests), 18)
         self.assertTrue(any("ocm-int-fixture-id-fixture-cluster/deployments/redhat-operators-catalog" in path for path in requests))
         self.assertTrue(any("ocm-int-fixture-id/hostedclusters/fixture-cluster" in path for path in requests))
@@ -292,9 +308,10 @@ class MinimalDiagnosticsTest(unittest.TestCase):
                 self.assertTrue(self.bundle()["categories"]["catalogDeployment"]["items"])
 
     def test_default_disabled_has_no_added_queries_or_artifacts(self):
+        self.environment["HO_MINIMAL_DIAGNOSTICS"] = "false"
         for key in SCRIPTS:
             with self.subTest(key=key):
-                self.run_script(key, enabled=False)
+                self.run_script(key)
                 self.assertFalse((self.artifacts / "ho-minimal-diagnostics.json").exists())
                 self.assertFalse(Path(self.environment["REQUESTS"]).exists())
 
@@ -347,6 +364,9 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         self.assertTrue(self.bundle()["truncated"])
         self.assertEqual(self.bundle()["outcome"], "partial")
 
+class DiagnosticsResilienceTest(DiagnosticsTestCase):
+    """Verify fail-closed limits, teardown and the projected command-map contract."""
+
     def test_workload_truncation_is_not_complete(self):
         self.run_script(mode="workload_truncated")
         bundle = self.bundle()
@@ -356,7 +376,7 @@ class MinimalDiagnosticsTest(unittest.TestCase):
     def test_selector_is_rejected_as_a_whole(self):
         self.run_script(mode="bad_selector")
         self.assertEqual(self.bundle()["categories"]["catalogDeployment"]["outcome"], "invalid_target")
-        requests = Path(self.environment["REQUESTS"]).read_text()
+        requests = Path(self.environment["REQUESTS"]).read_text(encoding="utf-8")
         self.assertNotIn("replicasets", requests)
 
     def test_unknown_enums_are_not_retained(self):
@@ -378,7 +398,7 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         (self.commands / HELPER).unlink()
         (self.profile / "ocm-token").unlink()
         blocked = self.directory / "do-not-retain"
-        blocked.write_text("fixture")
+        blocked.write_text("fixture", encoding="utf-8")
         self.environment["ARTIFACT_DIR"] = str(blocked / "child")
         result = self.run_script("rosa-e2e-test")
         self.assertEqual(result.returncode, 1)
@@ -389,13 +409,13 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         self.run_script(mode="bad_target")
         bundle = self.bundle()
         self.assertEqual(bundle["categories"]["target"]["outcome"], "invalid_target")
-        requests = Path(self.environment["REQUESTS"]).read_text()
+        requests = Path(self.environment["REQUESTS"]).read_text(encoding="utf-8")
         self.assertNotIn("redhat-operators-catalog", requests)
         self.assertNotIn("nodepools", requests)
 
     def test_unwritable_artifact_destination_preserves_failure(self):
         blocked = self.directory / "not-a-directory"
-        blocked.write_text("fixture")
+        blocked.write_text("fixture", encoding="utf-8")
         self.environment["ARTIFACT_DIR"] = str(blocked / "child")
         result = self.run_script("rosa-e2e-test", status=23)
         self.assertEqual(result.returncode, 23)
@@ -408,26 +428,26 @@ class MinimalDiagnosticsTest(unittest.TestCase):
             marker.unlink(missing_ok=True)
             launcher = 'function /usr/local/bin/e2e.test() { /bin/sleep 30 & printf "%s" "$!" > "$CHILD_PID"; wait; }; source "$1"'
             environment = dict(self.environment, HO_MINIMAL_DIAGNOSTICS=str(enabled).lower(), CHILD_PID=str(marker))
-            process = subprocess.Popen(["bash", "-c", launcher, "fixture", str(self.commands / "rosa-e2e-test")], env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            try:
-                deadline = time.monotonic() + 5
-                while not marker.exists() and time.monotonic() < deadline:
-                    time.sleep(0.02)
-                self.assertTrue(marker.exists())
-                process.send_signal(signal.SIGTERM)
-                statuses.append(process.wait(timeout=10))
-                child = int(marker.read_text())
-                with self.assertRaises(ProcessLookupError):
-                    os.kill(child, 0)
-            finally:
-                if process.poll() is None:
-                    if marker.exists():
-                        try:
-                            os.kill(int(marker.read_text()), signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                    process.kill()
-                    process.wait(timeout=2)
+            with subprocess.Popen(["bash", "-c", launcher, "fixture", str(self.commands / "rosa-e2e-test")], env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) as process:
+                try:
+                    deadline = time.monotonic() + 5
+                    while not marker.exists() and time.monotonic() < deadline:
+                        time.sleep(0.02)
+                    self.assertTrue(marker.exists())
+                    process.send_signal(signal.SIGTERM)
+                    statuses.append(process.wait(timeout=10))
+                    child = int(marker.read_text(encoding="utf-8"))
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(child, 0)
+                finally:
+                    if process.poll() is None:
+                        if marker.exists():
+                            try:
+                                os.kill(int(marker.read_text(encoding="utf-8")), signal.SIGKILL)
+                            except ProcessLookupError:
+                                pass
+                        process.kill()
+                        process.wait(timeout=2)
         self.assertEqual(statuses[0], statuses[1])
         self.assertTrue(self.bundle()["categories"]["catalogDeployment"]["items"])
 
@@ -436,7 +456,7 @@ class MinimalDiagnosticsTest(unittest.TestCase):
         self.run_script(mode="timeout")
         self.assertLess(time.monotonic() - start, 3)
         self.assertEqual(self.bundle()["failure"], "collector_failed")
-        self.assertIn("-k 2s 60s", Path(self.environment["TIMEOUTS"]).read_text())
+        self.assertIn("-k 2s 60s", Path(self.environment["TIMEOUTS"]).read_text(encoding="utf-8"))
 
     def test_final_output_limit_never_persists_child_payload(self):
         result = self.run_script("rosa-e2e-test", status=23, mode="output_limit", tracing=True)
@@ -481,11 +501,11 @@ class MinimalDiagnosticsTest(unittest.TestCase):
 
     def test_configmap_mount_keys_and_workflow_contract(self):
         for key, path in SCRIPTS.items():
-            ref = (REGISTRY / (path + "-ref.yaml")).read_text()
+            ref = (REGISTRY / (path + "-ref.yaml")).read_text(encoding="utf-8")
             self.assertIn("run_as_script: true", ref)
             self.assertIn("as: " + key, ref)
             self.assertIn("default: \"false\"", ref)
-        workflow = (REGISTRY / "rosa/e2e/hcp/ho-upgrade/rosa-e2e-hcp-ho-upgrade-workflow.yaml").read_text()
+        workflow = (REGISTRY / "rosa/e2e/hcp/ho-upgrade/rosa-e2e-hcp-ho-upgrade-workflow.yaml").read_text(encoding="utf-8")
         self.assertIn('HO_MINIMAL_DIAGNOSTICS: "true"', workflow)
         self.assertLess(workflow.index("- ref: " + HELPER), workflow.index("- chain: rosa-cluster-deprovision"))
         self.assertIn("- ref: rosa-hypershift-operator-restore", workflow)
