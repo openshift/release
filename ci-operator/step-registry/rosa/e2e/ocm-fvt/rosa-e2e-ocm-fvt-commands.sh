@@ -431,7 +431,7 @@ try:
         if recording.stat().st_size > 65536:
             raise ValueError("oversized recording")
         parser = configparser.ConfigParser(strict=True)
-        parser.read_string("[recording]\n" + recording.read_text())
+        parser.read_string("[recording]\n" + recording.read_text(encoding="utf-8"))
         for section_name in parser:
             if section_name.lower() not in ("recording", "cluster"):
                 continue

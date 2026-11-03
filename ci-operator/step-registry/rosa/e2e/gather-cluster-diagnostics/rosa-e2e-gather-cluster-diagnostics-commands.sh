@@ -14,6 +14,7 @@ fi
 export OCM_TOKEN
 python3 - <<'PY'
 import datetime
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
@@ -166,8 +167,15 @@ def identity():
     if cluster.get("name") != names[0] or cluster_id != expected_id:
         raise ValueError("invalid_identity_match")
     try:
-        created = datetime.datetime.fromisoformat(cluster["creation_timestamp"].replace("Z", "+00:00"))
-        if created.tzinfo is None or not started <= created.timestamp() <= finished:
+        timestamp = re.fullmatch(
+            r"([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})"
+            r"(?:\.([0-9]{1,9}))?(Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])",
+            cluster["creation_timestamp"])
+        if timestamp is None:
+            raise ValueError()
+        created = datetime.datetime.fromisoformat(timestamp[1] + timestamp[3].replace("Z", "+00:00"))
+        created_seconds = Decimal(int(created.timestamp())) + Decimal("0." + (timestamp[2] or "0"))
+        if not Decimal(started) <= created_seconds <= Decimal(str(finished)):
             raise ValueError()
     except (KeyError, TypeError, AttributeError, ValueError):
         raise ValueError("unscoped_creation_time") from None
