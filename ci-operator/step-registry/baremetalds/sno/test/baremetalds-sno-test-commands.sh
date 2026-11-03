@@ -41,6 +41,7 @@ echo "### Running tests"
 ${TIMEOUT_COMMAND} ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_IMAGE}" "${GREP_FLAGS}" "${GREP_ARGS}" << "EOF"
 
     set -x
+    set -o pipefail
 
     function get_test_list() {
         podman run --network host --rm -i -e KUBECONFIG=/tmp/kubeconfig -v ${KUBECONFIG}:/tmp/kubeconfig $1 \
@@ -58,12 +59,12 @@ ${TIMEOUT_COMMAND} ssh "${SSHOPTS[@]}" "root@${IP}" bash -s "${OPENSHIFT_TESTS_I
         name=$(basename ${kubeconfig})
 
         stderr=$( { get_test_list $1 $2 $3 | run_tests $1; } 2>&1)
-        exit_code=\$?
+        exit_code=$?
 
-        echo "\${stderr}"
+        echo "${stderr}"
 
-        if [[ \${exit_code} -ne 0 ]]; then
-            exit \${exit_code}
+        if [[ ${exit_code} -ne 0 ]]; then
+            exit ${exit_code}
         fi
     done
 EOF
