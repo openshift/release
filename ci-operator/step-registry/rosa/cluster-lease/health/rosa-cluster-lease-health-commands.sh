@@ -77,6 +77,13 @@ for i in $(seq 0 $((TOTAL - 1))); do
     echo "Cluster: ${CM_NAME} (${CLUSTER_ID})" >> "${REPORT}"
     echo "  Status: ${STATUS}" >> "${REPORT}"
 
+    REVOLVING_DOOR=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/revolving-door"] // ""')
+    if [[ "${REVOLVING_DOOR}" == "true" ]]; then
+        ERROR_REASON=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-reason"] // ""')
+        echo "  REVOLVING-DOOR: cluster stuck in replace loop (error: ${ERROR_REASON})" >> "${REPORT}"
+        log "REVOLVING-DOOR: ${CM_NAME} stuck in replace loop (error: ${ERROR_REASON})"
+    fi
+
     if [[ "${STATUS}" == "in-use" && -n "${ACQUIRED_AT}" ]]; then
         ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
         LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
@@ -216,13 +223,26 @@ for i in $(seq 0 $((TOTAL - 1))); do
 
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again, setting to available"
-        lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-            "metadata": {
-                "labels": { "rosa-cluster-lease/status": "available" },
-                "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
-            }
-        }' || true
-        echo "  RESTORED to available" >> "${REPORT}"
+        if [[ "${REVOLVING_DOOR}" == "true" ]]; then
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "available" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "", "rosa-cluster-lease/revolving-door": "" }
+                }
+            }' || true
+            # Clean up replace-history ConfigMap
+            lease_oc delete configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" 2>/dev/null || true
+            log "Cleared revolving-door state for ${CM_NAME}"
+            echo "  RESTORED to available (revolving-door cleared)" >> "${REPORT}"
+        else
+            lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "available" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
+                }
+            }' || true
+            echo "  RESTORED to available" >> "${REPORT}"
+        fi
     fi
 
     HEALTHY=$((HEALTHY + 1))
