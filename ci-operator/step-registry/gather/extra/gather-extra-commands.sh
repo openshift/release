@@ -1,4 +1,91 @@
 #!/bin/bash
+function gather_etcd_history() (
+  local destination="${ARTIFACT_DIR}/metrics/etcd-history"
+  local start end now prompod family query response='' compressed='' result
+  trap 'rm -f -- "${response:-}" "${compressed:-}"' EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+  mkdir -p "${destination}"
+  start=$(cat "${SHARED_DIR}/conformance-start" 2>/dev/null) || return 0
+  now=$(date -u +%s)
+  end=$(cat "${SHARED_DIR}/conformance-end" 2>/dev/null) || end=${now}
+  if [[ ! ${start} =~ ^[0-9]{1,10}$ || ! ${end} =~ ^[0-9]{1,10}$ ]] ||
+     (( start > end || end > now || end - start > 86400 )); then
+    echo 'Invalid conformance window; check shared conformance-start/end epoch seconds.' > "${destination}/gap.txt"
+    return 0
+  fi
+  start=$((start > 300 ? start - 300 : 0))
+  end=$((end + 300 < now ? end + 300 : now))
+  jq -n --argjson start "${start}" --argjson end "${end}" \
+    '{start: $start, end: $end, step: 15, marginSeconds: 300,
+      source: "control-plane Prometheus history; raw counters and histogram buckets",
+      coverage: "evaluation samples; inspect per-series gaps and scrape cadence"}' > "${destination}/window.json"
+  if [[ -z ${prometheus:-} ]]; then
+    echo 'No Prometheus pods discovered; check openshift-monitoring availability and pod-list RBAC. TSDB archives may also be unavailable.' > "${destination}/gap.txt"
+    return 0
+  fi
+  while IFS= read -r prompod; do
+    prompod=${prompod#pod/}
+    [[ -n ${prompod} ]] || continue
+    mkdir -p "${destination}/${prompod}"
+    for family in wal backend peer disk-read disk-write disk-io disk-flush cpu; do
+      case ${family} in
+        wal) query='{__name__=~"etcd_disk_wal_fsync_duration_seconds_(bucket|count|sum)",job="etcd"}' ;;
+        backend) query='{__name__=~"etcd_disk_backend_commit_duration_seconds_(bucket|count|sum)",job="etcd"}' ;;
+        peer) query='{__name__=~"etcd_network_peer_round_trip_time_seconds_(bucket|count|sum)",job="etcd"}' ;;
+        disk-read) query='{__name__=~"node_disk_(read_time_seconds_total|reads_completed_total)",job="node-exporter"}' ;;
+        disk-write) query='{__name__=~"node_disk_(write_time_seconds_total|writes_completed_total)",job="node-exporter"}' ;;
+        disk-io) query='{__name__=~"node_disk_io_time_(seconds_total|weighted_seconds_total)",job="node-exporter"}' ;;
+        disk-flush) query='{__name__=~"node_disk_flush_requests_(total|time_seconds_total)",job="node-exporter"}' ;;
+        cpu) query='node_cpu_seconds_total{job="node-exporter"}' ;;
+      esac
+      if [[ ${family} == disk-* || ${family} == cpu ]]; then
+        query+=' and on(instance) label_replace(kube_node_role{role=~"master|control-plane"}, "instance", "$1", "node", "(.*)")'
+      fi
+      response=$(mktemp)
+      result=query_failed
+      if oc --request-timeout=150s exec -n openshift-monitoring "${prompod}" -- \
+        curl --silent --show-error --fail --max-time 120 --get http://localhost:9090/api/v1/query_range \
+        --data-urlencode "query=${query}" --data-urlencode "start=${start}" \
+        --data-urlencode "end=${end}" --data-urlencode step=15 > "${response}" 2>/dev/null; then
+        result=invalid_response
+        if jq -se 'length == 1 and (.[0] | .status == "success" and .data.resultType == "matrix" and
+          (.data.result | type == "array") and
+          all(.data.result[]; (.metric | type == "object") and
+            all(.metric[]; type == "string") and (.values | type == "array") and
+            all(.values[]; type == "array" and length == 2 and (.[0] | type == "number") and
+              (.[1] | type == "string" and test("^(NaN|[+-]?Inf|[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?)$")))))' "${response}" >/dev/null 2>&1; then
+          result=empty
+          if jq -e 'any(.data.result[]; .values | length > 0)' "${response}" >/dev/null; then
+            compressed=$(mktemp "${destination}/${prompod}/.${family}.XXXXXX")
+            if (set -o pipefail; jq '{status, data: {resultType: .data.resultType, result: [.data.result[] |
+              {metric: (.metric | with_entries(select(.key | IN("__name__", "instance", "pod", "namespace", "job", "device", "cpu", "mode", "le", "To", "to")))), values,
+               coverage: (.values | {first: .[0][0], last: .[-1][0], samples: length,
+                 maximumGapSeconds: ([range(1; length) as $index | .[$index][0] - .[$index - 1][0]] | max // 0)})}]}}' \
+              "${response}" | gzip > "${compressed}") && chmod 0644 "${compressed}" &&
+              mv -- "${compressed}" "${destination}/${prompod}/${family}.json.gz"; then
+              result=ok
+            else
+              result=serialization_failed
+              rm -f -- "${compressed}"
+            fi
+          fi
+        fi
+      fi
+      rm -f "${response}"
+      jq -n --arg result "${result}" --arg query "${query}" \
+        '{result: $result, query: $query, action: (if $result == "ok" then
+          "Inspect per-member/per-peer samples and missing intervals; retain TSDB archives as source of truth."
+          else "Check exec RBAC, curl/API availability, scrape targets, metric names, control-plane role mapping and TSDB retention; do not interpret absence as zero latency." end)}' \
+        > "${destination}/${prompod}/${family}-status.json"
+    done
+  done <<< "${prometheus}"
+)
+
+if [[ ${BASH_SOURCE[0]} != "${0}" ]]; then
+  return
+fi
+
 function retry() {
   local max_retries="${1}"; shift
   local delay="${1}"; shift
@@ -306,6 +393,9 @@ while IFS= read -r i; do
 done < /tmp/containers
 
 prometheus="$( retry 3 5 oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )" || true
+if [[ -f ${SHARED_DIR}/conformance-start ]]; then
+  queue "${ARTIFACT_DIR}/metrics/etcd-history.log" gather_etcd_history
+fi
 if [[ -n "${prometheus}" ]]; then
 	echo "${prometheus}" | while read prompod; do
 	  prompod=${prompod#"pod/"}
