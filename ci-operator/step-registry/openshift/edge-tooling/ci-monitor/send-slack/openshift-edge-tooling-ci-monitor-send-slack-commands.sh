@@ -101,7 +101,7 @@ if [[ "${DATA_AVAILABLE}" != "true" ]]; then
     ICON=":warning:"
     MESSAGE="${ICON} *Edge OCP CI Monitor* — Data unavailable. Please investigate the artifacts."
 elif [[ "${BLOCKING_COUNT}" -eq 0 ]] && [[ "${INFORMING_COUNT}" -eq 0 ]]; then
-    if [[ "${SIPPY_AVAILABLE}" -gt 0 ]] && [[ "${SIPPY_COUNT}" -eq 0 ]]; then
+    if [[ "${SIPPY_AVAILABLE}" -gt 0 ]] && [[ "${SIPPY_COUNT}" -eq 0 ]] && [[ -z "${SIPPY_UNAVAILABLE}" ]]; then
         ICON=":large_green_circle:"
         MESSAGE="${ICON} *Edge OCP CI Monitor* — No failing jobs found."
     else
