@@ -331,19 +331,23 @@ run_tests_with_labels() {
   phase_slug="$(echo "${phase_name}" | tr -c 'A-Za-z0-9._-' '_' | sed 's/_\{2,\}/_/g;s/^_//;s/_$//')"
   echo "=== Phase: ${phase_name} ==="
   echo "ECO_TEST_LABELS: ${labels}"
+  # Keep set +e through return: with set -e, a non-zero return from this
+  # function aborts the whole script even when the caller used set +e.
   set +e
   ECO_TEST_LABELS="${labels}" make run-tests
   rc=$?
-  set -e
   preserve_phase_reports "${phase_slug}"
   return "${rc}"
 }
 
 # Base excludes for this GA-subscribe job (never run upgrade/fresh-install here).
-nhc_base_exclude='!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator && !tier:fresh-install'
+# Prefer ECO_TEST_LABELS from the job config so version-specific skips (e.g. CSV
+# annotation mismatches on 5.0) apply in phased mode too.
+nhc_base_exclude="${ECO_TEST_LABELS:-!tier:upgrade && !tier:upgrade-cluster && !tier:upgrade-operator && !tier:fresh-install}"
 
 if [[ "${MEDIK8S_NHC_PHASED_RUN:-}" == "true" && "${ECO_TEST_FEATURES}" == "nhc-operator" ]]; then
   echo "MEDIK8S_NHC_PHASED_RUN=true: running NHC in phases (base → resiliency → 69711)"
+  echo "NHC base label filter: ${nhc_base_exclude}"
   phase_rc=0
   set +e
   run_tests_with_labels "nhc-base (exclude resiliency + 69711)" \
