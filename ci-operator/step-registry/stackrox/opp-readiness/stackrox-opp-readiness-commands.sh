@@ -701,19 +701,43 @@ fi
 # ---------------------------------------------------------------------------
 # Check: At least 1 secured cluster connected
 # ---------------------------------------------------------------------------
+# A /v1/clusters record proves registration, not connection: a sensor that
+# never connected reports UNINITIALIZED and a disconnected sensor reports
+# UNHEALTHY (fixed ClusterHealthStatus enum in the ACS API, safe to log).
+# Count only clusters whose sensor is connected: HEALTHY or DEGRADED.
+# Every other value (including UNAVAILABLE, collector-only today) stays
+# uncounted so an unexpected value fails closed instead of passing.
 function CheckClustersConnected () {
-    typeset clusterCount=""
-    clusterCount="$(curl -sk -u "admin:${roxAdminPassword}" \
+    typeset verdict=""
+    verdict="$(curl -sk -u "admin:${roxAdminPassword}" \
         "https://${centralUrl}/v1/clusters" --max-time 10 \
-        | JsonLength clusters)" || return 1
-    [[ "${clusterCount}" -ge 1 ]] || return 1
-    true
+        | python3 -c '
+import json, sys
+try:
+    clusters = json.load(sys.stdin).get("clusters", [])
+except Exception:
+    sys.exit(1)
+known = ("UNINITIALIZED", "UNAVAILABLE", "UNHEALTHY", "DEGRADED", "HEALTHY")
+def norm(c):
+    s = ((c.get("healthStatus") or {}).get("sensorHealthStatus") or "UNSET")
+    return s if s in known else "OTHER"
+states = sorted({norm(c) for c in clusters})
+if any(norm(c) in ("HEALTHY", "DEGRADED") for c in clusters):
+    print("connected")
+else:
+    print("waiting:" + (",".join(states) or "noclusters"))
+' 2>/dev/null)" || return 1
+    if [[ "${verdict}" == connected ]]; then
+        return 0
+    fi
+    echo "[readiness]   no connected sensor yet (sensor states: ${verdict#waiting:})"
+    return 1
 }
 
 if WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected; then
     _add_case "clusters-connected" passed
 else
-    _add_case "clusters-connected" failed "Assertion" "no secured cluster connected (v1/clusters) (budget remaining $(_budget_remaining)s)"
+    _add_case "clusters-connected" failed "Assertion" "no secured cluster with a connected sensor (v1/clusters) (budget remaining $(_budget_remaining)s)"
     _assert_rc=1
 fi
 
