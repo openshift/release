@@ -402,54 +402,9 @@ tests:
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
     test:
-    - as: create-peer-pod
-      cli: latest
-      commands: |
-        cat <<'EOF' | oc apply -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: tls-scan-peerpod
-          namespace: openshift-sandboxed-containers-operator
-        spec:
-          runtimeClassName: kata-remote
-          automountServiceAccountToken: false
-          containers:
-            - name: pause
-              image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-              command: ["sleep", "infinity"]
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 32Mi
-                limits:
-                  cpu: 100m
-                  memory: 64Mi
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 1000
-                readOnlyRootFilesystem: true
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop:
-                    - ALL
-        EOF
-        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-create
     - ref: tls-scanner-run
-    - as: delete-peer-pod
-      cli: latest
-      commands: |
-        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-delete
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 - as: tls-scanner-pqc
@@ -513,54 +468,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: create-peer-pod
-      cli: latest
-      commands: |
-        cat <<'EOF' | oc apply -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: tls-scan-peerpod
-          namespace: openshift-sandboxed-containers-operator
-        spec:
-          runtimeClassName: kata-remote
-          automountServiceAccountToken: false
-          containers:
-            - name: pause
-              image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-              command: ["sleep", "infinity"]
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 32Mi
-                limits:
-                  cpu: 100m
-                  memory: 64Mi
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 1000
-                readOnlyRootFilesystem: true
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop:
-                    - ALL
-        EOF
-        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-create
     - ref: tls-scanner-run
-    - as: delete-peer-pod
-      cli: latest
-      commands: |
-        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-delete
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 zz_generated_metadata:
