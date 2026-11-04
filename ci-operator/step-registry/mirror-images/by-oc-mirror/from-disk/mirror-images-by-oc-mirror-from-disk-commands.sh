@@ -37,12 +37,27 @@ fi
 
 SSH_KEY="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 BASTION_IP=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
-BASTION_PRIVATE_IP=$(head -n 1 "${SHARED_DIR}/bastion_private_address")
+BASTION_PRIVATE_ADDR=$(head -n 1 "${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_KEY}"
 
 echo "Bastion public:  ${BASTION_SSH_USER}@${BASTION_IP}"
-echo "Bastion private: ${BASTION_PRIVATE_IP}"
+echo "Bastion private: ${BASTION_PRIVATE_ADDR}"
+
+# /etc/hosts requires an IP address, not a DNS name.  The AWS bastionhost
+# provisioner writes PrivateDnsName (e.g. ip-10-0-1-5.ec2.internal) to
+# bastion_private_address.  Resolve it to an IP here so the registry
+# hostname mapping in /etc/hosts works correctly.
+if [[ "${BASTION_PRIVATE_ADDR}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    BASTION_PRIVATE_IP="${BASTION_PRIVATE_ADDR}"
+else
+    BASTION_PRIVATE_IP=$(getent hosts "${BASTION_PRIVATE_ADDR}" | awk '{print $1; exit}')
+    if [[ -z "${BASTION_PRIVATE_IP}" ]]; then
+        echo "ERROR: could not resolve bastion private address '${BASTION_PRIVATE_ADDR}' to an IP"
+        exit 1
+    fi
+    echo "Resolved bastion private DNS '${BASTION_PRIVATE_ADDR}' -> IP '${BASTION_PRIVATE_IP}'"
+fi
 
 # private mirror registry host: <public_dns>:<port>
 # The TLS cert on the bastion registry is issued for this hostname.
