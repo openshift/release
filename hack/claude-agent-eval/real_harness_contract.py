@@ -4,6 +4,7 @@
 import argparse
 import contextlib
 import io
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -200,9 +201,12 @@ class RealHarnessContractTests(unittest.TestCase):
         )
 
         def score(config):
+            # The runner resolves thresholds once at preflight and hands the
+            # helper that result, so the orchestrator cannot lower them later.
+            thresholds = resolve_config(self.harness, self.repo, config).settings["thresholds"]
             arguments = [
-                "eval_regression.py", "--harness", str(self.harness), "--repo", str(self.repo),
-                "--config", str(config), "--run-dir", str(run_dir),
+                "eval_regression.py", "--harness", str(self.harness),
+                "--run-dir", str(run_dir), "--thresholds", json.dumps(thresholds),
             ]
             with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stdout(io.StringIO()):
                 return eval_regression.main()
