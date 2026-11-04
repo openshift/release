@@ -2,8 +2,7 @@
 set -euo pipefail
 
 GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-DEBUG_DIR="${ARTIFACT_DIR}/multiarch-debug"
-mkdir -p "${DEBUG_DIR}"
+DEBUG_DIR="${ARTIFACT_DIR}"
 
 if [[ ! -f "${GUEST_KUBECONFIG}" ]]; then
   echo "ERROR: nested_kubeconfig not found at ${GUEST_KUBECONFIG}" | tee "${DEBUG_DIR}/error.log"
