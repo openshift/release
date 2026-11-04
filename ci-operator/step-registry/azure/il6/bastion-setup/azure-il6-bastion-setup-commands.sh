@@ -37,26 +37,35 @@ echo "=== 1/4 split-horizon resolver on the bastion ==="
 # A second 'nameserver' line does not fix this: glibc falls through on timeout, not on
 # NXDOMAIN, so whichever resolver is asked first decides the answer. It needs a real
 # forwarder that splits on domain, hence dnsmasq with no-resolv and explicit upstreams.
-mapfile -t resolv_dns < <(on_bastion 'grep "^nameserver" /etc/resolv.conf' | awk '{print $2}')
-
-# Drop loopback. If this step is ever re-entered on a bastion it has already configured, or run
-# against a VNet whose dnsServers were left pointing somewhere stale, resolv.conf reads back
-# 127.0.0.1 -- and forwarding the IL6 domain to 127.0.0.1 would point dnsmasq at itself.
-vnet_dns=()
-for s in "${resolv_dns[@]}"; do
-    case "${s}" in
-        127.*|::1|"") continue ;;
-    esac
-    vnet_dns+=("${s}")
-done
-
+# The emulator's resolvers come from a declared variable, not from the bastion's resolv.conf.
+# This step repoints the VNet's dnsServers at the bastion further down, so on any later run
+# resolv.conf would read back a bastion address rather than the emulator's -- and forwarding
+# *.microsoft.scloud there would be either a loop or a black hole. azure-il6-check-prereqs
+# asserts the VNet actually matches this value, and restores it when it does not.
+read -r -a vnet_dns <<<"${AZURE_IL6_EMULATOR_DNS}"
 if [[ "${#vnet_dns[@]}" -eq 0 ]]; then
-    echo "ERROR: no usable nameserver in the bastion's resolv.conf (found: ${resolv_dns[*]:-none})."
-    echo "Expected the emulator's DNS servers. A loopback-only resolv.conf means the VNet's"
-    echo "dnsServers are stale or this step has already run against this host."
+    echo "ERROR: AZURE_IL6_EMULATOR_DNS is empty."
     exit 1
 fi
-echo "VNet DNS servers currently in use: ${vnet_dns[*]}"
+echo "Emulator DNS servers: ${vnet_dns[*]}"
+echo "Bastion resolv.conf before any change:"
+on_bastion 'cat /etc/resolv.conf' | sed 's/^/    /'
+
+bastion_private="$(<"${SHARED_DIR}/bastion_private_address")"
+
+# The mirror registry name. In an ordinary Azure disconnected job this is served by an Azure
+# Private DNS zone linked to the VNet, which nodes reach through Azure's resolver. Here the
+# emulator's custom dnsServers displace that resolver VNet-wide, so the zone is created, linked
+# and permanently unreachable. Serving the same name from here is the direct replacement: nodes
+# get the bastion's PRIVATE address, exactly as the private zone would have returned.
+mirror_record=""
+if [[ -s "${SHARED_DIR}/mirror_registry_url" ]]; then
+    mirror_fqdn="$(sed 's/:[0-9]*$//' "${SHARED_DIR}/mirror_registry_url")"
+    mirror_record="address=/${mirror_fqdn}/${bastion_private}"
+    echo "Mirror registry record: ${mirror_fqdn} -> ${bastion_private}"
+else
+    echo "NOTE: no mirror_registry_url in SHARED_DIR; no mirror record will be served."
+fi
 
 {
     echo "no-resolv"
@@ -64,7 +73,11 @@ echo "VNet DNS servers currently in use: ${vnet_dns[*]}"
         echo "server=/${AZURE_IL6_DNS_DOMAIN}/${s}"
     done
     echo "server=${AZURE_IL6_PUBLIC_DNS}"
+    [[ -n "${mirror_record}" ]] && echo "${mirror_record}"
+    # Loopback for the bastion itself and for the az container on --network host; the private
+    # address so every other NIC in the VNet can use it once dnsServers points here.
     echo "listen-address=127.0.0.1"
+    echo "listen-address=${bastion_private}"
     echo "bind-interfaces"
 } > /tmp/il6-split.conf
 echo "----- /etc/dnsmasq.d/il6-split.conf -----"
@@ -178,4 +191,29 @@ else
     exit 1
 fi
 
-echo "Bastion is ready: split DNS, emulator CA in the trust store, az available under podman."
+echo
+echo "=== 5/5 pointing the VNet at the bastion's resolver ==="
+# Until now only the bastion benefits from the split. Cluster nodes take their resolver from
+# DHCP, which serves the VNet's dnsServers, so they would still get the emulator's servers and
+# fail to resolve the mirror registry at first boot -- the one thing they must do before any
+# cluster exists. Repointing dnsServers here gives every node created afterwards the same
+# split: mirror registry and IL6 names locally, everything else via Azure's platform resolver.
+#
+# Done last on purpose. Between this line and the teardown that reverts it, the VNet depends on
+# this bastion being alive, so the window is kept as short as the job allows. The bastion itself
+# is pinned to 127.0.0.1 above and is unaffected.
+az login --service-principal \
+    -u "$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" \
+    -p "$(jq -r .clientSecret "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" \
+    --tenant "$(jq -r .tenantId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" --output none
+az account set --subscription "$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")"
+
+az network vnet update -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" \
+    --dns-servers "${bastion_private}" -o none
+echo "OK: VNet ${AZURE_IL6_VNET_NAME} dnsServers -> ${bastion_private}"
+
+# Leave a breadcrumb so the teardown knows the flip happened even if a later step fails.
+echo "${bastion_private}" > "${SHARED_DIR}/azure_il6_vnet_dns_override"
+
+echo
+echo "Bastion is ready: split DNS serving the VNet, emulator CA in the trust store, az under podman."

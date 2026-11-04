@@ -60,13 +60,29 @@ vnet_prefix="$(jq -r '.addressSpace.addressPrefixes[0] // empty' <<<"${vnet_json
 echo "OK   vnet address space: ${vnet_prefix}"
 
 # The VNet's DNS servers are the emulator's resolvers, reached across the tunnels. They are the
-# only way *.microsoft.scloud resolves for anything in this VNet, bastion included. If they are
-# unset the VNet has fallen back to Azure-provided DNS and the IL6 plane is invisible.
+# only way *.microsoft.scloud resolves for anything in this VNet, bastion included.
+#
+# This is also self-healing, and needs to be. azure-il6-bastion-setup repoints dnsServers at the
+# bastion so that cluster nodes inherit its split-horizon resolver, and the teardown puts them
+# back. A run that dies in between leaves the VNet pointing at a bastion that no longer exists --
+# after which NOTHING in the VNet resolves, the next bastion cannot pull its own boot images, and
+# the failure looks nothing like its cause. Rather than detect that and stop, restore the
+# expected value and carry on.
+read -r -a expected_dns <<<"${AZURE_IL6_EMULATOR_DNS}"
 mapfile -t dns_servers < <(jq -r '.dhcpOptions.dnsServers[]? // empty' <<<"${vnet_json}")
-if [[ "${#dns_servers[@]}" -eq 0 ]]; then
-    fail "VNet has no custom DNS servers configured. The emulated IL6 ARM endpoint will not resolve."
-else
+
+if [[ "${dns_servers[*]}" == "${expected_dns[*]}" ]]; then
     echo "OK   vnet DNS servers: ${dns_servers[*]}"
+else
+    echo "WARN vnet DNS servers are '${dns_servers[*]:-<none>}', expected '${expected_dns[*]}'."
+    echo "     A previous run almost certainly died before its teardown restored them."
+    echo "     Resetting so this run starts from a known state."
+    if az network vnet update -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" \
+        --dns-servers ${AZURE_IL6_EMULATOR_DNS} -o none; then
+        echo "OK   vnet DNS servers reset to ${expected_dns[*]}"
+    else
+        fail "could not reset the VNet's DNS servers. Nothing in this VNet will resolve the IL6 plane."
+    fi
 fi
 
 # ---------------------------------------------------------------- free subnet space

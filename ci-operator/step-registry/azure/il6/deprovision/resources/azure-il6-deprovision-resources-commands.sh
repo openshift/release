@@ -33,6 +33,24 @@ az login --service-principal \
     --tenant "$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")" --output none
 az account set --subscription "$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")"
 
+# FIRST, before anything is deleted. azure-il6-bastion-setup repointed the VNet's dnsServers at
+# this bastion so cluster nodes would inherit its resolver. If the bastion is removed while that
+# is still in place, the VNet is left pointing at an address that answers nothing -- and the next
+# run's bastion cannot resolve its own boot images, let alone the IL6 plane. The preflight can
+# repair that, but it should not have to.
+if [[ -f "${SHARED_DIR}/azure_il6_vnet_dns_override" ]]; then
+    echo "--- restoring VNet DNS servers to the emulator's (${AZURE_IL6_EMULATOR_DNS})"
+    if az network vnet update -g "${RG}" -n "${AZURE_IL6_VNET_NAME}" \
+        --dns-servers ${AZURE_IL6_EMULATOR_DNS} -o none; then
+        echo "OK: dnsServers restored before the bastion is removed."
+    else
+        echo "WARNING: could not restore dnsServers. The VNet will point at a deleted bastion"
+        echo "         until azure-il6-check-prereqs repairs it on the next run."
+    fi
+else
+    echo "--- VNet DNS servers were never repointed; nothing to restore."
+fi
+
 echo "Cleaning up Azure IL6 resources with prefix '${RESOURCE_PREFIX}'"
 echo "  resource group : ${RG}                   (NOT deleted)"
 echo "  vnet           : ${AZURE_IL6_VNET_NAME}  (NOT deleted)"
