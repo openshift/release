@@ -612,12 +612,21 @@ for _leaseJSON in "${SHARED_DIR}"/LEASE*; do
 
   # Determine how many pools are in this lease.  When pools > 1, VCM returns all
   # pools in status.poolInfo[].  When pools == 1, fall back to status.name.
+  #
+  # This threshold must stay in sync with the "-gt 1" check used above when
+  # populating vcenter_portgroups: that loop only keys the map by pool name
+  # for leases spanning more than one pool, falling back to keying by the
+  # lease's vcenter (status.name) for a single-pool lease. If this branch
+  # used ">0" instead, a single-pool lease (poolInfo length 1) would look up
+  # vcenter_portgroups by pool name even though it was only ever keyed by
+  # vcenter, crashing with "unbound variable" under set -o nounset whenever
+  # the pool name doesn't happen to equal the vcenter name.
   lease_pool_count=$(jq '.status.poolInfo | length' < "${_leaseJSON}")
   if [[ "${lease_pool_count}" == "null" || "${lease_pool_count}" -eq 0 ]]; then
     lease_pool_count=0
   fi
 
-  if [[ ${lease_pool_count} -gt 0 ]]; then
+  if [[ ${lease_pool_count} -gt 1 ]]; then
     log "Multi-pool lease: processing ${lease_pool_count} pool(s) from poolInfo"
     pool_names=()
     for ((lpi = 0; lpi < lease_pool_count; lpi++)); do

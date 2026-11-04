@@ -70,11 +70,6 @@ function print_failing_pod_logs() {
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
-#Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
@@ -351,7 +346,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -359,8 +353,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -571,36 +563,6 @@ for i in $(seq 1 90); do
     echo "Quay is ready (after $((i * 10))s)" >&2
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    quay_ca_bundle="$(mktemp)"
-    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
-      cat /etc/pki/tls/certs/ca-bundle.crt > "${quay_ca_bundle}"
-    fi
-    if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
-      cat "${SHARED_DIR}/ssl.cert" >> "${quay_ca_bundle}"
-    else
-      ingress_cert_secret=$(oc -n openshift-ingress-operator get ingresscontroller default \
-        -o jsonpath='{.spec.defaultCertificate.name}' 2>/dev/null || true)
-      ingress_cert_secret="${ingress_cert_secret:-router-certs-default}"
-      oc -n openshift-ingress get secret "${ingress_cert_secret}" \
-        -o jsonpath='{.data.tls\.crt}' | base64 --decode >> "${quay_ca_bundle}"
-    fi
-    initialize_payload="$(mktemp)"
-    chmod 600 "${initialize_payload}"
-    jq -n --arg username "${QUAY_USERNAME}" --arg password "${QUAY_PASSWORD}" \
-      --arg email "${QUAY_EMAIL}" \
-      '{username: $username, password: $password, email: $email, access_token: true}' \
-      > "${initialize_payload}"
-    if ! curl --fail --silent --show-error --cacert "${quay_ca_bundle}" \
-      -X POST "${quay_route}/api/v1/user/initialize" \
-      --header 'Content-Type: application/json' --data-binary "@${initialize_payload}" \
-      | jq -er '.access_token | select(type == "string" and length > 0)' \
-          > "${SHARED_DIR}/quay_oauth2_token"; then
-      echo "Failed to initialize the Quay user or obtain an access token" >&2
-      exit 1
-    fi
-    chmod 600 "${SHARED_DIR}/quay_oauth2_token"
-    rm -f "${initialize_payload}" "${quay_ca_bundle}"
     archive_pod_info
     exit 0
   fi

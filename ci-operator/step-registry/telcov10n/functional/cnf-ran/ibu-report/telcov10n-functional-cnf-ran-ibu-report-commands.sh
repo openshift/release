@@ -68,9 +68,12 @@ for f in "${SHARED_DIR}"/polarion_*.xml; do
 done
 
 mkdir -p /tmp/junit
-for f in "${SHARED_DIR}"/junit_*.xml; do
+# Only suite reports are converter inputs; report_testrun.xml can be empty.
+for f in "${SHARED_DIR}"/junit_*suite_test_junit.xml; do
   if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^junit_//')
+    # Keep the prefix so the converter input has a different destination path
+    # from the Report Portal copy when both are staged in /tmp/upload.
+    filename=$(basename "$f")
     cp "$f" "/tmp/junit/${filename}"
   fi
 done

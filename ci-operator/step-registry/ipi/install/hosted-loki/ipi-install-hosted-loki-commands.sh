@@ -16,6 +16,7 @@ PROXY_CA_MANIFEST=
 PROMTAIL_CA_VOLUME_MOUNT=
 TOKEN_REFRESHER_CA_VOLUME_MOUNT=
 PROXY_CA_VOLUME=
+CLUSTER_PROXY_URL=
 if [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
   echo "IPv6 clusters are disconnected and won't be able to reach Loki."
@@ -56,6 +57,18 @@ if test -f "${SHARED_DIR}/install-config.yaml"; then
       PROXY_CA_MANIFEST="true"
     fi
   fi
+fi
+
+# Some clusters reach the outside world only through a proxy that is never declared in
+# install-config.yaml, so the detection above finds nothing and the generated manifests get
+# no HTTPS_PROXY. baremetalds/devscripts is the main case: baremetalds-devscripts-proxy writes
+# proxy-conf.sh and the cluster is frequently IPv6-only, leaving promtail and the
+# token-refresher sidecar with no route to Loki or sso.redhat.com. Skip Loki there, as this
+# step did before proxy support was added.
+if [[ -z "${CLUSTER_PROXY_URL}" ]] && test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+  echo "Cluster egresses through a proxy declared only in proxy-conf.sh; Loki is not supported there."
+  exit 0
 fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"

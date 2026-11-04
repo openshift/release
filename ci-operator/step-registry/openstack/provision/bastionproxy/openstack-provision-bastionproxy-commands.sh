@@ -252,8 +252,10 @@ if [[ "${CONFIG_TYPE}" == *"externallb"* && "${EXTERNAL_LB_COUNT:-1}" -ge 2 ]]; 
   # Record before attach so cleanup works if attach fails.
   echo "${lb2_fip}" >> "${SHARED_DIR}/DELETE_FIPS"
   printf '%s\n%s\n' "$(<"${SHARED_DIR}/BASTION_FIP")" "${lb2_fip}" > "${SHARED_DIR}/LB_HOSTS"
+  printf '%s\n%s\n' "${PROXY_INTERFACE}" "${ADDITIONAL_LB_INTERFACE}" > "${SHARED_DIR}/LB_PRIVATE_IPS"
   cp "${SHARED_DIR}/DELETE_FIPS" "${ARTIFACT_DIR}"
   cp "${SHARED_DIR}/LB_HOSTS" "${ARTIFACT_DIR}"
+  cp "${SHARED_DIR}/LB_PRIVATE_IPS" "${ARTIFACT_DIR}"
   >&2 openstack server add floating ip "$lb2_server_id" "$lb2_fip"
 
   LB2_MAC_ADDRESS="$(openstack port show -f value -c mac_address $lb2_port_id)"

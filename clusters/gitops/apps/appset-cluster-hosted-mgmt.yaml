@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: appset-cluster-hosted-mgmt
   namespace: openshift-gitops
 spec:
@@ -16,6 +18,8 @@ spec:
       revision: main
   template:
     metadata:
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=false
       name: 'hosted-mgmt-{{.path.basename}}'
       namespace: openshift-gitops
     spec:
@@ -55,10 +59,3 @@ spec:
           - CreateNamespace=true
           - PruneLast=true
           - RespectIgnoreDifferences=true
-          - ServerSideApply=true
-  templatePatch: |
-    {{- if eq .path.basename "hive" }}
-    metadata:
-      annotations:
-        argocd.argoproj.io/compare-options: ServerSideDiff=false
-    {{- end }}

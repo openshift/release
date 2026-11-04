@@ -111,7 +111,20 @@ prepare_runtime() {
   echo '==> Pull catalog base image before building the candidate'
   # Match the default base image in the shared target's generated catalog Dockerfile.
   # Pinning it requires changing medik8s/tools too, not just this pre-pull.
-  podman pull quay.io/operator-framework/opm:latest
+  local attempt
+  for attempt in 1 2 3; do
+    if podman pull quay.io/operator-framework/opm:latest; then
+      return 0
+    fi
+
+    if [[ "$attempt" -lt 3 ]]; then
+      echo "Catalog base image pull failed (attempt $attempt/3). Retrying in 10 seconds." >&2
+      sleep 10
+    fi
+  done
+
+  echo 'ERROR: Catalog base image pull failed after 3 attempts.' >&2
+  return 1
 }
 
 build_candidate() {

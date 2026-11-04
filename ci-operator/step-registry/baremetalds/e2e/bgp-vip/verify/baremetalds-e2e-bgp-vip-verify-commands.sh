@@ -42,10 +42,17 @@ poll() {
 
 is_v6() { [[ "$1" == *:* ]]; }
 
-echo "[1/6] Infrastructure CR requests BGP VIP management"
+echo "[1/6] Infrastructure CR requests BGP VIP management and the BGPVIPConfig CRD is in the payload"
 vip_management="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.baremetal.vipManagement}')"
 if [[ "${vip_management}" != "BGP" ]]; then
     fail "vipManagement is '${vip_management}', expected 'BGP'"
+fi
+# openshift/api ships this v1alpha1 CRD only because hack/update-payload-crds.sh
+# names it (api#3127); nothing consumed the CRD when that glob was missing, so
+# the gap went unnoticed for weeks. Guard the delivery independently of the
+# consumers.
+if ! oc get crd bgpvipconfigs.machineconfiguration.openshift.io &>/dev/null; then
+    fail "CRD bgpvipconfigs.machineconfiguration.openshift.io is missing: the payload's cluster-config-api does not ship it"
 fi
 
 echo "[2/6] a Ready frr-k8s static pod runs on every control plane node"
