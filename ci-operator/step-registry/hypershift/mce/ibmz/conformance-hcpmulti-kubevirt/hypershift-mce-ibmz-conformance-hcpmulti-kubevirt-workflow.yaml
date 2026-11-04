@@ -22,8 +22,16 @@ workflow:
 
     # ── Operator installs ─────────────────────────────────────────────────
     # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
-    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    #- chain: hypershift-mce-ibmz-install-operators-mgmt
+        # --- Attach Secondary Disks to VMs for LVM
+    - ref: hypershift-mce-ibmz-install-libvirt-secondarydisk
 
+    # -- Provision LVM storage class
+    - chain: hypershift-mce-agent-lvm
+    
+    - ref: hypershift-mce-ibmz-install-metallb-oz
+    - ref: hypershift-mce-install
+    - ref: hypershift-kubevirt-install
     # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
     - ref: hypershift-mce-ibmz-create-hcpmulti
 

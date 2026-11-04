@@ -1,0 +1,44 @@
+ref:
+  as: hypershift-mce-ibmz-install-libvirt-secondarydisk
+  from: libvirt-installer
+  grace_period: 15m0s
+  commands: hypershift-mce-ibmz-install-libvirt-secondarydisk-commands.sh
+  env:
+  - name: CONTROL_COUNT
+    default: "3"
+    documentation: "Number of control-plane VMs to attach secondary disks to."
+  - name: COMPUTE_COUNT
+    default: "0"
+    documentation: "Number of compute VMs to attach secondary disks to. Set to 0 for compact clusters (control-plane nodes only)."
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: "Name of the libvirt storage pool where secondary volumes will be created."
+  - name: SECONDARY_DISK_CAPACITY
+    default: "100G"
+    documentation: "Size of the secondary disk volume to create and attach to each VM (used as the LVM physical volume)."
+  - name: SECONDARY_DISK_DEV
+    default: "vdc"
+    documentation: "Target device name to use when attaching the secondary disk inside each guest VM. Must not conflict with existing devices (vda = root, vdb = ignition). This is only the libvirt target name; the guest names virtio disks in discovery order, so use SECONDARY_DISK_SERIAL to locate the disk."
+  - name: SECONDARY_DISK_SERIAL
+    default: "lvmdisk"
+    documentation: "Virtio serial set on the secondary disk (max 20 characters). The disk is then available in every guest, regardless of architecture, at /dev/disk/by-id/virtio-<serial>, which is the path written to SHARED_DIR/lvmdevice for the LVM step."
+  - name: ADDITIONAL_POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: "Name of the libvirt storage pool on the additional (amd64/arm64) host where secondary volumes for the additional-compute VMs will be created."
+  - name: ADDITIONAL_LIBVIRT_PORT
+    default: "16509"
+    documentation: "Libvirt port on the additional hypervisor/bastion route, used to attach secondary disks to the additional-compute VMs."
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
+  documentation: >-
+    Attaches a secondary raw libvirt storage volume to each management-cluster VM
+    (control-plane and compute nodes) deployed by the upi-install-libvirt chain.
+    When the lease defines additional-compute nodes (heterogeneous clusters), the
+    same disk is also attached to those VMs on the additional libvirt host.
+    The secondary disk is intended as a physical volume for LVM-based storage-class
+    provisioning (e.g. LVMS / LVM operator) inside the OpenShift management cluster.
+    Volumes are created in the shared libvirt pool and hot-attached as persistent
+    virtio disks so they survive VM reboots.
