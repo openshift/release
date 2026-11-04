@@ -148,8 +148,12 @@ oc -n enmaas create secret generic vertex-sa-key \
   --dry-run=client -o yaml | oc apply -f -
 oc -n enmaas create secret generic metering-partner-api \
   --from-literal=model-catalog=dummy \
+  --from-literal=model-catalog-aibt=dummy \
   --from-literal=model-policy=dummy \
+  --from-literal=model-policy-aibt=dummy \
   --from-literal=usage-report=dummy \
+  --from-literal=usage-report-aibt=dummy \
+  --from-literal=usage-report-air=dummy \
   --dry-run=client -o yaml | oc apply -f -
 oc -n enmaas create secret generic metering-user-management-api \
   --from-literal=token="$(openssl rand -hex 32)" \
