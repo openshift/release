@@ -445,7 +445,11 @@ PATCH_EOF
 #     sectionName HTTPRoute AuthPolicy and AuthPolicy retarget: same wasm wait.
 #     identical-hostnames: same wasm fail-open as deny_email.
 #     control-plane update: retry until a new reconcile span appears.
-#     dataplane tracing: send x-request-id (OCP Istio omits it on the response).
+#     dataplane tracing: send x-request-id (OCP Istio omits it on the response)
+#       and force the tracing client through Gateway LB IP + Host header
+#       (*.apps ingress returns 200/401/429 but wasm-shim spans never hit Jaeger;
+#       rhcl-mc2 12/12 used the LB). wasm-shim:s390x-be-fix is already on the
+#       operator. Do not restore static empty-header GET /get.
 #     GatewayClass: prefer istio over openshift-default (OCP 4.22 always has
 #       openshift-default; upstream picks it and leaves TRLP report + tracing
 #       on OpenShift's gateway controller instead of OSSM3).
@@ -897,6 +901,49 @@ def _s390x_trace_headers():
         if old_rl in text:
             text = text.replace(old_rl, new_rl, 1)
         _write(path, text, f"dataplane tracing ids ({path.name})")
+
+
+def patch_dataplane_tracing_gateway_lb() -> None:
+    """Send dataplane-tracing HTTP to the Gateway LB, not the OpenShift router.
+
+    wasm-shim:s390x-be-fix is already on the operator (RELATED_IMAGE_WASMSHIM).
+    Auth/RL 200/401/429 already work. Jaeger is empty because the client uses
+    hostname.apps (ingress). rhcl-mc2 12/12 used Gateway LB IP + Host header.
+    Keep the Route hostname so it still matches the Gateway listener (*.apps).
+    Do not restore a static empty-header GET /get (that broke Authorino echo).
+    """
+    path = Path("testsuite/tests/singlecluster/tracing/data_plane_tracing/conftest.py")
+    if not path.exists():
+        print("SKIP dataplane tracing conftest missing")
+        return
+    text = path.read_text()
+    if f"{MARKER}: tracing-gw-lb" in text:
+        print("SKIP tracing Gateway LB client already patched")
+        return
+    if "from testsuite.gateway.exposers import StaticLocalHostname" not in text:
+        old_imp = "from testsuite.gateway.gateway_api.gateway import KuadrantGateway"
+        new_imp = (
+            "from testsuite.gateway.gateway_api.gateway import KuadrantGateway\n"
+            "from testsuite.gateway.exposers import StaticLocalHostname"
+        )
+        if old_imp not in text:
+            print("WARN tracing conftest KuadrantGateway import not found")
+            return
+        text = text.replace(old_imp, new_imp, 1)
+    extra = '''
+
+@pytest.fixture(scope="module")
+def client(route, hostname, gateway):  # pylint: disable=unused-argument
+    """s390x-authorino-fix: tracing-gw-lb — Gateway LB IP + Host, not *.apps router."""
+    wrapped = StaticLocalHostname(hostname.hostname, gateway.external_ip)
+    print(
+        f"dataplane tracing client -> Gateway LB {gateway.external_ip()} Host={hostname.hostname}"
+    )
+    c = wrapped.client()
+    yield c
+    c.close()
+'''
+    _write(path, text + extra, "dataplane tracing Gateway LB client")
 
 
 def patch_dns_delegate() -> None:
@@ -1424,6 +1471,7 @@ if __name__ == "__main__":
     patch_identical_hostnames()
     patch_control_plane_update()
     patch_dataplane_tracing()
+    patch_dataplane_tracing_gateway_lb()
     patch_dns_delegate()
     patch_oidc()
     patch_trlp_auth()
