@@ -5,6 +5,8 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+REGION="${REGION:-us-east-2}"
+
 echo "Provisioning RDS PostgreSQL instance for EnMaaS..."
 
 # Generate a unique instance identifier from the build

@@ -6,6 +6,8 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+REGION="${REGION:-us-east-2}"
+
 CLEANUP_EXIT_CODE=0
 
 echo "Starting RDS cleanup..."
