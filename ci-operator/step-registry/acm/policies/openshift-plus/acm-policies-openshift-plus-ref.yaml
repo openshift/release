@@ -11,7 +11,16 @@ ref:
     default: ""
     documentation: |-
       Comma-separated list of policy names to skip during enforcement.
-      Non-existent policies produce a warning, not a failure.
+      Non-existent policies produce a warning, not a failure. Entries are
+      normalized (whitespace trimmed, empty and duplicate entries dropped
+      with a warning). While any entry remains, the step writes one failing
+      JUnit result per configured entry to
+      ${ARTIFACT_DIR}/junit_skip_policies.xml (suite and classname
+      lp-interop--OPP--policies; presence in the cluster is recorded in
+      each failure message) so the skip state is countable instead of
+      invisible; the step still exits 0 on every path that exists today
+      (exit 1 remains only for the pre-existing policy-list fetch and
+      compliance-wait failure classes).
   - name: QUAY_OPERATOR_CHANNEL
     default: ""
     documentation: |-
@@ -26,3 +35,14 @@ ref:
       when the catalog default channel is incorrect or outdated.
   documentation: |-
     Setup and apply the openshift-plus policyset.
+    While SKIP_POLICIES is non-empty, the step also emits
+    ${ARTIFACT_DIR}/junit_skip_policies.xml with one failing JUnit result
+    per configured skip entry (INTEROP-9677 interim visibility). The
+    artifact is deliberately NOT propagated to ${SHARED_DIR}/junit:
+    interop-opp-skip-ratio-gate counts <skipped> results, and propagating
+    failure rows would inflate the gate denominator and mask real
+    skip-ratio breaches. Policy skips are counted via this per-step
+    artifact instead; the gate measures the JUnit propagated by the steps
+    preceding it in the lane's test list. FAIL_ON_BREACH=true is
+    unsupported on any lane with a non-empty SKIP_POLICIES for the same
+    reason.
