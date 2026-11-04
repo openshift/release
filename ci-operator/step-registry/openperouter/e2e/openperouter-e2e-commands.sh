@@ -18,7 +18,7 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" \
 
 echo "### Set up extra networks, create OpenPERouter CR, and verify deployment"
 set +e
-ssh "${SSHOPTS[@]}" "root@${IP}" bash /dev/stdin << 'RUNTESTS'
+ssh "${SSHOPTS[@]}" "root@${IP}" OPENPEROUTER_DATAPATH="${OPENPEROUTER_DATAPATH}" bash /dev/stdin << 'RUNTESTS'
 set -xeo pipefail
 cd /root/dev-scripts
 source common.sh
@@ -27,6 +27,7 @@ set -u
 export KUBECONFIG="/root/dev-scripts/ocp/${CLUSTER_NAME}/auth/kubeconfig"
 
 export CONFIG=/root/dev-scripts/config_root.sh
+export OPENPEROUTER_DATAPATH=${OPENPEROUTER_DATAPATH:-"kernel"}
 
 echo "Kernel release: $(uname -r)"
 echo "Kernel version: $(uname -v)"

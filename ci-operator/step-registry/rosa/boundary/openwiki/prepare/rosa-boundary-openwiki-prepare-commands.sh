@@ -51,10 +51,20 @@ cleanup() {
   rm -rf "$workdir"
 }
 trap cleanup EXIT
-curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
+# Keep the response private: a successful response contains a credential.
+# In particular, do not print the API response when diagnosing HTTP 422.
+if ! http_status=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
   -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' \
   --data "$(jq -nc --arg repository "${repo#*/}" '{repositories:[$repository],permissions:{contents:"read",pull_requests:"read"}}')" \
-  "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" > "$response_file"
+  -o "$response_file" -w '%{http_code}' \
+  "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens"); then
+  if [[ "$http_status" == 422 ]]; then
+    echo "GitHub App token request rejected (HTTP 422) for ${repo}. Have an installation administrator verify that this repository is granted to the configured App installation and that contents:read and pull_requests:read are allowed. Repository access must be granted in GitHub; CI configuration cannot grant it." >&2
+  else
+    echo "GitHub App token request failed (HTTP ${http_status:-unknown}) for ${repo}." >&2
+  fi
+  exit 1
+fi
 # Extract only a header-safe token for EXIT cleanup, even if scope validation
 # subsequently fails. No credential is written to SHARED_DIR yet.
 jq -er '.token | select(type == "string" and test("^ghs_[A-Za-z0-9_.-]+$"))' \

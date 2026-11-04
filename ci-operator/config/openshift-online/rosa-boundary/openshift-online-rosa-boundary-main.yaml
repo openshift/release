@@ -17,6 +17,7 @@ images:
   - dockerfile_literal: |
       FROM ubi-python
       USER 0
+      RUN dnf install -y --nodocs make && dnf clean all
       COPY . /workspace/
       WORKDIR /workspace/rosa-boundary/lambda/create-investigation
       RUN pip install uv && uv sync
@@ -33,7 +34,7 @@ images:
       # Install Python 3.11 and make it default via symlinks
       # (ci-run.sh on main branch still uses hardcoded python3 commands)
       # TODO: Remove symlinks after rosa-boundary PR merges with python3.11 detection
-      RUN dnf install -y --nodocs python3.11 python3.11-pip && \
+      RUN dnf install -y --nodocs make python3.11 python3.11-pip && \
           dnf clean all && \
           ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
           ln -sf /usr/bin/pip3.11 /usr/bin/pip3
@@ -77,8 +78,8 @@ tests:
   commands: |
     export UV_CACHE_DIR=/tmp/uv-cache
     export AWS_DEFAULT_REGION=us-east-1
-    cd /workspace/rosa-boundary/lambda/create-investigation
-    uv run pytest test_handler.py -v
+    cd /workspace/rosa-boundary
+    make test-lambda-create-investigation
   container:
     from: lambda-test-runner
 - as: localstack-integration-tests
@@ -87,7 +88,8 @@ tests:
   commands: |
     set -euo pipefail
     export LOCALSTACK_AUTH_TOKEN=$(cat /etc/localstack-secret/localstack-token)
-    exec /workspace/rosa-boundary/tests/localstack/ci-run.sh
+    cd /workspace/rosa-boundary
+    make test-localstack-ci
   container:
     from: localstack-test-runner
   nested_podman: true

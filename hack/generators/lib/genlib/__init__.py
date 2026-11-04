@@ -11,6 +11,30 @@ import pathlib
 # files when first making the transition.
 SORT_ONLY = False
 
+# Label required by Argo CD resource.selectors (clusters/core-ci/argocd).
+GITOPS_MANAGED_LABEL = 'ci.openshift.io/gitops-managed'
+
+
+def ensure_gitops_managed_label(resource):
+    """ensure_gitops_managed_label adds the Argo CD resource.selectors label to resource metadata."""
+    metadata = resource.setdefault('metadata', {})
+    labels = metadata.setdefault('labels', {})
+    labels[GITOPS_MANAGED_LABEL] = 'true'
+
+
+def should_label_gitops_managed(path):
+    """should_label_gitops_managed reports whether generated resources at path need the Argo label.
+
+    Paths not covered by any ApplicationSet (e.g. vsphere02) must stay unlabeled so
+    cluster-manifest-verifier does not fail on uncovered file changes.
+    """
+    if not path:
+        return True
+    normalized = str(path).replace('\\', '/')
+    if '/vsphere02/' in normalized:
+        return False
+    return True
+
 
 class GenDoc():
 
@@ -28,6 +52,7 @@ class GenDoc():
         self.comments = {}  # Maps resource index to a list of comments
         self.context = context
         self.who = {}  # Maps resource index to the caller who added the resource
+        self.label_gitops_managed = should_label_gitops_managed(filename_or_stream)
 
         # This flag should only be set to True when a user is attempting to reformat a file
         # prior to generating its content. This step allows git diffs to be far more
@@ -77,6 +102,8 @@ class GenDoc():
             raise IOError('Only expecting dict; received: ' + type(resource))
         if comment:
             self.add_comments(comment)
+        if self.label_gitops_managed:
+            ensure_gitops_managed_label(resource)
         self.who[len(self.resources)] = f'{os.path.basename(caller.filename)}'
         self.resources.append(resource)
 
