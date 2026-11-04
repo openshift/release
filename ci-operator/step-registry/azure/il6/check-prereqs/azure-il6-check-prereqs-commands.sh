@@ -34,14 +34,14 @@ echo "   vnet           : ${AZURE_IL6_VNET_NAME}"
 echo "=================================================================="
 
 # ---------------------------------------------------------------- resource group
-if [[ "$(az group exists -n "${AZURE_IL6_RESOURCE_GROUP}")" != "true" ]]; then
+# One call, not 'az group exists' followed by 'az group show' for the same resource: the show
+# fails on its own if the group is absent, which is what every other Azure preflight here does.
+if ! rg_region="$(az group show -n "${AZURE_IL6_RESOURCE_GROUP}" --query location -o tsv 2>/dev/null)"; then
     fail "resource group '${AZURE_IL6_RESOURCE_GROUP}' does not exist in subscription ${AZURE_AUTH_SUBSCRIPTION_ID}."
     echo "This group is a shared, pre-provisioned fixture. CI never creates it."
     echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
     exit 1
 fi
-
-rg_region="$(az group show -n "${AZURE_IL6_RESOURCE_GROUP}" --query location -o tsv)"
 echo "OK   resource group exists, region '${rg_region}'"
 if [[ "${rg_region}" != "${AZURE_IL6_REGION}" ]]; then
     fail "resource group is in '${rg_region}' but AZURE_IL6_REGION is '${AZURE_IL6_REGION}'. The cluster's commercial-plane resources must be co-located with the VNet."
@@ -70,7 +70,10 @@ else
 fi
 
 # ---------------------------------------------------------------- free subnet space
-used_prefixes="$(jq -r '[.subnets[].addressPrefix] | join(" ")' <<<"${vnet_json}")"
+# Both spellings: az creates subnets with --address-prefix or --address-prefixes depending on
+# CLI version, and azure-provision-bastionhost uses the plural form when it is available.
+# Reading only the singular field drops those subnets and overstates the free space.
+used_prefixes="$(jq -r '[.subnets[] | (.addressPrefix // empty), (.addressPrefixes[]? // empty)] | join(" ")' <<<"${vnet_json}")"
 echo "     existing subnets: ${used_prefixes}"
 
 free_count="$(python3 - "${vnet_prefix}" ${used_prefixes} <<'PY'

@@ -9,7 +9,10 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-SP_FILE="/var/run/azureil6-secrets/osServicePrincipal.json"
+# The azure-qe cluster profile's own principal. A dedicated IL6 principal was assumed to be
+# necessary, but azure-il6-az-check demonstrated this one authenticating against the emulated
+# ARM endpoint and enumerating it, so the extra Vault group is dead weight.
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
     echo "ERROR: IL6 service principal not found at ${SP_FILE}."
     echo
@@ -92,44 +95,11 @@ done
 # gets copied to the bastion and is one careless 'cp' away from a public artifact bucket. Quoting
 # the delimiter writes the variable names literally; they are expanded on the bastion, at run
 # time, from an environment that is never captured in logs.
-LOGIN_SCRIPT="${SHARED_DIR}/azureil6-login-script.sh"
-cat > "${LOGIN_SCRIPT}" << 'EOF'
-#!/bin/bash
-# Configure the az CLI for the emulated Azure IL6 plane.
-# Expects in the environment: APP_ID, AAD_CLIENT_SECRET, TENANT_ID, SUBSCRIPTION_ID
-
-if [[ -f /opt/azureil6/ca-bundle.pem ]]; then
-    export REQUESTS_CA_BUNDLE=/opt/azureil6/ca-bundle.pem
-    export SSL_CERT_FILE=/opt/azureil6/ca-bundle.pem
-fi
-EOF
-
-# Static, non-secret values are interpolated separately so the secret-bearing lines above stay
-# inside a quoted heredoc.
-cat >> "${LOGIN_SCRIPT}" << EOF
-
-az cloud register -n ${AZURE_IL6_CLOUD_REGISTER_NAME} \\
-    --endpoint-resource-manager "${AZURE_IL6_ARM_ENDPOINT}" 2>/dev/null \\
-  || az cloud update -n ${AZURE_IL6_CLOUD_REGISTER_NAME} \\
-    --endpoint-resource-manager "${AZURE_IL6_ARM_ENDPOINT}"
-az cloud set -n ${AZURE_IL6_CLOUD_REGISTER_NAME}
-az configure --defaults location=${AZURE_IL6_CLUSTER_REGION}
-EOF
-
-# Deliberately NOT present, unlike ipi-conf-azurestack:
-#     az cloud update --profile 2019-03-01-hybrid
-# Azure Stack Hub needs that API profile downgrade. IL6 runs current API versions and the
-# downgrade is explicitly disallowed.
-
-cat >> "${LOGIN_SCRIPT}" << 'EOF'
-az login --service-principal -u "${APP_ID}" -p "${AAD_CLIENT_SECRET}" --tenant "${TENANT_ID}" --output none
-az account set --subscription "${SUBSCRIPTION_ID}"
-EOF
-
-chmod +x "${LOGIN_SCRIPT}"
-
-echo "----- generated ${LOGIN_SCRIPT} -----"
-cat "${LOGIN_SCRIPT}"
+# No az login script is generated here. An earlier revision produced
+# ${SHARED_DIR}/azureil6-login-script.sh, but nothing ever sourced it, and it could not have
+# worked if anything had: no step exports APP_ID, AAD_CLIENT_SECRET, TENANT_ID or
+# SUBSCRIPTION_ID into the environment it expected. azure-il6-bastion-setup and
+# azure-il6-az-check configure and drive az on the bastion directly.
 
 echo "----- install-config.yaml platform.azure -----"
 yq-go r "${CONFIG}" 'platform.azure'

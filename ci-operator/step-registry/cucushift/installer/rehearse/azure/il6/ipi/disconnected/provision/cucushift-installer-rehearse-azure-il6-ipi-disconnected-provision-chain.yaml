@@ -5,7 +5,7 @@ chain:
   - ref: azure-il6-check-prereqs
   - ref: azure-il6-provision-subnets
   - chain: azure-provision-bastionhost
-  - ref: azure-il6-bastion-ca
+  - ref: azure-il6-bastion-setup
   # --- mirroring: the bastion has its own public IP and pulls from the internet ------------
   - ref: openshift-cluster-bot-rbac
   - chain: mirror-images-by-oc-adm
@@ -68,9 +68,16 @@ chain:
       The emulated plane has no Azure Private DNS zone service to create api-int records in, so
       the cluster is installed with userProvisionedDNS and dnsmasq on the bastion answers instead.
   - name: ENALBE_DNSMASQ_METHOD
-    default: "NetworkManager"
+    default: "systemd-service"
     documentation: |-
       Spelling matches the upstream bastion-dnsmasq ref, which has this typo in the variable name.
+
+      Must be systemd-service, not NetworkManager. azure-il6-bastion-setup already runs the
+      standalone dnsmasq service, bound to 127.0.0.1:53, to provide the split-horizon resolver
+      the bastion needs before it can pull anything. The NetworkManager method would start a
+      SECOND dnsmasq for the same port, which cannot bind -- so the api/api-int records would
+      silently never be served. systemd-service drops its records into /etc/dnsmasq.d alongside
+      the split config and reuses the one running instance.
   - name: MIRROR_IN_BASTION
     default: "yes"
     documentation: |-

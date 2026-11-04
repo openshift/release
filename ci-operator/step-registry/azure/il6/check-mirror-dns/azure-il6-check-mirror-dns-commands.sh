@@ -42,7 +42,7 @@ echo
 # asking the bastion's resolver, which has already been pointed at dnsmasq/127.0.0.1 and would
 # give a falsely reassuring answer.
 vnet_dns_raw="$(run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_host}" \
-    "grep -E '^nameserver' /run/NetworkManager/resolv.conf 2>/dev/null | awk '{print \\\$2}'" || true)"
+    "grep -E '^nameserver' /run/NetworkManager/resolv.conf 2>/dev/null | awk '{print \$2}'" || true)"
 
 mapfile -t vnet_dns < <(echo "${vnet_dns_raw}" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -v '^127\.' || true)
 

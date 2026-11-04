@@ -100,12 +100,9 @@ azure4|azuremag|azure-arm64)
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
 
-    # Without the emulator's CA the destroy fails x509 verification against the emulated ARM
-    # endpoint and leaks every resource it was supposed to remove.
-    if [[ -f "${SHARED_DIR}/azure_il6_remote_ca_path" ]]; then
-        echo "export SSL_CERT_FILE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
-        echo "export REQUESTS_CA_BUNDLE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
-    fi
+    # No SSL_CERT_FILE / REQUESTS_CA_BUNDLE override, for the same reason as the install step:
+    # azure-il6-bastion-setup puts the emulator CA in the system trust store, and overriding with
+    # a snapshot bundle would replace that store rather than extend it.
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then

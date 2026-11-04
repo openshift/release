@@ -32,20 +32,61 @@ az network nsg create -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${NSG_NAME}" -o none
 # traffic it needs is from inside the VNet (the bastion) and from across the tunnels (the emulated
 # IL6 control plane). Azure's default rules already allow intra-VNet traffic, so the NSG stays
 # empty of custom allow rules -- we only need it to exist so the subnets are not wide open.
-echo "Creating control-plane subnet '${CONTROL_PLANE_SUBNET}' (${AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR})..."
+# Subnet CIDRs are allocated at run time, not fixed. Unique subnet NAMES do not prevent ADDRESS
+# collisions, and nothing serialises access to this VNet -- the azure-qe boskos lease covers a
+# region, not this resource group -- so two concurrent runs with constant CIDRs would collide on
+# address space and the second would fail. azure-provision-bastionhost already picks its own
+# subnet this way; this matches it.
+existing_prefixes="$(az network vnet subnet list \
+    -g "${AZURE_IL6_RESOURCE_GROUP}" --vnet-name "${AZURE_IL6_VNET_NAME}" -o json \
+    | jq -r '[.[] | (.addressPrefix // empty), (.addressPrefixes[]? // empty)] | join(" ")')"
+echo "Existing subnet prefixes: ${existing_prefixes:-<none>}"
+
+allocated="$(python3 - "${AZURE_IL6_VNET_CIDR}" ${existing_prefixes} <<'PY'
+import ipaddress
+import sys
+
+vnet = ipaddress.ip_network(sys.argv[1])
+taken = [ipaddress.ip_network(p) for p in sys.argv[2:]]
+
+free = []
+for candidate in vnet.subnets(new_prefix=24):
+    if any(candidate.overlaps(t) for t in taken):
+        continue
+    free.append(str(candidate))
+    if len(free) == 2:
+        break
+
+if len(free) < 2:
+    sys.stderr.write("no two free /24s left in %s\n" % vnet)
+    sys.exit(1)
+
+print(" ".join(free))
+PY
+)"
+
+CONTROL_PLANE_CIDR="$(awk '{print $1}' <<<"${allocated}")"
+COMPUTE_CIDR="$(awk '{print $2}' <<<"${allocated}")"
+if [[ -z "${CONTROL_PLANE_CIDR}" || -z "${COMPUTE_CIDR}" ]]; then
+    echo "ERROR: could not allocate two free /24s inside ${AZURE_IL6_VNET_CIDR}."
+    exit 1
+fi
+echo "Allocated control-plane ${CONTROL_PLANE_CIDR}, compute ${COMPUTE_CIDR}"
+
+echo "Creating control-plane subnet '${CONTROL_PLANE_SUBNET}' (${CONTROL_PLANE_CIDR})..."
 az network vnet subnet create \
     -g "${AZURE_IL6_RESOURCE_GROUP}" \
     --vnet-name "${AZURE_IL6_VNET_NAME}" \
     -n "${CONTROL_PLANE_SUBNET}" \
-    --address-prefix "${AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR}" \
+    --address-prefix "${CONTROL_PLANE_CIDR}" \
     --network-security-group "${NSG_NAME}" -o none
 
-echo "Creating compute subnet '${COMPUTE_SUBNET}' (${AZURE_IL6_COMPUTE_SUBNET_CIDR})..."
+echo "Creating compute subnet '${COMPUTE_SUBNET}' (${COMPUTE_CIDR})..."
 az network vnet subnet create \
     -g "${AZURE_IL6_RESOURCE_GROUP}" \
     --vnet-name "${AZURE_IL6_VNET_NAME}" \
     -n "${COMPUTE_SUBNET}" \
-    --address-prefix "${AZURE_IL6_COMPUTE_SUBNET_CIDR}" \
+    --address-prefix "${COMPUTE_CIDR}" \
     --network-security-group "${NSG_NAME}" -o none
 
 # Consumed by ipi-conf-azure-provisionednetwork, which merges both files into install-config.

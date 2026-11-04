@@ -206,13 +206,13 @@ azure4|azuremag|azure-arm64)
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
 
-    # openshift-install talks to the emulated ARM endpoint over TLS signed by the emulator's own
-    # CA. Go reads SSL_CERT_FILE; without it every ARM call fails x509 verification. The bundle
-    # is installed on the bastion by azure-il6-bastion-ca.
-    if [[ -f "${SHARED_DIR}/azure_il6_remote_ca_path" ]]; then
-        echo "export SSL_CERT_FILE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
-        echo "export REQUESTS_CA_BUNDLE='/opt/azureil6/ca-bundle.pem'" >> "${REMOTE_ENV_FILE}"
-    fi
+    # No SSL_CERT_FILE / REQUESTS_CA_BUNDLE override here, deliberately.
+    #
+    # azure-il6-bastion-setup installs the emulator CA into /etc/pki/ca-trust/source/anchors and
+    # runs update-ca-trust extract, so Go and requests already trust the emulated ARM endpoint
+    # through the system store. Pointing SSL_CERT_FILE at a snapshot bundle would REPLACE that
+    # store rather than add to it -- and the snapshot predates mirror-images-by-oc-adm installing
+    # the mirror registry's own CA, so the payload pull would lose a certificate it needs.
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then

@@ -79,6 +79,67 @@ for disk in "${disks[@]}"; do
     az disk delete -g "${RG}" -n "${disk}" --yes -o none || echo "WARNING: failed to delete disk '${disk}'"
 done
 
+echo "--- images"
+mapfile -t images < <(az image list -g "${RG}" --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
+for image in "${images[@]}"; do
+    [[ -z "${image}" ]] && continue
+    echo "Deleting image '${image}'..."
+    az image delete -g "${RG}" -n "${image}" -o none || echo "WARNING: failed to delete image '${image}'"
+done
+
+# The bastion's storage account is the one resource azure-provision-bastionhost does NOT name with
+# the run prefix: 'az storage account create' caps names at 24 characters, so that step strips
+# 'ci-op-' and every dash from the namespace instead. Reproduce that name rather than prefix-match
+# it, or it leaks into the shared group on every run.
+sa_name="$(echo "${NAMESPACE}" | sed 's/ci-op-//' | sed 's/[-_]//g')${UNIQUE_HASH}basa"
+echo "--- storage account ${sa_name}"
+if az storage account show -g "${RG}" -n "${sa_name}" -o none 2>/dev/null; then
+    az storage account delete -g "${RG}" -n "${sa_name}" --yes -o none \
+        || echo "WARNING: failed to delete storage account '${sa_name}'"
+else
+    echo "No storage account '${sa_name}' in ${RG}; nothing to delete."
+fi
+
+# ----------------------------------------------------------------- private DNS
+# azure-provision-bastionhost creates a private DNS zone for the mirror registry and links it to
+# the VNet when REGISTER_MIRROR_REGISTRY_DNS is enabled. The link is prefix-named, the zone is not
+# -- it is named after the mirror registry FQDN and is therefore shared by concurrent runs. So the
+# link is always removed, and the zone only once nothing is left pointing at it.
+echo "--- private DNS zones"
+mapfile -t zones < <(az network private-dns zone list -g "${RG}" --query '[].name' -o tsv)
+for zone in "${zones[@]}"; do
+    [[ -z "${zone}" ]] && continue
+    # The A record azure-provision-bastionhost adds is named after the bastion, so it is
+    # prefix-matched. It has to go even when the zone itself survives, or every run leaves one
+    # behind in a zone that is shared and never deleted.
+    mapfile -t records < <(az network private-dns record-set a list -g "${RG}" -z "${zone}" \
+        --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
+    for record in "${records[@]}"; do
+        [[ -z "${record}" ]] && continue
+        echo "Deleting A record '${record}' from zone '${zone}'..."
+        az network private-dns record-set a delete -g "${RG}" -z "${zone}" -n "${record}" --yes -o none \
+            || echo "WARNING: failed to delete A record '${record}'"
+    done
+
+    mapfile -t links < <(az network private-dns link vnet list -g "${RG}" -z "${zone}" \
+        --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
+    for link in "${links[@]}"; do
+        [[ -z "${link}" ]] && continue
+        echo "Deleting VNet link '${link}' from zone '${zone}'..."
+        az network private-dns link vnet delete -g "${RG}" -z "${zone}" -n "${link}" --yes -o none \
+            || echo "WARNING: failed to delete VNet link '${link}'"
+    done
+
+    remaining=$(az network private-dns link vnet list -g "${RG}" -z "${zone}" --query 'length(@)' -o tsv)
+    if [[ "${remaining}" == "0" ]]; then
+        echo "Zone '${zone}' has no VNet links left; deleting it."
+        az network private-dns zone delete -g "${RG}" -n "${zone}" --yes -o none \
+            || echo "WARNING: failed to delete private DNS zone '${zone}'"
+    else
+        echo "Zone '${zone}' still has ${remaining} VNet link(s); leaving it in place."
+    fi
+done
+
 # ----------------------------------------------------------------- network
 echo "--- subnets"
 mapfile -t subnets < <(az network vnet subnet list \

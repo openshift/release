@@ -72,14 +72,26 @@ fi
 # that path would send the text through three levels of quote processing (local heredoc, ssh's
 # remote shell, podman's -c) and the JMESPath backticks and $-expansions do not survive it.
 #
-# jq is deliberately not used here -- mcr.microsoft.com/azure-cli is Alpine-based and does not
+# jq is deliberately not used here -- the az image is not guaranteed to carry it and we do not
 # ship it. Everything is expressed as JMESPath.
 # ---------------------------------------------------------------------------------------------
+# The service-principal secret lands in files on the CI pod and on the bastion. Removing them
+# on the happy path is not enough -- a malformed SP file, a failed scp, or any set -e trigger
+# would leave the credential behind for the lifetime of both. Registered before either is
+# written so there is no uncovered window.
+cleanup_credentials() {
+    rm -f /tmp/il6-sp.env
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_host}" 'rm -f /tmp/il6-sp.env' 2>/dev/null || true
+}
+trap cleanup_credentials EXIT
+
 cat > /tmp/il6-lb-query-inner.sh <<'INNER_EOF'
-#!/bin/bash
+#!/bin/sh
+# POSIX sh, not bash. An earlier revision used bash constructs while a comment above asserted the
+# image was Alpine-based, which has no bash -- one of the two had to be wrong and ':latest' made
+# it impossible to say which. Staying inside POSIX makes the question moot on any base image.
 set -o nounset
 set -o errexit
-set -o pipefail
 
 # Credentials arrive through podman --env-file, never on a command line.
 : "${APP_ID:?}" "${AAD_CLIENT_SECRET:?}" "${TENANT_ID:?}" "${SUBSCRIPTION_ID:?}"
@@ -99,7 +111,7 @@ lb_name="${INFRA_ID}-internal"
 for port in 6443 443; do
     fe_id="$(az network lb show -n "${lb_name}" -g "${RESOURCE_GROUP}" \
         --query "loadBalancingRules[?frontendPort==\`${port}\`].frontendIPConfiguration.id | [0]" -o tsv)"
-    if [[ -z "${fe_id}" || "${fe_id}" == "None" ]]; then
+    if [ -z "${fe_id}" ] || [ "${fe_id}" = "None" ]; then
         echo "ERROR: no load balancing rule on port ${port} in ${lb_name}" >&2
         exit 1
     fi
@@ -139,7 +151,7 @@ sudo podman run --rm --network host \\
     -e REQUESTS_CA_BUNDLE=/ca-bundle.pem \\
     -e SSL_CERT_FILE=/ca-bundle.pem \\
     -e AZURE_CONFIG_DIR=/tmp/azconfig \\
-    --entrypoint /bin/bash \\
+    --entrypoint /bin/sh \\
     ${AZURE_IL6_AZ_IMAGE} /il6-lb-query-inner.sh
 EOF
 

@@ -26,10 +26,13 @@ ref:
       The commercial-plane Azure region that AZURE_IL6_RESOURCE_GROUP lives in. This is NOT the
       emulated IL6 region (see AZURE_IL6_CLUSTER_REGION in ipi-conf-azureil6).
   - name: AZURE_IL6_REQUIRED_FREE_SUBNETS
-    default: "2"
+    default: "3"
     documentation: |-
-      How many free /24s the job needs inside the VNet. Used only to produce a clear error message
-      before anything is provisioned.
+      How many free /24s the job needs inside the VNet, used to produce a clear error message
+      before anything is provisioned. Three, not two: azure-il6-provision-subnets creates the
+      control-plane and compute subnets, and azure-provision-bastionhost then picks a third for
+      the bastion via find_available_cidr. A default of 2 let the preflight pass and the bastion
+      fail afterwards, once the first two subnets already existed.
   documentation: |-
     Fail-fast preflight for the Azure IL6 emulated-environment job.
 
