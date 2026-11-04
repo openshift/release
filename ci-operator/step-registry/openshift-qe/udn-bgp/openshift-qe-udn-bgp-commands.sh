@@ -35,7 +35,7 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
 
-REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
+REPO_URL="${E2E_REPO:-https://github.com/cloud-bulldozer/e2e-benchmarking}"
 LATEST_TAG=$(git ls-remote --tags "${REPO_URL}.git" | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 if [ "${E2E_VERSION}" == "default" ]; then
   E2E_BRANCH="${LATEST_TAG}"
@@ -99,6 +99,7 @@ BASTION_ENV=( \
   BASTION_WORK_DIR="${BASTION_WORK_DIR}" \
   BUILD_ID="${BUILD_ID:-}" \
   E2E_BRANCH="${E2E_BRANCH}" \
+  E2E_REPO="${REPO_URL}" \
   ENABLE_LOCAL_INDEX="${ENABLE_LOCAL_INDEX}" \
   ES_METADATA_INDEX="${ES_METADATA_INDEX:-perf_scale_ci}" \
   ES_SERVER="${ES_SERVER}" \
@@ -108,6 +109,8 @@ BASTION_ENV=( \
   JOB_NAME="${JOB_NAME:-}" \
   JOB_TYPE="${JOB_TYPE:-}" \
   KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}" \
+  KUBE_BURNER_OCP_REF="${KUBE_BURNER_OCP_REF}" \
+  KUBE_BURNER_OCP_REPO="${KUBE_BURNER_OCP_REPO}" \
   PROFILE_TYPE="${PROFILE_TYPE}" \
   PROW_JOB_ID="${PROW_JOB_ID:-}" \
   PULL_NUMBER="${PULL_NUMBER:-0}" \
