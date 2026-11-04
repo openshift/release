@@ -231,7 +231,9 @@ spec:
             memory: 300Mi
         env:
         - name: JAVA_TOOL_OPTIONS
-          value: -Xmx220m
+          value: -Xmx220m -Dmockserver.velocityDisallowClassLoading=false
+        - name: MOCKSERVER_VELOCITY_DISALLOW_CLASS_LOADING
+          value: "false"
         - name: MOCKSERVER_INITIALIZATION_JSON_PATH
           value: /config/mockserver/echo_expectation.json
         volumeMounts:

@@ -177,12 +177,17 @@ ECHO_EXPECTATION_FILE="${WORK_DIR}/echo_expectation.json"
 # JSON-escaped so Authorino JsonResponse headers (e.g. "simple": "{\"data\":...}")
 # survive into response.json()["headers"] for extract_response().
 #
-# Static GET /get → 200 JSON (no JS/Velocity). s390x MockServer GraalJS cannot
-# run the upstream JavaScript template; dataplane tracing hits /get. Body must
-# be JSON, not plaintext "OK": Authorino tests call response.json()["headers"]
-# (plaintext caused JSONDecodeError on ~20 tests in 2092567684859301888).
-# Keep Velocity echo as a low-priority catch-all so other paths still mirror
-# request headers when the template engine is available.
+# Do NOT add a static GET /get with empty headers: Authorino response tests
+# (test_headers/test_base64/test_auth_json/test_simple_response/test_multiple_responses)
+# and extract_response() all hit /get then read response.json()["headers"].
+# Job 2117568159971020800 used that static rule (priority 100) and those 12+12
+# tests failed with assert None / KeyError: 'simple'. Tracing still only needs
+# JSON 200, which Velocity returns. Reservation/hostname do not need empty
+# headers. s390x cannot run the upstream JAVASCRIPT/GraalJS template
+# (Kuadrant/testsuite#952); Velocity is the workaround, proven on v10.
+# MockServer 9.0.0 sandboxes Velocity class loading by default; patch_mockserver
+# below sets MOCKSERVER_VELOCITY_DISALLOW_CLASS_LOADING=false so .replace()
+# JSON-escaping still runs.
 cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
 [
   {
@@ -192,25 +197,6 @@ cat > "${ECHO_EXPECTATION_FILE}" <<'EOF'
     },
     "httpResponse": {
       "statusCode": 404
-    }
-  },
-  {
-    "id": "get",
-    "priority": 100,
-    "httpRequest": {
-      "method": "GET",
-      "path": "/get"
-    },
-    "httpResponse": {
-      "statusCode": 200,
-      "headers": {
-        "content-type": ["application/json"]
-      },
-      "body": {
-        "headers": {},
-        "method": "GET",
-        "url": "/get"
-      }
     }
   },
   {
@@ -464,6 +450,8 @@ PATCH_EOF
 #       openshift-default; upstream picks it and leaves TRLP report + tracing
 #       on OpenShift's gateway controller instead of OSSM3).
 #     DNSRecord delegate=false: retry A lookup until CoreDNS has the record.
+#     MockServer 9.0.0: allow Velocity class loading so the header-echo
+#       template can JSON-escape Authorino JsonResponse values.
 # ---------------------------------------------------------------------------
 AUTHORINO_FIXES_PY="${WORK_DIR}/authorino-s390x-fixes.py"
 cat > "${AUTHORINO_FIXES_PY}" <<'PY'
@@ -1392,6 +1380,35 @@ def patch_uma_wait() -> None:
     _write(path, text.replace(old, new, 1), "UMA 500-to-403 wait")
 
 
+def patch_mockserver_velocity_sandbox() -> None:
+    """MockServer 9.0.0 defaults velocityDisallowClassLoading=true.
+
+    The s390x Velocity echo JSON-escapes Authorino header values with
+    String.replace / Map.entrySet. That needs class loading; without it
+    GET /get either 500s (templateFailureAsServerError) or returns no
+    headers and Authorino response tests assert None.
+    """
+    path = Path("testsuite/backend/mockserver.py")
+    if not path.exists():
+        print("SKIP mockserver backend missing")
+        return
+    text = path.read_text()
+    if "MOCKSERVER_VELOCITY_DISALLOW_CLASS_LOADING" in text:
+        print("SKIP mockserver Velocity sandbox already patched")
+        return
+    old = 'env_limit = {"JAVA_TOOL_OPTIONS": "-Xmx220m"}'
+    new = (
+        "env_limit = {"
+        '"JAVA_TOOL_OPTIONS": "-Xmx220m -Dmockserver.velocityDisallowClassLoading=false", '
+        '"MOCKSERVER_VELOCITY_DISALLOW_CLASS_LOADING": "false"'
+        "}"
+    )
+    if old not in text:
+        print("WARN mockserver env_limit JAVA_TOOL_OPTIONS not found")
+        return
+    _write(path, text.replace(old, new, 1), "MockServer Velocity class loading")
+
+
 if __name__ == "__main__":
     patch_prefer_istio_gateway_class()
     patch_dinosaur()
@@ -1413,6 +1430,7 @@ if __name__ == "__main__":
     # Do not no-op RFC 0021 reservation or force stream=false. Latest testsuite
     # main plus mockserver:9.0.0 is what QE asked to re-run for 200/timeout reds.
     patch_xfcc()
+    patch_mockserver_velocity_sandbox()
 PY
 
 # ---------------------------------------------------------------------------
