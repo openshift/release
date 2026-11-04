@@ -56,8 +56,23 @@ fi
 # comment there). "hypershift destroy cluster" deletes only the CLI secrets, so
 # remove it here to keep the shared namespace clean.
 if [[ "${CLOUD_PROVIDER}" != "Azure" && -n "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
-  # Runs even if the destroy above failed, so the ConfigMap never outlives the job.
-  oc delete configmap "${CLUSTER_NAME}-additional-trust-bundle" \
-    --namespace="${HYPERSHIFT_NAMESPACE}" --ignore-not-found
+  # Runs even if the destroy above failed, but deletes the ConfigMap only once
+  # the HostedCluster is gone: while it exists it still references the
+  # ConfigMap, and a later cleanup of the cluster needs a valid object.
+  TRUST_BUNDLE_CONFIGMAP="${CLUSTER_NAME}-additional-trust-bundle"
+  cleanup_rc=0
+  if ! hc="$(oc get hostedcluster "${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}" --ignore-not-found -o name)"; then
+    echo "Could not check HostedCluster ${HYPERSHIFT_NAMESPACE}/${CLUSTER_NAME}; keeping ConfigMap ${TRUST_BUNDLE_CONFIGMAP}" >&2
+    cleanup_rc=1
+  elif [[ -n "${hc}" ]]; then
+    echo "HostedCluster ${HYPERSHIFT_NAMESPACE}/${CLUSTER_NAME} still exists; keeping ConfigMap ${TRUST_BUNDLE_CONFIGMAP} it references" >&2
+  else
+    oc delete configmap "${TRUST_BUNDLE_CONFIGMAP}" \
+      --namespace="${HYPERSHIFT_NAMESPACE}" --ignore-not-found || cleanup_rc=$?
+  fi
+  # Report the destroy failure first; otherwise the cleanup result.
+  if [[ "${destroy_rc:-0}" -eq 0 ]]; then
+    destroy_rc="${cleanup_rc}"
+  fi
 fi
 exit "${destroy_rc:-0}"

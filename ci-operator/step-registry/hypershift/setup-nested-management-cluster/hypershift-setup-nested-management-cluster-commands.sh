@@ -131,8 +131,9 @@ else
     #     setup, but this management cluster is itself a hosted cluster: its
     #     image.config is owned by the parent HostedCluster (an admission policy
     #     rejects direct changes), so it must be set through HostedCluster
-    #     spec.configuration.image. It is set at creation because image config is
-    #     part of the NodePool configuration: changing it later rolls the nodes.
+    #     spec.configuration.image. It is set at creation because the image
+    #     config, including this ConfigMap reference, is part of the NodePool
+    #     configuration hash: adding the reference later would roll the nodes.
     # Both references point to the same ConfigMap. The operator reads every key
     # of the additionalTrustedCA ConfigMap, so the trust bundle key works.
     #
@@ -257,18 +258,21 @@ done
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${CONSOLE_URL_FILE}"
 
 # The HyperShift operator reads the image.config CA only when it starts, so
-# make sure the parent has propagated it before hypershift-install runs.
+# make sure the parent has propagated it before hypershift-install runs. The
+# cluster version is Available at this point, so HCCO has long reconciled the
+# global configuration: a short budget is enough and keeps the step within its
+# timeout, which the waits above already use most of.
 if [[ -n "${TRUST_BUNDLE_CONFIGMAP:-}" ]]; then
-  echo "Waiting for image.config.openshift.io/cluster to reference ConfigMap ${TRUST_BUNDLE_CONFIGMAP}"
-  oc wait --timeout=10m image.config.openshift.io/cluster \
-    --for=jsonpath='{.spec.additionalTrustedCA.name}'="${TRUST_BUNDLE_CONFIGMAP}"
-  deadline=$((SECONDS + 600))
-  until oc get configmap -n openshift-config "${TRUST_BUNDLE_CONFIGMAP}" > /dev/null 2>&1; do
+  echo "Waiting for image.config.openshift.io/cluster to trust ConfigMap openshift-config/${TRUST_BUNDLE_CONFIGMAP}"
+  deadline=$((SECONDS + 300))
+  until [[ "$(oc get image.config.openshift.io/cluster -o jsonpath='{.spec.additionalTrustedCA.name}' 2> /dev/null)" == "${TRUST_BUNDLE_CONFIGMAP}" ]] &&
+    oc get configmap -n openshift-config "${TRUST_BUNDLE_CONFIGMAP}" > /dev/null 2>&1; do
     if (( SECONDS >= deadline )); then
-      echo "ConfigMap openshift-config/${TRUST_BUNDLE_CONFIGMAP} did not appear in the management cluster" >&2
+      echo "The management cluster image.config does not trust ConfigMap openshift-config/${TRUST_BUNDLE_CONFIGMAP} after 5 minutes" >&2
+      oc get image.config.openshift.io/cluster -o jsonpath='{.spec.additionalTrustedCA}{"\n"}' >&2 || true
       exit 1
     fi
-    echo "$(date --rfc-3339=seconds) ConfigMap openshift-config/${TRUST_BUNDLE_CONFIGMAP} not yet present"
+    echo "$(date --rfc-3339=seconds) image.config or ConfigMap openshift-config/${TRUST_BUNDLE_CONFIGMAP} not yet reconciled"
     sleep 10
   done
   echo "The management cluster image.config trusts the bundle in ${TRUST_BUNDLE_CONFIGMAP}"
