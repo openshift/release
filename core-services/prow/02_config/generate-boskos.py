@@ -640,7 +640,7 @@ CONFIG = {
         'us-west-2': 15,
     },
     'gitops-aws-quota-slice': {
-        'us-west-2': 20
+        'us-west-2': 30
     },
     'che-aws-quota-slice': {
         # us-east-2 is reserved for the air-gapped clusters
