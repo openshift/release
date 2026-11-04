@@ -1,0 +1,49 @@
+ref:
+  as: hypershift-mce-ibmz-create-hcpagent-kvm-oz
+  from: libvirt-installer
+  cli: latest
+  grace_period: 15m0s
+  commands: hypershift-mce-ibmz-create-hcpagent-kvm-oz-commands.sh
+  timeout: 2h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: AGENT_NODE_COUNT
+    default: "2"
+    documentation: |-
+      Number of KVM guests to create and attach to the hosted cluster as agents. Each guest uses
+      the MAC address reserved for compute[i] in the lease config, so it gets that fixed IP from
+      the libvirt network DHCP. The count cannot exceed the number of compute entries in the lease.
+  - name: AGENT_GUEST_MEMORY
+    default: "16384"
+    documentation: Memory of each KVM guest, in MiB.
+  - name: AGENT_GUEST_VCPUS
+    default: "4"
+    documentation: Number of vCPUs of each KVM guest.
+  - name: AGENT_GUEST_DISK_CAPACITY
+    default: "120G"
+    documentation: Size of the root disk of each KVM guest.
+  - name: POOL_NAME
+    default: "multiarch-ci-pool"
+    documentation: Libvirt storage pool where the discovery ISO and guest disks are created.
+  - name: GUEST_NETWORK
+    default: ""
+    documentation: |-
+      Libvirt network the guests are attached to. If empty, the management cluster
+      network is used (the leased resource name, followed by the unique hash when
+      USE_EXTERNAL_DNS is not "true").
+  - name: USE_EXTERNAL_DNS
+    default: "false"
+    documentation: Must match the value used when the management cluster was created.
+  documentation: |-
+    Creates KVM guests on the libvirt host of the leased resource, boots them from the
+    discovery ISO of the InfraEnv created by hypershift-mce-ibmz-create-hcpagent-oz, and
+    attaches them to the hosted cluster as agents.
+    The ISO is downloaded from the InfraEnv isoDownloadURL and uploaded to the libvirt pool.
+    Guests boot from the ISO (virtio-scsi cdrom), register as Agents, are approved and the
+    nodepool is scaled. After the installation the guest powers off; it is then redefined
+    without the cdrom and started from disk. Guests and volumes contain the leased resource
+    name so upi-libvirt-cleanup-post removes them.
+    Runs after hypershift-mce-ibmz-create-hcpagent-oz.
