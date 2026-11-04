@@ -118,9 +118,34 @@ run_tls_scan() {
       echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
   fi
 
+  # tls-scanner only accepts Old, Intermediate and Modern for
+  # --tls-profile-type: a Custom profile has no predefined cipher list, so the
+  # CLI override cannot express it (the scanner exits before scanning). For a
+  # cluster running a Custom profile (e.g. after tls-groups-configure or
+  # hypershift-tls-groups), omit the flag and let the scanner read the
+  # effective profile from APIServer/cluster instead. Note that the CLI
+  # override implies StrictAllComponents enforcement, while reading from the
+  # API honours the cluster's tlsAdherence setting.
   if [[ -n "${TLS_PROFILE_TYPE:-}" ]]; then
-      SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${TLS_PROFILE_TYPE}"
-      echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
+      # Trim surrounding whitespace so validation accepts exactly what the
+      # scanner itself accepts (its CLI normalizes case and whitespace).
+      local tls_profile_type="${TLS_PROFILE_TYPE}"
+      tls_profile_type="${tls_profile_type#"${tls_profile_type%%[![:space:]]*}"}"
+      tls_profile_type="${tls_profile_type%"${tls_profile_type##*[![:space:]]}"}"
+      case "${tls_profile_type,,}" in
+        old|intermediate|modern)
+          SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${tls_profile_type}"
+          echo "Using expected TLS profile type for compliance checks: ${tls_profile_type}"
+          ;;
+        custom)
+          echo "TLS_PROFILE_TYPE=Custom: no --tls-profile-type override, scanner reads the effective profile from APIServer/cluster"
+          echo "Note: on HyperShift management passes that profile comes from the shared management cluster's own APIServer CR and is informational only; the expected-groups assertion is profile-independent"
+          ;;
+        *)
+          echo "Invalid TLS_PROFILE_TYPE '${TLS_PROFILE_TYPE}' (supported: Old, Intermediate, Modern, Custom)"
+          exit 1
+          ;;
+      esac
   fi
 
   # SCANNER_CPU / SCANNER_MEMORY are deprecated but still honoured as fallback
