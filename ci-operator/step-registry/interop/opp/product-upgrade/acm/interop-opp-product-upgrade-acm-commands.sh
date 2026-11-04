@@ -34,13 +34,29 @@ _opp_cleanup() {
 
 # --- Atomic JUnit Writer (INTEROP-9527) ---
 # Suite naming (INTEROP-9601): emit the canonical Component Readiness suite
-# name. LP_IO__ET_PPP__NEW_TS_NAME is a printf-style template whose %s
-# placeholder is replaced by this step's raw suite name; the step-ref
-# default pins the canonical 'lp-interop--ACM--OPP--interop-opp-product-upgrade-acm'
+# name via the component-suffixed prefix variable (etirta's structured-naming
+# ruling on openshift/release#87932, 2026-11-03). The job env sets
+# LP_QE__CR__TS_NAME__PFX__ACM; the published name is
+# "<prefix>--interop-opp-product-upgrade-acm"
 # (docs/opp-suite-name-inventory.md, producer row for this step).
+# No default: consuming jobs must set the variable explicitly. When unset,
+# the step degrades to the raw suite name (pre-INTEROP-9601 behavior) with a
+# loud warning rather than crashing the lane.
 _JUNIT_RAW_TS_NAME="interop-opp-product-upgrade-acm"
-_junit_ts_name="${LP_IO__ET_PPP__NEW_TS_NAME:-lp-interop--ACM--OPP--${_JUNIT_RAW_TS_NAME}}"
-_junit_ts_name="${_junit_ts_name//%s/${_JUNIT_RAW_TS_NAME}}"
+if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
+  _junit_ts_name="${LP_QE__CR__TS_NAME__PFX__ACM}--${_JUNIT_RAW_TS_NAME}"
+else
+  echo ">>> WARNING: LP_QE__CR__TS_NAME__PFX__ACM is unset; emitting the raw suite name, which is unrouted in ci-test-mapping" >&2
+  _junit_ts_name="${_JUNIT_RAW_TS_NAME}"
+fi
+# XML-escape the suite name for attribute use; the raw value stays untouched
+# for filename derivation. Each replacement writes \& so the entity's literal
+# ampersand survives bash >= 5.2 patsub_replacement (where a bare & in the
+# replacement expands to the matched text) and older bash alike.
+_junit_ts_name_xml=${_junit_ts_name//&/\&amp;}
+_junit_ts_name_xml=${_junit_ts_name_xml//</\&lt;}
+_junit_ts_name_xml=${_junit_ts_name_xml//>/\&gt;}
+_junit_ts_name_xml=${_junit_ts_name_xml//\"/\&quot;}
 # '/' cannot appear in an artifact filename; sanitize defensively.
 _junit_fn="junit_${_junit_ts_name//\//_}.xml"
 
@@ -51,7 +67,7 @@ _junit_emit_safe() {
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${_junit_ts_name}" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="${_junit_ts_name_xml}" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
