@@ -9,6 +9,10 @@ repo=openshift-service-mesh/istio
 
 workdir=$(mktemp -d)
 trap 'rm -rf "${workdir}"' EXIT
+# This job checks out istio, not openshift/release; read policy from its default branch.
+gh api repos/openshift/release/contents/ci-operator/config/openshift-service-mesh/supported-istio-versions.txt \
+  -H 'Accept: application/vnd.github.raw+json' > "${workdir}/supported-istio-versions.txt"
+mapfile -t supported_versions < "${workdir}/supported-istio-versions.txt"
 cd "${workdir}"
 git init --bare repo.git
 cd repo.git
@@ -21,8 +25,7 @@ git fetch --no-tags midstream '+refs/heads/release-*:refs/remotes/midstream/rele
 issues=$(gh api --paginate --slurp "repos/${repo}/issues?state=open&per_page=100" | jq 'add')
 
 failed=0
-# Only these y-stream lines are supported, regardless of other midstream branches.
-for release_line in 1.30 1.31; do
+for release_line in "${supported_versions[@]}"; do
   source="refs/remotes/midstream/release-${release_line}"
   git show-ref --verify --quiet "${source}" || continue
   # List tag names without fetching their histories; exclude prereleases and patch zero.
