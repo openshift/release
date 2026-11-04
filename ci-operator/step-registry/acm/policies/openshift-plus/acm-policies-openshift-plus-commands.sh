@@ -98,12 +98,59 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   # Validate that skip-listed policies actually exist in the cluster
   typeset allPolicies=""
   allPolicies="$(oc get policies -n policies -o name 2>/dev/null)" || true
+  # Skipped policies that exist in the cluster surface as one failing
+  # JUnit result each (INTEROP-9677): while any skip remains, the skip
+  # state must be countable instead of invisible.  The step still exits
+  # 0; these are visibility failures, not step failures.  Names absent
+  # from the cluster keep warning-only semantics above.
+  typeset -a skippedPresentArr=()
   for p in "${skipPoliciesArr[@]}"; do
     if ! echo "${allPolicies}" | grep -q "/${p}$"; then
       printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
         "$(date -u +%FT%TZ)" "${p}"
+    else
+      skippedPresentArr+=("${p}")
     fi
   done
+
+  # Emit one failing testcase per skipped policy so Prow / TestGrid /
+  # Sippy / firewatch can count the skip state (suite and classname
+  # follow the lp-interop--OPP--* lane convention).
+  if (( ${#skippedPresentArr[@]} > 0 )); then
+    _skip_feature_for() {
+      case "${1}" in
+        policy-acs-*|policy-acs|policy-advanced-managed-cluster-*) printf '%s' 'ACS' ;;
+        policy-odf|policy-odf-*) printf '%s' 'ODF' ;;
+        policy-install-quay|policy-config-quay|policy-quay-*|policy-hub-quay-*) printf '%s' 'Quay' ;;
+        policy-observability-*) printf '%s' 'Observability' ;;
+        policy-compliance-*) printf '%s' 'Compliance' ;;
+        *) printf '%s' 'OPP' ;;
+      esac
+    }
+    typeset skipJunitFile="${ARTIFACT_DIR}/junit_skip_policies.xml"
+    typeset -i skipTestCount=${#skippedPresentArr[@]}
+    {
+      printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+      printf '<testsuite name="lp-interop--OPP--policies" tests="%d" failures="%d" skipped="0">\n' \
+        "${skipTestCount}" "${skipTestCount}"
+      for p in "${skippedPresentArr[@]}"; do
+        printf '  <testcase classname="lp-interop--OPP--policies" name="[sig-interop][Jira:INTEROP-9677][Feature:%s] %s skipped by SKIP_POLICIES" time="0">\n' \
+          "$(_skip_feature_for "${p}")" "${p}"
+        printf '    <failure message="policy skipped by SKIP_POLICIES">%s is excluded from the compliance wait by SKIP_POLICIES; its product coverage is not exercised in this run.</failure>\n' \
+          "${p}"
+        printf '  </testcase>\n'
+      done
+      printf '</testsuite>\n'
+    } > "${skipJunitFile}"
+    printf '[%s] Wrote %d skip-visibility failure(s) to %s\n' \
+      "$(date -u +%FT%TZ)" "${skipTestCount}" "${skipJunitFile}"
+    # Propagate to SHARED_DIR/junit so the skip-ratio gate and other
+    # step-local consumers see it (interop-opp-odf-health precedent)
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+      mkdir -p "${SHARED_DIR}/junit"
+      cp "${skipJunitFile}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    fi
+  fi
 
   # Build a regex to filter out skipped policies
   typeset skipRegex=""
