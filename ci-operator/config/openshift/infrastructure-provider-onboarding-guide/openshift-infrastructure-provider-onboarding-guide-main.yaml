@@ -16,14 +16,14 @@ tests:
   commands: |
     make build
 
-    # Publish a browsable copy of the site to the job artifacts. Keep mkdocs'
-    # default directory URLs: docs/overview.md links to siblings as
-    # "../<section>", which only stays inside site/ when pages are emitted as
-    # <section>/index.html. Under --no-directory-urls those links would point
-    # one level above site/ and dead-end on an empty GCS listing.
+    # Publish a browsable copy of the site to the job artifacts.
+    # --no-directory-urls emits "<page>.html" instead of "<page>/": GCS has no
+    # directory index, so directory-style links land on a gcsweb file listing
+    # instead of the page. Requires the .md-path links from
+    # openshift/infrastructure-provider-onboarding-guide#35.
     ARTIFACT_DIR="${ARTIFACT_DIR:-$(pwd)/_artifacts}"
     mkdir -p "${ARTIFACT_DIR}"
-    cp -r site "${ARTIFACT_DIR}/site"
+    mkdocs build --no-directory-urls --site-dir "${ARTIFACT_DIR}/site"
 
     # ci-operator uploads a container test's ARTIFACT_DIR under
     # <job>/artifacts/test/artifacts/, and Deck renders custom-link-*.html on
