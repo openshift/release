@@ -82,9 +82,9 @@ else
 fi
 
 GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e-platform.xml" "--ginkgo.v")
-log "LABEL_FILTER='${LABEL_FILTER:-}'"
-if [[ -n "${LABEL_FILTER:-}" ]]; then
-  GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
+log "PLATFORM_LABEL_FILTER='${PLATFORM_LABEL_FILTER:-}'"
+if [[ -n "${PLATFORM_LABEL_FILTER:-}" ]]; then
+  GINKGO_ARGS+=("--ginkgo.label-filter=${PLATFORM_LABEL_FILTER}")
 fi
 
 log "Running platform-plane validation: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
