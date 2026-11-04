@@ -427,7 +427,7 @@ EOF
 smoke_test_storageclasses() {
   local status=0
 
-  oc create namespace fsxn-trident-smoke --dry-run=client -o yaml | oc apply -f -
+  oc create namespace fsxn-trident-smoke
   for storageclass in ci-netapp-iscsi ci-netapp-iscsi-luks ci-netapp-nvme ci-netapp-nvme-luks; do
     if ! verify_storageclass "${storageclass}" Filesystem fs; then
       status=1

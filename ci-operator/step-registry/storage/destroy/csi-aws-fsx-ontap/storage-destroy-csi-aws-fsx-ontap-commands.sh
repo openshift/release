@@ -59,21 +59,16 @@ gather() {
 }
 
 gather_diagnostics() {
-  local directory="${ARTIFACT_DIR:-/tmp}/fsxn-trident" pod
+  local directory="${ARTIFACT_DIR:-/tmp}/fsxn-trident"
   mkdir -p "${directory}"
   [[ -n "${filesystem_id}" ]] && gather fsxn-filesystem.json aws fsx describe-file-systems --file-system-ids "${filesystem_id}"
   [[ -n "${security_group}" ]] && gather fsxn-security-group.json aws ec2 describe-security-groups --group-ids "${security_group}"
   [[ -s "${KUBECONFIG}" ]] || return 0
 
-  gather trident-resources.yaml oc get all,tridentorchestrator,tridentbackendconfig --namespace trident -o yaml
-  gather trident-events.txt oc get events --namespace trident --sort-by=.lastTimestamp
+  gather trident-inspect.log oc adm inspect "namespace/${TRIDENT_NAMESPACE}" --dest-dir="${directory}/inspect"
   gather storageclasses.yaml oc get storageclass -o yaml
   gather pvcs.yaml oc get pvc --all-namespaces -o yaml
   gather pvs.yaml oc get pv -o yaml
-  while read -r pod; do
-    [[ -n "${pod}" ]] || continue
-    gather "${pod##*/}.log" oc logs "${pod}" --namespace trident --all-containers=true --prefix=true
-  done < <(oc get pods --namespace trident -o name --request-timeout=30s || true)
 }
 
 delete_test_pvcs() {
