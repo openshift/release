@@ -32,12 +32,13 @@ ref:
     without any public internet access.
 
     Before running disk-to-mirror, enforces network isolation on the bastion via
-    iptables: all outbound traffic is dropped except loopback, established
-    connections, VPC-internal traffic (10.0.0.0/8, which covers the AWS private
-    endpoints for EC2/ELB/STS/S3), and the instance metadata endpoint
-    (169.254.169.254). Runs an isolation acceptance test to confirm that public
-    internet is unreachable and the local registry is reachable before proceeding.
-    Restores the original iptables rules after the import completes so that
+    dedicated iptables chains (OC_MIRROR_EGRESS for IPv4, OC_MIRROR_EGRESS6 for
+    IPv6): all outbound traffic is rejected except loopback, established
+    connections, the provisioned VPC CIDR read from vpc_info.json (which covers
+    the AWS private endpoints for EC2/ELB/STS/S3), and the instance metadata
+    endpoint (169.254.169.254). Runs an isolation acceptance test to confirm that
+    public internet is unreachable and the local registry is reachable before
+    proceeding. Removes the isolation chains after the import completes so that
     subsequent post-steps (deprovision, artifact gathering) work normally.
 
     After disk-to-mirror completes, copies the generated IDMS/ITMS
