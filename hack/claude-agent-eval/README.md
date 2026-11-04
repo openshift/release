@@ -98,10 +98,15 @@ dataset remain harness-owned. In case mode, `execution.max_budget_usd` limits
 each case invocation, not total CI spend or judge/orchestrator calls.
 `CLAUDE_MODEL` chooses the outer orchestrator model.
 
-The manifest runner pins `agent-eval-harness` at
-`e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f`. It fetches that exact commit,
-checks `git rev-parse HEAD`, and uses that checkout for configuration
-resolution, the Claude plugin, and regression scoring. The runner resolves
+The manifest runner pins `agent-eval-harness` at release tag
+`v1.61.5` ([releases](https://github.com/fullsend-ai/agent-eval-harness/releases)).
+It fetches exactly that tag, verifies the checkout resolves to the tag's commit,
+and uses that checkout for configuration resolution, the Claude plugin, and
+regression scoring. The resolved commit SHA is recorded in
+`runner/harness-install.log`, so a run stays traceable to an exact commit even
+if the tag is later moved. Bumping the pin is a deliberate release change:
+update `HARNESS_REVISION` in `hack/claude-agent-eval/eval_config.py` and
+regenerate the bundle with `sync_commands.py`. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 harness's rules. Resolution happens once, at preflight; the orchestrator runs
@@ -317,5 +322,6 @@ python3 hack/claude-agent-eval/real_harness_contract.py --harness-checkout /path
 ```
 
 Run the contract suite with Python 3.11+ and the harness's core dependencies
-(PyYAML, Jinja2, and truststore). It checks the checkout SHA and makes no
-API/model calls. The default offline suite does not fetch the harness.
+(PyYAML, Jinja2, and truststore). It checks the checkout is exactly the pinned
+release tag and makes no API/model calls. The default offline suite does not
+fetch the harness.

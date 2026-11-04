@@ -469,7 +469,7 @@ def remaining(deadline):
 
 
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Fetch and verify exactly the pinned harness revision."""
+    """Fetch and verify exactly the pinned harness release tag."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
     install_log.write_text(f"Expected harness revision: {HARNESS_REVISION}\n", encoding="utf-8")
@@ -477,10 +477,12 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
         (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
          60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1",
-          "origin", HARNESS_REVISION], 300, "fetch the pinned harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
-         60, "check out the pinned harness revision"),
+        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1", "origin",
+          f"refs/tags/{HARNESS_REVISION}:refs/tags/{HARNESS_REVISION}"],
+         300, "fetch the pinned harness release tag"),
+        (["git", "-C", str(harness), "checkout", "--quiet", "--detach",
+          f"refs/tags/{HARNESS_REVISION}"],
+         60, "check out the pinned harness release tag"),
     )
     for args, timeout, action in steps:
         left = remaining(deadline)
@@ -507,9 +509,15 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        status, actual = command(["git", "-C", str(harness), "rev-parse", "HEAD"],
-                                 repo, env, install_log, min(30, left),
-                                 append=True, capture_output=True)
+        # rev-parse prints one line per argument: the commit the pinned tag
+        # resolves to in this checkout, then the checked-out HEAD. Requiring
+        # both to be the same commit verifies the tag pin; the resolved SHA is
+        # logged so a run stays traceable to an exact commit even if the tag
+        # is later moved.
+        status, verified = command(["git", "-C", str(harness), "rev-parse",
+                                    f"refs/tags/{HARNESS_REVISION}^{{commit}}", "HEAD"],
+                                   repo, env, install_log, min(30, left),
+                                   append=True, capture_output=True)
     except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
             output.write(f"ERROR: git rev-parse timed out after {error.timeout} seconds\n".encode())
@@ -518,13 +526,18 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         with install_log.open("ab") as output:
             output.write(f"{type(error).__name__}: {error}\n".encode())
         raise EvalError("cannot verify harness revision; see runner/harness-install.log") from error
-    actual = actual.strip()
+    resolved, actual = "", ""
+    if not status:
+        lines = [line.strip() for line in verified.strip().splitlines()]
+        if len(lines) == 2:
+            resolved, actual = lines
     with install_log.open("ab") as output:
-        output.write(f"Verified harness revision: {actual}\n".encode())
+        output.write(f"Verified harness revision: {resolved or '<unavailable>'}\n".encode())
     if status:
         raise EvalError(f"cannot verify harness revision (exit {status}); see runner/harness-install.log")
-    if actual != HARNESS_REVISION:
-        message = f"harness revision mismatch: expected {HARNESS_REVISION}, got {actual!r}"
+    if not resolved or resolved != actual:
+        message = (f"harness revision mismatch: tag {HARNESS_REVISION} resolves to "
+                   f"{resolved or '<unavailable>'!r}, HEAD is {actual or '<unavailable>'!r}")
         with install_log.open("ab") as output:
             output.write(f"ERROR: {message}\n".encode())
         raise EvalError(f"{message}; see runner/harness-install.log")

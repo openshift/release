@@ -222,14 +222,18 @@ class HarnessPreparationTests(support.Fixture):
     def test_failed_checkout_or_wrong_harness_revision_has_junit(self):
         self.change_skill()
         for overrides, expected in (({"CHECKOUT_EXIT": "1"}, "fake harness checkout failed"),
-                                    ({"PINNED_REVISION": "wrong"}, "revision mismatch")):
+                                    ({"PINNED_HEAD": "wrong"}, "revision mismatch")):
             with self.subTest(overrides=overrides):
                 self.calls_path.unlink(missing_ok=True)
                 result = self.run_step(**overrides)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(self.claude_calls(), [])
                 self.assertEqual(self.junit().attrib["failures"], "1")
-                self.assertIn(expected, (self.artifacts / "runner/harness-install.log").read_text())
+                install_log = (self.artifacts / "runner/harness-install.log").read_text()
+                self.assertIn(expected, install_log)
+                if "PINNED_HEAD" in overrides:  # the mismatch must name the tag and both revisions
+                    self.assertIn(f"tag {config_bridge.HARNESS_REVISION}", install_log)
+                    self.assertIn(overrides["PINNED_HEAD"], install_log)
 
 
 class ConfigValidationTests(support.Fixture):

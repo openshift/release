@@ -213,12 +213,15 @@ class RealHarnessContractTests(unittest.TestCase):
 
 def checked_harness(path):
     result = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True, timeout=10,
+        ["git", "-C", str(path), "rev-parse", f"refs/tags/{HARNESS_REVISION}^{{commit}}", "HEAD"],
+        check=False, capture_output=True, text=True, timeout=10,
     )
-    actual = result.stdout.strip()
-    if actual != HARNESS_REVISION:
-        raise ValueError(f"expected harness {HARNESS_REVISION}, got {actual or '<empty>'}")
+    lines = result.stdout.split()
+    if result.returncode or len(lines) != 2:
+        detail = result.stderr.strip() or result.stdout.strip() or "<no output>"
+        raise ValueError(f"cannot resolve tag {HARNESS_REVISION} in {path}: {detail}")
+    if lines[0] != lines[1]:
+        raise ValueError(f"expected harness at tag {HARNESS_REVISION} ({lines[0]}), got {lines[1]}")
     if not (path / "agent_eval/config.py").is_file():
         raise ValueError(f"{path} does not contain agent_eval/config.py")
     return path

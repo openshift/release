@@ -103,7 +103,7 @@ if args[0] == "-C" and args[2] == "checkout":
     sys.exit(status)
 if args[0] == "-C" and args[2] == "rev-parse":
     with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
-    print(os.environ["PINNED_REVISION"])
+    print(os.environ["PINNED_REVISION"], os.environ.get("PINNED_HEAD", os.environ["PINNED_REVISION"]), sep="\n")
     sys.exit(0)
 os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
 '''

@@ -15,8 +15,11 @@ except ImportError:
     from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 
 
-HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
-HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
+# The harness is pinned by release tag (https://github.com/fullsend-ai/agent-eval-harness/releases),
+# not by an individual commit SHA: releases are the unit the harness team cuts
+# and supports, and the unit upgrades are picked up deliberately.
+HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
+HARNESS_REVISION = "v1.61.5"
 RESULT_SCHEMA_VERSION = 2
 
 
