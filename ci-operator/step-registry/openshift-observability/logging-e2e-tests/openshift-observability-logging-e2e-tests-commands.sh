@@ -11,6 +11,21 @@ if test -s "${SHARED_DIR}/proxy-conf.sh"; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Export cloud credentials so test code can reach cloud APIs directly.
+# GCP tests (prepareResourcesForLokiStack, createSecretForGCSBucket, GCL) read
+# GOOGLE_APPLICATION_CREDENTIALS; without it the step falls back to the GCE
+# metadata server on build04, causing every test to hang until the 90-min
+# per-test timeout is reached.
+if [[ -f "${CLUSTER_PROFILE_DIR}/gce.json" ]]; then
+    export GOOGLE_APPLICATION_CREDENTIALS="${CLUSTER_PROFILE_DIR}/gce.json"
+fi
+if [[ -f "${CLUSTER_PROFILE_DIR}/.awscred" ]]; then
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+if [[ -f "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" ]]; then
+    export AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+fi
+
 # The test framework writes kubeconfig copies and temporary files under HOME, which
 # is not writable for the random UID the step runs as.
 export HOME=/tmp/home
@@ -65,7 +80,10 @@ echo "Tests selected by suite ${TEST_SUITE}:"
 "${TESTS_EXT}" list tests --suite "${TEST_SUITE}" -o names
 
 echo "Running suite ${TEST_SUITE}"
-"${TESTS_EXT}" run-suite "${TEST_SUITE}" --max-concurrency "${TEST_MAX_CONCURRENCY:-1}" --junit-path "${ARTIFACT_DIR}/${report_name}" || true
+# --output jsonl streams results as they complete rather than batching to the end.
+# timeout -s INT at 5h45m (20700s) gives run-suite time to flush junit and trigger
+# the EXIT trap before Prow's 6h pod timeout fires a SIGKILL.
+timeout -s INT 20700 "${TESTS_EXT}" run-suite "${TEST_SUITE}" --max-concurrency "${TEST_MAX_CONCURRENCY:-1}" --output jsonl --junit-path "${ARTIFACT_DIR}/${report_name}" || true
 
 # run-suite exits 0 even when individual tests fail, because every spec in this
 # extension is tagged with an "informing" lifecycle (see the openshift-logging-e2e-tests
