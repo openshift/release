@@ -400,12 +400,16 @@ import json, sys
 data = json.load(sys.stdin)
 result = []
 for i in data.get("items", []):
+    status = i.get("status", {})
     result.append({
         "name": i["metadata"]["name"],
         "namespace": i["metadata"].get("namespace", ""),
-        "conditions": i.get("status", {}).get("conditions"),
-        "compliant": i.get("status", {}).get("compliant"),
-        "status": i.get("status", {}).get("status"),
+        "conditions": status.get("conditions"),
+        "compliant": status.get("compliant"),
+        "status": [
+            {"clusterName": s.get("clusterName"), "compliant": s.get("compliant")}
+            for s in status.get("status", []) or []
+        ]
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/09-policies.json" 2>&1 || \
