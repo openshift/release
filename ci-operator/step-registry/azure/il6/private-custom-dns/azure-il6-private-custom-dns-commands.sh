@@ -41,9 +41,13 @@ if [[ -z "${BASE_DOMAIN}" ]]; then
     exit 1
 fi
 
-SP_FILE="/var/run/azureil6-secrets/osServicePrincipal.json"
+# The same principal the install used. ipi-conf-azureil6 copies it here from the azure-qe cluster
+# profile, having established that the emulator accepts it; reading a separate Vault collection
+# instead would both require that collection to exist for the pod to start and risk authenticating
+# as a principal with no Reader on the resource group the installer just created.
+SP_FILE="${SHARED_DIR}/azure_il6_osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
-    echo "ERROR: IL6 service principal not found at ${SP_FILE}."
+    echo "ERROR: IL6 service principal not found at ${SP_FILE}; ipi-conf-azureil6 writes it."
     exit 1
 fi
 
@@ -83,7 +87,10 @@ cleanup_credentials() {
     rm -f /tmp/il6-sp.env
     run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_host}" 'rm -f /tmp/il6-sp.env' 2>/dev/null || true
 }
-trap cleanup_credentials EXIT
+# Folded into the status-file trap rather than registered separately. Bash keeps one handler per
+# signal, so a second 'trap ... EXIT' silently replaces the first -- which would mean this step
+# never wrote install-post-check-status.txt, on success or on failure.
+trap 'rc=$?; cleanup_credentials; if [[ "${rc}" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
 cat > /tmp/il6-lb-query-inner.sh <<'INNER_EOF'
 #!/bin/sh
@@ -123,6 +130,10 @@ INNER_EOF
 # podman --env-file format: bare KEY=VALUE, no 'export', no quoting. Written with a quoted
 # heredoc delimiter so the secret is interpolated by the command substitutions only, and read
 # back out of a file on the bastion that is deleted as soon as the query finishes.
+# 0600 before anything is written, not after: the secret must never exist in a file that was
+# briefly world-readable. scp preserves the mode, so the copy on the bastion inherits it.
+touch /tmp/il6-sp.env
+chmod 0600 /tmp/il6-sp.env
 cat > /tmp/il6-sp.env <<EOF
 APP_ID=$(jq -r .clientId "${SP_FILE}")
 AAD_CLIENT_SECRET=$(jq -r .clientSecret "${SP_FILE}")
@@ -177,7 +188,7 @@ if [[ "${query_rc}" -ne 0 ]]; then
     echo "ERROR: failed to query the internal load balancer on the emulated IL6 plane."
     echo "See ${ARTIFACT_DIR}/il6-lb-query.log. Usual causes, in order of likelihood:"
     echo "  * the IL6 service principal lacks Reader on ${RESOURCE_GROUP}"
-    echo "  * the SHIFT CA was not installed (azure-il6-bastion-ca did not run or failed)"
+    echo "  * the SHIFT CA was not installed (azure-il6-bastion-setup did not run or failed)"
     echo "  * ${ARM_ENDPOINT} is unreachable because an IPsec tunnel dropped mid-run"
     exit 1
 fi

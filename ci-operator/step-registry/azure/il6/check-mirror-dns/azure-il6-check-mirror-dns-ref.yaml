@@ -50,6 +50,8 @@ ref:
     install fails roughly forty minutes in with a bootstrap timeout and no obvious cause. This step
     turns that into an immediate, named failure.
 
-    Resolving it requires an A record for the mirror registry FQDN, pointing at the bastion's
-    private IP, in the emulator-side DNS. That is an environment prerequisite, not something CI can
-    provision -- see the job's README and the PR description.
+    azure-il6-bastion-setup resolves this without any emulator-side change: it serves an
+    address=<mirror fqdn>/<bastion private ip> record from its own dnsmasq and repoints the VNet's
+    dnsServers at itself, so every node created afterwards inherits that answer. This step verifies
+    the result rather than assuming it -- it reads dnsServers back from ARM and queries that
+    address, which is exactly what a node does at first boot.

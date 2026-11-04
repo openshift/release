@@ -21,6 +21,11 @@ workflow:
     `cucushift-installer-rehearse-azure-il6-ipi-disconnected-{provision,deprovision}` chains so
     that other workflows can extend this one without backporting changes.
 
-    Uses the azure-qe cluster profile for the commercial-plane credential and a separate Vault
-    collection, installer-ci-azureil6, for the emulated-plane service principal and the emulator's
-    CA chain.
+    Uses the azure-qe cluster profile, and only that. An earlier design assumed the emulated plane
+    needed its own service principal from a separate Vault collection; it does not. The emulator
+    fronts the same subscription, so the azure-qe principal authenticates on both planes, and the
+    emulator's CA chain is fetched onto the bastion by azure-il6-bastion-setup rather than mounted.
+
+    Takes a single-slot azure-il6-quota-slice lease in addition to the cluster profile's own. The
+    emulator is one fixture -- one resource group, one VNet, one pair of IPsec tunnels -- and this
+    job rewrites that VNet's dnsServers, which is a single value. Two runs cannot share it.

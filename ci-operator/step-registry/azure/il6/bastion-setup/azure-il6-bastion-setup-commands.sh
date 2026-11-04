@@ -209,12 +209,16 @@ az login --service-principal \
     --tenant "$(jq -r .tenantId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" --output none
 az account set --subscription "$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")"
 
+# The breadcrumb is written BEFORE the update, not after. az can fail on a client-side timeout
+# or a polling error after ARM has already applied the change; writing it afterwards means that
+# case leaves the VNet pointing at a bastion the teardown then deletes without restoring. The
+# restore is a plain --dns-servers set, so claiming the flip happened when it did not costs one
+# redundant API call and nothing else.
+echo "${bastion_private}" > "${SHARED_DIR}/azure_il6_vnet_dns_override"
+
 az network vnet update -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" \
     --dns-servers "${bastion_private}" -o none
 echo "OK: VNet ${AZURE_IL6_VNET_NAME} dnsServers -> ${bastion_private}"
-
-# Leave a breadcrumb so the teardown knows the flip happened even if a later step fails.
-echo "${bastion_private}" > "${SHARED_DIR}/azure_il6_vnet_dns_override"
 
 echo
 echo "Bastion is ready: split DNS serving the VNet, emulator CA in the trust store, az under podman."

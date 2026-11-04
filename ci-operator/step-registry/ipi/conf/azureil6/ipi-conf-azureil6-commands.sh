@@ -14,13 +14,11 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 # ARM endpoint and enumerating it, so the extra Vault group is dead weight.
 SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
-    echo "ERROR: IL6 service principal not found at ${SP_FILE}."
+    echo "ERROR: service principal not found at ${SP_FILE}."
     echo
-    echo "It is delivered by the Vault credential collection 'installer-ci-azureil6',"
-    echo "group 'service-principal'. The collection must contain a key named"
-    echo "'osServicePrincipal.json' holding a JSON object with clientId, clientSecret,"
-    echo "tenantId and subscriptionId for the EMULATED IL6 plane -- not the azure-qe"
-    echo "service principal, which is a commercial-plane credential."
+    echo "It comes from the azure-qe cluster profile, which every test in this chain already"
+    echo "mounts. If it is missing, the cluster_profile is wrong or the profile's secret has"
+    echo "lost its osServicePrincipal.json key."
     exit 1
 fi
 
@@ -31,9 +29,10 @@ for field in clientId clientSecret tenantId subscriptionId; do
     fi
 done
 
-# ipi-install-install-in-bastion scps this to the bastion and points AZURE_AUTH_LOCATION at it,
-# so that openshift-install authenticates against the IL6 plane rather than against the
-# commercial-plane azure-qe principal that the cluster profile supplies.
+# ipi-install-install-in-bastion scps this to the bastion and points AZURE_AUTH_LOCATION at it.
+# It is the azure-qe principal: the emulator fronts the same subscription, so the same credential
+# authenticates on both planes. Copied under an IL6-specific name anyway, so that if the emulator
+# ever does need its own principal, only this one line has to change.
 cp "${SP_FILE}" "${SHARED_DIR}/azure_il6_osServicePrincipal.json"
 
 # ---------------------------------------------------------------- install-config

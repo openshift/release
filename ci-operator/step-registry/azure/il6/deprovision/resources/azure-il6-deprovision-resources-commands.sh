@@ -40,12 +40,28 @@ az account set --subscription "$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")
 # repair that, but it should not have to.
 if [[ -f "${SHARED_DIR}/azure_il6_vnet_dns_override" ]]; then
     echo "--- restoring VNet DNS servers to the emulator's (${AZURE_IL6_EMULATOR_DNS})"
-    if az network vnet update -g "${RG}" -n "${AZURE_IL6_VNET_NAME}" \
-        --dns-servers ${AZURE_IL6_EMULATOR_DNS} -o none; then
+    # Retried, because this is the one teardown action whose failure is visible to the NEXT run
+    # rather than to this one. A single transient ARM error here would hand the next job a VNet
+    # that resolves nothing.
+    restored="no"
+    for attempt in 1 2 3; do
+        if az network vnet update -g "${RG}" -n "${AZURE_IL6_VNET_NAME}" \
+            --dns-servers ${AZURE_IL6_EMULATOR_DNS} -o none; then
+            restored="yes"
+            break
+        fi
+        echo "    attempt ${attempt} failed; retrying in $((attempt * 10))s"
+        sleep $((attempt * 10))
+    done
+
+    if [[ "${restored}" == "yes" ]]; then
         echo "OK: dnsServers restored before the bastion is removed."
     else
-        echo "WARNING: could not restore dnsServers. The VNet will point at a deleted bastion"
-        echo "         until azure-il6-check-prereqs repairs it on the next run."
+        echo "WARNING: could not restore dnsServers after 3 attempts. The VNet will point at a"
+        echo "         bastion this teardown is about to delete. azure-il6-check-prereqs detects"
+        echo "         and repairs that at the start of the next run, and the fixture lease keeps"
+        echo "         another run from starting in the meantime -- so this is recoverable, but it"
+        echo "         should be investigated if it recurs."
     fi
 else
     echo "--- VNet DNS servers were never repointed; nothing to restore."
@@ -120,9 +136,15 @@ fi
 
 # ----------------------------------------------------------------- private DNS
 # azure-provision-bastionhost creates a private DNS zone for the mirror registry and links it to
-# the VNet when REGISTER_MIRROR_REGISTRY_DNS is enabled. The link is prefix-named, the zone is not
-# -- it is named after the mirror registry FQDN and is therefore shared by concurrent runs. So the
-# link is always removed, and the zone only once nothing is left pointing at it.
+# the VNet when REGISTER_MIRROR_REGISTRY_DNS is enabled. The A record and the VNet link both carry
+# this run's prefix and are removed here. The ZONE is not prefixed -- it is named after the mirror
+# registry FQDN, shared by every run, and deliberately left in place.
+#
+# An earlier revision deleted any zone left with no VNet links. That broke this step's own stated
+# contract (nothing is deleted whose name does not carry this run's prefix) and could delete a
+# zone another run had just created but not yet linked. One zone per base domain persists in the
+# shared group instead; it costs nothing and 'az network private-dns zone create' is happy to
+# find it already there.
 echo "--- private DNS zones"
 mapfile -t zones < <(az network private-dns zone list -g "${RG}" --query '[].name' -o tsv)
 for zone in "${zones[@]}"; do
@@ -148,14 +170,7 @@ for zone in "${zones[@]}"; do
             || echo "WARNING: failed to delete VNet link '${link}'"
     done
 
-    remaining=$(az network private-dns link vnet list -g "${RG}" -z "${zone}" --query 'length(@)' -o tsv)
-    if [[ "${remaining}" == "0" ]]; then
-        echo "Zone '${zone}' has no VNet links left; deleting it."
-        az network private-dns zone delete -g "${RG}" -n "${zone}" --yes -o none \
-            || echo "WARNING: failed to delete private DNS zone '${zone}'"
-    else
-        echo "Zone '${zone}' still has ${remaining} VNet link(s); leaving it in place."
-    fi
+    echo "Zone '${zone}' itself is shared and is left in place."
 done
 
 # ----------------------------------------------------------------- network

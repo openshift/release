@@ -10,7 +10,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 ca_bundle="${SHARED_DIR}/azure_il6_ca_bundle"
 if [[ ! -s "${ca_bundle}" ]]; then
     echo "ERROR: ${ca_bundle} not found or empty."
-    echo "azure-il6-bastion-ca writes this file and must run before this step."
+    echo "azure-il6-bastion-setup writes this file and must run before this step."
     exit 1
 fi
 
