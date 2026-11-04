@@ -20,15 +20,14 @@ import unittest
 import urllib.error
 import urllib.request
 
-import yaml
-
-
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "ci-operator/step-registry"
 CONFIG = ROOT / ("ci-operator/config/openshift-online/rosa-e2e/"
                  "openshift-online-rosa-e2e-main__periodics.yaml")
 PRIVATE_JOB = "rosa-hcp-e2e-privatelink-connectivity-mc-health-staging"
 PUBLIC_JOB = "rosa-hcp-e2e-aws-vpc-cni-staging"
+WORKFLOWS = {PRIVATE_JOB: "rosa-e2e-hcp-rosa-cli-private",
+             PUBLIC_JOB: "rosa-e2e-hcp-aws-vpc-cni"}
 CUSTOMER_FILTER = "Area:DataPlane || Area:CustomerFeatures"
 PLATFORM_FILTER = "Area:ManagementPlane"
 PRIVATE_FILTER = "Area:ManagementPlane && !Access:PublicAPI"
@@ -89,10 +88,16 @@ class RosaE2ESelectionTests(unittest.TestCase):
                 cls.process.wait(timeout=10)
 
     def resolve(self, job_name=PRIVATE_JOB, environment=None):
-        config = yaml.safe_load(CONFIG.read_text(encoding="utf-8"))
+        with urllib.request.urlopen(
+                self.url + "/config?org=openshift-online&repo=rosa-e2e"
+                "&branch=main&variant=periodics", timeout=30) as response:
+            config = json.load(response)
         test = next(test for test in config["tests"] if test["as"] == job_name)
+        if environment is None:
+            return test["literal_steps"]["test"]
         config["tests"] = [test]
-        test["steps"]["env"].update(environment or {})
+        del test["literal_steps"]
+        test["steps"] = {"workflow": WORKFLOWS[job_name], "env": environment}
         request = urllib.request.Request(
             self.url + "/resolve", data=json.dumps(config).encode("utf-8"),
             headers={"Content-Type": "application/json"})

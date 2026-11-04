@@ -1,4 +1,8 @@
 base_images:
+  rosa-e2e-configresolver:
+    name: ci-operator-configresolver
+    namespace: ci
+    tag: latest
   ship-status-component-monitor:
     name: component-monitor
     namespace: ship-status-dash
@@ -32,6 +36,12 @@ tests:
   container:
     from: src
   run_if_changed: ^services/.*
+- as: rosa-e2e-selection
+  commands: python3 hack/test_rosa_e2e_selection.py -v
+  container:
+    clone: true
+    from: rosa-e2e-configresolver
+  run_if_changed: ^(ci-operator/step-registry/rosa/|ci-operator/config/openshift-online/rosa-e2e/|ci-operator/config/openshift/release/openshift-release-main\.yaml$|hack/test_rosa_e2e_selection\.py$)
 - as: hyperfleet-risk-scorer-test
   commands: bash hack/hyperfleet/validate-risk-scorer-step.sh
   container:
