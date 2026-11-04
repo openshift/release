@@ -27,7 +27,6 @@ Claude's full session output (stream-json) is captured to a temporary file and n
 > post:
 > - ref: openshift-observability-qe-agent
 > - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
-> - ref: send-results-to-reportportal
 >
 > # workflow: generic-claim
 > post:
@@ -192,13 +191,12 @@ tests:
     post:
     - ref: openshift-observability-qe-agent
     - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
-    - ref: send-results-to-reportportal
     test:
     - ref: <your-test-ref>
     workflow: cucushift-installer-rehearse-gcp-ipi
 ```
 
-> **Warning — keep the workflow's post steps**: a `post:` list in the test config **replaces** the `post:` of the workflow (the ci-operator config field has priority over the workflow's, see the [step registry docs](https://docs.ci.openshift.org/docs/architecture/step-registry/)). If `post:` lists only `openshift-observability-qe-agent`, the workflow's own post steps do not run: with the `cucushift-installer-rehearse-*` workflows the cluster is leaked (never deprovisioned) and nothing is sent to ReportPortal, with the `generic-claim` workflows no must-gather/gather-extra artifacts are collected. List the workflow's own post steps explicitly, in the workflow's order. The qe-agent step goes **first** because it needs the live cluster; the deprovision chain must be **last**. Look up the steps in the workflow's `*-workflow.yaml` under `ci-operator/step-registry`. The `cucushift-installer-rehearse-<cloud>-ipi` workflows (and the `-ovn` variant) use the form above with the matching `<cloud>` in the deprovision chain name; `generic-claim`, `optional-operators-ci-generic-claim` and `optional-operators-ci-operator-sdk-generic-claim` use:
+> **Warning — keep the workflow's post steps**: a `post:` list in the test config **replaces** the `post:` of the workflow (the ci-operator config field has priority over the workflow's, see the [step registry docs](https://docs.ci.openshift.org/docs/architecture/step-registry/)). If `post:` lists only `openshift-observability-qe-agent`, the workflow's own post steps do not run: with the `cucushift-installer-rehearse-*` workflows the cluster is leaked (never deprovisioned), with the `generic-claim` workflows no must-gather/gather-extra artifacts are collected. List the workflow's own post steps explicitly, in the workflow's order (a step you do not want, such as `send-results-to-reportportal` for teams that do not use ReportPortal, can be omitted; the deprovision/gather steps must not be). The qe-agent step goes **first** because it needs the live cluster; the deprovision chain must be **last**. Look up the steps in the workflow's `*-workflow.yaml` under `ci-operator/step-registry`. The `cucushift-installer-rehearse-<cloud>-ipi` workflows (and the `-ovn` variant) use the form above with the matching `<cloud>` in the deprovision chain name; `generic-claim`, `optional-operators-ci-generic-claim` and `optional-operators-ci-operator-sdk-generic-claim` use:
 >
 > ```yaml
 >     post:
@@ -390,11 +388,10 @@ env:
 post:
 - ref: openshift-observability-qe-agent
 - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
-- ref: send-results-to-reportportal
 workflow: cucushift-installer-rehearse-gcp-ipi
 ```
 
-The workflow's own post steps (deprovision chain and ReportPortal) are listed after the qe-agent step on purpose; see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config).
+The workflow's deprovision chain is listed after the qe-agent step on purpose (the workflow's `send-results-to-reportportal` step is intentionally left out because these jobs do not report to ReportPortal); see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config).
 
 **Test step trap** (in `distributed-tracing-tests-tempo-upstream-commands.sh`):
 ```bash
