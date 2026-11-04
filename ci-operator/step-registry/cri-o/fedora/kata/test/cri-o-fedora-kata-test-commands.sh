@@ -6,8 +6,10 @@ source "${SHARED_DIR}/env"
 chmod +x ${SHARED_DIR}/login_script.sh
 ${SHARED_DIR}/login_script.sh
 
+KATA_RUNTIME_VARIANT=${KATA_RUNTIME_VARIANT:-kata-static}
+
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
-    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" -e "build_kata=True" --connection=local -vvv
+    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" -e "build_kata=True" -e "KATA_RUNTIME_VARIANT=$KATA_RUNTIME_VARIANT" --connection=local -vvv
 EOF
