@@ -30,6 +30,21 @@ tests:
     export XDG_CACHE_HOME="/tmp/cache"
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
+    cat > /tmp/verify-downstream-commits.sh <<'EOF'
+    set -euo pipefail
+    changes=$(mktemp)
+    curl --fail --silent --show-error --location \
+      "https://raw.githubusercontent.com/openshift-service-mesh/.github/main/downstream-changes/istio_${AUTOMATOR_BRANCH}.yaml" \
+      --output "${changes}"
+    commits=$(yq -r '.commits[].sha' "${changes}")
+    rm "${changes}"
+    for sha in ${commits}; do
+      if ! git merge-base --is-ancestor "${sha}" HEAD; then
+        echo "Downstream commit ${sha} is missing after merging upstream ${AUTOMATOR_BRANCH}" >&2
+        exit 1
+      fi
+    done
+    EOF
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=istio \
@@ -40,7 +55,8 @@ tests:
     --modifier=merge_upstream_istio_1.31 \
     --merge-repository=https://github.com/istio/istio \
     --merge-branch=release-1.31 \
-    --merge-strategy=merge
+    --merge-strategy=merge \
+    --post-merge-hook=/tmp/verify-downstream-commits.sh
   container:
     from: src
   cron: 00 05 * * 1-5
