@@ -10,9 +10,6 @@ CLEANUP_EXIT_CODE=0
 
 echo "Starting RDS cleanup..."
 
-# Determine region
-REGION="${LEASED_RESOURCE:-us-east-2}"
-
 # Step 1: Delete the RDS instance (skip if no instance ID recorded)
 if [[ -f "${SHARED_DIR}/rds-instance-id" ]]; then
   INSTANCE_ID=$(cat "${SHARED_DIR}/rds-instance-id")

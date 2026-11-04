@@ -32,9 +32,6 @@ RAW_SUBNETS=$(cat "${SHARED_DIR}/private_subnet_ids")
 PRIVATE_SUBNETS=$(echo "${RAW_SUBNETS}" | tr "'" '"' | jq -r '.[]')
 echo "Private subnets: ${PRIVATE_SUBNETS}"
 
-# Determine the AWS region from the cluster profile or default
-REGION="${LEASED_RESOURCE:-us-east-2}"
-
 # Create DB subnet group
 echo "Creating DB subnet group: ${SUBNET_GROUP_NAME}..."
 aws rds create-db-subnet-group \
