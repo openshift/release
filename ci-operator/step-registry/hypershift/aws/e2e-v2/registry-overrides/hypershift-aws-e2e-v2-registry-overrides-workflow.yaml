@@ -11,10 +11,10 @@ workflow:
     Differences from hypershift-aws-e2e-v2:
     - hypershift-mirror-registry-ca-generate writes a CA to SHARED_DIR before anything else. The tests sign the
       mirror's serving certificate with it.
-    - The nested management cluster is created with that CA as additional trust bundle, so its kubelets can pull the
-      overridden control plane images from the mirror.
-    - hypershift-mirror-registry-ca-trust-mgmt adds the CA to image.config.openshift.io/cluster before
-      hypershift-install, so the operator and, through its trust bundle, every control plane operator trust it.
+    - The nested management cluster is created with that CA (HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE) both as
+      additional trust bundle, so its kubelets can pull the overridden control plane images from the mirror, and in
+      its image.config.openshift.io/cluster spec.additionalTrustedCA, so the HyperShift operator installed next and,
+      through its trust bundle, every control plane operator trust it.
 
     Test selection comes from TEST_PLAN in the job configuration.
 
@@ -34,7 +34,6 @@ workflow:
     - ref: ipi-install-rbac
     - ref: hypershift-mirror-registry-ca-generate
     - chain: hypershift-setup-nested-management-cluster
-    - ref: hypershift-mirror-registry-ca-trust-mgmt
     - ref: hypershift-install
     - ref: hypershift-resolve-nodepool-releases
     - ref: hypershift-write-test-plan
