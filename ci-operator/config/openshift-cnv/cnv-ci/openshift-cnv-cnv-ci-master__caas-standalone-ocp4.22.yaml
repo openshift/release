@@ -61,29 +61,30 @@ tests:
           memory: 600Mi
       timeout: 2h0m0s
     - ref: hypershift-kubevirt-install-odf
-    - as: deploy-caas-standalone
+    - as: deploy-caas-infra-standalone
       cli: latest
       commands: |
         curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
         mkdir -p /tmp/cnv-ci
         tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
-        ./hack/deploy-caas-standalone.sh
+        ./hack/caas/deploy-caas-infra-standalone.sh
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 600Mi
       timeout: 1h0m0s
-    - as: create-caas-tenant
+    - as: create-nested-cluster
       cli: latest
       commands: |
         curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
         mkdir -p /tmp/cnv-ci
         tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
-        ./hack/create-caas-tenant.sh
-        cp "${ARTIFACT_DIR}/tenant-kubeconfig" "${SHARED_DIR}/tenant-kubeconfig"
+        ./hack/caas/create-nested-cluster.sh
+        cp "${ARTIFACT_DIR}/infra-project-admin-kubeconfig" "${SHARED_DIR}/infra-project-admin-kubeconfig"
+        cp "${ARTIFACT_DIR}/nested-cluster-kubeconfig" "${SHARED_DIR}/nested-cluster-kubeconfig"
       env:
       - default: tenant-admin
         documentation: Project-admin identity used to provision the CAAS tenant.
@@ -94,23 +95,25 @@ tests:
           cpu: 100m
           memory: 600Mi
       timeout: 3h0m0s
-    - as: add-caas-tenant-workers
+    - as: add-workers-to-nested-cluster
       cli: latest
       commands: |
         curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
         mkdir -p /tmp/cnv-ci
         tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
-        TENANT_KUBECONFIG="${SHARED_DIR}/tenant-kubeconfig" ./hack/add-caas-tenant-workers.sh
+        INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+          NESTED_CLUSTER_KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig" \
+          ./hack/caas/add-workers-to-nested-cluster.sh
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 600Mi
       timeout: 2h0m0s
-    - as: tenant-conformance-minimal
+    - as: nested-cluster-conformance-minimal
       commands: |
-        export KUBECONFIG="${SHARED_DIR}/tenant-kubeconfig"
+        export KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig"
         openshift-tests run openshift/conformance/parallel/minimal \
           --provider '{"type":"baremetal"}' \
           -o "${ARTIFACT_DIR}/e2e.log" \
@@ -122,14 +125,14 @@ tests:
           cpu: "3"
           memory: 600Mi
       timeout: 4h0m0s
-    - as: delete-caas-tenant
+    - as: delete-nested-cluster
       cli: latest
       commands: |
         curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
         mkdir -p /tmp/cnv-ci
         tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
         cd /tmp/cnv-ci
-        ./hack/delete-caas-tenant.sh
+        ./hack/caas/delete-nested-cluster.sh
       from: src
       resources:
         requests:
