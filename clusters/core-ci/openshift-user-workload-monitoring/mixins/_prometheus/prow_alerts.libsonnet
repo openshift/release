@@ -92,7 +92,13 @@
           },
           {
             alert: 'TriggeredProwJobsPileup',
-            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
+            // Sustained-pileup detector: min_over_time fires only when the triggered
+            // count stayed above the threshold for the WHOLE 5m (jobs genuinely not
+            // draining), so a continuous pileup is one held firing. A max_over_time
+            // peak-detector instead fired (and, with keep_firing_for, re-fired) on the
+            // brief batch-scheduling bursts that drain within seconds -- the flapping
+            // observed in ci-metrics (baseline ~60, p90 ~170; only sub-5m spikes cross 450).
+            expr: 'min_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450',
             'keep_firing_for': '10m',
             labels: {
               severity: 'critical',
@@ -100,19 +106,23 @@
             annotations: {
               ops_color: 'orange',
               ops_category: 'ci_platform',
-              message: 'Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
+              message: 'Triggered prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak',
             }
           },
           {
             alert: 'SchedulingProwJobsPileup',
-            expr: 'max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
+            // Same sustained-pileup detector as TriggeredProwJobsPileup above
+            // (min_over_time, not a max_over_time peak-detector) so transient
+            // scheduling bursts do not fire/re-fire; only a queue that stays above
+            // the threshold for a full 5m pages.
+            expr: 'min_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300',
             'keep_firing_for': '10m',
             labels: {
               severity: 'warning',
             },
             annotations: {
-              message: 'Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
+              message: 'Scheduling prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.',
               runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak',
             }
           },

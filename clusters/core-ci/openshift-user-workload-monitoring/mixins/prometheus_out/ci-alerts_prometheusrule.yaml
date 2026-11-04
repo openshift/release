@@ -302,44 +302,22 @@ spec:
         severity: critical
     - alert: ci-tools-image-build-failures
       annotations:
-        message: The ci-tools image postsubmit {{ $labels.job_name }} is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.
+        message: No successful ci-tools image postsubmit {{ $labels.job_name }} build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.
         ops_category: ci_platform
         ops_color: orange
-      expr: |-
+      expr: |
         (
-        max by (job_name) (
-          max_over_time(
-            (
-              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"})
-              and
-              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"} offset 15m))
-            )[2d:5m]
+          sum by (job_name) (
+            increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[6h])
           )
-        )
+          > 0
         )
         unless on (job_name)
         (
-        (
-        max by (job_name) (
-          max_over_time(
-            (
-              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"success"})
-              and
-              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"success"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"success"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"success"} offset 15m))
-            )[2d:5m]
+          sum by (job_name) (
+            increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state="success"}[6h])
           )
-        )
-        ) >= on (job_name) (
-        max by (job_name) (
-          max_over_time(
-            (
-              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"})
-              and
-              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"} offset 15m))
-            )[2d:5m]
-          )
-        )
-        )
+          > 0
         )
       for: 1m
       labels:
@@ -783,19 +761,19 @@ spec:
         severity: critical
     - alert: TriggeredProwJobsPileup
       annotations:
-        message: Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
+        message: Triggered prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
         ops_category: ci_platform
         ops_color: orange
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak
-      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
+      expr: min_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
       keep_firing_for: 10m
       labels:
         severity: critical
     - alert: SchedulingProwJobsPileup
       annotations:
-        message: Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
+        message: Scheduling prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak
-      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
+      expr: min_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
       keep_firing_for: 10m
       labels:
         severity: warning

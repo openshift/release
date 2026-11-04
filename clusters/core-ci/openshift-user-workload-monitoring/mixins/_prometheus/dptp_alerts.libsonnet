@@ -176,18 +176,30 @@ local infraJobAnnotations = {
           },
           {
             alert: 'ci-tools-image-build-failures',
-            // Only the POSTSUBMIT (branch-ci) ci-tools image builds: they run on
-            // merge to main and promote the images, so a failure means the ci-tools
-            // images on main are broken. The presubmit (pull-ci) image builds are
-            // intentionally NOT alerted -- their failures reflect individual
-            // in-progress PRs (and prowjob_state_transitions has no per-PR label, so
-            // all PR runs collapse into one series), are already surfaced to the
-            // author as a required PR check, and are not an ops signal. Latest-transition
-            // comparison (an earlier success cannot mask a later failing build). 2d is
-            // the longest lookback the ci-metrics evaluator is confirmed to serve (it
-            // matches configmap_alerts' predict_linear[2d]); a broken postsubmit with no
-            // rebuild for >2d ages out until the next merge re-evaluates it.
-            expr: latestRunFailed('^branch-ci-openshift-ci-tools(-standalone)?-main-images$', '2d'),
+            // Only the POSTSUBMIT (branch-ci) ci-tools image builds: they run on merge
+            // to main and promote the images. These builds are flaky from transient
+            // infrastructure -- CentOS Stream mirror/dnf blips (DockerBuildFailed) and
+            // build-pod scheduling pressure (pod_pending) -- so paging on each failed
+            // build is noise. Fire only on SUSTAINED breakage: a failure/error in the
+            // last 6h with NO successful build in the last 6h (a later successful merge
+            // clears it). Presubmit (pull-ci) builds are intentionally excluded -- their
+            // failures are per-PR (and prowjob_state_transitions has no per-PR label),
+            // not platform health. 6h is within the evaluator's confirmed lookback.
+            expr: |||
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[6h])
+                )
+                > 0
+              )
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state="success"}[6h])
+                )
+                > 0
+              )
+            |||,
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -195,7 +207,7 @@ local infraJobAnnotations = {
             annotations: {
               ops_color: 'orange',
               ops_category: 'ci_platform',
-              message: 'The ci-tools image postsubmit {{ $labels.job_name }} is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.',
+              message: 'No successful ci-tools image postsubmit {{ $labels.job_name }} build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.',
             },
           },
         ],
