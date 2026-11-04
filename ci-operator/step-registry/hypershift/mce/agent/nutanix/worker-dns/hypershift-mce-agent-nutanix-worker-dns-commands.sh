@@ -9,6 +9,7 @@ source "$SHARED_DIR/nutanix_context.sh"
 CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
 BASE_DOMAIN=$(oc --kubeconfig="$SHARED_DIR/kubeconfig" get dns cluster -o jsonpath='{.spec.baseDomain}')
 STATE_FILE="$SHARED_DIR/nutanix_worker_dns_state.json"
+TUNNEL_STATE_FILE="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
 
 if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
   echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
@@ -34,19 +35,48 @@ function prism() {
     --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" "$NUTANIX_PC_URL/api/nutanix/v3/$path"
 }
 
+if [[ ! -s "$TUNNEL_STATE_FILE" || ! -s "$SHARED_DIR/nutanix_ingress_tunnel_ssh_config" ]]; then
+  echo "The Nutanix ingress tunnel must be ready before configuring worker DNS."
+  exit 1
+fi
+tunnel_state=$(<"$TUNNEL_STATE_FILE")
+if ! jq -e --arg lease "$NUTANIX_QUOTA_SLICE" --arg subnet "$SUBNET_UUID" \
+  --arg vip "$INGRESS_VIP" --arg host "$IP" '
+    .stage == "ready" and .lease == $lease and .subnetUUID == $subnet and
+    .vip == $vip and .hostIP == $host
+  ' <<<"$tunnel_state" >/dev/null; then
+  echo "The Nutanix ingress tunnel does not match this lease, subnet, and proxy host."
+  exit 1
+fi
+bind_ip=$(jq -er '.hostTunnelIP' <<<"$tunnel_state")
+advertise_ip=$(jq -er '.gatewayIP' <<<"$tunnel_state")
+client_ip=$(jq -er '.gatewayTunnelIP' <<<"$tunnel_state")
+tunnel_interface=$(jq -er '.interface' <<<"$tunnel_state")
+client_cidr="$client_ip/32"
+if [[ ! "$tunnel_interface" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+  echo "The Nutanix ingress tunnel has an invalid WireGuard interface."
+  exit 1
+fi
+gateway_route=$(ssh -F "$SHARED_DIR/nutanix_ingress_tunnel_ssh_config" \
+  nutanix-ingress-gateway ip -4 route get "$INGRESS_VIP")
+gateway_current_ip=$(awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}' <<<"$gateway_route")
+if [[ "$gateway_current_ip" != "$advertise_ip" ]]; then
+  echo "The Nutanix gateway's subnet IP changed before the discovery ISO was created."
+  exit 1
+fi
+
 management_ip=$(oc --kubeconfig="$SHARED_DIR/kubeconfig" get nodes -l node-role.kubernetes.io/worker= \
   -o json | jq -r '[.items[].status.addresses[]? | select(.type == "InternalIP") | .address | select(test("^[0-9.]+$"))] | first // empty')
-bind_ip=${NUTANIX_DNS_BIND_IP:-${IP:-}}
-advertise_ip=${NUTANIX_DNS_ADVERTISE_IP:-${IP:-}}
 upstream=${NUTANIX_DNS_UPSTREAM:-127.0.0.1}
-for address in "$management_ip" "$INGRESS_VIP" "$bind_ip" "$advertise_ip" "$upstream"; do
+for address in "$management_ip" "$INGRESS_VIP" "$bind_ip" "$advertise_ip" "$client_ip" "$upstream"; do
   if ! valid_ipv4 "$address"; then
     echo "Worker DNS requires valid IPv4 management, ingress, bind, advertised, and upstream addresses."
     exit 1
   fi
 done
-if [[ "$bind_ip" == "$upstream" || "$advertise_ip" == "$upstream" ]]; then
-  echo "The worker DNS upstream cannot be the worker-facing resolver."
+if [[ "$bind_ip" == "$upstream" || "$advertise_ip" == "$upstream" ||
+      "$bind_ip" == "$IP" || "$advertise_ip" == "$IP" || "$bind_ip" == "$advertise_ip" ]]; then
+  echo "Worker DNS must bind to the host tunnel IP and advertise a distinct Nutanix gateway IP."
   exit 1
 fi
 if [[ "$bind_ip" == 0.* || "$bind_ip" == 127.* || "$bind_ip" == 169.254.* ||
@@ -64,12 +94,15 @@ fi
 umask 077
 jq -n --arg cluster "$CLUSTER_NAME" --arg subnet "$SUBNET_UUID" --arg subnetName "$SUBNET_NAME" \
   --arg lease "$NUTANIX_QUOTA_SLICE" --arg bind "$bind_ip" --arg advertised "$advertise_ip" \
-  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,bindIP:$bind,advertisedIP:$advertised}' \
+  --arg clientCIDR "$client_cidr" --arg tunnelInterface "$tunnel_interface" \
+  '{cluster:$cluster,subnetUUID:$subnet,subnetName:$subnetName,lease:$lease,
+    bindIP:$bind,advertisedIP:$advertised,clientCIDR:$clientCIDR,tunnelInterface:$tunnelInterface}' \
   > "$STATE_FILE.tmp"
 mv "$STATE_FILE.tmp" "$STATE_FILE"
 
 ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
-  "$CLUSTER_NAME" "$BASE_DOMAIN" "$bind_ip" "$upstream" "$management_ip" "$INGRESS_VIP" <<'EOF'
+  "$CLUSTER_NAME" "$BASE_DOMAIN" "$bind_ip" "$upstream" "$management_ip" "$INGRESS_VIP" \
+  "$client_cidr" "$tunnel_interface" <<'EOF'
 set -euo pipefail
 
 cluster=$1
@@ -78,6 +111,8 @@ bind_ip=$3
 upstream=$4
 management_ip=$5
 ingress_vip=$6
+client_cidr=$7
+tunnel_interface=$8
 state_dir=/etc/hypershift-nutanix-worker-dns
 config_file="$state_dir/$cluster.conf"
 marker_file="$state_dir/$cluster.state"
@@ -90,8 +125,8 @@ if [[ -e "$config_file" || -e "$marker_file" || -e "$unit_file" ]]; then
 fi
 interface=$(ip -o -4 addr show | awk -v address="$bind_ip" '$3 == "inet" { split($4, fields, "/"); if (fields[1] == address) { print $2; exit } }')
 interface=${interface%%@*}
-if [[ -z "$interface" ]]; then
-  echo "The DNS bind address $bind_ip is not assigned to the baremetal host. Set NUTANIX_DNS_BIND_IP to a local address and arrange port 53 forwarding if needed."
+if [[ "$interface" != "$tunnel_interface" ]]; then
+  echo "The DNS bind address $bind_ip is not assigned to the run's WireGuard interface."
   exit 1
 fi
 firewall-cmd --state >/dev/null
@@ -101,7 +136,7 @@ if [[ -z "$zone" || "$zone" == "no zone" ]]; then
 fi
 for protocol in udp tcp; do
   deny_rule="rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
-  allow_rule="rule priority=\"-100\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
+  allow_rule="rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
   for rule in "$allow_rule" "$deny_rule"; do
     if firewall-cmd --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 ||
       firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1; then
@@ -112,7 +147,7 @@ for protocol in udp tcp; do
 done
 
 install -d -m 700 "$state_dir"
-printf '%s %s %s\n' "$cluster" "$bind_ip" "$zone" > "$marker_file"
+printf '%s %s %s %s\n' "$cluster" "$bind_ip" "$client_cidr" "$zone" > "$marker_file"
 chmod 600 "$marker_file"
 cat > "$config_file" <<CONF
 port=53
@@ -145,8 +180,10 @@ WantedBy=multi-user.target
 UNIT
 
 for protocol in udp tcp; do
-  allow_rule="rule priority=\"-100\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
-  firewall-cmd --zone="$zone" --add-rich-rule="$allow_rule" --timeout=24h
+  allow_rule="rule priority=\"-100\" family=\"ipv4\" source address=\"$client_cidr\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" accept"
+  deny_rule="rule priority=\"-90\" family=\"ipv4\" destination address=\"$bind_ip\" port port=\"53\" protocol=\"$protocol\" drop"
+  firewall-cmd --zone="$zone" --add-rich-rule="$allow_rule" --timeout=27h
+  firewall-cmd --zone="$zone" --add-rich-rule="$deny_rule" --timeout=27h
 done
 systemctl daemon-reload
 systemctl start "$unit"
@@ -165,7 +202,7 @@ if command -v dig >/dev/null; then
     exit 1
   fi
 fi
-printf 'Worker DNS listens on %s:53 in firewall zone %s without a source-IP restriction.\n' "$bind_ip" "$zone"
+printf 'Worker DNS listens on %s:53 in firewall zone %s for tunnel peer %s.\n' "$bind_ip" "$zone" "$client_cidr"
 EOF
-printf 'Configured worker DNS at %s:53 without changing DHCP on shared subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
+printf 'Configured worker DNS through Nutanix gateway %s:53 without exposing the baremetal host IP or changing DHCP on subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
   "$advertise_ip" "$SUBNET_NAME"

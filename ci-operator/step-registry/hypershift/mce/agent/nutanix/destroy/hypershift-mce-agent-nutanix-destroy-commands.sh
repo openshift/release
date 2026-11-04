@@ -4,7 +4,7 @@ set -euo pipefail
 set +x
 
 context_file="$SHARED_DIR/nutanix_context.sh"
-trap 'status=$?; if (( status == 0 )) && [[ ! -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then rm -f "$context_file"; fi' EXIT
+trap 'status=$?; if (( status == 0 )) && [[ ! -e "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then rm -f "$context_file"; fi' EXIT
 
 if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
   echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
@@ -230,9 +230,11 @@ if [[ "$management_cleanup_failed" == "true" ]]; then
   exit 1
 fi
 
-if [[ ! -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
-  rm -f "$SHARED_DIR/nutanix_context.sh"
-fi
 rm -f "$SHARED_DIR/nutanix_pull_secret_created"
 rm -rf /tmp/hcp-agent-nutanix
+if [[ -e "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
+  touch "$SHARED_DIR/nutanix_destroy_complete"
+else
+  rm -f "$SHARED_DIR/nutanix_context.sh"
+fi
 printf "Deleted this run's Nutanix resources for lease %s; CI-operator releases the lease after the workflow.\n" "$lease_resource"

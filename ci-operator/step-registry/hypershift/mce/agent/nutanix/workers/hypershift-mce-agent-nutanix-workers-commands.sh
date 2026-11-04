@@ -40,6 +40,34 @@ function gather_failure_diagnostics() {
 }
 trap gather_failure_diagnostics EXIT
 
+tunnel_state_file="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
+dns_state_file="$SHARED_DIR/nutanix_worker_dns_state.json"
+gateway_ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
+if [[ ! -s "$tunnel_state_file" || ! -s "$dns_state_file" || ! -s "$gateway_ssh_config" ]] || ! jq -e \
+  --arg lease "${NUTANIX_QUOTA_SLICE:-}" --arg subnet "$SUBNET_UUID" \
+  '.stage == "ready" and .lease == $lease and .subnetUUID == $subnet' \
+  "$tunnel_state_file" >/dev/null; then
+  echo "The Nutanix ingress tunnel and worker DNS must be ready before worker boot."
+  exit 1
+fi
+gateway_expected_ip=$(jq -er '.gatewayIP' "$tunnel_state_file")
+if [[ ! "$gateway_expected_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] ||
+   ! jq -e --arg lease "${NUTANIX_QUOTA_SLICE:-}" --arg subnet "$SUBNET_UUID" \
+     --arg cluster "$CLUSTER_NAME" --arg advertised "$gateway_expected_ip" \
+     '.lease == $lease and .subnetUUID == $subnet and .cluster == $cluster and
+      .advertisedIP == $advertised' "$dns_state_file" >/dev/null; then
+  echo "The discovery ISO's worker DNS address does not match the gateway."
+  exit 1
+fi
+gateway_route=$(ssh -F "$gateway_ssh_config" nutanix-ingress-gateway ip -4 route get "$INGRESS_VIP")
+gateway_current_ip=$(awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}' <<<"$gateway_route")
+if [[ "$gateway_current_ip" != "$gateway_expected_ip" ]]; then
+  echo "The Nutanix gateway's DNS address changed before worker boot."
+  exit 1
+fi
+ssh -F "$gateway_ssh_config" nutanix-ingress-gateway \
+  'sudo systemctl is-active --quiet hypershift-nutanix-ingress-firewall.service'
+
 mkdir -p "$WORK_DIR"
 reserved_macs_file="$SHARED_DIR/nutanix_worker_macs.json"
 if [[ ! -s "$reserved_macs_file" ]] || ! jq -e --arg cluster "$CLUSTER_NAME" --argjson count "$NUTANIX_WORKERS" '

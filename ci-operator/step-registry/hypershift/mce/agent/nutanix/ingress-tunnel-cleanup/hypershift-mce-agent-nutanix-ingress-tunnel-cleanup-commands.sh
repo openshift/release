@@ -5,8 +5,19 @@ set +x
 
 state_file="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
-if [[ ! -s "$state_file" ]]; then
+cleanup_context_if_complete() {
+  if [[ -e "$SHARED_DIR/nutanix_destroy_complete" && ! -e "$state_file" &&
+        ! -e "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
+    rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_destroy_complete"
+  fi
+}
+if [[ ! -e "$state_file" ]]; then
+  cleanup_context_if_complete
   exit 0
+fi
+if [[ ! -s "$state_file" ]]; then
+  echo "The tunnel state file is empty; retaining the Nutanix context for investigation."
+  exit 1
 fi
 
 # shellcheck source=/dev/null
@@ -224,4 +235,5 @@ delete_recorded() {
 delete_recorded vms vm "$gateway_name" "$gateway_uuid" "$gateway_task_uuid"
 delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
 rm -f "$ssh_config" "$state_file"
+cleanup_context_if_complete
 printf 'Removed the lease-owned proxy-host tunnel, Nutanix gateway VM, and image for %s.\n' "$lease"
