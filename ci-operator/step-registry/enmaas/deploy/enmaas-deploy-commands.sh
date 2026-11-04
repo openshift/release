@@ -7,7 +7,7 @@ echo "Cloning EnMaaS-opps repository (branch: ${ENMAAS_BRANCH})..."
 WORK_DIR=$(mktemp -d)
 
 # Clone EnMaaS-opps repository
-ENMAAS_CREDENTIALS="/var/run/enmaas-credentials/token"
+ENMAAS_CREDENTIALS="/secret/enmaas/token"
 if [[ -f "${ENMAAS_CREDENTIALS}" ]]; then
     echo "Configuring git credentials for private repository clone..."
     GITHUB_TOKEN=$(cat "${ENMAAS_CREDENTIALS}")
