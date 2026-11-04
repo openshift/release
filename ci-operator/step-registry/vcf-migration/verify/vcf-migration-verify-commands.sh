@@ -77,4 +77,38 @@ if [[ "${migration_ready}" != "True" ]]; then
   fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
 fi
 
+# Verify node region/zone labels match target failure domain tags
+if [[ -f "${SHARED_DIR}/vcf-migration-target-fds.json" ]]; then
+  log "verifying node region/zone labels match target failure domains"
+
+  while IFS= read -r fd; do
+    region="$(jq -r '.region' <<< "${fd}")"
+    zone="$(jq -r '.zone' <<< "${fd}")"
+
+    nodes_in_zone="$(oc get nodes -o json | jq -r --arg region "${region}" --arg zone "${zone}" '
+      [.items[]
+       | select(.metadata.labels["topology.kubernetes.io/region"] == $region
+                and .metadata.labels["topology.kubernetes.io/zone"] == $zone)
+       | .metadata.name] | length')"
+
+    if [[ "${nodes_in_zone}" -eq 0 ]]; then
+      log "warning: no nodes found with region=${region} zone=${zone}"
+    else
+      log "verified ${nodes_in_zone} node(s) in region=${region} zone=${zone}"
+    fi
+  done < <(jq -c '.[]' "${SHARED_DIR}/vcf-migration-target-fds.json")
+fi
+
+# Verify MachineConfigPools are Updated and not Degraded
+degraded_mcps="$(oc get machineconfigpools -o json | jq -r '
+  [.items[]
+   | select(
+       any(.status.conditions[]?; .type == "Updated" and .status != "True")
+       or any(.status.conditions[]?; .type == "Degraded" and .status != "False")
+     )
+   | .metadata.name] | join(",")')"
+if [[ -n "${degraded_mcps}" ]]; then
+  fail_with_details "MachineConfigPools are not converged: ${degraded_mcps}"
+fi
+
 log "verification succeeded; cluster now references only the target vCenter"
