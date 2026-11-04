@@ -17,8 +17,22 @@ Claude's full session output (stream-json) is captured to a temporary file and n
 
 1. Tag your test runner image as `obs-tests-runner` and install Claude Code CLI in it
 2. Add the `notify_qe_agent` EXIT trap to your test step script
-3. Add `openshift-observability-qe-agent` to the `post:` phase of your CI config
+3. Add `openshift-observability-qe-agent` to the `post:` phase of your CI config, followed by the workflow's own post steps (see the warning below)
 4. Set `AGENT_SKILL` to your team's skill name
+
+> **Warning**: a test-level `post:` **replaces** the workflow's post phase. List the workflow's own post steps after the qe-agent step, otherwise the `cucushift-installer-rehearse-*` clusters are never deprovisioned (leaked). Look the steps up in the workflow's `*-workflow.yaml`:
+>
+> ```yaml
+> # workflow: cucushift-installer-rehearse-gcp-ipi (aws, azure and aws-ipi-ovn are analogous)
+> post:
+> - ref: openshift-observability-qe-agent
+> - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+>
+> # workflow: generic-claim (the cluster is claimed from a pool and released by ci-operator;
+> # the workflow's only post step is `chain: gather`, which is optional, see below)
+> post:
+> - ref: openshift-observability-qe-agent
+> ```
 
 See [Setup](#setup) for detailed instructions.
 
@@ -176,10 +190,21 @@ tests:
       # ... other env vars
     post:
     - ref: openshift-observability-qe-agent
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     test:
     - ref: <your-test-ref>
     workflow: cucushift-installer-rehearse-gcp-ipi
 ```
+
+> **Warning — keep the workflow's post steps**: a `post:` list in the test config **replaces** the `post:` of the workflow (the ci-operator config field has priority over the workflow's, see the [step registry docs](https://docs.ci.openshift.org/docs/architecture/step-registry/)). If `post:` lists only `openshift-observability-qe-agent`, the workflow's own post steps do not run: with the `cucushift-installer-rehearse-*` workflows the cluster is leaked (never deprovisioned), with the `generic-claim` workflows no must-gather/gather-extra artifacts are collected. List the workflow's own post steps explicitly, in the workflow's order. Steps you do not need can be omitted on purpose, such as `send-results-to-reportportal` for teams that do not use ReportPortal or `chain: gather` for layered products that do not need the must-gather artifacts; the deprovision chain must not be omitted. The qe-agent step goes **first** because it needs the live cluster; the deprovision chain must come **after** it, and the workflow's remaining post steps keep the workflow's order. Look up the steps in the workflow's `*-workflow.yaml` under `ci-operator/step-registry`. The `cucushift-installer-rehearse-<cloud>-ipi` workflows (and the `-ovn` variant) use the form above with the matching `<cloud>` in the deprovision chain name; `generic-claim`, `optional-operators-ci-generic-claim` and `optional-operators-ci-operator-sdk-generic-claim` have only `chain: gather` in their post phase. The jobs in this repository omit it, so they use the qe-agent step alone (add `- chain: gather` after it if you want the gather artifacts):
+>
+> ```yaml
+>     post:
+>     - ref: openshift-observability-qe-agent
+>     test:
+>     - ref: <your-test-ref>
+>     workflow: generic-claim
+> ```
 
 > **Important**: The agent is prohibited from accessing the `kube-system` namespace via a prompt-level constraint in all skills. This prevents the agent from reading cloud provider credentials stored in that namespace. This is a soft control, not technically enforced by RBAC. See [Blast Radius and Risk Profile](#blast-radius-and-risk-profile) for details.
 
@@ -302,17 +327,17 @@ To mitigate this, all skills include a prompt-level constraint that prohibits th
 - **No outbound HTTP** — `WebFetch` is not in `allowedTools`; Claude cannot call arbitrary external URLs.
 - **No git push** — no git credentials are mounted; file changes are confined to the pod.
 - **No cross-tenant cluster access** — RBAC bounds apply; Claude cannot reach other teams' clusters or namespaces.
-- **No persistence beyond the job** — the test cluster is ephemeral and torn down by the deprovision chain after every job.
+- **No persistence beyond the job** — the test cluster is ephemeral and torn down by the deprovision chain after every job, as long as the config lists that chain in `post:` (see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)).
 
 ### Worst-case scenarios
 
-**Unexpected cluster mutation** — Claude misinterprets a skill step and deletes a namespace or patches a resource it should not touch. Not a concern in practice: the step runs in the `post:` phase against a test-only cluster, and the deprovision chain that follows destroys the entire cluster regardless. No production or shared infrastructure is reachable.
+**Unexpected cluster mutation** — Claude misinterprets a skill step and deletes a namespace or patches a resource it should not touch. Not a concern in practice: the step runs in the `post:` phase against a test-only cluster, and, provided the config lists the workflow's deprovision chain after the agent (see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)), that chain destroys the entire cluster regardless. No production or shared infrastructure is reachable.
 
 **Runaway session** — Claude enters a reasoning loop, consuming turns and Vertex AI budget without making progress. Hard-bounded on three axes: `--max-budget-usd 5` stops the session the moment spend reaches $5 — preventing runaway cost from exhausting the Vertex AI cost center budget — the Claude timeout (`STEP_TIMEOUT_MINUTES - 10` minutes, default 80m) kills the Claude process to guarantee time for post-processing and Jira filing — and the step timeout (90m) is the outer limit. `best_effort: true` ensures none of these bounds can block the pipeline.
 
 **ARTIFACT_DIR pollution** — Claude writes unexpected files to `ARTIFACT_DIR`, which are then uploaded to GCS. The skill scopes Claude to documented output paths, but this is a prompt-level control, not a technical one.
 
-**SHARED_DIR pollution** — Claude writes unexpected files to `SHARED_DIR`, which is shared with the deprovision post-step. The deprovision step ignores unexpected files in practice, but this is not formally enforced.
+**SHARED_DIR pollution** — Claude writes unexpected files to `SHARED_DIR`, which is shared with the other post steps, such as the deprovision chain when the config lists it (see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)). The deprovision step ignores unexpected files in practice, but this is not formally enforced; in particular, the installer deprovision step skips destruction when `${SHARED_DIR}/metadata.json` is missing or empty, so an agent that removed or truncated that file would leave the cluster running.
 
 ### Audit artifacts
 
@@ -361,8 +386,11 @@ env:
   JIRA_PROJECT: TRACING
 post:
 - ref: openshift-observability-qe-agent
+- chain: cucushift-installer-rehearse-gcp-ipi-deprovision
 workflow: cucushift-installer-rehearse-gcp-ipi
 ```
+
+The workflow's deprovision chain is listed after the qe-agent step on purpose (the workflow's `send-results-to-reportportal` step is intentionally left out because these jobs do not report to ReportPortal); see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config).
 
 **Test step trap** (in `distributed-tracing-tests-tempo-upstream-commands.sh`):
 ```bash
@@ -429,7 +457,7 @@ trap notify_qe_agent EXIT
 |---|---|---|
 | Bash command execution | `--allowedTools` allowlist | Protocol-enforced (Claude Code runtime) |
 | File writes | Skill-scoped to `ARTIFACT_DIR`; post-processing adds AI-generated banner | Prompt-level (skill instructions) |
-| Cluster mutations (create/delete/patch) | Ephemeral test cluster; deprovision chain destroys cluster after run | Infrastructure-level (CI job lifecycle) |
+| Cluster mutations (create/delete/patch) | Ephemeral test cluster; deprovision chain (listed in the test's `post:`) destroys cluster after run | Infrastructure-level (CI job lifecycle) |
 | API spend | `--max-budget-usd 5` hard cap | Protocol-enforced (Claude Code runtime) |
 | Claude timeout | `timeout ${STEP_TIMEOUT_MINUTES - 10}m` | Script-enforced (commands script) |
 | Session duration | `timeout: 1h30m0s` | Infrastructure-enforced (ci-operator) |
@@ -494,13 +522,13 @@ Multiple independent mechanisms can immediately terminate the agent:
 3. **Budget kill** — `--max-budget-usd 5` stops Claude when API spend reaches $5. Enforced by Claude Code runtime, independent of the agent's logic.
 4. **Grace period** — `grace_period: 2m0s` allows the EXIT trap to clean up temporary files after timeout.
 5. **`best_effort: true`** — even if the agent crashes or is killed, the CI pipeline continues to the deprovision step. The agent cannot block the pipeline.
-6. **Cluster destruction** — the deprovision chain runs after the agent, destroying the entire test cluster regardless of agent behavior. Any cluster-level changes the agent made are eliminated.
+6. **Cluster destruction** — the deprovision chain runs after the agent (it must be listed after the agent in the test's `post:`, see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)) and destroys the test cluster, eliminating any cluster-level changes the agent made. This is not fully independent of the agent: the installer deprovision step skips destruction when `${SHARED_DIR}/metadata.json` is missing or empty, and the agent can write to `SHARED_DIR` (the step has no technical protection for that file, see [Worst-case scenarios](#worst-case-scenarios)).
 
 All mechanisms function independently of the agent's logic and the AI model.
 
 ### Rollback
 
-- **Cluster changes**: No rollback needed — the deprovision chain destroys the cluster.
+- **Cluster changes**: No rollback needed — the deprovision chain destroys the cluster (when listed in `post:`, see the Setup warning).
 - **ARTIFACT_DIR files**: Files uploaded to GCS are read-only artifacts. They do not trigger automated actions. If an analysis is incorrect, the engineer simply ignores it.
 - **Test fixes**: Proposed fixes in `test-fixes/` are files in GCS, not applied to any repository. A human must create a PR to apply them.
 
@@ -732,7 +760,7 @@ Do not add unapproved personal information or customer data to skill files, `qe-
 |---|---|---|---|
 | Stream-json session output | Pod temp file (`mktemp`) | Duration of agent run | Deleted via `trap 'rm -f ...' EXIT` — never reaches GCS |
 | Pod filesystem (all data) | Ephemeral pod storage | Duration of CI job | Destroyed when pod terminates |
-| Test cluster (all state) | Ephemeral cluster nodes | Duration of CI job | Destroyed by deprovision chain after agent runs |
+| Test cluster (all state) | Ephemeral cluster nodes | Duration of CI job | Destroyed by the deprovision chain after the agent runs (when listed in `post:`) |
 | ARTIFACT_DIR files | GCS (via CI sidecar) | Subject to GCS lifecycle policies | Managed by Prow/GCS retention policies |
 | Vertex AI API calls | Stateless API | Request/response only | No conversation persistence on provider side |
 | Skill file (fetched) | Pod memory (shell variable) | Duration of agent run | Destroyed with pod |
