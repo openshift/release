@@ -20,7 +20,7 @@ Claude's full session output (stream-json) is captured to a temporary file and n
 3. Add `openshift-observability-qe-agent` to the `post:` phase of your CI config, followed by the workflow's own post steps (see the warning below)
 4. Set `AGENT_SKILL` to your team's skill name
 
-> **Warning**: a test-level `post:` **replaces** the workflow's post phase. List the workflow's own post steps after the qe-agent step, otherwise the `cucushift-installer-rehearse-*` clusters are never deprovisioned (leaked) and, for `generic-claim`, no must-gather is collected. Look the steps up in the workflow's `*-workflow.yaml`:
+> **Warning**: a test-level `post:` **replaces** the workflow's post phase. List the workflow's own post steps after the qe-agent step, otherwise the `cucushift-installer-rehearse-*` clusters are never deprovisioned (leaked). Look the steps up in the workflow's `*-workflow.yaml`:
 >
 > ```yaml
 > # workflow: cucushift-installer-rehearse-gcp-ipi (aws, azure and aws-ipi-ovn are analogous)
@@ -28,10 +28,10 @@ Claude's full session output (stream-json) is captured to a temporary file and n
 > - ref: openshift-observability-qe-agent
 > - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
 >
-> # workflow: generic-claim
+> # workflow: generic-claim (the cluster is claimed from a pool and released by ci-operator;
+> # the workflow's only post step is `chain: gather`, which is optional, see below)
 > post:
 > - ref: openshift-observability-qe-agent
-> - chain: gather
 > ```
 
 See [Setup](#setup) for detailed instructions.
@@ -196,12 +196,11 @@ tests:
     workflow: cucushift-installer-rehearse-gcp-ipi
 ```
 
-> **Warning — keep the workflow's post steps**: a `post:` list in the test config **replaces** the `post:` of the workflow (the ci-operator config field has priority over the workflow's, see the [step registry docs](https://docs.ci.openshift.org/docs/architecture/step-registry/)). If `post:` lists only `openshift-observability-qe-agent`, the workflow's own post steps do not run: with the `cucushift-installer-rehearse-*` workflows the cluster is leaked (never deprovisioned), with the `generic-claim` workflows no must-gather/gather-extra artifacts are collected. List the workflow's own post steps explicitly, in the workflow's order (a step you do not want, such as `send-results-to-reportportal` for teams that do not use ReportPortal, can be omitted; the deprovision/gather steps must not be). The qe-agent step goes **first** because it needs the live cluster; the deprovision chain must come **after** it, and the workflow's remaining post steps keep the workflow's order. Look up the steps in the workflow's `*-workflow.yaml` under `ci-operator/step-registry`. The `cucushift-installer-rehearse-<cloud>-ipi` workflows (and the `-ovn` variant) use the form above with the matching `<cloud>` in the deprovision chain name; `generic-claim`, `optional-operators-ci-generic-claim` and `optional-operators-ci-operator-sdk-generic-claim` use:
+> **Warning — keep the workflow's post steps**: a `post:` list in the test config **replaces** the `post:` of the workflow (the ci-operator config field has priority over the workflow's, see the [step registry docs](https://docs.ci.openshift.org/docs/architecture/step-registry/)). If `post:` lists only `openshift-observability-qe-agent`, the workflow's own post steps do not run: with the `cucushift-installer-rehearse-*` workflows the cluster is leaked (never deprovisioned), with the `generic-claim` workflows no must-gather/gather-extra artifacts are collected. List the workflow's own post steps explicitly, in the workflow's order. Steps you do not need can be omitted on purpose, such as `send-results-to-reportportal` for teams that do not use ReportPortal or `chain: gather` for layered products that do not need the must-gather artifacts; the deprovision chain must not be omitted. The qe-agent step goes **first** because it needs the live cluster; the deprovision chain must come **after** it, and the workflow's remaining post steps keep the workflow's order. Look up the steps in the workflow's `*-workflow.yaml` under `ci-operator/step-registry`. The `cucushift-installer-rehearse-<cloud>-ipi` workflows (and the `-ovn` variant) use the form above with the matching `<cloud>` in the deprovision chain name; `generic-claim`, `optional-operators-ci-generic-claim` and `optional-operators-ci-operator-sdk-generic-claim` have only `chain: gather` in their post phase. The jobs in this repository omit it, so they use the qe-agent step alone (add `- chain: gather` after it if you want the gather artifacts):
 >
 > ```yaml
 >     post:
 >     - ref: openshift-observability-qe-agent
->     - chain: gather
 >     test:
 >     - ref: <your-test-ref>
 >     workflow: generic-claim
