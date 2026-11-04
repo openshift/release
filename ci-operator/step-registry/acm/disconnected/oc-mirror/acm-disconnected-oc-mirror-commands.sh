@@ -254,6 +254,10 @@ main() {
     mkdir -p "${XDG_RUNTIME_DIR}/containers"
     cd "$TMP_DIR"
 
+    if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+
     check_mirror_registry
     configure_pull_secrets
     install_oc_mirror
