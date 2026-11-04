@@ -41,9 +41,8 @@ else
 fi
 
 # If RDS connection details are available in SHARED_DIR (written by
-# enmaas-provision-rds), create a Kubernetes secret with the database
-# credentials and update the params to point to the external RDS instance
-# instead of the in-cluster CloudNativePG database.
+# enmaas-provision-rds), build a connection URL and update params to point
+# to the external RDS instance instead of the in-cluster CloudNativePG database.
 if [[ -f "${SHARED_DIR}/rds-endpoint" ]]; then
   echo "External RDS detected, configuring database connection..."
 
@@ -56,20 +55,10 @@ if [[ -f "${SHARED_DIR}/rds-endpoint" ]]; then
   [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
   set +x
   RDS_PASS=$(cat "${SHARED_DIR}/rds-password")
-
-  # The secret follows the structure expected by EnMaaS for external database
-  # configuration: host, port, username, password, and dbname as individual keys.
-  oc create namespace enmaas --dry-run=client -o yaml | oc apply -f -
-  oc -n enmaas create secret generic enmaas-rds-credentials \
-    --from-literal=host="${RDS_HOST}" \
-    --from-literal=port="${RDS_PORT}" \
-    --from-literal=username="${RDS_USER}" \
-    --from-literal=password="${RDS_PASS}" \
-    --from-literal=dbname="${RDS_DBNAME}" \
-    --dry-run=client -o yaml | oc apply -f -
+  DB_URL="postgresql://${RDS_USER}:${RDS_PASS}@${RDS_HOST}:5432/${RDS_DBNAME}?sslmode=require"
   $WAS_TRACING && set -x
 
-  echo "RDS credentials secret created in enmaas namespace."
+  echo "RDS connection URL built."
 
   # Update params to use external database if the params file supports it
   if [[ -f "${PARAMS_FILE}" ]]; then
@@ -98,17 +87,74 @@ else
 fi
 
 echo "Creating namespaces..."
+oc create namespace enmaas --dry-run=client -o yaml | oc apply -f -
+oc create namespace enmaas-monitoring --dry-run=client -o yaml | oc apply -f -
 oc apply -f base/projects/enmaas/namespace.yaml
 oc apply -f base/projects/enmaas-monitoring/00-namespace.yaml
 
-# Secrets need to be provided via CI credential volumes mounted into $SHARED_DIR.
-# To add secrets, configure credential volumes in the ci-operator config and
-# create the required secret resources from files in $SHARED_DIR here.
-# Example:
-#   if [[ -f "${SHARED_DIR}/enmaas-secret.yaml" ]]; then
-#     oc apply -f "${SHARED_DIR}/enmaas-secret.yaml"
-#   fi
-echo "NOTE: Secrets should be provided via CI credential volumes in SHARED_DIR."
+echo "Creating enmaas-monitoring secrets..."
+oc -n enmaas-monitoring create secret generic grafana-oauth-cookie \
+  --from-literal=session_secret="$(openssl rand -base64 24)" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas-monitoring create secret generic alertmanager-oauth-cookie \
+  --from-literal=session_secret="$(openssl rand -base64 24)" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas-monitoring create secret generic prometheus-oauth-cookie \
+  --from-literal=session_secret="$(openssl rand -base64 24)" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas-monitoring create secret generic grafana-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password=admin \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas-monitoring create secret generic grafana-oauth-github \
+  --from-literal=client-id=dummy-client-id \
+  --from-literal=client-secret=dummy-client-secret \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas-monitoring create secret generic alertmanager-slack \
+  --from-literal=slack_api_url=https://hooks.slack.com/services/dummy/dummy/dummy \
+  --dry-run=client -o yaml | oc apply -f -
+echo "enmaas-monitoring secrets created."
+
+echo "Creating enmaas secrets..."
+# Disable tracing due to password handling
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+if [[ -n "${DB_URL:-}" ]]; then
+  oc -n enmaas create secret generic postgresql-credentials \
+    --from-literal=METERING_DB_URL="${DB_URL}" \
+    --dry-run=client -o yaml | oc apply -f -
+  oc -n enmaas create secret generic metering-readonly-db-url \
+    --from-literal=READ_DATABASE_URL="${DB_URL}" \
+    --dry-run=client -o yaml | oc apply -f -
+  oc -n enmaas create secret generic maas-db-config \
+    --from-literal=DB_CONNECTION_URL="${DB_URL}" \
+    --dry-run=client -o yaml | oc apply -f -
+fi
+$WAS_TRACING && set -x
+oc -n enmaas create secret generic provider-credentials \
+  --from-literal=ANTHROPIC_API_KEY=dummy-key \
+  --from-literal=CB_LITELLM_API_KEY=dummy-key \
+  --from-literal=LITELLM_API_KEY=dummy-key \
+  --from-literal=OPENAI_API_KEY=dummy-key \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas create secret generic pricetag-session \
+  --from-literal=SESSION_SECRET="$(openssl rand -hex 32)" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas create secret generic metering-internal-auth \
+  --from-literal=token="$(openssl rand -hex 32)" \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas create secret generic vertex-sa-key \
+  --from-literal=sa-key.json='{"type":"service_account","project_id":"dummy","private_key_id":"dummy","private_key":"dummy","client_email":"dummy@dummy.iam.gserviceaccount.com","client_id":"0","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}' \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas create secret generic metering-partner-api \
+  --from-literal=model-catalog=dummy \
+  --from-literal=model-policy=dummy \
+  --from-literal=usage-report=dummy \
+  --dry-run=client -o yaml | oc apply -f -
+oc -n enmaas create secret generic metering-user-management-api \
+  --from-literal=token="$(openssl rand -hex 32)" \
+  --dry-run=client -o yaml | oc apply -f -
+echo "enmaas secrets created."
 
 echo "Rendering and applying enmaas manifests..."
 make print ENV="${ENMAAS_ENV}" PROJECT=enmaas > /tmp/enmaas.yaml
@@ -117,5 +163,16 @@ oc apply -f /tmp/enmaas.yaml
 echo "Rendering and applying enmaas-monitoring manifests..."
 make print ENV="${ENMAAS_ENV}" PROJECT=enmaas-monitoring > /tmp/enmaas-monitoring.yaml
 oc apply --server-side --field-manager=enmaas-opps --force-conflicts -f /tmp/enmaas-monitoring.yaml
+
+echo "Patching NetworkPolicy for API server access..."
+API_IPS=$(oc get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[*].ip}')
+TO_ENTRIES=""
+for IP in ${API_IPS}; do
+  if [[ -n "${TO_ENTRIES}" ]]; then TO_ENTRIES="${TO_ENTRIES},"; fi
+  TO_ENTRIES="${TO_ENTRIES}{\"ipBlock\":{\"cidr\":\"${IP}/32\"}}"
+done
+oc patch networkpolicy enmaas-allow-maas-api-kube-api -n enmaas --type=merge \
+  -p "{\"spec\":{\"egress\":[{\"to\":[${TO_ENTRIES}],\"ports\":[{\"port\":443,\"protocol\":\"TCP\"},{\"port\":6443,\"protocol\":\"TCP\"}]}]}}"
+echo "NetworkPolicy patched for API server IPs: ${API_IPS}"
 
 echo "EnMaaS deployment applied successfully."
