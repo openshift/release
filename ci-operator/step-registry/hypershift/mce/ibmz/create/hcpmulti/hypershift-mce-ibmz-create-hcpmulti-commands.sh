@@ -134,9 +134,9 @@ hcp create nodepool kubevirt \
   --replicas 1 \
   --arch amd64 \
   --vm-node-selector kubernetes.io/arch=amd64 \
-  --memory 8Gi \
+  --memory 16Gi \
   --cores 4 \
-  --root-volume-size 32
+  --root-volume-size 60
 
 oc wait --timeout=45m --for=condition=Available --namespace="${HC_NS}" hostedclusters.hypershift.openshift.io/"${HC_NAME}"
 echo "$(date) Kubevirt cluster is available"
