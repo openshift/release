@@ -114,6 +114,8 @@ BASTION_ENV=( \
   PROFILE_TYPE="${PROFILE_TYPE}" \
   PROW_JOB_ID="${PROW_JOB_ID:-}" \
   PULL_NUMBER="${PULL_NUMBER:-0}" \
+  PPROF="${PPROF:-false}" \
+  PPROF_INTERVAL="${PPROF_INTERVAL:-0}" \
   REPO_NAME="${REPO_NAME:-}" \
   REPO_OWNER="${REPO_OWNER:-}" \
   REPO_URL="${REPO_URL}" \
@@ -149,6 +151,10 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
 EXTRA_FLAGS+=" --log-level=debug"
+EXTRA_FLAGS+=" --pprof=${PPROF}"
+if [[ "${PPROF_INTERVAL}" != "0" ]]; then
+  EXTRA_FLAGS+=" --pprof-interval=${PPROF_INTERVAL}"
+fi
 if [[ "${UDN_BGP_LAYER2}" == "true" ]]; then
   EXTRA_FLAGS+=" --layer2"
 fi
@@ -167,6 +173,20 @@ set -o errexit
 METRICS_FOLDER="${BASTION_WORK_DIR}/e2e-benchmarking/workloads/kube-burner-ocp-wrapper/collected-metrics-${UUID}"
 if bastion_ssh "test -f ${METRICS_FOLDER}/jobSummary.json"; then
   bastion_scp -r "${BASTION_SSH_USER}@${BASTION_HOST}:${METRICS_FOLDER}" "${ARTIFACT_DIR}/"
+fi
+
+PPROF_FOLDER="${BASTION_WORK_DIR}/e2e-benchmarking/workloads/kube-burner-ocp-wrapper/pprof-data"
+if [[ "${PPROF}" == "true" ]]; then
+  if bastion_ssh "test -d ${PPROF_FOLDER}"; then
+    bastion_scp -r "${BASTION_SSH_USER}@${BASTION_HOST}:${PPROF_FOLDER}" "${ARTIFACT_DIR}/"
+    if [[ -z "$(find "${ARTIFACT_DIR}/pprof-data" -type f -name '*.pprof' -print -quit)" ]]; then
+      echo "ERROR: pprof was enabled but no pprof files were collected" >&2
+      RUN_EXIT_CODE=1
+    fi
+  else
+    echo "ERROR: pprof was enabled but ${PPROF_FOLDER} was not created" >&2
+    RUN_EXIT_CODE=1
+  fi
 fi
 
 exit ${RUN_EXIT_CODE}
