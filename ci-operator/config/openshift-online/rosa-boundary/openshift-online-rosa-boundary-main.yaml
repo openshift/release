@@ -41,16 +41,24 @@ images:
       # Create /home/user with correct permissions BEFORE copying files
       # (nested-podman runs as UID 1000, needs writable home directory)
       RUN mkdir -p /home/user/.config && chown -R 1000:1000 /home/user
-      COPY . /workspace/
+      # Reuse the Go toolchain from the CI build root, as in sippy-integration.
+      COPY golang /usr/lib/golang
+      ENV GOROOT=/usr/lib/golang
+      ENV PATH=/usr/lib/golang/bin:${PATH}
+      ENV GOTOOLCHAIN=auto
+      COPY --chown=1000:0 rosa-boundary /workspace/rosa-boundary
       # Install test dependencies using uv (matches lambda-test-runner pattern)
       WORKDIR /workspace/rosa-boundary/tests/localstack
       RUN pip3 install uv && uv pip install --python python3.11 --system .
+      USER 1000
     from: nested-podman
     inputs:
       src:
         paths:
         - destination_dir: .
           source_path: /go/src/github.com/openshift-online/rosa-boundary
+        - destination_dir: golang
+          source_path: /usr/lib/golang/.
     to: localstack-test-runner
 prowgen:
   expose: true
@@ -88,12 +96,17 @@ tests:
   commands: |
     set -euo pipefail
     export LOCALSTACK_AUTH_TOKEN=$(cat /etc/localstack-secret/localstack-token)
+    # Keep build, module, and automatically downloaded toolchains writable by the test user.
+    export GOCACHE=$(mktemp -d)
+    export GOPATH=$(mktemp -d)
+    export GOMODCACHE="${GOPATH}/pkg/mod"
     cd /workspace/rosa-boundary
+    go version
     make test-localstack-ci
   container:
     from: localstack-test-runner
   nested_podman: true
-  run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/)
+  run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/|cmd/|pkg/|internal/|go\.(mod|sum)$|Makefile$)
   secret:
     collection: rosa-boundary
     group: ci
