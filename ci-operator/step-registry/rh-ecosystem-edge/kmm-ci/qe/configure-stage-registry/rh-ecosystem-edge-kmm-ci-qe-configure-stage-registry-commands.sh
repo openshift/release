@@ -104,7 +104,7 @@ else
 fi
 
 echo "Applying the KMM image mirror from registry.redhat.io/kmm to ${stage_registry}/kmm..."
-if oc api-resources --api-group=config.openshift.io --api-version=v1 --no-headers \
+if oc api-resources --api-group=config.openshift.io --no-headers \
     | awk '$1 == "imagedigestmirrorsets" { found=1 } END { exit found ? 0 : 1 }'; then
     oc apply -f - <<EOF
 apiVersion: config.openshift.io/v1
