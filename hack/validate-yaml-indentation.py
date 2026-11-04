@@ -316,38 +316,62 @@ def validate_yaml_indentation(file_path, expected_width=2, strict=True, show_con
     return errors, error_lines
 
 
-def get_changed_yaml_files(base_dir=None):
-    """Get YAML files changed in git (staged or working directory)."""
+def _git(args, base_dir=None):
+    """Run git and return the completed process, or None if it cannot run."""
     try:
-        # Get staged files
-        result = subprocess.run(
-            ['git', 'diff', '--cached', '--name-only', '--diff-filter=ACMR'],
+        return subprocess.run(
+            ['git'] + args,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
             check=False,
             cwd=base_dir or '.'
         )
-        staged_files = [f.strip() for f in result.stdout.split('\n') if f.strip()]
-
-        # Get unstaged files
-        result = subprocess.run(
-            ['git', 'diff', '--name-only', '--diff-filter=ACMR'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            check=False,
-            cwd=base_dir or '.'
-        )
-        unstaged_files = [f.strip() for f in result.stdout.split('\n') if f.strip()]
-
-        # Combine and filter YAML files
-        all_changed = set(staged_files + unstaged_files)
-        yaml_files = [f for f in all_changed if f.endswith(('.yaml', '.yml'))]
-
-        return [os.path.abspath(f) for f in yaml_files if os.path.exists(f)]
     except (subprocess.SubprocessError, OSError):
-        return []
+        return None
+
+
+def get_changed_yaml_files(base_dir=None):
+    """Get the YAML files changed by the current change set.
+
+    A Prow presubmit checks out the PR's merge commit, so the working tree is
+    clean and `git diff` is empty. Diff the exported base SHA against HEAD
+    (the merge commit) instead. Locally, fall back to staged, unstaged, and
+    untracked files.
+    """
+    base_sha = os.environ.get('PULL_BASE_SHA')
+
+    all_changed = set()
+
+    def add_output(output):
+        all_changed.update(f.strip() for f in output.splitlines() if f.strip())
+
+    if base_sha:
+        result = _git(
+            ['diff', '--name-only', '--no-renames', '--diff-filter=ACMR', base_sha, 'HEAD'],
+            base_dir,
+        )
+        if result is None or result.returncode != 0:
+            # The PR's change set could not be computed. Signal this instead
+            # of reporting "no changes", which would silently pass the check.
+            if result is not None and result.stderr.strip():
+                print(f"Error: git diff against the base failed: {result.stderr.strip()}",
+                      file=sys.stderr)
+            return None
+        add_output(result.stdout)
+    else:
+        for git_args in (
+            ['diff', '--cached', '--name-only', '--no-renames', '--diff-filter=ACMR'],
+            ['diff', '--name-only', '--no-renames', '--diff-filter=ACMR'],
+            ['ls-files', '--others', '--exclude-standard'],
+        ):
+            result = _git(git_args, base_dir)
+            if result is not None and result.returncode == 0:
+                add_output(result.stdout)
+
+    yaml_files = [f for f in all_changed if f.endswith(('.yaml', '.yml'))]
+
+    return sorted(os.path.abspath(f) for f in yaml_files if os.path.exists(f))
 
 
 def find_yaml_files(base_dir, exclude_patterns=None):
@@ -465,6 +489,14 @@ def get_yaml_files_to_validate(args):
 
     if args.git_diff:
         yaml_files = get_changed_yaml_files(str(path) if path.is_dir() else None)
+        if yaml_files is None:
+            print(
+                "Error: could not determine the pull request's changed files "
+                "from PULL_BASE_SHA; refusing to pass without validating "
+                "anything.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         if not yaml_files:
             if args.verbose:
                 print("No changed YAML files found in git")
