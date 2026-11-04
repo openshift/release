@@ -16,6 +16,19 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
+# The validation image used by ci/prow/yamllint originally did not include git,
+# and determining the changed files requires it. Install it on demand; this is a
+# no-op once the image ships git.
+if ! command -v git >/dev/null 2>&1; then
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "ERROR: git is required to determine changed files and is not installed" >&2
+    exit 1
+  fi
+  echo "git is not installed; installing it to determine changed files" >&2
+  apt-get update -qq
+  apt-get install -y -qq --no-install-recommends git
+fi
+
 # Run the Python validation script
 # Use --no-strict mode to be less strict about indentation width for existing files
 # This focuses on critical issues like tabs and mixed tab/space indentation
