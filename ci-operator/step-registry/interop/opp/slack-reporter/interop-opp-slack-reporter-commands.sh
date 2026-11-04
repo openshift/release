@@ -611,13 +611,36 @@ def scan(base, table, roles):
 def harvest_enrichment(base, evidence, roles):
     """Bounded, boundary-validated link harvest from post-phase logs.
 
-    LPINTEROP links (pinned redhat.atlassian.net form) and the
-    ReportPortal launch_url; anything not matching the pinned shapes is
+    LPINTEROP links (pinned redhat.atlassian.net form) and a canonical
+    ReportPortal launch URL rebuilt from the pinned host plus the
+    numeric launch id; anything not matching the pinned shapes is
     dropped with an omitted-marker (design doc section 11)."""
     lpinterop_re = re.compile(
         r'https://redhat\.atlassian\.net/browse/(LPINTEROP-\d+)')
+    # a raw candidate is accepted only when its host matches the pinned
+    # OPP ReportPortal instance exactly; the harvested value is REBUILT
+    # from the pinned host and the numeric launch id so no raw log
+    # content (session hash, userinfo, query string, arbitrary path) is
+    # ever echoed into the report or receipt.
+    launch_host = ('reportportal-lp-interop.apps.dno.ocp-hub.'
+                   'prod.psi.redhat.com')
     launch_re = re.compile(r'https://\S*reportportal\S*/launch\S*',
                            re.IGNORECASE)
+    launch_shape_re = re.compile(
+        r'/ui/#[^?#]*launches/all/(\d{1,12})$')
+
+    def canonical_launch(raw):
+        """Rebuild the canonical launch URL; None drops the candidate."""
+        if not raw.lower().startswith(
+                'https://' + launch_host + '/ui/#'):
+            return None
+        if '?' in raw or '@' in raw:
+            return None
+        found = launch_shape_re.search(raw)
+        if not found:
+            return None
+        return 'https://%s/ui/#launches/all/%s' % (
+            launch_host, found.group(1))
     links, launch, omitted = [], None, 0
     safe = SafeAccess(base)
     for step, role in roles.items():
@@ -645,7 +668,11 @@ def harvest_enrichment(base, evidence, roles):
             if launch is None:
                 found = launch_re.search(text)
                 if found:
-                    launch = found.group(0)
+                    canonical = canonical_launch(found.group(0))
+                    if canonical is None:
+                        omitted += 1
+                    else:
+                        launch = canonical
     job = os.environ.get('JOB_NAME', '')
     build = os.environ.get('BUILD_ID', '')
     prow = ('https://prow.ci.openshift.org/view/gs/'
@@ -1126,10 +1153,10 @@ def post(url, body):
             if sanitized in ACCEPT_SET:
                 return '1', str(status), 'delivered', {
                     'attempts': attempts, 'body_len': len(data)}
-            token = re.sub(r'[^a-z0-9_]', '', sanitized[:24])
+            # response content is never copied into the receipt --
+            # status, length, and the fixed sink_error category only
             return '0', str(status), 'sink_error', {
-                'attempts': attempts, 'body_len': len(data),
-                'body_token': token}
+                'attempts': attempts, 'body_len': len(data)}
         if status == 429 or 500 <= status < 600:
             if attempts >= MAX_ATTEMPTS:
                 return '0', str(status), 'sink_error', {
