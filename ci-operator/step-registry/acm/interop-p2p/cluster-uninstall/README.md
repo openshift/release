@@ -18,9 +18,13 @@ Spoke cluster health does not block hub-side deprovision; hub namespace must ret
 | Variable | Default | Description |
 |---|---|---|
 | `ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES` | `10` | Minutes to wait for ACM to clear `ManagedCluster` finalizers before auto-stripping them |
-| `ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES` | `60` | Minutes to wait per cluster for `ClusterDeprovision` to complete |
+| `ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES` | `90` | Minutes applied separately to waiting for `ClusterDeprovision` to appear and to waiting for completion; one cluster can take up to twice this value (parallel across spokes) |
 | `ACM_CLUSTER_DEPROVISION_POLL_SECONDS` | `10` | Poll interval while waiting for `ClusterDeprovision` to appear |
 | `ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC` | `false` | Strip `ManagedCluster` finalizers immediately on delete, skipping the detach wait |
+
+## Timeouts
+
+The 4h step ceiling is a diagnostic backstop, not a budget to add to the 11h install ceiling or the 15h job deadline. The job deadline follows the internal waits (10m detach plus two 90m deprovision waits). A step that rides its full ceiling can still exhaust the job deadline.
 
 ## Failure diagnostics
 
