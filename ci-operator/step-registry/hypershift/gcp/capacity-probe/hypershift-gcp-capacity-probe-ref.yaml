@@ -1,0 +1,82 @@
+ref:
+  as: hypershift-gcp-capacity-probe
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: hypershift-gcp-capacity-probe-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  grace_period: 5m0s
+  env:
+  - name: HYPERSHIFT_GCP_MACHINE_TYPES
+    default: "n2-standard-4 n2d-standard-4"
+    documentation: |-
+      Ordered list of amd64 machine type candidates probed per zone. The first
+      candidate is the shape current e2e jobs implicitly use (hypershift's
+      n2-standard-4 default); subsequent candidates are the cheapest same-spec
+      (4 vCPU / 16GB) alternatives. All candidates must be on the
+      OpenShift-supported GCP machine type list (E2 is NOT supported and must
+      not be added). The first zone/machine-type combination with on-demand
+      capacity is written to ${SHARED_DIR}/gcp-zone and
+      ${SHARED_DIR}/gcp-machine-type for the hypershift-gcp-create chain.
+  documentation: |-
+    Probes GCP on-demand capacity in the hosted cluster region before the
+    hypershift-gcp-create chain runs, to avoid the ZONE_RESOURCE_POOL_EXHAUSTED
+    failures that occur when every job implicitly requests hypershift's default
+    machine type in a single pinned zone.
+
+    GCP has no public real-time capacity API, but stockouts fail fast on
+    instances.insert, so the probe trial-creates an on-demand VM (never
+    preemptible/spot — that is a separate capacity pool) with each candidate
+    machine type, iterating the region's zones in randomized order, and deletes
+    it immediately on success.
+
+    Only ZONE_RESOURCE_POOL_EXHAUSTED / RESOURCE_POOL_EXHAUSTED errors count
+    as "no capacity, try the next candidate". Any other create failure
+    (permissions, auth, quota, missing image, a timed-out API call) hard-fails
+    immediately with a GCP_CAPACITY_PROBE_UNEXPECTED_ERROR message and the
+    real gcloud error, so unrelated regressions are never mislabeled as
+    stockouts.
+
+    The probe VM is created in the project's implicit auto-mode default
+    network (--network=default). Nothing in this repo creates or disables
+    that network, but org-policy hardening setting
+    compute.skipDefaultNetworkCreation would make the probe fail loudly with
+    a network-not-found error.
+
+    Runs in the ephemeral hosted cluster project after
+    hypershift-gcp-gke-provision. Requires ${SHARED_DIR}/wif-cred.json written
+    by hypershift-gcp-wif-auth and ${SHARED_DIR}/gcp-region and
+    ${SHARED_DIR}/hosted-cluster-project-id written by
+    hypershift-gcp-gke-provision.
+
+    The probe VM is minimal (no external IP, 10GB boot disk) and lives for
+    seconds. Timing budget: the happy path completes in ~1-2 minutes and a
+    full stockout in ~2-4 minutes (stockouts fail fast on instances.insert);
+    each create attempt is bounded to 90s so the worst case (6 attempts) fits
+    inside the 10m step timeout, and VM cleanup runs in the 5m grace period
+    rather than eating into it. To avoid leaking VMs in the ephemeral project,
+    cleanup runs on every exit path: the step deletes the VM in an EXIT trap
+    that also fires on SIGTERM/SIGINT, sweeping all zones of the region (a
+    gcloud timeout can leave a created VM in an earlier zone);
+    hypershift-gcp-capacity-probe-cleanup then runs in the workflow's post
+    phase to delete and verify removal of any leaked instance;
+    hypershift-gcp-gke-deprovision deletes it best-effort by its deterministic
+    name, and Hosted Cluster project deletion is the final backstop.
+
+    Outputs saved to ${SHARED_DIR}:
+    - gcp-zone: first zone where a candidate machine type was available
+    - gcp-machine-type: the machine type available in that zone
+    - gcp-capacity-probe-vm: probe VM name (deterministic from PROW_JOB_ID,
+      cleaned up best-effort by hypershift-gcp-gke-deprovision)
+
+    If no zone/machine-type combination has capacity, the step fails fast with
+    a greppable "GCP_NO_CAPACITY_IN_REGION" message so the job fails in minutes
+    instead of timing out during hosted cluster rollout.
+
+    Note: the probe is a snapshot, not a reservation — capacity can still
+    disappear between the probe and machine provisioning (~10 min window).

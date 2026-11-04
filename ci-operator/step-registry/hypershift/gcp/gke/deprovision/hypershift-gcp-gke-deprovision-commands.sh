@@ -114,6 +114,38 @@ set -x
 # ============================================================================
 
 # ----------------------------------------------------------------------------
+# Step 0: Delete any leftover capacity-probe VM (best-effort).
+# The probe VM normally deletes itself; this covers interrupted probe runs.
+# The name is deterministic from PROW_JOB_ID, so it can be reconstructed when
+# SHARED_DIR is unavailable. Also removed by Hosted Cluster project deletion
+# below, but explicit deletion keeps the signal in the job log.
+# ----------------------------------------------------------------------------
+PROBE_VM_NAME=""
+if [[ -s "${SHARED_DIR}/gcp-capacity-probe-vm" ]]; then
+    PROBE_VM_NAME="$(<"${SHARED_DIR}/gcp-capacity-probe-vm")"
+elif [[ -n "${PROW_JOB_ID:-}" ]]; then
+    PROBE_VM_NAME="ci-probe-$(echo -n "${PROW_JOB_ID}" | sha256sum | cut -c1-11)"
+fi
+if [[ -n "${PROBE_VM_NAME}" && -n "${HC_PROJECT_ID:-}" ]]; then
+    if [[ -s "${SHARED_DIR}/gcp-zone" ]]; then
+        gcloud compute instances delete "${PROBE_VM_NAME}" \
+            --project="${HC_PROJECT_ID}" \
+            --zone="$(<"${SHARED_DIR}/gcp-zone")" \
+            --quiet || true
+    else
+        # Zone unknown (probe interrupted before writing results) — try all
+        # zones of the region.
+        GCP_REGION="${GCP_REGION:-$(<"${SHARED_DIR}/gcp-region" 2>/dev/null || echo "${GKE_REGION}")}"
+        for zone in "${GCP_REGION}-a" "${GCP_REGION}-b" "${GCP_REGION}-c"; do
+            gcloud compute instances delete "${PROBE_VM_NAME}" \
+                --project="${HC_PROJECT_ID}" \
+                --zone="${zone}" \
+                --quiet || true
+        done
+    fi
+fi
+
+# ----------------------------------------------------------------------------
 # Step 1: Delete Hosted Cluster project (if it exists)
 # Delete first to remove any cross-project dependencies (PSC endpoints, etc.)
 # ----------------------------------------------------------------------------

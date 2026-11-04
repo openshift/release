@@ -12,15 +12,17 @@ workflow:
     5. hypershift-install: Install the HyperShift operator
     6. hypershift-gcp-control-plane-setup: Configure GCP Workload Identity for PSC and ExternalDNS
     7. hypershift-gcp-hosted-cluster-setup: Create WIF and network infrastructure
-    8. hypershift-gcp-create: Create GCP HostedCluster and wait for rollout
+    8. hypershift-gcp-capacity-probe: Find a zone/machine-type with on-demand capacity
+    9. hypershift-gcp-create: Create GCP HostedCluster and wait for rollout
 
     Test phase:
     1. hypershift-e2e-v2: Run Ginkgo v2 tests against the hosted cluster
 
     Post phase:
     1. hypershift-dump: Collect HyperShift artifacts for debugging
-    2. hypershift-gcp-destroy: Destroy the GCP HostedCluster
-    3. hypershift-gcp-gke-deprovision: Delete GKE cluster and GCP projects
+    2. hypershift-gcp-capacity-probe-cleanup: Delete and verify removal of any leaked probe VM
+    3. hypershift-gcp-destroy: Destroy the GCP HostedCluster
+    4. hypershift-gcp-gke-deprovision: Delete GKE cluster and GCP projects
   steps:
     allow_best_effort_post_steps: true
     pre:
@@ -31,11 +33,13 @@ workflow:
     - ref: hypershift-install
     - ref: hypershift-gcp-control-plane-setup
     - ref: hypershift-gcp-hosted-cluster-setup
+    - ref: hypershift-gcp-capacity-probe
     - chain: hypershift-gcp-create
     test:
     - chain: hypershift-e2e-v2
     post:
     - chain: hypershift-dump
+    - ref: hypershift-gcp-capacity-probe-cleanup
     - chain: hypershift-gcp-destroy
     - ref: hypershift-gcp-gke-deprovision
     env:

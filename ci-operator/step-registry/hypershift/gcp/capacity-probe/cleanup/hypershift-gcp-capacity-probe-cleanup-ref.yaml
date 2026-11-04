@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-gcp-capacity-probe-cleanup
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: hypershift-gcp-capacity-probe-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s
+  grace_period: 5m0s
+  best_effort: true
+  documentation: |-
+    Cleanup-phase validation for hypershift-gcp-capacity-probe: deletes any
+    probe VM leaked by an interrupted probe run and verifies none remain in
+    the ephemeral hosted cluster project.
+
+    The probe step deletes its own VM on every exit path; this step covers the
+    case where the probe step was killed before its EXIT trap completed. It
+    resolves the VM name from ${SHARED_DIR}/gcp-capacity-probe-vm or, when
+    SHARED_DIR is unavailable, reconstructs it deterministically from
+    PROW_JOB_ID, deletes it best-effort in all zones of the region, then
+    lists the project and fails (best_effort — logged, not job-failing) if an
+    instance with that name remains, with a greppable
+    GCP_CAPACITY_PROBE_VM_LEAK message.
+
+    Requires ${SHARED_DIR}/wif-cred.json (from hypershift-gcp-wif-auth),
+    ${SHARED_DIR}/gcp-region and ${SHARED_DIR}/hosted-cluster-project-id (from
+    hypershift-gcp-gke-provision). If the WIF credential is unavailable the
+    step warns and exits 0; hypershift-gcp-gke-deprovision (which can
+    re-derive the credential) and Hosted Cluster project deletion remain the
+    backstops.
