@@ -71,7 +71,9 @@ echo "----- /etc/dnsmasq.d/il6-split.conf -----"
 cat /tmp/il6-split.conf
 
 to_bastion /tmp/il6-split.conf /tmp/il6-split.conf
-on_bastion "sudo install -m 0644 -o root -g root /tmp/il6-split.conf /etc/dnsmasq.d/il6-split.conf && sudo restorecon -v /etc/dnsmasq.d/il6-split.conf || true"
+on_bastion "sudo install -m 0644 -o root -g root /tmp/il6-split.conf /etc/dnsmasq.d/il6-split.conf"
+on_bastion "sudo restorecon -v /etc/dnsmasq.d/il6-split.conf" \
+    || echo "WARNING: restorecon failed for il6-split.conf; dnsmasq may not be able to read it."
 on_bastion "sudo systemctl unmask dnsmasq && sudo systemctl enable --now dnsmasq"
 
 # Point the host's own resolver at dnsmasq. NetworkManager owns resolv.conf on RHCOS, so
@@ -122,7 +124,9 @@ echo "=== 3/4 installing the emulator CA into the RHCOS trust store ==="
 # update-ca-certificates does not exist here.
 remote_ca="/etc/pki/ca-trust/source/anchors/${AZURE_IL6_CA_FILE}"
 to_bastion "${ca_src}" /tmp/il6-ca.pem
-on_bastion "sudo install -m 0644 -o root -g root /tmp/il6-ca.pem ${remote_ca} && sudo restorecon -v ${remote_ca} || true"
+on_bastion "sudo install -m 0644 -o root -g root /tmp/il6-ca.pem ${remote_ca}"
+on_bastion "sudo restorecon -v ${remote_ca}" \
+    || echo "WARNING: restorecon failed for ${remote_ca}; update-ca-trust may skip it."
 on_bastion "sudo update-ca-trust extract && rm -f /tmp/il6-ca.pem"
 echo "${remote_ca}" > "${SHARED_DIR}/azure_il6_remote_ca_path"
 

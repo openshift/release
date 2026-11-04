@@ -13,6 +13,15 @@ ssh_opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
 
 on_bastion() { ssh "${ssh_opts[@]}" "${bastion_user}@${bastion_host}" "$@"; }
 
+# The service-principal secret is written to a file on both ends. Removing it on the happy path
+# is not enough: any set -e trigger, a failed scp, or a malformed SP file would leave it behind
+# for the lifetime of the pod and the bastion. Register the cleanup before anything can fail.
+cleanup_credentials() {
+    rm -f /tmp/azil6.env
+    on_bastion 'rm -f /tmp/azil6.env' 2>/dev/null || true
+}
+trap cleanup_credentials EXIT
+
 failures=0
 fail() { echo "FAIL: $*"; failures=$((failures + 1)); }
 
@@ -188,9 +197,6 @@ else
     echo
     echo "=== 5/6, 6/6 skipped: not on the emulated plane ==="
 fi
-
-# Always remove the credential, including on the failure paths above.
-on_bastion 'rm -f /tmp/azil6.env' || true
 
 echo
 if [[ "${failures}" -gt 0 ]]; then
