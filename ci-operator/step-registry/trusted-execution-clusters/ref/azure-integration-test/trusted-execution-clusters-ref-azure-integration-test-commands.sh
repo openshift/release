@@ -26,7 +26,7 @@ az login --service-principal \
 
 eval "$(ssh-agent -s)"
 
-export INTEGRATION_TEST_THREADS=2
+export INTEGRATION_TEST_THREADS=3
 
 echo "[INFO] Install cert-manager"
 CRT_MGR_VERSION=$(go list -m -f '{{.Version}}' github.com/cert-manager/cert-manager)
