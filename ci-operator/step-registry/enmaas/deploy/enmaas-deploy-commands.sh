@@ -170,13 +170,17 @@ oc apply --server-side --field-manager=enmaas-opps --force-conflicts -f /tmp/enm
 
 echo "Patching NetworkPolicy for API server access..."
 API_IPS=$(oc get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[*].ip}')
-TO_ENTRIES=""
-for IP in ${API_IPS}; do
-  if [[ -n "${TO_ENTRIES}" ]]; then TO_ENTRIES="${TO_ENTRIES},"; fi
-  TO_ENTRIES="${TO_ENTRIES}{\"ipBlock\":{\"cidr\":\"${IP}/32\"}}"
-done
-oc patch networkpolicy enmaas-allow-maas-api-kube-api -n enmaas --type=merge \
-  -p "{\"spec\":{\"egress\":[{\"to\":[${TO_ENTRIES}],\"ports\":[{\"port\":443,\"protocol\":\"TCP\"},{\"port\":6443,\"protocol\":\"TCP\"}]}]}}"
-echo "NetworkPolicy patched for API server IPs: ${API_IPS}"
+if [[ -z "${API_IPS}" ]]; then
+  echo "WARNING: Could not determine API server IPs, skipping NetworkPolicy patch."
+else
+  TO_ENTRIES=""
+  for IP in ${API_IPS}; do
+    if [[ -n "${TO_ENTRIES}" ]]; then TO_ENTRIES="${TO_ENTRIES},"; fi
+    TO_ENTRIES="${TO_ENTRIES}{\"ipBlock\":{\"cidr\":\"${IP}/32\"}}"
+  done
+  oc patch networkpolicy enmaas-allow-maas-api-kube-api -n enmaas --type=merge \
+    -p "{\"spec\":{\"egress\":[{\"to\":[${TO_ENTRIES}],\"ports\":[{\"port\":443,\"protocol\":\"TCP\"},{\"port\":6443,\"protocol\":\"TCP\"}]}]}}"
+  echo "NetworkPolicy patched for API server IPs: ${API_IPS}"
+fi
 
 echo "EnMaaS deployment applied successfully."
