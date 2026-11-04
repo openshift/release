@@ -1,0 +1,37 @@
+ref:
+  as: rh-ecosystem-edge-kmm-ci-qe-tests
+  cli: latest
+  from: eco-gotests
+  commands: rh-ecosystem-edge-kmm-ci-qe-tests-commands.sh
+  credentials:
+  - mount_path: /var/run/secrets/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: ci
+  env:
+  - name: ECO_TEST_FEATURES
+    default: modules
+    documentation: Eco-gotests feature set to execute.
+  - name: ECO_TEST_LABELS
+    default: "module && !kmm-longrun"
+    documentation: Ginkgo label expression for the KMM test suite.
+  - name: ECO_TEST_TIMEOUT
+    default: 80m
+    documentation: Maximum duration for the Ginkgo test suite.
+  - name: ECO_TEST_VERBOSE
+    default: "true"
+    documentation: Whether eco-gotests should enable verbose output.
+  - name: ECO_HWACCEL_KMM_DEVICE_PLUGIN_IMAGE
+    default: quay.io/cvultur/device-plugin:latest-%s
+    documentation: Device plugin image format used by the KMM tests.
+  - name: ECO_HWACCEL_KMM_REGISTRY
+    default: quay.io/ocp-edge-qe
+    documentation: External registry used by KMM module tests.
+  - name: ECO_HWACCEL_KMM_PULL_SECRET_FILE
+    default: /var/run/secrets/ci-pull-credentials/.dockerconfigjson
+    documentation: CI docker config containing the Quay authentication entry.
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  documentation: |-
+    Runs the KMM module eco-gotests suite and collects cluster diagnostics.
