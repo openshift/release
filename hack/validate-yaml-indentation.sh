@@ -16,17 +16,20 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
-# The validation image used by ci/prow/yamllint originally did not include git,
-# and determining the changed files requires it. Install it on demand; this is a
-# no-op once the image ships git.
+# The validation image used by ci/prow/yamllint runs as an unprivileged user and
+# originally did not include git. When git is missing, install dulwich (a pure
+# Python git implementation) into a writable directory so the change set can
+# still be computed. This is a no-op once the image ships git.
 if ! command -v git >/dev/null 2>&1; then
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "ERROR: git is required to determine changed files and is not installed" >&2
-    exit 1
+  deps_dir="${TMPDIR:-/tmp}/validate-yaml-deps"
+  if ! PYTHONPATH="${deps_dir}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c 'import dulwich' >/dev/null 2>&1; then
+    echo "git is not installed; installing dulwich to determine changed files" >&2
+    mkdir -p "${deps_dir}" "${TMPDIR:-/tmp}/validate-yaml-home"
+    HOME="${TMPDIR:-/tmp}/validate-yaml-home" \
+      PIP_CACHE_DIR="${TMPDIR:-/tmp}/validate-yaml-pip-cache" \
+      python3 -m pip install --quiet --disable-pip-version-check --target "${deps_dir}" dulwich >&2
   fi
-  echo "git is not installed; installing it to determine changed files" >&2
-  apt-get update -qq
-  apt-get install -y -qq --no-install-recommends git
+  export PYTHONPATH="${deps_dir}${PYTHONPATH:+:${PYTHONPATH}}"
 fi
 
 # Run the Python validation script

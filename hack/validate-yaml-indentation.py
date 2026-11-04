@@ -331,6 +331,41 @@ def _git(args, base_dir=None):
         return None
 
 
+def _dulwich_changed_files(base_sha, base_dir=None):
+    """Return paths changed between base_sha and HEAD using dulwich, or None.
+
+    Used when the git CLI is unavailable (the CI image runs unprivileged and
+    did not ship git). Only tree objects are read, so this works in a partial
+    clone created with --filter=blob:none.
+    """
+    # dulwich is an optional dependency, needed only when git is unavailable.
+    # pylint: disable=import-outside-toplevel
+    try:
+        from dulwich.diff_tree import tree_changes
+        from dulwich.errors import NotGitRepository, ObjectMissing
+        from dulwich.repo import Repo
+    except ImportError:
+        return None
+    # pylint: enable=import-outside-toplevel
+
+    try:
+        repo = Repo(base_dir or '.')
+    except NotGitRepository:
+        return None
+    try:
+        base = repo[base_sha.encode()]
+        head = repo[b'HEAD']
+        paths = set()
+        for change in tree_changes(repo.object_store, base.tree, head.tree):
+            if change.type in ('add', 'modify', 'copy', 'rename') and change.new.path:
+                paths.add(change.new.path.decode())
+        return paths
+    except (KeyError, ValueError, ObjectMissing):
+        return None
+    finally:
+        repo.close()
+
+
 def get_changed_yaml_files(base_dir=None):
     """Get the YAML files changed by the current change set.
 
@@ -352,13 +387,18 @@ def get_changed_yaml_files(base_dir=None):
             base_dir,
         )
         if result is None or result.returncode != 0:
-            # The PR's change set could not be computed. Signal this instead
-            # of reporting "no changes", which would silently pass the check.
-            if result is not None and result.stderr.strip():
-                print(f"Error: git diff against the base failed: {result.stderr.strip()}",
-                      file=sys.stderr)
-            return None
-        add_output(result.stdout)
+            # Fall back to dulwich when the git CLI is unavailable.
+            paths = _dulwich_changed_files(base_sha, base_dir)
+            if paths is None:
+                # The PR's change set could not be computed. Signal this
+                # instead of reporting "no changes", which would silently pass.
+                if result is not None and result.stderr.strip():
+                    print(f"Error: git diff against the base failed: {result.stderr.strip()}",
+                          file=sys.stderr)
+                return None
+            all_changed.update(paths)
+        else:
+            add_output(result.stdout)
     else:
         for git_args in (
             ['diff', '--cached', '--name-only', '--no-renames', '--diff-filter=ACMR'],
