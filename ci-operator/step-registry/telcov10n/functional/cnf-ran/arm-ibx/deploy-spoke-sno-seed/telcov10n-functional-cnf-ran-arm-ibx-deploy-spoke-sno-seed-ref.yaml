@@ -6,6 +6,7 @@ ref:
     tag: eco-ci-cd
   commands: telcov10n-functional-cnf-ran-arm-ibx-deploy-spoke-sno-seed-commands.sh
   timeout: 5h
+  grace_period: 10s
   resources:
     requests:
       cpu: 100m
@@ -17,9 +18,15 @@ ref:
   - name: CLUSTER_NAME
     default: ""
     documentation: Hub cluster name; uses the hub inventory saved in SHARED_DIR
-  - name: SPOKE_CLUSTER
+  - name: SEED_SPOKE_CLUSTER
     default: ""
-    documentation: Spoke cluster names in JSON array format
+    documentation: Seed SNO cluster name
+  - name: VERSION
+    default: "4.20"
+    documentation: OpenShift version for the ARM IBX spoke
+  - name: SPOKE_ARCH
+    default: "multi"
+    documentation: Required multi-architecture payload; enables mirrored release, Ironic Agent, and ARM64 boot-image preparation
   - name: ZTP_GIT_REPO
     default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
     documentation: Git repository containing the ZTP configuration
@@ -35,4 +42,6 @@ ref:
   documentation: |-
     Deploy the ARM IBX seed spoke via ZTP on the existing hub using
     ZTP_SEED_CLUSTERS_PATH and ZTP_SEED_POLICIES_PATH from job config.
+    Calls deploy-spoke-ztp-mno.yaml directly with a single-master SNO inventory,
+    matching the working MNO ARM deployment's multi-architecture preparation.
     The deployment playbook waits for installation and policy compliance.
