@@ -59,15 +59,15 @@ printf 'MetalLB Service VIP: %s; ready router endpoints: %s\n' "$service_vip" "$
 
 canary_host=
 while (( SECONDS < deadline )); do
-  canary_json=$(oc get route -n openshift-ingress-canary -o json 2>/dev/null || true)
+  canary_json=$(oc get route canary -n openshift-ingress-canary -o json 2>/dev/null || true)
   canary_host=$(jq -r \
-    '[.items[]? | .spec.host // empty | select(startswith("canary-"))] | first // empty' \
+    '[.status.ingress[]? | select(.routerName == "default") | .host // empty] | first // empty' \
     <<< "$canary_json")
   if [[ -n "$canary_host" ]]; then break; fi
   sleep 15
 done
 if [[ ! "$canary_host" =~ ^[a-zA-Z0-9.-]+$ ]]; then
-  echo "The ingress canary Route has an invalid hostname."
+  echo "The ingress canary Route has no valid hostname for the default router."
   exit 1
 fi
 
