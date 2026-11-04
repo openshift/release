@@ -18,7 +18,7 @@ Spoke cluster health does not block hub-side deprovision; hub namespace must ret
 | Variable | Default | Description |
 |---|---|---|
 | `ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES` | `10` | Minutes to wait for ACM to clear `ManagedCluster` finalizers before auto-stripping them |
-| `ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES` | `60` | Minutes to wait per cluster for `ClusterDeprovision` to complete |
+| `ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES` | `90` | Minutes to wait per cluster for `ClusterDeprovision` to complete (parallel across spokes) |
 | `ACM_CLUSTER_DEPROVISION_POLL_SECONDS` | `10` | Poll interval while waiting for `ClusterDeprovision` to appear |
 | `ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC` | `false` | Strip `ManagedCluster` finalizers immediately on delete, skipping the detach wait |
 

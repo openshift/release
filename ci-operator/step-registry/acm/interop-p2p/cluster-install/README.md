@@ -31,6 +31,7 @@ AWS region is **not** a step env var. The job must lease `MANAGED_CLUSTER_LEASED
 | `ACM_SPOKE_CP_TYPE` | `m6a.2xlarge` | Control plane instance type |
 | `ACM_SPOKE_NETWORK_TYPE` | `OVNKubernetes` | Cluster network type |
 | `ACM_SPOKE_INSTALL_TIMEOUT_MINUTES` | `150` | Provisioned wait timeout |
+| `ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT` | `3` | Hive `installAttemptsLimit` (retries before ProvisionStopped) |
 | `ACM_SPOKE_CLUSTER_INITIAL_VERSION` | `""` | Target OCP X.Y (job must set) |
 
 ## Failure diagnostics

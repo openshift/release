@@ -76,6 +76,12 @@ if [[ ! "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     exit 1
 fi
 
+# Hive installAttemptsLimit must be a positive integer (ProvisionStopped after N failures)
+if [[ ! "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+    : "ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT must be a positive integer, got: '${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}'"
+    exit 1
+fi
+
 # Limit maximum clusters to prevent resource exhaustion
 if [[ "${ACM_SPOKE_CLUSTER_COUNT}" -gt 3 ]]; then
     : "ACM_SPOKE_CLUSTER_COUNT exceeds maximum of 3, got: '${ACM_SPOKE_CLUSTER_COUNT}'"
@@ -496,7 +502,11 @@ ocEOF
     # Create ClusterDeployment - this is the main Hive resource
     # that triggers the actual cluster installation
     # Note: Uses the cluster-specific region from the lease
-    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}'"
+    # installAttemptsLimit: Hive retries failed installs up to this count before
+    # setting ProvisionStopped=True (InstallAttemptsLimitReached). Default 3 matches
+    # Hive's own default and allows transient AWS errors (e.g. LoadBalancerLimitExceeded)
+    # to self-heal instead of failing after a single attempt.
+    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}' (installAttemptsLimit=${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT})"
     {
         oc create -f - --dry-run=client -o json --save-config |
         jq -c \
@@ -505,6 +515,7 @@ ocEOF
             --arg domain     "${BASE_DOMAIN}" \
             --arg clusterSet "${clusterName}-set" \
             --arg imageSet   "${clusterImagesetName}" \
+            --argjson attempts "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" \
             '
             .metadata.name                                         = $name      |
             .metadata.namespace                                    = $name      |
@@ -513,6 +524,7 @@ ocEOF
             .spec.baseDomain                                       = $domain    |
             .spec.clusterName                                      = $name      |
             .spec.platform.aws.region                              = $region    |
+            .spec.installAttemptsLimit                             = $attempts  |
             .spec.provisioning.imageSetRef.name                    = $imageSet
             ' |
         yq -p json -o yaml eval .
@@ -539,7 +551,7 @@ spec:
         name: acm-aws-secret
   pullSecretRef:
     name: pull-secret
-  installAttemptsLimit: 1
+  installAttemptsLimit: 3
   provisioning:
     installConfigSecretRef:
       name: install-config

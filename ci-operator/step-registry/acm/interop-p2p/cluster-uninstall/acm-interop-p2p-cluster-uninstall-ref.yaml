@@ -17,11 +17,13 @@ ref:
       finalizers; the script auto-strips them after this timeout so that Hive
       infrastructure deprovisioning always proceeds.
   - name: ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES
-    default: "60"
+    default: "90"
     documentation: |-
       Minutes to wait per cluster for ClusterDeprovision to complete.
-      With multiple clusters, total wall-clock time can reach this value
-      multiplied by the number of clusters.
+      Clusters are deprovisioned in parallel, so wall-clock wait is
+      approximately max(per-cluster times), not their sum. Raised from 60
+      because slow AWS ELB/ENI cleanup often exceeded the prior limit and
+      left orphaned load balancers that compound quota exhaustion.
   - name: ACM_CLUSTER_DEPROVISION_POLL_SECONDS
     default: "10"
     documentation: |-
@@ -51,7 +53,7 @@ ref:
 
     Env vars consumed:
       ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES   - minutes to wait for ACM detach before auto force-strip (default: 10)
-      ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES - per-cluster deprovision wait limit (default: 60)
+      ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES - per-cluster deprovision wait limit (default: 90)
       ACM_CLUSTER_DEPROVISION_POLL_SECONDS    - poll interval for ClusterDeprovision creation (default: 10)
       ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC   - strip ManagedCluster finalizers immediately (default: false)
       SHARED_DIR                              - shared artifact directory (provides cluster name files)
