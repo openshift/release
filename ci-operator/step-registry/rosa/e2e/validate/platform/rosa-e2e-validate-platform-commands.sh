@@ -82,6 +82,7 @@ else
 fi
 
 GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e-platform.xml" "--ginkgo.v")
+LABEL_FILTER="${PLATFORM_LABEL_FILTER:-${LABEL_FILTER:-}}"
 log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
