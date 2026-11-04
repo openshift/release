@@ -274,6 +274,14 @@ CONFIG = {
         'westus2': 15,
         'centralus': 15
     },
+    # Exactly one slot, deliberately. The Azure IL6 emulator is a single fixture -- one resource
+    # group, one VNet, one pair of IPsec tunnels -- and the job rewrites that VNet's dnsServers,
+    # which is a single scalar. Two concurrent runs cannot both hold it, so the job is serialised
+    # here rather than papered over with retries. Growing this number requires a second emulator
+    # fixture, not a config change.
+    'azure-il6-quota-slice': {
+        'ussecwest': 1
+    },
     'azure-observability-quota-slice': {
         'westus': 25
     },
