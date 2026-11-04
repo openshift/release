@@ -202,6 +202,7 @@ echo "=== 5/5 pointing the VNet at the bastion's resolver ==="
 # Done last on purpose. Between this line and the teardown that reverts it, the VNet depends on
 # this bastion being alive, so the window is kept as short as the job allows. The bastion itself
 # is pinned to 127.0.0.1 above and is unaffected.
+az cloud set --name AzureCloud
 az login --service-principal \
     -u "$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" \
     -p "$(jq -r .clientSecret "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")" \
