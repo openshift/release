@@ -28,11 +28,19 @@ tests:
     # ci-operator uploads a container test's ARTIFACT_DIR under
     # <job>/artifacts/test/artifacts/, and Deck renders custom-link-*.html on
     # the job page, so surface a direct link to the rendered preview.
-    if [[ "${JOB_TYPE:-}" == "presubmit" && -n "${PULL_NUMBER:-}" ]]; then
-      GCS_JOB_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-    else
-      GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
-    fi
+    # Mirror prow's PathForSpec (pkg/pod-utils/gcs/target.go): batch jobs land
+    # under pr-logs/pull/batch/ and get no PULL_NUMBER, not under logs/.
+    case "${JOB_TYPE:-}" in
+      presubmit)
+        GCS_JOB_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+        ;;
+      batch)
+        GCS_JOB_PATH="pr-logs/pull/batch/${JOB_NAME}/${BUILD_ID}"
+        ;;
+      *)
+        GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
+        ;;
+    esac
     # gcs.ci.openshift.org is gcsweb's own vanity host (clusters/core-ci/
     # cert-manager/gcsweb_ingress.yaml), not a cluster router hostname, so it
     # survives app.ci moving. Browsing needs gcsweb rather than
