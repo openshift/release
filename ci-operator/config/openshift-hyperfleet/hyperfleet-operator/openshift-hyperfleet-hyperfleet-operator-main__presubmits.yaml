@@ -1,0 +1,53 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_literal: |
+      FROM nested-podman
+      COPY src/ /opt/app-root/src
+      WORKDIR /opt/app-root/src/hyperfleet-operator
+      USER root
+      RUN dnf install -y make gettext && dnf clean all
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-operator
+    optional: true
+    to: podman-test
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1G
+tests:
+- as: bundle
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    make bundle-build CONTAINER_TOOL=podman \
+      KUSTOMIZE_VARIANT=config/manifests/prod \
+      VALIDATE_RELATED_IMAGES=true \
+      BUNDLE_IMG=localhost/hyperfleet-operator-bundle:ci
+  container:
+    from: podman-test
+  nested_podman: true
+  run_if_changed: ^(bundle\.Dockerfile$|Makefile$|go\.(mod|sum)$|config/|validators/)
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-operator
+  variant: presubmits
