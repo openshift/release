@@ -16,6 +16,6 @@ fi
 key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 ssh -V
 openssl version
-sha256sum "$key"
-ssh-keygen -y -P '' -f "$key" >/dev/null
+# sha256sum "$key"
 tail -c 1 "$key" | od -An -tx1
+ssh-keygen -y -P '' -f "$key" >/dev/null
