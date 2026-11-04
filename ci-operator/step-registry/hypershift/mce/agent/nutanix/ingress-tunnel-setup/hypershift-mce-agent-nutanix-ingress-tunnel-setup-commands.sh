@@ -113,10 +113,17 @@ tunnel_network="$prefix.0/30"
 if [[ -n "${NUTANIX_TUNNEL_ENDPOINT_IP:-}" ]]; then
   endpoint_ip=$NUTANIX_TUNNEL_ENDPOINT_IP
 else
-  # The OFCIR SSH address can be a public forwarding address. Use the local
-  # source IP selected toward the Nutanix subnet for the gateway's UDP peer.
-  endpoint_route=$(ssh "${SSHOPTS[@]}" "root@$IP" ip -4 route get "$INGRESS_VIP")
-  endpoint_ip=$(awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}' <<< "$endpoint_route")
+  # Prefer the leased host's address when it is assigned locally. Nutanix
+  # guests can reach that public address even when the route-selected private
+  # source address is unreachable from their subnet. An OFCIR SSH address may
+  # instead be forwarded, so retain the local route source as a fallback.
+  host_addresses=$(ssh "${SSHOPTS[@]}" "root@$IP" ip -o -4 addr show)
+  if awk -v ip="$IP" '{split($4, address, "/"); if (address[1] == ip) found = 1} END {exit !found}' <<< "$host_addresses"; then
+    endpoint_ip=$IP
+  else
+    endpoint_route=$(ssh "${SSHOPTS[@]}" "root@$IP" ip -4 route get "$INGRESS_VIP")
+    endpoint_ip=$(awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}' <<< "$endpoint_route")
+  fi
 fi
 if ! valid_ipv4 "$endpoint_ip" || ! valid_ipv4 "$IP" ||
    [[ "$endpoint_ip" == 0.* || "$endpoint_ip" == 127.* ||
