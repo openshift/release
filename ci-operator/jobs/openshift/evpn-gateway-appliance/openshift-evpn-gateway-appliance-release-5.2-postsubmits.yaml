@@ -1,33 +1,26 @@
 postsubmits:
-  openshift-priv/oc-mirror:
+  openshift/evpn-gateway-appliance:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    cluster: build03
+    - ^release-5\.2$
+    cluster: build01
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
       - .ci-operator.yaml
-      - images/cli/Dockerfile.ci
-      - images/cli/Dockerfile.test
-    hidden: true
+      - Dockerfile.ci
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-priv-oc-mirror-release-5.0-images
-    path_alias: github.com/openshift/oc-mirror
+    name: branch-ci-openshift-evpn-gateway-appliance-release-5.2-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
@@ -42,9 +35,6 @@ postsubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
