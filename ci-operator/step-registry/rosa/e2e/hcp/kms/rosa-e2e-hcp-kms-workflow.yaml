@@ -7,6 +7,11 @@ workflow:
       REPLICAS: "3"
       ETCD_ENCRYPTION: "true"
       STORAGE_ENCRYPTION: "true"
+      # Scope both validation steps to the KMS specs (rosa-e2e Feature:KMS):
+      # data-plane PV encryption, EBS root-volume encryption, and KMS key
+      # health. The unscoped customer/platform tails run in the other rows of
+      # the ROSAENG-308 provision x validate matrix.
+      LABEL_FILTER: "Feature:KMS"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
@@ -49,9 +54,10 @@ workflow:
     The KMS-encryption row of the ROSAENG-308 provision x validate matrix
     (ROSAENG-63351): the rosa-CLI head provisions an HCP cluster with etcd
     encryption and EBS storage encryption backed by a customer-managed KMS key
-    (rosa-sts-kms-key-create), then runs the shared, provisioner-agnostic
-    validation tail (rosa-e2e-validate-customer, rosa-e2e-validate-platform),
-    whose customer-features specs assert the KMS configuration end to end.
+    (rosa-sts-kms-key-create), then runs the KMS specs of the shared,
+    provisioner-agnostic validation tail (LABEL_FILTER=Feature:KMS selects the
+    data-plane PV encryption, EBS root-volume encryption, and KMS key health
+    specs from rosa-e2e).
 
     The platform plane requires corp-network reachability: run this workflow
     only where backplane is reachable (capabilities: [intranet],
