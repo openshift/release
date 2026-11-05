@@ -21,10 +21,8 @@ GCP_POSTGRESQL_DBNAME="quaydb${RANDOM}"
 GCP_POSTGRESQL_USERNAME="quayuser${RANDOM}"
 GCP_POSTGRESQL_PASSWORD="Quayci$(python3 -c 'import secrets; print(secrets.token_hex(12))')Az9"
 
-# Cloud SQL wants database_version in POSTGRES_<major> form; the postgresql
-# provider wants the plain major for expected_version.
+# Cloud SQL wants database_version in POSTGRES_<major> form.
 DB_VERSION="POSTGRES_${POSTGRESQL_VERSION}"
-EXPECTED_VERSION="${POSTGRESQL_VERSION}"
 # Explicit instance name, generated and persisted to SHARED_DIR before apply
 # (see the identifiers block below): a step killed mid-apply would otherwise
 # leave an instance whose name is only knowable from post-apply outputs.
@@ -113,13 +111,11 @@ variable "region" {
 }
 
 variable "tier" {
-  # 8 vCPUs / 30GB RAM. The 2 vCPU tier hit the 2h step timeout on DB-bound
-  # pages; 4 vCPUs then still throttled the full suite - Cloud SQL
-  # connection setup stalled under the suite's churn (rehearsal
-  # 2117248575602692096: psycopg2.connect timeouts across all Quay workers,
-  # 14s /health/instance) since new connections on the public-IP path are
-  # rate-limited per instance. Cloud SQL connection throughput scales with
-  # vCPU/memory, so double the tier to clear that ceiling.
+  # 8 vCPUs / 30GB RAM. Doubled from 4 vCPUs while chasing the connection
+  # throttling, which turned out to be Cloud NAT port exhaustion on the
+  # public-IP path - the throttling was identical at 4 and 8 vCPUs - and is
+  # addressed by the private IP. The AWS parity point is 4 vCPUs
+  # (db.m5.xlarge); revisit this sizing once a private-IP rehearsal is green.
   default = "db-custom-8-30720"
 }
 
@@ -163,6 +159,13 @@ resource "google_service_networking_connection" "private_service_access" {
   network                 = data.google_compute_network.cluster_network.id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
+  # Cloud SQL keeps producer resources for a while after an instance is
+  # deleted, so deleting the connection right after can fail with "Producer
+  # services ... are still using this connection", which would leave the
+  # peering blocking the installer's network deletion. REMOVE_PEERING deletes
+  # the connection and, if the API refuses for that reason, removes the VPC
+  # peering so the network can be deleted.
+  deletion_policy = "REMOVE_PEERING"
 }
 
 provider "google" {
@@ -176,9 +179,6 @@ resource "google_sql_database_instance" "instance" {
   database_version = var.database_version
   region           = var.region
   deletion_protection = false
-  # Private IP in the cluster's network (see the Private Service Access
-  # resources above): no public IP, no Cloud NAT on the connection path.
-  network = data.google_compute_network.cluster_network.id
   depends_on = [google_service_networking_connection.private_service_access]
 
   settings {
@@ -194,8 +194,11 @@ resource "google_sql_database_instance" "instance" {
     disk_type         = "PD_SSD"
 
     ip_configuration {
+      # Private IP in the cluster's network (see the Private Service Access
+      # resources above): no public IP, no Cloud NAT on the connection path.
       ipv4_enabled    = false
       ssl_mode = "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"
+      private_network = data.google_compute_network.cluster_network.id
     }
   }
 }
@@ -284,63 +287,69 @@ chmod 0600 client-key.pem
 archive_terraform_state
 cp client-cert.pem client-key.pem server-ca.pem "${SHARED_DIR}/"
 
-# Install PostgreSQL extensions
-mkdir -p extension && cd extension
-
-cat >>variables.tf <<EOF
-variable "quay_db_host" {
+# Install the pg_trgm extension. The database is reachable only from inside
+# the cluster's network (private IP): this step pod runs on the build farm
+# and has no route to it, and Quay does not create the extension itself, so
+# run CREATE EXTENSION from a pod in the cluster. The client certificates
+# travel via a secret; psql refuses group/world-readable keys, so the pod
+# copies the key to a 0600 file before connecting. The pod manifest carries
+# the per-run database password, so it is written to a temp dir outside the
+# Terraform archive and removed with the pod.
+extension_pod_dir="$(mktemp -d)"
+cleanup_extension_pod() {
+  oc -n default delete pod quay-db-extension --ignore-not-found=true 2>/dev/null || true
+  oc -n default delete secret quay-db-client-certs --ignore-not-found=true 2>/dev/null || true
+  rm -rf "${extension_pod_dir}"
 }
+# Chain onto the state-archive trap: the pod and its secret must not outlive
+# this step even when it fails.
+trap 'archive_terraform_state; cleanup_extension_pod' EXIT
 
-variable "db_username" {
-}
+oc -n default create secret generic quay-db-client-certs \
+  --from-file=client-cert.pem="${TF_GCP_SQL_DIR}/client-cert.pem" \
+  --from-file=client-key.pem="${TF_GCP_SQL_DIR}/client-key.pem" \
+  --from-file=server-ca.pem="${TF_GCP_SQL_DIR}/server-ca.pem"
 
-variable "db_password" {
-  sensitive = true
-}
-
-variable "expected_version" {
-}
-
-variable "db_name" {
-}
+cat >"${extension_pod_dir}/db-extension-pod.yaml" <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: quay-db-extension
+  namespace: default
+spec:
+  restartPolicy: Never
+  containers:
+  - name: psql
+    image: registry.redhat.io/rhel9/postgresql-16
+    command: ["/bin/bash", "-c", "--"]
+    args:
+    - |
+      set -euo pipefail
+      cp /certs/client-key.pem /tmp/client-key.pem
+      chmod 0600 /tmp/client-key.pem
+      PGPASSWORD="${GCP_POSTGRESQL_PASSWORD}" psql \
+        "host=${QUAY_DB_PRIVATE_IP} port=5432 dbname=${GCP_POSTGRESQL_DBNAME} user=${GCP_POSTGRESQL_USERNAME} sslmode=verify-ca sslrootcert=/certs/server-ca.pem sslcert=/certs/client-cert.pem sslkey=/tmp/client-key.pem" \
+        -v ON_ERROR_STOP=1 \
+        -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
+    volumeMounts:
+    - name: certs
+      mountPath: /certs
+      readOnly: true
+  volumes:
+  - name: certs
+    secret:
+      secretName: quay-db-client-certs
 EOF
 
-cat >>install_extension.tf <<EOF
-terraform {
-  required_providers {
-    postgresql = {
-      source = "cyrilgdn/postgresql"
-      version = "1.22.0"
-    }
-  }
-}
-
-provider "postgresql" {
-  host            = var.quay_db_host
-  username        = var.db_username
-  password        = var.db_password
-  expected_version = var.expected_version
-  sslmode         = "require"
-  connect_timeout = 15
-}
-
-resource "postgresql_extension" "pg_trgm" {
-  name     = "pg_trgm"
-  database = var.db_name
-}
-EOF
-
-export TF_VAR_quay_db_host="${QUAY_DB_PRIVATE_IP}"
-export TF_VAR_db_username="${GCP_POSTGRESQL_USERNAME}"
-export TF_VAR_db_password="${GCP_POSTGRESQL_PASSWORD}"
-export TF_VAR_expected_version="${EXPECTED_VERSION}"
-export TF_VAR_db_name="${GCP_POSTGRESQL_DBNAME}"
-export PGSSLCERT="../client-cert.pem"
-export PGSSLKEY="../client-key.pem"
-export PGSSLROOTCERT="../server-ca.pem"
-
-terraform init
-terraform apply -auto-approve
+oc apply -f "${extension_pod_dir}/db-extension-pod.yaml"
+if ! oc -n default wait --for=jsonpath='{.status.phase}'=Succeeded pod/quay-db-extension --timeout=5m; then
+  echo "ERROR: the pg_trgm extension pod did not succeed; pod logs:" >&2
+  oc -n default logs quay-db-extension >&2 || true
+  cleanup_extension_pod
+  exit 1
+fi
+oc -n default logs quay-db-extension
+cleanup_extension_pod
 
 echo "PostgreSQL extensions installed successfully"
 

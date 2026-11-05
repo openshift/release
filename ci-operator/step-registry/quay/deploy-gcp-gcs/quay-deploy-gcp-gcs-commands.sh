@@ -467,7 +467,7 @@ else
   secret_args=(--from-file config.yaml=./config.yaml)
 fi
 
-# On redhat-3.18+ the Quay operator projects the config bundle secret into
+# On redhat-3.17+ the Quay operator projects the config bundle secret into
 # /run/secrets/postgresql only when it is named postgresql-client-certs (see
 # the QE gsql deploy). When the GCP SQL client certificates are present,
 # include them in the bundle under that name so the Quay pods can verify the

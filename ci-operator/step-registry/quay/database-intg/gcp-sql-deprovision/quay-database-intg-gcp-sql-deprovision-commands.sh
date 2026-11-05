@@ -80,6 +80,12 @@ cleanup_by_identifiers() {
     return 1
   fi
   echo "Reconstructing Terraform config and importing instance ${instance_name} for cleanup..." >&2
+  # A fresh, empty directory: the fallback is also reached from the archived-
+  # state path, where the extracted state may already manage the range and
+  # connection (a provision step killed during instance creation leaves
+  # exactly that). Importing already-managed addresses would fail and leak
+  # the peering, so never run against a directory with existing state.
+  mkdir -p identifier_fallback && cd identifier_fallback
   cat >create_gcp_sql.tf <<EOF
 provider "google" {
   credentials = file("auth.json")
@@ -112,6 +118,10 @@ resource "google_service_networking_connection" "private_service_access" {
   network                 = "projects/${GCP_PROJECT}/global/networks/${GCP_CLUSTER_NETWORK}"
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_ip_range.name]
+  # See the provisioning step: REMOVE_PEERING so a connection delete that is
+  # refused because producer resources linger still removes the VPC peering,
+  # which is what would block the installer's network deletion.
+  deletion_policy = "REMOVE_PEERING"
 }
 EOF
   cp "${CLUSTER_PROFILE_DIR}/gce.json" auth.json
