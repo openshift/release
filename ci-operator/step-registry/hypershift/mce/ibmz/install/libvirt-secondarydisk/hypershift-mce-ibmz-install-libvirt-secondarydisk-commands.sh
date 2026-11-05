@@ -149,6 +149,14 @@ function attach_secondary_disk () {
   echo "------------------------------------------------------------"
   echo "VM: ${vm}"
 
+  # The lease is exclusively ours and the VM was just recreated, so a volume with
+  # this name can only be left over from an earlier run whose cleanup missed it.
+  # Remove it instead of failing with "storage volume ... exists already".
+  if ${virsh_cmd} vol-info --pool "${pool}" "${vol_name}" &>/dev/null; then
+    echo "WARNING: stale volume ${vol_name} found in pool ${pool}; deleting it before re-creating."
+    ${virsh_cmd} vol-delete --pool "${pool}" "${vol_name}"
+  fi
+
   # Create a new raw volume in the shared pool.
   echo "Creating volume ${vol_name} (${SECONDARY_DISK_CAPACITY}) in pool ${pool}..."
   ${virsh_cmd} vol-create-as \
