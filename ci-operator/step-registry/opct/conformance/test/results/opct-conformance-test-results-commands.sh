@@ -272,16 +272,15 @@ function show_results() {
 # and the job must be red. If .stat.result is absent from an older report
 # shape, fall back to .stat.status (raw Sonobuoy verdict).
 #
-# Replay plugin exception: for 80-openshift-tests-replay, OPCT computes
-# Result = "---" when the replay itself observed filter-6 failures. The
-# replay suite re-runs known failures for debugging and may legitimately
-# contain permanent failures or bugs (per the data.go comment), so "---"
-# is accepted as a non-failure for that plugin only. An explicit "failed"
-# Result still fails the gate.
+# Replay plugin exclusion: 80-openshift-tests-replay is NOT gated. Per OPCT
+# maintainer direction (same thread): replay re-exercises e2e tests in the
+# same workflow to spare partners a manual re-run -- in CI the suite runs
+# 10 times statically while replay runs only once -- so its Result carries
+# no certification verdict. It is still listed in the executed-plugins log
+# for visibility, but never counted toward pass/fail.
 #
 # Return values (contract):
-#   0 = all executed plugins report stat.result == "passed"
-#       (Replay additionally accepts "---")
+#   0 = all executed plugins (excluding Replay) report stat.result == "passed"
 #   1 = valid report parsed, but at least one plugin is non-passed
 #       (plugin failure)
 #   2 = report missing or malformed (processing problem)
@@ -338,19 +337,16 @@ function check_plugin_gate() {
     return 2
   }
 
-  local total
-  total=$(echo "${plugins_json}" | jq 'length')
   show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
 
   # A plugin passes the gate when its OPCT-computed result is "passed".
-  # The Replay plugin additionally accepts "---" (see function comment).
+  # The Replay plugin is excluded from the gate entirely (see function
+  # comment); it is listed for visibility only.
+  local gated_json
+  gated_json=$(echo "${plugins_json}" | jq -c '[.[] | select(.name != "80-openshift-tests-replay")]')
+
   local failed_json
-  failed_json=$(echo "${plugins_json}" | jq -c '
-    [.[] | select(
-      .result != "passed"
-      and (( .name == "80-openshift-tests-replay" and .result == "---" ) | not)
-    )]
-  ')
+  failed_json=$(echo "${gated_json}" | jq -c '[.[] | select(.result != "passed")]')
   local failed_count
   failed_count=$(echo "${failed_json}" | jq 'length')
 
@@ -362,7 +358,9 @@ function check_plugin_gate() {
     return 1
   fi
 
-  show_msg "Plugin gate passed: all ${total} executed plugin(s) report stat.result: passed (Replay also accepts '---')"
+  local gated_total
+  gated_total=$(echo "${gated_json}" | jq 'length')
+  show_msg "Plugin gate passed: all ${gated_total} gated plugin(s) report stat.result: passed (Replay excluded from gate)"
   return 0
 }
 
