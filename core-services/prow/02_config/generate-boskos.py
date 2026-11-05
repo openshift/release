@@ -346,6 +346,12 @@ CONFIG = {
     'aro-hcp-dev-shard3-slot': {},
     'aro-hcp-dev-hypershift-westus3-slot': {},
     'aro-hcp-dev-shard4-slot': {},
+    'aro-hcp-dev-shard5-slot': {},
+    'aro-hcp-dev-shard6-slot': {},
+    'aro-hcp-dev-shard7-slot': {},
+    'aro-hcp-dev-shard8-slot': {},
+    'aro-hcp-dev-shard9-slot': {},
+    'aro-hcp-dev-shard10-slot': {},
     'aro-hcp-int-shard0-slot': {},
     'aro-hcp-int-westus3-shard0-slot': {},
     'aro-hcp-prod-shard0-slot': {},
@@ -887,6 +893,18 @@ for i in range(2):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(30):
     CONFIG['aro-hcp-dev-shard4-slot']['aro-hcp-dev-shard4-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard5-slot']['aro-hcp-dev-shard5-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard6-slot']['aro-hcp-dev-shard6-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard7-slot']['aro-hcp-dev-shard7-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard8-slot']['aro-hcp-dev-shard8-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard9-slot']['aro-hcp-dev-shard9-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard10-slot']['aro-hcp-dev-shard10-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
