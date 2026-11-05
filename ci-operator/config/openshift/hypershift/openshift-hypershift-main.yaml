@@ -141,6 +141,13 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  lint:
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+    requests:
+      cpu: 4000m
+      memory: 16Gi
   unit:
     limits:
       cpu: 4000m
@@ -156,10 +163,17 @@ resources:
       cpu: 4000m
       memory: 16Gi
 tests:
+- as: lint
+  capabilities:
+  - arm64
+  commands: make lint
+  container:
+    from: custom-verify-src
+  timeout: 1h30m0s
 - as: verify
   capabilities:
   - arm64
-  commands: make verify
+  commands: make verify-repository
   container:
     from: custom-verify-src
   timeout: 1h30m0s
