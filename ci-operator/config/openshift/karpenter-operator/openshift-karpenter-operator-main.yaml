@@ -40,6 +40,12 @@ resources:
     requests:
       cpu: 200m
       memory: 400Mi
+  test-schema:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "1"
+      memory: 2Gi
   verify:
     limits:
       memory: 8Gi
@@ -87,6 +93,14 @@ tests:
             variant: karpenter
             labelFilter: karpenter
     workflow: hypershift-aws-e2e-v2
+- as: test-schema
+  commands: |
+    export GOCACHE=/tmp/go-cache
+    export GOPROXY=https://proxy.golang.org
+    make test-schema
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: verify
   commands: |
     export GOCACHE=/tmp/
