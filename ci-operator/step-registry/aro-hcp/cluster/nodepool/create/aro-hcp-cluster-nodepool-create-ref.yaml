@@ -1,0 +1,59 @@
+ref:
+  as: aro-hcp-cluster-nodepool-create
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-cluster-nodepool-create-commands.sh
+  grace_period: 15s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: eastus2
+    documentation: Azure region used to discover availability zones for the node-pool VM size.
+  - name: MP_NAME
+    default: infra
+    documentation: Name of the additional ARO HCP node pool.
+  - name: MP_OPENSHIFT_VERSION
+    default: ""
+    documentation: Optional full OpenShift node-pool version in X.Y.Z format. When empty, inherit it from the existing workers node pool.
+  - name: MP_CHANNEL_GROUP
+    default: ""
+    documentation: Optional Azure RP channel group. When empty, inherit it from the existing node pool or cluster.
+  - name: MP_REPLICAS
+    default: "3"
+    documentation: Number of nodes in each additional node pool; with MULTI_AZ=true this count applies per selected zone.
+  - name: MP_MACHINE_TYPE
+    default: Standard_D4s_v5
+    documentation: Azure VM size for the additional node pool.
+  - name: MP_LABELS
+    default: ""
+    documentation: Optional Azure CLI shorthand labels, for example node-role.kubernetes.io/infra=.
+  - name: MP_TAINTS
+    default: ""
+    documentation: Optional Azure CLI shorthand taints, for example node-role.kubernetes.io/infra=:NoSchedule.
+  - name: MP_ZONE
+    default: ""
+    documentation: Optional single availability zone when MULTI_AZ is false.
+  - name: MULTI_AZ
+    default: "false"
+    documentation: Create one node pool in each selected availability zone.
+  - name: ZONES_COUNT
+    default: "1"
+    documentation: Number of availability zones to select from the VM SKU's regional zone list.
+  - name: MP_ZONES
+    default: ""
+    documentation: Optional space- or comma-separated zone override; otherwise zones are discovered from Azure.
+  - name: MP_SUBNET_ID
+    default: ""
+    documentation: Optional worker subnet resource ID. The cluster worker subnet is used when empty.
+  - name: MP_AUTO_REPAIR
+    default: "true"
+    documentation: Enable automatic repair for the additional node pool.
+  - name: MP_TIMEOUT
+    default: 90m
+    documentation: Maximum time to wait for the additional node pool to succeed.
+  documentation: |-
+    Create and wait for an additional node pool on an existing ARO HCP cluster.
+    The cluster name, resource group, and subscription are read from
+    SHARED_DIR/aro-hcp.env.

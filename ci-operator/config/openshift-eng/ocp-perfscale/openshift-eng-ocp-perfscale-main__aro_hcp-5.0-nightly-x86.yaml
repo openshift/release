@@ -1,0 +1,77 @@
+base_images:
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aro-hcp-control-plane-24nodes
+  cron: 0 2 * * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-perfscale
+    env:
+      COMPUTE_MACHINE_TYPE: Standard_D4s_v5
+      EXPECTED_WORKER_NODES: "24"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: Standard_D4s_v5
+      MP_NAME: infra
+      MP_REPLICAS: "3"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 90m
+      REGION: eastus2
+      REPLICAS: "24"
+      WORKER_OPENSHIFT_VERSION: 5.0.0
+      ZONES_COUNT: "3"
+    post:
+    - chain: aro-hcp-cluster-deprovision
+    pre:
+    - chain: aro-hcp-cluster-provision
+    - ref: aro-hcp-cluster-wait-ready
+    - ref: aro-hcp-cluster-nodepool-create
+    - chain: openshift-qe-hypershift-infra
+    - ref: aro-hcp-cluster-index
+    test:
+    - as: aro-hcp-guest-health
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get nodes -o wide
+        KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get co
+      from: aro-hcp-e2e-tools
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-qe-control-plane
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-perfscale
+  variant: aro_hcp-5.0-nightly-x86

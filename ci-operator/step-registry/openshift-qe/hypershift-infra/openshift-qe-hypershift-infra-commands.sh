@@ -6,6 +6,10 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# Use the ambient KUBECONFIG supplied by the CI workflow. The guest
+# Infrastructure resource is the source of truth for the platform.
+CLUSTER_PLATFORM=$(oc get infrastructure cluster -o go-template --template='{{.status.platform}}'| awk '{print tolower($0)}')
+
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
@@ -31,7 +35,11 @@ function oc_with_retry() {
 }
 
 function getDesiredInfraCount() {
-  desired_infra_count=${MP_REPLICAS}
+  if [[ "${CLUSTER_PLATFORM}" == "azure" ]]; then
+    desired_infra_count=$(<"${SHARED_DIR}/aro-hcp-infra-replicas")
+  else
+    desired_infra_count="${MP_REPLICAS}"
+  fi
   echo "Desired Infra node count: $desired_infra_count"
 }
 
@@ -230,48 +238,49 @@ function checkInfra() {
     exit 1
 }
 
-# Get cluster 
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-echo "CLUSTER_ID is $CLUSTER_ID"
-
-# Configure aws
-CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ -f "${AWSCRED}" ]]; then
-  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+# Provider-specific setup. The placement and readiness logic below is shared.
+if [[ "${CLUSTER_PLATFORM}" == "azure" ]]; then
+  is_hcp_cluster=true
+  log "Detected Azure HCP platform"
 else
-  echo "Did not find compatible cloud provider cluster_profile"
-  exit 1
-fi
+  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+  echo "CLUSTER_ID is $CLUSTER_ID"
 
-# Log in
-
-read_profile_file() {
-  local file="${1}"
-  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
-    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+  AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+  if [[ -f "${AWSCRED}" ]]; then
+    export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+    export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+  else
+    echo "Did not find compatible cloud provider cluster_profile"
+    exit 1
   fi
-}
 
-ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
-ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
-ROSA_TOKEN=$(read_profile_file "ocm-token")
+  read_profile_file() {
+    local file="${1}"
+    if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+      cat "${CLUSTER_PROFILE_DIR}/${file}"
+    fi
+  }
 
-if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
-elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-else
-  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
-  exit 1
+  ROSA_SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+  ROSA_SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+  ROSA_TOKEN=$(read_profile_file "ocm-token")
+
+  if [[ -n "${ROSA_SSO_CLIENT_ID}" && -n "${ROSA_SSO_CLIENT_SECRET}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
+    rosa login --env "${OCM_LOGIN_ENV}" --client-id "${ROSA_SSO_CLIENT_ID}" --client-secret "${ROSA_SSO_CLIENT_SECRET}"
+  elif [[ -n "${ROSA_TOKEN}" ]]; then
+    echo "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+    rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  else
+    echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+    exit 1
+  fi
+
+  is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
+  log "hypershift.enabled is set to $is_hcp_cluster"
 fi
-
-# Check if this is a HCP cluster
-is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
-log "hypershift.enabled is set to $is_hcp_cluster"
 
 if [[ "$is_hcp_cluster" == "true" ]]; then
   getDesiredInfraCount
