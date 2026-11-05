@@ -173,21 +173,34 @@ log "OCM login successful (${OCM_LOGIN_ENV})"
 
 # ---- backplane login + elevate ----------------------------------------------
 
-log "Running ocm-backplane login for ${CLUSTER_ID}..."
-if ! ocm-backplane login "${CLUSTER_ID}" 2>&1; then
-  log "ERROR: Backplane login failed for cluster ${CLUSTER_ID}"
-  COLLECTION_REASON="backplane login failed for ${CLUSTER_ID}"
+# Log into the management cluster: every CR dumped below (HostedClusters,
+# HostedControlPlanes, NodePools, CAPI Machines, ...) exists only on the
+# management plane. A plain `ocm-backplane login <id>` yields the hosted
+# (guest) plane, where those resource types do not exist. Same pattern as
+# the rosa-backplane-login step (ROSAENG-67580).
+log "Running ocm-backplane login --manager for ${CLUSTER_ID}..."
+if ! ocm-backplane login "${CLUSTER_ID}" --manager 2>&1; then
+  log "ERROR: Backplane --manager login failed for cluster ${CLUSTER_ID}"
+  COLLECTION_REASON="backplane --manager login failed for ${CLUSTER_ID}"
   exit 0
 fi
 
 log "Elevating backplane access (reason: ${elevate_reason})..."
-if ! ocm-backplane elevate "${elevate_reason}" -- config view --raw --minify > "${BP_KUBECONFIG}" 2>&1; then
-  log "ERROR: Failed to get elevated backplane kubeconfig"
-  rm -f "${BP_KUBECONFIG}"
-  COLLECTION_REASON="backplane elevate failed for ${CLUSTER_ID}"
-  exit 0
+ELEVATE_KUBECONFIG="$(mktemp /tmp/bp-elevated.XXXXXX)"
+if ocm-backplane elevate "${elevate_reason}" -- config view --raw --minify \
+  > "${ELEVATE_KUBECONFIG}" 2> "${CR_DIR}/backplane-elevate-error.txt"; then
+  mv "${ELEVATE_KUBECONFIG}" "${BP_KUBECONFIG}"
+  chmod 0600 "${BP_KUBECONFIG}"
+else
+  # Read-only CR dumps do not require backplane-cluster-admin. Keep the
+  # session kubeconfig that ocm-backplane login already wrote to $KUBECONFIG
+  # instead of discarding it, and retain the elevate error for diagnosis:
+  # redirecting elevate's output into BP_KUBECONFIG both truncated the login
+  # kubeconfig and swallowed the failure reason.
+  log "WARNING: backplane elevate failed (see backplane-elevate-error.txt); continuing with the non-elevated session kubeconfig"
+  rm -f "${ELEVATE_KUBECONFIG}"
+  cat "${CR_DIR}/backplane-elevate-error.txt" 2>/dev/null || true
 fi
-chmod 0600 "${BP_KUBECONFIG}"
 
 # Verify access
 if ! oc whoami > "${CR_DIR}/whoami.txt" 2>&1; then
