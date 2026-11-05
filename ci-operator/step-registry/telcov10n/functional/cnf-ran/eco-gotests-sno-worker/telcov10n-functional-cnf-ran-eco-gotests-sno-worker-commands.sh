@@ -194,32 +194,13 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
 done
 
 echo "Collect artifacts from bastion"
-for feature in ${ECO_GOTESTS_FEATURES}; do
-  ECO_GOTEST_DIR="${REMOTE_WORKDIR}/eco_gotests_${feature}"
-  ARTIFACT_SUBDIR="${ARTIFACT_DIR}/junit_eco_gotests_${feature}"
-  mkdir -p "${ARTIFACT_SUBDIR}"
-
-  scp_stderr=$(mktemp)
-  scp_rc=0
-  scp -r "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:${ECO_GOTEST_DIR}/report/*.xml" \
-    "${ARTIFACT_SUBDIR}/" 2>"${scp_stderr}" || scp_rc=$?
-  if [[ ${scp_rc} -ne 0 ]]; then
-    scp_err_msg=$(cat "${scp_stderr}")
-    if [[ "${scp_err_msg}" == *"No such file"* || "${scp_err_msg}" == *"not found"* ]]; then
-      echo "No report files found for feature ${feature} (non-fatal): ${scp_err_msg}"
-    else
-      echo "WARNING: scp failed for feature ${feature} (exit code ${scp_rc}): ${scp_err_msg}"
-    fi
-  fi
-  rm -f "${scp_stderr}"
-  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
-    "cd ${ECO_GOTEST_DIR}/report && find . -mindepth 1 ! -name '*.xml' -type f \
-     | zip /tmp/k8sreporter_${feature}.zip -@ 2>/dev/null || true"
-  scp "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_${feature}.zip" \
-    "${ARTIFACT_SUBDIR}/" 2>/dev/null || echo "No k8sreporter artifacts for ${feature} — skipping"
-done
+ansible-playbook ./playbooks/collect-eco-gotests-artifacts.yaml \
+  -i ./inventories/cnf/switch-config.yaml \
+  --extra-vars "eco_gotests_features='${ECO_GOTESTS_FEATURES}'" \
+  --extra-vars "eco_gotest_dir_prefix=${REMOTE_WORKDIR}/eco_gotests_" \
+  --extra-vars "artifact_dir=${ARTIFACT_DIR}" \
+  --extra-vars "hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH}" \
+  -vv
 
 echo "Copy reports to SHARED_DIR with prefixes"
 for feature in ${ECO_GOTESTS_FEATURES}; do
