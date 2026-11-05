@@ -105,15 +105,29 @@ server_name="${CLUSTER_NAME}-buildhost"
 
 MACHINE_TYPE="n4-standard-8"
 SSH_PUB_KEY=$(cat ${SHARED_DIR}/vpc-sshkey.pub)
+
+# CoreOS images (FCOS/RHCOS) do not consume the ssh-keys metadata; create the
+# SSH user with passwordless sudo through an Ignition config instead.
+USER_DATA_ARGS=""
+if [[ "${USE_IGNITION:-false}" == "true" ]]; then
+	SUDOERS_B64=$(echo "${SSH_USER} ALL=(ALL) NOPASSWD: ALL" | base64 -w0)
+	jq -n --arg user "${SSH_USER}" --arg key "${SSH_PUB_KEY}" --arg sudoers "data:;base64,${SUDOERS_B64}" '{
+		ignition: {version: "3.2.0"},
+		passwd: {users: [{name: $user, sshAuthorizedKeys: [$key]}]},
+		storage: {files: [{path: ("/etc/sudoers.d/90-" + $user), mode: 288, contents: {source: $sudoers}}]}
+	}' >"${workdir}/user-data.ign"
+	USER_DATA_ARGS="--metadata-from-file=user-data=${workdir}/user-data.ign"
+fi
 CREATED_ZONE=""
 for zone in ${ZONES}; do
 	echo "Trying zone ${zone}..."
 	if gcloud compute instances create "${server_name}" \
 		${IMAGE_ARGS} \
 		--boot-disk-type hyperdisk-balanced \
-		--boot-disk-size=${BOOT_DISK_SIZE} \
+		--boot-disk-size=${BOOT_DISK_SIZE:-200GB} \
 		--machine-type=${MACHINE_TYPE} \
 		--metadata ssh-keys="${SSH_USER}:${SSH_PUB_KEY}" \
+		${USER_DATA_ARGS} \
 		--network=${NETWORK} \
 		--subnet=${CONTROL_PLANE_SUBNET} \
 		--zone=${zone} \

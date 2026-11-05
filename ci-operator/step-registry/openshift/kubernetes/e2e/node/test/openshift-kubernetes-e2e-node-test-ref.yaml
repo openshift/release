@@ -22,13 +22,18 @@ ref:
     documentation: |-
       Overall test timeout on the remote host, as a Go duration.
   - name: NODE_E2E_TEST_ARGS
-    default: "--kubelet-flags=\"--cgroup-driver=systemd --cgroup-root=/ --cgroups-per-qos=true --runtime-cgroups=/system.slice/crio.service\""
+    default: >-
+      --container-runtime-process-name=/usr/local/bin/crio --container-runtime-pid-file=
+      --kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/crio.service --kubelet-cgroups=/system.slice/kubelet.service"
+      --extra-log="{\"name\": \"crio.log\", \"journalctl\": [\"-u\", \"crio\"]}"
     documentation: |-
-      Extra arguments passed to e2e_node.test (TEST_ARGS for `make test-e2e-node`).
-  - name: CRIO_REF
-    default: main
+      Extra arguments passed to e2e_node.test (TEST_ARGS for `make test-e2e-node`). Defaults to the
+      arguments of the upstream CRI-O node e2e jobs.
+  - name: CRIO_VERSION
+    default: release-1.36
     documentation: |-
-      Branch or tag of github.com/cri-o/cri-o to build and install on the test host.
+      CRI-O static bundle installed on the test host (github.com/cri-o/packaging): a version tag, a full
+      commit SHA, or `main` / `release-X.Y` for the latest bundle built from that branch.
   resources:
     requests:
       cpu: "4"
@@ -36,7 +41,8 @@ ref:
     limits:
       memory: 12Gi
   documentation: |-
-    Installs CRI-O on the (RHEL 10) VM created by gcp-crio-provision-buildhost, then runs
+    Installs the CRI-O static bundle on the RHCOS VM created by gcp-crio-provision-buildhost, with the same
+    configuration as the upstream FCOS CRI-O node e2e jobs (kubernetes/test-infra jobs/e2e_node/crio), then runs
     `make test-e2e-node REMOTE=true REMOTE_MODE=ssh` from the openshift/kubernetes source under test.
     The upstream remote runner builds kubelet and e2e_node.test locally, copies them to the VM, runs the
     suite there and copies JUnit results and logs back into the step artifacts.

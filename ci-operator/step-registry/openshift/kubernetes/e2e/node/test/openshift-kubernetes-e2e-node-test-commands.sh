@@ -16,122 +16,126 @@ trap gather EXIT
 timeout 5m bash -c "until ssh -q ${SSHOPTS[*]} ${IP} exit; do sleep 10; done"
 
 # The upstream remote runner expects a host with a running container runtime; it
-# takes care of CNI, firewall, SELinux labels and the kubelet itself. CRI-O is
-# installed with its own CI playbooks: setup-main.yml installs the build
-# dependencies (what the nightly cri-o-setup job bakes into crio-setup images),
-# then CRI-O is built and started the same way as in the cri-o-node-e2e-* jobs.
-echo "Installing CRI-O ${CRIO_REF} on ${IP}"
-timeout --kill-after 10m 150m ssh "${SSHOPTS[@]}" "${IP}" -- bash - <<EOF
+# takes care of the kubelet itself. The RHCOS boot image does not ship CRI-O (the
+# MCO normally pivots to the OCP node image), so install the CRI-O static bundle
+# the same way the upstream FCOS crio node e2e jobs do.
+echo "Installing CRI-O ${CRIO_VERSION} on ${IP}"
+timeout --kill-after 5m 30m ssh "${SSHOPTS[@]}" "${IP}" -- sudo CRIO_VERSION="${CRIO_VERSION}" bash -s <<'EOF'
 set -xeuo pipefail
-export PATH="\${HOME}/.local/bin:\${PATH}"
+# Inputs: CRIO_VERSION (tag, full SHA, or release-X.Y / main to use the latest bundle of that branch).
 cat /etc/os-release
-# iptables is used by the upstream remote runner's firewall setup; checkpolicy and
-# semodule_package build the SELinux module below. Not all are in the RHEL 10 cloud image.
-sudo dnf install -y python3 python3-pip git iptables-nft checkpolicy /usr/bin/semodule_package
-python3 -m pip install --user ansible
 
-SOURCE_DIR=/usr/go/src/github.com/cri-o/cri-o
-sudo rm -rf "\${SOURCE_DIR}"
-sudo mkdir -p "\${SOURCE_DIR}"
-sudo chown "\$(id -u)" "\${SOURCE_DIR}"
-git clone --depth 1 --branch "${CRIO_REF}" https://github.com/cri-o/cri-o.git "\${SOURCE_DIR}"
-cd "\${SOURCE_DIR}/contrib/test/ci"
-echo "localhost" >> hosts
-ansible-playbook setup-main.yml --connection=local
-cat > install-crio.yml <<'PLAYBOOK'
----
-- hosts: localhost, all
-  become: yes
-  environment:
-    GOPATH: /usr/go
-  vars_files:
-    - "{{ playbook_dir }}/vars.yml"
-  tags:
-    - e2e-node
-  tasks:
-    - name: build and install cri-o
-      include_tasks: "build/cri-o.yml"
-    - name: enable and start CRI-O
-      systemd:
-        name: crio
-        state: started
-        enabled: yes
-        daemon_reload: yes
-PLAYBOOK
-ansible-playbook install-crio.yml -i hosts -e "TEST_AGENT=prow" --connection=local --tags setup,e2e-node
+# Mirrors kubernetes/test-infra jobs/e2e_node/crio/templates/base/root.yaml (FCOS).
+# RHCOS differences: / is a read-only composefs (no /usr remount), so CRI-O's
+# libexec goes to /usr/local/libexec on the writable /var/usrlocal.
+LIBEXEC_CRIO_DIR=/usr/local/libexec/crio
 
-# The test kubelet runs as a transient systemd unit (init_t); same policy as the cri-o node e2e jobs.
-cat > /tmp/e2e-node-kubelet.te <<'TE'
-module e2e-node-kubelet 1.0;
+# The runner puts its workspace (kubelet, e2e_node.test, cni) under /tmp.
+mount -o remount,exec,suid /tmp
+
+# Match the FCOS kernel default (RHEL defaults THP to "always"): with THP always the
+# kubelet takes far fewer page faults than the Summary API test expects (>= 1000).
+echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
+
+cat > /etc/sysctl.d/99-e2e-sysctl.conf <<'CONF'
+# Increase kernel.pid_max and kernel.threads-max to maximum. This is needed for
+# pid eviction tests, because systemd will set a system wide DefaultTasksMax
+# based on mimunum of these values.
+kernel.pid_max=4194304
+kernel.threads-max=4194304
+CONF
+/usr/lib/systemd/systemd-sysctl
+
+mkdir -p /etc/containers/registries.conf.d
+cat > /etc/containers/registries.conf.d/99-localhost-insecure.conf <<'CONF'
+# Required for e2e tests using the fake-registry-server which serves HTTP-only
+[[registry]]
+location = "localhost:5000"
+insecure = true
+CONF
+
+mkdir -p /etc/crio/crio.conf.d
+cat > /etc/crio/crio.conf.d/20-crio.conf <<CONF
+[crio.image]
+signature_policy = "/etc/crio/policy.json"
+
+[crio.runtime]
+log_level = "debug"
+drop_infra_ctr = false
+default_runtime = "crun"
+
+[crio.runtime.runtimes.crun]
+runtime_path = "${LIBEXEC_CRIO_DIR}/crun"
+monitor_path = "${LIBEXEC_CRIO_DIR}/conmon"
+# TODO: having the crun subcgroup breaks this collection remove this when that is fixed
+default_annotations = { "run.oci.systemd.subgroup" = "" }
+
+[crio.runtime.runtimes.runc]
+runtime_path = "${LIBEXEC_CRIO_DIR}/runc"
+monitor_path = "${LIBEXEC_CRIO_DIR}/conmon"
+
+[crio.runtime.runtimes.test-handler]
+runtime_path = "${LIBEXEC_CRIO_DIR}/runc"
+monitor_path = "${LIBEXEC_CRIO_DIR}/conmon"
+CONF
+
+cat > /root/kubelet-e2e.te <<'TE'
+module kubelet-e2e 1.0;
 
 require {
-  type init_t;
-  type kmsg_device_t;
-  type container_runtime_t;
-  type websm_port_t;
-  type container_log_t;
-  type user_tmp_t;
-  type var_lib_t;
-  type kernel_t;
-  type http_port_t;
-  type http_cache_port_t;
-  type commplex_main_port_t;
-  type container_file_t;
-  type ephemeral_port_t;
-  type unreserved_port_t;
-  type us_cli_port_t;
-  type var_log_t;
-  class file { execute execute_no_trans map open read unlink };
-  class unix_stream_socket connectto;
-  class chr_file read;
-  class system syslog_read;
-  class tcp_socket name_connect;
-  class sock_file { create rename unlink write };
-  class dir rmdir;
+        type iptables_t;
+        type cgroup_t;
+        type user_tmp_t;
+        type init_t;
+        type container_t;
+        class dir { ioctl create open write };
+        class file { append create lock map open read rename unlink write };
 }
 
-allow init_t commplex_main_port_t:tcp_socket name_connect;
-allow init_t container_file_t:sock_file { create unlink write };
-allow init_t container_log_t:file { open read unlink };
-allow init_t container_runtime_t:unix_stream_socket connectto;
-allow init_t ephemeral_port_t:tcp_socket name_connect;
-allow init_t http_cache_port_t:tcp_socket name_connect;
-allow init_t http_port_t:tcp_socket name_connect;
-allow init_t kernel_t:system syslog_read;
-allow init_t kmsg_device_t:chr_file read;
-allow init_t unreserved_port_t:tcp_socket name_connect;
-allow init_t us_cli_port_t:tcp_socket name_connect;
-allow init_t user_tmp_t:file { execute execute_no_trans map open };
-allow init_t var_lib_t:sock_file { create rename unlink };
-allow init_t var_log_t:dir rmdir;
-allow init_t websm_port_t:tcp_socket name_connect;
+#============= init_t ==============
+allow init_t user_tmp_t:file { append create lock map open read rename unlink write };
+
+#============= container_t ==============
+allow container_t user_tmp_t:dir { create open write };
+
+#============= iptables_t ==============
+allow iptables_t cgroup_t:dir ioctl;
 TE
-checkmodule -M -m -o /tmp/e2e-node-kubelet.mod /tmp/e2e-node-kubelet.te
-semodule_package -o /tmp/e2e-node-kubelet.pp -m /tmp/e2e-node-kubelet.mod
-sudo semodule -i /tmp/e2e-node-kubelet.pp
+setenforce 1
+checkmodule -M -m -o /root/kubelet-e2e.mod /root/kubelet-e2e.te
+semodule_package -o /root/kubelet-e2e.pp -m /root/kubelet-e2e.mod
+semodule -i /root/kubelet-e2e.pp
+mkdir -p /var/lib/kubelet
+chcon -R -u system_u -r object_r -t var_lib_t /var/lib/kubelet
 
-# RuntimeClass/PodOverhead tests expect a "test-handler" runtime handler, as on upstream node e2e images.
-# CRI-O's playbook installs crun from source into /usr/local/bin, which is not in sudo's secure_path.
-CRUN_PATH=\$(sudo sh -c 'PATH=/usr/local/bin:\$PATH command -v crun') || { echo "crun not found" >&2; exit 1; }
-sudo tee /etc/crio/crio.conf.d/99-test-handler.conf <<CONF
-[crio.runtime.runtimes.test-handler]
-runtime_path = "\${CRUN_PATH}"
-runtime_type = "oci"
-runtime_root = "/run/crun"
-CONF
-sudo systemctl restart crio
+# Install the CRI-O static bundle, same as the FCOS crio-install.service.
+case "${CRIO_VERSION}" in
+  main | release-*)
+    CRIO_VERSION=$(curl --fail --retry 5 --retry-delay 3 -sSL "https://storage.googleapis.com/cri-o/latest-bundle-${CRIO_VERSION}.txt")
+    ;;
+esac
+curl --fail --retry 5 --retry-delay 3 --silent --show-error https://raw.githubusercontent.com/cri-o/packaging/main/get |
+  LIBEXEC_CRIO_DIR="${LIBEXEC_CRIO_DIR}" bash -s -- -t "${CRIO_VERSION}"
+rm -f /etc/cni/net.d/87-podman-bridge.conflist
+rm -f /etc/crio/crio.conf.d/10-crio.conf
+mv /etc/cni/net.d/10-crio-bridge.conflist.disabled /etc/cni/net.d/10-crio-bridge.conflist
+systemctl daemon-reload
+systemctl enable --now crio.service
 
-sudo crictl --runtime-endpoint unix:///var/run/crio/crio.sock version
+/usr/local/bin/crio version
+/usr/local/bin/crictl --runtime-endpoint unix:///var/run/crio/crio.sock version
 EOF
 
 echo "Running node e2e against ${IP}"
 export HOME=/tmp GOCACHE=/tmp/gocache
 export ARTIFACTS="${ARTIFACT_DIR}"
-export REMOTE=true REMOTE_MODE=ssh HOSTS="${IP}"
+# <node name>=<ssh address>: SSH goes to the public IP, but the node is named after
+# the private IP so the in-VM apiserver can reach the kubelet (:10250 is not open
+# on the public IP).
+export REMOTE=true REMOTE_MODE=ssh HOSTS="${PRIVATE_IP}=${IP}"
 export SSH_KEY="${SSH_PRIVATE_KEY_FILE}"
 export SSH_OPTIONS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
 export CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/crio/crio.sock
 export FOCUS="${NODE_E2E_FOCUS}" SKIP="${NODE_E2E_SKIP}" PARALLELISM="${NODE_E2E_PARALLELISM}"
-export TIMEOUT="${NODE_E2E_TIMEOUT}"
-export TEST_ARGS="${NODE_E2E_TEST_ARGS} --kubelet-flags=\"--node-ip=${PRIVATE_IP}\""
+export TIMEOUT="${NODE_E2E_TIMEOUT}" TEST_ARGS="${NODE_E2E_TEST_ARGS}"
 make test-e2e-node

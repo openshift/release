@@ -10,14 +10,14 @@ workflow:
       - ref: gcp-crio-deprovision-buildhost
       - ref: gcp-crio-deprovision-vpc
     env:
-      # Public RHEL 10 image rather than the prebuilt RHEL 9 crio-setup images, which are
-      # also snapshots of 200GB disks whose >1e8 inodes break the Summary API
-      # NodeConformance test. The test step installs CRI-O's build dependencies.
-      IMAGE_FAMILY: "rhel-10"
-      IMAGE_PROJECT: "rhel-cloud"
-      BOOT_DISK_SIZE: "50GB"
-      # Match the fork's Kubernetes minor (master is 1.37); bump when it rebases.
-      CRIO_REF: "release-1.37"
+      # RHCOS 10 boot image from openshift/installer data/data/coreos/coreos-rhel-10.json (main).
+      IMAGE_NAME: "rhcos-10-2-20260423-0-gcp-x86-64"
+      IMAGE_PROJECT: "rhcos-cloud"
+      USE_IGNITION: "true"
+      # XFS reports inodes proportional to the disk size; the Summary API test expects
+      # at most 1e8, which a 200GB disk exceeds (~104M).
+      BOOT_DISK_SIZE: "100GB"
   documentation: |-
-    The Kubernetes node E2E workflow provisions a single RHEL 10 GCP VM (no OpenShift cluster), installs CRI-O on
-    it, and runs test/e2e_node built from the openshift/kubernetes fork against it over SSH.
+    The Kubernetes node E2E workflow provisions a single RHCOS GCP VM (no OpenShift cluster), installs
+    CRI-O on it like the upstream FCOS CRI-O node e2e jobs, and runs test/e2e_node built from the
+    openshift/kubernetes fork against it over SSH.
