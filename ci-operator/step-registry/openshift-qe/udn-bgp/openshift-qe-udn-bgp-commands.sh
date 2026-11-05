@@ -73,6 +73,8 @@ else
   exit 1
 fi
 
+ICMP_CAPTURE_DIR="${BASTION_WORK_DIR}/icmp-pcaps"
+
 bastion_ssh() {
   if [[ -n "${JUMPHOST:-}" ]]; then
     ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p ${BASTION_SSH_USER}@${JUMPHOST}" "${BASTION_SSH_USER}@${BASTION_HOST}" "$@"
@@ -105,6 +107,8 @@ BASTION_ENV=( \
   ES_SERVER="${ES_SERVER}" \
   FRR_PEER_IP="${FRR_PEER_IP}" \
   GC="${GC}" \
+  ICMP_CAPTURE_DIR="${ICMP_CAPTURE_DIR}" \
+  ICMP_CAPTURE_FILTER="${ICMP_CAPTURE_FILTER:-icmp}" \
   ITERATIONS="${ITERATIONS}" \
   JOB_NAME="${JOB_NAME:-}" \
   JOB_TYPE="${JOB_TYPE:-}" \
@@ -144,6 +148,125 @@ for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.ite
   oc debug "node/${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/sampleapp:latest
 done
 
+rm -rf "${ICMP_CAPTURE_DIR}"
+mkdir -p "${ICMP_CAPTURE_DIR}"
+ICMP_CAPTURE_FAILED=0
+
+cleanup_icmp_capture() {
+  local exit_code=$?
+  set +o errexit
+
+  for pod in $(oc get pods -n udn-bgp-icmp-capture -l app=icmp-capture -o name); do
+    oc exec -n udn-bgp-icmp-capture "${pod}" -- \
+      chroot /host pkill -INT -x tcpdump || true
+  done
+  sleep 3
+
+  while read -r pod node; do
+    if ! oc exec -n udn-bgp-icmp-capture "${pod}" -- \
+      chroot /host tar -czf - -C /var/tmp udn-bgp-icmp \
+      > "${ICMP_CAPTURE_DIR}/${node}.tar.gz"; then
+      echo "ERROR: Failed to collect ICMP capture from ${node}" >&2
+      ICMP_CAPTURE_FAILED=1
+    fi
+  done < <(oc get pods -n udn-bgp-icmp-capture -l app=icmp-capture \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.nodeName}{"\n"}{end}')
+
+  oc delete namespace udn-bgp-icmp-capture --ignore-not-found=true --wait=false
+
+  if [[ "${ICMP_CAPTURE_FAILED}" -ne 0 && "${exit_code}" -eq 0 ]]; then
+    exit_code=1
+  fi
+  exit "${exit_code}"
+}
+trap cleanup_icmp_capture EXIT
+
+echo "=== Deploying node ICMP capture probes ==="
+cat <<'YAML' | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: udn-bgp-icmp-capture
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: icmp-capture
+  namespace: udn-bgp-icmp-capture
+spec:
+  selector:
+    matchLabels:
+      app: icmp-capture
+  template:
+    metadata:
+      labels:
+        app: icmp-capture
+    spec:
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: tcpdump
+        image: registry.access.redhat.com/ubi9/ubi:latest
+        command: ["/bin/bash", "-ceu"]
+        args:
+        - |
+          exec chroot /host /bin/bash -ceu '
+            iface=$(ip -o -4 route show default | awk "{print \$5; exit}")
+            if [[ -z "${iface}" ]]; then
+              echo "ERROR: No default IPv4 route found" >&2
+              exit 1
+            fi
+            mkdir -p /var/tmp/udn-bgp-icmp
+            echo "Capturing ICMP on ${NODE_NAME} interface ${iface}"
+            tcpdump -i "${iface}" -nn -s 256 -W 4 -C 10 \
+              -w "/var/tmp/udn-bgp-icmp/${NODE_NAME}-${iface}.pcap" \
+              "${TCPDUMP_FILTER}" &
+            pid=$!
+            trap "kill -INT ${pid} 2>/dev/null || true; wait ${pid} || true" TERM INT
+            wait "${pid}"
+            sleep infinity
+          '
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: TCPDUMP_FILTER
+          value: icmp
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - chroot /host pgrep -x tcpdump
+          initialDelaySeconds: 2
+          periodSeconds: 2
+          failureThreshold: 3
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        resources:
+          requests:
+            cpu: 10m
+            memory: 50Mi
+        volumeMounts:
+        - name: host
+          mountPath: /host
+      volumes:
+      - name: host
+        hostPath:
+          path: /
+          type: Directory
+YAML
+oc set env -n udn-bgp-icmp-capture ds/icmp-capture "TCPDUMP_FILTER=${ICMP_CAPTURE_FILTER}"
+oc rollout status daemonset/icmp-capture -n udn-bgp-icmp-capture --timeout=2m
+
 EXTRA_FLAGS=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
   EXTRA_FLAGS+=" --local-indexing"
@@ -164,7 +287,9 @@ export ES_SERVER ES_METADATA_INDEX EXTRA_FLAGS GC ITERATIONS KUBE_BURNER_VERSION
 export PROW_JOB_ID BUILD_ID JOB_NAME JOB_TYPE PULL_NUMBER REPO_OWNER REPO_NAME
 set +o errexit
 ./run.sh
-exit $?
+WORKLOAD_EXIT_CODE=$?
+set -o errexit
+exit "${WORKLOAD_EXIT_CODE}"
 EOF
 RUN_EXIT_CODE=$?
 $WAS_TRACING && set -x
@@ -187,6 +312,13 @@ if [[ "${PPROF}" == "true" ]]; then
     echo "ERROR: pprof was enabled but ${PPROF_FOLDER} was not created" >&2
     RUN_EXIT_CODE=1
   fi
+fi
+
+if bastion_ssh "test -d ${ICMP_CAPTURE_DIR}"; then
+  bastion_scp -r "${BASTION_SSH_USER}@${BASTION_HOST}:${ICMP_CAPTURE_DIR}" "${ARTIFACT_DIR}/"
+else
+  echo "ERROR: ICMP capture directory was not created on the bastion" >&2
+  RUN_EXIT_CODE=1
 fi
 
 exit ${RUN_EXIT_CODE}
