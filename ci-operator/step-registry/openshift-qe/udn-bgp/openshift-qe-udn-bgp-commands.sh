@@ -152,19 +152,46 @@ rm -rf "${ICMP_CAPTURE_DIR}"
 mkdir -p "${ICMP_CAPTURE_DIR}"
 ICMP_CAPTURE_FAILED=0
 
+collect_icmp_diagnostics() {
+  local diagnostics_dir="${ICMP_CAPTURE_DIR}/diagnostics"
+  mkdir -p "${diagnostics_dir}"
+
+  oc get namespace udn-bgp-icmp-capture -o yaml \
+    > "${diagnostics_dir}/namespace.yaml"
+  oc describe daemonset icmp-capture -n udn-bgp-icmp-capture \
+    > "${diagnostics_dir}/daemonset.txt"
+  oc get pods -n udn-bgp-icmp-capture -l app=icmp-capture -o wide \
+    > "${diagnostics_dir}/pods.txt"
+  oc get events -n udn-bgp-icmp-capture --sort-by=.lastTimestamp \
+    > "${diagnostics_dir}/events.txt"
+
+  while read -r pod; do
+    oc describe pod -n udn-bgp-icmp-capture "${pod}" \
+      >> "${diagnostics_dir}/pods-described.txt"
+    oc logs -n udn-bgp-icmp-capture "${pod}" \
+      > "${diagnostics_dir}/${pod##*/}.log" 2>&1 || true
+    oc logs -n udn-bgp-icmp-capture "${pod}" --previous \
+      > "${diagnostics_dir}/${pod##*/}-previous.log" 2>&1 || true
+  done < <(oc get pods -n udn-bgp-icmp-capture -l app=icmp-capture -o name)
+}
+
 cleanup_icmp_capture() {
   local exit_code=$?
   set +o errexit
 
+  if oc get namespace udn-bgp-icmp-capture > /dev/null 2>&1; then
+    collect_icmp_diagnostics
+  fi
+
   for pod in $(oc get pods -n udn-bgp-icmp-capture -l app=icmp-capture -o name); do
     oc exec -n udn-bgp-icmp-capture "${pod}" -- \
-      chroot /host pkill -INT -x tcpdump || true
+      pkill -INT -x tcpdump || true
   done
   sleep 3
 
   while read -r pod node; do
     if ! oc exec -n udn-bgp-icmp-capture "${pod}" -- \
-      chroot /host tar -czf - -C /var/tmp udn-bgp-icmp \
+      tar -czf - -C /captures . \
       > "${ICMP_CAPTURE_DIR}/${node}.tar.gz"; then
       echo "ERROR: Failed to collect ICMP capture from ${node}" >&2
       ICMP_CAPTURE_FAILED=1
@@ -192,6 +219,12 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: icmp-capture
+  namespace: udn-bgp-icmp-capture
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -206,32 +239,30 @@ spec:
       labels:
         app: icmp-capture
     spec:
+      serviceAccountName: icmp-capture
       hostNetwork: true
       tolerations:
       - operator: Exists
       terminationGracePeriodSeconds: 30
       containers:
       - name: tcpdump
-        image: registry.access.redhat.com/ubi9/ubi:latest
+        image: image-registry.openshift-image-registry.svc:5000/openshift/tools:latest
         command: ["/bin/bash", "-ceu"]
         args:
         - |
-          exec chroot /host /bin/bash -ceu '
-            iface=$(ip -o -4 route show default | awk "{print \$5; exit}")
-            if [[ -z "${iface}" ]]; then
-              echo "ERROR: No default IPv4 route found" >&2
-              exit 1
-            fi
-            mkdir -p /var/tmp/udn-bgp-icmp
-            echo "Capturing ICMP on ${NODE_NAME} interface ${iface}"
-            tcpdump -i "${iface}" -nn -s 256 -W 4 -C 10 \
-              -w "/var/tmp/udn-bgp-icmp/${NODE_NAME}-${iface}.pcap" \
-              "${TCPDUMP_FILTER}" &
-            pid=$!
-            trap "kill -INT ${pid} 2>/dev/null || true; wait ${pid} || true" TERM INT
-            wait "${pid}"
-            sleep infinity
-          '
+          iface=$(ip -o -4 route show default | awk '{print $5; exit}')
+          if [[ -z "${iface}" ]]; then
+            echo "ERROR: No default IPv4 route found" >&2
+            exit 1
+          fi
+          echo "Capturing ICMP on ${NODE_NAME} interface ${iface}"
+          tcpdump -i "${iface}" -nn -s 256 -W 4 -C 10 \
+            -w "/captures/${NODE_NAME}-${iface}.pcap" \
+            "${TCPDUMP_FILTER}" &
+          tcpdump_pid=$!
+          trap 'kill -INT "${tcpdump_pid}" 2>/dev/null || true; wait "${tcpdump_pid}" || true' TERM INT
+          wait "${tcpdump_pid}"
+          sleep infinity
         env:
         - name: NODE_NAME
           valueFrom:
@@ -244,7 +275,7 @@ spec:
             command:
             - /bin/bash
             - -c
-            - chroot /host pgrep -x tcpdump
+            - pgrep -x tcpdump
           initialDelaySeconds: 2
           periodSeconds: 2
           failureThreshold: 3
@@ -256,14 +287,15 @@ spec:
             cpu: 10m
             memory: 50Mi
         volumeMounts:
-        - name: host
-          mountPath: /host
+      - name: captures
+        mountPath: /captures
       volumes:
-      - name: host
+      - name: captures
         hostPath:
-          path: /
-          type: Directory
+          path: /var/tmp/udn-bgp-icmp
+          type: DirectoryOrCreate
 YAML
+oc adm policy add-scc-to-user privileged -z icmp-capture -n udn-bgp-icmp-capture
 oc set env -n udn-bgp-icmp-capture ds/icmp-capture "TCPDUMP_FILTER=${ICMP_CAPTURE_FILTER}"
 oc rollout status daemonset/icmp-capture -n udn-bgp-icmp-capture --timeout=2m
 
