@@ -36,6 +36,10 @@ function wait_machineconfigs_applied() {
     local -a roles=(master worker)
     for role in master worker; do
         num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
+        if (( num == 0 )); then
+            echo >&2 "No ${role} nodes found; cannot wait for machineconfigs to be applied"
+            return 1
+        fi
         if [[ "${role}" == "master" ]]; then
             # Feature adoption and sequential master drains can exceed 30 minutes.
             timeouts[${role}]=$((num*900))
