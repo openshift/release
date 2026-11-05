@@ -44,6 +44,15 @@ export SKIP_CONFIRM=true
 export PERSIST=true
 export DETECT_DIRTY_GIT_WORKTREE=0
 
+# Optional pin so the upgrade step can rehearse a specific "PR" commit
+# (config digests, suite tree) instead of the job's normal source checkout.
+if [[ -n "${ARO_HCP_UPGRADE_GIT_REF:-}" ]]; then
+  echo "ARO_HCP_UPGRADE_GIT_REF=${ARO_HCP_UPGRADE_GIT_REF}: fetching upgrade/PR override ..."
+  git fetch https://github.com/Azure/ARO-HCP.git "${ARO_HCP_UPGRADE_GIT_REF}"
+  git checkout -f FETCH_HEAD
+  echo "Checked out upgrade ref at $(git rev-parse HEAD)"
+fi
+
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
 # Preserve the Hypershift images from the PR config when the shared helper
