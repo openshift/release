@@ -12,6 +12,14 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM rosa-aws-cli
+      USER 0
+      RUN yum install -y git make && yum clean all
+      USER 1001
+    to: enmaas-deploy-image
 releases:
   latest:
     candidate:
@@ -715,6 +723,17 @@ tests:
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts-hcp-mp
+- always_run: false
+  as: enmaas-image-verify
+  commands: |
+    echo "=== Checking available tools ==="
+    which git && git --version
+    which make && make --version
+    which oc && oc version --client
+    which jq && jq --version
+    echo "=== All required tools available ==="
+  container:
+    from: enmaas-deploy-image
 zz_generated_metadata:
   branch: main
   org: openshift-eng
