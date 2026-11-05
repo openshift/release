@@ -250,6 +250,60 @@ ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
 
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
+# ---------------------------------------------------------------------------
+# Scanner V4 readiness gate: the scan-dependent policy tests (Fixable CVSS
+# >= 7 among them) read vulnerability results produced by the Scanner V4
+# matcher pods. When those pods are down (observed: matcher pods evicted in
+# a storage-pressure window, none running for ~3h; rehearsal build
+# 2118028576879022080), the tests fail with MISSING_SCAN_DATA, which looks
+# like a policy regression but is an environment condition. Give the
+# matcher a bounded head start and record a named case either way, so the
+# failure attribution is explicit instead of implicit in the suite output.
+# ---------------------------------------------------------------------------
+ACS_SCANNER_WAIT_S="${ACS_SCANNER_WAIT_S:-600}"
+ACS_SCANNER_POLL_S="${ACS_SCANNER_POLL_S:-30}"
+_centralNs="$(cat "${SHARED_DIR}/CENTRAL_NS" 2>/dev/null || true)"
+if [[ -z "${_centralNs}" ]]; then
+    _centralNs="stackrox"
+fi
+if ! oc get deployment -n "${_centralNs}" -o name 2>/dev/null | grep -q 'scanner-v4-matcher'; then
+    echo "[smoke] Scanner V4 matcher not deployed in ${_centralNs}; skipping scanner readiness gate"
+    _add_case "scanner-v4-ready" skipped "ScannerGate" "no scanner-v4-matcher deployment in ${_centralNs}; scan-dependent results follow suite behavior"
+else
+    echo "[smoke] Waiting for a Ready scanner-v4-matcher pod (cap ${ACS_SCANNER_WAIT_S}s)..."
+    typeset -i _scan_elapsed=0
+    typeset _scan_ready=""
+    while (( _scan_elapsed < ACS_SCANNER_WAIT_S )); do
+        _scan_ready="$(oc get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json 2>/dev/null | python3 -c '
+import json, sys
+
+d = json.load(sys.stdin)
+for pod in d.get("items", []):
+    meta = pod.get("metadata", {}) or {}
+    status = pod.get("status", {}) or {}
+    if status.get("phase") in ("Succeeded", "Failed") or meta.get("deletionTimestamp") is not None:
+        continue
+    conditions = {c.get("type"): c.get("status") for c in status.get("conditions", []) or []}
+    if conditions.get("Ready") == "True":
+        print(meta.get("name", "?"))
+        break
+' 2>/dev/null || true)"
+        if [[ -n "${_scan_ready}" ]]; then
+            break
+        fi
+        sleep "${ACS_SCANNER_POLL_S}"
+        _scan_elapsed=$(( _scan_elapsed + ACS_SCANNER_POLL_S ))
+    done
+    if [[ -n "${_scan_ready}" ]]; then
+        echo "[smoke] Scanner V4 matcher ready: ${_scan_ready}"
+        _add_case "scanner-v4-ready" passed
+    else
+        echo "[smoke] Scanner V4 matcher pods not Ready within ${ACS_SCANNER_WAIT_S}s:"
+        oc get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide 2>/dev/null || true
+        _add_case "scanner-v4-not-ready" failed "Environment" "no Ready scanner-v4-matcher pod in ${_centralNs} within ${ACS_SCANNER_WAIT_S}s; scan-dependent test results may report MISSING_SCAN_DATA for environment reasons"
+    fi
+fi
+
 STACKROX_REF="${STACKROX_REF:-master}"
 SCANNER_REF="${SCANNER_REF:-master}"
 
