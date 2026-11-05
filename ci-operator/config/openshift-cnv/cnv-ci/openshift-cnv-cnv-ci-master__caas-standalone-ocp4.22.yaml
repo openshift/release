@@ -20,6 +20,7 @@ tests:
   cron: 0 6 * * 2
   steps:
     allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: azure-virtualization
     env:
       AZURE_COMPUTE_DISK_SIZE: "150"
@@ -28,6 +29,50 @@ tests:
       ODF_BACKEND_STORAGE_CLASS: managed-csi
       ODF_VOLUME_SIZE: "200"
     post:
+    - as: gather-nested-cluster-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -s "${SHARED_DIR}/nested-cluster-kubeconfig" ]]; then
+          echo "Nested-cluster kubeconfig is missing; skipping must-gather"
+          exit 0
+        fi
+        if ! oc get namespace "${TENANT_NAMESPACE}" >/dev/null 2>&1; then
+          echo "Nested-cluster namespace ${TENANT_NAMESPACE} is gone; skipping must-gather"
+          exit 0
+        fi
+        # Keep files unpacked so LeakTK can censor them individually before upload.
+        mkdir -p "${ARTIFACT_DIR}/nested-cluster-must-gather"
+        oc --kubeconfig="${SHARED_DIR}/nested-cluster-kubeconfig" adm must-gather \
+          --dest-dir="${ARTIFACT_DIR}/nested-cluster-must-gather" \
+          --timeout=35m \
+          > "${ARTIFACT_DIR}/nested-cluster-must-gather.log" 2>&1
+      env:
+      - default: caas-project
+        name: TENANT_NAMESPACE
+      from: src
+      grace_period: 10m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 45m0s
+    - as: delete-nested-cluster
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/delete-nested-cluster.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 45m0s
     - chain: ipi-azure-post
     pre:
     - chain: ipi-conf-azure
@@ -125,20 +170,6 @@ tests:
           cpu: "3"
           memory: 600Mi
       timeout: 4h0m0s
-    - as: delete-nested-cluster
-      cli: latest
-      commands: |
-        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
-        mkdir -p /tmp/cnv-ci
-        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
-        cd /tmp/cnv-ci
-        ./hack/caas/delete-nested-cluster.sh
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 600Mi
-      timeout: 45m0s
 zz_generated_metadata:
   branch: master
   org: openshift-cnv
