@@ -47,11 +47,17 @@ BASH_XTRACEFD=${_xtrace_fd}
 set -x
 
 # shellcheck disable=SC2154
+# Once-flagged like _junit_emit: a TERM/INT trap runs _on_exit -> exit,
+# which fires the EXIT trap -> _on_exit again; without this guard the
+# redaction/copy below (and its TRACE line) would run twice.
+_cleanup_done=0
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
   # Takes the recorded exit status explicitly: $? here is unreliable (callers
   # run other commands first).
   local _exit_code="${1:-0}"
+  (( _cleanup_done )) && return 0
+  _cleanup_done=1
   set +x 2>/dev/null
   sed -i -E \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
