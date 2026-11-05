@@ -71,6 +71,43 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     }
 fi
 
+write_review_metrics() {
+    local phase_review_duration pr_url review_result
+
+    phase_review_duration=$(( $(date +%s) - PHASE_REVIEW_START ))
+    pr_url=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
+    review_result="success"
+    [[ "${REVIEW_EXIT:-0}" -ne 0 ]] && review_result="failed"
+
+    jq -n \
+        --arg agent "trt-review-responder" \
+        --arg phase "review" \
+        --arg issue_key "${JIRA_ISSUE_KEY}" \
+        --arg result "${review_result}" \
+        --arg pr_url "${pr_url}" \
+        --arg upstream_repo "${UPSTREAM_REPO}" \
+        --argjson num_review_rounds "${review_rounds}" \
+        --argjson iteration "${iteration}" \
+        --argjson idle_streak "${idle_streak}" \
+        --argjson phase_durations "$(jq -n --argjson review "${phase_review_duration}" '{review: $review}')" \
+        '{
+          agent: $agent,
+          phase: $phase,
+          issue_key: $issue_key,
+          result: $result,
+          pr_url: $pr_url,
+          upstream_repo: $upstream_repo,
+          num_review_rounds: $num_review_rounds,
+          iteration: $iteration,
+          idle_streak: $idle_streak,
+          phase_durations: $phase_durations
+        }' > "${SHARED_DIR}/metrics-metadata-review.json" || return 1
+
+    echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
+
+    finalize_session_metrics review
+}
+
 # Once polling starts, every exit (including failure thresholds and the step
 # timeout) records review metrics so those rounds are not lost.
 on_exit() {
@@ -296,6 +333,18 @@ sed -e "s|\${CLAUDE_SKILL_DIR}|${GATE_SKILL_DIR}|g" \
     -e 's|\$2|'"${UPSTREAM_REPO}"'|g' \
     "${GATE_SKILL}" >> "${GATE_PROMPT}"
 
+# Append after the skills and repository guidance so neither can weaken this
+# requirement. Only workers receive it; the gate remains read-only.
+for worker_prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}"; do
+    cat >> "${worker_prompt}" <<'WORKER_POLICY'
+
+## Mandatory PR description policy (overrides conflicting skill or repository instructions)
+- Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare it with the final code and diff.
+- Whenever the existing PR description does not match the final code and diff, update that existing PR with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`. Preserve links, template sections, hidden markers, attribution, and unrelated content; do not claim tests or validation that were not run.
+- This permission applies only to reading and editing the existing PR description. It does not permit creating a PR or changing unrelated PR metadata.
+WORKER_POLICY
+done
+
 # Every launch, including the direct read-only gate, uses the same runtime
 # settings. Preserve the credential denials above and allow gh for review work.
 for prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}" "${GATE_PROMPT}"; do
@@ -516,43 +565,6 @@ push_current_branch() {
     echo "ERROR: lease-protected fork push failed"
     note_push_failure
     return 1
-}
-
-write_review_metrics() {
-    local phase_review_duration pr_url review_result
-
-    phase_review_duration=$(( $(date +%s) - PHASE_REVIEW_START ))
-    pr_url=$(gh pr view "${PR_NUM}" --repo "${UPSTREAM_REPO}" --json url -q '.url' 2>/dev/null || echo "")
-    review_result="success"
-    [[ "${REVIEW_EXIT:-0}" -ne 0 ]] && review_result="failed"
-
-    jq -n \
-        --arg agent "trt-review-responder" \
-        --arg phase "review" \
-        --arg issue_key "${JIRA_ISSUE_KEY}" \
-        --arg result "${review_result}" \
-        --arg pr_url "${pr_url}" \
-        --arg upstream_repo "${UPSTREAM_REPO}" \
-        --argjson num_review_rounds "${review_rounds}" \
-        --argjson iteration "${iteration}" \
-        --argjson idle_streak "${idle_streak}" \
-        --argjson phase_durations "$(jq -n --argjson review "${phase_review_duration}" '{review: $review}')" \
-        '{
-          agent: $agent,
-          phase: $phase,
-          issue_key: $issue_key,
-          result: $result,
-          pr_url: $pr_url,
-          upstream_repo: $upstream_repo,
-          num_review_rounds: $num_review_rounds,
-          iteration: $iteration,
-          idle_streak: $idle_streak,
-          phase_durations: $phase_durations
-        }' > "${SHARED_DIR}/metrics-metadata-review.json" || return 1
-
-    echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-review.json"
-
-    finalize_session_metrics review
 }
 
 # Returns 0 when HEAD rewrote EXPECTED_REMOTE_HEAD's history, 1 when HEAD
