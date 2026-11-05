@@ -25,7 +25,18 @@ ref:
       pause worker MCP, apply each release image in ${SHARED_DIR}/upgrade-edge
       (from cucushift-upgrade-setedge-2hops) in order, then unpause workers.
       Requires upgrade-edge with at least two images. When "false" (default),
-      single-hop to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+      CPOU is controlled by SPOKE_CLUSTER_UPGRADE_CPOU.
+  - name: SPOKE_CLUSTER_UPGRADE_CPOU
+    default: "false"
+    documentation: |-
+      When "true" and SPOKE_CLUSTER_UPGRADE_EUS is not "true", perform a
+      control-plane-only (CPOU) upgrade on the spoke: pause the worker MCP,
+      apply each pullspec, then unpause workers. Pullspecs are read from
+      ${SHARED_DIR}/upgrade-edge when that file is non-empty (one image is
+      enough); otherwise the step upgrades to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+      Used for n+1 (e.g. 4.21→4.22). When "false" (default) and EUS is false,
+      workers stay unpaused for a single hop to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+      SPOKE_CLUSTER_UPGRADE_EUS takes precedence when both are "true".
   - name: ACM_MANIFESTWORK_NAME
     default: "spoke-ocp-upgrade"
     documentation: ManifestWork metadata.name applied on the hub for spoke ClusterVersion desiredUpdate.
@@ -53,9 +64,13 @@ ref:
     Upgrades the ACM managed spoke cluster (from acm-interop-p2p-cluster-install SHARED_DIR files)
     using ManifestWork on the hub and klusterlet-work RBAC on the spoke.
 
-    Default: single-hop to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE (release:target).
+    Default: single-hop to OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE (release:target)
+    with workers unpaused.
+    When SPOKE_CLUSTER_UPGRADE_CPOU=true: CPOU single-hop (pause worker MCP, upgrade
+    control plane, unpause). Used for n+1 (e.g. 4.21→4.22).
     When SPOKE_CLUSTER_UPGRADE_EUS=true: CPOU multi-hop from ${SHARED_DIR}/upgrade-edge
     (pause worker MCP, each hop, unpause). Used for EUS-to-EUS (e.g. 4.20→4.21→4.22).
+    EUS takes precedence when both flags are true.
 
     Post-upgrade MCP/CO/node health checks run in
     acm-interop-p2p-spoke-upgrade-healthcheck (cucushift upgrade-healthcheck logic on the spoke).
