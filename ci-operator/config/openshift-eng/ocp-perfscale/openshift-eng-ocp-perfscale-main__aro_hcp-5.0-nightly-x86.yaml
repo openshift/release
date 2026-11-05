@@ -56,21 +56,6 @@ tests:
     - chain: openshift-qe-hypershift-infra
     - ref: aro-hcp-cluster-index
     test:
-    - as: aro-hcp-guest-health
-      commands: |
-        set -o errexit
-        set -o nounset
-        set -o pipefail
-        nodes_json=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get nodes -o json)
-        total_nodes=$(jq '.items | length' <<<"${nodes_json}")
-        ready_nodes=$(jq '[.items[] | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length' <<<"${nodes_json}")
-        echo "Guest nodes Ready: ${ready_nodes}/${total_nodes}"
-        KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get co
-      from: aro-hcp-e2e-tools
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - chain: openshift-qe-control-plane
   timeout: 14h0m0s
 zz_generated_metadata:
