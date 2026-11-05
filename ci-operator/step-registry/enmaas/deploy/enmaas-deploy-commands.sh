@@ -171,16 +171,35 @@ oc apply --server-side --field-manager=enmaas-opps --force-conflicts -f /tmp/enm
 echo "Patching NetworkPolicy for API server access..."
 API_IPS=$(oc get endpoints kubernetes -n default -o jsonpath='{.subsets[0].addresses[*].ip}')
 if [[ -z "${API_IPS}" ]]; then
-  echo "WARNING: Could not determine API server IPs, skipping NetworkPolicy patch."
+  echo "WARNING: Could not determine API server IPs, skipping NetworkPolicy creation"
 else
+  # Build the to: list from API server IPs
   TO_ENTRIES=""
-  for IP in ${API_IPS}; do
-    if [[ -n "${TO_ENTRIES}" ]]; then TO_ENTRIES="${TO_ENTRIES},"; fi
-    TO_ENTRIES="${TO_ENTRIES}{\"ipBlock\":{\"cidr\":\"${IP}/32\"}}"
+  for ip in ${API_IPS}; do
+    TO_ENTRIES="${TO_ENTRIES}
+    - ipBlock:
+        cidr: ${ip}/32"
   done
-  oc patch networkpolicy enmaas-allow-maas-api-kube-api -n enmaas --type=merge \
-    -p "{\"spec\":{\"egress\":[{\"to\":[${TO_ENTRIES}],\"ports\":[{\"port\":443,\"protocol\":\"TCP\"},{\"port\":6443,\"protocol\":\"TCP\"}]}]}}"
-  echo "NetworkPolicy patched for API server IPs: ${API_IPS}"
+
+  cat <<EOF | oc apply -f -
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: enmaas-allow-api-server-egress
+  namespace: enmaas
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:${TO_ENTRIES}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+EOF
+  echo "NetworkPolicy enmaas-allow-api-server-egress created."
 fi
 
 echo "EnMaaS deployment applied successfully."
