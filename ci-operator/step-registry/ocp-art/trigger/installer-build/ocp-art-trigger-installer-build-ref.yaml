@@ -1,0 +1,29 @@
+ref:
+  as: ocp-art-trigger-installer-build
+  from: src
+  commands: ocp-art-trigger-installer-build-commands.sh
+  dependencies:
+  - name: release:latest
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: INSTALLER_TRIGGER_DRY_RUN
+    default: "false"
+    documentation: Log the proposed installer submission without creating a PipelineRun.
+  credentials:
+  - collection: art
+    group: installer-build-trigger
+    field: kubeconfig
+    as: kubeconfig
+    mount_path: /var/run/installer-build-trigger
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 20m0s
+  grace_period: 1m0s
+  documentation: |-
+    Submit the matching agent-based installer PipelineRun for a built/published
+    amd64 OCP payload. Used as a non-blocking release-controller Ready-phase job,
+    without waiting for acceptance tests. Requires a namespace-scoped submitter
+    kubeconfig provisioned in art/installer-build-trigger/kubeconfig. This does
+    not release an installer ISO to production.
