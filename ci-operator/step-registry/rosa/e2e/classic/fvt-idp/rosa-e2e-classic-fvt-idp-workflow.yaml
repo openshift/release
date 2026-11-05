@@ -1,0 +1,36 @@
+workflow:
+  as: rosa-e2e-classic-fvt-idp
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "false"
+      STS: "true"
+      REPLICAS: "2"
+    pre:
+    - chain: rosa-aws-sts-provision
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - chain: rosa-e2e-ocm-fvt-validate-customer-idp
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - ref: rosa-sts-account-roles-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    ROSAENG-67780 (classic row): the classic provisioner head
+    (rosa-aws-sts-provision, which installs the cluster with the HTPasswd IDP
+    and publishes the SHARED_DIR contract — cluster-id via
+    rosa-cluster-provision, customer-plane kubeconfig via
+    rosa-conf-idp-htpasswd) feeding the FVT IDP-variant validation tail
+    (rosa-e2e-ocm-fvt-validate-customer-idp), which runs the customer-facing
+    FVT IDP cases (cluster_idp_test.go in rosa-backend-tests cases/cms/)
+    against the composed cluster. Teardown stays with the workflow post
+    steps, never the FVT harness.
+
+    The job must provide OCM_FVT_JOB_NAME selecting an FVT profile whose case
+    set includes the classic IDP variants (DRAFT: to be confirmed with
+    CS/OCM QE, see the chain documentation).
