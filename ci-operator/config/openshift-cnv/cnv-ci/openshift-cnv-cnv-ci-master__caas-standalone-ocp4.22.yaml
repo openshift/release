@@ -158,11 +158,17 @@ tests:
       timeout: 2h0m0s
     - as: nested-cluster-conformance-minimal
       commands: |
+        set -euo pipefail
         export KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig"
-        openshift-tests run openshift/conformance/parallel/minimal \
+        TEST_ARTIFACT_DIR="${ARTIFACT_DIR}/conformance-minimal"
+        mkdir -p "${TEST_ARTIFACT_DIR}/junit"
+        openshift-tests run "openshift/conformance/parallel" \
           --provider '{"type":"baremetal"}' \
-          -o "${ARTIFACT_DIR}/e2e.log" \
-          --junit-dir "${ARTIFACT_DIR}/junit"
+          --run minimal \
+          --max-parallel-tests 10 \
+          --output-file "${TEST_ARTIFACT_DIR}/conformance-parallel.log" \
+          --junit-dir "${TEST_ARTIFACT_DIR}/junit" \
+          2> "${TEST_ARTIFACT_DIR}/conformance-parallel.stderr.log"
       from: tests
       grace_period: 30m0s
       resources:
