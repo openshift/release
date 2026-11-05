@@ -10,10 +10,9 @@ identity_file="$SHARED_DIR/nutanix_ingress_tunnel_identity.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
 cleanup_context_if_complete() {
   if [[ -e "$SHARED_DIR/nutanix_destroy_complete" && ! -e "$state_file" &&
-        ! -e "$SHARED_DIR/nutanix_worker_dns_state.json" &&
-        ! -e "$SHARED_DIR/nutanix_squid_allowed_hosts" ]]; then
-    rm -f "$identity_file" "$SHARED_DIR/nutanix_context.sh" \
-      "$SHARED_DIR/nutanix_destroy_complete"
+        ! -e "$identity_file" &&
+        ! -e "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
+    rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_destroy_complete"
   fi
 }
 if [[ ! -e "$state_file" ]]; then
@@ -260,7 +259,7 @@ delete_recorded() {
 
 delete_recorded vms vm "$gateway_name" "$gateway_uuid" "$gateway_task_uuid"
 delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
-rm -f "$ssh_config" "$state_file"
+rm -f "$ssh_config" "$state_file" "$identity_file"
 cleanup_context_if_complete
 printf 'Removed the lease-owned proxy-host tunnel, Nutanix gateway VM, and image for %s.\n' "$lease"
 if [[ "$tracing_enabled" == true ]]; then set -x; fi
