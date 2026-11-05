@@ -23,7 +23,8 @@ mkdir -p "${INVENTORY_PATH}/host_vars"
 echo "Copy host inventory files from SHARED_DIR"
 cp "${SHARED_DIR}/bastion" "${INVENTORY_PATH}/host_vars/bastion"
 
-KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+HUB_CLUSTERCONFIGS_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}"
+KUBECONFIG_PATH="${HUB_CLUSTERCONFIGS_PATH}/auth/kubeconfig"
 SPOKE_KUBECONFIG_PATH="/tmp/${SPOKE_CLUSTER_NAME}-kubeconfig"
 
 PROJECT_DIR="/tmp"
@@ -75,53 +76,19 @@ ssh -o ServerAliveInterval=30 \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "cd /tmp/eco_gotests_ptp && ./eco-gotests-ptp-run.sh || true"
 
-SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
-
-# Redact the bastion address from scp/ssh error output before it lands in the
-# public build log — keep the rest of the message (e.g. "Connection refused",
-# "Permission denied") for debugging.
-redact_bastion() {
-  local text="$1"
-  text="${text//${BASTION_USER}@${BASTION_IP}/<bastion>}"
-  text="${text//${BASTION_IP}/<bastion>}"
-  printf '%s\n' "${text}"
-}
-
-echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
-# SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
-# This is the only transfer from bastion to CI pod — processing happens on the bastion.
-# Cycle-to-scenario mapping matches deploy-run-eco-gotests-ptp.yaml's ptp_cycles.
-declare -A PTP_CYCLE_NAMES=( [0]="BC-OC" [1]="OC-2-PORT" [2]="T-TSC" [3]="T-BC" [4]="DUAL-TR-TBC" )
-for i in 0 1 2 3 4; do
-  local_dir="${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}-${PTP_CYCLE_NAMES[$i]}"
-  mkdir -p "${local_dir}"
-  if ! xml_output=$(scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-      "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/*.xml" \
-      "${local_dir}/" 2>&1); then
-    if grep -q "No such file or directory" <<<"${xml_output}"; then
-      echo "No XML artifacts in eco_gotests_ptp_${i} — skipping"
-    else
-      redact_bastion "${xml_output}" >&2
-      exit 1
-    fi
-  fi
-  if ! console_output=$(scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-      "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests_ptp_${i}/report/console.log" \
-      "${local_dir}/" 2>&1); then
-    if grep -q "No such file or directory" <<<"${console_output}"; then
-      echo "No console.log in eco_gotests_ptp_${i} — skipping"
-    else
-      redact_bastion "${console_output}" >&2
-      exit 1
-    fi
-  fi
-  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "cd /tmp/eco_gotests_ptp_${i}/report && find . -mindepth 1 ! -name '*.xml' ! -name 'console.log' -type f \
-     | zip /tmp/k8sreporter_ptp_${i}.zip -@ 2>/dev/null || true"
-  scp "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_ptp_${i}.zip" \
-    "${local_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_ptp_${i} — skipping"
+echo "Collect artifacts from bastion"
+PTP_CYCLE_COUNT=$(python3 -c "import json; print(len(json.loads('${PTP_CONFIGS:-[]}')))" 2>/dev/null || echo 0)
+ECO_GOTESTS_ARTIFACT_FEATURES="ptp_0"
+for i in $(seq 1 "${PTP_CYCLE_COUNT}"); do
+  ECO_GOTESTS_ARTIFACT_FEATURES+=" ptp_${i}"
 done
+
+ansible-playbook ./playbooks/collect-eco-gotests-artifacts.yaml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "eco_gotests_features='${ECO_GOTESTS_ARTIFACT_FEATURES}'" \
+  --extra-vars "artifact_dir=${ARTIFACT_DIR}" \
+  --extra-vars "hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH}" \
+  -vv
 
 echo "Process report files on bastion"
 BASTION_REPORT_DIR="/tmp/test_reports"
