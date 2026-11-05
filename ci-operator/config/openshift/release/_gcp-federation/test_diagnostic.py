@@ -1,9 +1,13 @@
 """Offline checks for credential isolation and unambiguous negative-test results."""
 
+import contextlib
+import io
+import base64
 import importlib.util
 import json
 import tempfile
 import unittest
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import unquote, urlparse, parse_qs
@@ -17,10 +21,12 @@ class RotatingCredentials:
     """Model a provider that returns a new coherent credential generation."""
 
     def __init__(self, method):
+        """Initialize a fake provider with a generation counter."""
         self.method = method
         self.calls = 0
 
     def get_frozen_credentials(self):
+        """Return a new fake temporary credential generation."""
         self.calls += 1
         return SimpleNamespace(access_key=str(self.calls), secret_key="secret", token="token")
 
@@ -29,15 +35,20 @@ class Session:
     """Provide only the credential interface required by the supplier."""
 
     def __init__(self, profile, credentials):
+        """Store the fake profile and credential provider."""
         self.profile_name = profile
         self.credentials = credentials
 
     def get_credentials(self):
+        """Return the fake credential provider."""
         return self.credentials
 
 
 class DiagnosticTests(unittest.TestCase):
+    """Exercise authentication checks without cloud calls or real credentials."""
+
     def test_validate_aws_config(self):
+        """Accept the expected role chain and reject bypasses or extra providers."""
         with tempfile.TemporaryDirectory() as directory:
             token = Path(directory, "token")
             token.write_text("not-a-real-token")
@@ -67,6 +78,7 @@ class DiagnosticTests(unittest.TestCase):
                         diagnostic.validate_aws_config(path, token)
 
     def test_validate_profile(self):
+        """Accept role identifiers only and reject stored credential files."""
         cases = [("roles only", None, False), ("GCP key", "gce.json", True), ("AWS key", ".awscred", True)]
         for name, extra, failure in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
@@ -82,6 +94,7 @@ class DiagnosticTests(unittest.TestCase):
                     diagnostic.validate_profile(path)
 
     def test_validate_claims(self):
+        """Check expected routing claims and reject mismatched token metadata."""
         valid = {"iss": diagnostic.ISSUER, "aud": ["sts.amazonaws.com"],
                  "sub": "system:serviceaccount:ci-op-example:default", "iat": 1, "exp": 3601}
         cases = [
@@ -102,6 +115,7 @@ class DiagnosticTests(unittest.TestCase):
                     diagnostic.validate_claims(claims)
 
     def test_get_aws_security_credentials(self):
+        """Check coherent rotations and reject unintended credential providers."""
         cases = [
             ("broker", "default", "assume-role", False),
             ("hub", "hub", "assume-role", False),
@@ -121,6 +135,7 @@ class DiagnosticTests(unittest.TestCase):
                     self.assertEqual(supplier.generations, 2)
 
     def test_is_condition_rejection(self):
+        """Distinguish provider-condition rejection from other HTTP outcomes."""
         payload = {"error": "invalid_grant", "error_description": "The given credential is rejected by the attribute condition."}
         cases = [
             ("provider condition", 400, payload, True),
@@ -134,6 +149,7 @@ class DiagnosticTests(unittest.TestCase):
                 self.assertEqual(diagnostic.is_condition_rejection(status, body), expected)
 
     def test_subject_token(self):
+        """Verify audience signing and credential cloning across fake rotations."""
         supplier = diagnostic.ChainSupplier(Session("default", RotatingCredentials("assume-role")))
         credentials = diagnostic.AudienceBoundCredentials(
             audience=diagnostic.AUDIENCE, subject_token_type=diagnostic.TOKEN_TYPE,
@@ -153,6 +169,7 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(supplier.generations, 2)
 
     def test_verify_marker(self):
+        """Require the exact marker content and a successful HTTP response."""
         cases = [
             ("expected content", 200, b"OpenShift CI AWS-to-GCP federation pilot\n", False),
             ("changed content", 200, b"different", True),
@@ -168,7 +185,58 @@ class DiagnosticTests(unittest.TestCase):
                 else:
                     diagnostic.verify_marker(response)
 
+    def test_run_renewal_and_log_output(self):
+        """Count real token changes while excluding identity and credential data from logs."""
+        claims = {"iss": diagnostic.ISSUER, "sub": "system:serviceaccount:ci-op-private:default"}
+        payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+        token_file = MagicMock()
+        token_file.read_text.return_value = "header." + payload + ".signature"
+        credentials = SimpleNamespace(token=None)
+        supplier = SimpleNamespace(calls=2, generations=2)
+        tokens = iter(["fake-token-one", "fake-token-one", "fake-token-two"])
+        http = MagicMock()
+
+        def response(url, **kwargs):
+            """Refresh fake credentials only on marker reads; deny other requests."""
+            if url.endswith("/federation-pilot.txt"):
+                credentials.token = next(tokens)
+                return SimpleNamespace(status_code=200, content=b"OpenShift CI AWS-to-GCP federation pilot\n")
+            return SimpleNamespace(status_code=403)
+
+        http.get.side_effect = response
+        output = io.StringIO()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch.dict(diagnostic.os.environ, {"CLUSTER_PROFILE_DIR": "/unused"}))
+            for name in ["validate_profile", "validate_aws_config", "validate_claims",
+                         "isolate_environment", "check_provider_rejection"]:
+                stack.enter_context(patch.object(diagnostic, name))
+            stack.enter_context(patch.object(diagnostic, "TOKEN_PATH", token_file))
+            stack.enter_context(patch.object(diagnostic.boto3, "Session"))
+            stack.enter_context(patch.object(diagnostic, "ChainSupplier", return_value=supplier))
+            stack.enter_context(patch.object(diagnostic, "AudienceBoundCredentials", return_value=credentials))
+            stack.enter_context(patch.object(diagnostic, "check_identity", return_value="private-session-arn"))
+            stack.enter_context(patch.object(diagnostic, "AuthorizedSession")).return_value.__enter__.return_value = http
+            stack.enter_context(patch.object(diagnostic.time, "monotonic", side_effect=[0, 0, 1, 2, 2]))
+            stack.enter_context(patch.object(diagnostic.time, "sleep"))
+            compare = stack.enter_context(patch.object(diagnostic.hmac, "compare_digest", wraps=diagnostic.hmac.compare_digest))
+            stack.enter_context(contextlib.redirect_stdout(output))
+            diagnostic.run(2)
+        self.assertEqual(compare.call_count, 2)
+        rows = [json.loads(line) for line in output.getvalue().splitlines()]
+        reads = [row for row in rows if row["check"] == "marker-read"]
+        self.assertEqual([row["google_generations"] for row in reads], [1, 1, 2])
+        self.assertEqual(rows[-1]["result"], "PASS")
+        for row in rows:
+            self.assertFalse({"issuer", "subject", "aws_arn", "configured_service_account"} & row.keys())
+            for key, value in row.items():
+                if key not in {"time", "check", "result"}:
+                    self.assertIsInstance(value, (int, float))
+        for private in [diagnostic.ISSUER, claims["sub"], diagnostic.SERVICE_ACCOUNT,
+                        "private-session-arn", "fake-token-one", "fake-token-two"]:
+            self.assertNotIn(private, output.getvalue())
+
     def test_require_denied(self):
+        """Accept only an explicit authorization denial."""
         for status in [200, 400, 403, 404, 500]:
             with self.subTest(status=status):
                 response = SimpleNamespace(status_code=status)

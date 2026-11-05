@@ -5,7 +5,7 @@ import argparse
 import base64
 import configparser
 import hashlib
-import importlib.metadata
+import hmac
 import json
 import os
 import re
@@ -45,7 +45,7 @@ class DiagnosticError(Exception):
 
 
 def report(check, result, **fields):
-    """Emit timestamped evidence containing only explicitly selected metadata."""
+    """Emit fixed status messages and numeric evidence without identity details."""
     print(json.dumps({
         "time": datetime.now(timezone.utc).isoformat(),
         "check": check, "result": result, **fields,
@@ -66,7 +66,7 @@ def validate_aws_config(path, token_path=TOKEN_PATH):
         raise DiagnosticError("unexpected AWS config sections")
     for section, values in expected.items():
         if dict(config[section]) != values:
-            raise DiagnosticError("unexpected AWS config in " + section)
+            raise DiagnosticError("unexpected AWS config values")
     if not token_path.is_file():
         raise DiagnosticError("projected AWS token is missing")
 
@@ -116,15 +116,18 @@ class ChainSupplier(aws.AwsSecurityCredentialsSupplier):
     """Read coherent refreshable AWS snapshots for each Google exchange."""
 
     def __init__(self, session):
+        """Track credential generations supplied by the refreshable session."""
         self.session = session
         self.calls = 0
         self.generations = 0
         self.last_access_key = None
 
     def get_aws_region(self, context, request):
+        """Return the fixed region used to sign pilot STS requests."""
         return "us-east-1"
 
     def get_aws_security_credentials(self, context, request):
+        """Return one coherent temporary credential snapshot and count rotations."""
         credentials = self.session.get_credentials()
         if credentials is None or credentials.method != "assume-role":
             raise DiagnosticError("AWS credentials did not use the expected role provider")
@@ -142,6 +145,7 @@ class AudienceBoundCredentials(aws.Credentials):
     """Use the public AWS signer to include the provider audience in the signature."""
 
     def __init__(self, audience, subject_token_type, aws_security_credentials_supplier, **kwargs):
+        """Retain the audience and supplier for signing and SDK credential cloning."""
         self.signing_audience = audience
         self.supplier = aws_security_credentials_supplier
         super().__init__(
@@ -150,6 +154,7 @@ class AudienceBoundCredentials(aws.Credentials):
         )
 
     def retrieve_subject_token(self, request):
+        """Serialize a signed AWS identity request bound to the provider audience."""
         region = self.supplier.get_aws_region(None, request)
         credentials = self.supplier.get_aws_security_credentials(None, request)
         options = aws.RequestSigner(region).get_request_options(
@@ -188,7 +193,7 @@ def is_condition_rejection(status, payload):
 def check_provider_rejection(profile, role_arn):
     """Require Google STS to reject a real hub role at the provider condition."""
     session = boto3.Session(profile_name=profile, region_name="us-east-1")
-    caller = check_identity(session, role_arn)
+    check_identity(session, role_arn)
     credentials = AudienceBoundCredentials(
         audience=AUDIENCE, subject_token_type=TOKEN_TYPE,
         aws_security_credentials_supplier=ChainSupplier(session), scopes=[SCOPE],
@@ -203,13 +208,13 @@ def check_provider_rejection(profile, role_arn):
         }, allow_redirects=False)
         if not is_condition_rejection(response.status_code, response.json()):
             raise DiagnosticError("Google STS did not reject the unauthorized role at its condition")
-    report("provider-rejection", "PASS", profile=profile, aws_arn=caller)
+    report("provider-rejection", "PASS")
 
 
 def verify_marker(response):
     """Require successful access to the exact expected harmless object content."""
     if response.status_code != 200:
-        raise DiagnosticError("marker read failed with HTTP " + str(response.status_code))
+        raise DiagnosticError("marker read did not succeed")
     if hashlib.sha256(response.content).hexdigest() != MARKER_SHA256:
         raise DiagnosticError("marker SHA256 differs from expected")
 
@@ -217,7 +222,7 @@ def verify_marker(response):
 def require_denied(response):
     """Require an authorization denial, not an absent object or network error."""
     if response.status_code != 403:
-        raise DiagnosticError("expected HTTP 403, got " + str(response.status_code))
+        raise DiagnosticError("expected authorization denial")
 
 
 def run(duration):
@@ -227,12 +232,9 @@ def run(duration):
     payload = TOKEN_PATH.read_text().split(".")[1]
     claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
     validate_claims(claims)
-    report("projected-token-routing", "PASS", issuer=claims["iss"], subject=claims["sub"],
-           issued_at=claims["iat"], expires_at=claims["exp"])
+    report("projected-token-routing", "PASS")
     isolate_environment()
-    report("dependencies", "INFO", versions={
-        name: importlib.metadata.version(name) for name in ["boto3", "botocore", "google-auth", "requests"]
-    }, isolation_caveat="service-account self-admin grant retained pending team review")
+    report("service-account-review", "PENDING")
     session = boto3.Session(profile_name="default", region_name="us-east-1")
     supplier = ChainSupplier(session)
     credentials = AudienceBoundCredentials(
@@ -249,16 +251,15 @@ def run(duration):
     first_read = True
     with AuthorizedSession(credentials) as http:
         while True:
-            caller = check_identity(session, BROKER_ARN)
+            check_identity(session, BROKER_ARN)
             verify_marker(http.get(STORAGE_URL + "/o/federation-pilot.txt", params={"alt": "media"},
                                    timeout=30, allow_redirects=False))
-            if credentials.token != last_google_token:
+            if last_google_token is None or not hmac.compare_digest(credentials.token, last_google_token):
                 google_generations += 1
                 last_google_token = credentials.token
             elapsed = time.monotonic() - start
-            report("marker-read", "PASS", aws_arn=caller, configured_service_account=SERVICE_ACCOUNT,
-                   elapsed_seconds=round(elapsed), google_generations=google_generations,
-                   google_expiry=credentials.expiry.isoformat(), supplier_calls=supplier.calls,
+            report("marker-read", "PASS", elapsed_seconds=round(elapsed),
+                   google_generations=google_generations, supplier_calls=supplier.calls,
                    aws_generations_supplied=supplier.generations)
             if first_read:
                 # Run admission and storage denial checks once, after the initial successful read.
@@ -266,7 +267,7 @@ def run(duration):
                                         timeout=30, allow_redirects=False))
                 require_denied(http.get(STORAGE_URL + "/o", params={"maxResults": 1},
                                         timeout=30, allow_redirects=False))
-                report("storage-denial", "PASS", object="denied-control.txt", bucket_listing="denied")
+                report("storage-denial", "PASS")
                 check_provider_rejection("hub", HUB_ARN)
                 first_read = False
             if elapsed >= duration:
