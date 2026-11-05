@@ -39,7 +39,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -76,7 +76,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -114,7 +114,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: azure-qe
     env:
@@ -263,7 +263,7 @@ tests:
     report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
       {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
       <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
+  restrict_network_access: true
   steps:
     cluster_profile: aws-sandboxed-containers-operator
     env:
@@ -285,6 +285,44 @@ tests:
       TESTS_OSC_ENABLE: "true"
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
+- as: aws-ipi-coco
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 1
+  reporter_config:
+    channel: '#kata-ocp-ci-reports'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
+      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
+      <{{.Status.URL}}|View logs>'
+  restrict_network_access: true
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    env:
+      AWS_REGION_OVERRIDE: us-east-2
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
+      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      OSC_INSTALL: "true"
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 0h
+      TEST_RELEASE_TYPE: Pre-GA
+      TESTS_CAA_ENABLE: "true"
+      TESTS_CAA_PROFILE: coco
+      TESTS_SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
+      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
+      TRUSTEE_INSTALL: "true"
+      WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-aws
   timeout: 24h0m0s
 - as: azure-ipi-peerpods-sts
