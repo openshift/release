@@ -287,8 +287,8 @@ spec:
             cpu: 10m
             memory: 50Mi
         volumeMounts:
-      - name: captures
-        mountPath: /captures
+        - name: captures
+          mountPath: /captures
       volumes:
       - name: captures
         hostPath:
