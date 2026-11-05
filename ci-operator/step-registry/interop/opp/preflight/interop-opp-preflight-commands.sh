@@ -252,9 +252,17 @@ function CheckOppCompatibility () {
     done
 
     if (( failed > 0 )); then
-        : "${failed} operator(s) failed compatibility check"
-        AppendCheck "opp_compatibility_matrix" "fail" "${details}"
-        (( CHECKS_FAILED += 1 ))
+        # Informational at pre-flight, not a gate. The OPP_COMPAT floors for
+        # the target OCP minor describe the post-upgrade operator set: the
+        # upgrade lanes intentionally install below the target floor
+        # (rhacs-operator 4.10 via the versioned channel, openshift/release#87865)
+        # and the product-upgrade steps move the operators forward mid-run.
+        # The floors are enforced where they are observable — by the
+        # product-upgrade steps and interop-opp-smoke after the upgrade.
+        # Gating here reds every upgrade lane at pre-flight on the reviewed
+        # baseline (INTEROP-9553; first seen after #87865 + #87963 combined).
+        : "${failed} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
+        AppendCheck "opp_compatibility_matrix" "warn" "${details}"
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
         AppendCheck "opp_compatibility_matrix" "pass" "${details}"
