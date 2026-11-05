@@ -20,10 +20,6 @@ STORAGE_BY_CLOUD = {
     "gcp": "gcs",
     "azure": "blob",
     "libvirt": "s3",
-    # Bare metal (Equinix) has no cloud object store and the dev-scripts cluster
-    # has no default StorageClass for ODF/NooBaa, so Quay uses an external AWS S3
-    # bucket (objectstorage managed:false) for registry storage.
-    "baremetal": "s3",
     # True AWS bare metal: metal workers with the same external S3 registry
     # storage as the aws lane (see templates/clouds/aws-metal.yaml.j2).
     "aws-metal": "s3",
@@ -37,9 +33,6 @@ DEPLOY_REF_BY_CLOUD = {
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
-    # Bare metal uses the external AWS S3 deploy step (bucket creds come from the
-    # quay-tests vault, not the cluster profile).
-    "baremetal": "quay-deploy-aws-s3",
     # True AWS bare metal reuses the aws lane's deploy step unchanged.
     "aws-metal": "quay-deploy-aws-s3",
 }
