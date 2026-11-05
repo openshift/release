@@ -35,6 +35,9 @@ if [[ -f "${PARAMS_FILE}" ]]; then
   sed -i "s|^GATEWAY_HOST=.*|GATEWAY_HOST=gateway-enmaas.${APP_DOMAIN}|" "${PARAMS_FILE}"
   sed -i "s|^GATEWAY_URL=.*|GATEWAY_URL=https://gateway-enmaas.${APP_DOMAIN}|" "${PARAMS_FILE}"
   sed -i "s|^WELCOME_DASHBOARD_URL=.*|WELCOME_DASHBOARD_URL=https://dashboard-enmaas.${APP_DOMAIN}/welcome|" "${PARAMS_FILE}"
+  # Override node selector for CI (stage uses dedicated enmaas=true nodes that don't exist in CI)
+  sed -i 's|^NODE_LABEL_KEY=.*|NODE_LABEL_KEY=kubernetes.io/os|' "${PARAMS_FILE}"
+  sed -i 's|^NODE_LABEL_VALUE=.*|NODE_LABEL_VALUE=linux|' "${PARAMS_FILE}"
   echo "Parameters patched successfully."
 else
   echo "WARNING: ${PARAMS_FILE} not found, skipping parameter patching."
