@@ -1,0 +1,31 @@
+# True AWS bare metal: c5.metal workers are full physical hosts (no hypervisor),
+# unlike the Equinix lane, where dev-scripts nests the whole cluster as libvirt
+# VMs on one shared server. Everything else matches the aws lane: the same
+# aws-quay-qe cluster profile and base domain, STS install, the ipi-aws workflow,
+# and the external S3 registry storage. The ipi-conf-aws step consumes
+# COMPUTE_NODE_TYPE, so c5.metal is the only metal-specific input. Control-plane
+# nodes stay on regular VMs: Quay does not care about master hardware, and metal
+# instances run ~5-10x the hourly price of the equivalent VM sizes. No proxy or
+# port-forward machinery here (unlike baremetal.yaml.j2): the routes are
+# publicly resolvable and the test pod has direct egress.
+tests:
+- steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c5.metal
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+{%- if database_deprovision_ref %}
+    - ref: "{{ database_deprovision_ref }}"
+{% endif %}
+{% if sts %}
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+{% else %}
+    - chain: ipi-aws-post
+{% endif %}
+    workflow: ipi-aws
