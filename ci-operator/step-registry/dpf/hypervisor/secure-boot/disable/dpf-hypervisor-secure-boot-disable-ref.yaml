@@ -1,0 +1,34 @@
+ref:
+  as: dpf-hypervisor-secure-boot-disable
+  from: dpf-ci
+  commands: dpf-hypervisor-secure-boot-disable-commands.sh
+  env:
+  - name: OPENSHIFT_DPF_BRANCH
+    default: main
+    documentation: openshift-dpf branch containing the standalone worker Secure Boot helper.
+  - name: WORKER_SECURE_BOOT_STATE
+    default: disable
+    documentation: Requested operation on every worker in the hypervisor env.user inventory.
+  - name: WORKER_SECURE_BOOT_TIMEOUT_MINUTES
+    default: ""
+    documentation: Optional helper timeout override from 1 to 30 minutes. Unset uses the helper's 15-minute default and 60-second polling. The 45-minute step budget leaves time for setup and prechecks.
+  - name: REDFISH_INSECURE
+    default: ""
+    documentation: Optional TLS verification override. Unset uses the helper's verified-TLS default; isolated self-signed lab BMCs require true or a trusted CA.
+  - name: REDFISH_CA_BUNDLE
+    default: ""
+    documentation: Optional trusted CA bundle path on the remote hypervisor.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 45m0s
+  grace_period: 2m0s
+  documentation: |-
+    Disable Secure Boot through openshift-dpf's standalone helper. Source the
+    hypervisor's existing env.user_<cluster-name> for worker/BMC configuration and
+    run the helper from a temporary checkout, independently of cluster installation.
+    The helper handles idempotency, reboots, polling and validation. Both operations
+    share one command implementation. Honor skip-work-steps and skip-nno-precompiled
+    before lab access. Consumers check cluster recovery after changing an installed
+    cluster. Requires WORKER_COUNT and worker BMC credentials in env.user.
