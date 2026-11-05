@@ -35,6 +35,11 @@ for file in nutanix_worker_names nutanix_worker_macs.json nutanix_worker_vms.tsv
   fi
 done
 
+if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_identity.json" ]]; then
+  jq '{schemaVersion,lease,prowJobID,subnetUUID,vip,interface,gatewayName,imageName}' \
+    "$SHARED_DIR/nutanix_ingress_tunnel_identity.json" \
+    > "$ARTIFACT_DIR/nutanix-ingress-tunnel-identity.json" || true
+fi
 if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
   jq '{lease,vip,subnetUUID,gatewayName,gatewayUUID,gatewayTaskUUID,gatewayIP,imageName,imageUUID,imageTaskUUID,interface,port,routeCIDR,firewallZone,stage}' \
     "$SHARED_DIR/nutanix_ingress_tunnel_state.json" \

@@ -6,9 +6,11 @@ tracing_enabled=false
 if [[ $- == *x* ]]; then tracing_enabled=true; fi
 
 state_file="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
+identity_file="$SHARED_DIR/nutanix_ingress_tunnel_identity.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
 cleanup_context_if_complete() {
   if [[ -e "$SHARED_DIR/nutanix_destroy_complete" && ! -e "$state_file" &&
+        ! -e "$identity_file" &&
         ! -e "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
     rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_destroy_complete"
   fi
@@ -21,6 +23,10 @@ if [[ ! -s "$state_file" ]]; then
   echo "The tunnel state file is empty; retaining the Nutanix context for investigation."
   exit 1
 fi
+if [[ ! -s "$identity_file" ]]; then
+  echo "The tunnel identity is missing; retaining the Nutanix context for investigation."
+  exit 1
+fi
 
 # Disable tracing only while sourcing the host connection settings.
 set +x
@@ -28,8 +34,11 @@ set +x
 source "$SHARED_DIR/packet-conf.sh"
 if [[ "$tracing_enabled" == true ]]; then set -x; fi
 state=$(cat "$state_file")
+identity=$(<"$identity_file")
 lease=$(jq -er '.lease' <<< "$state")
+job_id=$(jq -er '.prowJobID' <<< "$state")
 vip=$(jq -er '.vip' <<< "$state")
+subnet_uuid=$(jq -er '.subnetUUID' <<< "$state")
 iface=$(jq -er '.interface' <<< "$state")
 port=$(jq -er '.port' <<< "$state")
 gateway_name=$(jq -er '.gatewayName' <<< "$state")
@@ -42,14 +51,23 @@ host_ip=$(jq -er '.hostIP' <<< "$state")
 route_cidr=$(jq -er '.routeCIDR' <<< "$state")
 firewall_zone=$(jq -r '.firewallZone // empty' <<< "$state")
 stage=$(jq -er '.stage' <<< "$state")
-lease_hash=$(printf '%s' "$lease" | sha256sum | cut -c1-8)
-run_hash=$(printf '%s' "${PROW_JOB_ID:-}" | sha256sum | cut -c1-8)
-expected_interface="wgnx${lease_hash}"
-expected_gateway_name="hcp-nxwg-${lease_hash}-${run_hash}"
-if [[ "$lease" != "${NUTANIX_QUOTA_SLICE:-}" || "$host_ip" != "$IP" ||
-      -z "${PROW_JOB_ID:-}" || "$gateway_name" != "$expected_gateway_name" ||
-      "$image_name" != "$gateway_name-rhcos" ||
-      "$iface" != "$expected_interface" || ! "$port" =~ ^[0-9]+$ ||
+if [[ -z "${PROW_JOB_ID:-}" ]] || ! jq -e \
+  --arg lease "${NUTANIX_QUOTA_SLICE:-}" --arg job "$PROW_JOB_ID" \
+  --arg subnet "$subnet_uuid" --arg vip "$vip" --arg iface "$iface" \
+  --arg gateway "$gateway_name" --arg image "$image_name" '
+    .schemaVersion == 1 and .lease == $lease and .prowJobID == $job and
+    .subnetUUID == $subnet and .vip == $vip and
+    .interface == $iface and .gatewayName == $gateway and .imageName == $image
+  ' <<< "$identity" >/dev/null; then
+  echo "The tunnel identity does not match this run or the recorded state."
+  exit 1
+fi
+if [[ "$job_id" != "$PROW_JOB_ID" ||
+      "$lease" != "${NUTANIX_QUOTA_SLICE:-}" || "$host_ip" != "$IP" ||
+      ! "$iface" =~ ^wgnx[0-9a-f]{8}$ ||
+      ! "$gateway_name" =~ ^hcp-nxwg-[0-9a-f]{8}-[0-9a-f]{8}$ ||
+      "$gateway_name" != "hcp-nxwg-${iface#wgnx}-"* ||
+      "$image_name" != "$gateway_name-rhcos" || ! "$port" =~ ^[0-9]+$ ||
       ! "$vip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ||
       "$route_cidr" != "$vip/32" ||
       ( -n "$firewall_zone" && ! "$firewall_zone" =~ ^[a-zA-Z0-9_-]+$ ) ||
@@ -132,8 +150,8 @@ fi
 set +x
 # shellcheck source=/dev/null
 source "$SHARED_DIR/nutanix_context.sh"
-if [[ "$vip" != "$INGRESS_VIP" ]]; then
-  echo "The recorded VIP no longer matches the Nutanix context."
+if [[ "$vip" != "$INGRESS_VIP" || "$subnet_uuid" != "$SUBNET_UUID" ]]; then
+  echo "The recorded subnet or VIP no longer matches the Nutanix context."
   exit 1
 fi
 
@@ -241,7 +259,7 @@ delete_recorded() {
 
 delete_recorded vms vm "$gateway_name" "$gateway_uuid" "$gateway_task_uuid"
 delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
-rm -f "$ssh_config" "$state_file"
+rm -f "$ssh_config" "$state_file" "$identity_file"
 cleanup_context_if_complete
 printf 'Removed the lease-owned proxy-host tunnel, Nutanix gateway VM, and image for %s.\n' "$lease"
 if [[ "$tracing_enabled" == true ]]; then set -x; fi

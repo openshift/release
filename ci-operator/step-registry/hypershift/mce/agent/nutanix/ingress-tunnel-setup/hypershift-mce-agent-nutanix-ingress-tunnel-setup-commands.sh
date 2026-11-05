@@ -14,6 +14,7 @@ source "$SHARED_DIR/nutanix_context.sh"
 source "$SHARED_DIR/packet-conf.sh"
 
 state_file="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
+identity_file="$SHARED_DIR/nutanix_ingress_tunnel_identity.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
@@ -86,6 +87,25 @@ if [[ ! "${NUTANIX_QUOTA_SLICE:-}" =~ ^[a-zA-Z0-9-]+$ || -z "${PROW_JOB_ID:-}" ]
   echo "A Nutanix quota-slice lease and PROW_JOB_ID are required."
   exit 1
 fi
+if [[ ! -s "$identity_file" ]]; then
+  echo "The Nutanix tunnel identity is missing."
+  exit 1
+fi
+identity=$(<"$identity_file")
+if ! jq -e \
+  --arg lease "$NUTANIX_QUOTA_SLICE" --arg job "$PROW_JOB_ID" \
+  --arg subnet "$SUBNET_UUID" --arg vip "$INGRESS_VIP" '
+    .interface as $iface | .gatewayName as $gateway |
+    .schemaVersion == 1 and .lease == $lease and .prowJobID == $job and
+    .subnetUUID == $subnet and .vip == $vip and
+    ($iface | test("^wgnx[0-9a-f]{8}$")) and
+    ($gateway | test("^hcp-nxwg-[0-9a-f]{8}-[0-9a-f]{8}$")) and
+    ($gateway | startswith("hcp-nxwg-" + ($iface | ltrimstr("wgnx")) + "-")) and
+    .imageName == ($gateway + "-rhcos")
+  ' <<<"$identity" >/dev/null; then
+  echo "The Nutanix tunnel identity does not match this run, subnet, and ingress VIP."
+  exit 1
+fi
 if [[ -e "$state_file" || -e "$ssh_config" ]]; then
   echo "Tunnel state already exists; clean up the previous gateway before retrying."
   exit 1
@@ -135,11 +155,9 @@ if ! valid_ipv4 "$endpoint_ip" || ! valid_ipv4 "$IP" ||
   exit 1
 fi
 lease=$NUTANIX_QUOTA_SLICE
-run_hash=$(printf '%s' "$PROW_JOB_ID" | sha256sum | cut -c1-8)
-lease_hash=$(printf '%s' "$lease" | sha256sum | cut -c1-8)
-interface="wgnx${lease_hash}"
-gateway_name="hcp-nxwg-${lease_hash}-${run_hash}"
-image_name="${gateway_name}-rhcos"
+interface=$(jq -er '.interface' <<<"$identity")
+gateway_name=$(jq -er '.gatewayName' <<<"$identity")
+image_name=$(jq -er '.imageName' <<<"$identity")
 connection_uuid=$(cat /proc/sys/kernel/random/uuid)
 key_file="$CLUSTER_PROFILE_DIR/packet-ssh-key"
 if [[ ! -r "$key_file" ]]; then
@@ -161,11 +179,12 @@ fi
 
 # The state is written before either Prism creation request. Cleanup can recover
 # a UUID by exact run-owned name if an API response is lost after creation.
-jq -n --arg lease "$lease" --arg vip "$INGRESS_VIP" --arg subnet "$SUBNET_UUID" \
+jq -n --arg lease "$lease" --arg job "$PROW_JOB_ID" \
+  --arg vip "$INGRESS_VIP" --arg subnet "$SUBNET_UUID" \
   --arg name "$gateway_name" --arg image "$image_name" --arg iface "$interface" \
   --arg port "$port" --arg host "$IP" --arg endpoint "$endpoint_ip" \
   --arg hostTunnel "$host_tunnel_ip" --arg gatewayTunnel "$gateway_tunnel_ip" \
-  '{lease:$lease,vip:$vip,subnetUUID:$subnet,gatewayName:$name,gatewayUUID:"",
+  '{lease:$lease,prowJobID:$job,vip:$vip,subnetUUID:$subnet,gatewayName:$name,gatewayUUID:"",
     gatewayTaskUUID:"",gatewayIP:"",imageName:$image,imageUUID:"",
     imageTaskUUID:"",interface:$iface,port:$port,
     hostIP:$host,endpointIP:$endpoint,hostTunnelIP:$hostTunnel,

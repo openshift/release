@@ -7,8 +7,8 @@ if [[ "${IP_STACK:-v4}" != "v4" ]]; then
   exit 1
 fi
 
-if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
-  echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
+if [[ ! "${NUTANIX_QUOTA_SLICE:-}" =~ ^[a-zA-Z0-9-]+$ || -z "${PROW_JOB_ID:-}" ]]; then
+  echo "A Nutanix quota-slice lease and PROW_JOB_ID are required."
   exit 1
 fi
 
@@ -64,8 +64,29 @@ if [[ ! "${ingress_vip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || ! awk -F. '{ exi
   exit 1
 fi
 
-context_tmp="${SHARED_DIR}/nutanix_context.sh.tmp"
 umask 077
+lease_hash=$(printf '%s' "$lease_resource" | sha256sum | cut -c1-8)
+run_hash=$(printf '%s' "$PROW_JOB_ID" | sha256sum | cut -c1-8)
+interface="wgnx${lease_hash}"
+gateway_name="hcp-nxwg-${lease_hash}-${run_hash}"
+image_name="${gateway_name}-rhcos"
+identity_file="${SHARED_DIR}/nutanix_ingress_tunnel_identity.json"
+identity_tmp="${identity_file}.tmp"
+# Write the resource identity before tunnel setup can make any Prism requests.
+jq -n --arg lease "$lease_resource" --arg job "$PROW_JOB_ID" \
+  --arg subnet "$subnet_uuid" --arg vip "$ingress_vip" \
+  --arg iface "$interface" --arg gateway "$gateway_name" --arg image "$image_name" \
+  '{schemaVersion:1,lease:$lease,prowJobID:$job,subnetUUID:$subnet,vip:$vip,
+    interface:$iface,gatewayName:$gateway,imageName:$image}' > "$identity_tmp"
+if [[ -e "$identity_file" ]] && ! cmp -s "$identity_tmp" "$identity_file"; then
+  rm -f "$identity_tmp"
+  echo "A different Nutanix tunnel identity already exists for this shared job directory."
+  exit 1
+fi
+chmod 600 "$identity_tmp"
+mv "$identity_tmp" "$identity_file"
+
+context_tmp="${SHARED_DIR}/nutanix_context.sh.tmp"
 printf 'export NUTANIX_HOST=%q\n' "${prism_central_host}" > "${context_tmp}"
 printf 'export NUTANIX_PORT=%q\n' "${prism_central_port}" >> "${context_tmp}"
 printf 'export NUTANIX_USERNAME=%q\n' "${prism_central_username}" >> "${context_tmp}"
