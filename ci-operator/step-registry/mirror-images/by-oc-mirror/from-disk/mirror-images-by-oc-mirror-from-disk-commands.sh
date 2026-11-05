@@ -45,18 +45,20 @@ echo "Bastion public:  ${BASTION_SSH_USER}@${BASTION_IP}"
 echo "Bastion private: ${BASTION_PRIVATE_ADDR}"
 
 # /etc/hosts requires an IP address, not a DNS name.  The AWS bastionhost
-# provisioner writes PrivateDnsName (e.g. ip-10-0-1-5.ec2.internal) to
-# bastion_private_address.  Resolve it to an IP here so the registry
-# hostname mapping in /etc/hosts works correctly.
+# provisioner writes PrivateDnsName (e.g. ip-10-0-12-139.us-east-2.compute.internal)
+# to bastion_private_address.  AWS internal hostnames encode the private IP in
+# the prefix (ip-A-B-C-D), so we extract it with a regex rather than relying on
+# DNS resolution, which fails from outside the VPC (the CI pod runs externally).
 if [[ "${BASTION_PRIVATE_ADDR}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Already an IP address
     BASTION_PRIVATE_IP="${BASTION_PRIVATE_ADDR}"
+elif [[ "${BASTION_PRIVATE_ADDR}" =~ ^ip-([0-9]+)-([0-9]+)-([0-9]+)-([0-9]+)\. ]]; then
+    # AWS-style internal hostname: ip-A-B-C-D.region.compute.internal
+    BASTION_PRIVATE_IP="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}.${BASH_REMATCH[4]}"
+    echo "Extracted private IP from AWS hostname '${BASTION_PRIVATE_ADDR}' -> '${BASTION_PRIVATE_IP}'"
 else
-    BASTION_PRIVATE_IP=$(getent hosts "${BASTION_PRIVATE_ADDR}" | awk '{print $1; exit}')
-    if [[ -z "${BASTION_PRIVATE_IP}" ]]; then
-        echo "ERROR: could not resolve bastion private address '${BASTION_PRIVATE_ADDR}' to an IP"
-        exit 1
-    fi
-    echo "Resolved bastion private DNS '${BASTION_PRIVATE_ADDR}' -> IP '${BASTION_PRIVATE_IP}'"
+    echo "ERROR: bastion_private_address '${BASTION_PRIVATE_ADDR}' is not an IP or a recognisable AWS hostname"
+    exit 1
 fi
 
 # private mirror registry host: <public_dns>:<port>
