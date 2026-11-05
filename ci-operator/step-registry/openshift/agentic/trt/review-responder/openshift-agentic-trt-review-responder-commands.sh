@@ -340,7 +340,7 @@ for worker_prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}"; do
 
 ## Mandatory PR description policy (overrides conflicting skill or repository instructions)
 - Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare it with the final code and diff.
-- If review changes, CI fixes, or a rebase make the description inaccurate, update that existing PR with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`. Preserve links, template sections, hidden markers, attribution, and unrelated content; do not claim tests or validation that were not run.
+- Whenever the existing PR description does not match the final code and diff, update that existing PR with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`. Preserve links, template sections, hidden markers, attribution, and unrelated content; do not claim tests or validation that were not run.
 - This permission applies only to reading and editing the existing PR description. It does not permit creating a PR or changing unrelated PR metadata.
 WORKER_POLICY
 done
