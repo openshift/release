@@ -9,6 +9,13 @@ set -o pipefail
 
 trap 'children=$(jobs -p); if [[ -n "${children}" ]]; then kill ${children} 2>/dev/null || true; wait ${children} 2>/dev/null || true; fi' TERM INT
 
+PROVISION_STEP=0
+log_step() {
+  PROVISION_STEP=$((PROVISION_STEP + 1))
+  echo "[provision step ${PROVISION_STEP}] $*"
+}
+
+log_step "Validating provisioning inputs."
 : "${OPENSHIFT_VERSION:?OPENSHIFT_VERSION must be set}"
 : "${WORKER_OPENSHIFT_VERSION:?WORKER_OPENSHIFT_VERSION must be set}"
 if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
@@ -20,11 +27,13 @@ if [[ "${MULTI_AZ:-false}" == "true" && ! "${ZONES_COUNT:-}" =~ ^[1-9][0-9]*$ ]]
   exit 1
 fi
 
+log_step "Preparing Azure CLI authentication."
 export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
 
 SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+log_step "Loading the Azure service principal from the cluster profile."
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing from the selected Azure cluster profile." >&2
   exit 1
@@ -34,6 +43,7 @@ AZURE_CLIENT_ID=$(jq -er '.clientId' "${SP_FILE}")
 AZURE_CLIENT_SECRET=$(jq -er '.clientSecret' "${SP_FILE}")
 AZURE_TENANT_ID=$(jq -er '.tenantId' "${SP_FILE}")
 
+log_step "Authenticating to Azure."
 set +x
 az login \
   --service-principal \
@@ -46,9 +56,11 @@ unset AZURE_CLIENT_SECRET AZURE_TENANT_ID
 
 SUBSCRIPTION_ID=$(az account show --query id --output tsv)
 az account set --subscription "${SUBSCRIPTION_ID}"
+log_step "Azure authentication completed for subscription ${SUBSCRIPTION_ID}."
 
 # The Microsoft Learn quickstart requires the ARO CLI extension and Azure CLI
 # support for the RP-backed `az aro hcp` command family.
+log_step "Preparing the ARO CLI extension and Azure resource providers."
 az extension add --name aro --upgrade --yes --only-show-errors
 az aro hcp -h >/dev/null
 
@@ -59,6 +71,7 @@ for provider in \
   Microsoft.Authorization; do
   az provider register --namespace "${provider}" --wait --only-show-errors
 done
+log_step "ARO CLI and Azure resource-provider setup completed."
 
 # Normalize a requested cluster name to the Azure resource-name format.
 sanitize_name() {
@@ -71,10 +84,9 @@ sanitize_name() {
 if [[ -n "${ARO_HCP_CLUSTER_NAME:-}" ]]; then
   CLUSTER_NAME=$(sanitize_name "${ARO_HCP_CLUSTER_NAME}")
 else
-  # Match the ROSA HCP CI naming shape while retaining the Azure provider
-  # identity: ci-aro-h-<4 random characters>.
+  # Generate a compact 10-character name: aro-h-<4 random characters>.
   CLUSTER_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
-  CLUSTER_NAME="ci-aro-h-${CLUSTER_SUFFIX}"
+  CLUSTER_NAME="aro-h-${CLUSTER_SUFFIX}"
 fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 # Keep the standard CI cluster identity artifact available to shared steps.
@@ -217,13 +229,15 @@ EOF
 
 # Write the names before creating anything so the post step can clean up a
 # partially-created run.
+log_step "Writing cluster state and initializing provisioning metadata."
 write_state
 initialize_cluster_config
 
 exec > >(tee -a "${PROVISION_LOG}") 2>&1
 
-echo "Provisioning ARO HCP cluster ${CLUSTER_NAME} in ${REGION}"
+log_step "Provisioning ARO HCP cluster ${CLUSTER_NAME} in ${REGION}."
 
+log_step "Creating the customer resource group."
 az group create \
   --name "${CUSTOMER_RG_NAME}" \
   --subscription "${SUBSCRIPTION_ID}" \
@@ -231,6 +245,7 @@ az group create \
   --only-show-errors \
   --output none
 
+log_step "Creating the customer network security group."
 az network nsg create \
   --name "${CUSTOMER_NSG}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
@@ -238,6 +253,7 @@ az network nsg create \
   --only-show-errors \
   --output none
 
+log_step "Creating the customer VNet and worker subnet."
 az network vnet create \
   --name "${CUSTOMER_VNET_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
@@ -249,6 +265,7 @@ az network vnet create \
   --only-show-errors \
   --output none
 
+log_step "Creating the VNet integration subnet."
 az network vnet subnet create \
   --name "${CUSTOMER_VNET_INTEGRATION_SUBNET_NAME}" \
   --vnet-name "${CUSTOMER_VNET_NAME}" \
@@ -262,6 +279,7 @@ NSG_ID=$(az network nsg show --name "${CUSTOMER_NSG}" --resource-group "${CUSTOM
 VNET_ID=$(az network vnet show --name "${CUSTOMER_VNET_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
 SUBNET_ID=$(az network vnet subnet show --name "${CUSTOMER_VNET_SUBNET1}" --vnet-name "${CUSTOMER_VNET_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
 VNET_INTEGRATION_SUBNET_ID=$(az network vnet subnet show --name "${CUSTOMER_VNET_INTEGRATION_SUBNET_NAME}" --vnet-name "${CUSTOMER_VNET_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
+log_step "Resolved the network resource IDs required by the HCP request."
 
 declare -A MI_ID
 declare -A MI_PID
@@ -270,6 +288,7 @@ declare -A MI_PID
 create_identity() {
   local key="$1"
   local name="${CLUSTER_NAME}-${key}"
+  echo "Creating managed identity ${name}."
   az identity create \
     --name "${name}" \
     --resource-group "${CUSTOMER_RG_NAME}" \
@@ -279,6 +298,7 @@ create_identity() {
   MI_PID["${key}"]=$(az identity show --name "${name}" --resource-group "${CUSTOMER_RG_NAME}" --query principalId --output tsv)
 }
 
+log_step "Creating the managed identities required by the HCP."
 for identity in \
   cp-cluster-api-azure \
   cp-control-plane \
@@ -295,6 +315,7 @@ for identity in \
   service-managed-identity; do
   create_identity "${identity}"
 done
+log_step "Managed identity creation completed."
 
 READER_ROLE="acdd72a7-3385-48ef-bd42-f606fba81ae7"
 HCP_CLUSTER_API_PROVIDER_ROLE="88366f10-ed47-4cc0-9fab-c8a06148393e"
@@ -331,6 +352,7 @@ assign_role() {
 }
 
 # Control-plane operator roles.
+log_step "Assigning control-plane, service-managed-identity, and data-plane roles."
 assign_role "${MI_PID[cp-cluster-api-azure]}" "${HCP_CLUSTER_API_PROVIDER_ROLE}" "${VNET_ID}"
 assign_role "${MI_PID[cp-control-plane]}" "${HCP_CONTROL_PLANE_OPERATOR_ROLE}" "${VNET_ID}"
 assign_role "${MI_PID[cp-control-plane]}" "${HCP_CONTROL_PLANE_OPERATOR_ROLE}" "${NSG_ID}"
@@ -365,7 +387,9 @@ done
 assign_role "${MI_PID[dp-file-csi-driver]}" "${FILE_STORAGE_OPERATOR_ROLE}" "${NSG_ID}"
 assign_role "${MI_PID[dp-file-csi-driver]}" "${FILE_STORAGE_OPERATOR_ROLE}" "${VNET_ID}"
 assign_role "${MI_PID[dp-image-registry]}" "${IMAGE_REGISTRY_OPERATOR_ROLE}" "${VNET_ID}"
+log_step "Azure role assignments completed."
 
+log_step "Creating the etcd KMS Key Vault."
 az keyvault create \
   --name "${KEYVAULT_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
@@ -385,6 +409,7 @@ fi
 assign_role "${PROVISIONER_OBJECT_ID}" "${KEY_VAULT_CRYPTO_OFFICER_ROLE}" "${KEYVAULT_ID}"
 assign_role "${MI_PID[cp-kms]}" "${KEY_VAULT_CRYPTO_USER_ROLE}" "${KEYVAULT_ID}"
 
+log_step "Creating the etcd KMS key."
 for attempt in $(seq 1 30); do
   if az keyvault key create \
     --vault-name "${KEYVAULT_NAME}" \
@@ -403,12 +428,14 @@ for attempt in $(seq 1 30); do
 done
 KMS_KEY_VERSION=$(az keyvault key show --vault-name "${KEYVAULT_NAME}" --name "${KMS_KEY_NAME}" --query key.kid --output tsv | awk -F/ '{print $NF}')
 
+log_step "Waiting for Azure role propagation before creating the HCP."
 sleep "${ARO_HCP_ROLE_PROPAGATION_DELAY}"
 
 CONTROL_PLANE_INSTALL_START=$(date +%s)
 record_timer "global_start" "${CONTROL_PLANE_INSTALL_START}"
 record_timer "control_plane_install_start" "${CONTROL_PLANE_INSTALL_START}"
 
+log_step "Submitting the ARO HCP create request."
 az aro hcp cluster create \
   --name "${CLUSTER_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
@@ -434,6 +461,8 @@ az aro hcp cluster create \
   --assign-data-plane-operator-identity file-csi-driver "${MI_ID[dp-file-csi-driver]}" \
   --assign-data-plane-operator-identity image-registry "${MI_ID[dp-image-registry]}" \
   --only-show-errors
+
+log_step "Polling the ARO RP until the control plane reaches a terminal state."
 
 # Convert a CI duration value into seconds for polling deadlines.
 duration_to_seconds() {
@@ -624,6 +653,7 @@ wait_for_nodepool() {
 }
 
 wait_for_cluster
+log_step "Control-plane provisioning completed successfully."
 
 CONTROL_PLANE_READY=$(date +%s)
 record_timer "control_plane_ready" "${CONTROL_PLANE_READY}"
@@ -666,6 +696,7 @@ if ! WORKER_ZONE_LIST=$(select_worker_zones); then
   echo "Unable to select availability zones for the worker node pool(s)." >&2
   exit 1
 fi
+log_step "Selected worker availability zones: ${WORKER_ZONE_LIST:-default}."
 if [[ -n "${WORKER_ZONE_LIST}" ]]; then
   mapfile -t WORKER_ZONES < <(printf '%s\n' "${WORKER_ZONE_LIST}")
 else
@@ -693,6 +724,7 @@ printf '%s\n' "${WORKER_ZONES[@]}" >"${SHARED_DIR}/aro-hcp-worker-zones"
 write_state
 
 WORKER_INSTALL_START=$(date +%s)
+log_step "Creating and waiting for worker node pool(s): ${NODEPOOL_NAMES}."
 for index in "${!WORKER_ZONES[@]}"; do
   create_worker_nodepool \
     "${WORKER_NODEPOOL_NAMES[${index}]}" \
@@ -702,6 +734,7 @@ done
 WORKER_RP_READY=$(date +%s)
 record_timer "nodepool_install_seconds" "$((WORKER_RP_READY - WORKER_INSTALL_START))"
 
+log_step "Requesting the administrator kubeconfig."
 az aro hcp cluster request-credential \
   --admin \
   --name "${CLUSTER_NAME}" \
@@ -713,8 +746,9 @@ cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig"
 chmod 600 "${SHARED_DIR}/nested_kubeconfig"
 
 if command -v oc >/dev/null 2>&1; then
+  log_step "Verifying guest cluster access with oc."
   KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get clusterversion --request-timeout=60s
 fi
 
 write_state
-echo "ARO HCP cluster ${CLUSTER_NAME} and worker node pools ${NODEPOOL_NAMES} are ready."
+log_step "ARO HCP cluster ${CLUSTER_NAME} and worker node pools ${NODEPOOL_NAMES} are ready."
