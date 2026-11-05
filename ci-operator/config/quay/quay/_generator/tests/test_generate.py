@@ -198,6 +198,24 @@ def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
     assert custom["tests"][0]["cron"] == "17 3 * * 1"
 
 
+def test_kind_settings_downstream_periodic_reports_failures_to_slack() -> None:
+    downstream = apply_kind_settings({"tests": [{"steps": {}}]}, _phase0_cell())
+    reporter = downstream["tests"][0]["reporter_config"]
+    assert reporter["channel"] == "#team-quay-downstream-interruptions"
+    assert reporter["job_states_to_report"] == ["failure", "error"]
+    assert "{{.Status.URL}}" in reporter["report_template"]
+
+    upstream = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(branch="master", quay_version=None)
+    )
+    assert "reporter_config" not in upstream["tests"][0]
+
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(kind="presubmit", cron=None)
+    )
+    assert "reporter_config" not in presubmit["tests"][0]
+
+
 def test_cron_alias_resolves_to_interval() -> None:
     for alias, interval in (("daily", "@daily"), ("nightly", "@daily"), ("weekly", "@weekly")):
         matrix = _matrix_with_job(
