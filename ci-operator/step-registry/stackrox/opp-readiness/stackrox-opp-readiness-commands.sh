@@ -745,49 +745,74 @@ fi
 # Check: Sensor pods Running (detect OOMKilled)
 # ---------------------------------------------------------------------------
 function CheckSensorPods () {
-    typeset podCount=""
-    podCount="$(oc get pods -n "${scNs}" -l app=sensor \
-        -o json 2>/dev/null | JsonLength items)" || return 1
-    if [[ "${podCount}" -eq 0 ]]; then
-        echo "[readiness]   no sensor pods found yet"
+    # Terminal pods (phase Succeeded/Failed, or already deleting) can never
+    # become Ready: a kubelet-evicted sensor pod that is never garbage-
+    # collected must not hold the assertion red while its replacement is
+    # healthy (observed: evicted sensor pod stuck in phase Failed for the
+    # whole run while Central reported the replacement sensor HEALTHY;
+    # rehearsal build 2118028576879022080). Only live pods gate readiness.
+    typeset sensorStatus=""
+    sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+import json, sys
+
+d = json.load(sys.stdin)
+oom = []
+live = []
+for pod in d.get("items", []):
+    meta = pod.get("metadata", {}) or {}
+    status = pod.get("status", {}) or {}
+    for cs in status.get("containerStatuses", []) or []:
+        terminated = (cs.get("lastState", {}) or {}).get("terminated", {})
+        if terminated.get("reason") == "OOMKilled":
+            oom.append(cs.get("name", "?"))
+    if status.get("phase") in ("Succeeded", "Failed") or meta.get("deletionTimestamp") is not None:
+        continue
+    conditions = {c.get("type"): c.get("status") for c in status.get("conditions", []) or []}
+    live.append((meta.get("name", "?"), conditions.get("Ready", "Unknown")))
+
+if oom:
+    print("OOMKilled: " + ",".join(sorted(set(oom))))
+if not live:
+    print("NO_LIVE_PODS")
+elif all(ready == "True" for _, ready in live):
+    print("ALL_LIVE_READY")
+else:
+    not_ready = ["%s(Ready=%s)" % (name, ready) for name, ready in live if ready != "True"]
+    print("NOT_READY: " + " ".join(not_ready))
+' 2>/dev/null)" || return 1
+    if printf '%s\n' "${sensorStatus}" | grep -q '^OOMKilled:'; then
+        echo "[readiness] WARNING: OOMKilled detected in sensor containers: $(printf '%s\n' "${sensorStatus}" | sed -n 's/^OOMKilled: //p')"
+    fi
+    if printf '%s\n' "${sensorStatus}" | grep -q '^NO_LIVE_PODS$'; then
+        echo "[readiness]   no live sensor pods found yet (terminal pods ignored)"
         return 1
     fi
-
-    typeset sensorJson=""
-    sensorJson="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null)" || return 1
-    typeset oomContainers=""
-    if [[ -n "${sensorJson}" ]]; then
-        oomContainers="$(echo "${sensorJson}" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-for pod in d.get('items',[]):
-    for cs in pod.get('status',{}).get('containerStatuses',[]):
-        ls=cs.get('lastState',{}).get('terminated',{})
-        if ls.get('reason')=='OOMKilled':
-            print(cs['name'])
-")"
-    fi
-    if [[ -n "${oomContainers}" ]]; then
-        echo "[readiness] WARNING: OOMKilled detected in sensor containers: ${oomContainers}"
-    fi
-
-    typeset podConditions=""
-    podConditions="$(oc get pods -n "${scNs}" -l app=sensor \
-        -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}={.status}{" "}{end}{"\n"}{end}' 2>/dev/null)" || return 1
     typeset notReady=""
-    notReady="$(echo "${podConditions}" | while IFS= read -r line; do
-            [[ -z "${line}" ]] && continue
-            if ! echo "${line}" | grep -q 'Ready=True'; then
-                echo "${line%% *}:NotReady"
-            fi
-        done)"
-    [[ -z "${notReady}" ]] || return 1
+    notReady="$(printf '%s\n' "${sensorStatus}" | sed -n 's/^NOT_READY: //p')"
+    [[ -z "${notReady}" ]] || { echo "[readiness]   sensor pods not Ready: ${notReady}"; return 1; }
     true
 }
 
 if WaitFor "sensor pods Running in ${scNs}" CheckSensorPods; then
     _add_case "sensor-ready" passed
 else
+    # Name the offending pod(s) in the build log: the retry loop alone only
+    # shows counters (observed in rehearsal build 2118028576879022080, where
+    # the diagnosis had to come from a later must-gather).
+    echo "[readiness] Sensor pod states at timeout:"
+    oc get pods -n "${scNs}" -l app=sensor -o wide 2>/dev/null || true
+    oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+import json, sys
+
+d = json.load(sys.stdin)
+for pod in d.get("items", []):
+    meta = pod.get("metadata", {}) or {}
+    status = pod.get("status", {}) or {}
+    conditions = {c.get("type"): c.get("status") for c in status.get("conditions", []) or []}
+    print("%s phase=%s Ready=%s deletionTimestamp=%s" % (
+        meta.get("name", "?"), status.get("phase", "?"),
+        conditions.get("Ready", "Unknown"), meta.get("deletionTimestamp")))
+' 2>/dev/null || true
     _add_case "sensor-ready" failed "Assertion" "sensor pods not Ready in ${scNs} (budget remaining $(_budget_remaining)s)"
     _assert_rc=1
 fi
