@@ -28,15 +28,15 @@ workflow:
     # backplane (ROSAENG-67580).
     - ref: rosa-backplane-login
     test:
-    # Scope each plane to the rosa-e2e Feature:KMS specs (data-plane PV
-    # encryption, EBS root-volume encryption, KMS key health). The unscoped
-    # customer/platform tails run in the other rows of the ROSAENG-308
-    # provision x validate matrix. PLATFORM_LABEL_FILTER (not LABEL_FILTER)
-    # scopes the platform step without touching the customer step.
+    # The customer step runs its default tail (Area:DataPlane ||
+    # Area:CustomerFeatures) so the job also validates normal behaviour
+    # (workloads, networking, storage, ...) on an encrypted cluster; the
+    # customer-plane KMS specs are part of that tail. The platform step is
+    # scoped to the rosa-e2e Feature:KMS specs via PLATFORM_LABEL_FILTER (the
+    # per-plane filter pattern from the PrivateLink job): the KMS key health
+    # spec. The unscoped platform tail runs in the other rows of the
+    # ROSAENG-308 provision x validate matrix.
     - ref: rosa-e2e-validate-customer
-      env:
-      - name: LABEL_FILTER
-        default: "Feature:KMS"
     - ref: rosa-e2e-validate-platform
       env:
       - name: PLATFORM_LABEL_FILTER
@@ -60,10 +60,12 @@ workflow:
     The KMS-encryption row of the ROSAENG-308 provision x validate matrix
     (ROSAENG-63351): the rosa-CLI head provisions an HCP cluster with etcd
     encryption and EBS storage encryption backed by a customer-managed KMS key
-    (rosa-sts-kms-key-create), then runs the KMS specs of the shared,
-    provisioner-agnostic validation tail (LABEL_FILTER / PLATFORM_LABEL_FILTER
-    = Feature:KMS select the data-plane PV encryption, EBS root-volume
-    encryption, and KMS key health specs from rosa-e2e).
+    (rosa-sts-kms-key-create), then validates the cluster with the shared,
+    provisioner-agnostic tail: the customer step runs its default
+    Area:DataPlane || Area:CustomerFeatures selection (which includes the
+    rosa-e2e KMS specs: data-plane PV encryption and EBS root-volume
+    encryption), while the platform step is scoped to the KMS key health spec
+    via PLATFORM_LABEL_FILTER=Feature:KMS.
 
     The platform plane requires corp-network reachability: run this workflow
     only where backplane is reachable (capabilities: [intranet],
