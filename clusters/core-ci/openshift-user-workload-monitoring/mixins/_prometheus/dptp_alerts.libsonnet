@@ -4,6 +4,40 @@ local cleanupJobPattern = '^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-d
 local cloudJobPattern = '^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$';
 local fleetJobPattern = '^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$';
 local repoJobPattern = '^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$';
+// Cleanup/cloud reaper + sanity jobs that post per-run crier reports today but
+// carry no `role: infra` label, so infrastructure-job-failures below cannot match
+// them. Derived from the catalog patterns above (same ops classification) plus the
+// qci registry pruner, so adding a job to a catalog pattern also extends coverage.
+local stripAnchors(p) = std.substr(p, 2, std.length(p) - 4);
+local deprovisionCleanupJobPattern = '^(' + stripAnchors(cleanupJobPattern) + '|' + stripAnchors(cloudJobPattern) + '|periodic-openshift-release-qci-pruner)$';
+// Timestamp of a job's most recent terminal transition of the given state(s), per
+// job_name, over `window`: timestamp(v) and (increase(v[10m])>0 or birth) yields the
+// eval time at each increment, and max_over_time holds the latest within the window.
+// The birth term (v>0 unless v offset 15m) catches a counter born at 1 on its first
+// increment or re-created after a prow-controller-manager restart, which increase()
+// alone would miss.
+local lastTransition(states, pattern, window) =
+  local sel = 'prowjob_state_transitions{job="prow-controller-manager",job_name=~"%(p)s",state=~"%(s)s"}' % { p: pattern, s: states };
+  |||
+    max by (job_name) (
+      max_over_time(
+        (
+          timestamp(%(sel)s)
+          and
+          (increase(%(sel)s[10m]) > 0 or (%(sel)s > 0 unless %(sel)s offset 15m))
+        )[%(w)s:5m]
+      )
+    )
+  ||| % { sel: sel, w: window };
+// Fires while a job's most recent terminal transition is a failure/error that a
+// later success has not overtaken (or it has never succeeded) -- a timestamp
+// comparison, NOT "a failure in the window and no success in the window", so a
+// success followed by a later failure still fires and a failure followed by a later
+// success resolves (addresses the window-contains ambiguity).
+local latestRunFailed(pattern, window) =
+  local fail = lastTransition('failure|error', pattern, window);
+  local succ = lastTransition('success', pattern, window);
+  '(\n' + fail + ')\nunless on (job_name)\n(\n(\n' + succ + ') >= on (job_name) (\n' + fail + ')\n)';
 local infraJobAnnotations = {
   ops_color: '{{ if match %s $labels.job_name }}yellow{{ else }}orange{{ end }}' % std.manifestJson(cleanupJobPattern),
   ops_category: '{{ if match %s $labels.job_name }}repo_automation{{ else if match %s $labels.job_name }}cluster_fleet{{ else if match %s $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}' % [
@@ -117,7 +151,65 @@ local infraJobAnnotations = {
               ops_category: infraJobAnnotations.ops_category,
               message: 'plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>.',
             },
-          }
+          },
+          {
+            alert: 'infrastructure-cleanup-job-failures',
+            // Cleanup/cloud reaper + sanity jobs (gcp/aws/konflux deprovision,
+            // hypershift hosted sanity, qci pruner) are selected by name because they
+            // carry no `role: infra` label; they share the ops_* classification of the
+            // infra alerts above and route through slack-criticals to #ops-testplatform
+            // with the ops tags. These replace the per-run crier reports removed from
+            // the job definitions. Uses the latest-transition comparison (not
+            // failure-in-window / success-in-window) so a success later overtaken by a
+            // failure still fires and a recovered job resolves. 2d window covers these
+            // jobs' <=daily cadence.
+            expr: latestRunFailed(deprovisionCleanupJobPattern, '2d'),
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              ops_color: infraJobAnnotations.ops_color,
+              ops_category: infraJobAnnotations.ops_category,
+              message: 'Cleanup/cloud CI job {{ $labels.job_name }} is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.',
+            },
+          },
+          {
+            alert: 'ci-tools-image-build-failures',
+            // Only the POSTSUBMIT (branch-ci) ci-tools image builds: they run on merge
+            // to main and promote the images. These builds are flaky from transient
+            // infrastructure -- CentOS Stream mirror/dnf blips (DockerBuildFailed) and
+            // build-pod scheduling pressure (pod_pending) -- so paging on each failed
+            // build is noise. Fire only on SUSTAINED breakage: a failure/error in the
+            // last 6h with NO successful build in the last 6h (a later successful merge
+            // clears it). Presubmit (pull-ci) builds are intentionally excluded -- their
+            // failures are per-PR (and prowjob_state_transitions has no per-PR label),
+            // not platform health. 6h is within the evaluator's confirmed lookback.
+            expr: |||
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[6h])
+                )
+                > 0
+              )
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state="success"}[6h])
+                )
+                > 0
+              )
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
+              message: 'No successful ci-tools image postsubmit {{ $labels.job_name }} build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.',
+            },
+          },
         ],
       },
       {

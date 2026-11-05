@@ -1030,6 +1030,8 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         if [[ "${ERROR_REASON}" == ClusterPackage:* ]]; then
             log "SKIPPING RESTORE: ${CM_NAME} has health-check ClusterPackage error-reason, deferring to health check for recovery"
             echo "SKIPPED RESTORE: ${CM_NAME} (error-reason: ${ERROR_REASON})" >> "${REPORT}"
+            UNHEALTHY=$((UNHEALTHY + 1))
+            continue
         else
             log "RESTORED: ${CM_NAME} is healthy again"
             if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
@@ -1140,7 +1142,7 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     CM=$(echo "${ACTUAL_CMS}" | jq ".items[${i}]")
     CM_NAME=$(echo "${CM}" | jq -r '.metadata.name')
     CLUSTER_ID=$(echo "${CM}" | jq -r '.data["cluster-id"]')
-    ERROR_AT=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-at"] // ""')
+    ERROR_AT=$(echo "${CM}" | jq -r '(.metadata.annotations["rosa-cluster-lease/error-at"] | select(. != "")) // .metadata.creationTimestamp // ""')
 
     if [[ -z "${ERROR_AT}" ]]; then
         continue

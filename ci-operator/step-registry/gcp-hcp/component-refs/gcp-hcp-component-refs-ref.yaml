@@ -1,0 +1,46 @@
+ref:
+  as: gcp-hcp-component-refs
+  from: gcp-hcp-e2e-tests
+  commands: gcp-hcp-component-refs-commands.sh
+  env:
+  - name: PR_IMAGES_REPOSITORY
+    default: "northamerica-northeast2-docker.pkg.dev/gcp-hcp-commons-dev/gcp-hcp-pr-images"
+    documentation: "Artifact Registry repository Konflux publishes component pull request images to (gcp-hcp-infra metadata/defaults.yaml pr_images_repository)"
+  - name: PR_IMAGES_WAIT_TIMEOUT
+    default: "1800"
+    documentation: "Seconds to wait, in total, for the pull request images to be published before failing"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  timeout: 45m0s
+  documentation: |-
+    Resolves which components the e2e run deploys from a pull request build
+    instead of the version pinned in gcp-hcp-infra, and writes them to
+    ${SHARED_DIR}/gcp-hcp-component-refs as <component>=<sha> lines for
+    gcp-hcp-tf-provision, which passes each as e2e-render.sh --component-ref.
+
+    Every pull request in JOB_SPEC (the job's own repository, plus repositories
+    added with /testwith) from a component repository is included, e.g.
+    openshift-online/gecko maps to component gecko. Pull requests to
+    openshift-online/gcp-hcp-infra itself are the infrastructure under test, and
+    openshift/release pull requests are rehearsals; neither is a component. Pull
+    requests to any other repository fail the step, since only onboarded
+    components publish pull request images. Only one pull request per component
+    is supported, so component jobs must not be batched by Tide (keep them
+    optional and manually triggered).
+
+    Waits up to PR_IMAGES_WAIT_TIMEOUT in total for the components' images to be
+    published to PR_IMAGES_REPOSITORY (tagged with the commit SHA by the
+    component's Konflux publish-pr-images check), then fails with a clear
+    message if they are missing. Lookup errors other than "not found" (e.g. no
+    read access) fail immediately.
+
+    The repository-to-component and component-to-image mappings must match
+    KNOWN_COMPONENTS in gcp-hcp-infra scripts/e2e-render.sh and the images its
+    ArgoCD apps deploy.
+
+    Writes an empty file when the run deploys no pull request builds, which is
+    the case for gcp-hcp-infra's own jobs.
+
+    Requires ${SHARED_DIR}/wif-cred.json from hypershift-gcp-wif-auth.

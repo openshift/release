@@ -10,6 +10,7 @@ set -o pipefail
 : "${HCP_RECOVERY_IMAGE:?HCP_RECOVERY_IMAGE must be set}"
 : "${FLEET_IMAGE:?FLEET_IMAGE must be set}"
 : "${MGMT_AGENT_IMAGE:?MGMT_AGENT_IMAGE must be set}"
+: "${SWIFT_RECORDER_IMAGE:?SWIFT_RECORDER_IMAGE must be set}"
 : "${KUBE_APPLIER_IMAGE:?KUBE_APPLIER_IMAGE must be set}"
 : "${EXPORTER_IMAGE:?EXPORTER_IMAGE must be set}"
 

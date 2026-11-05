@@ -352,7 +352,7 @@ CONFIG = {
     'aro-hcp-prod-shard1-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
-    'aro-hcp-stg-westus3-shard0-slot': {},
+    'aro-hcp-stg-shard1-slot': {},
     'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -640,7 +640,7 @@ CONFIG = {
         'us-west-2': 15,
     },
     'gitops-aws-quota-slice': {
-        'us-west-2': 20
+        'us-west-2': 30
     },
     'che-aws-quota-slice': {
         # us-east-2 is reserved for the air-gapped clusters
@@ -900,7 +900,7 @@ for i in range(4):
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
-    CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
+    CONFIG['aro-hcp-stg-shard1-slot']['aro-hcp-stg-shard1-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(52):
     CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES

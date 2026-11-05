@@ -102,19 +102,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-autonode
-  cron: 0 2 * * *
-  steps:
-    cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_LATEST: release:multi-latest
-      OCP_IMAGE_PREVIOUS: release:multi-initial
-    env:
-      AWS_MULTI_ARCH: "true"
-      CI_TESTS_RUN: ^TestKarpenter
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-multi
   cron: 0 2 * * *
   steps:
@@ -209,6 +196,21 @@ tests:
         risks
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
+- as: e2e-aws-ovn-conformance-serial-techpreview-nested
+  cron: 0 4 1 12 *
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      GUEST_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: HighlyAvailable
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\| loadbalancer
+        NLB internal should be reachable with hairpinning traffic\| FIPS TestFIPS\|
+        API LBs follow /readyz of kube-apiserver and stop sending requests before
+        server shutdowns for external clients\| oc can operate accept risks\| Network
+        Observability should clean up a timed out OLM installation
+      TEST_SUITE: openshift/conformance/serial
+    workflow: hypershift-aws-conformance-nested
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
@@ -296,6 +298,11 @@ tests:
   steps:
     cluster_profile: aws-qe
     workflow: hypershift-aws-conformance-dynamic-dns
+- as: e2e-aws-conformance-ipsec
+  cron: 22 2 12,26 * *
+  steps:
+    cluster_profile: aws-qe
+    workflow: hypershift-aws-conformance-ipsec
 - as: e2e-aws-conformance-calico
   minimum_interval: 168h
   steps:

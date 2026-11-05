@@ -40,10 +40,15 @@ cat > "${SHARED_DIR}/dns_up.json" <<EOF
 }
 EOF
 
+# Records published by this step, as "<name>|<type>|<space separated values>".
+# Used at the end to read them back from Route 53 once the change is INSYNC.
+PUBLISHED_RRSETS=()
+
 if [ -f "${SHARED_DIR}/API_IP" ]; then
   API_IP=$(<"${SHARED_DIR}"/API_IP)
 
-  # LB_HOSTS present => multi-value api RR; else API_IP. api-int always API_IP.
+  # LB_HOSTS present => multi-value api RR; else API_IP.
+  # api-int uses LB_PRIVATE_IPS when present, else API_IP.
   API_RECORD_VALUES=()
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
     while IFS= read -r ip || [[ -n "${ip}" ]]; do
@@ -69,19 +74,34 @@ if [ -f "${SHARED_DIR}/API_IP" ]; then
     '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
     "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
   cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
+  PUBLISHED_RRSETS+=("api.${CLUSTER_NAME}.${BASE_DOMAIN}.|${API_RECORD_TYPE}|${API_RECORD_VALUES[*]}")
   if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
-    if [[ "${API_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    API_INT_VALUES=()
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+      while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        API_INT_VALUES+=("${ip}")
+      done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+    fi
+    if [[ "${#API_INT_VALUES[@]}" -eq 0 ]]; then
+      API_INT_VALUES+=("${API_IP}")
+    fi
+
+    if [[ "${API_INT_VALUES[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       API_INT_RECORD_TYPE="A"
     else
       API_INT_RECORD_TYPE="AAAA"
     fi
-    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_IP}"
+    API_INT_RESOURCE_RECORDS="$(printf '%s\n' "${API_INT_VALUES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({"Value": .})')"
+
+    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_INT_VALUES[*]}"
     jq --arg name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." \
       --arg type "${API_INT_RECORD_TYPE}" \
-      --arg ip "${API_IP}" \
-      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": [{"Value": $ip}]}}]' \
+      --argjson rr "${API_INT_RESOURCE_RECORDS}" \
+      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
       "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
     cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
+    PUBLISHED_RRSETS+=("api-int.${CLUSTER_NAME}.${BASE_DOMAIN}.|${API_INT_RECORD_TYPE}|${API_INT_VALUES[*]}")
   fi
 fi
 
@@ -147,4 +167,33 @@ if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && 
 fi
 
 cp "${SHARED_DIR}/dns_up.json" "${ARTIFACT_DIR}/"
-aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/dns_up.json"
+
+echo "Submitting DNS change batch"
+CHANGE_ID="$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" \
+  --change-batch "file://${SHARED_DIR}/dns_up.json" --query '"ChangeInfo"."Id"' --output text)"
+echo "Waiting for DNS records to sync (change ${CHANGE_ID})"
+aws route53 wait resource-record-sets-changed --id "${CHANGE_ID}"
+
+# dns_up.json only proves what was submitted. Read the records back from
+# Route 53 so a dropped or truncated RRset fails here, before install.
+for rrset in "${PUBLISHED_RRSETS[@]}"; do
+  IFS='|' read -r rr_name rr_type rr_values <<<"${rrset}"
+  rr_expected="$(tr ' ' '\n' <<<"${rr_values}" | sort)"
+  rr_record="$(aws route53 list-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" \
+    --start-record-name "${rr_name}" --start-record-type "${rr_type}" --max-items 1 \
+    --query 'ResourceRecordSets[0]' --output json)"
+  rr_actual_name="$(jq -r '.Name // empty' <<<"${rr_record}")"
+  rr_actual_type="$(jq -r '.Type // empty' <<<"${rr_record}")"
+  rr_actual="$(jq -r '.ResourceRecords[]?.Value' <<<"${rr_record}" | sort)"
+  if [[ "${rr_actual_name}" != "${rr_name}" || "${rr_actual_type}" != "${rr_type}" ]]; then
+    echo "ERROR: Route 53 has no ${rr_type} record for ${rr_name} (found '${rr_actual_name}' '${rr_actual_type}')"
+    exit 1
+  fi
+  if [[ "${rr_actual}" != "${rr_expected}" ]]; then
+    echo "ERROR: ${rr_name} ${rr_type} in Route 53 does not match the published values"
+    echo "  expected: $(tr '\n' ' ' <<<"${rr_expected}")"
+    echo "  actual:   $(tr '\n' ' ' <<<"${rr_actual}")"
+    exit 1
+  fi
+  echo "Route 53 ${rr_name} ${rr_type} matches published values: $(tr '\n' ' ' <<<"${rr_expected}")"
+done

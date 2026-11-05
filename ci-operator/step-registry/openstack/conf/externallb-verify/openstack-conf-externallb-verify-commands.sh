@@ -67,17 +67,43 @@ if [[ -f "${SHARED_DIR}/dns_up.json" ]]; then
         echo "api DNS records include ${expected} LB endpoint(s)"
     fi
 
-    if [[ -f "${SHARED_DIR}/API_IP" ]]; then
-        api_ip="$(<"${SHARED_DIR}/API_IP")"
-        api_int_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords[].Value' \
-            "${SHARED_DIR}/dns_up.json")"
-        echo "api-int DNS address(es): ${api_int_values}"
-        if ! grep -Fxq "${api_ip}" <<<"${api_int_values}"; then
-            echo "ERROR: expected api-int to include API VIP ${api_ip}"
+    api_int_values="$(jq -r '.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords[].Value' \
+        "${SHARED_DIR}/dns_up.json")"
+    echo "api-int DNS address(es): ${api_int_values}"
+
+    if [[ -f "${SHARED_DIR}/LB_HOSTS" && ! -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+        echo "ERROR: LB_HOSTS present (multi-LB) but LB_PRIVATE_IPS is missing; api-int was not published to LB private IPs"
+        exit 1
+    fi
+
+    # api-int expects LB_PRIVATE_IPS (multi-LB) when present, else the API VIP.
+    api_int_expected_ips=()
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+        while IFS= read -r ip || [[ -n "${ip}" ]]; do
+            [[ -z "${ip}" ]] && continue
+            api_int_expected_ips+=("${ip}")
+        done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+    fi
+    if [[ "${#api_int_expected_ips[@]}" -eq 0 && -s "${SHARED_DIR}/API_IP" ]]; then
+        api_int_expected_ips+=("$(<"${SHARED_DIR}/API_IP")")
+    fi
+    if [[ "${#api_int_expected_ips[@]}" -eq 0 ]]; then
+        echo "ERROR: neither LB_PRIVATE_IPS nor API_IP is available to verify api-int"
+        exit 1
+    fi
+    for ip in "${api_int_expected_ips[@]}"; do
+        if ! grep -Fxq "${ip}" <<<"${api_int_values}"; then
+            echo "ERROR: expected api-int to include ${ip}"
             exit 1
         fi
-        echo "api-int DNS includes API VIP ${api_ip}"
+    done
+    api_int_count="$(jq '[.Changes[].ResourceRecordSet | select(.Name | startswith("api-int.")) | .ResourceRecords | length] | first // 0' \
+        "${SHARED_DIR}/dns_up.json")"
+    if [[ "${api_int_count}" -lt "${#api_int_expected_ips[@]}" ]]; then
+        echo "ERROR: expected at least ${#api_int_expected_ips[@]} addresses for api-int, got ${api_int_count}"
+        exit 1
     fi
+    echo "api-int DNS includes ${#api_int_expected_ips[@]} expected address(es)"
 fi
 
 # Outside probe: in-cluster hairpin to these FIPs is unavailable on this cloud.
