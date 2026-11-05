@@ -76,32 +76,38 @@ az extension add --name aro --upgrade --yes --only-show-errors
 az aro hcp -h >/dev/null
 
 # The HCP resource reports the control-plane minor version, while node pools
-# require a full X.Y.Z version. Prefer the existing workers node pool so an
-# additional pool uses the same patch level and channel as the cluster.
+# require a full X.Y.Z version. Resolve the newest enabled node-pool version
+# for the cluster's major/minor release and channel from the Azure RP.
 CLUSTER_VERSION_JSON=$(az aro hcp cluster show \
   --name "${CLUSTER_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
   --query properties.version \
   --output json)
+CLUSTER_MAJOR_MINOR=$(jq -r '.id // empty' <<<"${CLUSTER_VERSION_JSON}" | awk -F. 'NF >= 2 { print $1 "." $2; exit }')
 CLUSTER_CHANNEL_GROUP=$(jq -r '.channelGroup // empty' <<<"${CLUSTER_VERSION_JSON}")
+MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${CLUSTER_CHANNEL_GROUP:-stable}}"
+: "${CLUSTER_MAJOR_MINOR:?The HCP did not report a valid major.minor version}"
 
-NODEPOOLS_JSON=$(az aro hcp cluster nodepool list \
-  --cluster-name "${CLUSTER_NAME}" \
-  --resource-group "${CUSTOMER_RG_NAME}" \
-  --output json 2>/dev/null || printf '[]')
-EXISTING_NODEPOOL_VERSION=$(jq -r '[.[] | select(.name == "workers") | .properties.version.id] | .[0] // empty' <<<"${NODEPOOLS_JSON}")
-if [[ -z "${EXISTING_NODEPOOL_VERSION}" ]]; then
-  EXISTING_NODEPOOL_VERSION=$(jq -r '[.[] | .properties.version.id] | .[0] // empty' <<<"${NODEPOOLS_JSON}")
-fi
-EXISTING_NODEPOOL_CHANNEL_GROUP=$(jq -r '[.[] | select(.name == "workers") | .properties.version.channelGroup] | .[0] // empty' <<<"${NODEPOOLS_JSON}")
-if [[ -z "${EXISTING_NODEPOOL_CHANNEL_GROUP}" ]]; then
-  EXISTING_NODEPOOL_CHANNEL_GROUP=$(jq -r '[.[] | .properties.version.channelGroup] | .[0] // empty' <<<"${NODEPOOLS_JSON}")
-fi
-
-MP_OPENSHIFT_VERSION="${MP_OPENSHIFT_VERSION:-${EXISTING_NODEPOOL_VERSION}}"
-MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${EXISTING_NODEPOOL_CHANNEL_GROUP:-${CLUSTER_CHANNEL_GROUP:-stable}}}"
-: "${MP_OPENSHIFT_VERSION:?No existing node-pool version was found; set MP_OPENSHIFT_VERSION explicitly to an X.Y.Z version}"
-echo "Using node pool version ${MP_OPENSHIFT_VERSION} and channel group ${MP_CHANNEL_GROUP}."
+# The current ARO CLI returns channel-group metadata with each version rather
+# than accepting --channel-group on get-versions. Request node-pool versions
+# and filter the response here so the selected value is always X.Y.Z.
+AVAILABLE_VERSIONS_JSON=$(az aro hcp get-versions \
+  --location "${REGION}" \
+  --node-pools \
+  --output json)
+MP_OPENSHIFT_VERSION=$(jq -r \
+  --arg channel_group "${MP_CHANNEL_GROUP}" \
+  --arg major_minor "${CLUSTER_MAJOR_MINOR}" \
+  '[.[]
+   | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
+   | select(.channel_group == $channel_group)
+   | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+   | select(.version | startswith($major_minor + "."))
+   | .version]
+   | sort_by(split(".") | map(tonumber))
+   | last // empty' <<<"${AVAILABLE_VERSIONS_JSON}")
+: "${MP_OPENSHIFT_VERSION:?No enabled ${CLUSTER_MAJOR_MINOR}.z node-pool version is available in ${REGION} for channel ${MP_CHANNEL_GROUP} }"
+echo "Using latest available node pool version ${MP_OPENSHIFT_VERSION} and channel group ${MP_CHANNEL_GROUP}."
 
 # Convert a node-pool timeout value into seconds for polling.
 duration_to_seconds() {

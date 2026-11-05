@@ -17,7 +17,6 @@ log_step() {
 
 log_step "Validating provisioning inputs."
 : "${OPENSHIFT_VERSION:?OPENSHIFT_VERSION must be set}"
-: "${WORKER_OPENSHIFT_VERSION:?WORKER_OPENSHIFT_VERSION must be set}"
 if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
   echo "REPLICAS must be a positive integer." >&2
   exit 1
@@ -659,6 +658,44 @@ CONTROL_PLANE_READY=$(date +%s)
 record_timer "control_plane_ready" "${CONTROL_PLANE_READY}"
 record_timer "control_plane_install_seconds" "$((CONTROL_PLANE_READY - CONTROL_PLANE_INSTALL_START))"
 
+# Resolve the newest enabled node-pool patch version after the HCP is ready.
+# The control plane accepts X.Y, but node pools require X.Y.Z.
+resolve_worker_nodepool_version() {
+  local cluster_version_json cluster_major_minor cluster_channel_group available_versions_json
+
+  cluster_version_json=$(az aro hcp cluster show \
+    --name "${CLUSTER_NAME}" \
+    --resource-group "${CUSTOMER_RG_NAME}" \
+    --query properties.version \
+    --output json)
+  cluster_major_minor=$(jq -r '.id // empty' <<<"${cluster_version_json}" | awk -F. 'NF >= 2 { print $1 "." $2; exit }')
+  cluster_channel_group=$(jq -r '.channelGroup // "stable"' <<<"${cluster_version_json}")
+  : "${cluster_major_minor:?The HCP did not report a valid major.minor version}"
+
+  # The current ARO CLI returns channel-group metadata with each version
+  # rather than accepting --channel-group on get-versions.
+  available_versions_json=$(az aro hcp get-versions \
+    --location "${REGION}" \
+    --node-pools \
+    --output json)
+  WORKER_NODEPOOL_VERSION=$(jq -r \
+    --arg channel_group "${cluster_channel_group}" \
+    --arg major_minor "${cluster_major_minor}" \
+    '[.[]
+     | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
+     | select(.channel_group == $channel_group)
+     | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+     | select(.version | startswith($major_minor + "."))
+     | .version]
+     | sort_by(split(".") | map(tonumber))
+     | last // empty' <<<"${available_versions_json}")
+  WORKER_CHANNEL_GROUP="${cluster_channel_group}"
+  : "${WORKER_NODEPOOL_VERSION:?No enabled ${cluster_major_minor}.z node-pool version is available in ${REGION} for channel ${WORKER_CHANNEL_GROUP} }"
+  echo "Using latest available worker node pool version ${WORKER_NODEPOOL_VERSION} and channel group ${WORKER_CHANNEL_GROUP}."
+}
+
+resolve_worker_nodepool_version
+
 # Create one worker node pool, wait for it, and record its install timers.
 create_worker_nodepool() {
   local nodepool_name="$1"
@@ -673,7 +710,8 @@ create_worker_nodepool() {
     --resource-group "${CUSTOMER_RG_NAME}"
     --replicas "${replicas}"
     --vm-size "${COMPUTE_MACHINE_TYPE}"
-    --version "${WORKER_OPENSHIFT_VERSION}"
+    --version "${WORKER_NODEPOOL_VERSION}"
+    --channel-group "${WORKER_CHANNEL_GROUP}"
     --only-show-errors
   )
   if [[ -n "${availability_zone}" ]]; then
