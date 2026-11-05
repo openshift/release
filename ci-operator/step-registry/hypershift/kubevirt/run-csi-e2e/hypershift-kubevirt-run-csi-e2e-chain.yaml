@@ -11,7 +11,7 @@ chain:
         wait
       }
       trap cleanup EXIT
-      
+
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
@@ -62,7 +62,7 @@ chain:
         echo "overriding Monitor Test Failure in CSI tests"
         csi_exit_code=0
       fi
-      
+
       export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver-rwx.yaml"
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${PR_SHA}/hack/test-driver-rwx.yaml)
@@ -70,7 +70,7 @@ chain:
         response=$(curl -L --head --write-out '%{http_code}' --silent --output /dev/null https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver.yaml)
         if [ $response != "200" ]; then
           ocp_version="master"
-        fi        
+        fi
         echo "Getting test-driver-rwx.yaml from the ocp version ${ocp_version} branch"
         rwx_driver_file_url="https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/${ocp_version}/hack/test-driver-rwx.yaml"
         rwx_supported_http_code=$(curl -o "${TEST_CSI_DRIVER_FILES}" -L -w "%{http_code}" "${rwx_driver_file_url}")

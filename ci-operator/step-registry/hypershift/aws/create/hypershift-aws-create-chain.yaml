@@ -30,12 +30,12 @@ chain:
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
       documentation: |
-        Specifies the AWS region for the cluster. If intentionally left as an empty string, 
+        Specifies the AWS region for the cluster. If intentionally left as an empty string,
         the region defaults to that of the management cluster.
     - name: HYPERSHIFT_HC_ZONES
       default: "us-east-1a"
       documentation: |
-        Specifies the AWS AZs to create the NodePools. If intentionally left as an empty string,  
+        Specifies the AWS AZs to create the NodePools. If intentionally left as an empty string,
         it defaults to an AZ utilized by the management cluster.
     - name: ENDPOINT_ACCESS
       default: "Public"
@@ -135,13 +135,13 @@ chain:
         extra_flags+="&& oc apply -f /tmp/hc.yaml"
         echo "$extra_flags"
       }
-      
+
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       HC_ZONES="${HYPERSHIFT_HC_ZONES}"
       if [[ -z "$HC_ZONES" ]]; then
         HC_ZONES="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')"
       fi
-      
+
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
@@ -171,11 +171,11 @@ chain:
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
         --auto-node=${HYPERSHIFT_AUTONODE}
       )
-      
+
       if [[ $HYPERSHIFT_SHARED_VPC == "true" ]]; then
           COMMAND+=(--vpc-owner-aws-creds="${CLUSTER_PROFILE_DIR}/.awscred_shared_account")
       fi
-      
+
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
       fi
@@ -183,11 +183,11 @@ chain:
       if [[ $PUBLIC_ONLY == "true" ]]; then
         COMMAND+=(--public-only)
       fi
-      
+
       if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
         COMMAND+=(--feature-set=TechPreviewNoUpgrade)
       fi
-      
+
       if [[ $HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE == "true" ]]; then
         COMMAND+=(--node-upgrade-type=InPlace)
       fi
@@ -199,15 +199,15 @@ chain:
       if [[ -n $EXTRA_ARGS ]]; then
         COMMAND+=(${EXTRA_ARGS})
       fi
-      
+
       if [[ $HYPERSHIFT_DISK_ENCRYPTION == "true" ]]; then
         COMMAND+=(--root-volume-kms-key="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
-      
+
       if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
         COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
-      
+
       # The derived name is held in a shell local, not in HYPERSHIFT_DYNAMIC_DNS, to keep
       # it clear that it is generated here rather than configured from outside. The env
       # var is only the legacy fixed-record override.
@@ -234,7 +234,7 @@ chain:
       if [[ "$CNI_PROVIDER" == "cilium" || "$CNI_PROVIDER" == "calico" ]]; then
         COMMAND+=(--annotations=hypershift.openshift.io/aws-load-balancer-health-probe-mode=ServiceNodePort)
       fi
-      
+
       # Disabling Hosted Cluster capabilities
       if [[ -n "$HC_DISABLED_CAPS" ]]; then
         COMMAND+=(--disable-cluster-capabilities "$HC_DISABLED_CAPS")

@@ -16,6 +16,22 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
+# The validation image used by ci/prow/yamllint runs as an unprivileged user and
+# originally did not include git. When git is missing, install dulwich (a pure
+# Python git implementation) into a writable directory so the change set can
+# still be computed. This is a no-op once the image ships git.
+if ! command -v git >/dev/null 2>&1; then
+  deps_dir="${TMPDIR:-/tmp}/validate-yaml-deps"
+  if ! PYTHONPATH="${deps_dir}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c 'import dulwich' >/dev/null 2>&1; then
+    echo "git is not installed; installing dulwich to determine changed files" >&2
+    mkdir -p "${deps_dir}" "${TMPDIR:-/tmp}/validate-yaml-home"
+    HOME="${TMPDIR:-/tmp}/validate-yaml-home" \
+      PIP_CACHE_DIR="${TMPDIR:-/tmp}/validate-yaml-pip-cache" \
+      python3 -m pip install --quiet --disable-pip-version-check --target "${deps_dir}" dulwich >&2
+  fi
+  export PYTHONPATH="${deps_dir}${PYTHONPATH:+:${PYTHONPATH}}"
+fi
+
 # Run the Python validation script
 # Use --no-strict mode to be less strict about indentation width for existing files
 # This focuses on critical issues like tabs and mixed tab/space indentation

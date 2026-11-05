@@ -39,7 +39,7 @@ check-cluster-profiles:
 	@echo "Cluster profiles config check: PASS"
 
 check-yaml-indentation: python-help
-	hack/validate-yaml-indentation.sh .
+	hack/validate-yaml-indentation.sh . --use-yamllint
 	@echo "YAML indentation check: PASS"
 
 check-validate-main-promotion: python-help
