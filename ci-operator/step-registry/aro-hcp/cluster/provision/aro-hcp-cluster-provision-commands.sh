@@ -375,7 +375,7 @@ az keyvault create \
   --output none
 
 KEYVAULT_ID=$(az keyvault show --name "${KEYVAULT_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
-KEY_VAULT_CRYPTO_OFFICER_ROLE="f25e0fa2-a7c8-4377-ade3-9b78c0e5f72e"
+KEY_VAULT_CRYPTO_OFFICER_ROLE="14b46e9e-c2b7-41b4-b07b-48a6ebf60603"
 KEY_VAULT_CRYPTO_USER_ROLE="12338af0-0e69-4776-bea7-57ae8d297424"
 
 PROVISIONER_OBJECT_ID="${ARO_HCP_PROVISIONER_OBJECT_ID:-}"
