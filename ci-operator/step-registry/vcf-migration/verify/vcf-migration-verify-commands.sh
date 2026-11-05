@@ -81,6 +81,23 @@ fi
 if [[ -f "${SHARED_DIR}/vcf-migration-target-fds.json" ]]; then
   log "verifying node region/zone labels match target failure domains"
 
+  # Build a list of valid target region/zone pairs
+  target_zones="$(jq -r '[.[] | "\(.region)/\(.zone)"] | join(" ")' "${SHARED_DIR}/vcf-migration-target-fds.json")"
+
+  # Check that every node matches at least one target failure domain
+  mismatched_nodes="$(oc get nodes -o json | jq -r --arg zones "${target_zones}" '
+    [.items[]
+     | .metadata.labels["topology.kubernetes.io/region"] as $region
+     | .metadata.labels["topology.kubernetes.io/zone"] as $zone
+     | "\($region)/\($zone)" as $node_zone
+     | select(($zones | split(" ") | contains([$node_zone])) | not)
+     | .metadata.name] | join(",")')"
+
+  if [[ -n "${mismatched_nodes}" ]]; then
+    fail_with_details "nodes do not match target failure domains: ${mismatched_nodes}"
+  fi
+
+  # Log how many nodes are in each target zone
   while IFS= read -r fd; do
     region="$(jq -r '.region' <<< "${fd}")"
     zone="$(jq -r '.zone' <<< "${fd}")"
@@ -91,11 +108,7 @@ if [[ -f "${SHARED_DIR}/vcf-migration-target-fds.json" ]]; then
                 and .metadata.labels["topology.kubernetes.io/zone"] == $zone)
        | .metadata.name] | length')"
 
-    if [[ "${nodes_in_zone}" -eq 0 ]]; then
-      log "warning: no nodes found with region=${region} zone=${zone}"
-    else
-      log "verified ${nodes_in_zone} node(s) in region=${region} zone=${zone}"
-    fi
+    log "verified ${nodes_in_zone} node(s) in region=${region} zone=${zone}"
   done < <(jq -c '.[]' "${SHARED_DIR}/vcf-migration-target-fds.json")
 fi
 
