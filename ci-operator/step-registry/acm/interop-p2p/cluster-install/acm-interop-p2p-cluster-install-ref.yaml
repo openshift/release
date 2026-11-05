@@ -120,12 +120,14 @@ ref:
     derived from its 1-based index so multi-spoke Submariner setups do not conflict
     with the hub or with each other.
 
-    Step timeout (11h) covers the default budgets: 450m of provisioning for every
-    install attempt, credential extraction, up to 30m per spoke for ManagedCluster
-    Available, and, when image-policy cleanup runs, up to 25m per spoke for
-    MachineConfigPool rollout. Spokes provision in parallel, so the 450m budget
-    is not multiplied by the spoke count. The extra time lets the script hit its
-    own timeout and write diagnostics before CI kills the step.
+    Spokes install in parallel. The step timeout (11h) covers one 450m
+    provisioning budget for the slowest spoke, and every install attempt for
+    that spoke shares it. It also covers credential extraction, up to 30m per
+    spoke for ManagedCluster Available, and, when image-policy cleanup runs,
+    up to 25m per spoke for MachineConfigPool rollout. Phase 2 waits run at
+    the same time, so provisioning time is the slowest spoke, not the sum.
+    The extra time lets the script hit its own timeout and write diagnostics
+    before CI kills the step.
 
     Env vars consumed:
       ACM_SPOKE_ARCH_TYPE               - node architecture (default: amd64)

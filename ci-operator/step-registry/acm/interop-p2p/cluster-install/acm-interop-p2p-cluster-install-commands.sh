@@ -1014,12 +1014,31 @@ done
 
 : "All cluster resources created. Waiting for provisioning..."
 
-# Phase 2: Wait for all clusters to complete provisioning
-# Each cluster typically takes 30-45 minutes to provision
+# Phase 2: Wait for all clusters concurrently. Each wait keeps its own
+# ACM_SPOKE_INSTALL_TIMEOUT_MINUTES budget, and the budgets overlap.
+# Each cluster typically takes 30-45 minutes to provision.
+typeset -a provisionPidsArr=()
+typeset -a provisionNamesArr=()
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
-    WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}"
+    WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}" &
+    provisionPidsArr+=("$!")
+    provisionNamesArr+=("${clusterNamesArr[i]}")
 done
+
+typeset -i provisionFailedCount=0
+typeset -i provisionIdx=0
+for pid in "${provisionPidsArr[@]}"; do
+    if ! wait "${pid}"; then
+        : "Provisioning failed for cluster '${provisionNamesArr[${provisionIdx}]}'"
+        (( provisionFailedCount++ )) || true
+    fi
+    (( provisionIdx++ )) || true
+done
+if [[ "${provisionFailedCount}" -gt 0 ]]; then
+    : "${provisionFailedCount} cluster(s) failed to provision"
+    exit 3
+fi
 
 : "All clusters provisioned. Extracting credentials..."
 
