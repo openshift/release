@@ -56,6 +56,65 @@ typeset sourceVersion=""
 typeset -i sourceMinorVersion=0
 typeset isForceUpdate="false"
 
+# ---------------------------------------------------------------------------
+# OPP operator pod readiness predicate (INTEROP-9672).
+#
+# Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N and
+# bootstrap pods -- exit (often to Error) once their upgrade batch completes
+# and are not OPP operator workload. They must not count against readiness:
+# the 5.0/5.1 upgrade lanes failed ValidateOppOperators on exactly these
+# pods while CVO, ClusterOperators and MachineConfigPools were all healthy
+# (runs 2118373032635404288 and 2118380423871467520).
+# ---------------------------------------------------------------------------
+function NotReadyOppPods () {
+    # $1: `oc get pods --no-headers` output; prints the not-ready lines.
+    awk '$1 !~ /^installer-/ && $1 !~ /^bootstrap-/ && !/Completed/ && !/Running/ && !/Succeeded/' <<< "$1"
+}
+
+# --- Offline predicate self-test (phase 0) ----------------------------------
+# Pins the readiness predicate on fixtures so a later edit that changes the
+# step semantics fails loudly instead of silently re-reding or re-greening
+# lanes. Installer/bootstrap lines below are verbatim from the pinned runs
+# cited above; control lines are synthetic inputs.
+# shellcheck disable=SC2317  # invoked from Main
+function PredicateSelfTest () {
+    local fixture expected got failures=0
+
+    fixture="installer-2-ip-10-0-23-27.us-east-2.compute.internal                      0/1   Error       0     65m
+installer-2-retry-1-ip-10-0-23-27.us-east-2.compute.internal              0/1   Error       0     64m
+installer-2-retry-2-ip-10-0-23-27.us-east-2.compute.internal              0/1   Error       0     63m
+installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m
+installer-3-retry-1-ip-10-0-3-205.us-east-2.compute.internal              0/1   Error       0     57m
+installer-3-retry-2-ip-10-0-3-205.us-east-2.compute.internal              0/1   Error       0     56m"
+    expected=""
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: installer-only fixture must filter to empty; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    fixture="cluster-version-operator-864d9f7c5-abcde      1/1     Running            0     65m
+bootstrap-1234567-deploy-pod                 0/1     Completed         0     58m
+quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+rhacs-operator-controller-7f6d8b9c-pqrst      1/1     Running            0     60m
+installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m"
+    expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: mixed fixture must keep only the CrashLoopBackOff line; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    if (( failures > 0 )); then
+        echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
+        return 1
+    fi
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept)"
+    true
+}
+
 function DebugOnExit () {
     if (( exitCode != 0 )); then
         echo "### DEBUG: Upgrade failure diagnostics ###"
@@ -438,7 +497,7 @@ function ValidateOppOperators () {
             (( failCount += 1 ))
             continue
         fi
-        notReady="$(awk '!/Completed/ && !/Running/ && !/Succeeded/' <<< "${podList}")"
+        notReady="$(NotReadyOppPods "${podList}")"
         if [[ -n "${notReady}" ]]; then
             : "WARNING: Non-running pods in ${ns}:"
             echo "${notReady}"
@@ -458,6 +517,9 @@ function ValidateOppOperators () {
 }
 
 function Main () {
+    echo ">>> PHASE: phase 0 — offline predicate self-test"
+    PredicateSelfTest
+
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
