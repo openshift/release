@@ -3,8 +3,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-dnf install -y git make && dnf clean all
-
 echo "Cloning EnMaaS-opps repository (branch: ${ENMAAS_BRANCH})..."
 WORK_DIR=$(mktemp -d)
 
