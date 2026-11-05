@@ -119,6 +119,7 @@ DISALLOWED_TOOLS=(
     "Bash(od*google-token*)"
     "Bash(git push*)"
     "Bash(git send-pack*)"
+    "Bash(gh release*)"
     "Bash(head*/var/run/github-token*)"
     "Bash(sed*/var/run/github-token*)"
     "Bash(od*/var/run/github-token*)"
@@ -135,6 +136,7 @@ append_pipeline_constraints() {
 - Do not check out or pull the PR branch — you are already on it.
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
 - Do not amend commits. Create new commits so the pipeline can fast-forward push.
+- For browser evidence, capture the image with the Playwright MCP server, then invoke the upload-screenshot skill on the saved file. The established helper may create only a screenshot prerelease in FORK_REPO using the injected fork token and returns markdown for the review or CI report. Do not run gh release yourself, publish branches, or create PRs.
 EOF
 }
 
@@ -282,7 +284,7 @@ for prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}" "${GATE_PROMPT}"; do
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
 - Work serially in the parent agent. Do not delegate.
-- Do not push or create PRs. Any permitted commits stay local; only the pipeline publishes. The gate remains read-only.
+- Do not push or create PRs. Any permitted commits stay local; only the upload-screenshot skill may publish screenshot assets to the configured fork. The gate remains read-only.
 - Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
 CI_POLICY
 done

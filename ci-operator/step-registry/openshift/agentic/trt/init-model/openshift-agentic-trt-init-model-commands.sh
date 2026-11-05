@@ -372,12 +372,11 @@ codex_home_cleanup() {
 }
 
 prepare_codex_home() {
-    if [[ -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
+    if [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" && -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
         return 0
     fi
     CODEX_HOME=$(mktemp -d /tmp/codex-home.XXXXXX) || return 1
     export CODEX_HOME
-    [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" ]] && return 0
     CODEX_HOME_CLEANUP_INSTALLED=1
     local previous quoted
     previous=$(trap -p EXIT || true)
@@ -388,6 +387,370 @@ prepare_codex_home() {
         CODEX_HOME_PREVIOUS_EXIT_CMD=$(eval "printf '%s' ${quoted}")
     fi
     trap codex_home_cleanup EXIT
+}
+
+configure_codex_project_plugins() {
+    local settings="${WORKDIR}/.claude/settings.json"
+    local github_enabled=false
+    unset CLAUDE_PLUGIN_ROOT
+    if [[ -e "${settings}" || -L "${settings}" ]]; then
+        if [[ ! -r "${settings}" ]]; then
+            echo "ERROR: project plugin settings are unreadable: ${settings}" >&2
+            return 1
+        fi
+        if ! github_enabled=$(jq -er '
+          if type != "object" then error("settings must be an object")
+          elif (has("enabledPlugins") | not) then false
+          elif (.enabledPlugins | type) != "object" then error("enabledPlugins must be an object")
+          elif (.enabledPlugins | has("github@ai-helpers") | not) then false
+          elif (.enabledPlugins["github@ai-helpers"] | type) != "boolean" then error("plugin state must be boolean")
+          else .enabledPlugins["github@ai-helpers"]
+          end
+          | tostring
+        ' "${settings}"); then
+            echo "ERROR: invalid project plugin settings: ${settings}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${github_enabled}" == true ]]; then
+        if ! codex plugin marketplace add /opt/ai-helpers >/dev/null 2>&1; then
+            echo "ERROR: failed to add the ai-helpers Codex plugin marketplace" >&2
+            return 1
+        fi
+        local plugin_json plugin_root cache_root script
+        if ! plugin_json=$(codex plugin add github@ai-helpers --json 2>/dev/null); then
+            echo "ERROR: failed to install the github@ai-helpers Codex plugin" >&2
+            return 1
+        fi
+        if ! plugin_root=$(jq -er '
+          select(.pluginId == "github@ai-helpers")
+          | .installedPath
+          | select(type == "string" and length > 0)
+        ' <<<"${plugin_json}"); then
+            echo "ERROR: Codex did not report the installed github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        if ! plugin_root=$(realpath -e -- "${plugin_root}") \
+            || ! cache_root=$(realpath -e -- "${CODEX_HOME}/plugins/cache"); then
+            echo "ERROR: Codex reported an invalid github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        case "${plugin_root}" in
+            "${cache_root}"/*) ;;
+            *)
+                echo "ERROR: Codex installed github@ai-helpers outside its native plugin cache" >&2
+                return 1
+                ;;
+        esac
+        script="${plugin_root}/skills/upload-screenshot/upload_screenshot.sh"
+        if [[ ! -f "${script}" || ! -x "${script}" ]]; then
+            echo "ERROR: installed github@ai-helpers is missing the upload-screenshot helper" >&2
+            return 1
+        fi
+        # Codex shell tools inherit this process environment. The compatibility
+        # variable is required by the existing Claude-authored skill command.
+        export CLAUDE_PLUGIN_ROOT="${plugin_root}"
+    elif ! codex plugin remove github@ai-helpers >/dev/null 2>&1; then
+        echo "ERROR: failed to disable the github@ai-helpers Codex plugin" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_is_allowed() {
+    local server=$1
+    [[ " ${ALLOWED_TOOLS:-} " == *" mcp__${server}__"* ]]
+}
+
+codex_project_mcp_url_is_safe() {
+    python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+try:
+    url = urlsplit(sys.argv[1])
+except ValueError:
+    sys.exit(1)
+if url.scheme not in {"http", "https"} or not url.hostname:
+    sys.exit(1)
+if url.username is not None or url.password is not None or url.query or url.fragment:
+    sys.exit(1)
+PY
+}
+
+# Codex does not consume the Claude-compatible project .mcp.json directly.
+# Register only servers already allowed by the job's ALLOWED_TOOLS contract;
+# this keeps unrelated or interactive project servers disabled.
+codex_project_mcp_server_type() {
+    local config=$1 server=$2
+    jq -r --arg server "${server}" \
+        '.mcpServers[$server].type // (if .mcpServers[$server].url then "http" else "stdio" end)' \
+        "${config}"
+}
+
+codex_project_mcp_validate_server() {
+    local config=$1 server=$2 type url
+    type=$(codex_project_mcp_server_type "${config}" "${server}") || {
+        echo "ERROR: failed to read MCP server ${server}" >&2
+        return 1
+    }
+    case "${type}" in
+        stdio)
+            if ! jq -e --arg server "${server}" '
+              (.mcpServers[$server].command // null) as $command
+              | (.mcpServers[$server].args // []) as $args
+              | (.mcpServers[$server].env // {}) as $env
+              | ($command | type == "string" and length > 0 and index("\u0000") == null)
+                and ($args | type == "array"
+                  and all(.[]; type == "string" and index("\u0000") == null))
+                and ($env | type == "object"
+                  and all(to_entries[];
+                    (.key | test("^[A-Za-z_][A-Za-z0-9_]*$"))
+                    and (.value | type == "string" and index("\u0000") == null)))
+            ' "${config}" >/dev/null; then
+                echo "ERROR: invalid stdio configuration for MCP server ${server}" >&2
+                return 1
+            fi
+            ;;
+        http)
+            if ! jq -e --arg server "${server}" \
+                '.mcpServers[$server].url | type == "string"' "${config}" >/dev/null; then
+                echo "ERROR: invalid HTTP configuration for MCP server ${server}" >&2
+                return 1
+            fi
+            url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}") || return 1
+            if [[ -z "${url}" ]] || ! codex_project_mcp_url_is_safe "${url}"; then
+                echo "ERROR: invalid or credential-bearing URL for MCP server ${server}" >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "ERROR: unsupported transport for MCP server ${server}" >&2
+            return 1
+            ;;
+    esac
+}
+
+codex_project_mcp_collect_servers() {
+    local config=$1 output_name=$2 server names rc=0
+    local -n output=${output_name}
+    output=()
+    names=$(mktemp "${CODEX_HOME}/.trt-project-mcp-names.XXXXXX") || return 1
+    if [[ -f "${config}" ]] && ! python3 - "${config}" > "${names}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    servers = json.load(handle)["mcpServers"]
+for name in sorted(servers):
+    sys.stdout.buffer.write(name.encode() + b"\0")
+PY
+    then
+        rm -f "${names}"
+        echo "ERROR: failed to read project MCP server names" >&2
+        return 1
+    fi
+    while IFS= read -r -d '' server; do
+        if [[ ! "${server}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "ERROR: unsafe MCP server name in ${config}" >&2
+            rc=1
+            continue
+        fi
+        codex_project_mcp_is_allowed "${server}" || continue
+        if codex_project_mcp_validate_server "${config}" "${server}"; then
+            output+=("${server}")
+        else
+            rc=1
+        fi
+    done < "${names}"
+    rm -f "${names}"
+    return "${rc}"
+}
+
+codex_project_mcp_remove_servers() {
+    local action=$1 server rc=0
+    shift
+    for server in "$@"; do
+        if ! codex mcp remove "${server}" </dev/null >/dev/null 2>&1; then
+            echo "ERROR: failed to ${action} MCP server ${server}" >&2
+            rc=1
+        fi
+    done
+    return "${rc}"
+}
+
+codex_project_mcp_remove_managed() {
+    local state=$1
+    [[ -f "${state}" ]] || return 0
+    if ! jq -e '
+      .servers | type == "array"
+        and all(.[]; type == "string" and test("^[A-Za-z0-9._-]+$"))
+    ' "${state}" >/dev/null 2>&1; then
+        echo "ERROR: invalid managed MCP state" >&2
+        return 1
+    fi
+    local -a previous=()
+    mapfile -t previous < <(jq -r '.servers[]' "${state}")
+    codex_project_mcp_remove_servers "remove managed" "${previous[@]}"
+}
+
+codex_project_mcp_parse_stdio() {
+    local config=$1 server=$2 command_name=$3 args_name=$4 env_name=$5
+    local -n command_output=${command_name}
+    local -n args_output=${args_name}
+    local -n env_output=${env_name}
+    local parsed kind key value complete=false rc=0
+    command_output=""
+    args_output=()
+    env_output=()
+    parsed=$(mktemp "${CODEX_HOME}/.trt-project-mcp-server.XXXXXX") || return 1
+    if ! python3 - "${config}" "${server}" > "${parsed}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    server = json.load(handle)["mcpServers"][sys.argv[2]]
+
+def emit(kind, key, value):
+    for field in (kind, key, value):
+        sys.stdout.buffer.write(field.encode() + b"\0")
+
+emit("command", "", server["command"])
+for value in server.get("args", []):
+    emit("arg", "", value)
+for key, value in server.get("env", {}).items():
+    emit("env", key, value)
+emit("done", "", "")
+PY
+    then
+        rm -f "${parsed}"
+        echo "ERROR: failed to parse stdio MCP server ${server}" >&2
+        return 1
+    fi
+    while IFS= read -r -d '' kind \
+        && IFS= read -r -d '' key \
+        && IFS= read -r -d '' value; do
+        case "${kind}" in
+            command) command_output=${value} ;;
+            arg) args_output+=("${value}") ;;
+            env) env_output+=(--env "${key}=${value}") ;;
+            done) complete=true; break ;;
+            *) rc=1 ;;
+        esac
+    done < "${parsed}"
+    rm -f "${parsed}"
+    if [[ "${complete}" != true || "${rc}" -ne 0 ]]; then
+        echo "ERROR: invalid parsed data for stdio MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_stdio() {
+    local config=$1 server=$2 command
+    local -a args=() env_args=()
+    codex_project_mcp_parse_stdio "${config}" "${server}" command args env_args || return 1
+    if ! codex mcp add "${server}" "${env_args[@]}" -- "${command}" "${args[@]}" \
+        >/dev/null 2>&1; then
+        echo "ERROR: failed to register stdio MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_http() {
+    local config=$1 server=$2 url
+    url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}") || return 1
+    if ! timeout --kill-after=5s 60s codex mcp add "${server}" --url "${url}" \
+        </dev/null >/dev/null 2>&1; then
+        echo "ERROR: failed to register HTTP MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_server() {
+    local config=$1 server=$2 type
+    type=$(codex_project_mcp_server_type "${config}" "${server}") || return 1
+    case "${type}" in
+        stdio) codex_project_mcp_register_stdio "${config}" "${server}" ;;
+        http) codex_project_mcp_register_http "${config}" "${server}" ;;
+        *)
+            echo "ERROR: unsupported transport for MCP server ${server}" >&2
+            return 1
+            ;;
+    esac
+}
+
+codex_project_mcp_register_servers() {
+    local config=$1 server rc=0
+    shift
+    local -a servers=("$@")
+    for server in "${servers[@]}"; do
+        codex_project_mcp_register_server "${config}" "${server}" || rc=1
+    done
+    if [[ "${rc}" -ne 0 ]]; then
+        codex_project_mcp_remove_servers "clean up" "${servers[@]}" || true
+        return 1
+    fi
+}
+
+codex_project_mcp_persist_state() {
+    local state=$1 fingerprint=$2
+    shift 2
+    local servers_json='[]' state_tmp
+    local -a servers=("$@")
+    if [[ ${#servers[@]} -gt 0 ]]; then
+        servers_json=$(printf '%s\n' "${servers[@]}" | jq -R . | jq -s .) || return 1
+    fi
+    state_tmp=$(mktemp "${CODEX_HOME}/.trt-project-mcp-state.XXXXXX") || return 1
+    if ! jq -n --arg fingerprint "${fingerprint}" --argjson servers "${servers_json}" \
+        '{fingerprint: $fingerprint, servers: $servers}' > "${state_tmp}"; then
+        rm -f "${state_tmp}"
+        return 1
+    fi
+    mv "${state_tmp}" "${state}"
+}
+
+_configure_codex_project_mcp() {
+    local config="${WORKDIR}/.mcp.json"
+    local state="${CODEX_HOME}/.trt-project-mcp-state.json"
+    local config_hash="absent" fingerprint
+    local -a servers=()
+    if [[ -f "${config}" ]]; then
+        config_hash=$(sha256sum "${config}" | cut -d' ' -f1) || return 1
+    fi
+    fingerprint=$(printf '%s\0%s' "${config_hash}" "${ALLOWED_TOOLS:-}" | sha256sum | cut -d' ' -f1) || return 1
+    if [[ -f "${state}" ]] && jq -e --arg fingerprint "${fingerprint}" '
+      .fingerprint == $fingerprint
+        and (.servers | type == "array")
+        and all(.servers[]; type == "string" and test("^[A-Za-z0-9._-]+$"))
+    ' "${state}" >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ -f "${config}" ]] && ! jq -e '.mcpServers | type == "object"' "${config}" >/dev/null 2>&1; then
+        echo "ERROR: invalid project MCP configuration: ${config}" >&2
+        return 1
+    fi
+    codex_project_mcp_collect_servers "${config}" servers || return 1
+    # Do not register anything while a stale managed server may remain.
+    codex_project_mcp_remove_managed "${state}" || return 1
+    codex_project_mcp_register_servers "${config}" "${servers[@]}" || return 1
+    if ! codex_project_mcp_persist_state "${state}" "${fingerprint}" "${servers[@]}"; then
+        echo "ERROR: failed to persist managed MCP state" >&2
+        codex_project_mcp_remove_servers "clean up" "${servers[@]}" || true
+        return 1
+    fi
+}
+
+configure_codex_project_mcp() {
+    local restore_xtrace=false rc=0
+    if [[ $- == *x* ]]; then
+        restore_xtrace=true
+        set +x
+    fi
+    _configure_codex_project_mcp || rc=$?
+    if ${restore_xtrace}; then
+        set -x
+    fi
+    return "${rc}"
 }
 
 agentic_ci() {
@@ -461,6 +824,8 @@ agentic_ci() {
         prepare_codex_home || return 1
         exclude_codex_from_worktree
         ensure_codex || return 1
+        configure_codex_project_plugins || return 1
+        configure_codex_project_mcp || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then
             if [[ ! -r "${settings_file}" ]]; then
