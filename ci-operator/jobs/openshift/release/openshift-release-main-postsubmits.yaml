@@ -6,6 +6,61 @@ postsubmits:
     cluster: app.ci
     decorate: true
     decoration_config:
+      timeout: 1h0m0s
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-prowgen-efs
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - |
+          yq -r '(.repos // {}) | keys | .[]' core-services/prow/_managed-repos.yaml > /tmp/managed-repos
+          while IFS= read -r repo; do
+            if compgen -G "ci-operator/jobs/${repo}/*.yaml" > /dev/null; then
+              echo "${repo} still has jobs in Git; skipping EFS generation until cutover."
+              continue
+            fi
+            ci-operator-prowgen \
+              --from-dir ci-operator/config \
+              --registry ci-operator/step-registry \
+              --to-dir /mnt/job-configs/generated \
+              "${repo}"
+          done < /tmp/managed-repos
+        command:
+        - /bin/bash
+        - -ceu
+        image: registry.ci.openshift.org/ci/prowgen-efs:latest
+        imagePullPolicy: Always
+        name: prowgen
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /mnt/job-configs
+          name: job-configs
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      volumes:
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    decoration_config:
       sparse_checkout_files:
       - ./ci-operator/config
       - ./ci-operator/jobs
