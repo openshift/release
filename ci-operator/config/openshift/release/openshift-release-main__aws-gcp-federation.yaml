@@ -1,0 +1,58 @@
+build_root:
+  project_image:
+    dockerfile_path: ci-operator/config/openshift/release/_gcp-federation/Dockerfile
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 256Mi
+tests:
+- always_run: false
+  as: gcp-wif
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    cluster_profile: gcp-aws-federation-pilot
+    node_architecture: amd64
+    test:
+    - as: check-federation
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        export PYTHONDONTWRITEBYTECODE=1
+        python3 ci-operator/config/openshift/release/_gcp-federation/diagnostic.py \
+          --duration-seconds 0 | tee "${ARTIFACT_DIR}/federation.jsonl"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 15m0s
+- always_run: false
+  as: gcp-wif-renewal
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    cluster_profile: gcp-aws-federation-pilot
+    node_architecture: amd64
+    test:
+    - as: check-renewal
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        export PYTHONDONTWRITEBYTECODE=1
+        python3 ci-operator/config/openshift/release/_gcp-federation/diagnostic.py \
+          --duration-seconds 4500 | tee "${ARTIFACT_DIR}/federation.jsonl"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 1h30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: aws-gcp-federation
