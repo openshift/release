@@ -757,11 +757,11 @@ function JStep () {
 # XmlEscape — replace XML special characters for attribute/text values.
 function XmlEscape () {
     typeset s="${1}"
-    s="${s//&/&amp;}"
-    s="${s//</&lt;}"
-    s="${s//>/&gt;}"
-    s="${s//\"/&quot;}"
-    s="${s//\'/&apos;}"
+    s="${s//&/\&amp;}"
+    s="${s//</\&lt;}"
+    s="${s//>/\&gt;}"
+    s="${s//\"/\&quot;}"
+    s="${s//\'/\&apos;}"
     printf '%s' "${s}"
 }
 
@@ -783,13 +783,15 @@ function WriteJunit () {
     done < "${junitFile}"
 
     {
+        typeset suiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}cclm-live-migration${migrationSuffix}"
+        typeset escapedSuiteName; escapedSuiteName="$(XmlEscape "${suiteName}")"
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
-        printf '<testsuite name="cclm-live-migration%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
-            "${migrationSuffix}" "${total}" "${failures}" "${totalTime}"
+        printf '<testsuite name="%s" tests="%d" failures="%d" errors="0" skipped="0" time="%d">\n' \
+            "${escapedSuiteName}" "${total}" "${failures}" "${totalTime}"
         while IFS=$'\t' read -r status name elapsed failMsg; do
             typeset escapedName; escapedName="$(XmlEscape "${name}")"
-            printf '  <testcase name="%s" classname="cclm-live-migration%s" time="%d">\n' \
-                "${escapedName}" "${migrationSuffix}" "${elapsed}"
+            printf '  <testcase name="%s" classname="%s" time="%d">\n' \
+                "${escapedName}" "${escapedSuiteName}" "${elapsed}"
             if [[ "${status}" == "FAIL" ]]; then
                 typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
                 printf '    <failure message="%s">%s</failure>\n' \

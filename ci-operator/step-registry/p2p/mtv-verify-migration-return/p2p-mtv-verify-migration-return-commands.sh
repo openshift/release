@@ -894,14 +894,16 @@ function WriteJunit () {
   done < "${junitFile}"
 
   {
+    typeset suiteName="${LP_IO__CR_COMP_NAME:+${LP_IO__CR_COMP_NAME}--}cclm-migration-verify${migrationSuffix}"
+    typeset escapedSuiteName; escapedSuiteName="$(XmlEscape "${suiteName}")"
     printf '<?xml version="1.0" encoding="UTF-8"?>\n'
     printf '<testsuites>\n'
-    printf '  <testsuite name="cclm-migration-verify%s" tests="%d" failures="%d" skipped="%d" time="%d">\n' \
-      "${migrationSuffix}" "${total}" "${failures}" "${skipped}" "${totalTime}"
+    printf '  <testsuite name="%s" tests="%d" failures="%d" skipped="%d" time="%d">\n' \
+      "${escapedSuiteName}" "${total}" "${failures}" "${skipped}" "${totalTime}"
     while IFS=$'\t' read -r status name elapsed failMsg; do
       typeset escapedName; escapedName="$(XmlEscape "${name}")"
-      printf '    <testcase name="%s" classname="cclm-migration-verify%s" time="%d">\n' \
-        "${escapedName}" "${migrationSuffix}" "${elapsed}"
+      printf '    <testcase name="%s" classname="%s" time="%d">\n' \
+        "${escapedName}" "${escapedSuiteName}" "${elapsed}"
       if [[ "${status}" == "FAIL" ]]; then
         typeset escapedMsg; escapedMsg="$(XmlEscape "${failMsg}")"
         printf '      <failure message="%s">%s</failure>\n' \
