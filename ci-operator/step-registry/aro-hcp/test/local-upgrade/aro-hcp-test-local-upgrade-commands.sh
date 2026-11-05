@@ -80,7 +80,7 @@ yq eval -n "
 unset _YQ_HO_REGISTRY _YQ_HO_REPOSITORY _YQ_HO_DIGEST
 unset _YQ_SHARED_INGRESS_REGISTRY _YQ_SHARED_INGRESS_REPOSITORY _YQ_SHARED_INGRESS_DIGEST
 
-CI_RP_ALLOWED_SOURCE=$(./hack/ci/discover-public-ip.sh)
+CI_RP_ALLOWED_SOURCE=$(./test/aro-hcp-tests infra discover-public-ip)
 export CI_RP_ALLOWED_SOURCE
 
 # shellcheck source=hack/ci/build-config-override.sh
