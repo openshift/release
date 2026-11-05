@@ -1,7 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
-set +x
+
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
 
 state_file="$SHARED_DIR/nutanix_ingress_tunnel_state.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
@@ -20,8 +22,11 @@ if [[ ! -s "$state_file" ]]; then
   exit 1
 fi
 
+# Disable tracing only while sourcing the host connection settings.
+set +x
 # shellcheck source=/dev/null
 source "$SHARED_DIR/packet-conf.sh"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi
 state=$(cat "$state_file")
 lease=$(jq -er '.lease' <<< "$state")
 vip=$(jq -er '.vip' <<< "$state")
@@ -123,6 +128,8 @@ if [[ ! -s "$SHARED_DIR/nutanix_context.sh" ]]; then
   echo "The Nutanix context is unavailable; retaining tunnel state for VM cleanup."
   exit 1
 fi
+# Disable tracing for the Prism credential source and all remaining API calls.
+set +x
 # shellcheck source=/dev/null
 source "$SHARED_DIR/nutanix_context.sh"
 if [[ "$vip" != "$INGRESS_VIP" ]]; then
@@ -237,3 +244,4 @@ delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
 rm -f "$ssh_config" "$state_file"
 cleanup_context_if_complete
 printf 'Removed the lease-owned proxy-host tunnel, Nutanix gateway VM, and image for %s.\n' "$lease"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi

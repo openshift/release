@@ -1,7 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
-set +x
+
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
 
 mkdir -p "$ARTIFACT_DIR"
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
@@ -48,6 +50,8 @@ if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
 fi
 
 if [[ -s "$SHARED_DIR/nutanix_context.sh" ]]; then
+  # Disable tracing while loading Prism credentials and fetching VM details.
+  set +x
   source "$SHARED_DIR/nutanix_context.sh"
   if [[ -s "$SHARED_DIR/vm_uuids.txt" ]]; then
     : > "$ARTIFACT_DIR/nutanix-vms.jsonl"
@@ -58,10 +62,14 @@ if [[ -s "$SHARED_DIR/nutanix_context.sh" ]]; then
       jq -c '{uuid:.metadata.uuid,name:.spec.name,nics:[.spec.resources.nic_list[]? | {mac_address,subnet_uuid}],power_state:.status.resources.power_state}' <<<"$response" >> "$ARTIFACT_DIR/nutanix-vms.jsonl"
     done < "$SHARED_DIR/vm_uuids.txt"
   fi
+  if [[ "$tracing_enabled" == true ]]; then set -x; fi
 fi
 
 if [[ -f "$SHARED_DIR/packet-conf.sh" ]]; then
+  # The host connection file runs SSH setup commands when sourced.
+  set +x
   source "$SHARED_DIR/packet-conf.sh"
+  if [[ "$tracing_enabled" == true ]]; then set -x; fi
   ssh "${SSHOPTS[@]}" "root@$IP" 'sudo podman logs --tail=500 external-squid 2>&1' > "$ARTIFACT_DIR/nutanix-squid.log" 2>&1 || true
   if [[ -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
     tunnel_interface=$(jq -r '.interface // empty' "$SHARED_DIR/nutanix_ingress_tunnel_state.json")

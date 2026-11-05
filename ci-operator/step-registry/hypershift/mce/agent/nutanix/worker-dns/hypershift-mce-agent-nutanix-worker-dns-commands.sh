@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# Keep tracing disabled while Prism credentials and cluster DNS settings are used.
 set +x
 
 source "$SHARED_DIR/packet-conf.sh"
@@ -206,3 +209,4 @@ printf 'Worker DNS listens on %s:53 in firewall zone %s for tunnel peer %s.\n' "
 EOF
 printf 'Configured worker DNS through Nutanix gateway %s:53 without exposing the baremetal host IP or changing DHCP on subnet %s; verify UDP and TCP 53 from a Nutanix worker.\n' \
   "$advertise_ip" "$SUBNET_NAME"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi

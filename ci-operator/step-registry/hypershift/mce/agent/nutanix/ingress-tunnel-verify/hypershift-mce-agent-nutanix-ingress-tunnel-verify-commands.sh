@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# The sourced context and later cluster responses include credentials or URLs.
 set +x
 
 # shellcheck source=/dev/null
@@ -237,3 +240,4 @@ oc get "managedcluster/$managed_cluster_name" -o jsonpath='{.status.conditions}'
   > "$ARTIFACT_DIR/nutanix-managedcluster-conditions.txt" 2>/dev/null || true
 printf 'Verified %s through the gateway, proxy-host route, and Squid; ingress canary and ManagedCluster are healthy.\n' \
   "$canary_host"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi

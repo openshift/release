@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# Prism credentials are used throughout VM discovery, deletion, and verification.
 set +x
 
 context_file="$SHARED_DIR/nutanix_context.sh"
@@ -238,3 +241,4 @@ else
   rm -f "$SHARED_DIR/nutanix_context.sh"
 fi
 printf "Deleted this run's Nutanix resources for lease %s; CI-operator releases the lease after the workflow.\n" "$lease_resource"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi

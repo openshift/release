@@ -1,14 +1,18 @@
 #!/bin/bash
 
 set -euo pipefail
-set +x
 
 STATE_FILE="$SHARED_DIR/nutanix_worker_dns_state.json"
 if [[ ! -s "$STATE_FILE" ]]; then
   exit 0
 fi
 
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# The shared host connection file may contain sensitive connection settings.
+set +x
 source "$SHARED_DIR/packet-conf.sh"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi
 state=$(cat "$STATE_FILE")
 cluster=$(jq -er '.cluster' <<<"$state")
 lease=$(jq -er '.lease' <<<"$state")

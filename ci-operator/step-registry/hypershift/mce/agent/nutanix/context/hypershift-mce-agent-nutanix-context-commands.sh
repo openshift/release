@@ -20,6 +20,10 @@ if [[ ! -r "${auth_file}" ]]; then
   exit 1
 fi
 
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# Disable tracing while sourcing Prism credentials, using them in API requests,
+# and writing the private context file.
 set +x
 declare prism_central_host prism_central_port prism_central_username prism_central_password
 declare prism_element_host prism_element_port prism_element_username prism_element_password
@@ -81,5 +85,7 @@ printf 'export NUTANIX_PC_URL=%q\n' "${pc_url}" >> "${context_tmp}"
 chmod 600 "${context_tmp}"
 mv "${context_tmp}" "${SHARED_DIR}/nutanix_context.sh"
 
+unset prism_central_password prism_element_password
+if [[ "$tracing_enabled" == true ]]; then set -x; fi
 printf 'Nutanix quota slice: %s\nPrism Element: %s (%s)\nSelected subnet: %s (%s)\nIngress VIP: %s\n' \
   "${lease_resource}" "${pe_name}" "${pe_uuid}" "${subnet_name}" "${subnet_uuid}" "${ingress_vip}"

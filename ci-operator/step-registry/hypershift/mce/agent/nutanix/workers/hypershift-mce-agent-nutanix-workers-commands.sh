@@ -3,6 +3,9 @@
 set -euo pipefail
 
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# Prism credentials and cluster/proxy data are used across worker provisioning.
 set +x
 source "$SHARED_DIR/nutanix_context.sh"
 CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
@@ -397,3 +400,4 @@ done
 
 rm -f "$WORK_DIR/$IMAGE_NAME"
 printf 'Provisioned %s run-owned Nutanix workers; Agents joined and guest Nodes are Ready.\n' "$NUTANIX_WORKERS"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi

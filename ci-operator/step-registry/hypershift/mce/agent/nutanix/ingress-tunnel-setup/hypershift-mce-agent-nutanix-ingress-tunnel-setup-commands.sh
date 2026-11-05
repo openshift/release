@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -euo pipefail
+tracing_enabled=false
+if [[ $- == *x* ]]; then tracing_enabled=true; fi
+# Prism credentials and WireGuard private keys are used throughout provisioning.
 set +x
 umask 077
 
@@ -586,3 +589,4 @@ ssh -F "$ssh_config" nutanix-ingress-gateway \
 update_state stage ready
 printf 'Gateway %s (%s, %s) and the proxy-host VIP /32 route are ready for lease %s.\n' \
   "$gateway_name" "$gateway_uuid" "$gateway_ip" "$lease"
+if [[ "$tracing_enabled" == true ]]; then set -x; fi
