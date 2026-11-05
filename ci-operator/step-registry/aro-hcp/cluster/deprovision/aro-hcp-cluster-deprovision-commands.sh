@@ -73,6 +73,7 @@ if az aro hcp cluster show \
       --name "${CLUSTER_NAME}" \
       --resource-group "${CUSTOMER_RG_NAME}" \
       --yes \
+      --no-wait \
       --only-show-errors; then
     echo "Failed to request deletion of ARO HCP ${CLUSTER_NAME}; continuing with resource-group cleanup." >&2
     cleanup_failed=true
@@ -102,7 +103,14 @@ fi
 # The documented delete flow leaves the customer resource group, VNet, and
 # subnets behind. Always attempt this cleanup, including when the RP delete
 # fails or times out; deleting the group also removes the HCP resource.
-if [[ "$(az group exists --name "${CUSTOMER_RG_NAME}" --subscription "${AZURE_SUBSCRIPTION_ID}")" == "true" ]]; then
+rg_exists=""
+if ! rg_exists=$(az group exists \
+    --name "${CUSTOMER_RG_NAME}" \
+    --subscription "${AZURE_SUBSCRIPTION_ID}" \
+    --only-show-errors); then
+  echo "Failed to determine whether customer resource group ${CUSTOMER_RG_NAME} exists." >&2
+  cleanup_failed=true
+elif [[ "${rg_exists}" == "true" ]]; then
   if ! az group delete \
       --name "${CUSTOMER_RG_NAME}" \
       --subscription "${AZURE_SUBSCRIPTION_ID}" \

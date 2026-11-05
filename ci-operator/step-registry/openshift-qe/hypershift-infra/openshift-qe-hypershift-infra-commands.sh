@@ -6,9 +6,9 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# Use the ambient KUBECONFIG supplied by the CI workflow. The guest
-# Infrastructure resource is the source of truth for the platform.
-CLUSTER_PLATFORM=$(oc get infrastructure cluster -o go-template --template='{{.status.platform}}'| awk '{print tolower($0)}')
+# Read the guest Infrastructure resource; it is the source of truth for the
+# platform and must not be resolved against the management cluster.
+CLUSTER_PLATFORM=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get infrastructure cluster -o go-template --template='{{.status.platform}}' | awk '{print tolower($0)}')
 
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"

@@ -206,10 +206,12 @@ check_guest_pods() {
   # Job-owned pods may remain Failed after the Job has completed. They are
   # terminal workload artifacts and should not block cluster readiness.
   bad=$(jq -r '.items[] |
-    select((.status.phase // "Unknown") != "Running" and
-           (.status.phase // "Unknown") != "Succeeded" and
-           (any(.metadata.ownerReferences[]?; .kind == "Job") | not)) |
-    [.metadata.namespace, .metadata.name, (.status.phase // "Unknown")] | @tsv' <<<"${json}")
+    (.status.phase // "Unknown") as $phase |
+    (any(.metadata.ownerReferences[]?; .kind == "Job")) as $job_owned |
+    select($phase != "Running" and
+           $phase != "Succeeded" and
+           (($job_owned and $phase == "Failed") | not)) |
+    [.metadata.namespace, .metadata.name, $phase] | @tsv' <<<"${json}")
   if [[ -n "${bad}" ]]; then
     echo "Guest pods not ready: $(head -5 <<<"${bad}" | tr '\n' '; ')"
     return 1

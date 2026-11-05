@@ -43,7 +43,7 @@ tests:
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "5.0"
       READY_WAIT_TIMEOUT: 90m
-      REGION: eastus2
+      REGION: australiaeast
       REPLICAS: "24"
       WORKER_OPENSHIFT_VERSION: 5.0.0
       ZONES_COUNT: "3"
@@ -61,7 +61,10 @@ tests:
         set -o errexit
         set -o nounset
         set -o pipefail
-        KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get nodes
+        nodes_json=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get nodes -o json)
+        total_nodes=$(jq '.items | length' <<<"${nodes_json}")
+        ready_nodes=$(jq '[.items[] | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length' <<<"${nodes_json}")
+        echo "Guest nodes Ready: ${ready_nodes}/${total_nodes}"
         KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get co
       from: aro-hcp-e2e-tools
       resources:
@@ -69,7 +72,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-qe-control-plane
-  timeout: 8h0m0s
+  timeout: 14h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
