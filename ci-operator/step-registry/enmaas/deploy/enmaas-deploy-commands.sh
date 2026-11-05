@@ -29,7 +29,7 @@ APP_DOMAIN=$(oc get ingresses.config/cluster -o jsonpath='{.spec.domain}')
 echo "Cluster app domain: ${APP_DOMAIN}"
 
 echo "Patching enmaas.params with cluster-specific values..."
-PARAMS_FILE="clusters/${ENMAAS_ENV}/enmaas/enmaas.params"
+PARAMS_FILE="clusters/${ENMAAS_ENV}/params/enmaas.params"
 if [[ -f "${PARAMS_FILE}" ]]; then
   sed -i "s|^DASHBOARD_HOST=.*|DASHBOARD_HOST=dashboard-enmaas.${APP_DOMAIN}|" "${PARAMS_FILE}"
   sed -i "s|^GATEWAY_HOST=.*|GATEWAY_HOST=gateway-enmaas.${APP_DOMAIN}|" "${PARAMS_FILE}"
