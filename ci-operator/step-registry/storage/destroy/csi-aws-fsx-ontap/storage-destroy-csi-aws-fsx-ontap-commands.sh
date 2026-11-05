@@ -138,14 +138,15 @@ clear_trident_finalizers() {
   local resource namespace name
   while read -r resource; do
     [[ -n "${resource}" ]] || continue
-    while read -r namespace name; do
+    # Read the name first: read strips leading whitespace for cluster-scoped resources.
+    while read -r name namespace; do
       [[ -n "${name}" ]] || continue
       if [[ -n "${namespace}" ]]; then
         oc patch "${resource}" "${name}" --namespace "${namespace}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on ${resource}/${name}"
       else
         oc patch "${resource}" "${name}" --type=merge -p '{"metadata":{"finalizers":[]}}' || record_failure "could not clear finalizers on ${resource}/${name}"
       fi
-    done < <(oc get "${resource}" --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+    done < <(oc get "${resource}" --all-namespaces -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.namespace}{"\n"}{end}' 2>/dev/null || true)
   done < <(oc get crd -o name 2>/dev/null | awk -F/ '/trident\.netapp\.io/ {print $2}' || true)
 }
 
@@ -186,18 +187,6 @@ worker_machineconfig_removed() {
     any(.status.conditions[]; .type == "Degraded" and .status == "False")'
 }
 
-cleanup_machineconfig() {
-  [[ -s "${KUBECONFIG}" ]] || return 0
-
-  local machineconfig
-  machineconfig="$(state_value fsxn-machineconfig-name)"
-  [[ -n "${machineconfig}" ]] || return 0
-  oc delete machineconfig "${machineconfig}" --ignore-not-found || record_failure "could not delete ${machineconfig}"
-  # Healthy conditions alone may still describe the old configuration before
-  # the controller notices the deletion. Wait for desired AND applied sources.
-  wait_for 3000 30 "worker MachineConfigPool cleanup" worker_machineconfig_removed "${machineconfig}" || true
-}
-
 delete_resource() {
   local error
   if error="$("$@" 2>&1 >/dev/null)"; then
@@ -209,7 +198,7 @@ delete_resource() {
   case "${error}" in
     *'(VolumeNotFound)'*|*'(StorageVirtualMachineNotFound)'*|*'(FileSystemNotFound)'*|*'(InvalidGroup.NotFound)'*)
       return 0 ;;
-    *'(BadRequest)'*|*'(ResourceInUse)'*|*'(DependencyViolation)'*|*'(Throttling)'*|*'(ThrottlingException)'*|*'(TooManyRequestsException)'*|*'(RequestLimitExceeded)'*|*'(ServiceUnavailable)'*|*'(InternalServerError)'*|*'(InternalServerException)'*|*'Could not connect to the endpoint URL'*|*'Connect timeout'*|*'Read timeout'*|*'Connection was closed'*)
+    *'(BadRequest)'*|*'(ResourceInUse)'*|*'(DependencyViolation)'*|*'(Throttling)'*|*'(ThrottlingException)'*|*'(TooManyRequestsException)'*|*'(RequestLimitExceeded)'*|*'(RequestTimeout)'*|*'(RequestTimeoutException)'*|*'(SlowDown)'*|*'(ServiceUnavailable)'*|*'(InternalError)'*|*'(InternalServerError)'*|*'(InternalServerException)'*|*'Could not connect to the endpoint URL'*|*'Connect timeout'*|*'Read timeout'*|*'Connection was closed'*)
       # FSx can reject deletion while provisioning or another operation is
       # completing. Retry under the global deadline, keeping the same token.
       echo "Retrying $1 $2 $3: ${error}" >&2
@@ -299,8 +288,6 @@ main() {
       sleep 30
     done
   fi
-  # Attempt worker restoration even if AWS cleanup failed.
-  cleanup_machineconfig
   return "${cleanup_status}"
 }
 
