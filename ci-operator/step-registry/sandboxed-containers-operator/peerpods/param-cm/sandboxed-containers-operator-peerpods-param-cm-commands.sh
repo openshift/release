@@ -5,6 +5,12 @@ if [ "$ENABLEPEERPODS" != "true" ]; then
     exit 0
 fi
 
+# Restricted-network runs: source the bastion proxy so az CLI calls reach the
+# Azure API (no-op for connected runs).
+if test -s "${SHARED_DIR}/proxy-conf.sh"; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Switch to a directory with rw permission
 cd /tmp || exit 1
 
@@ -429,8 +435,16 @@ handle_azure() {
     else
         MANAGEMENT_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP"
     fi
+    # Provisioned-network flows (for example the restricted proxy+mirror
+    # workflow) keep the VNet in the provisioned resource group, not in the
+    # cluster resource group: use the provisioned group for network lookups,
+    # same as the ACR endpoint step does.
+    if [[ -s "${SHARED_DIR}/resourcegroup" && -s "${SHARED_DIR}/customer_vnet_subnets.yaml" ]]; then
+        MANAGEMENT_RESOURCE_GROUP="$(cat "${SHARED_DIR}/resourcegroup")"
+        echo "Provisioned network detected - using network resource group: ${MANAGEMENT_RESOURCE_GROUP}"
+    fi
     for I in {1..30}; do
-	    AZURE_VNET_NAME=$(az network vnet list --resource-group "${MANAGEMENT_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv ||:)
+	    AZURE_VNET_NAME=$(cat "${SHARED_DIR}/vnet_name" 2>/dev/null || az network vnet list --resource-group "${MANAGEMENT_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv ||:)
 	    if [[ -z "${AZURE_VNET_NAME}" ]]; then
 		    sleep "${I}"
 	    else	# VNET set, we are done
