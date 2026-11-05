@@ -21,6 +21,7 @@ SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
 CLUSTER_CONFIG_FILE="${SHARED_DIR}/cluster-config"
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
+# Convert a CI duration value into seconds for the readiness deadline.
 duration_to_seconds() {
   local value="$1"
   case "${value}" in
@@ -32,6 +33,7 @@ duration_to_seconds() {
   esac
 }
 
+# Create valid shared metadata before recording readiness results.
 ensure_metadata() {
   if [[ ! -s "${CLUSTER_CONFIG_FILE}" ]] || ! jq empty "${CLUSTER_CONFIG_FILE}" >/dev/null 2>&1; then
     jq -n '{provider: "azure", cluster: {}, timers: {}, nodepools: {}}' > "${CLUSTER_CONFIG_FILE}.tmp"
@@ -40,6 +42,7 @@ ensure_metadata() {
   fi
 }
 
+# Record a numeric cluster-level readiness timer.
 record_timer() {
   local key="$1" value="$2" tmp
   ensure_metadata
@@ -49,6 +52,7 @@ record_timer() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record a numeric readiness timer for one node pool.
 record_nodepool_timer() {
   local nodepool="$1" key="$2" value="$3" tmp
   ensure_metadata
@@ -61,7 +65,7 @@ record_nodepool_timer() {
 export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-ready"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal--dot--json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing; cannot authenticate readiness checks." >&2
   exit 1
@@ -88,6 +92,7 @@ cluster_operators_ready=false
 guest_pods_ready=false
 worker_nodes_ready=false
 
+# Check the hosted control-plane RP state and record its completion timer.
 check_rp_cluster() {
   local state now start
   state=$(az aro hcp cluster show --name "${CLUSTER_NAME}" --resource-group "${CUSTOMER_RG_NAME}" \
@@ -112,6 +117,7 @@ check_rp_cluster() {
   return 1
 }
 
+# Check that every Azure RP node-pool operation has succeeded.
 check_rp_nodepools() {
   local json bad pending name now start
   json=$(az aro hcp cluster nodepool list --cluster-name "${CLUSTER_NAME}" \
@@ -151,6 +157,7 @@ check_rp_nodepools() {
   return 0
 }
 
+# Check that the guest API can be reached with the downloaded kubeconfig.
 check_guest_api() {
   [[ -s "${KUBECONFIG_FILE}" ]] || { echo "Waiting for guest kubeconfig."; return 1; }
   if KUBECONFIG="${KUBECONFIG_FILE}" oc whoami >/dev/null 2>&1; then
@@ -161,6 +168,7 @@ check_guest_api() {
   return 1
 }
 
+# Check that ClusterVersion is available, stable, and not degraded.
 check_cluster_version() {
   local json available progressing degraded
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get clusterversion version -o json 2>/dev/null || true)
@@ -176,6 +184,7 @@ check_cluster_version() {
   return 1
 }
 
+# Check that all guest cluster operators are available and healthy.
 check_cluster_operators() {
   local json bad
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get clusteroperators -o json 2>/dev/null || true)
@@ -189,11 +198,18 @@ check_cluster_operators() {
   return 0
 }
 
+# Check that non-terminal guest workloads are running or completed.
 check_guest_pods() {
   local json bad
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get pods --all-namespaces -o json 2>/dev/null || true)
   [[ -n "${json}" ]] || { echo "Waiting for guest pods."; return 1; }
-  bad=$(jq -r '.items[] | select((.status.phase // "Unknown") != "Running" and (.status.phase // "Unknown") != "Succeeded") | [.metadata.namespace, .metadata.name, (.status.phase // "Unknown")] | @tsv' <<<"${json}")
+  # Job-owned pods may remain Failed after the Job has completed. They are
+  # terminal workload artifacts and should not block cluster readiness.
+  bad=$(jq -r '.items[] |
+    select((.status.phase // "Unknown") != "Running" and
+           (.status.phase // "Unknown") != "Succeeded" and
+           (any(.metadata.ownerReferences[]?; .kind == "Job") | not)) |
+    [.metadata.namespace, .metadata.name, (.status.phase // "Unknown")] | @tsv' <<<"${json}")
   if [[ -n "${bad}" ]]; then
     echo "Guest pods not ready: $(head -5 <<<"${bad}" | tr '\n' '; ')"
     return 1
@@ -202,6 +218,7 @@ check_guest_pods() {
   return 0
 }
 
+# Check that the expected worker nodes are Ready and schedulable.
 check_worker_nodes() {
   local nodes desired ready
   nodes=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get nodes -o json 2>/dev/null || true)

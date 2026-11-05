@@ -24,7 +24,7 @@ export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
 
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal--dot--json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing from the selected Azure cluster profile." >&2
   exit 1
@@ -60,6 +60,7 @@ for provider in \
   az provider register --namespace "${provider}" --wait --only-show-errors
 done
 
+# Normalize a requested cluster name to the Azure resource-name format.
 sanitize_name() {
   printf '%s' "$1" \
     | tr '[:upper:]_' '[:lower:]-' \
@@ -95,6 +96,7 @@ STATE_FILE="${SHARED_DIR}/aro-hcp.env"
 PROVISION_LOG="${ARTIFACT_DIR}/aro-hcp-cluster-provision.log"
 CLUSTER_CONFIG_FILE="${SHARED_DIR}/cluster-config"
 
+# Create the shared JSON metadata file when it does not already exist.
 initialize_cluster_config() {
   if [[ -s "${CLUSTER_CONFIG_FILE}" ]] && jq empty "${CLUSTER_CONFIG_FILE}" >/dev/null 2>&1; then
     return
@@ -111,6 +113,7 @@ initialize_cluster_config() {
   chmod 600 "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record a numeric cluster-level timer in the shared metadata file.
 record_timer() {
   local key="$1"
   local value="$2"
@@ -121,6 +124,7 @@ record_timer() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record a numeric timer for a worker node pool in shared metadata.
 record_nodepool_timer() {
   local nodepool="$1"
   local key="$2"
@@ -132,6 +136,7 @@ record_nodepool_timer() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record a string-valued cluster status or state in shared metadata.
 record_timer_string() {
   local key="$1"
   local value="$2"
@@ -142,6 +147,7 @@ record_timer_string() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Accumulate the time spent in a control-plane install state.
 record_install_state_duration() {
   local state="$1"
   local value="$2"
@@ -153,6 +159,7 @@ record_install_state_duration() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Accumulate the time spent in a node-pool install state.
 record_nodepool_state_duration() {
   local nodepool="$1"
   local state="$2"
@@ -165,6 +172,7 @@ record_nodepool_state_duration() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record the final RP status for a worker node pool.
 record_nodepool_status() {
   local nodepool="$1"
   local state="$2"
@@ -175,6 +183,7 @@ record_nodepool_status() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Map Azure provisioning states to the shared timing-state vocabulary.
 normalize_install_state() {
   case "${1,,}" in
     claim|pending) echo "pending" ;;
@@ -185,6 +194,7 @@ normalize_install_state() {
   esac
 }
 
+# Persist the names and identifiers needed by later CI steps and cleanup.
 write_state() {
   cat >"${STATE_FILE}" <<EOF
 AZURE_SUBSCRIPTION_ID=${SUBSCRIPTION_ID}
@@ -256,6 +266,7 @@ VNET_INTEGRATION_SUBNET_ID=$(az network vnet subnet show --name "${CUSTOMER_VNET
 declare -A MI_ID
 declare -A MI_PID
 
+# Create and record one managed identity used by the HCP deployment.
 create_identity() {
   local key="$1"
   local name="${CLUSTER_NAME}-${key}"
@@ -296,6 +307,7 @@ IMAGE_REGISTRY_OPERATOR_ROLE="8b32b316-c2f5-4ddf-b05b-83dacd2d08b5"
 FEDERATED_CREDENTIAL_ROLE="ef318e2a-8334-4a05-9e4a-295a196c6a6e"
 HCP_SERVICE_MI_ROLE="c0ff367d-66d8-445e-917c-583feb0ef0d4"
 
+# Create an Azure role assignment only when the requested assignment is absent.
 assign_role() {
   local principal_id="$1"
   local role_id="$2"
@@ -423,6 +435,7 @@ az aro hcp cluster create \
   --assign-data-plane-operator-identity image-registry "${MI_ID[dp-image-registry]}" \
   --only-show-errors
 
+# Convert a CI duration value into seconds for polling deadlines.
 duration_to_seconds() {
   local value="$1"
   if [[ "${value}" =~ ^([0-9]+)s$ ]]; then
@@ -439,6 +452,7 @@ duration_to_seconds() {
   fi
 }
 
+# Poll the Azure RP until the hosted control plane reaches a terminal state.
 wait_for_cluster() {
   local timeout_seconds
   timeout_seconds=$(duration_to_seconds "${READY_WAIT_TIMEOUT}")
@@ -488,10 +502,12 @@ wait_for_cluster() {
   return 1
 }
 
+# Normalize a comma- or space-separated zone list and remove duplicates.
 normalize_zones() {
   tr ', ' '\n' <<<"$1" | awk 'NF && !seen[$0]++' | sort -V
 }
 
+# Query Azure for zones where the worker VM SKU is available.
 discover_availability_zones() {
   local sku_json
   if ! sku_json=$(az vm list-skus \
@@ -512,6 +528,7 @@ discover_availability_zones() {
       .zones[]?] | unique | .[]' <<<"${sku_json}" | sort -V -u
 }
 
+# Select the configured or discovered zones for worker node pools.
 select_worker_zones() {
   local candidates
   local -a candidates_array
@@ -543,6 +560,7 @@ select_worker_zones() {
   fi
 }
 
+# Build the worker node-pool name, adding a zone suffix for multi-AZ pools.
 worker_nodepool_name_for_zone() {
   local zone="$1"
   if [[ "${MULTI_AZ:-false}" != "true" ]]; then
@@ -552,6 +570,7 @@ worker_nodepool_name_for_zone() {
   fi
 }
 
+# Poll the Azure RP until one worker node pool reaches a terminal state.
 wait_for_nodepool() {
   local nodepool_name="$1"
   local nodepool_install_start="$2"
@@ -610,6 +629,7 @@ CONTROL_PLANE_READY=$(date +%s)
 record_timer "control_plane_ready" "${CONTROL_PLANE_READY}"
 record_timer "control_plane_install_seconds" "$((CONTROL_PLANE_READY - CONTROL_PLANE_INSTALL_START))"
 
+# Create one worker node pool, wait for it, and record its install timers.
 create_worker_nodepool() {
   local nodepool_name="$1"
   local availability_zone="$2"

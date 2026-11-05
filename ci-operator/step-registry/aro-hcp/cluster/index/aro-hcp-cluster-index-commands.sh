@@ -29,6 +29,7 @@ ES_SERVER="${ES_SERVER%/}"
 : "${ES_SERVER:?Elasticsearch endpoint is empty}"
 ES_INDEX_VALUE="${ES_INDEX:-rosa-metadata}"
 
+# Send an Elasticsearch request without exposing credential-bearing diagnostics.
 curl_es() {
   # Suppress curl diagnostics because the endpoint can contain basic-auth
   # credentials. Callers emit sanitized, generic failure messages instead.
@@ -49,6 +50,7 @@ UUID_VALUE="$(cat /proc/sys/kernel/random/uuid 2>/dev/null || uuidgen)"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 payload=$(mktemp)
 response=$(mktemp)
+# Remove temporary request files when indexing exits.
 cleanup() {
   rm -f "${payload}" "${response}"
 }

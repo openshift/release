@@ -25,6 +25,7 @@ SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
 : "${CLUSTER_NAME:?SHARED_DIR/aro-hcp.env must provide the cluster name}"
 : "${CUSTOMER_RG_NAME:?SHARED_DIR/aro-hcp.env must provide the resource group}"
 
+# Record a numeric timer for an additional node pool in cluster metadata.
 record_nodepool_timer() {
   local nodepool="$1"
   local key="$2"
@@ -45,7 +46,7 @@ export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-nodepool"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
 
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal--dot--json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing; cannot authenticate for node-pool creation." >&2
   exit 1
@@ -102,6 +103,7 @@ MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${EXISTING_NODEPOOL_CHANNEL_GROUP:-${CLUST
 : "${MP_OPENSHIFT_VERSION:?No existing node-pool version was found; set MP_OPENSHIFT_VERSION explicitly to an X.Y.Z version}"
 echo "Using node pool version ${MP_OPENSHIFT_VERSION} and channel group ${MP_CHANNEL_GROUP}."
 
+# Convert a node-pool timeout value into seconds for polling.
 duration_to_seconds() {
   local value="$1"
   if [[ "${value}" =~ ^([0-9]+)s$ ]]; then
@@ -118,10 +120,12 @@ duration_to_seconds() {
   fi
 }
 
+# Normalize a comma- or space-separated zone list and remove duplicates.
 normalize_zones() {
   tr ', ' '\n' <<<"$1" | awk 'NF && !seen[$0]++' | sort -V
 }
 
+# Query Azure for zones where the requested VM SKU is available.
 discover_availability_zones() {
   local sku_json
   if ! sku_json=$(az vm list-skus \
@@ -142,6 +146,7 @@ discover_availability_zones() {
       .zones[]?] | unique | .[]' <<<"${sku_json}" | sort -V -u
 }
 
+# Select the configured or discovered zones for the additional node pool.
 select_availability_zones() {
   local candidates
   local -a candidates_array
@@ -178,6 +183,7 @@ select_availability_zones() {
   fi
 }
 
+# Build the node-pool name, adding a zone suffix for multi-AZ pools.
 nodepool_name_for_zone() {
   local zone="$1"
   if [[ "${MULTI_AZ:-false}" != "true" ]]; then
@@ -187,6 +193,7 @@ nodepool_name_for_zone() {
   fi
 }
 
+# Create one node pool, wait for the RP operation, and persist its timers.
 create_nodepool() {
   local nodepool_name="$1"
   local availability_zone="$2"
