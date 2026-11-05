@@ -111,6 +111,65 @@ configure_evpn_security_groups() {
   echo "EVPN security group rules configured"
 }
 
+# Allow routed CUDN traffic on all existing nodes' primary ENIs and both bastion
+# ENIs. Call after the worker-subnet ENI is attached. Nodes added later are not covered.
+disable_source_dest_checks() {
+  local node_provider_ids node_name provider_id instance_id eni_id source_dest_check attempt
+  local -a instance_ids=("${INSTANCE_ID}") eni_ids=("${WORKER_ENI_ID}")
+
+  node_provider_ids=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.providerID}{"\n"}{end}')
+  if [[ -z "${node_provider_ids}" ]]; then
+    echo "ERROR: No cluster nodes found" >&2
+    return 1
+  fi
+
+  while read -r node_name provider_id; do
+    if [[ "${provider_id}" != aws://*/i-* ]]; then
+      echo "ERROR: Node ${node_name} has an invalid AWS provider ID: ${provider_id}" >&2
+      return 1
+    fi
+    # The final component of an AWS provider ID is the EC2 instance ID.
+    instance_ids+=("${provider_id##*/}")
+  done <<< "${node_provider_ids}"
+
+  # Collect the nodes' and bastion's primary ENIs alongside the secondary ENI.
+  for instance_id in "${instance_ids[@]}"; do
+    eni_id=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+      --filters "Name=attachment.instance-id,Values=${instance_id}" "Name=attachment.device-index,Values=0" \
+      --query 'NetworkInterfaces[0].NetworkInterfaceId' --output text)
+    if [[ -z "${eni_id}" || "${eni_id}" == "None" ]]; then
+      echo "ERROR: No primary ENI found for instance ${instance_id}" >&2
+      return 1
+    fi
+    eni_ids+=("${eni_id}")
+  done
+
+  for eni_id in "${eni_ids[@]}"; do
+    echo "Disabling source/destination checking on ENI ${eni_id}"
+    aws --region "${REGION}" ec2 modify-network-interface-attribute \
+      --network-interface-id "${eni_id}" --no-source-dest-check
+    # EC2 reads can briefly return the old value after a successful update.
+    # Check immediately, then retry five times with 5-second waits (25s total
+    # waiting per ENI, plus API call time). API errors still fail immediately.
+    for attempt in {1..6}; do
+      source_dest_check=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+        --network-interface-ids "${eni_id}" \
+        --query 'NetworkInterfaces[0].SourceDestCheck' --output text)
+      if [[ "${source_dest_check,,}" == "false" ]]; then
+        break
+      fi
+      if (( attempt < 6 )); then
+        sleep 5
+      fi
+    done
+    if [[ "${source_dest_check,,}" != "false" ]]; then
+      echo "ERROR: Source/destination checking remains enabled or unknown on ${eni_id}: ${source_dest_check}" >&2
+      return 1
+    fi
+    echo "Verified ENI ${eni_id}: SourceDestCheck=${source_dest_check}"
+  done
+}
+
 echo "=== Provisioning AWS bastion instance ==="
 
 INFRA_ID=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
@@ -286,10 +345,6 @@ jq --arg id "${INSTANCE_ID}" --arg kn "${AWS_INSTANCE_NAME}" \
 aws --region "${REGION}" ec2 wait instance-running --instance-ids "${INSTANCE_ID}"
 echo "Instance is running"
 
-# Disable source/dest check (needed for VXLAN)
-aws --region "${REGION}" ec2 modify-instance-attribute \
-  --instance-id "${INSTANCE_ID}" --no-source-dest-check
-
 # Attach a secondary ENI in the worker subnet for EVPN underlay traffic.
 echo "Creating worker-subnet ENI for EVPN..."
 WORKER_ENI_ID=$(aws --region "${REGION}" ec2 create-network-interface \
@@ -325,6 +380,9 @@ if [[ "${WORKER_ENI_ATTACHED}" != "true" ]]; then
   echo "ERROR: Worker ENI ${WORKER_ENI_ID} did not reach attached state after 60s" >&2
   exit 1
 fi
+
+# All required ENIs now exist; configure and verify them together.
+disable_source_dest_checks
 
 PRIVATE_IP=$(aws --region "${REGION}" ec2 describe-network-interfaces \
   --network-interface-ids "${WORKER_ENI_ID}" \
