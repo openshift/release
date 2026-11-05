@@ -103,7 +103,21 @@ ssh -o ServerAliveInterval=60 \
   -i "${PROJECT_DIR}/temp_ssh_key" "cd ${REMOTE_DIR}; ./eco-gotests-ptp-gm-run.sh || true"
 
 echo "Collect artifacts from bastion"
-PTP_CYCLE_COUNT=$(python3 -c "import json; print(len(json.loads('${PTP_CYCLE_CONFIGS:-[]}')))" 2>/dev/null || echo 0)
+PTP_CYCLE_COUNT=$(PTP_CYCLE_CONFIGS="${PTP_CYCLE_CONFIGS:-[]}" python3 - <<'PY'
+import json
+import os
+import sys
+
+try:
+    configs = json.loads(os.environ["PTP_CYCLE_CONFIGS"])
+    if not isinstance(configs, list):
+        raise TypeError("expected a JSON array")
+    print(len(configs))
+except (json.JSONDecodeError, TypeError) as exc:
+    print(f"WARNING: failed to parse PTP_CYCLE_CONFIGS as JSON: {exc}", file=sys.stderr)
+    print(0)
+PY
+)
 ECO_GOTESTS_ARTIFACT_FEATURES="containernshide_0 powermanagement_0 deploymenttypes_0"
 for i in $(seq 0 "${PTP_CYCLE_COUNT}"); do
   ECO_GOTESTS_ARTIFACT_FEATURES+=" ptp_gm_${i}"
