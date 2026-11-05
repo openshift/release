@@ -9,6 +9,10 @@ unset GOFLAGS
 
 pip install azure-cli
 
+git remote add Jakob-Naucke https://github.com/Jakob-Naucke/trusted-cluster-operator
+git fetch Jakob-Naucke
+git checkout no-default-images
+
 AZURE_SUBSCRIPTION_ID=$(cat /tmp/secrets/azure/subscription-id)
 TEST_IMAGE=$(cat /tmp/secrets/azure/test-image)
 TEST_NAMESPACE_PREFIX="ci-${PULL_NUMBER:+${PULL_NUMBER}-}$(uuidgen | cut -d- -f1)-"
