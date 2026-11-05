@@ -71,8 +71,8 @@ done
 [[ "${quayFound}" == "false" ]] && : "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}"
 
 # ── SKIP_POLICIES handling ──────────────────────────────────────────
-# SKIP_POLICIES: comma-separated policy names to exclude from the
-# compliance wait.  Empty (default) means wait for ALL policies.
+# SKIP_POLICIES: comma- or newline-separated policy names to exclude
+# from the compliance wait.  Empty (default) means wait for ALL policies.
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
@@ -80,7 +80,17 @@ if [[ -n "${SKIP_POLICIES:-}" ]]; then
   # with one summary warning.  No rejection: warn-only semantics preserved.
   typeset -a _rawSkipArr=()
   typeset _seenSkips='|'
-  IFS=',' read -ra _rawSkipArr <<< "${SKIP_POLICIES}"
+  # `read` is line-oriented: splitting the whole value at once would keep
+  # only the first line and silently drop every entry after the first
+  # newline — those policies would then be neither normalized nor given a
+  # JUnit row, and would still be waited on.  Split per line instead, so
+  # newline and comma are equivalent separators.
+  typeset _skipLine=''
+  while IFS= read -r _skipLine; do
+    typeset -a _lineSkipArr=()
+    IFS=',' read -ra _lineSkipArr <<< "${_skipLine}" || true
+    _rawSkipArr+=(${_lineSkipArr[@]+"${_lineSkipArr[@]}"})
+  done <<< "${SKIP_POLICIES}"
   typeset -a _droppedArr=()
   for _p in "${_rawSkipArr[@]}"; do
     _p="${_p//[[:space:]]/}"
