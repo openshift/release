@@ -448,8 +448,10 @@ PATCH_EOF
 #     dataplane tracing: send x-request-id (OCP Istio omits it on the response)
 #       and force the tracing client through Gateway LB IP + Host header
 #       (*.apps ingress returns 200/401/429 but wasm-shim spans never hit Jaeger;
-#       rhcl-mc2 12/12 used the LB). wasm-shim:s390x-be-fix is already on the
-#       operator. Do not restore static empty-header GET /get.
+#       rhcl-mc2 12/12 used the LB). Keep stock Jaeger service kuadrant-filter
+#       (do not rewrite to wasm-shim: job 2118206636085481472 listed
+#       kuadrant-filter, not wasm-shim). wasm-shim:s390x-be-fix is already on
+#       the operator. Do not restore static empty-header GET /get.
 #     GatewayClass: prefer istio over openshift-default (OCP 4.22 always has
 #       openshift-default; upstream picks it and leaves TRLP report + tracing
 #       on OpenShift's gateway controller instead of OSSM3).
@@ -1873,35 +1875,11 @@ if p.exists():
         print('egress-bk already present or no backend name')
 PY
 "
-CONTAINER_SCRIPT+="# s390x BE-safe wasm-shim (v0.15.0 / quay.io/mtahoor/wasm-shim:s390x-be-fix)
-# and RHCL 1.4.x both publish dataplane traces as Jaeger service wasm-shim.
-# Testsuite 80f962fc+ looks up kuadrant-filter. Always rewrite, including when
-# overlaying main — this wasm image does not export as kuadrant-filter.
-echo '=== Jaeger lookup kuadrant-filter -> wasm-shim ==='
-python3 - <<'PY' || true
-from pathlib import Path
-root = Path('testsuite/tests/singlecluster/tracing/data_plane_tracing')
-files = sorted(root.glob('*.py')) if root.is_dir() else []
-if not files:
-    files = [
-        Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py'),
-        Path('testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing_rate_limit_only.py'),
-    ]
-old, new = 'kuadrant-filter', 'wasm-shim'
-n = 0
-for p in files:
-    if not p.exists():
-        print('missing', p)
-        continue
-    t = p.read_text()
-    if old not in t:
-        print(p, ': no kuadrant-filter (already wasm-shim?)')
-        continue
-    p.write_text(t.replace(old, new))
-    print('patched', p, '-> wasm-shim')
-    n += 1
-print('jaeger service rename files', n)
-PY
+CONTAINER_SCRIPT+="# Dataplane tracing: keep stock testsuite Jaeger service kuadrant-filter.
+# Overlay of main already looks that up. Job 2118206636085481472 (Gateway LB +
+# wasm-shim:s390x-be-fix) listed kuadrant-filter in Jaeger and not wasm-shim;
+# rewriting to wasm-shim made all 12 tests query an empty service.
+echo '=== Jaeger lookup stays kuadrant-filter (no wasm-shim rewrite) ==='
 "
 CONTAINER_SCRIPT+="
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
