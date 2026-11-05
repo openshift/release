@@ -1,0 +1,23 @@
+ref:
+  as: quay-georep-deprovision-storage
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-deprovision-storage-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  best_effort: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  documentation: |-
+    Destroy the two S3 buckets created by quay-georep-provision-storage.
+    Reads ${SHARED_DIR}/terraform-georep-storage.tgz for Terraform state.
+    Skips cleanup if no state files exist (deploy step exited early).

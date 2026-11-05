@@ -1,0 +1,35 @@
+ref:
+  as: quay-georep-provision-cluster-b
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-provision-cluster-b-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  env:
+  - name: QUAY_GEOREP_REGION_SECONDARY
+    default: "us-west-2"
+    documentation: AWS region for the secondary IPI cluster.
+  - name: QUAY_GEOREP_CLUSTER_B_NODE_COUNT
+    default: "3"
+    documentation: Number of worker nodes for the secondary cluster.
+  - name: QUAY_GEOREP_BASE_DOMAIN
+    default: "quayqe.devcluster.openshift.com"
+    documentation: Base domain for the secondary cluster DNS zone.
+  documentation: |-
+    Provision a second IPI OCP cluster in the secondary region for Quay
+    geo-replication testing. Extracts openshift-install from the same
+    release payload as cluster A, creates an install-config for the
+    secondary region, and runs the installer. Writes
+    ${SHARED_DIR}/kubeconfig-cluster-b for subsequent steps and saves
+    the install state for quay-georep-deprovision-cluster-b to destroy.
