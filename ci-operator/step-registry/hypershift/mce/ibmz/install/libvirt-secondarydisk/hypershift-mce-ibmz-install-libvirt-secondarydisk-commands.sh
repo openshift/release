@@ -75,11 +75,68 @@ if [[ ${#additional_vm_names[@]} -gt 0 ]]; then
   echo "  Additional host pool: ${ADDITIONAL_POOL_NAME}"
 fi
 
-# attach_secondary_disk <virsh command> <pool> <vm>
+# Power-cycle a VM so that devices added to its persistent config take effect.
+# A guest reboot is not enough: it keeps the same QEMU process and old device set.
+# restart_vm <virsh command> <vm>
+function restart_vm () {
+  local virsh_cmd="$1"
+  local vm="$2"
+  local state
+
+  echo "Shutting down ${vm}..."
+  ${virsh_cmd} shutdown "${vm}" || true
+  for (( n=0; n<60; n++ )); do
+    state=$(${virsh_cmd} domstate "${vm}" 2>/dev/null || true)
+    [[ "${state}" == "shut off" ]] && break
+    sleep 5
+  done
+  if [[ "${state}" != "shut off" ]]; then
+    echo "WARNING: ${vm} did not shut down within 300s (state: ${state}); forcing power off."
+    ${virsh_cmd} destroy "${vm}"
+  fi
+
+  echo "Starting ${vm}..."
+  ${virsh_cmd} start "${vm}"
+}
+
+# Wait until the named OpenShift node reports Ready again after a restart.
+# wait_node_ready <vm>
+function wait_node_ready () {
+  local vm="$1"
+  local node_line
+
+  if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+    echo "WARNING: ${SHARED_DIR}/kubeconfig not found; not waiting for node ${vm} to become Ready."
+    return 0
+  fi
+
+  echo "Waiting for node ${vm} to become Ready..."
+  for (( n=0; n<60; n++ )); do
+    # Node names may carry a domain suffix (e.g. ".ci").
+    node_line=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get nodes --no-headers 2>/dev/null \
+      | grep -E "^${vm}(\.[a-zA-Z0-9.-]+)?[[:space:]]+" || true)
+    if [[ -n "${node_line}" ]] && awk '{print $2}' <<< "${node_line}" | grep -qx "Ready"; then
+      echo "Node ${vm} is Ready."
+      return 0
+    fi
+    sleep 15
+  done
+  echo "ERROR: node ${vm} did not become Ready within 15 minutes." >&2
+  return 1
+}
+
+# attach_secondary_disk <virsh command> <pool> <vm> [hot|cold]
+#   hot  (default): hot-plug into the running VM.  Used for the s390x guests,
+#        whose virtio disks sit on the CCW bus and have no PCI slots to run out of.
+#   cold: add to the persistent config only, then power-cycle the VM.  Used for the
+#        additional amd64/arm64 guests, which are PCIe machines.  Their domain XML
+#        has no spare pcie-root-port, so hot-plug fails with "No more available PCI
+#        slots"; libvirt adds the root ports it needs when the domain starts.
 function attach_secondary_disk () {
   local virsh_cmd="$1"
   local pool="$2"
   local vm="$3"
+  local plug_mode="${4:-hot}"
   local vol_name="${vm}-lvm-disk"
   local vol_path
 
@@ -109,16 +166,30 @@ function attach_secondary_disk () {
   # must not collide with existing devices.  The serial gives the disk a stable
   # /dev/disk/by-id/virtio-<serial> path inside the guest, because the guest
   # kernel names virtio disks in discovery order, not by the target name here.
-  echo "Attaching ${vol_name} to ${vm}..."
-  ${virsh_cmd} attach-disk "${vm}" \
-    "${vol_path}" \
-    "${SECONDARY_DISK_DEV}" \
-    --driver qemu \
-    --subdriver raw \
-    --targetbus virtio \
-    --serial "${SECONDARY_DISK_SERIAL}" \
-    --persistent \
-    --live
+  echo "Attaching ${vol_name} to ${vm} (${plug_mode}-plug)..."
+  if [[ "${plug_mode}" == "cold" ]]; then
+    # --config (not --persistent): on a running domain --persistent also hot-plugs.
+    ${virsh_cmd} attach-disk "${vm}" \
+      "${vol_path}" \
+      "${SECONDARY_DISK_DEV}" \
+      --driver qemu \
+      --subdriver raw \
+      --targetbus virtio \
+      --serial "${SECONDARY_DISK_SERIAL}" \
+      --config
+    restart_vm "${virsh_cmd}" "${vm}"
+    wait_node_ready "${vm}"
+  else
+    ${virsh_cmd} attach-disk "${vm}" \
+      "${vol_path}" \
+      "${SECONDARY_DISK_DEV}" \
+      --driver qemu \
+      --subdriver raw \
+      --targetbus virtio \
+      --serial "${SECONDARY_DISK_SERIAL}" \
+      --persistent \
+      --live
+  fi
 
   echo "Secondary disk attached successfully to ${vm}."
 }
@@ -128,7 +199,7 @@ for VM in ${vm_names[@]+"${vm_names[@]}"}; do
 done
 
 for VM in ${additional_vm_names[@]+"${additional_vm_names[@]}"}; do
-  attach_secondary_disk "${VIRSH_ADDITIONAL}" "${ADDITIONAL_POOL_NAME}" "${VM}"
+  attach_secondary_disk "${VIRSH_ADDITIONAL}" "${ADDITIONAL_POOL_NAME}" "${VM}" cold
 done
 
 echo "============================================================"
