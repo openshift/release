@@ -250,7 +250,7 @@ function show_results() {
 }
 
 # check_plugin_gate validates that every plugin OPCT actually executed
-# reports stat.status == "passed", reading the structured opct-report.json
+# reports stat.result == "passed", reading the structured opct-report.json
 # produced by 'opct report --save-to' -- the same data contract the OPCT
 # web UI consumes (internal/report/data.go ReportFileNameIndexJSON).
 #
@@ -258,13 +258,30 @@ function show_results() {
 # (internal/report/data.go populatePluginConformance skips absent plugins),
 # so its key set already reflects run-mode intent -- e.g. upgrade mode
 # omitting plugins 10/20/80 -- without a separate parse of the archive's
-# meta/info.json. .stat.status mirrors the raw Sonobuoy plugin status
-# (same source Sonobuoy's own results text output prints), as opposed to
-# .stat.result which OPCT overrides for display (e.g. forced to "---" for
-# the Replay plugin when filtered failures exist).
+# meta/info.json.
+#
+# Per OPCT maintainer direction (Slack thread G012C6LKVM2/p1793807889222619):
+# gate on the report API's .stat.result, not the raw Sonobuoy status.
+# .stat.status mirrors the Sonobuoy plugin status verbatim, while
+# .stat.result is the OPCT-computed verdict: internal/report/data.go
+# populatePluginConformance sets Result = "passed" when FilterFailures == 0,
+# i.e. after the known-failures/baseline/flake/replay filter pipeline has
+# excluded failures OPCT's rules consider acceptable. Gating on Result gives
+# CI that same tolerance instead of failing the job on every single test
+# failure. If Result itself is failing, the failure survived OPCT's rules
+# and the job must be red. If .stat.result is absent from an older report
+# shape, fall back to .stat.status (raw Sonobuoy verdict).
+#
+# Replay plugin exception: for 80-openshift-tests-replay, OPCT computes
+# Result = "---" when the replay itself observed filter-6 failures. The
+# replay suite re-runs known failures for debugging and may legitimately
+# contain permanent failures or bugs (per the data.go comment), so "---"
+# is accepted as a non-failure for that plugin only. An explicit "failed"
+# Result still fails the gate.
 #
 # Return values (contract):
-#   0 = all executed plugins report stat.status == "passed"
+#   0 = all executed plugins report stat.result == "passed"
+#       (Replay additionally accepts "---")
 #   1 = valid report parsed, but at least one plugin is non-passed
 #       (plugin failure)
 #   2 = report missing or malformed (processing problem)
@@ -308,7 +325,13 @@ function check_plugin_gate() {
     | if type != "object" then error("provider.plugins is not an object: \(type)") else . end
     | if length == 0 then error("provider.plugins is empty") else . end
     | to_entries
-    | map({name: .key, status: .value.stat.status})
+    | map({
+        name: .key,
+        status: .value.stat.status,
+        # OPCT-computed verdict; fall back to raw Sonobuoy status when the
+        # report shape predates the result field.
+        result: (.value.stat.result // .value.stat.status)
+      })
   ' "${report_json}" 2>&1) || {
     plugin_gate_reason="failed to parse ${report_json}: ${plugins_json}"
     show_msg "ERROR: ${plugin_gate_reason}"
@@ -319,20 +342,27 @@ function check_plugin_gate() {
   total=$(echo "${plugins_json}" | jq 'length')
   show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
 
+  # A plugin passes the gate when its OPCT-computed result is "passed".
+  # The Replay plugin additionally accepts "---" (see function comment).
   local failed_json
-  failed_json=$(echo "${plugins_json}" | jq -c '[.[] | select(.status != "passed")]')
+  failed_json=$(echo "${plugins_json}" | jq -c '
+    [.[] | select(
+      .result != "passed"
+      and (( .name == "80-openshift-tests-replay" and .result == "---" ) | not)
+    )]
+  ')
   local failed_count
   failed_count=$(echo "${failed_json}" | jq 'length')
 
   if [[ ${failed_count} -ne 0 ]]; then
     plugin_gate_reason=$(echo "${failed_json}" | jq -r '
-      [.[] | "plugin \u0027\(.name)\u0027 status: \(.status) (expected passed)"] | join("; ")
+      [.[] | "plugin \u0027\(.name)\u0027 result: \(.result) (sonobuoy status: \(.status), expected passed)"] | join("; ")
     ')
     show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
     return 1
   fi
 
-  show_msg "Plugin gate passed: all ${total} executed plugin(s) report stat.status: passed"
+  show_msg "Plugin gate passed: all ${total} executed plugin(s) report stat.result: passed (Replay also accepts '---')"
   return 0
 }
 
