@@ -46,11 +46,6 @@ images:
     - arm64
     dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
-  - dockerfile_literal: |
-      FROM base
-      RUN dnf install -y python3-pip
-    from: src
-    to: custom-verify-src
   - additional_architectures:
     - arm64
     dockerfile_literal: |
@@ -61,7 +56,6 @@ images:
 promotion:
   to:
   - excluded_images:
-    - custom-verify-src
     - hypershift-cli
     - hypershift-operator
     - hypershift-tests
@@ -133,6 +127,13 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  lint:
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+    requests:
+      cpu: 4000m
+      memory: 16Gi
   unit:
     limits:
       cpu: 4000m
@@ -148,12 +149,19 @@ resources:
       cpu: 4000m
       memory: 16Gi
 tests:
+- as: lint
+  capabilities:
+  - arm64
+  commands: make lint
+  container:
+    from: src
+  timeout: 1h30m0s
 - as: verify
   capabilities:
   - arm64
-  commands: make verify-ci
+  commands: make verify-repository
   container:
-    from: custom-verify-src
+    from: src
   timeout: 1h30m0s
 - as: unit
   capabilities:
