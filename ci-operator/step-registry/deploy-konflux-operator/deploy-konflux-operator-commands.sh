@@ -66,8 +66,7 @@ function create_stage_registry_auth() {
     fi
 
     jq -e -c '
-        if .url != "https://registry.stage.redhat.io"
-            or (.user | type) != "string" or .user == ""
+        if (.user | type) != "string" or .user == ""
             or (.password | type) != "string" or .password == ""
         then error("Invalid stage registry credentials")
         else {auths: {"registry.stage.redhat.io": {auth: ((.user + ":" + .password) | @base64)}}}
