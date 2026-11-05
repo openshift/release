@@ -84,9 +84,9 @@ sanitize_name() {
 if [[ -n "${ARO_HCP_CLUSTER_NAME:-}" ]]; then
   CLUSTER_NAME=$(sanitize_name "${ARO_HCP_CLUSTER_NAME}")
 else
-  # Generate a compact 10-character name: aro-h-<4 random characters>.
+  # Match the ROSA HCP CI naming shape: ci-aro-h-<4 random characters>.
   CLUSTER_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
-  CLUSTER_NAME="aro-h-${CLUSTER_SUFFIX}"
+  CLUSTER_NAME="ci-aro-h-${CLUSTER_SUFFIX}"
 fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 # Keep the standard CI cluster identity artifact available to shared steps.
