@@ -98,15 +98,17 @@ dataset remain harness-owned. In case mode, `execution.max_budget_usd` limits
 each case invocation, not total CI spend or judge/orchestrator calls.
 `CLAUDE_MODEL` chooses the outer orchestrator model.
 
-The manifest runner pins `agent-eval-harness` at release tag
-`v1.61.5` ([releases](https://github.com/fullsend-ai/agent-eval-harness/releases)).
-It fetches exactly that tag, verifies the checkout resolves to the tag's commit,
-and uses that checkout for configuration resolution, the Claude plugin, and
-regression scoring. The resolved commit SHA is recorded in
-`runner/harness-install.log`, so a run stays traceable to an exact commit even
-if the tag is later moved. Bumping the pin is a deliberate release change:
-update `HARNESS_REVISION` in `hack/claude-agent-eval/eval_config.py` and
-regenerate the bundle with `sync_commands.py`. The runner resolves
+The manifest runner resolves `agent-eval-harness` at job start: the latest
+published release from the public GitHub `releases/latest` API — never the
+moving `main` branch, which may be broken mid-development. The API call uses
+the mounted `GITHUB_TOKEN` when present, only to lift unauthenticated rate
+limits. `EVAL_HARNESS_REVISION` overrides the resolution with an exact release
+tag or full commit SHA, e.g. to bisect a harness regression; unset means
+latest. The runner fetches exactly the resolved revision, verifies the
+checkout is that revision's commit, and uses that checkout for configuration
+resolution, the Claude plugin, and regression scoring. The resolved revision
+and its commit SHA are recorded in `runner/harness-install.log`, so every run
+stays traceable to an exact commit. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 harness's rules. Resolution happens once, at preflight; the orchestrator runs
@@ -315,13 +317,14 @@ image currently uses Python 3.14 and unpinned pylint; older local versions
 may miss checks enforced by CI.
 
 The offline suite uses a fake harness API. Separately, run the contract suite
-against the exact pinned checkout to verify overlays with the real parser:
+against a real harness release checkout to verify overlays with the real
+parser:
 
 ```bash
 python3 hack/claude-agent-eval/real_harness_contract.py --harness-checkout /path/to/agent-eval-harness
 ```
 
 Run the contract suite with Python 3.11+ and the harness's core dependencies
-(PyYAML, Jinja2, and truststore). It checks the checkout is exactly the pinned
-release tag and makes no API/model calls. The default offline suite does not
-fetch the harness.
+(PyYAML, Jinja2, and truststore). It checks the checkout sits exactly at a
+release tag (or at `EVAL_HARNESS_REVISION` when set) and makes no API/model
+calls. The default offline suite does not fetch the harness.

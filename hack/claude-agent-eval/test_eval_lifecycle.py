@@ -231,8 +231,8 @@ class HarnessPreparationTests(support.Fixture):
                 self.assertEqual(self.junit().attrib["failures"], "1")
                 install_log = (self.artifacts / "runner/harness-install.log").read_text()
                 self.assertIn(expected, install_log)
-                if "PINNED_HEAD" in overrides:  # the mismatch must name the tag and both revisions
-                    self.assertIn(f"tag {config_bridge.HARNESS_REVISION}", install_log)
+                if "PINNED_HEAD" in overrides:  # the mismatch must name the revision and both revisions
+                    self.assertIn(f"{self.env['EVAL_HARNESS_REVISION']} resolves to", install_log)
                     self.assertIn(overrides["PINNED_HEAD"], install_log)
 
 

@@ -5,6 +5,7 @@ import argparse
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,8 @@ from unittest import mock
 
 import yaml
 
-from eval_config import EvalError, HARNESS_REVISION, resolve_config  # pylint: disable=import-error
+from eval_config import (EvalError, REVISION_OVERRIDE, expected_commit_ref,  # pylint: disable=import-error
+                         resolve_config, validate_harness_revision)
 from eval_plan import artifact_name  # pylint: disable=import-error
 import eval_regression  # pylint: disable=import-error
 
@@ -216,16 +218,28 @@ class RealHarnessContractTests(unittest.TestCase):
 
 
 def checked_harness(path):
-    result = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", f"refs/tags/{HARNESS_REVISION}^{{commit}}", "HEAD"],
-        check=False, capture_output=True, text=True, timeout=10,
-    )
-    lines = result.stdout.split()
-    if result.returncode or len(lines) != 2:
-        detail = result.stderr.strip() or result.stdout.strip() or "<no output>"
-        raise ValueError(f"cannot resolve tag {HARNESS_REVISION} in {path}: {detail}")
-    if lines[0] != lines[1]:
-        raise ValueError(f"expected harness at tag {HARNESS_REVISION} ({lines[0]}), got {lines[1]}")
+    """Require an exact harness revision: the override pin, or any release tag."""
+    revision = os.environ.get(REVISION_OVERRIDE, "").strip()
+    if revision:
+        revision = validate_harness_revision(revision)
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", expected_commit_ref(revision), "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        lines = result.stdout.split()
+        if result.returncode or len(lines) != 2:
+            detail = result.stderr.strip() or result.stdout.strip() or "<no output>"
+            raise ValueError(f"cannot resolve {revision} in {path}: {detail}")
+        if lines[0] != lines[1]:
+            raise ValueError(f"expected harness at {revision} ({lines[0]}), got {lines[1]}")
+    else:
+        described = subprocess.run(
+            ["git", "-C", str(path), "describe", "--tags", "--exact-match", "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        if described.returncode or not described.stdout.strip():
+            raise ValueError(f"{path} is not checked out at an exact release tag; "
+                             "pass a tag or commit checkout, not a moving branch")
     if not (path / "agent_eval/config.py").is_file():
         raise ValueError(f"{path} does not contain agent_eval/config.py")
     return path
