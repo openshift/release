@@ -87,6 +87,10 @@ else
   CLUSTER_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
   CLUSTER_NAME="ci-aro-h-${CLUSTER_SUFFIX}"
 fi
+if (( ${#CLUSTER_NAME} > 15 )); then
+  echo "${CLUSTER_NAME} is too long for the ARO HCP ExternalAuth resource name; use 15 characters or fewer." >&2
+  exit 1
+fi
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 # Keep the standard CI cluster identity artifact available to shared steps.
 # ARO HCP uses the resource name as its cluster identifier.
@@ -778,15 +782,14 @@ az aro hcp cluster request-credential \
   --name "${CLUSTER_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
   --file "${SHARED_DIR}/kubeconfig" \
+  --overwrite-existing \
   --only-show-errors
 chmod 600 "${SHARED_DIR}/kubeconfig"
 cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig"
 chmod 600 "${SHARED_DIR}/nested_kubeconfig"
 
-if command -v oc >/dev/null 2>&1; then
-  log_step "Verifying guest cluster access with oc."
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get clusterversion --request-timeout=60s
-fi
+log_step "Verifying guest cluster access with oc."
+KUBECONFIG="${SHARED_DIR}/kubeconfig" oc get clusterversion --request-timeout=60s
 
 write_state
 log_step "ARO HCP cluster ${CLUSTER_NAME} and worker node pools ${NODEPOOL_NAMES} are ready."
