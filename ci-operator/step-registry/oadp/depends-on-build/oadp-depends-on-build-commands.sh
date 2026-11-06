@@ -143,7 +143,10 @@ fi
 # empty (and, under errexit+pipefail, failing the step via the grep no-match
 # exit code) even on a successful fetch.
 PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
-PR_BODY_ESCAPED="${PR_BODY_ESCAPED#\"body\": *\"}"
+# sed, not a bash glob strip: the glob's ' *' means one literal space plus
+# wildcard, so it would miss a zero-space compact payload that the regex
+# above does match -- same regex semantics on both sides.
+PR_BODY_ESCAPED=$(printf '%s' "${PR_BODY_ESCAPED}" | sed -E 's/^"body": *"//')
 PR_BODY_ESCAPED="${PR_BODY_ESCAPED%\"}"
 DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
 
