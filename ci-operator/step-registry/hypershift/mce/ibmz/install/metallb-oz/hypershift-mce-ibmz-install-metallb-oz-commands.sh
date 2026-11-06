@@ -4,12 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Allow callers to redirect oc commands to a different cluster by setting
-# INSTALL_KUBECONFIG. Empty = use ci-operator default.
-if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
-  export KUBECONFIG="${INSTALL_KUBECONFIG}"
-fi
-
 # ── Merge abi-pull-secret into the cluster pull secret ───────────────────────
 # The abi-pull-secret contains credentials for registry.redhat.io and
 # brew.registry.redhat.io which OLM catalog pods need to pull index images.
@@ -211,6 +205,9 @@ POOL_START="${METALLB_POOL_HOST_START:-53}"
 POOL_END="${METALLB_POOL_HOST_END:-54}"
 if [[ -n "${METALLB_MGMT_IPS:-}" ]]; then
   IP_POOL="${METALLB_MGMT_IPS}"
+elif [[ -f "${SHARED_DIR}/METALLB_MGMT_IPS" ]]; then
+  IP_POOL="$(cat "${SHARED_DIR}/METALLB_MGMT_IPS")"
+  echo "  Loaded IP pool from SHARED_DIR: ${IP_POOL}"
 else
   # Auto-detect the IP subnet from the first node's INTERNAL-IP reported by
   # 'oc get no -o wide', then pick the matching pool range.
