@@ -65,9 +65,9 @@ log "  source: ${CPO_SRC_IMAGE}"
 log "  destination: ${DEST}"
 oc image mirror --registry-config="${REGISTRY_AUTH_FILE}" "${CPO_SRC_IMAGE}" "${DEST}"
 
-# Record an immutable digest pullspec and verify it with the Quay credential. The repository is
-# private; rosa-operator-override-cpo-image adds the same credential to the HostedCluster pull
-# secret before applying the image annotation.
+# Record an immutable digest pullspec and verify it with the Quay credential. The destination
+# repository must remain publicly readable so HyperShift and the control-plane pods can access the
+# image without modifying the cluster pull secret.
 DIGEST=$(oc image info --registry-config="${REGISTRY_AUTH_FILE}" -o json "${DEST}" | jq -r '.digest // empty')
 if [[ -z "${DIGEST}" ]]; then
   log "ERROR: Failed to resolve the mirrored CPO image digest"
