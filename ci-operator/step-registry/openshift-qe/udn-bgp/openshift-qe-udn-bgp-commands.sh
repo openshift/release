@@ -166,7 +166,7 @@ collect_icmp_diagnostics() {
     > "${diagnostics_dir}/events.txt"
 
   while read -r pod; do
-    oc describe pod -n udn-bgp-icmp-capture "${pod}" \
+    oc describe "${pod}" -n udn-bgp-icmp-capture \
       >> "${diagnostics_dir}/pods-described.txt"
     oc logs -n udn-bgp-icmp-capture "${pod}" \
       > "${diagnostics_dir}/${pod##*/}.log" 2>&1 || true
@@ -256,7 +256,7 @@ spec:
             exit 1
           fi
           echo "Capturing ICMP on ${NODE_NAME} interface ${iface}"
-          tcpdump -i "${iface}" -nn -s 256 -W 4 -C 10 \
+          tcpdump -i "${iface}" -nn -s 256 -Z root -W 4 -C 10 \
             -w "/captures/${NODE_NAME}-${iface}.pcap" \
             "${TCPDUMP_FILTER}" &
           tcpdump_pid=$!
