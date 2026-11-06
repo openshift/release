@@ -94,7 +94,8 @@ fetch_pr_json() {
     # builds images in, whose NAT egress is a different IP than the build
     # farm's. Best effort -- an unpullable image or equally blocked egress
     # just falls through to the no-op path below.
-    local POD="depends-on-fetch-$(date +%s)"
+    local POD
+    POD="depends-on-fetch-$(date +%s)"
     timeout 150 oc run --rm -i --restart=Never --image=curlimages/curl "${POD}" -n "${OO_INSTALL_NAMESPACE}" -- \
         curl -sf "${CURL_HEADERS[@]}" "${PR_API_URL}" > /tmp/depends-on-pr.json 2>/tmp/depends-on-curl.err
 }
