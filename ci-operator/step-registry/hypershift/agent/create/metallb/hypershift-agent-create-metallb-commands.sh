@@ -91,6 +91,13 @@ EOF
 
 echo "Configure IPAddressPool in different network environments separately."
 if [[ $IP_STACK == "v4" ]]; then
+  if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+    set +x
+    METALLB_INGRESS_VIP=$(source "${SHARED_DIR}/nutanix_context.sh" && printf '%s' "${INGRESS_VIP:?}")
+    set -x
+  else
+    METALLB_INGRESS_VIP=192.168.111.30
+  fi
   oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -100,7 +107,7 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
+  - ${METALLB_INGRESS_VIP}-${METALLB_INGRESS_VIP}
 EOF
 elif [[ $IP_STACK == "v4v6" ]]; then
   oc create -f - <<EOF
@@ -166,6 +173,13 @@ spec:
     ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
   type: LoadBalancer
 EOF
+
+# The Nutanix flow verifies the VIP and the run-owned tunnel in the next step.
+# Waiting for the ClusterVersion here can deadlock while the ingress canary
+# cannot yet reach the newly allocated VIP.
+if [[ -f "${SHARED_DIR}/nutanix_ingress_tunnel_state.json" ]]; then
+  exit 0
+fi
 
 echo "Wait HostedCluster ready..."
 until \
