@@ -41,6 +41,14 @@ spec:
         severity: warning
       annotations:
         message: Argo CD reported one or more failed application sync operations in the last 30 minutes.
+    - alert: ArgoCDApplicationOutOfSync
+      expr: max by (name, project, dest_server, namespace) (argocd_app_info{namespace="openshift-gitops",sync_status="OutOfSync"}) == 1
+      for: 1m
+      labels:
+        severity: warning
+        cluster: core-ci
+      annotations:
+        message: 'Argo CD Application {{ $labels.name }} (project {{ $labels.project }}, dest {{ $labels.dest_server }}) is OutOfSync on core-ci. Triage: docs/dptp-triage-sop/argocd-application-outofsync.md'
     - alert: ArgoCDApplicationNotSyncedOrHealthy
       expr: |
         sum(
