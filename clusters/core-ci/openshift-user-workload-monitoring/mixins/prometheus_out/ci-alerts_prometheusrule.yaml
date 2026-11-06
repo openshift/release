@@ -84,7 +84,7 @@ spec:
       expr: |
         absent(up{job="ghproxy"} == 1)
       for: 10m
-      keep_firing_for: 10m
+      keep_firing_for: 1h
       labels:
         severity: critical
     - alert: prow-controller-manager-Singleton-Down
@@ -177,26 +177,45 @@ spec:
         message: ci-tools postsubmit {{ $labels.job_name }} has failures. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
         ops_category: ci_platform
         ops_color: orange
-      expr: |
+      expr: |-
         (
-          sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[24h]
-            )
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} offset 15m))
+            )[24h:5m]
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
-          > 0
+        )
         )
         unless on (job_name)
         (
-          sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
-            )
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"} offset 15m))
+            )[24h:5m]
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
-          > 0
         )
+        ) >= on (job_name) (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} offset 15m))
+            )[24h:5m]
+          )
+        )
+        )
+        )
+        )
+        * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
       for: 1m
       labels:
         severity: critical
@@ -205,26 +224,45 @@ spec:
         message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).
         ops_category: '{{ if match "^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$" $labels.job_name }}repo_automation{{ else if match "^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$" $labels.job_name }}cluster_fleet{{ else if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$|^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$" $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}'
         ops_color: '{{ if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$" $labels.job_name }}yellow{{ else }}orange{{ end }}'
-      expr: |
+      expr: |-
         (
-          sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="failure"}[13h]
-            )
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"} offset 15m))
+            )[13h:5m]
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
-          > 0
+        )
         )
         unless on (job_name)
         (
-          sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="success"}[7h]
-            )
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"success"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"success"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"success"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"success"} offset 15m))
+            )[13h:5m]
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
-          > 0
         )
+        ) >= on (job_name) (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state=~"failure|error"} offset 15m))
+            )[13h:5m]
+          )
+        )
+        )
+        )
+        )
+        * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
       for: 1m
       labels:
         severity: critical
@@ -233,24 +271,109 @@ spec:
         message: plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>.
         ops_category: '{{ if match "^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$" $labels.job_name }}repo_automation{{ else if match "^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$" $labels.job_name }}cluster_fleet{{ else if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$|^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$" $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}'
         ops_color: '{{ if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$" $labels.job_name }}yellow{{ else }}orange{{ end }}'
+      expr: |-
+        (
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} offset 15m))
+            )[13h:5m]
+          )
+        )
+        )
+        unless on (job_name)
+        (
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"success"} offset 15m))
+            )[13h:5m]
+          )
+        )
+        ) >= on (job_name) (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state=~"failure|error"} offset 15m))
+            )[13h:5m]
+          )
+        )
+        )
+        )
+        )
+        * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
+      for: 1m
+      labels:
+        severity: critical
+    - alert: infrastructure-cleanup-job-failures
+      annotations:
+        message: Cleanup/cloud CI job {{ $labels.job_name }} is failing and has not succeeded recently. Investigate via <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> and follow the <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md|infrastructure-jobs SOP>.
+        ops_category: '{{ if match "^(periodic-prow-auto-config-brancher|periodic-branch-protector|periodic-branch-protector-openshift-org|periodic-org-sync|periodic-openshift-release-fast-forward|periodic-openshift-release-merge-blockers|periodic-openshift-release-private-org-sync)$" $labels.job_name }}repo_automation{{ else if match "^(branch-ci-.+-build[0-9]+-apply|periodic-build[0-9]+-upgrade|periodic-(hosted-mgmt2?|core-ci)-upgrade|periodic-etcd-defragger|periodic-hosted-mgmt2?-hypershift-deployment)$" $labels.job_name }}cluster_fleet{{ else if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$|^(periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted)$" $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}'
+        ops_color: '{{ if match "^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?)$" $labels.job_name }}yellow{{ else }}orange{{ end }}'
+      expr: |-
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"} offset 15m))
+            )[2d:5m]
+          )
+        )
+        )
+        unless on (job_name)
+        (
+        (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"success"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"success"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"success"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"success"} offset 15m))
+            )[2d:5m]
+          )
+        )
+        ) >= on (job_name) (
+        max by (job_name) (
+          max_over_time(
+            (
+              timestamp(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"})
+              and
+              (increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"}[10m]) > 0 or (prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"} > 0 unless prowjob_state_transitions{job="prow-controller-manager",job_name=~"^(periodic-ipi-deprovision-gcp(-[23])?|periodic-ipi-deprovision-aws|periodic-ci-openshift-release-main-deprovision-deprovision-aws(-[2-5])?|periodic-hypershift-deprovision-aws-konflux-(prod|stg)-hosted-mgmt2?|periodic-ci-openshift-release-main-hypershift-4[.](19|20|21)-periodic-ci-openshift-hypershift-hosted|periodic-openshift-release-qci-pruner)$",state=~"failure|error"} offset 15m))
+            )[2d:5m]
+          )
+        )
+        )
+        )
+      for: 1m
+      labels:
+        severity: critical
+    - alert: ci-tools-image-build-failures
+      annotations:
+        message: No successful ci-tools image postsubmit {{ $labels.job_name }} build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.
+        ops_category: ci_platform
+        ops_color: orange
       expr: |
         (
           sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[13h]
-            )
+            increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[6h])
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
           > 0
         )
         unless on (job_name)
         (
           sum by (job_name) (
-            increase(
-              prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[7h]
-            )
+            increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state="success"}[6h])
           )
-          * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
           > 0
         )
       for: 1m
@@ -367,8 +490,8 @@ spec:
         ops_color: orange
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
-      for: 1m
-      keep_firing_for: 3m
+      for: 2m
+      keep_firing_for: 15m
       labels:
         severity: critical
     - alert: ProbeFailing-Lenient
@@ -379,7 +502,7 @@ spec:
       expr: |
         up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
       for: 5m
-      keep_firing_for: 3m
+      keep_firing_for: 15m
       labels:
         severity: critical
   - name: openshift-priv-image-building-jobs-failing
@@ -695,19 +818,19 @@ spec:
         severity: critical
     - alert: TriggeredProwJobsPileup
       annotations:
-        message: Triggered prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
+        message: Triggered prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.
         ops_category: ci_platform
         ops_color: orange
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak
-      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
+      expr: min_over_time((sum(prowjobs{job="prow-controller-manager", state="triggered"}))[5m:]) > 450
       keep_firing_for: 10m
       labels:
         severity: critical
     - alert: SchedulingProwJobsPileup
       annotations:
-        message: Scheduling prowjobs peaked above the configured threshold in the last 5 minutes (peak={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
+        message: Scheduling prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low={{ $value }}). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.
         runbook_url: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak
-      expr: max_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
+      expr: min_over_time((sum(prowjobs{job="prow-controller-manager", state="scheduling"}))[5m:]) > 300
       keep_firing_for: 10m
       labels:
         severity: warning

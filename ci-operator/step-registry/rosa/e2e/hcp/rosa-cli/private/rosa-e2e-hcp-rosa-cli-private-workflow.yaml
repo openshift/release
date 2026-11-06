@@ -4,6 +4,7 @@ workflow:
     env:
       CHANNEL_GROUP: stable
       REPLICAS: "3"
+      PLATFORM_LABEL_FILTER: "Area:ManagementPlane && !Access:PublicAPI"
     pre:
       - chain: rosa-e2e-hcp-rosa-cli-private-provision
       - ref: rosa-cluster-wait-ready-hosted-cp
@@ -49,6 +50,10 @@ workflow:
     the backplane kubeconfig) followed by rosa-e2e-validate-platform (management
     and service clusters). Either head (OCM SDK, terraform-provider-rhcs) can be
     swapped in front of the same tail.
+
+    Platform-plane validation retains management-plane coverage but excludes
+    tests requiring public API reachability. Customer-plane selection is unchanged
+    and continues to validate the private guest cluster through backplane access.
 
     The platform plane requires corp-network reachability: run this workflow only
     where backplane is reachable (capabilities: [intranet],

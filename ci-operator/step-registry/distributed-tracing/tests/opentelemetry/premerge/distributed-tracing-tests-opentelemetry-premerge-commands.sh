@@ -163,14 +163,17 @@ done
 # Returns once OLM rolled out the patched deployments: each must carry exactly one entry of every variable with
 # the requested value, and must be Available.
 function set_operator_env() {
-  local names='[]' entries='[]' pair csv_name patch deployment patched
+  local names='[]' entries='[]' pair csv_list csv_name patch deployment patched
   for pair in "$@"; do
     names=$(jq -c --arg n "${pair%%=*}" '. + [$n]' <<< "${names}")
     entries=$(jq -c --arg n "${pair%%=*}" --arg v "${pair#*=}" '. + [{"name": $n, "value": $v}]' <<< "${entries}")
   done
   echo "Setting the operator environment variables: $(jq -r 'map(.name) | join(" ")' <<< "${entries}")"
 
-  if ! csv_name=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name | grep -m1 "opentelemetry-operator" | cut -d/ -f2); then
+  # List the CSVs first: with pipefail, "grep -m1" closing the pipe early can fail "oc get" with SIGPIPE while the CSV exists.
+  csv_list=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name)
+  csv_name=$(grep -m1 "opentelemetry-operator" <<< "${csv_list}" | cut -d/ -f2 || true)
+  if [[ -z "${csv_name}" ]]; then
     echo "ERROR: no opentelemetry-operator CSV found in namespace ${OPERATOR_NAMESPACE}."
     exit 1
   fi

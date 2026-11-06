@@ -50,6 +50,22 @@ tests:
       OCM_LOGIN_ENV: staging
       REGION: us-west-2
     workflow: rosa-e2e-hcp-aws-vpc-cni
+- as: rosa-hcp-kms-e2e-staging
+  capabilities:
+  - intranet
+  cron: 0 16 * * 2
+  restrict_network_access: false
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: stable
+      CLUSTER_SECTOR: rosa-e2e
+      ENABLE_BILLING_ACCOUNT: "yes"
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: staging
+      REGION: us-west-2
+    workflow: rosa-e2e-hcp-kms
 - as: rosa-hcp-external-oidc-e2e-staging
   capabilities:
   - intranet
@@ -350,7 +366,7 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       FIPS: "true"
       HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
+      LABEL_FILTER: Platform:HCP || (Feature:FIPS && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.19"
       REGION: us-west-2
@@ -366,7 +382,7 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       FIPS: "true"
       HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
+      LABEL_FILTER: Platform:HCP || (Feature:FIPS && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.20"
       REGION: us-west-2
@@ -382,7 +398,7 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       FIPS: "true"
       HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
+      LABEL_FILTER: Platform:HCP || (Feature:FIPS && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.21"
       REGION: us-west-2
@@ -398,7 +414,7 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       FIPS: "true"
       HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
+      LABEL_FILTER: Platform:HCP || (Feature:FIPS && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
       REGION: us-west-2
@@ -414,7 +430,7 @@ tests:
       ENABLE_BILLING_ACCOUNT: "yes"
       FIPS: "true"
       HOSTED_CP: "true"
-      LABEL_FILTER: Platform:HCP
+      LABEL_FILTER: Platform:HCP || (Feature:FIPS && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "5.0"
       REGION: us-west-2
@@ -429,7 +445,7 @@ tests:
       CLUSTER_TOPOLOGY: classic
       FIPS: "true"
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic && !Access:MC
+      LABEL_FILTER: (Platform:Classic && !Access:MC) || (Feature:FIPS && !Platform:HCP)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.19"
       REPLICAS: "2"
@@ -444,7 +460,7 @@ tests:
       CLUSTER_TOPOLOGY: classic
       FIPS: "true"
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic && !Access:MC
+      LABEL_FILTER: (Platform:Classic && !Access:MC) || (Feature:FIPS && !Platform:HCP)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.20"
       REPLICAS: "2"
@@ -459,7 +475,7 @@ tests:
       CLUSTER_TOPOLOGY: classic
       FIPS: "true"
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic && !Access:MC
+      LABEL_FILTER: (Platform:Classic && !Access:MC) || (Feature:FIPS && !Platform:HCP)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.21"
       REPLICAS: "2"
@@ -474,7 +490,7 @@ tests:
       CLUSTER_TOPOLOGY: classic
       FIPS: "true"
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic && !Access:MC
+      LABEL_FILTER: (Platform:Classic && !Access:MC) || (Feature:FIPS && !Platform:HCP)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
       REPLICAS: "2"
@@ -489,7 +505,7 @@ tests:
       CLUSTER_TOPOLOGY: classic
       FIPS: "true"
       HOSTED_CP: "false"
-      LABEL_FILTER: Platform:Classic && !Access:MC
+      LABEL_FILTER: (Platform:Classic && !Access:MC) || (Feature:FIPS && !Platform:HCP)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "5.0"
       REPLICAS: "2"
@@ -516,7 +532,8 @@ tests:
       CHANNEL_GROUP: stable
       CLUSTER_TOPOLOGY: osd-gcp
       FIPS: "true"
-      LABEL_FILTER: Platform:OSD-GCP && !Access:MC
+      LABEL_FILTER: (Platform:OSD-GCP && !Access:MC) || (Feature:FIPS && !Platform:HCP
+        && !Platform:Classic)
       OCM_LOGIN_ENV: staging
       OPENSHIFT_VERSION: "4.22"
       REGION: us-east1

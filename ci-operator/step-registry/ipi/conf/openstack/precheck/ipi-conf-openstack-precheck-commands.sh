@@ -80,7 +80,18 @@ fi
 verify_name "$CLUSTER_NAME" "api" "${API_IPS[@]}"
 verify_name "$CLUSTER_NAME" "ingress.apps" "$INGRESS_IP"
 if [[ "${CONFIG_TYPE:-}" == *"externallb"* || -f "${SHARED_DIR}/LB_HOSTS" ]]; then
-    verify_name "$CLUSTER_NAME" "api-int" "${API_IP}"
+    # LB_PRIVATE_IPS (multi-LB machines-subnet IPs) when present; otherwise API VIP.
+    API_INT_IPS=()
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+        while IFS= read -r ip || [[ -n "${ip}" ]]; do
+            [[ -z "${ip}" ]] && continue
+            API_INT_IPS+=("${ip}")
+        done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+    fi
+    if [[ "${#API_INT_IPS[@]}" -eq 0 ]]; then
+        API_INT_IPS+=("${API_IP}")
+    fi
+    verify_name "$CLUSTER_NAME" "api-int" "${API_INT_IPS[@]}"
 fi
 
 if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then
