@@ -176,6 +176,22 @@ tests:
           cpu: "3"
           memory: 600Mi
       timeout: 4h0m0s
+    - as: nested-cluster-kubevirt-csi-tests
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/run-kubevirt-csi-tests.sh "${SHARED_DIR}/nested-cluster-kubeconfig"
+      from: tests
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: "3"
+          memory: 600Mi
+      timeout: 4h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift-cnv
