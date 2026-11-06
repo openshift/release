@@ -49,6 +49,29 @@ tests:
     from: podman-test
   nested_podman: true
   run_if_changed: ^(bundle\.Dockerfile$|Makefile$|config/|validators/)
+- as: kind-podman-smoke
+  optional: true
+  capabilities:
+  - nested-podman
+  commands: |
+    set -euo pipefail
+    KIND_VERSION=v0.30.0
+    curl -fsSL -o /tmp/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+    install -m 0755 /tmp/kind /usr/local/bin/kind
+    kind version
+    KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+    curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+    export KIND_EXPERIMENTAL_PROVIDER=podman
+    kind create cluster --wait 300s
+    kubectl get nodes -o wide
+  container:
+    from: podman-test
+  nested_podman: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: 8Gi
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
