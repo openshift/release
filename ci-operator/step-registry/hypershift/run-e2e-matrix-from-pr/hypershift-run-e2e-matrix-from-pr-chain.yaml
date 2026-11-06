@@ -1,0 +1,54 @@
+chain:
+  as: hypershift-run-e2e-matrix-from-pr
+  steps:
+  - as: tests
+    cli: latest
+    env:
+    - name: AWS_MULTI_ARCH
+      default: "false"
+      documentation: Must remain false for the AWS amd64 PR matrix.
+    - name: HYPERSHIFT_PLATFORM
+      default: aws
+      documentation: Platform selected by the PR matrix resolver.
+    commands: |-
+      set -euo pipefail
+      snapshot="${SHARED_DIR}/nodepool_release_images"
+      [[ -f "${snapshot}" ]] || { echo "Missing PR release snapshot" >&2; exit 1; }
+      mapfile -t exports < "${snapshot}"
+      digest='[a-f0-9]{64}'
+      ci_repository='(registry\.ci\.openshift\.org/ocp/release|quay-proxy\.ci\.openshift\.org/openshift/ci)'
+      stable_repository='quay\.io/openshift-release-dev/ocp-release'
+      [[ ${#exports[@]} == 3 &&
+          "${exports[0]}" =~ ^export\ RELEASE_IMAGE_LATEST=\'${ci_repository}@sha256:${digest}\'$ &&
+          "${exports[1]}" =~ ^export\ OCP_IMAGE_N1=\'${stable_repository}@sha256:${digest}\'$ &&
+          "${exports[2]}" == "${exports[1]/OCP_IMAGE_N1/E2E_PREVIOUS_RELEASE_IMAGE}" ]] || {
+          echo "Invalid or incomplete PR release snapshot" >&2; exit 1;
+      }
+      source "${snapshot}"
+      export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      export AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      export PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
+      if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
+          export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
+      fi
+      /hypershift/bin/run-tests
+    timeout: 150m
+    grace_period: 5m
+    from: hypershift-tests
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+    - name: "release:initial"
+      env: E2E_PREVIOUS_RELEASE_IMAGE
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      group: ops/hypershift-ci-jobs-awscreds
+      collection: hypershift-team
+    - mount_path: /etc/ci-pull-credentials
+      bundle: ci-pull-credentials
+      namespace: test-credentials

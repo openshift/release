@@ -1,0 +1,23 @@
+workflow:
+  as: hypershift-run-e2e-matrix
+  documentation: |-
+    Optional AWS amd64 PR release selection with one context and one selected
+    minor. Preserves the normal v2 management cluster and PR operator setup;
+    only guest/test release inputs use the PR body matrix. See README.md.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-write-test-plan
+    - ref: hypershift-resolve-pr-releases
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-run-e2e-matrix-from-pr
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: aws
+      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: alias/hypershift-ci
