@@ -10,6 +10,7 @@ managed_files:
     - quay-quay-master.yaml
     - quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp412-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
     - quay-quay-redhat-3.18__gcp-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__azure-ocp422-e2e-install.yaml
@@ -53,6 +54,8 @@ quay:
         clouds: [aws,gcp,azure]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
       # Bare metal runs the full dev-scripts + LVMS + Quay stack on a single
       # shared Equinix host (~2h end to end) and holds an ofcir lease for the
       # whole time; weekly keeps the pool pressure and host churn reasonable.
@@ -63,6 +66,8 @@ quay:
         clouds: [baremetal]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
       # Sibling of the daily row: same files, distinct as (e.g. aws-s3-rds-nightly).
       # Uses quay-database-intg-{aws-rds,azure-postgres} before deploy.
       - cron: weekly
@@ -70,13 +75,22 @@ quay:
         clouds: [aws,azure]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         database: true
       - cron: weekly
         source: nightly
         clouds: [aws]
         ocp: ["5.0"]
         test: e2e-install
-      # oldest OCP Quay 3.18 supports with an ART nightly FBC (v4.12/v4.13 have none)
+      # Oldest OCP Quay 3.18 supports with an ART nightly FBC.
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.12"]
+        test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.12-20261105220722254817.ocp4.12
       - cron: weekly
         source: nightly
         clouds: [aws]
@@ -87,24 +101,32 @@ quay:
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         arches: [arm64]
       - cron: weekly
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         fips: true
       - cron: 0 8 * * 2
         source: nightly
         clouds: [libvirt]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         arches: [s390x]
       - cron: daily
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         storage: odf
       # Operator-channel upgrade lane: install n-1 (stable-3.17), seed it, OLM-upgrade
       # to n (stable-3.18), then verify/functional Playwright phases. Runs on a
@@ -119,6 +141,8 @@ quay:
         clouds: [aws]
         ocp: ["4.22"]
         test: upgrade
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         upgrade_from: "3.17"
   - branch: redhat-3.17
     jobs:
@@ -127,6 +151,8 @@ quay:
         clouds: [aws,gcp,azure]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
       # Sibling of the daily row, matching the 3.18 database lane; Quay 3.17
       # supports PostgreSQL 17, so the steps' default version applies.
       - cron: weekly
@@ -134,24 +160,32 @@ quay:
         clouds: [aws,azure]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         database: true
       - cron: daily
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         storage: odf
       - cron: weekly
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         fips: true
       - cron: nightly
         source: nightly
         clouds: [aws]
         ocp: ["4.22"]
         test: upgrade
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.22-20261105215929015368.ocp4.22
         upgrade_from: "3.16"
   - branch: redhat-5.0
     jobs:
@@ -206,11 +240,15 @@ quay:
         clouds: [aws,gcp,azure]
         ocp: ["4.21"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.21-20261105220544927724.ocp4.21
       - cron: daily
         source: nightly
         clouds: [aws]
         ocp: ["4.21"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:quay-fbc-unified-4.21-20261105220544927724.ocp4.21
         storage: odf
   # Quay 3.15 and the EUS streams (3.9, 3.10, 3.12, 3.14) have no Playwright
   # coverage, so they run the quay-tests Cypress old-UI and REST API suites
