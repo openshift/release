@@ -31,8 +31,9 @@ FLEET_REPO=$(yq '.fleet.image.repository' "${CONFIG_FILE}")
 MGMT_AGENT_REPO=$(yq '.mgmtAgent.image.repository' "${CONFIG_FILE}")
 SWIFT_RECORDER_REPO=$(yq '.swiftRecorder.image.repository' "${CONFIG_FILE}")
 KUBE_APPLIER_REPO=$(yq '.kubeApplier.image.repository' "${CONFIG_FILE}")
+TOOLBOX_REPO=$(yq '.toolbox.image.repository' "${CONFIG_FILE}")
 echo "Target ACR: ${ACR_URL}"
-echo "Repos: backend=${BACKEND_REPO}, frontend=${FRONTEND_REPO}, admin-api=${ADMIN_API_REPO}, sessiongate=${SESSIONGATE_REPO}, exporter=${EXPORTER_REPO}, oc-mirror=${OC_MIRROR_REPO}, fleet=${FLEET_REPO}, mgmt-agent=${MGMT_AGENT_REPO}, swift-recorder=${SWIFT_RECORDER_REPO}, kube-applier=${KUBE_APPLIER_REPO}"
+echo "Repos: backend=${BACKEND_REPO}, frontend=${FRONTEND_REPO}, admin-api=${ADMIN_API_REPO}, sessiongate=${SESSIONGATE_REPO}, exporter=${EXPORTER_REPO}, oc-mirror=${OC_MIRROR_REPO}, fleet=${FLEET_REPO}, mgmt-agent=${MGMT_AGENT_REPO}, swift-recorder=${SWIFT_RECORDER_REPO}, kube-applier=${KUBE_APPLIER_REPO}, toolbox=${TOOLBOX_REPO}"
 
 # Authenticate to CI registry
 export XDG_RUNTIME_DIR="/tmp/run"
@@ -92,5 +93,8 @@ retry oc image mirror "${ARO_HCP_SWIFT_RECORDER}" "${ACR_URL}/${SWIFT_RECORDER_R
 
 echo "Pushing kube-applier: ${ARO_HCP_KUBE_APPLIER} -> ${ACR_URL}/${KUBE_APPLIER_REPO}:${IMAGE_TAG}"
 retry oc image mirror "${ARO_HCP_KUBE_APPLIER}" "${ACR_URL}/${KUBE_APPLIER_REPO}:${IMAGE_TAG}"
+
+echo "Pushing toolbox: ${ARO_HCP_TOOLBOX} -> ${ACR_URL}/${TOOLBOX_REPO}:${IMAGE_TAG}"
+retry oc image mirror "${ARO_HCP_TOOLBOX}" "${ACR_URL}/${TOOLBOX_REPO}:${IMAGE_TAG}"
 
 echo "All images pushed successfully."
