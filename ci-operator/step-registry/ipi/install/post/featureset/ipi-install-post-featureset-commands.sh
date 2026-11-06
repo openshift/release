@@ -30,26 +30,60 @@ function check_latest_machineconfig_applied() {
     fi
 }
 
-function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=60
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$((num*10))
-    while (( try < max_retries )); do
-        echo "Checking #${try}"
-        if ! check_latest_machineconfig_applied "${role}"; then
-            sleep ${interval}
-        else
-            break
+function wait_machineconfigs_applied() {
+    local role num start elapsed remaining role_remaining interval=60
+    local -A timeouts=()
+    local -a roles=(master worker)
+    for role in master worker; do
+        num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
+        if (( num == 0 )); then
+            echo >&2 "No ${role} nodes found; cannot wait for machineconfigs to be applied"
+            return 1
         fi
-        (( try += 1 ))
+        if [[ "${role}" == "master" ]]; then
+            # Feature adoption and sequential master drains can exceed 30 minutes.
+            timeouts[${role}]=$((num*900))
+        else
+            timeouts[${role}]=$((num*600))
+        fi
+        echo "Waiting up to ${timeouts[${role}]}s for ${role} machineconfigs to be applied"
     done
-    if (( try == max_retries )); then
-        echo >&2 "Timeout waiting for all $role machineconfigs are applied"
-        return 1
-    else
-        echo "All ${role} machineconfigs check PASSED"
-        return 0
+    # Observe the nearer deadline before another pool's API requests can delay it.
+    if (( timeouts[worker] < timeouts[master] )); then
+        roles=(worker master)
     fi
+    start=${SECONDS}
+    while true; do
+        for role in "${roles[@]}"; do
+            if [[ ! -v "timeouts[${role}]" ]]; then
+                continue
+            fi
+            elapsed=$((SECONDS-start))
+            echo "Checking ${role} machineconfigs after ${elapsed}s (${timeouts[${role}]}s budget)"
+            if (( SECONDS-start <= timeouts[${role}] )) && check_latest_machineconfig_applied "${role}"; then
+                echo "All ${role} machineconfigs check PASSED after $((SECONDS-start))s"
+                unset 'timeouts[${role}]'
+                continue
+            fi
+            role_remaining=$((timeouts[${role}]-(SECONDS-start)))
+            if (( role_remaining <= 0 )); then
+                echo >&2 "Timeout waiting for all $role machineconfigs to be applied after $((SECONDS-start))s (${timeouts[${role}]}s budget)"
+                return 1
+            fi
+        done
+        if (( ${#timeouts[@]} == 0 )); then
+            return 0
+        fi
+        remaining=${interval}
+        for role in "${!timeouts[@]}"; do
+            role_remaining=$((timeouts[${role}]-(SECONDS-start)))
+            if (( role_remaining < remaining )); then
+                remaining=${role_remaining}
+            fi
+        done
+        # Recompute after all requests; an expired pool needs an immediate check.
+        sleep "$((remaining > 0 ? remaining : 0))"
+    done
 }
 
 function wait_machineconfig_generated() {
@@ -93,5 +127,4 @@ wait_machineconfig_generated "${latest_mc_master_before}" "master"
 wait_machineconfig_generated "${latest_mc_worker_before}" "worker"
 
 echo "Make sure all machines are applied with latest machineconfig"
-wait_machineconfig_applied "master"
-wait_machineconfig_applied "worker"
+wait_machineconfigs_applied
