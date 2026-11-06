@@ -1,0 +1,26 @@
+ref:
+  as: openshift-e2e-aws-nested-virtualization
+  documentation: |-
+    Validate that AWS EC2 compute nodes have nested virtualization properly
+    enabled and configured. This step performs several validation checks:
+    1. Verifies AWS EC2 CpuOptions.NestedVirtualization is set to "enabled"
+    2. Checks CPU virtualization flags (vmx for Intel, svm for AMD) in /proc/cpuinfo
+    3. Confirms KVM kernel module is loaded and /dev/kvm device exists
+  from_image:
+    namespace: ocp
+    name: "5.0"
+    tag: upi-installer
+  commands: openshift-e2e-aws-nested-virtualization-commands.sh
+  timeout: 30m0s
+  grace_period: 10m
+  cli: latest
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: COMPUTE_NODE_REPLICAS
+    default: "3"
+    documentation: |-
+      Number of worker nodes. Used to determine which nodes to validate.
+      Set to 0 for compact/SNO clusters where masters run workloads.
