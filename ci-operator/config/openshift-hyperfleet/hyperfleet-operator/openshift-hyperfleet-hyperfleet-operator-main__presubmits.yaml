@@ -55,13 +55,17 @@ tests:
   - nested-podman
   commands: |
     set -euo pipefail
+    # Prow runs containers as a random UID: install to a writable dir, not /usr/local/bin
+    BIN_DIR=/tmp/bin
+    mkdir -p "${BIN_DIR}"
     KIND_VERSION=v0.30.0
-    curl -fsSL -o /tmp/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
-    install -m 0755 /tmp/kind /usr/local/bin/kind
-    kind version
+    curl -fsSL -o "${BIN_DIR}/kind" "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+    chmod 0755 "${BIN_DIR}/kind"
     KUBECTL_VERSION=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
-    curl -fsSL -o /tmp/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-    install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+    curl -fsSL -o "${BIN_DIR}/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+    chmod 0755 "${BIN_DIR}/kubectl"
+    export PATH="${BIN_DIR}:${PATH}"
+    kind version
     export KIND_EXPERIMENTAL_PROVIDER=podman
     kind create cluster --wait 300s
     kubectl get nodes -o wide
