@@ -602,57 +602,87 @@ worker_nodepool_name_for_zone() {
   fi
 }
 
-# Poll the Azure RP until one worker node pool reaches a terminal state.
-wait_for_nodepool() {
-  local nodepool_name="$1"
-  local nodepool_install_start="$2"
+# Poll all worker node pools in one loop after their create requests have been
+# submitted. This keeps multi-AZ provisioning concurrent while preserving
+# per-nodepool state and timing metadata without concurrent JSON file writes.
+wait_for_nodepools() {
   local timeout_seconds
   timeout_seconds=$(duration_to_seconds "${READY_WAIT_TIMEOUT}")
   local deadline=$((SECONDS + timeout_seconds))
-  local previous_state=""
-  local state_start="${nodepool_install_start}"
-  while (( SECONDS < deadline )); do
-    local state current_time state_key elapsed
-    state=$(az aro hcp cluster nodepool show \
-      --cluster-name "${CLUSTER_NAME}" \
-      --name "${nodepool_name}" \
-      --resource-group "${CUSTOMER_RG_NAME}" \
-      --query properties.provisioningState \
-      --output tsv 2>/dev/null || true)
-    echo "Node pool ${nodepool_name} provisioningState=${state:-NotFound}"
-    current_time=$(date +%s)
-    if [[ -n "${state}" ]]; then
-      state_key=$(normalize_install_state "${state}")
-      if [[ -z "${previous_state}" ]]; then
-        previous_state="${state_key}"
-      elif [[ "${state_key}" != "${previous_state}" ]]; then
-        elapsed=$((current_time - state_start))
-        record_nodepool_state_duration "${nodepool_name}" "${previous_state}" "${elapsed}"
-        previous_state="${state_key}"
-        state_start="${current_time}"
-      fi
-    fi
-    case "${state}" in
-      Succeeded)
-        record_nodepool_status "${nodepool_name}" "${state}"
-        return 0
-        ;;
-      Failed|Canceled|Cancelled|Error)
-        if [[ -n "${previous_state}" ]]; then
-          record_nodepool_state_duration "${nodepool_name}" "${previous_state}" "$((current_time - state_start))"
-        fi
-        record_nodepool_status "${nodepool_name}" "${state}"
-        return 1
-        ;;
-    esac
-    sleep 30
+  local remaining="$#"
+  local failed=0
+  local nodepool_name state current_time state_key elapsed
+  local -A previous_state state_start complete
+
+  for nodepool_name in "$@"; do
+    previous_state["${nodepool_name}"]=""
+    state_start["${nodepool_name}"]="${NODEPOOL_INSTALL_STARTS[${nodepool_name}]}"
+    complete["${nodepool_name}"]=0
   done
-  if [[ -n "${previous_state}" ]]; then
-    record_nodepool_state_duration "${nodepool_name}" "${previous_state}" "$(( $(date +%s) - state_start ))"
+
+  while (( remaining > 0 && SECONDS < deadline )); do
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+
+      state=$(az aro hcp cluster nodepool show \
+        --cluster-name "${CLUSTER_NAME}" \
+        --name "${nodepool_name}" \
+        --resource-group "${CUSTOMER_RG_NAME}" \
+        --query properties.provisioningState \
+        --output tsv 2>/dev/null || true)
+      echo "Node pool ${nodepool_name} provisioningState=${state:-NotFound}"
+      current_time=$(date +%s)
+
+      if [[ -n "${state}" ]]; then
+        state_key=$(normalize_install_state "${state}")
+        if [[ -z "${previous_state[${nodepool_name}]}" ]]; then
+          previous_state["${nodepool_name}"]="${state_key}"
+        elif [[ "${state_key}" != "${previous_state[${nodepool_name}]}" ]]; then
+          elapsed=$((current_time - state_start[${nodepool_name}]))
+          record_nodepool_state_duration "${nodepool_name}" "${previous_state[${nodepool_name}]}" "${elapsed}"
+          previous_state["${nodepool_name}"]="${state_key}"
+          state_start["${nodepool_name}"]="${current_time}"
+        fi
+      fi
+
+      case "${state}" in
+        Succeeded)
+          record_nodepool_status "${nodepool_name}" "${state}"
+          record_nodepool_timer "${nodepool_name}" "rp_ready" "${current_time}"
+          record_nodepool_timer "${nodepool_name}" "install_seconds" "$((current_time - NODEPOOL_INSTALL_STARTS[${nodepool_name}]))"
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          echo "Worker node pool ${nodepool_name} is ready."
+          ;;
+        Failed|Canceled|Cancelled|Error)
+          if [[ -n "${previous_state[${nodepool_name}]}" ]]; then
+            record_nodepool_state_duration "${nodepool_name}" "${previous_state[${nodepool_name}]}" "$((current_time - state_start[${nodepool_name}]))"
+          fi
+          record_nodepool_status "${nodepool_name}" "${state}"
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          failed=1
+          echo "Node pool ${nodepool_name} ended in ${state}." >&2
+          ;;
+      esac
+    done
+    (( remaining == 0 )) || sleep 30
+  done
+
+  if (( remaining > 0 )); then
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+      current_time=$(date +%s)
+      if [[ -n "${previous_state[${nodepool_name}]}" ]]; then
+        record_nodepool_state_duration "${nodepool_name}" "${previous_state[${nodepool_name}]}" "$((current_time - state_start[${nodepool_name}]))"
+      fi
+      record_nodepool_status "${nodepool_name}" "timeout"
+      echo "Timed out waiting for node pool ${nodepool_name}." >&2
+      failed=1
+    done
   fi
-  record_nodepool_status "${nodepool_name}" "timeout"
-  echo "Timed out waiting for node pool ${nodepool_name}." >&2
-  return 1
+
+  return "${failed}"
 }
 
 wait_for_cluster
@@ -700,12 +730,12 @@ resolve_worker_nodepool_version() {
 
 resolve_worker_nodepool_version
 
-# Create one worker node pool, wait for it, and record its install timers.
+# Submit one worker node-pool create request and record its install start time.
+# Readiness is handled by wait_for_nodepools so all zones can progress together.
 create_worker_nodepool() {
   local nodepool_name="$1"
   local availability_zone="$2"
   local replicas="$3"
-  local nodepool_install_start nodepool_rp_ready
   local -a nodepool_args
 
   nodepool_args=(
@@ -723,15 +753,7 @@ create_worker_nodepool() {
   fi
 
   echo "Creating worker node pool ${nodepool_name} with ${replicas} replicas${availability_zone:+ in availability zone ${availability_zone}}."
-  nodepool_install_start=$(date +%s)
-  record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
   az aro hcp cluster nodepool create "${nodepool_args[@]}"
-  wait_for_nodepool "${nodepool_name}" "${nodepool_install_start}"
-
-  nodepool_rp_ready=$(date +%s)
-  record_nodepool_timer "${nodepool_name}" "rp_ready" "${nodepool_rp_ready}"
-  record_nodepool_timer "${nodepool_name}" "install_seconds" "$((nodepool_rp_ready - nodepool_install_start))"
-  echo "Worker node pool ${nodepool_name} is ready."
 }
 
 if ! WORKER_ZONE_LIST=$(select_worker_zones); then
@@ -766,13 +788,31 @@ printf '%s\n' "${WORKER_ZONES[@]}" >"${SHARED_DIR}/aro-hcp-worker-zones"
 write_state
 
 WORKER_INSTALL_START=$(date +%s)
-log_step "Creating and waiting for worker node pool(s): ${NODEPOOL_NAMES}."
+log_step "Submitting worker node pool create requests concurrently: ${NODEPOOL_NAMES}."
+declare -A NODEPOOL_INSTALL_STARTS
+NODEPOOL_CREATE_PIDS=()
 for index in "${!WORKER_ZONES[@]}"; do
+  nodepool_name="${WORKER_NODEPOOL_NAMES[${index}]}"
+  nodepool_install_start=$(date +%s)
+  NODEPOOL_INSTALL_STARTS["${nodepool_name}"]="${nodepool_install_start}"
+  record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
   create_worker_nodepool \
-    "${WORKER_NODEPOOL_NAMES[${index}]}" \
+    "${nodepool_name}" \
     "${WORKER_ZONES[${index}]}" \
-    "${WORKER_REPLICAS_PER_ZONE}"
+    "${WORKER_REPLICAS_PER_ZONE}" &
+  NODEPOOL_CREATE_PIDS+=("$!")
 done
+
+nodepool_create_failed=0
+for pid in "${NODEPOOL_CREATE_PIDS[@]}"; do
+  if ! wait "${pid}"; then
+    nodepool_create_failed=1
+  fi
+done
+(( nodepool_create_failed == 0 )) || exit 1
+
+log_step "Waiting for all worker node pools to become ready: ${NODEPOOL_NAMES}."
+wait_for_nodepools "${WORKER_NODEPOOL_NAMES[@]}"
 WORKER_RP_READY=$(date +%s)
 record_timer "nodepool_install_seconds" "$((WORKER_RP_READY - WORKER_INSTALL_START))"
 

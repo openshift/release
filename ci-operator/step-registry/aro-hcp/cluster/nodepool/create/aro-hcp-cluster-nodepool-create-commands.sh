@@ -199,11 +199,11 @@ nodepool_name_for_zone() {
   fi
 }
 
-# Create one node pool, wait for the RP operation, and persist its timers.
+# Submit one node-pool create request. Readiness and timer completion are
+# handled after all zone-specific requests have been submitted.
 create_nodepool() {
   local nodepool_name="$1"
   local availability_zone="$2"
-  local nodepool_install_start nodepool_rp_ready timeout_seconds deadline state
   local -a nodepool_args
 
   nodepool_args=(
@@ -231,39 +231,18 @@ create_nodepool() {
   fi
 
   echo "Creating ARO HCP node pool ${nodepool_name} on ${CLUSTER_NAME}${availability_zone:+ in availability zone ${availability_zone}}."
-  nodepool_install_start=$(date +%s)
-  record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
   az aro hcp cluster nodepool create "${nodepool_args[@]}"
+}
 
-  timeout_seconds=$(duration_to_seconds "${MP_TIMEOUT}")
-  deadline=$((SECONDS + timeout_seconds))
-  state=""
-  while (( SECONDS < deadline )); do
-    state=$(az aro hcp cluster nodepool show \
-      --cluster-name "${CLUSTER_NAME}" \
-      --name "${nodepool_name}" \
-      --resource-group "${CUSTOMER_RG_NAME}" \
-      --query properties.provisioningState \
-      --output tsv 2>/dev/null || true)
-    echo "Node pool ${nodepool_name} provisioningState=${state:-NotFound}"
-    case "${state}" in
-      Succeeded) break ;;
-      Failed|Canceled|Cancelled|Error)
-        echo "Node pool ${nodepool_name} failed with state ${state}." >&2
-        exit 1
-        ;;
-    esac
-    sleep 30
-  done
+record_nodepool_ready() {
+  local nodepool_name="$1"
+  local nodepool_rp_ready="$2"
+  local nodepool_install_start="${NODEPOOL_INSTALL_STARTS[${nodepool_name}]}"
+  local availability_zone="${NODEPOOL_ZONES[${nodepool_name}]}"
+  local install_seconds=$((nodepool_rp_ready - nodepool_install_start))
 
-  if [[ "${state}" != "Succeeded" ]]; then
-    echo "Timed out waiting for node pool ${nodepool_name}." >&2
-    exit 1
-  fi
-
-  nodepool_rp_ready=$(date +%s)
   record_nodepool_timer "${nodepool_name}" "rp_ready" "${nodepool_rp_ready}"
-  record_nodepool_timer "${nodepool_name}" "install_seconds" "$((nodepool_rp_ready - nodepool_install_start))"
+  record_nodepool_timer "${nodepool_name}" "install_seconds" "${install_seconds}"
 
   NODEPOOL_STATE_FILE="${SHARED_DIR}/aro-hcp-nodepool-${nodepool_name}.env"
   cat >"${NODEPOOL_STATE_FILE}" <<EOF
@@ -276,10 +255,63 @@ NODEPOOL_VM_SIZE=${MP_MACHINE_TYPE}
 NODEPOOL_AVAILABILITY_ZONE=${availability_zone}
 NODEPOOL_INSTALL_START=${nodepool_install_start}
 NODEPOOL_RP_READY=${nodepool_rp_ready}
-NODEPOOL_INSTALL_SECONDS=$((nodepool_rp_ready - nodepool_install_start))
+NODEPOOL_INSTALL_SECONDS=${install_seconds}
 EOF
   chmod 600 "${NODEPOOL_STATE_FILE}"
   echo "ARO HCP node pool ${nodepool_name} is ready."
+}
+
+wait_for_nodepools() {
+  local timeout_seconds
+  timeout_seconds=$(duration_to_seconds "${MP_TIMEOUT}")
+  local deadline=$((SECONDS + timeout_seconds))
+  local remaining="$#"
+  local failed=0
+  local nodepool_name state current_time
+  local -A complete
+
+  for nodepool_name in "$@"; do
+    complete["${nodepool_name}"]=0
+  done
+
+  while (( remaining > 0 && SECONDS < deadline )); do
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+
+      state=$(az aro hcp cluster nodepool show \
+        --cluster-name "${CLUSTER_NAME}" \
+        --name "${nodepool_name}" \
+        --resource-group "${CUSTOMER_RG_NAME}" \
+        --query properties.provisioningState \
+        --output tsv 2>/dev/null || true)
+      echo "Node pool ${nodepool_name} provisioningState=${state:-NotFound}"
+      current_time=$(date +%s)
+      case "${state}" in
+        Succeeded)
+          record_nodepool_ready "${nodepool_name}" "${current_time}"
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          ;;
+        Failed|Canceled|Cancelled|Error)
+          echo "Node pool ${nodepool_name} failed with state ${state}." >&2
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          failed=1
+          ;;
+      esac
+    done
+    (( remaining == 0 )) || sleep 30
+  done
+
+  if (( remaining > 0 )); then
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+      echo "Timed out waiting for node pool ${nodepool_name}." >&2
+      failed=1
+    done
+  fi
+
+  return "${failed}"
 }
 
 if ! TARGET_ZONE_LIST=$(select_availability_zones); then
@@ -294,9 +326,30 @@ fi
 
 printf '%s\n' "${TARGET_ZONES[@]}" >"${SHARED_DIR}/aro-hcp-nodepool-zones"
 printf '%s\n' "$(( ${#TARGET_ZONES[@]} * MP_REPLICAS ))" >"${SHARED_DIR}/aro-hcp-infra-replicas"
+
+declare -A NODEPOOL_INSTALL_STARTS NODEPOOL_ZONES
+NODEPOOL_NAMES=()
+NODEPOOL_CREATE_PIDS=()
 for availability_zone in "${TARGET_ZONES[@]}"; do
   nodepool_name=$(nodepool_name_for_zone "${availability_zone}")
-  create_nodepool "${nodepool_name}" "${availability_zone}"
+  NODEPOOL_NAMES+=("${nodepool_name}")
+  NODEPOOL_ZONES["${nodepool_name}"]="${availability_zone}"
+  nodepool_install_start=$(date +%s)
+  NODEPOOL_INSTALL_STARTS["${nodepool_name}"]="${nodepool_install_start}"
+  record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
+  create_nodepool "${nodepool_name}" "${availability_zone}" &
+  NODEPOOL_CREATE_PIDS+=("$!")
 done
+
+nodepool_create_failed=0
+for pid in "${NODEPOOL_CREATE_PIDS[@]}"; do
+  if ! wait "${pid}"; then
+    nodepool_create_failed=1
+  fi
+done
+(( nodepool_create_failed == 0 )) || exit 1
+
+echo "Waiting for all ARO HCP node pools to become ready: ${NODEPOOL_NAMES[*]}."
+wait_for_nodepools "${NODEPOOL_NAMES[@]}"
 
 echo "ARO HCP node pool creation completed for ${#TARGET_ZONES[@]} availability zone(s)."
