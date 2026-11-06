@@ -1,0 +1,36 @@
+ref:
+  as: hypershift-install-hosted-loki
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: hypershift-install-hosted-loki-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - collection: loki-ci
+    group: loki-prod-collector-test-secret
+    mount_path: /var/run/loki-secret
+  env:
+  - name: LOKI_INSTALL_MODE
+    default: guest-cluster
+    documentation: |-
+      Apply the Loki manifests to a HyperShift guest cluster. The
+      guest-cluster mode uses ${SHARED_DIR}/nested_kubeconfig. The
+      guest-cluster-multi mode uses the per-cluster kubeconfigs exported as
+      ${SHARED_DIR}/<cluster-name>_kubeconfig.
+  - name: LOKI_ENABLED
+    default: 'true'
+    documentation: |-
+      Configure the guest cluster for use with Loki.
+  - name: LOKI_USE_SERVICEMONITOR
+    default: 'true'
+    documentation: |-
+      Monitor Promtail through a ServiceMonitor.
+  documentation: |-
+    The HyperShift guest-cluster Loki step deploys Promtail and the event
+    exporter to the hosted cluster and sends logs to Loki hosted on the DPCR
+    cluster maintained by the Continuous Release Tooling and Technical Release
+    teams.
