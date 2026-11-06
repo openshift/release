@@ -1,0 +1,282 @@
+base_images:
+  agentic-validation:
+    namespace: ci
+    name: agentic-validation-rehearsal-88469
+    tag: latest
+build_root:
+  image_stream_tag:
+    namespace: ocp
+    name: '4.21'
+    tag: cli
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: agentic-prepare
+  steps:
+    test:
+    - as: openshift-agentic-prepare-validation
+      from: agentic-validation
+      commands: 'export JOB_SPEC=''{"refs": {"org": "openshift", "repo": "cluster-kube-controller-manager-operator",
+        "base_sha": "cd45079d8bb7a391ba0eb3282d9ef75232fe425c", "pulls": [{"number":
+        977, "sha": "cd8e06e5a828f3bed4da98ff469992e9f7877608"}]}}''
+
+        #!/bin/bash
+
+        set -euo pipefail
+
+
+        # Preparation receives Jira/model credentials. Only checked plans and source
+
+        # references enter SHARED_DIR; raw issue bodies, tokens and prompts stay private.
+
+        export VALIDATION_SOURCE_DIR="${PWD}"
+
+        exec python3 /opt/agentic-validation/openshift-agentic-validate-commands.py
+        prepare
+
+        '
+      credentials:
+      - collection: test-platform-infra
+        group: jira-token-dptp-bot
+        mount_path: /var/run/jira-token
+      - collection: test-platform-infra
+        group: agent-validation-model
+        mount_path: /var/run/validation-model
+      env:
+      - name: VALIDATION_MODEL_URL
+        default: https://models.corp.redhat.com/oai/v1/chat/completions
+        documentation: HTTPS Chat Completions endpoint. Redirects are rejected.
+      - name: VALIDATION_PREPARE_MODEL
+        default: granite-3.3-8b-instruct
+        documentation: Planning model; validate compatibility and plan quality before
+          enabling a job.
+      - name: VALIDATION_MODEL_TOKEN_FILE
+        default: /var/run/validation-model/token
+        documentation: Bearer token file; never shared with generated commands.
+      - name: JIRA_USERNAME
+        default: aos-team-dp-testplatform@redhat.com
+        documentation: Jira account for basic authentication.
+      - name: JIRA_TOKEN_FILE
+        default: /var/run/jira-token/password
+        documentation: Jira API token file. Retrieval failure is recorded and PR fallback
+          is attempted.
+      - name: VALIDATION_TIMEOUT_SECONDS
+        default: '600'
+        documentation: Overall preparation deadline in seconds, including source retrieval
+          (600 seconds = 10 minutes).
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+      timeout: 12m0s
+      grace_period: 1m0s
+  optional: true
+  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+- as: agentic-observed-pass
+  steps:
+    test:
+    - as: openshift-agentic-validate
+      from: agentic-validation
+      commands: "set -euo pipefail\npython3 - 7 <<'PY'\n\"\"\"Live-model, nested-container\
+        \ rehearsal with controlled observations.\"\"\"\n\nimport importlib\nimport\
+        \ json\nimport os\nfrom pathlib import Path\nimport sys\nimport tempfile\n\
+        \nsys.path.insert(0, \"/opt/agentic-validation\")\nvalidation = importlib.import_module(\"\
+        openshift-agentic-validate-commands\")\n\n\ndef make_plan():\n    plan = {\n\
+        \        \"title\": \"Rehearsal: compare immutable fixture observations\"\
+        ,\n        \"ready\": True,\n        \"gaps\": [],\n        \"assumptions\"\
+        : [\"This is a runner rehearsal with fixture files, not a product or cluster\
+        \ validation.\"],\n        \"sources\": {\"revision\": \"fixture\", \"url\"\
+        : \"https://github.com/openshift/release/pull/88469\", \"issues\": []},\n\
+        \        \"checks\": [{\n            \"id\": \"observed-value\",\n       \
+        \     \"source\": \"inference\",\n            \"reference\": \"Controlled\
+        \ rehearsal fixture\",\n            \"issue\": \"\",\n            \"requirement\"\
+        : \"The observed value equals the desired value\",\n            \"prerequisites\"\
+        : [\"The supervisor has created /work/desired and /work/observed\"],\n   \
+        \         \"actions\": [\n                \"Read /work/desired and /work/observed;\
+        \ print both values as command evidence\",\n                \"Compare the\
+        \ file contents without modifying either file\",\n            ],\n       \
+        \     \"expected\": \"The contents of /work/observed equal those of /work/desired.\
+        \ A mismatch is fail.\",\n            \"evidence\": \"Both actual file values\
+        \ and the comparison outcome\",\n        }],\n    }\n    plan[\"hash\"] =\
+        \ validation.plan_hash(plan)\n    return plan\n\n\ndef main():\n    observed\
+        \ = int(sys.argv[1])\n    expected = \"pass\" if observed == 7 else \"fail\"\
+        \n    validation.configure_runtime(\"execute\")\n    artifacts = Path(os.environ[\"\
+        ARTIFACT_DIR\"])\n    artifacts.mkdir(parents=True, exist_ok=True)\n    plan\
+        \ = make_plan()\n    validation.write_plan(artifacts, plan)\n    model = validation.Model(\"\
+        execute\")\n    results = {}\n    runner_error = None\n    with tempfile.TemporaryDirectory(prefix=\"\
+        agentic-rehearsal-\") as temporary:\n        directory = Path(temporary)\n\
+        \        validation.write_json(directory / \"kubeconfig.json\", {\"fixture\"\
+        : True})\n        try:\n            with validation.Sandbox(directory, \"\
+        https://127.0.0.1:1\", registry_auth=Path(os.environ[\"REGISTRY_AUTH_FILE\"\
+        ])) as container:\n                _, status = container.run(f\"printf 7 >\
+        \ /work/desired; printf {observed} > /work/observed\")\n                if\
+        \ status:\n                    raise validation.ValidationError(\"could not\
+        \ create rehearsal observations\")\n                execution = validation.Execution(plan,\
+        \ artifacts, container, [model.token])\n                results = execution.results\n\
+        \                execution.run(model)\n        except Exception as error:\n\
+        \            runner_error = validation.safe_error(error)\n    status = validation.finalize(plan,\
+        \ results, artifacts, runner_error, {\"model\": model.model, \"usage\": model.usage})\n\
+        \    report = json.loads((artifacts / \"results.json\").read_text())\n   \
+        \ print(f\"Live fixture: expected={expected}, actual={report['overall']},\
+        \ exit={status}\", flush=True)\n    if report[\"overall\"] != expected:\n\
+        \        raise validation.ValidationError(\"rehearsal did not produce the\
+        \ expected outcome\")\n    return status\n\n\nif __name__ == \"__main__\"\
+        :\n    try:\n        sys.exit(main())\n    except Exception as error:\n  \
+        \      print(validation.safe_error(error), file=sys.stderr)\n        sys.exit(1)\n\
+        \nPY\n"
+      credentials:
+      - collection: test-platform-infra
+        group: agent-validation-model
+        mount_path: /var/run/validation-model
+      - namespace: test-credentials
+        bundle: registry-pull-credentials
+        mount_path: /var/run/registry-pull-credentials
+      dependencies:
+      - name: agentic-validation
+        env: VALIDATION_SANDBOX_IMAGE
+      env:
+      - name: VALIDATION_MODEL_URL
+        default: https://models.corp.redhat.com/oai/v1/chat/completions
+        documentation: HTTPS Chat Completions endpoint. Must support native function
+          tools for execution.
+      - name: VALIDATION_EXECUTE_MODEL
+        default: granite-3.3-8b-instruct
+        documentation: Execution model. Lack of native tool support is a runner error
+          and cannot pass.
+      - name: VALIDATION_MODEL_TOKEN_FILE
+        default: /var/run/validation-model/token
+        documentation: Bearer token file, retained by the supervisor outside the command
+          sandbox.
+      - name: VALIDATION_COMPONENT
+        documentation: Payload component whose tested image digest must be running
+          before validation.
+        default: fixture
+      - name: REGISTRY_AUTH_FILE
+        default: /var/run/registry-pull-credentials/.dockerconfigjson
+        documentation: Supervisor-only credentials for payload inspection and nested
+          image pulls; never mounted in the command container.
+      - name: VALIDATION_MAX_TURNS
+        default: '12'
+        documentation: Hard upper bound on model turns, at most sixteen commands/results
+          per turn.
+      - name: VALIDATION_TIMEOUT_SECONDS
+        default: '600'
+        documentation: Overall execution deadline in seconds (2700 seconds = 45 minutes).
+          Each command is limited to 90 seconds.
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+      timeout: 12m0s
+      grace_period: 2m0s
+  optional: true
+  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+- as: agentic-observed-fail
+  steps:
+    test:
+    - as: openshift-agentic-validate
+      from: agentic-validation
+      commands: "set -euo pipefail\npython3 - 6 <<'PY'\n\"\"\"Live-model, nested-container\
+        \ rehearsal with controlled observations.\"\"\"\n\nimport importlib\nimport\
+        \ json\nimport os\nfrom pathlib import Path\nimport sys\nimport tempfile\n\
+        \nsys.path.insert(0, \"/opt/agentic-validation\")\nvalidation = importlib.import_module(\"\
+        openshift-agentic-validate-commands\")\n\n\ndef make_plan():\n    plan = {\n\
+        \        \"title\": \"Rehearsal: compare immutable fixture observations\"\
+        ,\n        \"ready\": True,\n        \"gaps\": [],\n        \"assumptions\"\
+        : [\"This is a runner rehearsal with fixture files, not a product or cluster\
+        \ validation.\"],\n        \"sources\": {\"revision\": \"fixture\", \"url\"\
+        : \"https://github.com/openshift/release/pull/88469\", \"issues\": []},\n\
+        \        \"checks\": [{\n            \"id\": \"observed-value\",\n       \
+        \     \"source\": \"inference\",\n            \"reference\": \"Controlled\
+        \ rehearsal fixture\",\n            \"issue\": \"\",\n            \"requirement\"\
+        : \"The observed value equals the desired value\",\n            \"prerequisites\"\
+        : [\"The supervisor has created /work/desired and /work/observed\"],\n   \
+        \         \"actions\": [\n                \"Read /work/desired and /work/observed;\
+        \ print both values as command evidence\",\n                \"Compare the\
+        \ file contents without modifying either file\",\n            ],\n       \
+        \     \"expected\": \"The contents of /work/observed equal those of /work/desired.\
+        \ A mismatch is fail.\",\n            \"evidence\": \"Both actual file values\
+        \ and the comparison outcome\",\n        }],\n    }\n    plan[\"hash\"] =\
+        \ validation.plan_hash(plan)\n    return plan\n\n\ndef main():\n    observed\
+        \ = int(sys.argv[1])\n    expected = \"pass\" if observed == 7 else \"fail\"\
+        \n    validation.configure_runtime(\"execute\")\n    artifacts = Path(os.environ[\"\
+        ARTIFACT_DIR\"])\n    artifacts.mkdir(parents=True, exist_ok=True)\n    plan\
+        \ = make_plan()\n    validation.write_plan(artifacts, plan)\n    model = validation.Model(\"\
+        execute\")\n    results = {}\n    runner_error = None\n    with tempfile.TemporaryDirectory(prefix=\"\
+        agentic-rehearsal-\") as temporary:\n        directory = Path(temporary)\n\
+        \        validation.write_json(directory / \"kubeconfig.json\", {\"fixture\"\
+        : True})\n        try:\n            with validation.Sandbox(directory, \"\
+        https://127.0.0.1:1\", registry_auth=Path(os.environ[\"REGISTRY_AUTH_FILE\"\
+        ])) as container:\n                _, status = container.run(f\"printf 7 >\
+        \ /work/desired; printf {observed} > /work/observed\")\n                if\
+        \ status:\n                    raise validation.ValidationError(\"could not\
+        \ create rehearsal observations\")\n                execution = validation.Execution(plan,\
+        \ artifacts, container, [model.token])\n                results = execution.results\n\
+        \                execution.run(model)\n        except Exception as error:\n\
+        \            runner_error = validation.safe_error(error)\n    status = validation.finalize(plan,\
+        \ results, artifacts, runner_error, {\"model\": model.model, \"usage\": model.usage})\n\
+        \    report = json.loads((artifacts / \"results.json\").read_text())\n   \
+        \ print(f\"Live fixture: expected={expected}, actual={report['overall']},\
+        \ exit={status}\", flush=True)\n    if report[\"overall\"] != expected:\n\
+        \        raise validation.ValidationError(\"rehearsal did not produce the\
+        \ expected outcome\")\n    return status\n\n\nif __name__ == \"__main__\"\
+        :\n    try:\n        sys.exit(main())\n    except Exception as error:\n  \
+        \      print(validation.safe_error(error), file=sys.stderr)\n        sys.exit(1)\n\
+        \nPY\n"
+      credentials:
+      - collection: test-platform-infra
+        group: agent-validation-model
+        mount_path: /var/run/validation-model
+      - namespace: test-credentials
+        bundle: registry-pull-credentials
+        mount_path: /var/run/registry-pull-credentials
+      dependencies:
+      - name: agentic-validation
+        env: VALIDATION_SANDBOX_IMAGE
+      env:
+      - name: VALIDATION_MODEL_URL
+        default: https://models.corp.redhat.com/oai/v1/chat/completions
+        documentation: HTTPS Chat Completions endpoint. Must support native function
+          tools for execution.
+      - name: VALIDATION_EXECUTE_MODEL
+        default: granite-3.3-8b-instruct
+        documentation: Execution model. Lack of native tool support is a runner error
+          and cannot pass.
+      - name: VALIDATION_MODEL_TOKEN_FILE
+        default: /var/run/validation-model/token
+        documentation: Bearer token file, retained by the supervisor outside the command
+          sandbox.
+      - name: VALIDATION_COMPONENT
+        documentation: Payload component whose tested image digest must be running
+          before validation.
+        default: fixture
+      - name: REGISTRY_AUTH_FILE
+        default: /var/run/registry-pull-credentials/.dockerconfigjson
+        documentation: Supervisor-only credentials for payload inspection and nested
+          image pulls; never mounted in the command container.
+      - name: VALIDATION_MAX_TURNS
+        default: '12'
+        documentation: Hard upper bound on model turns, at most sixteen commands/results
+          per turn.
+      - name: VALIDATION_TIMEOUT_SECONDS
+        default: '600'
+        documentation: Overall execution deadline in seconds (2700 seconds = 45 minutes).
+          Each command is limited to 90 seconds.
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+      timeout: 12m0s
+      grace_period: 2m0s
+  optional: true
+  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+zz_generated_metadata:
+  org: openshift
+  repo: release
+  branch: main
+  variant: agentic-rehearsal

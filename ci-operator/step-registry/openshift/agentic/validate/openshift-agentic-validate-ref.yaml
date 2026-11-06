@@ -1,0 +1,53 @@
+ref:
+  as: openshift-agentic-validate
+  from: agentic-validation
+  commands: openshift-agentic-validate-commands.sh
+  credentials:
+  - collection: test-platform-infra
+    group: agent-validation-model
+    mount_path: /var/run/validation-model
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  dependencies:
+  - name: agentic-validation
+    env: VALIDATION_SANDBOX_IMAGE
+  - name: release:latest
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: VALIDATION_MODEL_URL
+    default: https://models.corp.redhat.com/oai/v1/chat/completions
+    documentation: HTTPS Chat Completions endpoint. Must support native function tools for execution.
+  - name: VALIDATION_EXECUTE_MODEL
+    default: granite-3.3-8b-instruct
+    documentation: Execution model. Lack of native tool support is a runner error and cannot pass.
+  - name: VALIDATION_MODEL_TOKEN_FILE
+    default: /var/run/validation-model/token
+    documentation: Bearer token file, retained by the supervisor outside the command sandbox.
+  - name: VALIDATION_COMPONENT
+    documentation: Payload component whose tested image digest must be running before validation.
+  - name: REGISTRY_AUTH_FILE
+    default: /var/run/registry-pull-credentials/.dockerconfigjson
+    documentation: Supervisor-only credentials for payload inspection and nested image pulls; never mounted in the command container.
+  - name: VALIDATION_MAX_TURNS
+    default: "40"
+    documentation: Hard upper bound on model turns, at most sixteen commands/results per turn.
+  - name: VALIDATION_TIMEOUT_SECONDS
+    default: "2700"
+    documentation: Overall execution deadline in seconds (2700 seconds = 45 minutes). Each command is limited to 90 seconds.
+  nested_podman: true
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 50m0s
+  grace_period: 2m0s
+  documentation: |-
+    Executes the captured plan against SHARED_DIR/kubeconfig. Checks source revision,
+    plan integrity and the deployed payload component digest. Runs generated commands
+    in a networkless container with an API-only Unix-socket broker; the model token
+    and build/provisioning credentials stay outside. Workloads launched through the
+    target API require infrastructure-level egress isolation of the test cluster.
+    Publishes evidence, per-check results, report.md and JUnit. Only complete passing
+    checks with evidence and a successful runner produce exit zero. Existing workflow
+    post steps retain responsibility for cluster gathering and destruction.
