@@ -1,8 +1,3 @@
-base_images:
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
 build_root:
   image_stream_tag:
     name: release
@@ -27,9 +22,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: baremetal-s3-nightly
-  capabilities:
-  - intranet
+- as: aws-metal-s3-nightly
   cron: '@weekly'
   reporter_config:
     channel: '#team-quay-downstream-interruptions'
@@ -38,23 +31,12 @@ tests:
     - error
     report_template: ':red_circle: *{{.Spec.Job}}* run {{.Status.BuildID}} ended *{{.Status.State}}*:
       {{.Status.URL}} <@U0AKNPBBVT7>'
-  restrict_network_access: false
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: aws-quay-qe
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NUM_WORKERS=3
-        WORKER_VCPU=8
-        WORKER_MEMORY=20480
-        VM_EXTRADISKS=true
-        VM_EXTRADISKS_LIST="vda vdb"
-        VM_EXTRADISKS_SIZE=100G
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: c5.metal
       ENABLE_BUILD_SUPPORT: "true"
-      LVM_CLUSTER_DEVICE_PATH: /dev/vdb
-      LVM_CLUSTER_WIPE_DEVICE: "true"
-      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
-      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
       PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
         and loads architecture filter with mirror configuration|loads existing architecture
@@ -81,18 +63,13 @@ tests:
       QUAY_INDEX_IMAGE_TAG: quay-3.18__v4.22__quay-rhel9-operator
       QUAY_OPERATOR_CHANNEL: stable-3.18
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-      REQUIRED_DEFAULT_STORAGECLASS: lvms-vg1
     post:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
     - ref: quay-deprovision
-    - chain: baremetalds-ofcir-post
+    - chain: ipi-aws-post-manual-oidc-sts
     pre:
-    - chain: baremetalds-ofcir-pre
-    - ref: lvms-catalogsource
-    - ref: operatorhub-subscribe-lvm-operator
-    - ref: storage-create-lvm-cluster
-    - ref: storage-conf-storageclass-set-default-storageclass
+    - chain: ipi-aws-pre-manual-oidc-sts
     test:
     - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art
@@ -102,10 +79,9 @@ tests:
     - ref: quay-deploy-jaeger
     - ref: quay-deploy-aws-s3
     - ref: quay-test-e2e
-    workflow: baremetalds-e2e-ovn-dualstack
-  timeout: 8h0m0s
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: redhat-3.18
   org: quay
   repo: quay
-  variant: baremetal-ocp422-e2e-install
+  variant: aws-metal-ocp422-e2e-install

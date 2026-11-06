@@ -389,8 +389,8 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
             fips = _job_bool_field(job, "fips", where) or False
             sts = _job_bool_field(job, "sts", where)
-            if sts is not None and "aws" not in clouds:
-                raise ValueError(f"{where}.sts is only valid when clouds include aws")
+            if sts is not None and not ({"aws", "aws-metal"} & set(clouds)):
+                raise ValueError(f"{where}.sts is only valid when clouds include aws or aws-metal")
             database = _job_bool_field(job, "database", where) or False
             cron_raw = job.get("cron")
             source_raw = job.get("source")
@@ -496,7 +496,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         run_if_changed=run_if_changed,
                         skip_if_only_changed=skip_if_only_changed,
                         fips=fips,
-                        sts=cloud == "aws" and sts is not False,
+                        sts=cloud in ("aws", "aws-metal") and sts is not False,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
                         database=database,
