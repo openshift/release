@@ -160,9 +160,16 @@ BASTION_ICMP_SERVICE="udn-bgp-icmp-capture.service"
 
 start_bastion_diagnostics() {
   echo "=== Starting bastion route and ICMP diagnostics ==="
-  systemctl start "${BASTION_ROUTE_SERVICE}" "${BASTION_ICMP_SERVICE}"
-  systemctl is-active --quiet "${BASTION_ROUTE_SERVICE}"
-  systemctl is-active --quiet "${BASTION_ICMP_SERVICE}"
+  systemctl start "${BASTION_ROUTE_SERVICE}" "${BASTION_ICMP_SERVICE}" || true
+  sleep 5
+  local unit
+  for unit in "${BASTION_ROUTE_SERVICE}" "${BASTION_ICMP_SERVICE}"; do
+    if ! systemctl is-active --quiet "${unit}"; then
+      echo "WARNING: ${unit} is not active; ICMP capture may be incomplete" >&2
+      systemctl status --no-pager --full "${unit}" || true
+      journalctl --no-pager --unit "${unit}" --lines 50 || true
+    fi
+  done
 }
 
 collect_bastion_diagnostics() {
@@ -177,7 +184,7 @@ collect_bastion_diagnostics() {
     echo "ERROR: Bastion route table capture is empty" >&2
     ICMP_CAPTURE_FAILED=1
   fi
-  if [[ ! -f "${BASTION_DIAG_DIR}/bastion-icmp.pcap" ]]; then
+  if ! compgen -G "${BASTION_DIAG_DIR}/bastion-icmp*.pcap*" > /dev/null; then
     echo "ERROR: Bastion ICMP capture is missing" >&2
     ICMP_CAPTURE_FAILED=1
   fi
@@ -298,19 +305,60 @@ spec:
         command: ["/bin/bash", "-ceu"]
         args:
         - |
-          iface=$(ip -o -4 route show default | awk '{print $5; exit}')
-          if [[ -z "${iface}" ]]; then
-            echo "ERROR: No default IPv4 route found" >&2
-            exit 1
-          fi
-          echo "Capturing ICMP on ${NODE_NAME} interface ${iface}"
-          tcpdump -i "${iface}" -nn -s 256 -Z root -W 4 -C 10 \
-            -w "/captures/${NODE_NAME}-${iface}.pcap" \
-            "${TCPDUMP_FILTER}" &
-          tcpdump_pid=$!
-          trap 'kill -INT "${tcpdump_pid}" 2>/dev/null || true; wait "${tcpdump_pid}" || true' TERM INT
-          wait "${tcpdump_pid}"
-          sleep infinity
+          declare -A capture_pid=()
+          sleep_pid=
+          cleanup() {
+            local iface attempt alive
+            if [[ -n "${sleep_pid}" ]]; then
+              kill "${sleep_pid}" 2>/dev/null || true
+            fi
+            for iface in "${!capture_pid[@]}"; do
+              kill -INT "${capture_pid[${iface}]}" 2>/dev/null || true
+            done
+            # SIGINT makes tcpdump flush and close its file; escalate to SIGTERM
+            # when a capture does not exit, and never block container teardown.
+            for attempt in 1 2 3 4 5; do
+              alive=0
+              for iface in "${!capture_pid[@]}"; do
+                if kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+                  alive=1
+                fi
+              done
+              if [[ "${alive}" -eq 0 ]]; then
+                break
+              fi
+              sleep 0.2
+            done
+            for iface in "${!capture_pid[@]}"; do
+              kill -TERM "${capture_pid[${iface}]}" 2>/dev/null || true
+            done
+            capture_pid=()
+          }
+          trap 'cleanup; exit 0' EXIT TERM INT
+
+          # Re-scan every cycle so interfaces that appear after the pod starts
+          # are captured too. Interfaces in state UNKNOWN are administratively
+          # up and must not be skipped.
+          while :; do
+            while read -r iface; do
+              if [[ -z "${iface}" || "${iface}" == "lo" ]]; then
+                continue
+              fi
+              if [[ -n "${capture_pid[${iface}]:-}" ]] && kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+                continue
+              fi
+              echo "Capturing ICMP on ${NODE_NAME} interface ${iface} at $(date -u --rfc-3339=seconds)"
+              tcpdump -i "${iface}" -nn -s 256 -Z root -W 4 -C 10 \
+                -w "/captures/${NODE_NAME}-${iface}.pcap" \
+                "${TCPDUMP_FILTER}" &
+              capture_pid[${iface}]=$!
+            done < <(ip -o link show up | awk -F': ' '{print $2}' | grep -v '^lo$')
+            # Background the sleep and wait on it so a stop signal is handled at once.
+            sleep 15 &
+            sleep_pid=$!
+            wait "${sleep_pid}" || true
+            sleep_pid=
+          done
         env:
         - name: NODE_NAME
           valueFrom:
