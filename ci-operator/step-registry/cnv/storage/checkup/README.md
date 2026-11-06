@@ -26,7 +26,10 @@ explicitly select a valid development image for the rehearsal.
    missing or ambiguous effective default fails preparation.
 5. `cnv-storage-checkup-run` resolves its image from the prepared installed-CSV
    context, creates a dedicated namespace and permissions, and runs the shipped
-   checkup through its ConfigMap/Job interface.
+   checkup through its ConfigMap/Job interface. The Namespace, RBAC, ConfigMap,
+   and Job manifests are in the run ref's `CHECKUP_*_MANIFEST` defaults, separate
+   from the execution script. The script substitutes only the namespace, image,
+   timeout, storage class, and checkup parameters.
 6. `cnv-storage-checkup-gather` collects diagnostics and removes the namespace and
    its cluster-reader binding. The platform's post chain then deletes OCP.
 
@@ -38,8 +41,11 @@ virtualization enablement, and CNV installation. Its caller supplies an AWS
 channel inputs required by `cnv-deploy-cnv`. The preparation step checks for
 advertised KVM capacity rather than relying on the instance type alone.
 
-The default checkup boots ten concurrent VMs. Worker sizing must account for
-their guest memory, virtualization overhead, boot-source imports, and CNV itself.
+The product checkup defaults to ten concurrent VMs. The AWS job sets
+`CHECKUP_NUM_VMS=4` as a smaller concurrent-boot trial because the ten-VM run
+exceeded the EBS per-volume snapshot rate. This preserves concurrent coverage,
+but covers fewer VMs. Worker sizing must account for their guest memory,
+virtualization overhead, boot-source imports, and CNV itself.
 
 For ODF or HPP, insert backend installation and default-class configuration
 before checkup preparation. A workflow `pre` override replaces the entire list;
@@ -104,16 +110,14 @@ checkup, and 900 seconds for the Job. The AWS source job supplies longer budgets
 | `CHECKUP_JOB_TIMEOUT_SECONDS` | `2100` (35 minutes) |
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
-In the AWS rehearsal, the snapshot was not ready during artifact collection and
-the snapshotter was still polling roughly twelve minutes after creation,
-exceeding both the default boot and overall checkup deadlines.
-[AWS documents that snapshot creation is asynchronous](https://docs.aws.amazon.com/ebs/latest/userguide/ebs-creating-snapshot.html).
-The 20-minute operation limit allows time beyond the observed polling window;
-the 30-minute overall limit bounds the complete checkup, including any subsequent
-failures. These are trial budgets: the failed rehearsal does not establish the
-snapshot's completion time. A passing run is needed to measure and tune them.
-If the snapshot remains unready at the operation deadline, investigate its EBS
-state and controller events before increasing the budget again.
+In the latest [AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
+the initial VM booted after about 16 minutes, but four of ten subsequent VMs
+stalled while AWS rejected concurrent snapshot requests from the same golden
+image EBS volume. AWS documents this as a per-volume rate limit and advises
+[at least 15 seconds between concurrent snapshots](https://docs.aws.amazon.com/ec2/latest/devguide/errors-overview.html).
+The shipped checkup has no setting to space its VM creation requests, so the
+AWS job reduces the count to four. A rehearsal must confirm that four VMs avoid
+the rate error and fit within the 30-minute overall budget.
 The parent job retains its five-hour limit, including installation and teardown.
 
 ### Collected artifacts
@@ -146,7 +150,7 @@ multi-architecture image index can resolve to a different platform digest.
 
 The [AWS job](../../../../config/openshift/release/openshift-release-main__cnv-storage-checkup.yaml)
 uses the shared `openshift-org-aws` profile, three `m8i.4xlarge` workers, automatic
-StorageClass selection, and ten checkup VMs. Its schedule is daily at
+StorageClass selection, and four checkup VMs. Its schedule is daily at
 03:00 UTC. The OCP 5.0 nightly baseline follows the manually verified cluster;
 the CNV build is selected separately.
 

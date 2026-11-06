@@ -138,99 +138,26 @@ mv "${ARTIFACT_DIR}/context.json.tmp" "${ARTIFACT_DIR}/context.json"
 image=$(jq -er '.image | select(type == "string" and length > 0)' "${context}")
 storage_class=$(jq -er '.storage_class | select(type == "string" and length > 0)' "${context}")
 
-namespace=$(oc --request-timeout=30s create -f - -o jsonpath='{.metadata.name}' <<'EOF'
-apiVersion: v1
-kind: Namespace
-metadata:
-  generateName: cnv-storage-checkup-
-  labels:
-    ci.openshift.io/storage-checkup: "true"
-EOF
-)
+namespace=$(printf '%s\n' "${CHECKUP_NAMESPACE_MANIFEST}" |
+  oc --request-timeout=30s create -f - -o jsonpath='{.metadata.name}')
 printf '%s\n' "${namespace}" > "${SHARED_DIR}/cnv-storage-checkup-namespace"
 
-# Match the product checkup permissions, including snapshot/restore operations
-# used by newer product images. All write permissions are confined to this run.
-oc --request-timeout=30s -n "${namespace}" create -f - <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: storage-checkup-sa
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: storage-checkup
-rules:
-- apiGroups: [""]
-  resources: [configmaps]
-  verbs: [get, update]
-- apiGroups: [kubevirt.io]
-  resources: [virtualmachines]
-  verbs: [create, delete, get, patch]
-- apiGroups: [kubevirt.io]
-  resources: [virtualmachineinstances]
-  verbs: [get]
-- apiGroups: [subresources.kubevirt.io]
-  resources: [virtualmachineinstances/addvolume, virtualmachineinstances/removevolume, virtualmachines/stop]
-  verbs: [update]
-- apiGroups: [kubevirt.io]
-  resources: [virtualmachineinstancemigrations]
-  verbs: [create]
-- apiGroups: [cdi.kubevirt.io]
-  resources: [datavolumes]
-  verbs: [create, delete]
-- apiGroups: [""]
-  resources: [persistentvolumeclaims]
-  verbs: [delete]
-- apiGroups: [snapshot.kubevirt.io]
-  resources: [virtualmachinesnapshots, virtualmachinerestores]
-  verbs: [create, get, delete]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: storage-checkup
-subjects:
-- kind: ServiceAccount
-  name: storage-checkup-sa
-  namespace: ${namespace}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: storage-checkup
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: ${namespace}-reader
-subjects:
-- kind: ServiceAccount
-  name: storage-checkup-sa
-  namespace: ${namespace}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-reader
-EOF
+# The registry provides these manifests as step environment defaults. Only
+# runtime values are substituted here; resource definitions live in the ref.
+render_manifest() {
+  sed -e "s|__NAMESPACE__|${namespace}|g" \
+    -e "s|__CHECKUP_TIMEOUT__|${CHECKUP_TIMEOUT}|g" \
+    -e "s|__STORAGE_CLASS__|${storage_class}|g" \
+    -e "s|__CHECKUP_VMI_TIMEOUT__|${CHECKUP_VMI_TIMEOUT}|g" \
+    -e "s|__CHECKUP_NUM_VMS__|${CHECKUP_NUM_VMS}|g" \
+    -e "s|__CHECKUP_SKIP_TEARDOWN__|${CHECKUP_SKIP_TEARDOWN}|g" \
+    -e "s|__CHECKUP_JOB_TIMEOUT_SECONDS__|${CHECKUP_JOB_TIMEOUT_SECONDS}|g" \
+    -e "s|__CHECKUP_IMAGE__|${image}|g"
+}
 
-oc --request-timeout=30s -n "${namespace}" create configmap storage-checkup-config \
-  --from-literal="spec.timeout=${CHECKUP_TIMEOUT}" \
-  --from-literal="spec.param.storageClass=${storage_class}" \
-  --from-literal="spec.param.vmiTimeout=${CHECKUP_VMI_TIMEOUT}" \
-  --from-literal="spec.param.numOfVMs=${CHECKUP_NUM_VMS}" \
-  --from-literal="spec.param.skipTeardown=${CHECKUP_SKIP_TEARDOWN}"
-
-jq -n --arg image "${image}" --arg namespace "${namespace}" \
-  --argjson deadline "${CHECKUP_JOB_TIMEOUT_SECONDS}" '{
-    apiVersion: "batch/v1", kind: "Job", metadata: {name: "storage-checkup", namespace: $namespace},
-    spec: {backoffLimit: 0, activeDeadlineSeconds: $deadline,
-      template: {spec: {serviceAccountName: "storage-checkup-sa", restartPolicy: "Never",
-        containers: [{name: "storage-checkup", image: $image, imagePullPolicy: "Always",
-          resources: {requests: {cpu: "100m", memory: "256Mi"}},
-          env: [{name: "CONFIGMAP_NAMESPACE", value: $namespace},
-            {name: "CONFIGMAP_NAME", value: "storage-checkup-config"}]}]}}}
-  }' | oc --request-timeout=30s create -f -
+printf '%s\n' "${CHECKUP_RBAC_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
+printf '%s\n' "${CHECKUP_CONFIGMAP_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
+printf '%s\n' "${CHECKUP_JOB_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
 
 echo "Running CNV storage checkup in ${namespace} against ${storage_class}"
 failure_category=execution
