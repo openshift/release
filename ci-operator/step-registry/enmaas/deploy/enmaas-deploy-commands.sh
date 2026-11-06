@@ -284,16 +284,28 @@ echo "BuildConfigs created."
 
 # Trigger builds
 echo "Starting image builds..."
-oc start-build maas-api --from-dir="${BUILDS_DIR}/models-as-a-service/maas-api" -n enmaas --follow
-oc start-build metering-service --from-dir="${BUILDS_DIR}/pricetag-metering" -n enmaas --follow
-oc start-build usage-exporter --from-dir="${BUILDS_DIR}/enmaas-usage-exporter" -n enmaas --follow
-oc start-build praxis-ai --from-dir="${BUILDS_DIR}/praxis-ai" -n enmaas --follow
+oc start-build maas-api --from-dir="${BUILDS_DIR}/models-as-a-service/maas-api" -n enmaas --follow --wait
+oc start-build metering-service --from-dir="${BUILDS_DIR}/pricetag-metering" -n enmaas --follow --wait
+oc start-build usage-exporter --from-dir="${BUILDS_DIR}/enmaas-usage-exporter" -n enmaas --follow --wait
+oc start-build praxis-ai --from-dir="${BUILDS_DIR}/praxis-ai" -n enmaas --follow --wait
 echo "Image builds completed."
 
 # Patch enmaas.params to use internal registry images instead of quay.io/modden/
 echo "Patching enmaas.params for internal registry images..."
 INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000/enmaas"
 if [[ -f "${PARAMS_FILE}" ]]; then
+  if ! grep -q '^ENMAAS_API_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
+    echo "ERROR: ENMAAS_API_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
+    exit 1
+  fi
+  if ! grep -q '^METERING_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
+    echo "ERROR: METERING_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
+    exit 1
+  fi
+  if ! grep -q '^PRAXIS_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
+    echo "ERROR: PRAXIS_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
+    exit 1
+  fi
   sed -i "s|^ENMAAS_API_IMAGE_REPOSITORY=.*|ENMAAS_API_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/maas-api|" "${PARAMS_FILE}"
   sed -i "s|^METERING_IMAGE_REPOSITORY=.*|METERING_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/metering-service|" "${PARAMS_FILE}"
   sed -i "s|^PRAXIS_IMAGE_REPOSITORY=.*|PRAXIS_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/praxis-ai|" "${PARAMS_FILE}"
