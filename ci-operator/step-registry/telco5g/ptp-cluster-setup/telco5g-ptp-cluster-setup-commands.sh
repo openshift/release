@@ -32,6 +32,12 @@ CLUSTER_HV_IP="10.6.34.246"
 
 export KCLI_PARAM="-P tag=${T5CI_VERSION} -P version=nightly"
 
+# TEMP: reuse the cluster installed by the previous 4.22 rehearsal while
+# debugging the bastion API tunnel. Remove this override before merging.
+if [[ "${T5CI_VERSION:-}" == "4.22" ]]; then
+  SKIP_OCP_INSTALL=true
+fi
+
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 echo "${CLUSTER_HV_IP}" > "$SHARED_DIR/hv-ip"
 
