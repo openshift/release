@@ -520,14 +520,88 @@ UMask=0077
 WantedBy=multi-user.target
 ROUTE_UNIT
 
+cat > /usr/local/sbin/udn-bgp-icmp-capture <<'ICMP_SCRIPT'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+output_dir=/var/lib/udn-bgp-diagnostics
+log_file="${output_dir}/icmp-capture.log"
+declare -A capture_pid=()
+sleep_pid=
+
+log() {
+  printf '%s %s\n' "$(date -u --rfc-3339=seconds)" "$*" >> "${log_file}"
+}
+
+cleanup() {
+  local iface attempt alive
+  if [[ -n "${sleep_pid}" ]]; then
+    kill "${sleep_pid}" 2>/dev/null || true
+  fi
+  for iface in "${!capture_pid[@]}"; do
+    kill -INT "${capture_pid[${iface}]}" 2>/dev/null || true
+  done
+  # SIGINT makes tcpdump flush and close its file; escalate to SIGTERM when a
+  # capture does not exit, and never block teardown waiting for it.
+  for attempt in 1 2 3 4 5; do
+    alive=0
+    for iface in "${!capture_pid[@]}"; do
+      if kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+        alive=1
+      fi
+    done
+    if [[ "${alive}" -eq 0 ]]; then
+      break
+    fi
+    sleep 0.2
+  done
+  for iface in "${!capture_pid[@]}"; do
+    kill -TERM "${capture_pid[${iface}]}" 2>/dev/null || true
+  done
+  capture_pid=()
+}
+trap 'cleanup; exit 0' EXIT TERM INT
+
+if ! command -v tcpdump > /dev/null; then
+  log "ERROR: tcpdump is not available"
+  exit 1
+fi
+
+log "starting ICMP capture supervisor"
+while :; do
+  # Re-scan every cycle so interfaces that appear later (for example the
+  # worker ENI once it carries traffic) are captured too. Interfaces in
+  # state UNKNOWN are administratively up and must not be skipped.
+  while read -r iface; do
+    if [[ -z "${iface}" || "${iface}" == "lo" ]]; then
+      continue
+    fi
+    if [[ -n "${capture_pid[${iface}]:-}" ]] && kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+      continue
+    fi
+    tcpdump -i "${iface}" -nn -s 256 -Z root -W 4 -C 10 \
+      -w "${output_dir}/bastion-icmp-${iface}.pcap" icmp &
+    capture_pid[${iface}]=$!
+    log "started ICMP capture on ${iface} (pid ${capture_pid[${iface}]})"
+  done < <(ip -o link show up | awk -F': ' '{print $2}' | grep -v '^lo$')
+  # Background the sleep and wait on it so a stop signal is handled at once.
+  sleep 15 &
+  sleep_pid=$!
+  wait "${sleep_pid}" || true
+  sleep_pid=
+done
+ICMP_SCRIPT
+chmod 0755 /usr/local/sbin/udn-bgp-icmp-capture
+
 cat > /etc/systemd/system/udn-bgp-icmp-capture.service <<'ICMP_UNIT'
 [Unit]
-Description=UDN-BGP bastion ICMP capture
+Description=UDN-BGP bastion ICMP capture on all connected interfaces
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/tcpdump -i any -nn -s 256 -Z root -W 4 -C 10 -w /var/lib/udn-bgp-diagnostics/bastion-icmp.pcap icmp
+ExecStart=/usr/local/sbin/udn-bgp-icmp-capture
 Restart=always
 RestartSec=5s
 KillSignal=SIGINT
@@ -538,10 +612,20 @@ WantedBy=multi-user.target
 ICMP_UNIT
 
 systemctl daemon-reload
-systemctl enable --now udn-bgp-route-dump.service udn-bgp-icmp-capture.service
-systemctl restart udn-bgp-route-dump.service udn-bgp-icmp-capture.service
-systemctl is-active --quiet udn-bgp-route-dump.service
-systemctl is-active --quiet udn-bgp-icmp-capture.service
+systemctl enable --now udn-bgp-route-dump.service udn-bgp-icmp-capture.service || true
+
+# Diagnostics must never fail provisioning. Surface the unit state and journal
+# in the build log (the bastion is destroyed on failure, so the journal is
+# otherwise lost) and only warn when a unit is not active.
+sleep 5
+for unit in udn-bgp-route-dump.service udn-bgp-icmp-capture.service; do
+  if ! systemctl is-active --quiet "${unit}"; then
+    echo "WARNING: ${unit} is not active, diagnostics may be incomplete" >&2
+  fi
+  echo "--- ${unit} ---"
+  systemctl status --no-pager --full "${unit}" || true
+  journalctl --no-pager --unit "${unit}" --lines 50 || true
+done
 
 echo "--- Tool versions ---"
 command -v podman >/dev/null && podman --version
