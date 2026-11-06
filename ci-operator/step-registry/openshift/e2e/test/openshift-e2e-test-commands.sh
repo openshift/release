@@ -34,8 +34,9 @@ export KUBECONFIG=$KUBECONFIG_BAK
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
+# Jobs can override by setting --retry-strategy in TEST_ARGS (e.g. once or none).
 if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
-    if openshift-tests run --help | grep -q 'retry-strategy'; then
+    if [[ "${TEST_ARGS:-}" != *"--retry-strategy"* ]] && openshift-tests run --help | grep -q 'retry-strategy'; then
         TEST_ARGS+=" --retry-strategy=aggressive"
     fi
 fi
@@ -371,7 +372,9 @@ function upgrade_paused() {
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
 
     echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
-    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" "${TEST_ARGS:-}" \
+    # Unquoted so TEST_ARGS (and trailing empty SHARD_ARGS) split into real flags.
+    # Quoting the whole string makes --retry-strategy=once a single invalid token.
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" ${TEST_ARGS:-} \
         --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
@@ -654,20 +657,20 @@ ipsec-suite)
      oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full"}}}}}'
      wait_for_ipsec_full_mode
      echo "IPsec Full mode rollout complete. running IPsec test suite now"
-     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="${TEST_ARGS:-} --run \[sig-network\]\[Feature:IPsec\]" suite
 
      # Rollout IPsec External mode and run the suite.
      echo "Rolling out IPsec External mode"
      oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"External"}}}}}'
      wait_for_ipsec_external_mode
      echo "IPsec External mode rollout complete. running IPsec test suite now"
-     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="${TEST_ARGS:-} --run \[sig-network\]\[Feature:IPsec\]" suite
 
      # Rollout IPsec Full mode with NAT-T encapsulation and run the suite.
      oc patch networks.operator.openshift.io cluster --type=merge -p='{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"ipsecConfig":{"mode":"Full", "full":{"encapsulation": "Always"}}}}}}'
      wait_for_ipsec_full_mode
      echo "IPsec Full mode with NAT-T encapsulation rollout complete. running IPsec test suite now"
-     TEST_SUITE=openshift/network/ipsec TEST_ARGS="--run \[sig-network\]\[Feature:IPsec\]" suite
+     TEST_SUITE=openshift/network/ipsec TEST_ARGS="${TEST_ARGS:-} --run \[sig-network\]\[Feature:IPsec\]" suite
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"
