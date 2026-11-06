@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if [[ -n "${CPO_PULL_SECRET_FILE:-}" ]]; then rm -f "${CPO_PULL_SECRET_FILE}"; fi' EXIT TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
 log() {
   echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") ${*}\033[0m"
@@ -110,99 +110,9 @@ done
 
 HCP_NAMESPACE="${HC_NAMESPACE}-${CLUSTER_NAME}"
 
-# The CPO Deployment uses the pull-secret copied from HostedCluster.spec.pullSecret. Add a
-# repository-scoped Quay credential to that source secret, then apply the private image override
-# to trigger HostedCluster reconciliation and propagation to the hosted control plane namespace.
-# A path-scoped auth entry preserves any existing registry-wide quay.io credential needed by the
-# cluster.
-HC_PULL_SECRET_NAME=$(KUBECONFIG="${MC_KUBECONFIG}" oc get hostedcluster "${CLUSTER_NAME}" \
-  -n "${HC_NAMESPACE}" -o jsonpath='{.spec.pullSecret.name}')
-if [[ -z "${HC_PULL_SECRET_NAME}" ]]; then
-  log "ERROR: HostedCluster '${CLUSTER_NAME}' does not reference a pull secret"
-  exit 1
-fi
-
-QUAY_CREDS_DIR="/var/run/quay-credentials"
-QUAY_USERNAME_FILE="${QUAY_CREDS_DIR}/username"
-QUAY_CREDENTIAL_FILE="${QUAY_CREDS_DIR}/credential"
-if [[ ! -r "${QUAY_USERNAME_FILE}" || ! -r "${QUAY_CREDENTIAL_FILE}" ]]; then
-  log "ERROR: Quay username or credential is not available in ${QUAY_CREDS_DIR}"
-  exit 1
-fi
-
-CPO_AUTH_SCOPE=$(echo "${CPO_IMAGE_REF}" | awk -F/ 'NF >= 3 { print $1 "/" $2 }')
-if [[ "${CPO_AUTH_SCOPE}" != "quay.io/rosa-ci" ]]; then
-  log "ERROR: Refusing to use the rosa-ci credential for unexpected image scope '${CPO_AUTH_SCOPE}'"
-  exit 1
-fi
-
-CPO_PULL_SECRET_FILE=$(mktemp /tmp/rosa-cpo-pull-secret.XXXXXX)
-chmod 0600 "${CPO_PULL_SECRET_FILE}"
-if ! KUBECONFIG="${MC_KUBECONFIG}" oc get secret "${HC_PULL_SECRET_NAME}" -n "${HC_NAMESPACE}" \
-  -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > "${CPO_PULL_SECRET_FILE}"; then
-  log "ERROR: Failed to read HostedCluster pull secret '${HC_PULL_SECRET_NAME}'"
-  exit 1
-fi
-if ! jq -e '.auths | type == "object"' "${CPO_PULL_SECRET_FILE}" >/dev/null; then
-  log "ERROR: HostedCluster pull secret '${HC_PULL_SECRET_NAME}' is not valid docker config JSON"
-  exit 1
-fi
-
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-QUAY_USERNAME=$(tr -d '\r\n' < "${QUAY_USERNAME_FILE}")
-QUAY_CREDENTIAL=$(tr -d '\r\n' < "${QUAY_CREDENTIAL_FILE}")
-if [[ -z "${QUAY_USERNAME}" || -z "${QUAY_CREDENTIAL}" ]]; then
-  log "ERROR: Quay username or credential is empty"
-  unset QUAY_USERNAME QUAY_CREDENTIAL
-  ${WAS_TRACING} && set -x
-  exit 1
-fi
-QUAY_AUTH=$(printf '%s:%s' "${QUAY_USERNAME}" "${QUAY_CREDENTIAL}" | base64 -w0)
-jq --arg scope "${CPO_AUTH_SCOPE}" --arg auth "${QUAY_AUTH}" \
-  '.auths[$scope] = {"auth": $auth}' "${CPO_PULL_SECRET_FILE}" > "${CPO_PULL_SECRET_FILE}.new"
-mv "${CPO_PULL_SECRET_FILE}.new" "${CPO_PULL_SECRET_FILE}"
-unset QUAY_USERNAME QUAY_CREDENTIAL
-
-KUBECONFIG="${MC_KUBECONFIG}" oc set data "secret/${HC_PULL_SECRET_NAME}" -n "${HC_NAMESPACE}" \
-  --from-file=".dockerconfigjson=${CPO_PULL_SECRET_FILE}"
-log "Added repository-scoped Quay credential to HostedCluster pull secret '${HC_PULL_SECRET_NAME}'"
-
 KUBECONFIG="${MC_KUBECONFIG}" oc annotate hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" \
   "hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE_REF}" --overwrite
 log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_IMAGE_REF}"
-
-PULL_SECRET_SYNC_START=$(date +%s)
-while true; do
-  # --ignore-not-found turns an absent secret into a quiet, empty success, so a non-zero exit means
-  # a genuine API failure worth surfacing instead of silently waiting out the timeout. On failure
-  # stdout is empty, so the 2>&1 capture holds only the (secret-free) API error. Keep base64/jq
-  # errors on /dev/null: their stderr can echo decoded secret contents.
-  if ! OC_PULL_SECRET=$(KUBECONFIG="${MC_KUBECONFIG}" oc get secret pull-secret -n "${HCP_NAMESPACE}" \
-      --ignore-not-found -o jsonpath='{.data.\.dockerconfigjson}' 2>&1); then
-    log "WARNING: oc get pull-secret failed: ${OC_PULL_SECRET}"
-  elif [[ -n "${OC_PULL_SECRET}" ]]; then
-    HCP_QUAY_AUTH=$(echo "${OC_PULL_SECRET}" | base64 -d 2>/dev/null \
-      | jq -r --arg scope "${CPO_AUTH_SCOPE}" '.auths[$scope].auth // empty' 2>/dev/null || true)
-    if [[ "${HCP_QUAY_AUTH}" == "${QUAY_AUTH}" ]]; then
-      log "Private Quay credential propagated to hosted control plane namespace"
-      break
-    fi
-  fi
-  elapsed=$(( $(date +%s) - PULL_SECRET_SYNC_START ))
-  if (( elapsed >= CPO_ROLLOUT_TIMEOUT )); then
-    log "ERROR: Timed out waiting for the private Quay credential in ${HCP_NAMESPACE}/pull-secret"
-    unset QUAY_AUTH HCP_QUAY_AUTH OC_PULL_SECRET
-    ${WAS_TRACING} && set -x
-    exit 1
-  fi
-  log "WAITING: Hosted control plane pull secret has not updated (elapsed: ${elapsed}s); retrying in 10s"
-  sleep 10
-done
-unset QUAY_AUTH HCP_QUAY_AUTH OC_PULL_SECRET
-${WAS_TRACING} && set -x
-rm -f "${CPO_PULL_SECRET_FILE}"
-CPO_PULL_SECRET_FILE=""
 
 # Wait for reconciliation to update the CPO Deployment, then require a healthy rollout. This makes
 # it impossible for readiness checks to pass using only the old payload CPO.
