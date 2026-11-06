@@ -1,0 +1,26 @@
+ref:
+  as: servicemesh-istio-release-branches
+  from: src
+  commands: servicemesh-istio-release-branches-commands.sh
+  credentials:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  timeout: 1h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Create missing release-X.Y.Z branches in openshift-service-mesh/istio at the
+    exact commit tagged X.Y.Z upstream in istio/istio (Z > 0), excluding later
+    release-X.Y commits. Supported minor versions are read from
+    ci-operator/config/openshift-service-mesh/supported-istio-versions.txt on the default branch of
+    openshift/release. Each must have an existing midstream release-X.Y branch.
+    Process only the latest stable patch tag per supported release line; never
+    backfill older patches. Existing z-stream branches
+    are never changed. Verify that each upstream tag commit is an ancestor of
+    the y-stream tip before branching; otherwise open a GitHub issue (deduplicated
+    against open issues) and fail. The bot token needs contents and issues write
+    permissions in openshift-service-mesh/istio. Requires git, gh, and jq.
