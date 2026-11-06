@@ -81,13 +81,19 @@ oc version --client
 echo "[$(date --utc +%FT%T.%3NZ)] Fetching PR description for ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}"
 PR_API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}"
 CURL_HEADERS=(-H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+# mktemp, not fixed /tmp names: predictable paths are symlink/TOCTOU-hijackable
+# (CWE-377), and unique files also cannot collide across retries.
+TMP_PR_JSON=$(mktemp)
+TMP_CURL_ERR=$(mktemp)
 
 fetch_pr_json() {
-    # $1: "direct" or "via-test-cluster". Body -> /tmp/depends-on-pr.json,
-    # curl stderr -> /tmp/depends-on-curl.err, http code -> stdout (direct
-    # mode only; the pod mode validates by content instead).
+    # $1: "direct" or "via-test-cluster". Body -> ${TMP_PR_JSON}, curl stderr
+    # -> ${TMP_CURL_ERR}, http code -> stdout (direct mode only; the pod mode
+    # validates by content instead). Both curls are time-bounded so a stalled
+    # connection cannot block the remaining fallback attempts or the no-op
+    # path.
     if [[ "${1}" == "direct" ]]; then
-        curl -s -S -o /tmp/depends-on-pr.json -w '%{http_code}' "${CURL_HEADERS[@]}" "${PR_API_URL}" 2>/tmp/depends-on-curl.err
+        curl -s -S --connect-timeout 10 --max-time 60 -o "${TMP_PR_JSON}" -w '%{http_code}' "${CURL_HEADERS[@]}" "${PR_API_URL}" 2>"${TMP_CURL_ERR}"
         return
     fi
     # Alternate egress: one-shot pod on the TEST cluster this step already
@@ -97,7 +103,7 @@ fetch_pr_json() {
     local POD
     POD="depends-on-fetch-$(date +%s)"
     timeout 150 oc run --rm -i --restart=Never --image=curlimages/curl "${POD}" -n "${OO_INSTALL_NAMESPACE}" -- \
-        curl -sf "${CURL_HEADERS[@]}" "${PR_API_URL}" > /tmp/depends-on-pr.json 2>/tmp/depends-on-curl.err
+        curl -sf --connect-timeout 10 --max-time 120 "${CURL_HEADERS[@]}" "${PR_API_URL}" > "${TMP_PR_JSON}" 2>"${TMP_CURL_ERR}"
 }
 
 PR_JSON=""
@@ -112,16 +118,16 @@ for MODE in direct via-test-cluster; do
         fi
         CURL_RC=$?
         set -o errexit
-        if [[ "${CURL_RC}" -eq 0 && "${HTTP_CODE:-}" == "200" && -s /tmp/depends-on-pr.json ]] \
-            && grep -q '"number"' /tmp/depends-on-pr.json; then
-            PR_JSON=$(cat /tmp/depends-on-pr.json)
+        if [[ "${CURL_RC}" -eq 0 && "${HTTP_CODE:-}" == "200" && -s "${TMP_PR_JSON}" ]] \
+            && grep -q '"number"' "${TMP_PR_JSON}"; then
+            PR_JSON=$(cat "${TMP_PR_JSON}")
             break 2
         fi
-        echo "[$(date --utc +%FT%T.%3NZ)] PR description fetch (${MODE}, attempt ${ATTEMPT}/3) failed: curl exit ${CURL_RC}, http ${HTTP_CODE:-none}, stderr: $(head -c 200 /tmp/depends-on-curl.err 2>/dev/null || echo none)" >&2
+        echo "[$(date --utc +%FT%T.%3NZ)] PR description fetch (${MODE}, attempt ${ATTEMPT}/3) failed: curl exit ${CURL_RC}, http ${HTTP_CODE:-none}, stderr: $(head -c 200 "${TMP_CURL_ERR}" 2>/dev/null || echo none)" >&2
         sleep $((ATTEMPT * 5))
     done
 done
-rm -f /tmp/depends-on-pr.json /tmp/depends-on-curl.err
+rm -f "${TMP_PR_JSON}" "${TMP_CURL_ERR}"
 
 if [[ -z "${PR_JSON}" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not fetch the ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER} description from the GitHub API after all attempts -- Depends-On resolution is DISABLED for this run; continuing as a no-op so the job is not failed by it" >&2
@@ -199,10 +205,11 @@ while IFS= read -r line; do
 
     echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${DEP_REPO}#${DEP_PR} once for $(printf '%s' "${MATCHED_CANDIDATES}" | grep -c .) matching candidate(s)"
     SRC_DIR=$(mktemp -d)
+    TARBALL_FILE=$(mktemp)
     TARBALL_URL="https://github.com/${DEP_REPO}/archive/refs/pull/${DEP_PR}/head.tar.gz"
-    curl -sfL "${TARBALL_URL}" -o /tmp/depends-on-src.tar.gz
-    tar xzf /tmp/depends-on-src.tar.gz -C "${SRC_DIR}" --strip-components=1
-    rm -f /tmp/depends-on-src.tar.gz
+    curl -sfL "${TARBALL_URL}" -o "${TARBALL_FILE}"
+    tar xzf "${TARBALL_FILE}" -C "${SRC_DIR}" --strip-components=1
+    rm -f "${TARBALL_FILE}"
 
     while IFS= read -r CAND_LINE; do
         [[ -z "${CAND_LINE}" ]] && continue
