@@ -232,6 +232,10 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
+      ALLOWED_LOCATIONS: westus3
+      ARO_HCP_ASSET_ADMISSION_OPTIONS: e2e_identities.cleanup-workers=2
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SWEEPER_TAGS: "true"
       ARO_REPO_BRANCH: aro-hcp-2026-09-01-preview
       ARO_REPO_DIR: /tmp/cluster-api-installer-int
@@ -239,20 +243,15 @@ tests:
       DEPLOY_CHARTS: "true"
       LOCATION: westus3
       USE_KIND: "true"
-      VAULT_SECRET_PROFILE: int
-    leases:
-    - count: 1
-      env: ENV_QUOTA_LEASED_RESOURCE
-      resource_type: aro-hcp-int-quota-slice
-    - count: 1
-      env: LEASED_MSI_CONTAINERS
-      resource_type: aro-hcp-test-msi-containers-int
+      VAULT_SECRET_PROFILE: int-rh
     post:
     - ref: capz-arohcp-summary
     - ref: capz-arohcp-teardown
     - ref: capz-arohcp-cleanup-msi-roleassignments
     - ref: capz-arohcp-aks-deprovision
+    - ref: aro-hcp-lease-release
     pre:
+    - ref: aro-hcp-lease-acquire
     - ref: capz-arohcp-write-env
     - ref: capz-arohcp-aks-provision
     - ref: capz-arohcp-check-dependencies
