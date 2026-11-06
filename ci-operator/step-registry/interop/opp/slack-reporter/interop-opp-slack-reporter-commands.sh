@@ -619,15 +619,26 @@ def harvest_enrichment(base, evidence, roles):
         r'https://redhat\.atlassian\.net/browse/(LPINTEROP-\d+)')
     # a raw candidate is accepted only when its host matches the pinned
     # OPP ReportPortal instance exactly; the harvested value is REBUILT
-    # from the pinned host and the numeric launch id so no raw log
-    # content (session hash, userinfo, query string, arbitrary path) is
-    # ever echoed into the report or receipt.
+    # from the pinned host, the validated project key and the numeric
+    # launch id so no raw log content (userinfo, query string,
+    # arbitrary path) is ever echoed into the report or receipt. The
+    # project key is a route component, not decoration: the launch
+    # route is /ui/#<project>/launches/all/<id>, and a URL without it
+    # names a project called 'launches' and resolves to nothing.
     launch_host = ('reportportal-lp-interop.apps.dno.ocp-hub.'
                    'prod.psi.redhat.com')
     launch_re = re.compile(r'https://\S*reportportal\S*/launch\S*',
                            re.IGNORECASE)
+    # the project key is kept, but only in ReportPortal's own project
+    # key alphabet (server-side PROJECT_NAME_REGEXP, 1-64 chars,
+    # leading alphanumeric): no '/', '#', '?', '@', '%', whitespace or
+    # ':' can survive into the report. A key containing a 32+
+    # character alphanumeric run is secret-shaped content from an
+    # untrusted log and is rejected here, so the delivery secret-shape
+    # check never sees a launch URL that looks like a token.
     launch_shape_re = re.compile(
-        r'/ui/#[^?#]*launches/all/(\d{1,12})$')
+        r'/ui/#([A-Za-z0-9][A-Za-z0-9_-]{0,63})/launches/all/(\d{1,12})$')
+    secret_run_re = re.compile(r'[A-Za-z0-9]{32,}')
 
     def canonical_launch(raw):
         """Rebuild the canonical launch URL; None drops the candidate."""
@@ -639,8 +650,10 @@ def harvest_enrichment(base, evidence, roles):
         found = launch_shape_re.search(raw)
         if not found:
             return None
-        return 'https://%s/ui/#launches/all/%s' % (
-            launch_host, found.group(1))
+        if secret_run_re.search(found.group(1)):
+            return None
+        return 'https://%s/ui/#%s/launches/all/%s' % (
+            launch_host, found.group(1), found.group(2))
     links, launch, omitted = [], None, 0
     safe = SafeAccess(base)
     for step, role in roles.items():
