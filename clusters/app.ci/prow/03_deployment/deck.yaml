@@ -144,6 +144,7 @@ objects:
           - --hook-url=http://hook-apps:8888/plugin-help
           - --oauth-url=/github-login
           - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs/efs
           - --spyglass=true
           - --gcs-credentials-file=/etc/test-platform-results-viewer/credentials.json
           - --history-bucket=test-platform-results
@@ -207,6 +208,9 @@ objects:
             readOnly: true
           - name: release
             mountPath: /var/repo
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -258,6 +262,9 @@ objects:
             secretName: test-platform-results-viewer
         - name: release
           emptyDir: {}
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -415,6 +422,7 @@ objects:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --job-config-path=/etc/jobs/efs
           - --tide-url=http://tide/
           - --hook-url=http://hook-apps:8888/plugin-help
           - --hidden-only=true
@@ -473,6 +481,9 @@ objects:
             readOnly: true
           - name: release
             mountPath: /var/repo
+          - name: job-configs
+            mountPath: /etc/jobs/efs
+            readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -509,6 +520,9 @@ objects:
             secretName: deck-internal-tls
         - name: release
           emptyDir: {}
+        - name: job-configs
+          persistentVolumeClaim:
+            claimName: job-configs-nfs
         - name: build-farm-credentials
           secret:
             secretName: deck
