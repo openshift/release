@@ -186,7 +186,7 @@ function CheckOppCompatibility () {
     typeset ocpKey="${1}"
     typeset compatSpec="${OPP_COMPAT[${ocpKey}]:-}"
     typeset allCsvs
-    typeset failed=0
+    typeset unverifiable=0 belowFloor=0
 
     allCsvs="$(oc get csv -A --no-headers)" || {
         : "Failed to retrieve CSVs"
@@ -224,7 +224,7 @@ function CheckOppCompatibility () {
         if [[ -z "${csvLine}" ]]; then
             : "Operator not found: ${opPrefix}"
             details="${details}${opPrefix}: NOT INSTALLED; "
-            (( failed += 1 ))
+            (( unverifiable += 1 ))  # missing CSV is a hard failure, not a floor question
             continue
         fi
 
@@ -233,7 +233,7 @@ function CheckOppCompatibility () {
         if [[ -z "${installedVersion}" ]]; then
             : "Operator ${opPrefix}: could not parse version from CSV ${csvName}"
             details="${details}${opPrefix}: version unparseable from ${csvName}; "
-            (( failed += 1 ))
+            (( unverifiable += 1 ))
             continue
         fi
 
@@ -244,14 +244,20 @@ function CheckOppCompatibility () {
         if (( instMajor < minMajor || (instMajor == minMajor && instMinor < minMinor) )); then
             : "Operator ${opPrefix} version ${installedVersion} is below minimum ${minVersion} for OCP ${ocpKey}"
             details="${details}${opPrefix}: ${installedVersion} < ${minVersion} (INCOMPATIBLE); "
-            (( failed += 1 ))
+            (( belowFloor += 1 ))
         else
             : "Operator ${opPrefix}: version ${installedVersion} >= ${minVersion} (OK)"
             details="${details}${opPrefix}: ${installedVersion} >= ${minVersion} (OK); "
         fi
     done
 
-    if (( failed > 0 )); then
+    if (( unverifiable > 0 )); then
+        # A missing CSV or an unparseable version is not a floor question: the
+        # operator could not be verified at all. Keep these fatal.
+        : "${unverifiable} operator(s) missing or unparseable against the compatibility matrix"
+        AppendCheck "opp_compatibility_matrix" "fail" "${details}"
+        (( CHECKS_FAILED += 1 ))
+    elif (( belowFloor > 0 )); then
         # Informational at pre-flight, not a gate. The OPP_COMPAT floors for
         # the target OCP minor describe the post-upgrade operator set: the
         # upgrade lanes intentionally install below the target floor
@@ -261,7 +267,7 @@ function CheckOppCompatibility () {
         # product-upgrade steps and interop-opp-smoke after the upgrade.
         # Gating here reds every upgrade lane at pre-flight on the reviewed
         # baseline (INTEROP-9553; first seen after #87865 + #87963 combined).
-        : "${failed} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
+        : "${belowFloor} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
