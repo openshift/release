@@ -235,18 +235,21 @@ for login_attempt in $(seq 1 ${LOGIN_MAX_RETRIES}); do
   set +o errexit
   if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
     echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+    export OCM_CLIENT_ID="${SSO_CLIENT_ID}"
+    export OCM_CLIENT_SECRET="${SSO_CLIENT_SECRET}"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" 2>&1)
     login_exit_code=$?
     if [[ ${login_exit_code} -eq 0 ]]; then
-      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" 2>&1)
       login_exit_code=$?
     fi
   elif [[ -n "${ROSA_TOKEN}" ]]; then
     echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+    export OCM_TOKEN="${ROSA_TOKEN}"
+    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" 2>&1)
     login_exit_code=$?
     if [[ ${login_exit_code} -eq 0 ]]; then
-      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" 2>&1)
       login_exit_code=$?
     fi
   else
@@ -332,6 +335,17 @@ if [[ -z "$OPENSHIFT_VERSION" && -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
   fi
   OPENSHIFT_VERSION=${y_streams[$source_index]}
   log "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
+fi
+
+# If minimum version was discovered, use it to constrain the cluster version
+if [[ -f "${SHARED_DIR}/minimum-openshift-version" ]]; then
+  MINIMUM_VERSION=$(cat "${SHARED_DIR}/minimum-openshift-version")
+  if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    OPENSHIFT_VERSION="${MINIMUM_VERSION}"
+    log "Using minimum discovered version ${OPENSHIFT_VERSION}"
+  else
+    log "Using specified version ${OPENSHIFT_VERSION} (minimum available: ${MINIMUM_VERSION})"
+  fi
 fi
 
 # If account-roles-create fell back to a different version, use it. This overrides
