@@ -26,11 +26,26 @@ check_pods_running() {
     return
   fi
 
+  local pod_count
+  pod_count=$(jq -r '.items | length' <<< "${pods_json}")
+  if [[ "${pod_count}" -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: no pods found in ${namespace}"
+    VALIDATION_FAILED=1
+    return
+  fi
+
   local not_ready
-  not_ready=$(echo "${pods_json}" | jq -r '
+  # A pod with no containerStatuses (e.g. still initializing) is treated as
+  # not ready too, rather than vacuously passing because no container was
+  # found to be explicitly not-ready.
+  not_ready=$(jq -r '
     .items[] |
-    select(.status.phase != "Running" or (.status.containerStatuses // [] | any(.ready == false))) |
-    .metadata.name')
+    select(
+      .status.phase != "Running" or
+      ((.status.containerStatuses // []) | length == 0) or
+      ((.status.containerStatuses // []) | any(.ready == false))
+    ) |
+    .metadata.name' <<< "${pods_json}")
 
   if [[ -n "${not_ready}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: unhealthy pod(s) in ${namespace}:"
@@ -42,14 +57,30 @@ check_pods_running() {
 }
 
 echo "$(date -u --rfc-3339=seconds) - Confirming the Infrastructure CR has no vSphere failure domain data..."
-VCENTERS=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters}' 2>&1) || VCENTERS=""
-FAILURE_DOMAINS=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.vsphere.failureDomains}' 2>&1) || FAILURE_DOMAINS=""
-if [[ -n "${VCENTERS}" || -n "${FAILURE_DOMAINS}" ]]; then
-  # This job exists specifically to exercise code against a legacy-shaped
-  # Infrastructure CR; if the simulation stopped applying (e.g. the installer
-  # started rejecting the stripped manifest, or STRIP_VSPHERE_FAILURE_DOMAINS
-  # was dropped from the job), every other check below would be validating
-  # the wrong thing. Fail loudly instead of silently passing.
+# This job exists specifically to exercise code against a legacy-shaped
+# Infrastructure CR; if the simulation stopped applying (e.g. the installer
+# started rejecting the stripped manifest, or STRIP_VSPHERE_FAILURE_DOMAINS
+# was dropped from the job), every other check below would be validating the
+# wrong thing. A failed read here must not be treated the same as a
+# successful read of an empty field -- that would hide the read failure
+# behind a false "confirmed empty" pass.
+INFRA_READ_FAILED=0
+if ! VCENTERS=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.vsphere.vcenters}' 2>&1); then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to read spec.platformSpec.vsphere.vcenters from the Infrastructure CR"
+  echo "${VCENTERS}"
+  INFRA_READ_FAILED=1
+  VCENTERS=""
+fi
+if ! FAILURE_DOMAINS=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.vsphere.failureDomains}' 2>&1); then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to read spec.platformSpec.vsphere.failureDomains from the Infrastructure CR"
+  echo "${FAILURE_DOMAINS}"
+  INFRA_READ_FAILED=1
+  FAILURE_DOMAINS=""
+fi
+
+if [[ ${INFRA_READ_FAILED} -ne 0 ]]; then
+  VALIDATION_FAILED=1
+elif [[ -n "${VCENTERS}" || -n "${FAILURE_DOMAINS}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - ERROR: expected spec.platformSpec.vsphere.vcenters and .failureDomains to be empty, found:"
   echo "  vcenters: ${VCENTERS}"
   echo "  failureDomains: ${FAILURE_DOMAINS}"
@@ -81,12 +112,31 @@ check_pods_running "${CSI_NAMESPACE}"
 echo "$(date -u --rfc-3339=seconds) - Scanning cloud-controller-manager logs for the OCPBUGS-136178 regression signature..."
 # Iterate every pod rather than relying on a specific label selector, since
 # the exact CCM pod labels are lower-confidence than the namespace name.
-CCM_LOGS=""
+# Each pod's log is scanned immediately (bounded by --tail) instead of being
+# concatenated into one growing variable, and matched with a plain bash
+# substring test instead of piping into `grep -q`: with `pipefail`, a `grep
+# -q` consumer that stops reading after an early match can SIGPIPE the writer
+# on the other end of the pipe, which turns into a spurious pipeline failure
+# (and a missed detection) once there is enough log data after the match.
+CCM_LOG_READ_FAILED=0
+CCM_SIGNATURE_FOUND=0
 for pod in $(oc get pods -n "${CCM_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
-  CCM_LOGS+=$(oc logs -n "${CCM_NAMESPACE}" "${pod}" --all-containers --tail=-1 2>&1 || true)
-  CCM_LOGS+=$'\n'
+  if ! pod_logs=$(oc logs -n "${CCM_NAMESPACE}" "${pod}" --all-containers --tail=10000 2>&1); then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: failed to read logs for CCM pod ${pod}"
+    echo "${pod_logs}"
+    CCM_LOG_READ_FAILED=1
+    continue
+  fi
+  if [[ "${pod_logs}" == *"No Virtual Center hosts defined"* ]]; then
+    CCM_SIGNATURE_FOUND=1
+  fi
 done
-if echo "${CCM_LOGS}" | grep -qF "No Virtual Center hosts defined"; then
+
+if [[ ${CCM_LOG_READ_FAILED} -ne 0 ]]; then
+  VALIDATION_FAILED=1
+fi
+
+if [[ ${CCM_SIGNATURE_FOUND} -ne 0 ]]; then
   echo "$(date -u --rfc-3339=seconds) - ERROR: found 'No Virtual Center hosts defined' in CCM logs (OCPBUGS-136178 regression signature)"
   VALIDATION_FAILED=1
 else
@@ -100,7 +150,7 @@ echo "$(date -u --rfc-3339=seconds) - (best-effort) Checking cloud-conf ConfigMa
 CLOUD_CONF=$(oc get configmap cloud-conf -n "${CCM_NAMESPACE}" -o jsonpath='{.data.cloud\.conf}' 2>&1) || CLOUD_CONF=""
 if [[ -z "${CLOUD_CONF}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - WARNING: could not read cloud-conf ConfigMap data.cloud.conf in ${CCM_NAMESPACE}; skipping this best-effort check"
-elif ! echo "${CLOUD_CONF}" | grep -q '^\[VirtualCenter'; then
+elif ! grep -q '^\[VirtualCenter' <<< "${CLOUD_CONF}"; then
   echo "$(date -u --rfc-3339=seconds) - WARNING: cloud-conf has no [VirtualCenter ...] section (OCPBUGS-136178 symptom); not failing the job on this best-effort check, but worth investigating:"
   echo "${CLOUD_CONF}"
 else
