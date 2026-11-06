@@ -220,7 +220,11 @@ function CheckOppCompatibility () {
         minMinor="${minVersion##*.}"
 
         typeset csvLine csvName installedVersion
-        csvLine="$(echo "${allCsvs}" | grep "${opPrefix}" | head -1)" || true
+        # Match the CSV name column only: a bare substring match on the whole
+        # row can select an unrelated CSV (namespace, display name, or REPLACES
+        # column), which would hide a missing operator CSV. Same prefix rule as
+        # interop-opp-smoke.
+        csvLine="$(awk -v prefix="${opPrefix}" 'index($2, prefix) == 1 {print; exit}' <<< "${allCsvs}")" || true
         if [[ -z "${csvLine}" ]]; then
             : "Operator not found: ${opPrefix}"
             details="${details}${opPrefix}: NOT INSTALLED; "
