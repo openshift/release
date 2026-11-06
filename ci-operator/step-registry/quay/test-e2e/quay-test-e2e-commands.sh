@@ -1250,6 +1250,9 @@ fi
 # and never publish their JUnit. Swallow the failure so every phase executes and
 # reports; the aggregated JUnit (not the job color) carries the pass/fail detail.
 # Non-best-effort callers (e.g. the e2e-install gate) still fail on a non-zero rc.
+echo "DEBUG: sleeping 8h for cluster investigation..."
+sleep 8h
+
 if [[ "${PLAYWRIGHT_BEST_EFFORT:-false}" == "true" ]]; then
   # Record this phase's result so the final report/gate step can fail the JOB when
   # any best-effort phase had test failures, even though this step exits 0 (so the
