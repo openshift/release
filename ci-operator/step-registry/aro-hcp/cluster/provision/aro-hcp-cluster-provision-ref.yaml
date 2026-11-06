@@ -1,0 +1,90 @@
+ref:
+  as: aro-hcp-cluster-provision
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-cluster-provision-commands.sh
+  timeout: 6h0m0s
+  grace_period: 15s
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  env:
+  - name: ARO_HCP_API_VERSION
+    default: "2026-09-01-preview"
+    documentation: Azure Resource Provider API version used by the ARO HCP CLI.
+  - name: REGION
+    default: eastus2
+    documentation: Azure region in which the customer HCP is created.
+  - name: ARO_HCP_CLUSTER_NAME
+    default: ""
+    documentation: Optional cluster name. When empty, a name in the form ci-aro-h-<4 random characters> is generated.
+  - name: WORKER_NODEPOOL_NAME
+    default: "workers"
+    documentation: Name of the worker node pool.
+  - name: ARO_HCP_CUSTOMER_RG_NAME
+    default: ""
+    documentation: Optional customer resource group name.
+  - name: ARO_HCP_CUSTOMER_NSG
+    default: ""
+    documentation: Optional customer network security group name.
+  - name: ARO_HCP_CUSTOMER_VNET_NAME
+    default: ""
+    documentation: Optional customer VNet name.
+  - name: ARO_HCP_CUSTOMER_VNET_SUBNET1
+    default: ""
+    documentation: Optional customer worker subnet name.
+  - name: ARO_HCP_CUSTOMER_VNET_INTEGRATION_SUBNET_NAME
+    default: ""
+    documentation: Optional customer VNet integration subnet name.
+  - name: ARO_HCP_KEYVAULT_NAME
+    default: ""
+    documentation: Optional Key Vault name for customer-managed etcd encryption.
+  - name: ARO_HCP_KMS_KEY_NAME
+    default: "etcd-kms-key"
+    documentation: Key Vault key name for customer-managed etcd encryption.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: OpenShift control-plane version in X.Y format.
+  - name: REPLICAS
+    default: "2"
+    documentation: Number of worker nodes in the node pool.
+  - name: COMPUTE_MACHINE_TYPE
+    default: Standard_D8s_v6
+    documentation: Azure VM size for the worker node pool.
+  - name: MULTI_AZ
+    default: "false"
+    documentation: Create the default worker pool as one node pool per selected availability zone.
+  - name: ZONES_COUNT
+    default: "1"
+    documentation: Number of availability zones to select from the worker VM SKU's regional zone list.
+  - name: MP_ZONE
+    default: ""
+    documentation: Optional single availability zone when MULTI_AZ is false.
+  - name: MP_ZONES
+    default: ""
+    documentation: Optional space- or comma-separated worker-zone override; otherwise zones are discovered from Azure.
+  - name: ARO_HCP_ADDRESS_PREFIX
+    default: 10.0.0.0/16
+    documentation: Customer VNet address space.
+  - name: ARO_HCP_WORKER_SUBNET_PREFIX
+    default: 10.0.0.0/24
+    documentation: Customer worker subnet address space.
+  - name: ARO_HCP_INTEGRATION_SUBNET_PREFIX
+    default: 10.0.1.0/24
+    documentation: VNet integration subnet address space.
+  - name: READY_WAIT_TIMEOUT
+    default: 90m
+    documentation: Maximum time to wait for the HCP and node pool to succeed.
+  - name: ARO_HCP_ROLE_PROPAGATION_DELAY
+    default: "30"
+    documentation: Seconds to wait after role assignment creation.
+  - name: ARO_HCP_PROVISIONER_OBJECT_ID
+    default: ""
+    documentation: Optional Entra object ID for the provisioning service principal.
+  documentation: |-
+    Create a customer-facing ARO HCP cluster using the documented Azure CLI flow:
+    resource group, network, managed identities, role assignments, customer-managed
+    etcd key, HCP resource, worker node pool, readiness checks, and admin kubeconfig.
+    The cluster name is written to SHARED_DIR/cluster-id and the customer resource
+    group and all resources in it are recorded in SHARED_DIR for the matching
+    deprovision step.
