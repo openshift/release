@@ -110,11 +110,14 @@ def changed_files(repo, base_sha):
 PYTHON_SOURCE_0
 cat > "${runner_dir}/eval_config.py" <<'PYTHON_SOURCE_1'
 #!/usr/bin/env python3
-"""Resolve eval configuration through the pinned agent-eval-harness loader."""
+"""Resolve eval configuration and the harness revision through the harness's own APIs."""
 
 import argparse
 import importlib
 import json
+import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 import sys
@@ -126,9 +129,79 @@ except ImportError:
     from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 
 
-HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
-HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
+HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
+# The public GitHub releases API for HARNESS_URL's repository. The endpoint
+# needs no token; GITHUB_TOKEN is attached when the environment provides one
+# only to lift shared-IP rate limits.
+HARNESS_LATEST_RELEASE = "https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest"
+# Set to an exact release tag or full commit SHA to stop following the latest
+# release, e.g. to bisect a harness regression; empty or unset means latest.
+REVISION_OVERRIDE = "EVAL_HARNESS_REVISION"
+RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
+COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
 RESULT_SCHEMA_VERSION = 2
+
+
+def is_commit_sha(revision):
+    """True when the revision is a full commit SHA rather than a release tag."""
+    return bool(COMMIT_SHA.fullmatch(revision))
+
+
+def validate_harness_revision(revision):
+    """Accept only a release tag or a full commit SHA, never a moving branch.
+
+    The value reaches Git refspecs and rev-parse arguments, so anything that
+    is not exactly one of those two shapes is rejected outright.
+    """
+    if COMMIT_SHA.fullmatch(revision):
+        return revision.lower()
+    if RELEASE_TAG.fullmatch(revision):
+        return revision
+    raise EvalError(f"harness revision must be a release tag like v1.62.0 or a full "
+                    f"commit SHA, never a branch: {revision!r}")
+
+
+def expected_commit_ref(revision):
+    """The ref naming the pinned commit: the tag's commit, or the SHA itself."""
+    return revision.lower() if is_commit_sha(revision) else f"refs/tags/{revision}^{{commit}}"
+
+
+def latest_release_tag(document):
+    """Validate a GitHub releases/latest document and return its tag name."""
+    tag = document.get("tag_name") if isinstance(document, dict) else None
+    if not isinstance(tag, str) or not RELEASE_TAG.fullmatch(tag):
+        raise EvalError(f"{HARNESS_LATEST_RELEASE} returned an unusable release tag: {tag!r}")
+    return tag
+
+
+def resolve_latest_release(env, timeout):
+    """Ask the public GitHub releases API for the latest published release tag."""
+    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+               "User-Agent": "openshift-release-manifest-eval-runner"}
+    token = env.get("GITHUB_TOKEN", "").strip()
+    if token:  # The endpoint is public; the token only lifts rate limits.
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(HARNESS_LATEST_RELEASE, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            document = json.load(response)
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        raise EvalError(f"cannot resolve the latest harness release from "
+                        f"{HARNESS_LATEST_RELEASE}: {type(error).__name__}: {error}") from error
+    return latest_release_tag(document)
+
+
+def resolve_harness_revision(env, timeout):
+    """Return the revision this run uses and where it came from.
+
+    REVISION_OVERRIDE pins an exact tag or commit SHA when set (bisecting a
+    harness regression); otherwise the latest published release is resolved,
+    so the step never runs the moving main branch, which may be broken.
+    """
+    override = env.get(REVISION_OVERRIDE, "").strip()
+    if override:
+        return validate_harness_revision(override), f"{REVISION_OVERRIDE} override"
+    return resolve_latest_release(env, timeout), "latest release"
 
 
 @dataclass(frozen=True)
@@ -389,12 +462,14 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from .eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
+                              resolve_harness_revision, validate_resolution_result)
     from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
+                             resolve_harness_revision, validate_resolution_result)
     from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
@@ -834,19 +909,37 @@ def remaining(deadline):
     return deadline - time.monotonic()
 
 
+def harness_fetch_targets(revision):
+    """Map a resolved revision to its fetch refspec and checkout target."""
+    if is_commit_sha(revision):  # a bisect pin, fetched as one exact commit
+        return revision, "FETCH_HEAD"
+    return f"refs/tags/{revision}:refs/tags/{revision}", f"refs/tags/{revision}"
+
+
+def verified_revisions(verified):
+    """Split captured rev-parse output into (named commit, checked-out HEAD)."""
+    lines = [line.strip() for line in verified.strip().splitlines()]
+    return (lines[0], lines[1]) if len(lines) == 2 else ("", "")
+
+
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Fetch and verify exactly the pinned harness revision."""
+    """Resolve the harness revision, fetch exactly it, and verify the checkout."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
-    install_log.write_text(f"Expected harness revision: {HARNESS_REVISION}\n", encoding="utf-8")
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached while resolving the harness revision")
+    revision, source = resolve_harness_revision(env, min(30, left))
+    install_log.write_text(f"Expected harness revision: {revision} ({source})\n", encoding="utf-8")
+    fetch_spec, checkout_ref = harness_fetch_targets(revision)
     steps = (
         (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
         (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
          60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1",
-          "origin", HARNESS_REVISION], 300, "fetch the pinned harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
-         60, "check out the pinned harness revision"),
+        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1", "origin", fetch_spec],
+         300, "fetch the resolved harness revision"),
+        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", checkout_ref],
+         60, "check out the resolved harness revision"),
     )
     for args, timeout, action in steps:
         left = remaining(deadline)
@@ -873,9 +966,14 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        status, actual = command(["git", "-C", str(harness), "rev-parse", "HEAD"],
-                                 repo, env, install_log, min(30, left),
-                                 append=True, capture_output=True)
+        # rev-parse prints one line per argument: the commit the resolved
+        # revision names, then the checked-out HEAD. Requiring both to be
+        # the same commit verifies the checkout; the resolved SHA is logged
+        # so a run stays traceable to an exact commit even if a tag moves.
+        status, verified = command(["git", "-C", str(harness), "rev-parse",
+                                    expected_commit_ref(revision), "HEAD"],
+                                   repo, env, install_log, min(30, left),
+                                   append=True, capture_output=True)
     except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
             output.write(f"ERROR: git rev-parse timed out after {error.timeout} seconds\n".encode())
@@ -884,13 +982,14 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         with install_log.open("ab") as output:
             output.write(f"{type(error).__name__}: {error}\n".encode())
         raise EvalError("cannot verify harness revision; see runner/harness-install.log") from error
-    actual = actual.strip()
+    resolved, actual = verified_revisions(verified) if not status else ("", "")
     with install_log.open("ab") as output:
-        output.write(f"Verified harness revision: {actual}\n".encode())
+        output.write(f"Verified harness revision: {resolved or '<unavailable>'}\n".encode())
     if status:
         raise EvalError(f"cannot verify harness revision (exit {status}); see runner/harness-install.log")
-    if actual != HARNESS_REVISION:
-        message = f"harness revision mismatch: expected {HARNESS_REVISION}, got {actual!r}"
+    if not resolved or resolved != actual:
+        message = (f"harness revision mismatch: {revision} resolves to "
+                   f"{resolved or '<unavailable>'!r}, HEAD is {actual or '<unavailable>'!r}")
         with install_log.open("ab") as output:
             output.write(f"ERROR: {message}\n".encode())
         raise EvalError(f"{message}; see runner/harness-install.log")
