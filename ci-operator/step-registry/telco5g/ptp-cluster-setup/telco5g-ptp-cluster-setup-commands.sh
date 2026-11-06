@@ -17,28 +17,84 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 
-#Set common ssh parameters for Ansible
+#Set common ssh parameters for Ansible.
+# Compression is not put in COMMON_SSH_ARGS because it is also used by the
+# ProxyCommand, which carries the outer SSH ciphertext. The outer connections
+# below add -C explicitly.
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 #Set cluster variables
-CLUSTER_NAME="ptpcimno"
+CLUSTER_NAME="ptp-ci-mno"
 PLAN_NAME="${CLUSTER_NAME}_ci"
-CLUSTER_API_IP="10.8.34.117"
+CLUSTER_API_IP="10.6.34.248"
 CLUSTER_API_PORT="6443"
-CLUSTER_HV_IP="10.8.34.218"
+CLUSTER_HV_IP="10.6.34.246"
 
 export KCLI_PARAM="-P tag=${T5CI_VERSION} -P version=nightly"
 
 echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
-#Check connectivity
-ping ${CLUSTER_HV_IP} -c 10 || true
-echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
+echo "${CLUSTER_HV_IP}" > "$SHARED_DIR/hv-ip"
+
+tcp_check() {
+  local host="$1"
+  local port="$2"
+  local wait_s="${3:-5}"
+  if command -v nc >/dev/null 2>&1; then
+    timeout "${wait_s}" nc -z "${host}" "${port}" >/dev/null 2>&1
+  elif command -v ncat >/dev/null 2>&1; then
+    timeout "${wait_s}" ncat -z "${host}" "${port}" >/dev/null 2>&1
+  else
+    timeout "${wait_s}" bash -c "cat < /dev/null > /dev/tcp/${host}/${port}" >/dev/null 2>&1
+  fi
+}
+
+BASTION_IP=""
+BASTION_USER=""
+if [[ -r /var/run/bastion-ip/bastionip ]]; then BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"; fi
+if [[ -r /var/run/bastion-user/bastionuser ]]; then BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"; fi
+
+# shellcheck disable=SC2206 # deliberately split COMMON_SSH_ARGS into separate ssh arguments
+SSH_BASE_ARGS=(-i "${SSH_PKEY}" ${COMMON_SSH_ARGS} -o BatchMode=yes -C)
+CONNECT_MODE=""
+if timeout 20 ssh "${SSH_BASE_ARGS[@]}" "kni@${CLUSTER_HV_IP}" true >/dev/null 2>&1; then
+  CONNECT_MODE="direct"
+  echo "Direct SSH to the hypervisor works"
+else
+  echo "Direct SSH to the hypervisor failed; trying the bastion"
+fi
+
+if [[ -z "${CONNECT_MODE}" && -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]; then
+  if tcp_check "${BASTION_IP}" 22 5; then
+    BASTION_PROXY="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -o BatchMode=yes -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"
+    if timeout 45 ssh "${SSH_BASE_ARGS[@]}" -o "ProxyCommand=${BASTION_PROXY}" "kni@${CLUSTER_HV_IP}" true >/dev/null 2>&1; then
+      CONNECT_MODE="bastion"
+      echo "Bastion SSH to the hypervisor works"
+    else
+      echo "Bastion SSH to the hypervisor failed"
+    fi
+  else
+    echo "Bastion SSH port is not reachable"
+  fi
+fi
+
+if [[ -z "${CONNECT_MODE}" ]]; then
+  echo "ERROR: no SSH connectivity to the hypervisor (direct or via the bastion)"
+  exit 1
+fi
+echo "Using ${CONNECT_MODE} SSH path to the hypervisor"
 
 #Create inventory file
+if [[ "${CONNECT_MODE}" == "bastion" ]]; then
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_retries=5
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -C -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -o BatchMode=yes -p 22 -W %h:%p -q ${BASTION_USER}@${BASTION_IP}"' ansible_ssh_retries=5
 EOF
+else
+cat << EOF > $SHARED_DIR/inventory
+[hypervisor]
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS} -C" ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_retries=5
+EOF
+fi
 
 echo "#############################################################################..."
 echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME  ========"
@@ -277,34 +333,6 @@ spec:
           name: sync-time-once.service
 EOF
 
-wait_for_mcp() {
-  timeout=${1}
-  # Wait until MCO starts applying new machine config to nodes
-  date
-  echo "Waiting for all MachineConfigPools to start updating..."
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc wait mcp worker --for='condition=UPDATING=True' --timeout=300s &>/dev/null
-  date
-  echo "Waiting for all MachineConfigPools to finish updating..."
-  timeout "${timeout}" bash <<EOT
-    until
-      KUBECONFIG=$SHARED_DIR/kubeconfig oc wait mcp worker --for='condition=UPDATED=True' --timeout=10s 2>/dev/null && \
-      KUBECONFIG=$SHARED_DIR/kubeconfig oc wait mcp worker --for='condition=UPDATING=False' --timeout=10s 2>/dev/null && \
-      KUBECONFIG=$SHARED_DIR/kubeconfig oc wait mcp worker --for='condition=DEGRADED=False' --timeout=10s;
-    do
-      sleep 10
-    done
-EOT
-  date
-  echo "All MachineConfigPools to finished updating"
-}
-
-log_chronyd_status() {
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc version || true
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
-}
-
 
 #Set status and run playbooks
 status=0
@@ -327,19 +355,9 @@ if [[ ! -f "$SHARED_DIR/kubeconfig" ]]; then
   status=1
 fi
 
-if [[ -f "$SHARED_DIR/kubeconfig" ]]; then
-  echo "************ Cluster version (oc get clusterversion) ************"
-  if ! KUBECONFIG="$SHARED_DIR/kubeconfig" oc get clusterversion; then
-    echo "ERROR: oc get clusterversion failed (API unreachable, auth, or oc missing in this ref)"
-    status=1
-  fi
-  echo "****************************************************************"
-fi
+# The CI pod does not run oc against the cluster. Keep the same informational
+# lines the setup emitted when the RDU3 API was not directly reachable.
+echo "INFO: cluster API is not directly reachable from the CI pod;"
+echo "INFO: skipping local oc checks. The test step runs on the hypervisor with its local kubeconfig."
 
-if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then
-  #installer has issues applying machine-configs with OCP 4.10, using manual way
-  KUBECONFIG="$SHARED_DIR/kubeconfig" oc apply -f "$SHARED_DIR/disable_ntp.yml" || true
-  wait_for_mcp "2700s" || true
-  log_chronyd_status || true
-fi
 exit $status
