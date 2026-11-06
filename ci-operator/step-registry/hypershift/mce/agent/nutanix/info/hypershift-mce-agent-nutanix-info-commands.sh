@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+# OpenShift assigns an arbitrary UID, and OpenSSH requires a passwd entry for it.
+if ! getent passwd "$(id -u)" >/dev/null; then
+  /usr/local/bin/fix_uid.sh
+fi
+
 tracing_enabled=false
 if [[ $- == *x* ]]; then tracing_enabled=true; fi
 
