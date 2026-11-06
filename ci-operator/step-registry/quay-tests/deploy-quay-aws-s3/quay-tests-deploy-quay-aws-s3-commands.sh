@@ -143,12 +143,23 @@ done
 # Verify the bucket exists before proceeding (terraform-native: the step
 # container has no aws CLI — rehearsal build 2115841047585099776 failed with
 # 'aws: command not found' at the original head-bucket check)
-echo "Verifying S3 bucket ${QUAY_AWS_S3_BUCKET} exists..."
-if ! terraform state list | grep -q '^aws_s3_bucket\.quayaws$'; then
-  echo "S3 bucket ${QUAY_AWS_S3_BUCKET} not present in terraform state" >&2
+echo "Verifying S3 bucket ${QUAY_AWS_S3_BUCKET} in terraform state..."
+# Compare the bucket name stored in terraform state (not just resource
+# presence): the state's aws_s3_bucket.quayaws must be the bucket this run
+# created, otherwise Quay would be configured against an unverified store.
+if ! terraform state show -no-color aws_s3_bucket.quayaws |
+  awk -v expected="${QUAY_AWS_S3_BUCKET}" '
+    $1 == "bucket" && $2 == "=" {
+      value = $3
+      gsub(/^"|"$/, "", value)
+      if (value == expected) found = 1
+    }
+    END { exit !found }
+  '; then
+  echo "S3 bucket ${QUAY_AWS_S3_BUCKET} is not the bucket in terraform state" >&2
   exit 1
 fi
-echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully (terraform state)"
+echo "S3 bucket ${QUAY_AWS_S3_BUCKET} verified successfully (terraform state, name compared)"
 
 #Share Terraform Var and Terraform Directory
 echo "${QUAY_AWS_S3_BUCKET}" > ${SHARED_DIR}/QUAY_AWS_S3_BUCKET
