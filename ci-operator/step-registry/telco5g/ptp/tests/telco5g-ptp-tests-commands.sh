@@ -1,9 +1,64 @@
 #!/bin/bash
 
+if [[ "${RUN_ON_HYPERVISOR:-false}" != "true" ]]; then
+  set -o nounset
+  set -o errexit
+  set -o pipefail
+
+  if [ -x "$HOME/fix_uid.sh" ]; then
+    "$HOME/fix_uid.sh"
+  fi
+
+  CLUSTER_HV_IP="$(cat "$SHARED_DIR/hv-ip" 2>/dev/null || echo 10.6.34.246)"
+  BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+  BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
+  SSH_PKEY="${HOME}/key"
+  cp /var/run/ci-key/cikey "$SSH_PKEY"
+  chmod 600 "$SSH_PKEY"
+  COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
+  hv_ssh() {
+    ssh -i "${SSH_PKEY}" ${COMMON_SSH_ARGS} -C -o BatchMode=yes \
+      -o "ProxyCommand=ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -o BatchMode=yes -W %h:%p -q ${BASTION_USER}@${BASTION_IP}" \
+      "kni@${CLUSTER_HV_IP}" "$@"
+  }
+
+  # Prevent concurrent runs on the hypervisor. A live pid file means another
+  # test run owns the cluster; a stale pid file is removed.
+  if hv_ssh "test -e ~/runner/test.pid"; then
+    if hv_ssh "kill -0 \$(cat ~/runner/test.pid) 2>/dev/null"; then
+      echo "ERROR: a PTP test run is already in progress on the hypervisor (~/runner/test.pid)"
+      exit 1
+    fi
+    hv_ssh "rm -f ~/runner/test.pid"
+  fi
+
+  # Start from a clean runner directory, copy the test script and the CI environment,
+  # then run the test shell there in the background.
+  hv_ssh "rm -rf ~/runner && mkdir -p ~/runner/shared ~/runner/artifacts ~/runner/output"
+  {
+    for var in T5CI_VERSION T5CI_JOB_TYPE T5CI_DEPLOY_UPSTREAM E2E_TESTS_CONFIG EVENT_PROXY_IMAGE TEST_REPO TEST_BRANCH PTP_REPO PTP_UNDER_TEST_BRANCH DAEMON_REPO CEP_REPO SKIP_INTERFACES COLLECT_POD_LOGS PTP_LOG_LEVEL NAMESPACE JOB_NAME JOB_SPEC BUILD_ID PROW_JOB_ID; do
+      if [[ -n "${!var:-}" ]]; then
+        printf 'export %s=%q\n' "$var" "${!var}"
+      fi
+    done
+  } > "$SHARED_DIR/ci.env"
+  cat > "$SHARED_DIR/telco5g-ptp-tests-commands.sh" <<'TEST_SCRIPT'
+#!/bin/bash
 set -x
 set -o nounset
 set -o errexit
 set -o pipefail
+
+# Load the CI environment copied by the launcher (the test runs on the hypervisor).
+if [[ -f "$SHARED_DIR/ci.env" ]]; then
+  source "$SHARED_DIR/ci.env"
+fi
+
+# The CI container runs with a random UID that has no passwd entry. ssh needs
+# one to resolve the local user, otherwise it exits with "No user exists for uid".
+if [ -x "$HOME/fix_uid.sh" ]; then
+  "$HOME/fix_uid.sh"
+fi
 
 # ===========================================================================
 # CONFIGURATION
@@ -28,9 +83,10 @@ fi
 export USE_CEPV2
 
 # --- Source repos and branches ---
-# Test code: repo and branch for the conformance test suite
-export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-export TEST_BRANCH="${TEST_BRANCH:-main}"
+# Test code: repo and branch for the conformance test suite.
+# TEMP: use the fix-downstream-ci branch from edcdavid's fork for this run.
+export TEST_REPO="https://github.com/edcdavid/ptp-operator-upstream.git"
+export TEST_BRANCH="fix-downstream-ci"
 
 # Product under test: repo and branch for the operator being deployed
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
@@ -45,7 +101,7 @@ fi
 
 # --- Test settings ---
 export PTP_LOG_LEVEL="${PTP_LOG_LEVEL:-debug}"
-export SKIP_INTERFACES="${SKIP_INTERFACES:-eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12399}"
+export SKIP_INTERFACES="${SKIP_INTERFACES:-eno12399,eno12409,eno8303,eno8303np0,eno8403,eno8403np1,eno8503np2,eno8603np3,ens3f0,ens3f1,ens5f0,ens5f1,ens5f2,ens5f3,ens6f0,ens6f1,ens7f3}"
 export COLLECT_POD_LOGS="${COLLECT_POD_LOGS:-true}"
 
 # --- Event API, consumer image, and test modes (version-dependent) ---
@@ -69,13 +125,13 @@ else
 fi
 
 # Test modes by release:
-#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm
-#   ---------+----+----+-----------+-------------+--------------+-----+----
-#   4.12     | Y  | Y  |           |             |              |     |
-#   4.13-4.15| Y  | Y  | Y         |             |              |     |
-#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |
-#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y
-#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y
+#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm | tgmoc | tgmbc
+#   ---------+----+----+-----------+-------------+--------------+-----+-----+-------+------
+#   4.12     | Y  | Y  |           |             |              |     |     |       |
+#   4.13-4.15| Y  | Y  | Y         |             |              |     |     |       |
+#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |     |       |
+#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y   |       |
+#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y   | Y     | Y
 if [[ "$T5CI_VERSION" == 4.12 ]]; then
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
   TEST_MODES=("bc" "oc")
@@ -91,19 +147,18 @@ elif [[ "$T5CI_VERSION" == 4.19 ]]; then
 else
   # 4.20+
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
-  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  TEST_MODES=("tgm" "tbc" "tgmoc" "tgmbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
 fi
 
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# Build script that runs inside the podman builder pod.
-# Clones, builds, and pushes PTP operator / daemon / sidecar images.
-# Placeholder tokens (PTP_IMAGE, OPERATOR_VERSION, etc.) are substituted
-# by build_pod_definition() before the pod is created.
+# Build scripts that run inside the podman builder containers.
+# The operator, daemon, and sidecar are built concurrently in separate
+# containers of the same privileged builder pod.
 # ---------------------------------------------------------------------------
-build_script() {
-  cat <<'BUILDSCRIPT'
+build_preamble() {
+  cat <<'PREAMBLE'
 set -xe
 yum install jq git wget podman-docker -y
 yum group install "development-tools" -y
@@ -116,99 +171,90 @@ go version
 set +xe
 
 echo "podman login with serviceaccount"
-
-# Used for 4.16 and newer releases.
-pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
+pass=$( jq '.["image-registry.openshift-image-registry.svc:5000"].auth' /var/run/secrets/openshift.io/push/.dockercfg )
 pass=`echo ${pass:1:-1} | base64 -d`
 podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
-
-# Used for 4.15 and older releases.
 if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
-  pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+  pass=$( jq '.["image-registry.openshift-image-registry.svc:5000"].password' /var/run/secrets/openshift.io/push/.dockercfg )
   podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
 fi
-
 set -x
-
-export IMG=PTP_IMAGE
-export DAEMON_IMG="DAEMON_IMAGE"
-export SIDECAR_IMG="SIDECAR_IMAGE"
 
 export T5CI_VERSION="T5CI_VERSION_VAL"
 export USE_UPSTREAM="USE_UPSTREAM_VAL"
 export USE_CEPV2="USE_CEPV2_VAL"
+PREAMBLE
+}
 
-# Clone the operator under test (OPERATOR_VERSION = PTP_UNDER_TEST_BRANCH: the
-# fork/upstream branch for upstream runs, or release-<version> for downstream).
+build_operator_script() {
+  build_preamble
+  cat <<'OPERATOR'
+export IMG=PTP_IMAGE
 echo "Cloning ptp-operator branch OPERATOR_VERSION"
 git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
 cd ptp-operator
-# OCPBUGS-52327 fix build due to libresolv.so link error
 sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
-# For UPSTREAM use Dockerfile for upstream contents
 if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
   sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
   make docker-build
 else
-  # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions for non-UPSTREAM runs
-  if [ -f "Dockerfile.ocp" ]; then
-    DOCKERFILE="Dockerfile.ocp"
-  else
-    DOCKERFILE="Dockerfile.ci"
-  fi
+  if [ -f "Dockerfile.ocp" ]; then DOCKERFILE="Dockerfile.ocp"; else DOCKERFILE="Dockerfile.ci"; fi
   sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
   podman build -t "${IMG}" -f "$DOCKERFILE"
 fi
-podman push ${IMG} --tls-verify=false
-cd ..
+podman push "${IMG}" --tls-verify=false
+OPERATOR
+}
 
+build_daemon_script() {
+  build_preamble
+  cat <<'DAEMON'
+export DAEMON_IMG="DAEMON_IMAGE"
 if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
-  # If we a running a downstream run we are done
+  echo "Downstream run: skipping upstream linuxptp-daemon build"
   exit 0
 fi
-
-# If were running upstream we should also use the upstream daemon!
 echo "Running on upstream main branch of linuxptp-daemon"
 git clone --single-branch --branch main DAEMON_REPO_URL
 cd linuxptp-daemon
-# Split DAEMON_IMG into IMAGE_TAG_BASE and VERSION because
-# hack/build-image.sh unconditionally overwrites IMG from these two vars.
 IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
-podman push ${DAEMON_IMG} --tls-verify=false
+podman push "${DAEMON_IMG}" --tls-verify=false
+DAEMON
+}
 
+build_sidecar_script() {
+  build_preamble
+  cat <<'SIDECAR'
+export SIDECAR_IMG="SIDECAR_IMAGE"
+if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
+  echo "Downstream run: skipping upstream sidecar build"
+  exit 0
+fi
 if [[ "${USE_CEPV2:-false}" == "true" ]]; then
-  # 5.1+: cloud-event-proxy (CEPv2) is built from linuxptp-daemon/Dockerfile.cep;
-  # there is no longer a standalone cloud-event-proxy repo.
   echo "Building cloud-event-proxy (CEPv2) from linuxptp-daemon/Dockerfile.cep"
+  git clone --single-branch --branch main DAEMON_REPO_URL
+  cd linuxptp-daemon
   podman build -t "${SIDECAR_IMG}" -f Dockerfile.cep .
-  podman push ${SIDECAR_IMG} --tls-verify=false
-  cd ..
+  podman push "${SIDECAR_IMG}" --tls-verify=false
 else
-  cd ..
-  # <5.1: cloud-event-proxy (CEPv1) is built from its standalone repo.
   echo "Running on main branch of cloud-event-proxy"
   git clone --single-branch --branch main CEP_REPO_URL
   cd cloud-event-proxy
   IMG=${SIDECAR_IMG} make podman-build
-  podman push ${SIDECAR_IMG} --tls-verify=false
-  cd ..
+  podman push "${SIDECAR_IMG}" --tls-verify=false
 fi
-BUILDSCRIPT
+SIDECAR
 }
 
 # ---------------------------------------------------------------------------
 # Assemble the RBAC + Pod YAML for the builder pod.
-# Substitutes all placeholder tokens and returns the final manifest on stdout.
-# Requires: dockercfg_secret (name of the builder-dockercfg-* secret)
 # ---------------------------------------------------------------------------
 build_pod_definition() {
   local dockercfg_secret=$1
-  local script
-  script=$(build_script)
-
-  # Indent the build script to fit inside the YAML command block (10 spaces)
-  local indented_script
-  indented_script=$(echo "$script" | sed 's/^/          /')
+  local operator_script daemon_script sidecar_script
+  operator_script=$(build_operator_script | sed 's/^/          /')
+  daemon_script=$(build_daemon_script | sed 's/^/          /')
+  sidecar_script=$(build_sidecar_script | sed 's/^/          /')
 
   cat <<EOF
 ---
@@ -230,7 +276,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  managedFields:
   name: privileged-rights
   namespace: openshift-ptp
 roleRef:
@@ -251,15 +296,51 @@ spec:
   restartPolicy: Never
   serviceAccountName: builder
   containers:
-    - name: priv
+    - name: operator
       image: quay.io/podman/stable:v4.9.4
-      command:
-        - /bin/bash
-        - -c
+      command: ["/bin/bash", "-c"]
+      args:
         - |
-${indented_script}
+${operator_script}
       securityContext:
         privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
+    - name: daemon
+      image: quay.io/podman/stable:v4.9.4
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+${daemon_script}
+      securityContext:
+        privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
+    - name: sidecar
+      image: quay.io/podman/stable:v4.9.4
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+${sidecar_script}
+      securityContext:
+        privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
       volumeMounts:
         - mountPath: /var/run/secrets/openshift.io/push
           name: dockercfg
@@ -329,26 +410,25 @@ build_images() {
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
-  # Wait for builder pod to complete
-  local success=0 iterations=0 sleep_time=10 max_iterations=120
-  until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]; do
-    run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
-    if [ "$run_status" == "Succeeded" ]; then
-      success=1
-      break
-    elif [ "$run_status" == "Failed" ]; then
-      echo "[ERROR] builder pod failed at iteration ${iterations}"
-      break
-    fi
-    iterations=$((iterations + 1))
-    sleep $sleep_time
-  done
+  # Wait for builder pod to complete, failing fast on Succeeded or Failed.
+  local wait_timeout=1200
+  oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/podman -n openshift-ptp --timeout="${wait_timeout}s" >/dev/null 2>&1 &
+  local success_pid=$!
+  oc wait --for=jsonpath='{.status.phase}'=Failed pod/podman -n openshift-ptp --timeout="${wait_timeout}s" >/dev/null 2>&1 &
+  local failed_pid=$!
+  wait -n "${success_pid}" "${failed_pid}" || true
+  kill "${success_pid}" "${failed_pid}" 2>/dev/null || true
+  wait "${success_pid}" "${failed_pid}" 2>/dev/null || true
+  run_status=$(oc -n openshift-ptp get pod podman -o jsonpath='{.status.phase}' 2>/dev/null || echo Unknown)
 
   echo "[INFO] --- builder pod logs ---"
-  oc -n openshift-ptp logs podman
+  for c in operator daemon sidecar; do
+    echo "[INFO] --- builder container: ${c} ---"
+    oc -n openshift-ptp logs podman -c "${c}" || true
+  done
   echo "[INFO] --- end builder pod logs ---"
 
-  if [[ $success -eq 1 ]]; then
+  if [[ "${run_status}" == "Succeeded" ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed (status: ${run_status})"
@@ -423,7 +503,17 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
+# The tests run directly on the hypervisor, which has access to the cluster API.
 export KUBECONFIG=$SHARED_DIR/kubeconfig
+
+# The setup step generates the NTP MachineConfigs in SHARED_DIR. Apply them
+# from the hypervisor with its local kubeconfig; no CI-pod API port-forward.
+if [[ -f "$SHARED_DIR/disable_ntp.yml" ]]; then
+  echo "[INFO] Applying NTP MachineConfigs"
+  oc apply -f "$SHARED_DIR/disable_ntp.yml"
+  oc wait mcp worker --for=condition=UPDATED=True --timeout=2700s
+  oc wait mcp worker --for=condition=UPDATING=False --timeout=600s
+fi
 
 echo "[INFO] ===== Step: Pre-flight checks ====="
 echo "************ Checking node readiness ************"
@@ -455,6 +545,14 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
 else
   source "$HOME"/golang-1.22.4
 fi
+# The product branch may require a newer Go toolchain (e.g. controller-gen
+# v0.18 needs Go 1.24) than the one in the runner image. Let Go fetch it.
+export GOTOOLCHAIN=auto
+# The image's golang profile points GOPATH at /go, which is root-owned
+# inside the container; use the writable HOME copy instead.
+export GOPATH="$HOME/go"
+export GOCACHE="$HOME/.cache/go-build"
+export GOMODCACHE="$GOPATH/pkg/mod"
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
@@ -473,7 +571,7 @@ build_images
 echo "[INFO] --- Build complete ---"
 
 echo "[INFO] --- Downloading latest oc client ---"
-mkdir ~/bin
+mkdir -p ~/bin
 wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 tar -zxvf openshift-client-linux.tar.gz -C ~/bin
 export PATH=$HOME/bin:$PATH
@@ -542,6 +640,7 @@ cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 global:
   maxoffset: 100
   minoffset: -100
+  holdover_timeout: 600
 soaktest:
   disable_all: false
   event_output_file: "./event-output.csv"
@@ -596,8 +695,20 @@ export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 # ---------------------------------------------------------------------------
 # Run test suites for each mode
 # ---------------------------------------------------------------------------
-echo "[INFO] --- Waiting 300s for OpenShift to complete initialization ---"
-sleep 300
+echo "[INFO] --- Waiting for PTP operator and linuxptp-daemon to become ready ---"
+if ! kubectl rollout status deployment/ptp-operator -n openshift-ptp --timeout=300s; then
+  echo "[ERROR] PTP operator deployment did not become ready"
+  kubectl get deployment,daemonset,pods -n openshift-ptp -o wide || true
+  kubectl describe deployment/ptp-operator -n openshift-ptp || true
+  exit 1
+fi
+if ! kubectl rollout status daemonset/linuxptp-daemon -n openshift-ptp --timeout=300s; then
+  echo "[ERROR] linuxptp-daemon daemonset did not become ready"
+  kubectl get deployment,daemonset,pods -n openshift-ptp -o wide || true
+  kubectl describe daemonset/linuxptp-daemon -n openshift-ptp || true
+  exit 1
+fi
+echo "[INFO] --- PTP operator and linuxptp-daemon are ready ---"
 
 print_time  # RTC logs
 
@@ -606,12 +717,12 @@ for mode in "${TEST_MODES[@]}"; do
   echo "[INFO] --- Running tests for PTP_TEST_MODE=${mode} ---"
 
   export PTP_TEST_MODE="${mode}"
-  export JUNIT_OUTPUT_FILE="test_results_${PTP_TEST_MODE}.xml"
+  export JUNIT_OUTPUT_FILE="test_results.xml"
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
   exit_code=0
-  make functests || exit_code=$?
+  ./scripts/run-tests.sh --kind both --mode "${mode}" || exit_code=$?
   declare "$temp_status=$exit_code"
 
   # Get RTC logs
@@ -686,3 +797,34 @@ set -e
 # return saved status
 echo "[INFO] ===== Done (exit ${status}) ====="
 exit "${status}"
+TEST_SCRIPT
+  tar -C "$SHARED_DIR" -cf - . | hv_ssh "tar -C ~/runner/shared -xf -"
+
+  hv_ssh "command -v podman >/dev/null 2>&1" \
+    || { echo "ERROR: hypervisor is missing podman"; exit 1; }
+  hv_ssh "podman image exists registry.ci.openshift.org/ci/telco-runner:latest >/dev/null 2>&1 || podman pull registry.ci.openshift.org/ci/telco-runner:latest >/dev/null 2>&1" \
+    || { echo "ERROR: unable to pull the telco-runner image on the hypervisor"; exit 1; }
+
+  # The image uses /output as HOME, but that path is root-owned in the image.
+  # Seed a writable copy so the test can create ~/bin and download oc.
+  hv_ssh "podman run --rm --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/dest:Z registry.ci.openshift.org/ci/telco-runner:latest -c 'cp -a /output/. /dest/'" \
+    || { echo "ERROR: unable to seed a writable /output for the test container"; exit 1; }
+
+  hv_ssh "cd ~/runner && nohup bash -c 'podman run --rm --name telco5g-ptp-tests --net=host --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/output:Z -v ~/runner:/runner:Z -e RUN_ON_HYPERVISOR=true -e SHARED_DIR=/runner/shared -e ARTIFACT_DIR=/runner/artifacts -w /runner registry.ci.openshift.org/ci/telco-runner:latest /runner/shared/telco5g-ptp-tests-commands.sh; rc=\$?; echo \$rc > ~/runner/test.exitcode; rm -f ~/runner/test.pid' > ~/runner/tests-output.log 2>&1 & echo \$! > ~/runner/test.pid"
+
+  while hv_ssh "test -e ~/runner/test.pid"; do
+    echo "Waiting for the hypervisor test run..."
+    sleep 30
+  done
+
+  mkdir -p "$ARTIFACT_DIR"
+  if hv_ssh "test -d ~/runner/artifacts"; then
+    hv_ssh "tar -C ~/runner/artifacts -cf - ." | tar -C "$ARTIFACT_DIR" -xf - || true
+  fi
+  if hv_ssh "test -f ~/runner/tests-output.log"; then
+    hv_ssh "cat ~/runner/tests-output.log" > "$ARTIFACT_DIR/tests-output.log"
+    cat "$ARTIFACT_DIR/tests-output.log"
+  fi
+  rc="$(hv_ssh "cat ~/runner/test.exitcode" 2>/dev/null || echo 1)"
+  exit "$rc"
+fi
