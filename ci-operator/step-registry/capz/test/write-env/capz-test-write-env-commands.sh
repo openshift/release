@@ -89,9 +89,10 @@ MSI_SUFFIX=""
 MSI_RESOURCEGROUPNAME="${MSI_RESOURCEGROUPNAME:-}"
 if [[ -n "${LEASED_MSI_CONTAINERS:-}" && -z "${MSI_RESOURCEGROUPNAME}" ]]; then
   read -r MSI_RESOURCEGROUPNAME _ <<< "${LEASED_MSI_CONTAINERS}"
-  # Extract MSI_SUFFIX from slot-managed container RG name
-  # (e.g. aro-hcp-msi-container-dev-shard0-04-00 → shard0-04-00).
-  if [[ "$MSI_RESOURCEGROUPNAME" =~ ^aro-hcp-msi-container-[a-z]+-(.+)$ ]]; then
+  # Extract MSI_SUFFIX from either a Boskos test-pool RG or a slot-managed RG.
+  if [[ "$MSI_RESOURCEGROUPNAME" =~ ^aro-hcp-test-msi-containers-[a-z]+-([0-9]+)$ ]]; then
+    MSI_SUFFIX="${BASH_REMATCH[1]}"
+  elif [[ "$MSI_RESOURCEGROUPNAME" =~ ^aro-hcp-msi-container-[a-z]+-(.+)$ ]]; then
     MSI_SUFFIX="${BASH_REMATCH[1]}"
   fi
   echo "[write-env] Using pre-existing MSI from Boskos pool: ${MSI_RESOURCEGROUPNAME}"
