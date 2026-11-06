@@ -1,0 +1,92 @@
+# promtool unit tests for repo-brancher-fast-forward-failures.
+# Anti-flap intent (same requirement as the other ops alerts): the alert must fire
+# when repo-brancher logs permanent reconciliation errors and stay CONTINUOUSLY fired
+# while they recur -- never resolve-then-refire mid-failure -- then resolve once the
+# errors stop. The signal is a counter, repo_brancher_reconciliations_total
+# {result="permanent_error"}; the 24h increase window bridges the controller's sparse
+# re-attempts, and increase() tolerates counter resets (pod restarts).
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. NO FLAP under sustained/sparse failures: the counter increments at t=30m, 120m,
+  #    240m, 360m (hours apart, like the controller's real re-attempt cadence). The
+  #    alert must fire once and stay firing continuously at every checkpoint -- it must
+  #    NOT resolve between the sparse increments.
+  - interval: 1m
+    input_series:
+      - series: 'repo_brancher_reconciliations_total{job="repo-brancher-controller", result="permanent_error"}'
+        values: '0+0x29 1+0x89 2+0x119 3+0x119 4+0x239'
+    alert_rule_test:
+      - eval_time: 36m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+      - eval_time: 200m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+      - eval_time: 599m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+
+  # 2. Counter RESET (controller pod restart) mid-failure must not cause a flap: the
+  #    counter rises to 1 at t=30m, resets to 0 at t=200m (restart), rises again at
+  #    t=250m. increase() accounts for the reset, so the alert stays firing throughout.
+  - interval: 1m
+    input_series:
+      - series: 'repo_brancher_reconciliations_total{job="repo-brancher-controller", result="permanent_error"}'
+        values: '0+0x29 1+0x169 0+0x49 1+0x349'
+    alert_rule_test:
+      - eval_time: 36m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+      - eval_time: 300m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+
+  # 3. RESOLVE once failures stop: a single error at t=30m, then quiet. It fires while
+  #    the error is within the 24h window and resolves after the window empties
+  #    (+ keep_firing_for). Coarse 30m interval so the series can span >25h.
+  - interval: 30m
+    input_series:
+      - series: 'repo_brancher_reconciliations_total{job="repo-brancher-controller", result="permanent_error"}'
+        values: '0 1+0x51'
+    alert_rule_test:
+      - eval_time: 300m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              ops_color: orange
+              ops_category: repo_automation
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+      - eval_time: 1560m
+        alertname: repo-brancher-fast-forward-failures
+        exp_alerts: []

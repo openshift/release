@@ -437,6 +437,39 @@ local infraJobAnnotations = {
         ],
       },
       {
+        name: 'repo-brancher-fast-forward-failures',
+        rules: [
+          {
+            alert: 'repo-brancher-fast-forward-failures',
+            // The repo-brancher-controller (app.ci) posts branch fast-forward failures to
+            // #ops-testplatform as the "DPTP Bot", bypassing Alertmanager. It also exports
+            // repo_brancher_reconciliations_total{result="permanent_error"} (scraped via its
+            // ServiceMonitor; present in ci-metrics), which counts permanent reconciliation
+            // errors -- the non-fast-forward failures. Alerting on those routes the signal
+            // through Alertmanager like every other ops alert (deduplicated, silenceable).
+            // The counter carries no org/repo/branch labels, so this alert cannot name the
+            // failing repo; the controller logs and the #ops-testplatform "Repo brancher
+            // fast-forward failures" history have the specifics. For per-repo detail, add a
+            // labelled failure gauge to the controller in openshift/ci-tools. The 24h
+            // lookback matches the bot's re-report cadence and keeps the alert firing across
+            // the manual fix.
+            expr: |||
+              sum(increase(repo_brancher_reconciliations_total{job="repo-brancher-controller",result="permanent_error"}[24h])) > 0
+            |||,
+            'for': '5m',
+            'keep_firing_for': '1h',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              ops_color: 'orange',
+              ops_category: 'repo_automation',
+              message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.',
+            },
+          }
+        ],
+      },
+      {
         name: 'pod-scaler-admission-resource-warning',
         rules: [
           {

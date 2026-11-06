@@ -547,6 +547,19 @@ spec:
       for: 1m
       labels:
         severity: critical
+  - name: repo-brancher-fast-forward-failures
+    rules:
+    - alert: repo-brancher-fast-forward-failures
+      annotations:
+        message: 'repo-brancher-controller has had permanent reconciliation errors (e.g. branch fast-forward "non_fast_forward" failures) in the last 24h; these need manual intervention (force fast-forward). Check the controller logs and the #ops-testplatform "Repo brancher fast-forward failures" history for the affected org/repo/branch.'
+        ops_category: repo_automation
+        ops_color: orange
+      expr: |
+        sum(increase(repo_brancher_reconciliations_total{job="repo-brancher-controller",result="permanent_error"}[24h])) > 0
+      for: 5m
+      keep_firing_for: 1h
+      labels:
+        severity: critical
   - name: pod-scaler-admission-resource-warning
     rules:
     - alert: pod-scaler-admission-resource-warning
