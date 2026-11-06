@@ -65,9 +65,68 @@ oc version --client
 # Live fetch, not a cached/webhook copy: this is what makes step 4 above
 # ("edit Depends-On after the fact, then /test") work -- every run of this
 # step re-reads whatever the PR description says right now.
+#
+# FETCH RESILIENCE: the anonymous GitHub API is frequently unreachable from
+# build-farm step pods (their shared egress IP sits over GitHub's 60 req/hr
+# anonymous limit; observed as an immediate failure in every CI run of this
+# step so far -- e.g. the openshift/release#84228 and #88443 rehearsals and
+# openshift/oadp-operator#2531's post-#84228 e2e-test-aws run, all failing
+# this exact fetch before any test ran). A failed description fetch must NOT
+# fail the whole job: every presubmit this step is wired into would go red
+# before its own tests even start. So: retry direct, then retry through the
+# TEST cluster's own egress (a different NAT IP than the build farm's), and
+# only if every path fails, degrade to a no-op with a loud warning plus a
+# marker artifact -- Depends-On resolution being down stays visible in the
+# log and artifacts, while the job itself is unaffected.
 echo "[$(date --utc +%FT%T.%3NZ)] Fetching PR description for ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER}"
-PR_JSON=$(curl -sf -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
-  "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}")
+PR_API_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}"
+CURL_HEADERS=(-H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+
+fetch_pr_json() {
+    # $1: "direct" or "via-test-cluster". Body -> /tmp/depends-on-pr.json,
+    # curl stderr -> /tmp/depends-on-curl.err, http code -> stdout (direct
+    # mode only; the pod mode validates by content instead).
+    if [[ "${1}" == "direct" ]]; then
+        curl -s -S -o /tmp/depends-on-pr.json -w '%{http_code}' "${CURL_HEADERS[@]}" "${PR_API_URL}" 2>/tmp/depends-on-curl.err
+        return
+    fi
+    # Alternate egress: one-shot pod on the TEST cluster this step already
+    # builds images in, whose NAT egress is a different IP than the build
+    # farm's. Best effort -- an unpullable image or equally blocked egress
+    # just falls through to the no-op path below.
+    local POD="depends-on-fetch-$(date +%s)"
+    timeout 150 oc run --rm -i --restart=Never --image=curlimages/curl "${POD}" -n "${OO_INSTALL_NAMESPACE}" -- \
+        curl -sf "${CURL_HEADERS[@]}" "${PR_API_URL}" > /tmp/depends-on-pr.json 2>/tmp/depends-on-curl.err
+}
+
+PR_JSON=""
+for MODE in direct via-test-cluster; do
+    for ATTEMPT in 1 2 3; do
+        set +o errexit
+        if [[ "${MODE}" == "direct" ]]; then
+            HTTP_CODE=$(fetch_pr_json direct)
+        else
+            HTTP_CODE=200
+            fetch_pr_json via-test-cluster
+        fi
+        CURL_RC=$?
+        set -o errexit
+        if [[ "${CURL_RC}" -eq 0 && "${HTTP_CODE:-}" == "200" && -s /tmp/depends-on-pr.json ]] \
+            && grep -q '"number"' /tmp/depends-on-pr.json; then
+            PR_JSON=$(cat /tmp/depends-on-pr.json)
+            break 2
+        fi
+        echo "[$(date --utc +%FT%T.%3NZ)] PR description fetch (${MODE}, attempt ${ATTEMPT}/3) failed: curl exit ${CURL_RC}, http ${HTTP_CODE:-none}, stderr: $(head -c 200 /tmp/depends-on-curl.err 2>/dev/null || echo none)" >&2
+        sleep $((ATTEMPT * 5))
+    done
+done
+rm -f /tmp/depends-on-pr.json /tmp/depends-on-curl.err
+
+if [[ -z "${PR_JSON}" ]]; then
+    echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not fetch the ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER} description from the GitHub API after all attempts -- Depends-On resolution is DISABLED for this run; continuing as a no-op so the job is not failed by it" >&2
+    echo "github-api-fetch-failed ${REPO_OWNER}/${REPO_NAME}#${PULL_NUMBER} $(date --utc +%FT%T.%3NZ)" >> "${ARTIFACT_DIR}/depends-on-fetch-failed.txt"
+    exit 0
+fi
 
 # Isolate just the JSON "body" field before scanning for Depends-On lines --
 # scanning the raw response risks a false match if the PR TITLE itself
@@ -78,8 +137,13 @@ PR_JSON=$(curl -sf -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Ver
 # image already assumes GNU coreutils (the `date --utc` calls throughout
 # this script are GNU-only too), and GNU grep's PCRE support is standard on
 # the RHEL/UBI base this image is built from.
-PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body":"(\\.|[^"\\])*"' | head -1)
-PR_BODY_ESCAPED="${PR_BODY_ESCAPED#\"body\":\"}"
+# GitHub's API returns pretty-printed JSON ("body": "..." with a space
+# after the colon), so the key match must tolerate that whitespace: a
+# '"body":"' pattern never matched the real payload, leaving the extraction
+# empty (and, under errexit+pipefail, failing the step via the grep no-match
+# exit code) even on a successful fetch.
+PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
+PR_BODY_ESCAPED="${PR_BODY_ESCAPED#\"body\": *\"}"
 PR_BODY_ESCAPED="${PR_BODY_ESCAPED%\"}"
 DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
 
