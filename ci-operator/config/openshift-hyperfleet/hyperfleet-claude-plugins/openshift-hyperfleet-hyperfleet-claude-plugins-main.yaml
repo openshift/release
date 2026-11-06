@@ -2,7 +2,8 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9/ubi:9.8-1791888712
-      RUN dnf install -y bc git jq make python3 && dnf clean all
+      RUN dnf module enable -y nodejs:22 && \
+          dnf install -y bc git jq make nodejs npm python3 python3-pip && dnf clean all
 resources:
   '*':
     limits:
@@ -13,7 +14,15 @@ resources:
 tests:
 - as: unit
   commands: |
+    set -euo pipefail
     export HOME=/tmp
+    # Bootstrap main has only make test; branches with lint declare its dependencies.
+    if [ -f package-lock.json ]; then
+      npm ci --ignore-scripts --no-fund --no-audit
+      python3 -m pip install --user -r requirements-lint.txt
+      export PATH="$HOME/.local/bin:$PATH"
+      make lint
+    fi
     make test
   container:
     from: src
