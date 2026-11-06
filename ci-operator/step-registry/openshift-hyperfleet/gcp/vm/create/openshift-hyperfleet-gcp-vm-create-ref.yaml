@@ -1,0 +1,51 @@
+ref:
+  as: openshift-hyperfleet-gcp-vm-create
+  from: cli
+  grace_period: 10m
+  commands: openshift-hyperfleet-gcp-vm-create-commands.sh
+  credentials:
+  - collection: hyperfleet
+    group: hyperfleet-e2e
+    mount_path: /var/run/hyperfleet-e2e
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 20m0s
+  env:
+  - name: GCP_VM_ZONE
+    default: us-central1-a
+    documentation: |-
+      The GCP zone to create the VM in.
+  - name: GCP_VM_MACHINE_TYPE
+    default: e2-standard-4
+    documentation: |-
+      The GCP machine type for the VM.
+  - name: GCP_VM_IMAGE_FAMILY
+    default: debian-12
+    documentation: |-
+      The image family to boot the VM from.
+  - name: GCP_VM_IMAGE_PROJECT
+    default: debian-cloud
+    documentation: |-
+      The project that provides the boot image family.
+  - name: GCP_VM_BOOT_DISK_SIZE
+    default: 100GB
+    documentation: |-
+      The boot disk size for the VM.
+  - name: GCP_VM_TTL_HOURS
+    default: "24"
+    documentation: |-
+      Hours from creation until the VM's ttl label expires. The VM is labeled
+      managed-by=prow, owner=hyperfleet-ci, project=hyperfleet, and ttl=<date> so that
+      it can be identified and reaped if the destroy step never runs.
+  documentation: |-
+    This step creates a GCP VM for HyperFleet per-run testing. The instance
+    name, zone, firewall rule name, public IP, SSH user, and SSH private key
+    are stored in ${SHARED_DIR} (gcp_vm_name, gcp_vm_zone,
+    gcp_vm_firewall_rule, gcp_vm_public_ip, gcp_vm_ssh_user, vm_ssh_key) for
+    use by the test step. The VM and its firewall rule are deleted by the
+    openshift-hyperfleet-gcp-vm-destroy step. Because of the way Prow creates
+    the shared directory, the private key file will have 644 permissions when
+    the test step starts; run `chmod 400 "${SHARED_DIR}/vm_ssh_key"` before
+    using it with ssh.
