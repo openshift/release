@@ -677,6 +677,29 @@ function get_yq() {
   return 0
 }
 
+# strip_vsphere_failure_domains deletes vcenters/failureDomains from the
+# generated Infrastructure manifest, simulating a cluster installed without
+# vSphere failure domain information (SPLAT-3028). Per the openshift/api
+# VSpherePlatformSpec/VSpherePlatformStatus types, both fields only exist
+# under spec.platformSpec.vsphere; status carries neither, so nothing else
+# needs touching. Unlike the other optional yq-based tweaks below, failing to
+# apply this is fatal: the whole point of a job setting
+# STRIP_VSPHERE_FAILURE_DOMAINS is to produce a legacy-shaped cluster, so
+# silently continuing without it would validate the wrong state instead.
+function strip_vsphere_failure_domains() {
+  local dir=${1}
+
+  if ! get_yq; then
+    echo "ERROR: yq is unavailable; cannot strip vcenters/failureDomains from the Infrastructure manifest" >&2
+    exit 1
+  fi
+
+  local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.vcenters"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains"
+}
+
 # inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
 function inject_boot_diagnostics() {
   local dir=${1}
@@ -1077,6 +1100,10 @@ spec:
   skippedImagestreams:
   - openliberty
 EOF
+    fi
+
+    if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+      strip_vsphere_failure_domains "${dir}"
     fi
     ;;
 esac
