@@ -217,6 +217,53 @@ tests:
     - ref: capz-arohcp-delete-workload-cluster
     - ref: capz-arohcp-validate-cleanup
   timeout: 4h0m0s
+- as: stage
+  cron: 0 20 * * 1-5
+  presubmit: true
+  reporter_config:
+    channel: '#hcm-aro-team-capz'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}}:slack-green: Job *{{.Spec.Job}}*
+      succeeded.{{else}}:failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.{{end}}
+      <{{.Status.URL}}|View logs>'
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ARO_HCP_ASSET_ADMISSION_OPTIONS: e2e_identities.cleanup-workers=2
+      ARO_HCP_DEPLOY_ENV: stg
+      ARO_HCP_SWEEPER_TAGS: "true"
+      ARO_REPO_BRANCH: aro-hcp-2026-09-01-preview
+      ARO_REPO_DIR: /tmp/cluster-api-installer-stg
+      ARO_REPO_URL: https://github.com/stolostron/cluster-api-installer.git
+      DEPLOY_CHARTS: "true"
+      LOCATION: westus3
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+      USE_KIND: "true"
+      VAULT_SECRET_PROFILE: stg-rh
+    post:
+    - ref: capz-arohcp-summary
+    - ref: capz-arohcp-teardown
+    - ref: capz-arohcp-cleanup-msi-roleassignments
+    - ref: capz-arohcp-aks-deprovision
+    - ref: aro-hcp-lease-release
+    pre:
+    - ref: aro-hcp-lease-acquire
+    - ref: capz-arohcp-write-env
+    - ref: capz-arohcp-aks-provision
+    - ref: capz-arohcp-check-dependencies
+    - ref: capz-arohcp-setup
+    test:
+    - ref: capz-arohcp-management-cluster
+    - ref: capz-arohcp-generate-yamls
+    - ref: capz-arohcp-cleanup-pre
+    - ref: capz-arohcp-deploy-crs
+    - ref: capz-arohcp-verify-workload-cluster
+    - ref: capz-arohcp-delete-workload-cluster
+    - ref: capz-arohcp-validate-cleanup
+  timeout: 4h0m0s
 - as: production
   cron: 0 20 * * 1-5
   reporter_config:
