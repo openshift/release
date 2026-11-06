@@ -59,16 +59,25 @@ typeset isForceUpdate="false"
 # ---------------------------------------------------------------------------
 # OPP operator pod readiness predicate (INTEROP-9672).
 #
-# Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N and
-# bootstrap pods -- exit (often to Error) once their upgrade batch completes
-# and are not OPP operator workload. They must not count against readiness:
-# the 5.0/5.1 upgrade lanes failed ValidateOppOperators on exactly these
-# pods while CVO, ClusterOperators and MachineConfigPools were all healthy
-# (runs 2118373032635404288 and 2118380423871467520).
+# Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N pods
+# -- exit (often to Error) once their upgrade batch completes and are not OPP
+# operator workload. They must not count against readiness: the 5.0/5.1
+# upgrade lanes failed ValidateOppOperators on exactly these pods while CVO,
+# ClusterOperators and MachineConfigPools were all healthy (runs
+# 2118373032635404288 and 2118380423871467520; pinned witnesses
+# 2116725542353899520 installer-3 x3, 2116930868332204032 installer-4).
+#
+# The exclusion is keyed to the CVO artifacts' structural naming — a numeric
+# batch id, an optional -retry-N, and the node hostname (installer-N
+# [-retry-N]-ip-<host>) — NOT to the bare installer-/bootstrap- prefix: a
+# genuinely failing OPP pod that merely starts with those words (e.g.
+# installer-quay-helper) must stay visible to readiness (CodeRabbit review
+# of this PR). Bootstrap pods follow the same tightened shape when they
+# carry it; a bootstrap-named pod without the hostname suffix stays visible.
 # ---------------------------------------------------------------------------
 function NotReadyOppPods () {
     # $1: `oc get pods --no-headers` output; prints the not-ready lines.
-    awk '$1 !~ /^installer-/ && $1 !~ /^bootstrap-/ && !/Completed/ && !/Running/ && !/Succeeded/' <<< "$1"
+    awk '$1 !~ /^installer-[0-9]+(-retry-[0-9]+)?-ip-/ && $1 !~ /^bootstrap-[0-9]+(-retry-[0-9]+)?-ip-/ && !/Completed/ && !/Running/ && !/Succeeded/' <<< "$1"
 }
 
 # --- Offline predicate self-test (phase 0) ----------------------------------
@@ -98,11 +107,15 @@ installer-3-retry-2-ip-10-0-3-205.us-east-2.compute.internal              0/1   
 bootstrap-1234567-deploy-pod                 0/1     Completed         0     58m
 quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
 rhacs-operator-controller-7f6d8b9c-pqrst      1/1     Running            0     60m
-installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m"
-    expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m"
+installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
+    expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
     got="$(NotReadyOppPods "${fixture}")"
     if [[ "${got}" != "${expected}" ]]; then
-        echo "selftest FAIL: mixed fixture must keep only the CrashLoopBackOff line; got:"
+        echo "selftest FAIL: mixed fixture must keep the CrashLoopBackOff line and the similarly-named OPP pods; got:"
         echo "${got}"
         (( failures += 1 ))
     fi
