@@ -2,7 +2,7 @@ ref:
   as: acm-interop-p2p-cluster-uninstall
   from: cli
   commands: acm-interop-p2p-cluster-uninstall-commands.sh
-  timeout: 3h0m0s
+  timeout: 4h0m0s
   grace_period: 30m0s
   resources:
     requests:
@@ -17,11 +17,15 @@ ref:
       finalizers; the script auto-strips them after this timeout so that Hive
       infrastructure deprovisioning always proceeds.
   - name: ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES
-    default: "60"
+    default: "90"
     documentation: |-
-      Minutes to wait per cluster for ClusterDeprovision to complete.
-      With multiple clusters, total wall-clock time can reach this value
-      multiplied by the number of clusters.
+      Minutes to wait per cluster for the ClusterDeprovision object to appear
+      and, in a separate wait, to complete. Each wait uses this limit, so one
+      cluster can take up to twice this value. Clusters are deprovisioned in
+      parallel, so wall-clock wait is approximately max(per-cluster times), not
+      their sum. Raised from 60 because slow AWS ELB/ENI cleanup often exceeded
+      the prior limit and left orphaned load balancers that compound quota
+      exhaustion.
   - name: ACM_CLUSTER_DEPROVISION_POLL_SECONDS
     default: "10"
     documentation: |-
@@ -44,6 +48,11 @@ ref:
     (e.g. because the spoke is unreachable), finalizers are stripped automatically
     so that Hive deprovisioning is never blocked.
 
+    Step timeout (4h) covers the default budgets: 10m ManagedCluster detach plus two
+    separate 90m ClusterDeprovision waits (appear, then complete). Clusters run in
+    parallel, so wall-clock is the slowest spoke, not the sum. The extra time lets
+    the script hit its own timeout and write diagnostics before CI kills the step.
+
     Cluster names are read from SHARED_DIR (written by acm-interop-p2p-cluster-install):
       - managed-cluster-names    (preferred; one name per line for multi-cluster)
       - managed-cluster-name-{N} (indexed files, e.g. managed-cluster-name-1)
@@ -51,7 +60,7 @@ ref:
 
     Env vars consumed:
       ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES   - minutes to wait for ACM detach before auto force-strip (default: 10)
-      ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES - per-cluster deprovision wait limit (default: 60)
+      ACM_CLUSTER_DEPROVISION_TIMEOUT_MINUTES - per-wait limit for ClusterDeprovision appearance and completion (default: 90; one cluster can take up to twice this)
       ACM_CLUSTER_DEPROVISION_POLL_SECONDS    - poll interval for ClusterDeprovision creation (default: 10)
       ACM_CLUSTER_UNINSTALL_FORCE_DELETE_MC   - strip ManagedCluster finalizers immediately (default: false)
       SHARED_DIR                              - shared artifact directory (provides cluster name files)

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 #
 # ACM Spoke Cluster Installation Script
 #
@@ -34,7 +35,6 @@
 #   - Sufficient leases acquired for the number of clusters
 #
 
-set -euxo pipefail; shopt -s inherit_errexit
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
@@ -73,6 +73,18 @@ fi
 # Ensure cluster count is a valid positive integer
 if [[ ! "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     : "ACM_SPOKE_CLUSTER_COUNT must be a positive integer, got: '${ACM_SPOKE_CLUSTER_COUNT}'"
+    exit 1
+fi
+
+# Hive ClusterDeployment.spec.installAttemptsLimit is *int32: a positive integer
+# no greater than 2147483647. Reject oversized values before jq --argjson.
+if [[ ! "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+    : "ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT must be a positive integer, got: '${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}'"
+    exit 1
+fi
+if (( ${#ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT} > 10 )) \
+    || [[ "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" -gt 2147483647 ]]; then
+    : "ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT exceeds Hive int32 maximum 2147483647, got: '${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}'"
     exit 1
 fi
 
@@ -496,7 +508,12 @@ ocEOF
     # Create ClusterDeployment - this is the main Hive resource
     # that triggers the actual cluster installation
     # Note: Uses the cluster-specific region from the lease
-    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}'"
+    # installAttemptsLimit: maximum number of install attempts. A limit of 3
+    # permits three total attempts (one initial attempt and two retries) before
+    # Hive sets ProvisionStopped=True (InstallAttemptsLimitReached). Default 3
+    # matches Hive's own default and allows transient AWS errors
+    # (e.g. LoadBalancerLimitExceeded) to self-heal.
+    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}' (installAttemptsLimit=${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT})"
     {
         oc create -f - --dry-run=client -o json --save-config |
         jq -c \
@@ -505,6 +522,7 @@ ocEOF
             --arg domain     "${BASE_DOMAIN}" \
             --arg clusterSet "${clusterName}-set" \
             --arg imageSet   "${clusterImagesetName}" \
+            --argjson attempts "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" \
             '
             .metadata.name                                         = $name      |
             .metadata.namespace                                    = $name      |
@@ -513,6 +531,7 @@ ocEOF
             .spec.baseDomain                                       = $domain    |
             .spec.clusterName                                      = $name      |
             .spec.platform.aws.region                              = $region    |
+            .spec.installAttemptsLimit                             = $attempts  |
             .spec.provisioning.imageSetRef.name                    = $imageSet
             ' |
         yq -p json -o yaml eval .
@@ -539,7 +558,7 @@ spec:
         name: acm-aws-secret
   pullSecretRef:
     name: pull-secret
-  installAttemptsLimit: 1
+  installAttemptsLimit: 3
   provisioning:
     installConfigSecretRef:
       name: install-config
@@ -651,7 +670,7 @@ WaitForManagedClusterAvailable() {
         : "Timed out waiting for ManagedCluster '${clusterName}' Available=True — current conditions:"
         oc get managedcluster "${clusterName}" \
             -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' \
-            2>/dev/null || true
+            || true
         return 1
     fi
 }
@@ -995,12 +1014,31 @@ done
 
 : "All cluster resources created. Waiting for provisioning..."
 
-# Phase 2: Wait for all clusters to complete provisioning
-# Each cluster typically takes 30-45 minutes to provision
+# Phase 2: Wait for all clusters concurrently. Each wait keeps its own
+# ACM_SPOKE_INSTALL_TIMEOUT_MINUTES budget, and the budgets overlap.
+# Each cluster typically takes 30-45 minutes to provision.
+typeset -a provisionPidsArr=()
+typeset -a provisionNamesArr=()
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
-    WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}"
+    WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}" &
+    provisionPidsArr+=("$!")
+    provisionNamesArr+=("${clusterNamesArr[i]}")
 done
+
+typeset -i provisionFailedCount=0
+typeset -i provisionIdx=0
+for pid in "${provisionPidsArr[@]}"; do
+    if ! wait "${pid}"; then
+        : "Provisioning failed for cluster '${provisionNamesArr[${provisionIdx}]}'"
+        (( provisionFailedCount++ )) || true
+    fi
+    (( provisionIdx++ )) || true
+done
+if [[ "${provisionFailedCount}" -gt 0 ]]; then
+    : "${provisionFailedCount} cluster(s) failed to provision"
+    exit 3
+fi
 
 : "All clusters provisioned. Extracting credentials..."
 
