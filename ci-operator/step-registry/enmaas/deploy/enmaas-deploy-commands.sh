@@ -293,24 +293,42 @@ echo "Image builds completed."
 # Patch enmaas.params to use internal registry images instead of quay.io/modden/
 echo "Patching enmaas.params for internal registry images..."
 INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000/enmaas"
+
+image_digest() {
+  oc get istag "$1:latest" -n enmaas -o jsonpath='{.image.metadata.name}'
+}
+
+set_param() {
+  local key="$1" value="$2"
+  if ! grep -q "^${key}=" "${PARAMS_FILE}"; then
+    echo "ERROR: ${key} not found in ${PARAMS_FILE}"
+    exit 1
+  fi
+  sed -i "s|^${key}=.*|${key}=${value}|" "${PARAMS_FILE}"
+}
+
 if [[ -f "${PARAMS_FILE}" ]]; then
-  if ! grep -q '^ENMAAS_API_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
-    echo "ERROR: ENMAAS_API_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
-    exit 1
-  fi
-  if ! grep -q '^METERING_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
-    echo "ERROR: METERING_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
-    exit 1
-  fi
-  if ! grep -q '^PRAXIS_IMAGE_REPOSITORY=' "${PARAMS_FILE}"; then
-    echo "ERROR: PRAXIS_IMAGE_REPOSITORY not found in ${PARAMS_FILE}"
-    exit 1
-  fi
-  sed -i "s|^ENMAAS_API_IMAGE_REPOSITORY=.*|ENMAAS_API_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/maas-api|" "${PARAMS_FILE}"
-  sed -i "s|^METERING_IMAGE_REPOSITORY=.*|METERING_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/metering-service|" "${PARAMS_FILE}"
-  sed -i "s|^PRAXIS_IMAGE_REPOSITORY=.*|PRAXIS_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/praxis-ai|" "${PARAMS_FILE}"
-  # Remove digest pins so :latest tag is used from ImageStream
-  sed -i '/^.*_IMAGE_DIGEST=/d' "${PARAMS_FILE}"
+  # Read digests from ImageStreamTags
+  MAAS_API_DIGEST=$(image_digest maas-api)
+  METERING_DIGEST=$(image_digest metering-service)
+  PRAXIS_DIGEST=$(image_digest praxis-ai)
+
+  # Validate digests
+  for digest_var in MAAS_API_DIGEST METERING_DIGEST PRAXIS_DIGEST; do
+    if [[ ! "${!digest_var}" =~ ^sha256: ]]; then
+      echo "ERROR: ${digest_var} does not start with sha256: (got '${!digest_var}')"
+      exit 1
+    fi
+  done
+
+  # Set image repositories and digests
+  set_param ENMAAS_API_IMAGE_REPOSITORY "${INTERNAL_REGISTRY}/maas-api"
+  set_param ENMAAS_API_IMAGE_DIGEST "${MAAS_API_DIGEST}"
+  set_param METERING_IMAGE_REPOSITORY "${INTERNAL_REGISTRY}/metering-service"
+  set_param METERING_IMAGE_DIGEST "${METERING_DIGEST}"
+  set_param PRAXIS_IMAGE_REPOSITORY "${INTERNAL_REGISTRY}/praxis-ai"
+  set_param VERTEX_IMAGE_DIGEST "${PRAXIS_DIGEST}"
+
   # Remove pull secret reference (internal registry needs no pull secret)
   sed -i '/^ENMAAS_API_IMAGE_PULL_SECRET=/d' "${PARAMS_FILE}"
   echo "enmaas.params patched for internal registry."
