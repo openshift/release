@@ -1,0 +1,294 @@
+base_images:
+  bm-https:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: bm-tdx-sanity
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  restrict_network_access: false
+  steps:
+    env:
+      OSC_BM_JOB: |
+        {
+          "machine": {
+            "id": "virtlab26118sifo"
+          },
+          "ocp": {
+            "build": "ga",
+            "topology": "sno",
+            "version": "latest-4.22"
+          },
+          "reservation": {
+            "release_on_error": true,
+            "release_on_fail": true
+          },
+          "runner": "0.1.0",
+          "schema_version": 1,
+          "test_plan": [
+            {
+              "profile": "default",
+              "suites": [
+                {
+                  "name": "simple",
+                  "tests": [
+                    "sanity"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      OSC_BM_PRE_SLEEP: 3h
+      OSC_BM_SECRET_DIR: /var/run/osc-bm-https
+    post:
+    - as: bm-post
+      commands: |
+        #!/usr/bin/env bash
+        # shellcheck disable=SC2154
+        set -euo pipefail
+        : "${ARTIFACT_DIR:?}" "${SHARED_DIR:?}"
+        test -s "${SHARED_DIR}/bm-job" || exit 0
+        read -r job < "${SHARED_DIR}/bm-job"
+        [[ "${job}" =~ ^[0-9a-f]{32}$ ]]
+        # shellcheck disable=SC2034
+        set +x
+        umask 077
+        work="$(mktemp -d)"
+        : "${OSC_BM_SECRET_DIR:?}"
+        read -r active < "${OSC_BM_SECRET_DIR}/active"
+        [[ "${active}" == blue || "${active}" == green ]]
+        client="${OSC_BM_SECRET_DIR}/${active}"
+        read -r endpoint < "${client}-endpoint-ip"
+        if [[ "${endpoint}" == *:* ]]; then
+            endpoint="[${endpoint}]"
+        fi
+        url="https://${endpoint}:443/v1/jobs"
+        curl_options=(--disable --silent --show-error --fail --proto '=https' --noproxy '*' --connect-timeout 30
+            --cacert "${client}-ca-bundle" --cert "${client}-client-cert" --key "${client}-client-key")
+
+        bm_curl() {
+            local budget="$1" output="$2"
+            shift 2
+            local deadline=$((SECONDS + budget)) attempt remaining status code delay=1
+            for attempt in 1 2 3 4; do
+                remaining=$((deadline - SECONDS))
+                (( remaining > 0 )) || return 28
+                code=0
+                # Each attempt replaces partial output; all attempts share one deadline.
+                status="$(curl "${curl_options[@]}" --max-time "${remaining}" \
+                    --output "${output}" --write-out '%{http_code}' "$@")" || code=$?
+                (( code == 0 )) && return 0
+                case "${code}:${status}" in
+                    7:*|18:*|28:*|52:*|55:*|56:*|22:408|22:429|22:500|22:502|22:503|22:504) ;;
+                    *) return "${code}" ;;
+                esac
+                (( attempt < 4 && SECONDS + delay < deadline )) || return "${code}"
+                sleep "${delay}"
+                delay=$((delay * 2))
+            done
+        }
+
+        bm_curl 895 "${work}/results.tar" \
+            --dump-header "${work}/headers" \
+            "${url}/${job}/artifacts"
+        tar --no-same-owner --no-same-permissions -xf "${work}/results.tar" -C "${ARTIFACT_DIR}"
+        failed=''
+        while IFS= read -r header; do
+            header="${header%$'\r'}"
+            case "${header,,}" in
+                x-osc-failed:*) failed="${header#*: }" ;;
+            esac
+        done < "${work}/headers"
+        [[ "${failed}" =~ ^[01]$ ]]
+        exit "${failed}"
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-https
+        mount_path: /var/run/osc-bm-https
+      env:
+      - documentation: Directory containing mounted HTTPS credentials.
+        name: OSC_BM_SECRET_DIR
+      from: bm-https
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
+    pre:
+    - as: bm-pre
+      commands: |
+        #!/usr/bin/env bash
+        # shellcheck disable=SC2154
+        set -euo pipefail
+        if [[ "${OSC_BM_PRE_SLEEP:-0}" != 0 ]]; then
+            sleep "${OSC_BM_PRE_SLEEP}"
+        fi
+        : "${OSC_BM_JOB:?}" "${PROW_JOB_ID:?}" "${SHARED_DIR:?}"
+        [[ "${PROW_JOB_ID}" =~ ^[a-zA-Z0-9._-]{1,200}$ ]]
+        # shellcheck disable=SC2034
+        set +x
+        umask 077
+        work="$(mktemp -d)"
+        : "${OSC_BM_SECRET_DIR:?}"
+        read -r active < "${OSC_BM_SECRET_DIR}/active"
+        [[ "${active}" == blue || "${active}" == green ]]
+        client="${OSC_BM_SECRET_DIR}/${active}"
+        read -r endpoint < "${client}-endpoint-ip"
+        if [[ "${endpoint}" == *:* ]]; then
+            endpoint="[${endpoint}]"
+        fi
+        url="https://${endpoint}:443/v1/jobs"
+        curl_options=(--disable --silent --show-error --fail --proto '=https' --noproxy '*' --connect-timeout 30
+            --cacert "${client}-ca-bundle" --cert "${client}-client-cert" --key "${client}-client-key")
+
+        bm_curl() {
+            local budget="$1" output="$2"
+            shift 2
+            local deadline=$((SECONDS + budget)) attempt remaining status code delay=1
+            for attempt in 1 2 3 4; do
+                remaining=$((deadline - SECONDS))
+                (( remaining > 0 )) || return 28
+                code=0
+                # Each attempt replaces partial output; all attempts share one deadline.
+                status="$(curl "${curl_options[@]}" --max-time "${remaining}" \
+                    --output "${output}" --write-out '%{http_code}' "$@")" || code=$?
+                (( code == 0 )) && return 0
+                case "${code}:${status}" in
+                    7:*|18:*|28:*|52:*|55:*|56:*|22:408|22:429|22:500|22:502|22:503|22:504) ;;
+                    *) return "${code}" ;;
+                esac
+                (( attempt < 4 && SECONDS + delay < deadline )) || return "${code}"
+                sleep "${delay}"
+                delay=$((delay * 2))
+            done
+        }
+
+        bm_curl 120 "${work}/job" \
+            --header 'Content-Type: application/json' \
+            --header "X-Osc-External-Id: prow:${PROW_JOB_ID}" \
+            --data-binary "${OSC_BM_JOB}" "${url}"
+        read -r job < "${work}/job"
+        [[ "${job}" =~ ^[0-9a-f]{32}$ ]]
+        printf '%s\n' "${job}" > "${SHARED_DIR}/bm-job"
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-https
+        mount_path: /var/run/osc-bm-https
+      env:
+      - name: OSC_BM_JOB
+      - default: "0"
+        documentation: Temporary debugging delay before pre starts (seconds or h/m/s).
+        name: OSC_BM_PRE_SLEEP
+      - documentation: Directory containing mounted HTTPS credentials.
+        name: OSC_BM_SECRET_DIR
+      from: bm-https
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h10m0s
+    test:
+    - as: bm-test
+      commands: |
+        #!/usr/bin/env bash
+        # shellcheck disable=SC2154
+        set -euo pipefail
+        : "${SHARED_DIR:?}"
+        read -r job < "${SHARED_DIR}/bm-job"
+        [[ "${job}" =~ ^[0-9a-f]{32}$ ]]
+        # shellcheck disable=SC2034
+        set +x
+        umask 077
+        work="$(mktemp -d)"
+        : "${OSC_BM_SECRET_DIR:?}"
+        read -r active < "${OSC_BM_SECRET_DIR}/active"
+        [[ "${active}" == blue || "${active}" == green ]]
+        client="${OSC_BM_SECRET_DIR}/${active}"
+        read -r endpoint < "${client}-endpoint-ip"
+        if [[ "${endpoint}" == *:* ]]; then
+            endpoint="[${endpoint}]"
+        fi
+        url="https://${endpoint}:443/v1/jobs"
+        curl_options=(--disable --silent --show-error --fail --proto '=https' --noproxy '*' --connect-timeout 30
+            --cacert "${client}-ca-bundle" --cert "${client}-client-cert" --key "${client}-client-key")
+
+        bm_curl() {
+            local budget="$1" output="$2"
+            shift 2
+            local deadline=$((SECONDS + budget)) attempt remaining status code delay=1
+            for attempt in 1 2 3 4; do
+                remaining=$((deadline - SECONDS))
+                (( remaining > 0 )) || return 28
+                code=0
+                # Each attempt replaces partial output; all attempts share one deadline.
+                status="$(curl "${curl_options[@]}" --max-time "${remaining}" \
+                    --output "${output}" --write-out '%{http_code}' "$@")" || code=$?
+                (( code == 0 )) && return 0
+                case "${code}:${status}" in
+                    7:*|18:*|28:*|52:*|55:*|56:*|22:408|22:429|22:500|22:502|22:503|22:504) ;;
+                    *) return "${code}" ;;
+                esac
+                (( attempt < 4 && SECONDS + delay < deadline )) || return "${code}"
+                sleep "${delay}"
+                delay=$((delay * 2))
+            done
+        }
+
+        offset=0
+        wait_timeout=14400
+        deadline=$((SECONDS + wait_timeout))
+        while (( SECONDS < deadline )); do
+            remaining=$((deadline - SECONDS))
+            (( remaining > 120 )) && remaining=120
+            bm_curl "${remaining}" "${work}/log" \
+                --dump-header "${work}/headers" \
+                "${url}/${job}/logs?offset=${offset}"
+            next='' done='' failed=''
+            while IFS= read -r header; do
+                header="${header%$'\r'}"
+                case "${header,,}" in
+                    x-osc-offset:*) next="${header#*: }" ;;
+                    x-osc-done:*) done="${header#*: }" ;;
+                    x-osc-failed:*) failed="${header#*: }" ;;
+                esac
+            done < "${work}/headers"
+            [[ "${next}" =~ ^[0-9]+$ && "${done}" =~ ^[01]$ && "${failed}" =~ ^[01]$ ]]
+            (( next >= offset ))
+            cat "${work}/log"
+            if [[ "${done}" == 1 ]]; then
+                exit "${failed}"
+            fi
+            if (( next == offset )); then
+                sleep 1
+            fi
+            offset="${next}"
+        done
+        printf '%s\n' 'Job observation timed out; execution remains controller-managed.' >&2
+        exit 1
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-https
+        mount_path: /var/run/osc-bm-https
+      env:
+      - documentation: Directory containing mounted HTTPS credentials.
+        name: OSC_BM_SECRET_DIR
+      from: bm-https
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h2m0s
+  timeout: 9h0m0s
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: bm
