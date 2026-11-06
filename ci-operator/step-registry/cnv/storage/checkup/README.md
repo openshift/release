@@ -42,12 +42,12 @@ virtualization enablement step. Each caller supplies the matching
 channel inputs required by `cnv-deploy-cnv`. Preparation checks for advertised
 KVM capacity rather than relying on the instance type alone.
 
-The product checkup defaults to ten concurrent VMs. The AWS job sets
-`CHECKUP_NUM_VMS=4` because the ten-VM rehearsal exceeded the EBS per-volume
-snapshot rate. Azure and GCP also start at four VMs to use the same small
-concurrent-boot baseline until their own rehearsals establish capacity. Worker
-sizing must account for guest memory, virtualization overhead, boot-source
-imports, and CNV itself.
+The product checkup defaults to ten concurrent VMs. The first AWS ten-VM
+rehearsal exceeded the EBS per-volume snapshot rate; four VMs passed on AWS,
+Azure, and GCP. The current jobs set `CHECKUP_NUM_VMS=6` to test additional
+concurrent-boot capacity on each platform. Rehearsals must establish whether
+six VMs fit each provider's storage and worker limits. Worker sizing must
+account for guest memory, virtualization overhead, boot-source imports, and CNV.
 
 For ODF or HPP, insert backend installation and default-class configuration
 before checkup preparation. A workflow `pre` override replaces the entire list;
@@ -121,8 +121,8 @@ the initial VM booted after about 16 minutes, but four of ten subsequent VMs
 stalled while AWS rejected concurrent snapshot requests from the same golden
 image EBS volume. AWS documents this as a per-volume rate limit and advises
 [at least 15 seconds between concurrent snapshots](https://docs.aws.amazon.com/ec2/latest/devguide/errors-overview.html).
-The shipped checkup has no setting to space its VM creation requests, so the
-AWS job reduces the count to four. A subsequent
+The shipped checkup has no setting to space its VM creation requests. A
+subsequent
 [AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408)
 passed with four VMs within the 30-minute checkup budget.
 Each parent job retains a five-hour limit, including installation and teardown.
@@ -157,7 +157,7 @@ multi-architecture image index can resolve to a different platform digest.
 
 The [cloud jobs](../../../../config/openshift/release/openshift-release-main__cnv-storage-checkup.yaml)
 use shared profiles, three VM-capable workers per cluster, automatic StorageClass
-selection, and four checkup VMs. Their schedules are staggered in UTC:
+selection, and six checkup VMs. Their schedules are staggered in UTC:
 
 | Job | Profile | Worker type | Expected CSI provisioner | Schedule |
 | --- | --- | --- | --- | --- |
@@ -166,9 +166,9 @@ selection, and four checkup VMs. Their schedules are staggered in UTC:
 | GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Daily 09:00 |
 
 The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
-build is selected separately. Azure and GCP worker sizing, profile capacity,
-snapshot/restore behavior, and complete cleanup must be confirmed by Prow
-rehearsals before counting those lanes as validated coverage.
+build is selected separately. Four-VM rehearsals confirmed Azure and GCP driver
+selection, snapshot/restore behavior, and post-step cleanup. The six-VM setting
+still needs a rehearsal on each platform before it is treated as validated.
 The GCP PD coverage story [CNV-72113](https://redhat.atlassian.net/browse/CNV-72113)
 provides platform test context; [CNV-99261](https://redhat.atlassian.net/browse/CNV-99261)
 tracks its integration with this shared CNV checkup. Confirm the final
@@ -176,8 +176,8 @@ provisioning and maintenance ownership with the GCP QE owners during review.
 
 Each job adds the existing CNV CI Brew and Konflux credentials to the cluster pull
 secret before CNV installation using a helper pinned to a reviewed CNV CI commit.
-It does not install ODF or HPP. Generated Prow jobs
-live under `ci-operator/jobs/openshift/release/`. The AWS rehearsal passed on
-[PR #87544](https://github.com/openshift/release/pull/87544); Azure and GCP
-still need rehearsals to verify their driver selection, execution, diagnostics,
-and teardown.
+It does not install ODF or HPP. Generated Prow jobs live under
+`ci-operator/jobs/openshift/release/`. Previous four-VM rehearsals passed on
+[AWS](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408),
+[Azure](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2118706420693078016),
+and [GCP](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-gcp/2118706423209660416).
