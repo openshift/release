@@ -6,9 +6,11 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'deploy_vm_bastion' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
-setup_debug_on_fail
 
 main() {
+    # Install unified exit handler (handles DEBUG_ON_FAIL and cleanup)
+    setup_telco_kpis_exit_handler
+
     MACHINE="bastion.${HUB_CLUSTER}.telco-kpis.rdu3.redhat.com"
     echo "Deploying bastion VM: ${MACHINE}"
 
@@ -35,10 +37,10 @@ main() {
                 -e remote_flock_become=true \
                 ${DEBUG_FLAG} || echo "WARNING: Failed to release lock '${LOCK_NAME}'"
             LOCK_UUID=""
-            rm -f "${UUID_FILE}"
+            rm -f "${UUID_FILE}" || true
         fi
     }
-    add_exit_handler release_lock
+    add_cleanup_handler release_lock
 
     echo "Acquiring lock '${LOCK_NAME}' on hypervisor (BUILD_ID=${BUILD_ID:-unknown})..."
     ansible-playbook ./playbooks/telco-kpis/remote-flock-acquire.yml \
