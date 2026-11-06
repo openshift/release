@@ -260,7 +260,12 @@ while (( SECONDS < deadline )); do
   [[ "${rc}" -ne 2 ]] || exit 1
   check_guest_api || true
   if [[ "${guest_api_ready}" == true ]]; then
-    check_cluster_version || true
+    if [[ "${SKIP_CLUSTER_VERSION_CHECK}" == "true" ]]; then
+      echo "Skipping ClusterVersion readiness check by configuration."
+      cluster_version_ready=true
+    else
+      check_cluster_version || true
+    fi
     check_cluster_operators || true
     check_guest_pods || true
     check_worker_nodes || true
