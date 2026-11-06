@@ -1,6 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+# TEMPORARY: combine #481 with this rehearsal; remove before merging #88130.
+if [[ -n "${E2E_REHEARSAL_SOURCE_SHA}" ]]; then
+    PR481_DIR=$(mktemp -d)
+    git -C "${PR481_DIR}" init --quiet
+    git -C "${PR481_DIR}" fetch --depth=1 https://github.com/rh-ecosystem-edge/openshift-dpf.git pull/481/head
+    if [[ "$(git -C "${PR481_DIR}" rev-parse FETCH_HEAD)" != "${E2E_REHEARSAL_SOURCE_SHA}" ]]; then
+        echo "ERROR: PR #481 has changed; update the reviewed source pin before rehearsing." >&2
+        exit 1
+    fi
+    git -C "${PR481_DIR}" checkout --detach "${E2E_REHEARSAL_SOURCE_SHA}"
+    echo "Testing openshift-dpf source: ${E2E_REHEARSAL_SOURCE_SHA}"
+    cd "${PR481_DIR}"
+fi
+
 # Copy .env to working directory
 cp "${SHARED_DIR}/.env" .env
 
