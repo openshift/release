@@ -1,4 +1,8 @@
 base_images:
+  agentic-validation:
+    name: agentic-validation
+    namespace: ci
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -51,6 +55,19 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-agentic-validation
+  capabilities:
+  - nested-podman
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      VALIDATION_COMPONENT: cluster-kube-controller-manager-operator
+    test:
+    - ref: openshift-agentic-prepare-validation
+    - ref: openshift-agentic-validate
+    workflow: ipi-aws
 - always_run: false
   as: e2e-aws-ovn-upgrade
   steps:
