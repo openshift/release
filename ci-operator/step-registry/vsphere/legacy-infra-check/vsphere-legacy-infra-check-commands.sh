@@ -120,7 +120,17 @@ echo "$(date -u --rfc-3339=seconds) - Scanning cloud-controller-manager logs for
 # (and a missed detection) once there is enough log data after the match.
 CCM_LOG_READ_FAILED=0
 CCM_SIGNATURE_FOUND=0
-for pod in $(oc get pods -n "${CCM_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+if ! ccm_pod_names=$(oc get pods -n "${CCM_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}' 2>&1); then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to list pods in ${CCM_NAMESPACE} for the log scan"
+  echo "${ccm_pod_names}"
+  CCM_LOG_READ_FAILED=1
+  ccm_pod_names=""
+elif [[ -z "${ccm_pod_names}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: no pods found in ${CCM_NAMESPACE} to scan for the OCPBUGS-136178 regression signature"
+  CCM_LOG_READ_FAILED=1
+fi
+
+for pod in ${ccm_pod_names}; do
   if ! pod_logs=$(oc logs -n "${CCM_NAMESPACE}" "${pod}" --all-containers --tail=10000 2>&1); then
     echo "$(date -u --rfc-3339=seconds) - ERROR: failed to read logs for CCM pod ${pod}"
     echo "${pod_logs}"
