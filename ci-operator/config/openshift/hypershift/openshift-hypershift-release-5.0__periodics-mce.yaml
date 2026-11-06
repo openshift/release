@@ -155,7 +155,7 @@ tests:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
+        IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
         WORKER_MEMORY=24576
         VM_EXTRADISKS=true
@@ -166,11 +166,15 @@ tests:
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       IP_STACK: v6
-      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
-      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-5.0
       MCE_VERSION: "5.0"
       METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-metal3-create
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-compact-conformance
   capabilities:
