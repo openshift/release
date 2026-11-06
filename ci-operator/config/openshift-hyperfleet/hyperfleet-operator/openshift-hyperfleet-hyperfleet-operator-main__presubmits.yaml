@@ -66,6 +66,16 @@ tests:
     chmod 0755 "${BIN_DIR}/kubectl"
     export PATH="${BIN_DIR}:${PATH}"
     kind version
+    # The kindest/node image contains files owned by unmappable UIDs/GIDs
+    # (e.g. nfsnobody 65534), which the rootless podman user namespace cannot
+    # chown during pull. ignore_chown_errors skips those instead of failing.
+    # Proper fix is wider subuid/subgid ranges in the nested-podman image.
+    mkdir -p "${HOME}/.config/containers"
+    cat > "${HOME}/.config/containers/storage.conf" <<'EOF'
+    [storage]
+    driver = "overlay"
+    ignore_chown_errors = "true"
+    EOF
     export KIND_EXPERIMENTAL_PROVIDER=podman
     kind create cluster --wait 300s
     kubectl get nodes -o wide
