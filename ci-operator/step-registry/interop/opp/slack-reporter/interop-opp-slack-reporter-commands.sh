@@ -15,11 +15,17 @@
 # embed.py between the sentinels; regenerate, never hand-edit. The
 # generated module must stay the FIRST code in its heredoc program
 # (its `from __future__ import annotations` is only legal at program
-# top). shopt patsub_replacement is explicitly OFF: bash >= 5.2 expands
-# `&` in ${var/pat/repl} replacements (docs/design/step-registry-patterns
-# section 4), and no string munging may happen in bash anyway.
+# top). shopt patsub_replacement is explicitly OFF wherever the option
+# exists: bash >= 5.2 expands `&` in ${var/pat/repl} replacements
+# (docs/design/step-registry-patterns section 4), and no string munging
+# may happen in bash anyway. Older cli images ship bash < 5.2, where the
+# option does not exist and `shopt -u` on an unknown name is a hard error
+# under the entrypoint's errexit; there the intent already holds, so the
+# option is probed first and only unset when this bash knows it.
 
-shopt -u patsub_replacement
+if shopt -q patsub_replacement 2>/dev/null; then
+    shopt -u patsub_replacement
+fi
 set -uo pipefail
 
 # ------------------------------------------------- constants (reporter-owned)
