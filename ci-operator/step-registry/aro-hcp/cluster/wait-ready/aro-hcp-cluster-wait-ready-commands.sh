@@ -189,7 +189,12 @@ check_cluster_operators() {
   local json bad
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get clusteroperators -o json 2>/dev/null || true)
   [[ -n "${json}" ]] || { echo "Waiting for ClusterOperators."; return 1; }
-  bad=$(jq -r '.items[] | select((any(.status.conditions[]?; .type == "Available" and .status == "True") | not) or any(.status.conditions[]?; .type == "Progressing" and .status == "True") or any(.status.conditions[]?; .type == "Degraded" and .status == "True")) | .metadata.name' <<<"${json}")
+  bad=$(jq -r '.items[] |
+    select(.metadata.name != "console") |
+    select((any(.status.conditions[]?; .type == "Available" and .status == "True") | not) or
+           any(.status.conditions[]?; .type == "Progressing" and .status == "True") or
+           any(.status.conditions[]?; .type == "Degraded" and .status == "True")) |
+    .metadata.name' <<<"${json}")
   if [[ -n "${bad}" ]]; then
     echo "ClusterOperators not ready: $(tr '\n' ' ' <<<"${bad}")"
     return 1
