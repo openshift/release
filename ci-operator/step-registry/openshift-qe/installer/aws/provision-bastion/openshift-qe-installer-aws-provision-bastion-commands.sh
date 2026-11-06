@@ -472,9 +472,10 @@ echo "--- Installing system packages ---"
 # tar: extract kube-burner-ocp binary in e2e-benchmarking run.sh
 # util-linux: uuidgen used by run.sh when UUID is not preset
 # jq, wget, git: cluster/FRR tooling and repo clone on bastion
+# tcpdump: bastion-side ICMP capture for UDN-BGP diagnostics
 # python3: e2e-benchmarking utils/index.sh (metadata indexing helpers)
 # curl: AL2023 ships curl-minimal (provides /usr/bin/curl); do not install full curl.
-for pkg in iproute jq wget git make tar util-linux python3; do
+for pkg in iproute jq wget git make tar util-linux python3 tcpdump; do
   rpm -q "${pkg}" &>/dev/null || dnf install -y "${pkg}"
 done
 if ! command -v curl &>/dev/null; then
@@ -503,6 +504,67 @@ curl -sSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/l
 # Symlink into /usr/local/bin so 'go' is on the default SSH PATH
 ln -sf /usr/local/go/bin/go /usr/local/bin/go
 echo "go: $(go version)"
+
+echo "--- Installing UDN-BGP bastion diagnostics ---"
+install -d -m 0755 /var/lib/udn-bgp-diagnostics
+cat > /usr/local/sbin/udn-bgp-route-dump <<'ROUTE_SCRIPT'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+output=/var/lib/udn-bgp-diagnostics/route-tables.txt
+while true; do
+  printf '\n=== %s main ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show || true
+  printf '\n=== %s all tables ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show table all || true
+  printf '\n=== %s failing-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.1.0.3 || true
+  printf '\n=== %s working-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.2.0.3 || true
+  sleep 5
+done >> "${output}" 2>&1
+ROUTE_SCRIPT
+chmod 0755 /usr/local/sbin/udn-bgp-route-dump
+
+cat > /etc/systemd/system/udn-bgp-route-dump.service <<'ROUTE_UNIT'
+[Unit]
+Description=UDN-BGP bastion routing table sampler
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/udn-bgp-route-dump
+Restart=always
+RestartSec=5s
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ROUTE_UNIT
+
+cat > /etc/systemd/system/udn-bgp-icmp-capture.service <<'ICMP_UNIT'
+[Unit]
+Description=UDN-BGP bastion ICMP capture
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/tcpdump -i any -nn -s 256 -Z root -W 4 -C 10 -w /var/lib/udn-bgp-diagnostics/bastion-icmp.pcap icmp
+Restart=always
+RestartSec=5s
+KillSignal=SIGINT
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ICMP_UNIT
+
+systemctl daemon-reload
+systemctl enable --now udn-bgp-route-dump.service udn-bgp-icmp-capture.service
+systemctl restart udn-bgp-route-dump.service udn-bgp-icmp-capture.service
+systemctl is-active --quiet udn-bgp-route-dump.service
+systemctl is-active --quiet udn-bgp-icmp-capture.service
 
 echo "--- Tool versions ---"
 command -v podman >/dev/null && podman --version
