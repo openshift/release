@@ -163,6 +163,149 @@ oc -n enmaas create secret generic metering-user-management-api \
   --dry-run=client -o yaml | oc apply -f -
 echo "enmaas secrets created."
 
+# TODO: Remove BuildConfig image builds once Konflux images are available
+# Build container images from source using OpenShift BuildConfigs as a temporary
+# workaround until Konflux-built images are published to quay.io/modden/.
+echo "Building container images from source (temporary BuildConfig workaround)..."
+
+# Clone source repositories
+# NOTE: git credential helper is already configured above — do not reconfigure
+echo "Cloning source repositories for image builds..."
+BUILDS_DIR=$(mktemp -d)
+
+# Public repo — only need the maas-api subdirectory
+git clone --depth 1 "https://github.com/opendatahub-io/models-as-a-service.git" \
+    "${BUILDS_DIR}/models-as-a-service"
+
+# Private repos (use credential helper configured above)
+git clone --depth 1 "https://github.com/redhat-et/pricetag-metering.git" \
+    "${BUILDS_DIR}/pricetag-metering"
+git clone --depth 1 "https://github.com/redhat-et/enmaas-usage-exporter.git" \
+    "${BUILDS_DIR}/enmaas-usage-exporter"
+git clone --depth 1 "https://github.com/redhat-et/praxis-ai.git" \
+    "${BUILDS_DIR}/praxis-ai"
+
+echo "Source repositories cloned."
+
+# Create ImageStreams
+echo "Creating ImageStreams..."
+for img in maas-api metering-service usage-exporter praxis-ai; do
+  oc create imagestream "${img}" -n enmaas --dry-run=client -o yaml | oc apply -f -
+done
+echo "ImageStreams created."
+
+# Create BuildConfigs
+echo "Creating BuildConfigs..."
+
+# maas-api: Dockerfile-based build
+oc apply -f - <<'BCEOF'
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: maas-api
+  namespace: enmaas
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: maas-api:latest
+BCEOF
+
+# metering-service: Dockerfile-based build
+oc apply -f - <<'BCEOF'
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: metering-service
+  namespace: enmaas
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: metering-service:latest
+BCEOF
+
+# usage-exporter: Containerfile-based build
+oc apply -f - <<'BCEOF'
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: usage-exporter
+  namespace: enmaas
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: usage-exporter:latest
+BCEOF
+
+# praxis-ai: Containerfile-based build with build arg
+oc apply -f - <<'BCEOF'
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: praxis-ai
+  namespace: enmaas
+spec:
+  source:
+    type: Binary
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+      buildArgs:
+      - name: PRAXIS_AI_FEATURES
+        value: "full,gcp-adc-filter"
+  output:
+    to:
+      kind: ImageStreamTag
+      name: praxis-ai:latest
+BCEOF
+
+echo "BuildConfigs created."
+
+# Trigger builds
+echo "Starting image builds..."
+oc start-build maas-api --from-dir="${BUILDS_DIR}/models-as-a-service/maas-api" -n enmaas --follow
+oc start-build metering-service --from-dir="${BUILDS_DIR}/pricetag-metering" -n enmaas --follow
+oc start-build usage-exporter --from-dir="${BUILDS_DIR}/enmaas-usage-exporter" -n enmaas --follow
+oc start-build praxis-ai --from-dir="${BUILDS_DIR}/praxis-ai" -n enmaas --follow
+echo "Image builds completed."
+
+# Patch enmaas.params to use internal registry images instead of quay.io/modden/
+echo "Patching enmaas.params for internal registry images..."
+INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000/enmaas"
+if [[ -f "${PARAMS_FILE}" ]]; then
+  sed -i "s|^ENMAAS_API_IMAGE_REPOSITORY=.*|ENMAAS_API_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/maas-api|" "${PARAMS_FILE}"
+  sed -i "s|^METERING_IMAGE_REPOSITORY=.*|METERING_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/metering-service|" "${PARAMS_FILE}"
+  sed -i "s|^PRAXIS_IMAGE_REPOSITORY=.*|PRAXIS_IMAGE_REPOSITORY=${INTERNAL_REGISTRY}/praxis-ai|" "${PARAMS_FILE}"
+  # Remove digest pins so :latest tag is used from ImageStream
+  sed -i '/^.*_IMAGE_DIGEST=/d' "${PARAMS_FILE}"
+  # Remove pull secret reference (internal registry needs no pull secret)
+  sed -i '/^ENMAAS_API_IMAGE_PULL_SECRET=/d' "${PARAMS_FILE}"
+  echo "enmaas.params patched for internal registry."
+else
+  echo "WARNING: ${PARAMS_FILE} not found, skipping internal registry patching."
+fi
+
 echo "Rendering and applying enmaas manifests..."
 make print ENV="${ENMAAS_ENV}" PROJECT=enmaas > /tmp/enmaas.yaml
 oc apply -f /tmp/enmaas.yaml
