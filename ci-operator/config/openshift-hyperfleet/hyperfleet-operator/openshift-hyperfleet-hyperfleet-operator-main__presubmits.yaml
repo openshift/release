@@ -33,6 +33,45 @@ resources:
       cpu: "1"
       memory: 1G
 tests:
+- as: gcp-vm-smoke
+  steps:
+    post:
+    - ref: openshift-hyperfleet-gcp-vm-destroy
+    pre:
+    - ref: openshift-hyperfleet-gcp-vm-create
+    test:
+    - as: smoke
+      commands: |
+        chmod 400 "${SHARED_DIR}/vm_ssh_key"
+        VM_SSH_USER="$(cat "${SHARED_DIR}/gcp_vm_ssh_user")"
+        VM_PUBLIC_IP="$(cat "${SHARED_DIR}/gcp_vm_public_ip")"
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -i "${SHARED_DIR}/vm_ssh_key" \
+          "${VM_SSH_USER}@${VM_PUBLIC_IP}" '
+          set -euo pipefail
+          echo "hello from $(hostname)"
+
+          # Install Docker and KinD, then create a KinD cluster.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker.io
+          sudo systemctl enable --now docker
+          sudo docker version
+
+          curl -sSLo /tmp/kind "https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64"
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          kind version
+          curl -sSLo /tmp/kubectl "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          kubectl version --client
+
+          sudo kind create cluster --name hyperfleet --wait 300s
+          sudo kubectl get nodes
+        '
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: bundle
   capabilities:
   - nested-podman
