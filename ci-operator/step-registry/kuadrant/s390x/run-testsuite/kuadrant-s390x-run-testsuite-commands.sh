@@ -447,11 +447,13 @@ PATCH_EOF
 #     control-plane update: retry until a new reconcile span appears.
 #     dataplane tracing: send x-request-id (OCP Istio omits it on the response)
 #       and force the tracing client through Gateway LB IP + Host header
-#       (*.apps ingress returns 200/401/429 but wasm-shim spans never hit Jaeger;
-#       rhcl-mc2 12/12 used the LB). Keep stock Jaeger service kuadrant-filter
-#       (do not rewrite to wasm-shim: job 2118206636085481472 listed
-#       kuadrant-filter, not wasm-shim). wasm-shim:s390x-be-fix is already on
-#       the operator. Do not restore static empty-header GET /get.
+#       (*.apps ingress returns 200/401/429). rhcl-mc2 12/12: Jaeger does not
+#       return traces when the primary search service is kuadrant-filter /
+#       wasm-shim + request_id. Look up via authorino (auth+RL) or limitador
+#       (RL-only; no gateway service on OCP-managed Istio) with
+#       guid:x-request-id. Keep process assertions on kuadrant-filter.
+#       wasm-shim:s390x-be-fix is already on the operator. Do not restore
+#       static empty-header GET /get.
 #     GatewayClass: prefer istio over openshift-default (OCP 4.22 always has
 #       openshift-default; upstream picks it and leaves TRLP report + tracing
 #       on OpenShift's gateway controller instead of OSSM3).
@@ -946,6 +948,65 @@ def client(route, hostname, gateway):  # pylint: disable=unused-argument
     c.close()
 '''
     _write(path, text + extra, "dataplane tracing Gateway LB client")
+
+
+def patch_dataplane_tracing_jaeger_lookup() -> None:
+    """rhcl-mc2 12/12: Jaeger search via authorino/limitador, not kuadrant-filter.
+
+    Primary service=kuadrant-filter|wasm-shim + request_id returns 0 traces even
+    when the span exists. Same request_id works as authorino + guid:x-request-id.
+    RL-only has no AuthPolicy; OCP-managed Istio has no {label}.kuadrant gateway
+    traces, so search limitador instead.
+    """
+    replacements = [
+        (
+            Path("testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py"),
+            "authorino",
+        ),
+        (
+            Path(
+                "testsuite/tests/singlecluster/tracing/data_plane_tracing/"
+                "test_kuadrant_tracing_rate_limit_only.py"
+            ),
+            "limitador",
+        ),
+    ]
+    old_attrs = (
+        'service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}'
+    )
+    old_tags = (
+        'service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id}'
+    )
+    old_attrs_ws = '''tracing.get_traces(
+            service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
+        )'''
+    old_tags_ws = '''tracing.get_traces(
+            service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id}
+        )'''
+    for path, service in replacements:
+        if not path.exists():
+            print(f"SKIP {path} missing")
+            continue
+        text = path.read_text()
+        if "guid:x-request-id" in text:
+            print(f"SKIP {path.name} Jaeger lookup already patched")
+            continue
+        new_attrs = (
+            f'service="{service}", min_processes=min_procs, '
+            f'attributes={{"guid:x-request-id": request_id}}'
+        )
+        new_call = f'''tracing.get_traces(
+            service="{service}", min_processes=min_procs, attributes={{"guid:x-request-id": request_id}}
+        )'''
+        n = text.count(old_attrs) + text.count(old_tags) + text.count(old_attrs_ws) + text.count(old_tags_ws)
+        text = text.replace(old_attrs_ws, new_call)
+        text = text.replace(old_tags_ws, new_call)
+        text = text.replace(old_attrs, new_attrs)
+        text = text.replace(old_tags, new_attrs)
+        if n == 0:
+            print(f"WARN {path.name} kuadrant-filter get_traces not found")
+            continue
+        _write(path, text, f"dataplane tracing Jaeger lookup {service} ({path.name}, {n})")
 
 
 def patch_dns_delegate() -> None:
@@ -1474,6 +1535,7 @@ if __name__ == "__main__":
     patch_control_plane_update()
     patch_dataplane_tracing()
     patch_dataplane_tracing_gateway_lb()
+    patch_dataplane_tracing_jaeger_lookup()
     patch_dns_delegate()
     patch_oidc()
     patch_trlp_auth()
@@ -1875,11 +1937,9 @@ if p.exists():
         print('egress-bk already present or no backend name')
 PY
 "
-CONTAINER_SCRIPT+="# Dataplane tracing: keep stock testsuite Jaeger service kuadrant-filter.
-# Overlay of main already looks that up. Job 2118206636085481472 (Gateway LB +
-# wasm-shim:s390x-be-fix) listed kuadrant-filter in Jaeger and not wasm-shim;
-# rewriting to wasm-shim made all 12 tests query an empty service.
-echo '=== Jaeger lookup stays kuadrant-filter (no wasm-shim rewrite) ==='
+CONTAINER_SCRIPT+="# Dataplane tracing: rhcl-mc2 12/12 looked up authorino + guid:x-request-id
+# (not kuadrant-filter/wasm-shim + request_id). The in-job patcher applies that.
+echo '=== Jaeger lookup via authorino/limitador + guid:x-request-id ==='
 "
 CONTAINER_SCRIPT+="
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
