@@ -536,7 +536,6 @@ CONFIG = {
     },
     'powervs-2-quota-slice': {
         'syd04': 1,
-        'syd05': 1,
     },
     'powervs-3-quota-slice': {},
     'powervs-4-quota-slice': {
