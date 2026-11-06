@@ -23,7 +23,7 @@ Written generically to cover the N-repo case tracked by [openshift/oadp-operator
 
 ## Process
 
-1. Reads the triggering PR's description via the GitHub API, using Prow's own injected `REPO_OWNER`/`REPO_NAME`/`PULL_NUMBER` (no JSON parsing needed to identify the PR itself).
+1. Reads the triggering PR's description via the GitHub API, using Prow's own injected `REPO_OWNER`/`REPO_NAME`/`PULL_NUMBER` (no JSON parsing needed to identify the PR itself). The fetch is resilient: anonymous `api.github.com` is frequently unreachable from build-farm step pods (their shared egress IP is over GitHub's anonymous rate limit; observed failing in every CI run of this step so far), so it retries direct, then retries through a one-shot curl pod on the test cluster's own egress, and on total failure **degrades to a no-op with a loud warning and a `depends-on-fetch-failed.txt` marker artifact rather than failing the job** -- a broken description fetch must never turn every wired presubmit red before its own tests run.
 2. Scans it for every `Depends-On: https://github.com/<org>/<repo>/pull/<N>` line (Gerrit/Zuul convention, one per line).
 3. For each line whose `<org>/<repo>` matches an entry in `DEPENDS_ON_CANDIDATES`: fetches that PR's source as a GitHub tarball (no `git` dependency), builds it as a container image via an OpenShift binary `Build` (`oc new-build --strategy=docker --binary` + `oc start-build --from-dir=...`) running **inside the target test cluster**, and records the result.
 4. A PR with no matching `Depends-On:` line for any configured candidate is a total no-op -- nothing is built, nothing is written, no other step's behavior changes.
