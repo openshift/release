@@ -69,13 +69,23 @@ tests:
     # The kindest/node image contains files owned by unmappable UIDs/GIDs
     # (e.g. nfsnobody 65534), which the rootless podman user namespace cannot
     # chown during pull. ignore_chown_errors skips those instead of failing.
-    # Proper fix is wider subuid/subgid ranges in the nested-podman image.
-    mkdir -p "${HOME}/.config/containers"
-    cat > "${HOME}/.config/containers/storage.conf" <<'EOF'
-    [storage]
-    driver = "overlay"
-    ignore_chown_errors = true
-    EOF
+    # The storage library in the nested-podman image only accepts that key
+    # under [storage.options.overlay]: left in [storage] it is silently dropped
+    # with a "Failed to decode" warning and the pull still fails. Extend the
+    # image's existing config instead of replacing it, keeping its runroot and
+    # graphroot valid for the random Prow UID (same approach as the medik8s
+    # step-registry jobs). Proper fix is wider subuid/subgid ranges in the
+    # nested-podman image.
+    storage_config="$(podman info --format '{{.Store.ConfigFile}}')"
+    test -r "${storage_config}"
+    export CONTAINERS_STORAGE_CONF=/tmp/hyperfleet-e2e-storage.conf
+    awk '
+      /^\[storage.options.overlay\]$/ { in_overlay = 1; found = 1; print; print "ignore_chown_errors = \"true\""; next }
+      /^\[/ { in_overlay = 0 }
+      in_overlay && /^[[:space:]]*ignore_chown_errors[[:space:]]*=/ { next }
+      { print }
+      END { if (!found) { print "[storage.options.overlay]"; print "ignore_chown_errors = \"true\"" } }
+    ' "${storage_config}" > "${CONTAINERS_STORAGE_CONF}"
     export KIND_EXPERIMENTAL_PROVIDER=podman
     kind create cluster --wait 300s
     kubectl get nodes -o wide
