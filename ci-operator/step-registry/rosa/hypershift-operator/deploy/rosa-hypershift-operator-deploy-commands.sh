@@ -6,6 +6,23 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ "${HO_MINIMAL_DIAGNOSTICS:-false}" == true ]]; then
+  gather_ho_on_exit() {
+    local original_status=$? temporary=''
+    set +x
+    if ! HO_DIAGNOSTIC_PHASE=deploy bash "${BASH_SOURCE[0]%/*}/rosa-hypershift-operator-gather-minimal" >/dev/null 2>&1; then
+      if ! { [[ -n "${ARTIFACT_DIR:-}" ]] && mkdir -p "${ARTIFACT_DIR}" && temporary=$(mktemp "${ARTIFACT_DIR}/.ho-minimal.XXXXXX") &&
+        printf '%s\n' '{"schemaVersion":1,"outcome":"failed","failure":"helper_unavailable","truncated":false}' > "${temporary}" &&
+        mv -f "${temporary}" "${ARTIFACT_DIR}/ho-minimal-diagnostics.json"; } 2>/dev/null; then
+        [[ -z "${temporary}" ]] || rm -f "${temporary}" 2>/dev/null || true
+        echo 'HO minimum diagnostics: artifact write failed' >&2
+      fi
+    fi
+    exit "${original_status}"
+  }
+  trap gather_ho_on_exit EXIT
+fi
+
 read_profile_file() {
   local file="${1}"
   if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
@@ -60,6 +77,14 @@ MC_KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
 ocm get "/api/clusters_mgmt/v1/clusters/${MC_CLUSTER_ID}/credentials" | jq -r .kubeconfig > "${MC_KUBECONFIG}"
 echo "${MC_NAME}" > "${SHARED_DIR}/mc-cluster-name"
 echo "${MC_CLUSTER_ID}" > "${SHARED_DIR}/mc-cluster-id"
+
+if [[ "${HO_MINIMAL_DIAGNOSTICS:-false}" == true ]]; then
+  (
+    set +x
+    ARTIFACT_DIR="${ARTIFACT_DIR}/ho-before-deploy" HO_DIAGNOSTIC_PHASE=before_deploy \
+      bash "${BASH_SOURCE[0]%/*}/rosa-hypershift-operator-gather-minimal"
+  ) >/dev/null 2>&1 || true
+fi
 
 # Check if the MC is locked by a PR test job
 EXISTING_LOCK=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap ho-deploy-lock -n hypershift -o jsonpath='{.data.job}' 2>/dev/null || true)
