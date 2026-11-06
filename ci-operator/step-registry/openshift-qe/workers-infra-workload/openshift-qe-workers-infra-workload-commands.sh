@@ -608,25 +608,25 @@ case ${SET_ENV_BY_PLATFORM} in
      #ARM64 Architecture:
 	   if [[ $node_arch == "arm64" ]];then
 	      if [[ ${scale_type} == "medium" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.4xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-m6g.4xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.4xlarge
 	      elif [[ ${scale_type} == "small" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.2xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-m6g.2xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.2xlarge
 	      elif [[ ${scale_type} == "extrasmall" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=m6g.xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-m6g.xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m6g.xlarge
 	      fi
 	   else
 	      if [[ ${scale_type} == "medium" ]];then
               #AMD/Standard Architecture:
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=r5.4xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-r5.4xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m5.4xlarge
 	      elif [[ ${scale_type} == "small" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=r5.2xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-r5.2xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m5.2xlarge
 	      elif [[ ${scale_type} == "extrasmall" ]];then
-                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=r5.xlarge
+                OPENSHIFT_INFRA_NODE_INSTANCE_TYPE=${OPENSHIFT_INFRA_NODE_INSTANCE_TYPE:-r5.xlarge}
                 OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE=m5.xlarge
 	      fi
            fi
