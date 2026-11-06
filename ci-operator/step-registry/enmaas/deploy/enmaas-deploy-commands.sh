@@ -125,13 +125,13 @@ set +x
 if [[ -n "${DB_URL:-}" ]]; then
   oc -n enmaas create secret generic postgresql-credentials \
     --from-literal=METERING_DB_URL="${DB_URL}" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml | oc apply -n enmaas -f -
   oc -n enmaas create secret generic metering-readonly-db-url \
     --from-literal=READ_DATABASE_URL="${DB_URL}" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml | oc apply -n enmaas -f -
   oc -n enmaas create secret generic maas-db-config \
     --from-literal=DB_CONNECTION_URL="${DB_URL}" \
-    --dry-run=client -o yaml | oc apply -f -
+    --dry-run=client -o yaml | oc apply -n enmaas -f -
 fi
 $WAS_TRACING && set -x
 oc -n enmaas create secret generic provider-credentials \
@@ -139,16 +139,16 @@ oc -n enmaas create secret generic provider-credentials \
   --from-literal=CB_LITELLM_API_KEY=dummy-key \
   --from-literal=LITELLM_API_KEY=dummy-key \
   --from-literal=OPENAI_API_KEY=dummy-key \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 oc -n enmaas create secret generic pricetag-session \
   --from-literal=SESSION_SECRET="$(openssl rand -hex 32)" \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 oc -n enmaas create secret generic metering-internal-auth \
   --from-literal=token="$(openssl rand -hex 32)" \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 oc -n enmaas create secret generic vertex-sa-key \
   --from-literal=sa-key.json='{"type":"service_account","project_id":"dummy","private_key_id":"dummy","private_key":"dummy","client_email":"dummy@dummy.iam.gserviceaccount.com","client_id":"0","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token"}' \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 oc -n enmaas create secret generic metering-partner-api \
   --from-literal=model-catalog=dummy \
   --from-literal=model-catalog-aibt=dummy \
@@ -157,10 +157,10 @@ oc -n enmaas create secret generic metering-partner-api \
   --from-literal=usage-report=dummy \
   --from-literal=usage-report-aibt=dummy \
   --from-literal=usage-report-air=dummy \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 oc -n enmaas create secret generic metering-user-management-api \
   --from-literal=token="$(openssl rand -hex 32)" \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply -n enmaas -f -
 echo "enmaas secrets created."
 
 # TODO: Remove BuildConfig image builds once Konflux images are available
@@ -190,7 +190,7 @@ echo "Source repositories cloned."
 # Create ImageStreams
 echo "Creating ImageStreams..."
 for img in maas-api metering-service usage-exporter praxis-ai; do
-  oc create imagestream "${img}" -n enmaas --dry-run=client -o yaml | oc apply -f -
+  oc create imagestream "${img}" -n enmaas --dry-run=client -o yaml | oc apply -n enmaas -f -
 done
 echo "ImageStreams created."
 
@@ -198,7 +198,7 @@ echo "ImageStreams created."
 echo "Creating BuildConfigs..."
 
 # maas-api: Dockerfile-based build
-oc apply -f - <<'BCEOF'
+oc apply -n enmaas -f - <<'BCEOF'
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -218,7 +218,7 @@ spec:
 BCEOF
 
 # metering-service: Dockerfile-based build
-oc apply -f - <<'BCEOF'
+oc apply -n enmaas -f - <<'BCEOF'
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -238,7 +238,7 @@ spec:
 BCEOF
 
 # usage-exporter: Containerfile-based build
-oc apply -f - <<'BCEOF'
+oc apply -n enmaas -f - <<'BCEOF'
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
@@ -258,7 +258,7 @@ spec:
 BCEOF
 
 # praxis-ai: Containerfile-based build with build arg
-oc apply -f - <<'BCEOF'
+oc apply -n enmaas -f - <<'BCEOF'
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
