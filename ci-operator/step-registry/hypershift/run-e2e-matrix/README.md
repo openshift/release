@@ -1,4 +1,9 @@
-# Optional AWS PR release selection
+# HyperShift release-matrix testing
+
+The release-matrix workflow runs HyperShift tests with selected guest releases.
+Currently, it supports input only from the PR description and only for AWS
+amd64. It uses the first checked release minor for one context; multiple-release
+fanout, other platforms and other selection sources are not implemented.
 
 `/test e2e-from-pr-aws` requests one optional, non-gating main PR job. It uses
 the normal nested AWS v2 management cluster and PR-built operator/test image.
@@ -60,15 +65,11 @@ does not introduce a CPO override or claim PR CPO coverage for stock payloads.
 Minimal `pr-release-matrix.json` artifacts record selected minor/platform,
 head SHA, fetch time and resolved names/pullspecs/digests; no full body/headers.
 
-Run the offline fixtures, using Python 3 and the repository's PyYAML dependency:
+Validate the resolver shell with:
 
 ```sh
-python3 hack/test_hypershift_pr_releases.py -v
 shellcheck -S warning ci-operator/step-registry/hypershift/resolve-pr-releases/*-commands.sh
 ```
 
-Fixtures stub public HTTP and image commands, run the actual resolver and
-create/test shell consumers (substituting only the application binary), and
-assert existing source/generated jobs remain identical. They do not provision
-AWS resources. Repository generators/registry validators must also be run;
-these local tests are not an end-to-end CI/cloud rehearsal.
+Run the repository generators and registry validators after configuration
+changes. These local checks are not an end-to-end CI/cloud rehearsal.
