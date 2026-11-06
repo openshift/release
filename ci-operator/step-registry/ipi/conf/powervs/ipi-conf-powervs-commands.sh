@@ -152,6 +152,13 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+# Temporary configuration for PowerVS 5.1 runs during interim migration until DHCP set-up across remaining regions.
+# Overrides default 's1022' to 's922' to avoid capacity and resource constraints in the target workspace.
+# Remove this change after required set up is completed and runs are moved back to default
+if [[ "${BRANCH}" == "5.1" && ( -z "${POWERVS_SYS_TYPE:-}" || "${POWERVS_SYS_TYPE}" == "s1022" ) ]]; then
+  POWERVS_SYS_TYPE="s922"
+fi
+
 PLATFORM_ARGS_COMPUTE=( "sysType" "${POWERVS_SYS_TYPE}" )
 PLATFORM_ARGS_WORKER=( "sysType" "${POWERVS_SYS_TYPE}" )
 POWERVS_ZONE=${LEASED_RESOURCE}
