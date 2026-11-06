@@ -111,9 +111,10 @@ done
 HCP_NAMESPACE="${HC_NAMESPACE}-${CLUSTER_NAME}"
 
 # The CPO Deployment uses the pull-secret copied from HostedCluster.spec.pullSecret. Add a
-# repository-scoped Quay credential to that source secret and wait for HyperShift to propagate it
-# before applying the private image override. A path-scoped auth entry preserves any existing
-# registry-wide quay.io credential needed by the cluster.
+# repository-scoped Quay credential to that source secret, then apply the private image override
+# to trigger HostedCluster reconciliation and propagation to the hosted control plane namespace.
+# A path-scoped auth entry preserves any existing registry-wide quay.io credential needed by the
+# cluster.
 HC_PULL_SECRET_NAME=$(KUBECONFIG="${MC_KUBECONFIG}" oc get hostedcluster "${CLUSTER_NAME}" \
   -n "${HC_NAMESPACE}" -o jsonpath='{.spec.pullSecret.name}')
 if [[ -z "${HC_PULL_SECRET_NAME}" ]]; then
@@ -167,6 +168,10 @@ KUBECONFIG="${MC_KUBECONFIG}" oc set data "secret/${HC_PULL_SECRET_NAME}" -n "${
   --from-file=".dockerconfigjson=${CPO_PULL_SECRET_FILE}"
 log "Added repository-scoped Quay credential to HostedCluster pull secret '${HC_PULL_SECRET_NAME}'"
 
+KUBECONFIG="${MC_KUBECONFIG}" oc annotate hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" \
+  "hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE_REF}" --overwrite
+log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_IMAGE_REF}"
+
 PULL_SECRET_SYNC_START=$(date +%s)
 while true; do
   # --ignore-not-found turns an absent secret into a quiet, empty success, so a non-zero exit means
@@ -198,10 +203,6 @@ unset QUAY_AUTH HCP_QUAY_AUTH OC_PULL_SECRET
 ${WAS_TRACING} && set -x
 rm -f "${CPO_PULL_SECRET_FILE}"
 CPO_PULL_SECRET_FILE=""
-
-KUBECONFIG="${MC_KUBECONFIG}" oc annotate hostedcluster "${CLUSTER_NAME}" -n "${HC_NAMESPACE}" \
-  "hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE_REF}" --overwrite
-log "Annotated HostedCluster '${CLUSTER_NAME}' with control-plane-operator-image=${CPO_IMAGE_REF}"
 
 # Wait for reconciliation to update the CPO Deployment, then require a healthy rollout. This makes
 # it impossible for readiness checks to pass using only the old payload CPO.
