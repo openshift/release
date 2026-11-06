@@ -126,6 +126,42 @@ duration_to_seconds() {
   fi
 }
 
+# The Azure CLI nodepool command declares --labels and --taints as list
+# arguments. Keep the step inputs in the familiar Kubernetes shorthand form,
+# but pass the CLI a JSON list. JSON values are also accepted so callers can
+# provide the native Azure CLI form directly.
+labels_to_json() {
+  local labels="$1"
+  if [[ "${labels}" == \[* ]]; then
+    printf '%s\n' "${labels}"
+    return
+  fi
+  jq -cn --arg labels "${labels}" '
+    ($labels
+      | gsub("[[:space:]]+"; ",")
+      | split(",")
+      | map(select(length > 0)
+          | split("=") as $parts
+          | {key: $parts[0], value: ($parts[1:] | join("="))}))
+  '
+}
+
+taints_to_json() {
+  local taints="$1"
+  if [[ "${taints}" == \[* ]]; then
+    printf '%s\n' "${taints}"
+    return
+  fi
+  jq -cn --arg taints "${taints}" '
+    ($taints
+      | gsub("[[:space:]]+"; ",")
+      | split(",")
+      | map(select(length > 0)
+          | capture("^(?<key>[^=:]+)(=(?<value>[^:]*))?:(?<effect>[^:]+)$")
+          | {key: .key, value: (.value // ""), effect: .effect}))
+  '
+}
+
 # Normalize a comma- or space-separated zone list and remove duplicates.
 normalize_zones() {
   tr ', ' '\n' <<<"$1" | awk 'NF && !seen[$0]++' | sort -V
@@ -218,10 +254,10 @@ create_nodepool() {
     --only-show-errors
   )
   if [[ -n "${MP_LABELS:-}" ]]; then
-    nodepool_args+=(--labels "${MP_LABELS}")
+    nodepool_args+=(--labels "$(labels_to_json "${MP_LABELS}")")
   fi
   if [[ -n "${MP_TAINTS:-}" ]]; then
-    nodepool_args+=(--taints "${MP_TAINTS}")
+    nodepool_args+=(--taints "$(taints_to_json "${MP_TAINTS}")")
   fi
   if [[ -n "${availability_zone}" ]]; then
     nodepool_args+=(--availability-zone "${availability_zone}")
