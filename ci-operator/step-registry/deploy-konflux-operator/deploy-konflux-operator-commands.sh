@@ -4,14 +4,14 @@ set -e
 set -u
 set -o pipefail
 
-declare -r PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 declare -r TOOLS_DIR=/tmp/bin
 declare -r MIRROR_REGISTRY_DIR="${MIRROR_REGISTRY_DIR:-"/var/run/vault/mirror-registry"}"
 declare -r MIRROR_REGISTRY_CREDS="${MIRROR_REGISTRY_DIR}/registry_creds"
+declare -r STAGE_REGISTRY_PATH="${MIRROR_REGISTRY_DIR}/registry_stage.json"
 declare -r USE_REGISTRY_PROXY="${KONFLUX_USE_REGISTRY_PROXY:-false}"
 declare -r REGISTRY_PROXY_HOST="${KONFLUX_REGISTRY_PROXY_HOST:-""}"
 declare -r REGISTRY_PROXY_PORT="${KONFLUX_REGISTRY_PROXY_PORT:-""}"
-declare -r DEPLOY_KONFLUX_OPERATOR_VERSION=v8.1
+declare -r DEPLOY_KONFLUX_OPERATOR_REVISION="${DEPLOY_KONFLUX_OPERATOR_REVISION:-"851d3bf67eb187cc60a378f897dd724ba125ff1d"}"
 
 if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
     echo "ERROR: KONFLUX_TARGET_OPERATORS and KONFLUX_TARGET_FBC_TAGS cannot be set at the same time"
@@ -57,6 +57,23 @@ EOF
     echo "${auth_file}"
 }
 
+function create_stage_registry_auth() {
+    local auth_file="$1"
+
+    if [[ ! -f "${STAGE_REGISTRY_PATH}" ]]; then
+        echo "Stage registry credentials not found at ${STAGE_REGISTRY_PATH}" >&2
+        return 1
+    fi
+
+    jq -e -c '
+        if (.user | type) != "string" or .user == ""
+            or (.password | type) != "string" or .password == ""
+        then error("Invalid stage registry credentials")
+        else {auths: {"registry.stage.redhat.io": {auth: ((.user + ":" + .password) | @base64)}}}
+        end
+    ' "${STAGE_REGISTRY_PATH}" > "${auth_file}"
+}
+
 function install_opm() {
     echo "Install opm"
     run_command "curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o ${TOOLS_DIR}/opm && chmod +x ${TOOLS_DIR}/opm"
@@ -74,9 +91,22 @@ function install_deps() {
     install_oc # we need a modern client
 }
 
-function deploy_operators() {
+function deploy_operators() (
+    local auth_dir auth_file
+    local use_stage_auth=true
+    if [[ "${DISCONNECTED:-false}" == "true" && "${USE_REGISTRY_PROXY}" == "true" ]]; then
+        use_stage_auth=false
+    fi
+    if [[ "${use_stage_auth}" == "true" ]]; then
+        auth_dir=$(mktemp -d)
+        trap 'rm -rf -- "${auth_dir}"' EXIT
+        auth_file="${auth_dir}/.dockerconfigjson"
+        umask 077
+        create_stage_registry_auth "${auth_file}"
+    fi
+
     run_command "cd $(mktemp -d)"
-    run_command "git clone --depth 1 --branch ${DEPLOY_KONFLUX_OPERATOR_VERSION} https://github.com/ajaggapa/deploy-konflux-operator.git"
+    run_command "git clone --depth 1 --revision $DEPLOY_KONFLUX_OPERATOR_REVISION https://github.com/ajaggapa/deploy-konflux-operator.git"
     run_command "chmod -R a+x deploy-konflux-operator"
 
     declare args=()
@@ -86,11 +116,13 @@ function deploy_operators() {
     if [[ -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
         args+=(--fbc-tag "${KONFLUX_TARGET_FBC_TAGS}")
     fi
-
-    local mirror_registry_creds
-    mirror_registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
+    if [[ "${use_stage_auth}" == "true" ]]; then
+        args+=(--registry-auth "${auth_file}")
+    fi
 
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
+        local mirror_registry_creds
+        mirror_registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
         local mirror_registry_url
         mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 
@@ -117,14 +149,13 @@ function deploy_operators() {
         else
             local registry_auth
             registry_auth=$(create_registry_auth "${mirror_registry_url}" "${mirror_registry_creds}")
-            args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}" --quay-auth "${PULL_SECRET}/.dockerconfigjson")
+            args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}")
         fi
-    else
-        args+=(--quay-auth "${PULL_SECRET}/.dockerconfigjson")
     fi
 
-    run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
-}
+    echo "Deploying Konflux operators"
+    deploy-konflux-operator/deploy-operator.sh "${args[@]}"
+)
 
 set_proxy
 install_deps
