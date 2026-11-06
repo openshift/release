@@ -191,7 +191,13 @@ aws|aws-arm64|aws-usgov)
     echo "export AWS_SHARED_CREDENTIALS_FILE='${REMOTE_SECRETS_DIR}/.awscred'" >> "${REMOTE_ENV_FILE}"
     ;;
 azure4|azuremag|azure-arm64)
-    if [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
+    if [[ -f "${SHARED_DIR}/azure_il6_osServicePrincipal.json" ]]; then
+        # Azure IL6: the cluster profile's principal belongs to commercial Azure. The resources
+        # being created live on the emulated IL6 plane and need its own principal, which
+        # ipi-conf-azureil6 puts here.
+        echo "Setting AZURE credential for the emulated IL6 plane"
+        AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_il6_osServicePrincipal.json"
+    elif [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
         echo "Setting AZURE credential using managed identity for installer"
         AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json"
     else
@@ -199,6 +205,14 @@ azure4|azuremag|azure-arm64)
     fi
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
+
+    # No SSL_CERT_FILE / REQUESTS_CA_BUNDLE override here, deliberately.
+    #
+    # azure-il6-bastion-setup installs the emulator CA into /etc/pki/ca-trust/source/anchors and
+    # runs update-ca-trust extract, so Go and requests already trust the emulated ARM endpoint
+    # through the system store. Pointing SSL_CERT_FILE at a snapshot bundle would REPLACE that
+    # store rather than add to it -- and the snapshot predates mirror-images-by-oc-adm installing
+    # the mirror registry's own CA, so the payload pull would lose a certificate it needs.
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then
