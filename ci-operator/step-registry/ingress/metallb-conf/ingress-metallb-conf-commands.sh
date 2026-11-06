@@ -19,7 +19,7 @@ if [[ -f "${SHARED_DIR}/subnets.json" ]]; then
   # Get subnets configuration
   SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
 
-  # Extract MetalLB IP range from indices #40-49 (10 IPs for MetalLB)
+  # Extract MetalLB IP range from indices #40-63 (24 IPs for MetalLB)
   # IP allocation in vSphere static clusters:
   # - #0-1: Network/Gateway (reserved)
   # - #2-3: API/Ingress VIPs
@@ -27,13 +27,13 @@ if [[ -f "${SHARED_DIR}/subnets.json" ]]; then
   # - #11-23: Available for other uses
   # - #24-31: IPAM pool for dynamic machines (/29)
   # - #32-39: Available
-  # - #40-49: MetalLB IP pool (10 IPs)
-  echo "Extracting MetalLB IP addresses from vSphere subnet (indices #40-49)..."
+  # - #40-63: MetalLB IP pool (24 IPs — /26 subnet ceiling)
+  echo "Extracting MetalLB IP addresses from vSphere subnet (indices #40-63)..."
 
   # Calculate IPs from machineNetworkCidr (vsphere-elastic format)
   machine_network_cidr=$(jq -r '.spec.machineNetworkCidr' "${SUBNETS_CONFIG}")
   METALLB_IP_START=$(python3 -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[40])")
-  METALLB_IP_END=$(python3 -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[49])")
+  METALLB_IP_END=$(python3 -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[63])")
 
   if [[ -z "${METALLB_IP_START}" ]] || [[ -z "${METALLB_IP_END}" ]] || [[ "${METALLB_IP_START}" == "null" ]] || [[ "${METALLB_IP_END}" == "null" ]]; then
       echo "ERROR: Failed to extract MetalLB IP range from subnets.json"
@@ -50,7 +50,7 @@ else
   ENVIRONMENT="baremetalds"
   echo "Detected baremetalds environment (or default)"
   METALLB_IP_START="192.168.111.30"
-  METALLB_IP_END="192.168.111.39"
+  METALLB_IP_END="192.168.111.53"
   echo "Using hardcoded MetalLB IP range: ${METALLB_IP_START}-${METALLB_IP_END}"
 fi
 
