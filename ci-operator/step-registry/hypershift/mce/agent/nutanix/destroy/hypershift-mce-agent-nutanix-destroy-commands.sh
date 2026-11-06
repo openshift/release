@@ -28,9 +28,65 @@ fi
 # shellcheck source=/dev/null
 source "$context_file"
 if [[ ! -s "$SHARED_DIR/cluster-name" ]]; then
+  if [[ -s "$SHARED_DIR/nutanix_worker_macs.json" || -s "$SHARED_DIR/nutanix_worker_names" ||
+        -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
+    echo "Nutanix resources may exist but the HostedCluster name is unavailable."
+    exit 1
+  fi
   exit 0
 fi
 CLUSTER_NAME=$(cat "$SHARED_DIR/cluster-name")
+if [[ ! "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ ]]; then
+  echo "The recorded HostedCluster name is invalid."
+  exit 1
+fi
+
+# The InfraEnv step records worker names and MACs before the workers step can
+# create VMs. Recover exact run-owned names when worker provisioning failed or
+# its UUID records were never returned to the CI shared directory.
+worker_macs_file="$SHARED_DIR/nutanix_worker_macs.json"
+worker_names_file="$SHARED_DIR/nutanix_worker_names"
+if [[ -e "$worker_macs_file" ]]; then
+  if [[ ! -s "$worker_macs_file" ]] || ! jq -e --arg cluster "$CLUSTER_NAME" '
+    . as $workers |
+    ($workers | type) == "array" and
+    ($workers | length) > 0 and
+    all($workers | to_entries[];
+      .value.name == ($cluster + "-worker-" + (.key | tostring)) and
+      (.value.mac // "" | test("^02(:[0-9a-f]{2}){5}$"))) and
+    ([$workers[].mac] | unique | length) == ($workers | length)
+  ' "$worker_macs_file" >/dev/null; then
+    echo "The recorded Nutanix worker MAC reservations are invalid; refusing VM cleanup."
+    exit 1
+  fi
+  if [[ -s "$worker_names_file" ]]; then
+    if ! cmp -s "$worker_names_file" <(jq -r '.[].name' "$worker_macs_file"); then
+      echo "The recorded Nutanix worker names do not match the MAC reservations."
+      exit 1
+    fi
+  else
+    jq -r '.[].name' "$worker_macs_file" > "$worker_names_file"
+  fi
+fi
+
+image_name_file="$SHARED_DIR/nutanix_image_name"
+if [[ -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
+  infraenv_name=$(<"$SHARED_DIR/nutanix_infraenv_name")
+  if [[ "$infraenv_name" != "$CLUSTER_NAME-nutanix" ]]; then
+    echo "The recorded Nutanix InfraEnv name does not match this HostedCluster."
+    exit 1
+  fi
+  expected_image_name="$infraenv_name.iso"
+  if [[ -s "$image_name_file" ]]; then
+    if [[ "$(<"$image_name_file")" != "$expected_image_name" ]]; then
+      echo "The recorded Nutanix image name does not match this InfraEnv."
+      exit 1
+    fi
+  else
+    printf '%s\n' "$expected_image_name" > "$image_name_file"
+  fi
+fi
+
 RUN_LABEL_KEY=ci.openshift.io/hcp-agent-nutanix-run
 export KUBECONFIG="$SHARED_DIR/kubeconfig"
 management_cleanup_failed=false
