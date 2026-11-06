@@ -150,7 +150,51 @@ done
 
 rm -rf "${ICMP_CAPTURE_DIR}"
 mkdir -p "${ICMP_CAPTURE_DIR}"
+BASTION_DIAG_DIR="${ICMP_CAPTURE_DIR}/bastion"
+rm -rf "${BASTION_DIAG_DIR}"
+mkdir -p "${BASTION_DIAG_DIR}"
 ICMP_CAPTURE_FAILED=0
+BASTION_DIAGNOSTICS_DIR="/var/lib/udn-bgp-diagnostics"
+BASTION_ROUTE_SERVICE="udn-bgp-route-dump.service"
+BASTION_ICMP_SERVICE="udn-bgp-icmp-capture.service"
+
+start_bastion_diagnostics() {
+  echo "=== Starting bastion route and ICMP diagnostics ==="
+  systemctl start "${BASTION_ROUTE_SERVICE}" "${BASTION_ICMP_SERVICE}"
+  systemctl is-active --quiet "${BASTION_ROUTE_SERVICE}"
+  systemctl is-active --quiet "${BASTION_ICMP_SERVICE}"
+}
+
+collect_bastion_diagnostics() {
+  systemctl stop "${BASTION_ROUTE_SERVICE}" "${BASTION_ICMP_SERVICE}"
+  sleep 1
+
+  if ! cp -a "${BASTION_DIAGNOSTICS_DIR}/." "${BASTION_DIAG_DIR}/"; then
+    echo "ERROR: Failed to collect bastion route and ICMP diagnostics" >&2
+    ICMP_CAPTURE_FAILED=1
+  fi
+  if [[ ! -s "${BASTION_DIAG_DIR}/route-tables.txt" ]]; then
+    echo "ERROR: Bastion route table capture is empty" >&2
+    ICMP_CAPTURE_FAILED=1
+  fi
+  if [[ ! -f "${BASTION_DIAG_DIR}/bastion-icmp.pcap" ]]; then
+    echo "ERROR: Bastion ICMP capture is missing" >&2
+    ICMP_CAPTURE_FAILED=1
+  fi
+
+  systemctl status "${BASTION_ROUTE_SERVICE}" --no-pager \
+    > "${BASTION_DIAG_DIR}/route-service-status.txt" 2>&1 || true
+  systemctl status "${BASTION_ICMP_SERVICE}" --no-pager \
+    > "${BASTION_DIAG_DIR}/icmp-service-status.txt" 2>&1 || true
+  journalctl -u "${BASTION_ROUTE_SERVICE}" --no-pager \
+    > "${BASTION_DIAG_DIR}/route-service-journal.txt" 2>&1 || true
+  journalctl -u "${BASTION_ICMP_SERVICE}" --no-pager \
+    > "${BASTION_DIAG_DIR}/icmp-service-journal.txt" 2>&1 || true
+  cp /etc/systemd/system/"${BASTION_ROUTE_SERVICE}" \
+    "${BASTION_DIAG_DIR}/" 2>/dev/null || true
+  cp /etc/systemd/system/"${BASTION_ICMP_SERVICE}" \
+    "${BASTION_DIAG_DIR}/" 2>/dev/null || true
+}
 
 collect_icmp_diagnostics() {
   local diagnostics_dir="${ICMP_CAPTURE_DIR}/diagnostics"
@@ -178,6 +222,8 @@ collect_icmp_diagnostics() {
 cleanup_icmp_capture() {
   local exit_code=$?
   set +o errexit
+
+  collect_bastion_diagnostics
 
   if oc get namespace udn-bgp-icmp-capture > /dev/null 2>&1; then
     collect_icmp_diagnostics
@@ -207,6 +253,8 @@ cleanup_icmp_capture() {
   exit "${exit_code}"
 }
 trap cleanup_icmp_capture EXIT
+
+start_bastion_diagnostics
 
 echo "=== Deploying node ICMP capture probes ==="
 cat <<'YAML' | oc apply -f -
