@@ -86,7 +86,7 @@ function cleanup_prior() {
             if [ -n "${VPC_CONN_ID}" ]
             then
                 echo "deleting VPC connection"
-                ibmcloud tg connection-delete "${GW}" "${CS}" --force || true
+                ibmcloud tg connection-delete "${GW}" "${VPC_CONN_ID}" --force || true
                 sleep 120
                 echo "Done Cleaning up GW VPC Connection"
             else
@@ -334,4 +334,11 @@ configure_automation
 run_automation
 wait_for_additional_nodes_readiness "$((2+${ADDITIONAL_WORKERS}))"
 
+# Kill any running processes
+pkill terraform || true
+pkill ibmcloud || true
+
+echo "Remaining Processes"
+ps -ef || true
+echo "Done, cleanup '$(date)'"
 exit 0
