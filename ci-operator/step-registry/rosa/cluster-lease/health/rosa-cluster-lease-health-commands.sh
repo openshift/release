@@ -150,7 +150,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
     # accessible), skip the CP check — do NOT mark the cluster as error.
     CLUSTER_KUBECONFIG=$(mktemp)
     CP_CHECK_SKIPPED=""
-    if ! ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null | jq -r '.kubeconfig' > "${CLUSTER_KUBECONFIG}" 2>/dev/null || [[ ! -s "${CLUSTER_KUBECONFIG}" ]]; then
+    if ! ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null | jq -r '.kubeconfig // empty | select(length > 0)' > "${CLUSTER_KUBECONFIG}" 2>/dev/null || [[ ! -s "${CLUSTER_KUBECONFIG}" ]]; then
         log "WARNING: ${CM_NAME} could not fetch cluster kubeconfig from OCM, skipping ClusterPackage check"
         CP_CHECK_SKIPPED="true"
     fi
@@ -209,6 +209,18 @@ for i in $(seq 0 $((TOTAL - 1))); do
             fi
         else
             log "WARNING: ${CM_NAME} could not list ClusterPackages, skipping CP check"
+        fi
+    fi
+    if [[ "${STATUS}" == "error" ]]; then
+        if [[ -n "${CP_CHECK_SKIPPED}" ]] || ! RBAC_RESULT=$(oc auth can-i create configmaps \
+            --as=dedicated-admin-check --as-group=dedicated-admins \
+            -n dedicated-admin --request-timeout=30s \
+            --kubeconfig="${CLUSTER_KUBECONFIG}" 2>/dev/null) || [[ "${RBAC_RESULT}" != "yes" ]]; then
+            log "UNHEALTHY: ${CM_NAME} dedicated-admins RBAC not verified, retaining error status"
+            echo "  RBAC: dedicated-admins permissions not verified (error retained)" >> "${REPORT}"
+            rm -f "${CLUSTER_KUBECONFIG}"
+            UNHEALTHY=$((UNHEALTHY + 1))
+            continue
         fi
     fi
     rm -f "${CLUSTER_KUBECONFIG}"
