@@ -86,7 +86,12 @@ run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "mkdir 
 # Update here to support intallation in bastion on different platforms
 case "${CLUSTER_TYPE}" in
 azure4|azuremag|azure-arm64)
-    if [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
+    if [[ -f "${SHARED_DIR}/azure_il6_osServicePrincipal.json" ]]; then
+        # Azure IL6: the cluster lives on the emulated IL6 plane, so 'destroy cluster' must
+        # authenticate with the IL6 principal, not the commercial-plane one from the profile.
+        echo "Setting AZURE credential for the emulated IL6 plane"
+        AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_il6_osServicePrincipal.json"
+    elif [[ -f "${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json" ]]; then
         echo "Setting AZURE credential using managed identity for installer"
         AZURE_AUTH_LOCATION="${SHARED_DIR}/azure_managed_identity_osServicePrincipal.json"
     else
@@ -94,6 +99,10 @@ azure4|azuremag|azure-arm64)
     fi
     run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${AZURE_AUTH_LOCATION}" "${REMOTE_SECRETS_DIR}/osServicePrincipal.json"
     echo "export AZURE_AUTH_LOCATION='${REMOTE_SECRETS_DIR}/osServicePrincipal.json'" >> "${REMOTE_ENV_FILE}"
+
+    # No SSL_CERT_FILE / REQUESTS_CA_BUNDLE override, for the same reason as the install step:
+    # azure-il6-bastion-setup puts the emulator CA in the system trust store, and overriding with
+    # a snapshot bundle would replace that store rather than extend it.
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then
