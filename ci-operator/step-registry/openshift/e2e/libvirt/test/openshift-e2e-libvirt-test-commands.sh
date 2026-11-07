@@ -16,6 +16,9 @@ libvirt-ppc64le*|libvirt-s390x*|powervs*|powervc*|power-s2s*)
     ;;
 esac
 
+echo "Sleeping 7200s (2 hours) for debugging..."
+sleep 7200
+
 function upgrade() {
     set -x
     openshift-tests run-upgrade all \
