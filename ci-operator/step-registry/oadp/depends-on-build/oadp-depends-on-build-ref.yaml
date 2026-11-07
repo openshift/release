@@ -47,6 +47,25 @@ ref:
       written, nothing downstream changes. Add more lines to test more
       repos (or more images per repo) together in one job; this script
       does not change.
+
+      The second field is normally a real `RELATED_IMAGE_*` env var name,
+      but two sentinel values are special-cased:
+      - `MANAGER_IMAGE` -- the candidate is oadp-operator's own manager
+        image, applied by patching the manager Deployment's container
+        image directly rather than a Subscription env var (consumed by
+        the KDM configs' inline set-related-image steps).
+      - `TESTS_SOURCE` -- the candidate's PR source is wanted as the e2e
+        TEST CODE, not as a container image. The PR's tarball is copied
+        to `${SHARED_DIR}/depends-on-tests-source-<org>-<name>.tar.gz`
+        for this job's own e2e test step to unpack and run `make
+        test-e2e` from, and nothing is appended to
+        depends-on-images.txt. For jobs running oadp-operator's e2e
+        suite from a pre-built image (the KDM e2e configs), so an
+        unmerged oadp-operator PR's test-code changes execute there.
+        Requires the e2e test image to carry the Go toolchain and the
+        repo's `make test-e2e` dependencies (konveyor/
+        oadp-operator-e2e-tests does). Dockerfile/context fields are
+        ignored for this sentinel.
   documentation: |-
     Generic N-candidate resolver for openshift/oadp-operator#2389 style
     cross-repo "test these unmerged PRs together" scenarios, following the
