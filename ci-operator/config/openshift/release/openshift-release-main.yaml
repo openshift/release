@@ -1,4 +1,8 @@
 base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
   ship-status-component-monitor:
     name: component-monitor
     namespace: ship-status-dash
@@ -32,6 +36,12 @@ tests:
   container:
     from: src
   run_if_changed: ^services/.*
+- as: rosa-hcp-readiness
+  commands: python3 hack/test_rosa_hcp_readiness.py
+  container:
+    clone: true
+    from: rosa-aws-cli
+  run_if_changed: ^(ci-operator/step-registry/rosa/cluster/wait-ready/hosted-cp/|hack/test_rosa_hcp_readiness\.py$|ci-operator/config/openshift/release/openshift-release-main\.yaml$)
 - as: hyperfleet-risk-scorer-test
   commands: bash hack/hyperfleet/validate-risk-scorer-step.sh
   container:
