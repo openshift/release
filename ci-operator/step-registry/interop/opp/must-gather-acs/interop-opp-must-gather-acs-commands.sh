@@ -139,14 +139,24 @@ echo "[${TIMESTAMP}] Starting OLM evidence capture..."
 #    (adopt-vs-duplicate and channel comparison); conditions alone cannot
 #    distinguish "CRD absent" from "zero objects", so the CRD is probed
 #    first and an explicit CRD_ABSENT marker is written when missing.
+#    The OperatorPolicy this predicate needs is ACM's (policy.open-cluster-
+#    management.io/v1beta1, spec.subscription): only an ACM OperatorPolicy
+#    re-creates a Subscription after removal, which is what adopt-vs-duplicate
+#    is about. No CRD in group operator.management.openshift.io is registered
+#    by OCP or by OLMv1 (operator-controller ships ClusterExtension, not
+#    OperatorPolicy), so probing that name could only ever report a false
+#    absence. Both the CRD probe and the capture use ACM's fully-qualified
+#    name: with more than one OperatorPolicy group registered, the bare plural
+#    resolves to whichever discovery orders first and would silently capture
+#    the wrong objects (the same trap the Subscription capture below documents).
 echo "[1/10] OperatorPolicy..."
 # Three-way CRD guard (capture contract): the CRD exists → capture;
 # lookup fails NotFound → CRD_ABSENT; fails for any other reason →
 # probe_error — a permission or API error must never render as absence.
-OP_CRD_OUTPUT=$(oc get crd operatorpolicies.operator.management.openshift.io 2>&1)
+OP_CRD_OUTPUT=$(oc get crd operatorpolicies.policy.open-cluster-management.io 2>&1)
 OP_CRD_RC=$?
 if [[ ${OP_CRD_RC} -eq 0 ]]; then
-  oc get operatorpolicy -A -o json 2>/dev/null | \
+  oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
 data = json.load(sys.stdin)
@@ -170,7 +180,7 @@ print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/01-operatorpolicy.json" 2>&1 || \
     echo "probe_error: operatorpolicy query failed" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 elif echo "${OP_CRD_OUTPUT}" | grep -qi "not found"; then
-  echo "CRD_ABSENT: operatorpolicies.operator.management.openshift.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 else
   echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC}): ${OP_CRD_OUTPUT}" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 fi
@@ -809,7 +819,7 @@ FIXTURE
   _expect rhacs_csv_count unknown
   _expect predicate_inputs_classified false
   _expect removal_preconditions_met false
-  echo "CRD_ABSENT: operatorpolicies.operator.management.openshift.io not registered on this cluster" > "${tmp}/01-operatorpolicy.json"
+  echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect operatorpolicy_present false
 
