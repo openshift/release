@@ -164,6 +164,9 @@ gcs_prefix_for_job() {
 # paginated; returns non-zero when the listing itself fails.
 gcs_list_build_objects() {
     local prefix="$1" out="$2" token=""
+    # the pagination scratch files are temp files too: register them so
+    # on_exit removes them (every other scratch file follows this pattern)
+    _CLEANUP_FILES="${_CLEANUP_FILES} ${out}.page ${out}.token"
     : > "${out}"
     while :; do
         if [ -n "${token}" ]; then
