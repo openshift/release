@@ -37,3 +37,66 @@ spec:
 EOF
 
 sed 's/master/worker/g' "${SHARED_DIR}/manifest_mc-master-runc.yml" > "${SHARED_DIR}/manifest_mc-worker-runc.yml"
+
+# Create the GCP CCM CredentialsRequest manifest
+# This is required because in OpenShift 5.0, when custom MachineConfigs are added during installation,
+# the cloud-controller-manager-operator does not properly create this CredentialsRequest from the release payload.
+# Without this manifest, the gcp-ccm-cloud-credentials secret won't be created, causing the
+# gcp-cloud-controller-manager deployment to fail with missing credentials.
+cat > "${SHARED_DIR}/manifest_gcp-ccm-credreq.yml" << 'EOF'
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  annotations:
+    capability.openshift.io/name: CloudCredential+CloudControllerManager
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+  name: openshift-gcp-ccm
+  namespace: openshift-cloud-credential-operator
+spec:
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: GCPProviderSpec
+    permissions:
+    - compute.addresses.create
+    - compute.addresses.delete
+    - compute.addresses.get
+    - compute.addresses.list
+    - compute.firewalls.create
+    - compute.firewalls.delete
+    - compute.firewalls.get
+    - compute.firewalls.update
+    - compute.forwardingRules.create
+    - compute.forwardingRules.delete
+    - compute.forwardingRules.get
+    - compute.healthChecks.create
+    - compute.healthChecks.delete
+    - compute.healthChecks.get
+    - compute.healthChecks.update
+    - compute.httpHealthChecks.create
+    - compute.httpHealthChecks.delete
+    - compute.httpHealthChecks.get
+    - compute.httpHealthChecks.update
+    - compute.instanceGroups.create
+    - compute.instanceGroups.delete
+    - compute.instanceGroups.get
+    - compute.instanceGroups.update
+    - compute.instances.get
+    - compute.instances.use
+    - compute.regionBackendServices.create
+    - compute.regionBackendServices.delete
+    - compute.regionBackendServices.get
+    - compute.regionBackendServices.update
+    - compute.targetPools.addInstance
+    - compute.targetPools.create
+    - compute.targetPools.delete
+    - compute.targetPools.get
+    - compute.targetPools.removeInstance
+    - compute.zones.list
+    skipServiceCheck: true
+  secretRef:
+    name: gcp-ccm-cloud-credentials
+    namespace: openshift-cloud-controller-manager
+  serviceAccountNames:
+  - cloud-controller-manager
+EOF
