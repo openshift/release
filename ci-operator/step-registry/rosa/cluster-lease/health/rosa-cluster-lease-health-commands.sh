@@ -57,6 +57,7 @@ log "Lease health check: ${TOTAL} cluster(s) in inventory"
 
 HEALTHY=0
 UNHEALTHY=0
+PROVISIONING=0
 RECOVERED=0
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
@@ -118,7 +119,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
 
     # Skip health checks for provisioning clusters
     if [[ "${STATUS}" == "provisioning" ]]; then
-        HEALTHY=$((HEALTHY + 1))
+        PROVISIONING=$((PROVISIONING + 1))
         echo "  Provisioning (skipped)" >> "${REPORT}"
         continue
     fi
@@ -229,7 +230,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
 done
 
 echo "" >> "${REPORT}"
-echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
+echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered, ${PROVISIONING} provisioning" >> "${REPORT}"
 
-log "Lease health check complete: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} stale leases recovered"
+log "Lease health check complete: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} stale leases recovered, ${PROVISIONING} provisioning"
 cat "${REPORT}"
