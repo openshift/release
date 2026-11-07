@@ -19,6 +19,22 @@ if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
     source "${SHARED_DIR}/cluster-debug-tools.env"
 fi
 
+# Disconnected jobs can mirror extension images through a registry whose CA is
+# only in the job's additional trust bundle. Go clients used by openshift-tests
+# do not read image.config.openshift.io, so combine the local system bundle with
+# the job bundle and expose it through SSL_CERT_FILE.
+if [[ -z "${SSL_CERT_FILE:-}" && -s "${SHARED_DIR}/additional_trust_bundle" ]]; then
+    combined_ca="${SHARED_DIR}/combined-ca.crt"
+    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
+        cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    elif [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+        cat /etc/ssl/certs/ca-certificates.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    else
+        cp "${SHARED_DIR}/additional_trust_bundle" "${combined_ca}"
+    fi
+    export SSL_CERT_FILE="${combined_ca}"
+fi
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
