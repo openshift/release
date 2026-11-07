@@ -16,6 +16,19 @@ echo "=== TRT Jira Solver ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+
+# Keep the private prompt through normal metrics extraction, but never beyond
+# this task shell. Existing artifact cleanup is chained without trap eval.
+solver_cleanup() {
+    local rc=$?
+    if declare -F copy_artifacts >/dev/null; then
+        copy_artifacts
+    fi
+    rm -f "${SESSION_PROMPT_FILE}" || true
+    return "${rc}"
+}
+trap solver_cleanup EXIT
+
 load_github_tokens
 configure_github_git_credentials
 
@@ -95,7 +108,7 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
     }
-    trap copy_artifacts EXIT TERM INT
+    trap solver_cleanup EXIT TERM INT
 fi
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---

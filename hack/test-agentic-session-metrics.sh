@@ -195,4 +195,106 @@ OTEL_LOG="${work}/missing-otel.jsonl"
 finalize_session_metrics review
 test ! -e "${SESSION_PROMPT_FILE}"
 
+# Evaluation mode never captures the harness prompt and still removes the
+# empty private handoff when finalization runs.
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+# shellcheck disable=SC2034 # Consumed by sourced agentic_ci/finalize functions.
+EVAL_MODE=true
+agentic_ci "synthetic evaluation prompt" >/dev/null
+test ! -s "${SESSION_PROMPT_FILE}"
+finalize_session_metrics solve
+test ! -e "${SESSION_PROMPT_FILE}"
+unset EVAL_MODE
+
+# Exercise the actual solver command with external boundaries stubbed. The
+# only source rewrite points its unavailable /opt skill path at a fixture.
+run_solver_exit_case() {
+    local name=$1 agent_exit=$2 expected_exit=$3
+    local case_dir="${work}/solver-${name}"
+    local workspace="${case_dir}/workspace-${name}"
+    local shared="${case_dir}/shared"
+    local artifacts="${case_dir}/artifacts"
+    local tmp="${case_dir}/tmp"
+    local bin="${case_dir}/bin"
+    local solver="${case_dir}/solver.sh"
+    local log="${case_dir}/solver.log"
+    mkdir -p "${workspace}/artifacts" "${shared}" "${artifacts}" "${tmp}" "${bin}" \
+        "${case_dir}/home" "${case_dir}/pr-metadata"
+
+    git -C "${workspace}" init -b main >/dev/null
+    git -C "${workspace}" config user.name "Synthetic Test"
+    git -C "${workspace}" config user.email "synthetic@example.invalid"
+    printf '%s\n' "synthetic repository" > "${workspace}/README.md"
+    : > "${workspace}/setup.sh"
+    git -C "${workspace}" add README.md setup.sh
+    git -C "${workspace}" -c commit.gpgsign=false commit -m "synthetic base" >/dev/null
+    printf '%s\n' "synthetic retained artifact" > "${workspace}/artifacts/retained.txt"
+
+    cat > "${shared}/github-app-auth.sh" <<'SH'
+load_github_tokens() { :; }
+configure_github_git_credentials() { :; }
+refresh_github_tokens() { :; }
+SH
+    printf '%s\n' "TEST-1" > "${shared}/jira-issue-key"
+    printf '%s\n' '{"fields":{"summary":"Synthetic issue"}}' > "${shared}/jira-issue.json"
+    printf '%s\n' "Synthetic solve instructions." > "${case_dir}/jira-solve.md"
+
+    SHARED_DIR="${shared}" ARTIFACT_DIR="${artifacts}" TMPDIR="${tmp}" \
+        bash "${repo_root}/ci-operator/step-registry/openshift/agentic/trt/init-model/openshift-agentic-trt-init-model-commands.sh" \
+        >/dev/null
+    sed "s|/opt/ai-helpers/plugins/openshift-developer/skills/jira-solve/SKILL.md|${case_dir}/jira-solve.md|" \
+        "${repo_root}/ci-operator/step-registry/openshift/agentic/trt/jira-solver/openshift-agentic-trt-jira-solver-commands.sh" \
+        > "${solver}"
+
+    cat > "${bin}/curl" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '#!/bin/sh' 'exit 0'
+SH
+    cat > "${bin}/agentic-ci" <<'SH'
+#!/usr/bin/env bash
+exit "${SYNTHETIC_AGENT_EXIT:-0}"
+SH
+    cat > "${bin}/podman" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+    chmod +x "${bin}/curl" "${bin}/agentic-ci" "${bin}/podman" "${solver}"
+
+    local rc
+    set +e
+    PATH="${bin}:${PATH}" \
+        HOME="${case_dir}/home" \
+        TMPDIR="${tmp}" \
+        SHARED_DIR="${shared}" \
+        ARTIFACT_DIR="${artifacts}" \
+        WORKDIR="${workspace}" \
+        PR_METADATA_DIR="${case_dir}/pr-metadata" \
+        SETUP_SCRIPT="setup.sh" \
+        UPSTREAM_REPO="example/repo" \
+        FORK_REPO="example/fork" \
+        AGENT_MODEL="claude-test-model" \
+        ALLOWED_TOOLS="Read" \
+        SYNTHETIC_AGENT_EXIT="${agent_exit}" \
+        bash "${solver}" > "${log}" 2>&1
+    rc=$?
+    set -e
+
+    test "${rc}" -eq "${expected_exit}"
+    test -s "${artifacts}/retained.txt"
+    test -z "$(find "${tmp}" -name 'trt-session-initial-prompt.*' -type f -print -quit)"
+    if grep -Fq "Follow the Solve Process instructions" "${log}"; then
+        echo "ERROR: solver logged its private prompt" >&2
+        return 1
+    fi
+    rm -f "/tmp/agentic-system-prompt-$(basename "${workspace}").md"
+}
+
+# A successful worker that forgets the feature branch exits before metrics
+# finalization; EXIT cleanup must retain the task's exit code and remove prompt.
+run_solver_exit_case no-branch 0 1
+# Existing nonzero-agent handling finalizes metrics, preserves exit status, and
+# still runs the existing artifact cleanup.
+run_solver_exit_case agent-failure 23 23
+echo "PASS: solver prompt cleanup preserves no-branch rc=1 and agent-failure rc=23"
+
 echo "PASS: agentic session metrics extraction and dashboard join path"
