@@ -1,0 +1,77 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
+      USER root
+      WORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator
+      RUN git clone --depth 1 --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git .
+      ENV CGO_ENABLED=0
+      RUN make
+
+      FROM quay.io/centos/centos:stream9
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/build/_output/bin/ptp-operator /usr/local/bin/
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/manifests /manifests
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/bindata /bindata
+
+      LABEL io.k8s.display-name="OpenShift ptp-operator" \
+            io.k8s.description="This is a component that manages cluster PTP configuration." \
+            io.openshift.tags="openshift,ptp" \
+            com.redhat.delivery.appregistry=true \
+            maintainer="PTP Team <ptp-dev@redhat.com>"
+
+      ENTRYPOINT ["/usr/local/bin/ptp-operator"]
+    to: ptp-operator
+  - dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.25 AS builder
+      USER root
+      WORKDIR /go/src/github.com/k8snetworkplumbingwg/linuxptp-daemon
+      RUN git clone --depth 1 --branch main https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git .
+      RUN go mod download
+      ARG GIT_COMMIT=unknown
+      ENV GIT_COMMIT=${GIT_COMMIT}
+      RUN make
+
+      FROM quay.io/centos/centos:stream9
+
+      RUN yum -y update && yum -y update glibc && yum --setopt=skip_missing_names_on_install=False -y \
+        install \
+        pciutils \
+        linuxptp \
+        ethtool \
+        hwdata \
+        synce4l \
+        iproute \
+        procps-ng \
+        chrony \
+        gpsd-minimal \
+        gpsd-minimal-clients \
+        && yum clean all
+
+      RUN ln -s /usr/bin/gpspipe /usr/local/bin/gpspipe
+      RUN ln -s /usr/sbin/gpsd /usr/local/sbin/gpsd
+      RUN ln -s /usr/bin/ubxtool /usr/local/bin/ubxtool
+
+      COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/linuxptp-daemon/bin/ptp /usr/local/bin/
+
+      CMD ["/usr/local/bin/ptp"]
+    to: ptp
+promotion:
+  cron: 0 3 * * 1,3,5
+  to:
+  - namespace: ptp-upstream
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ptp-upstream-images
