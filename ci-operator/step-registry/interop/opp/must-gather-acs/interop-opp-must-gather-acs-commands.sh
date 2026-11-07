@@ -69,13 +69,51 @@ collect_acs_diagnostics() {
     # (same endpoint roxctl central debug download-diagnostics uses)
     echo "Downloading ACS diagnostic bundle..."
 
-    # TLS posture: the route certificate is signed by the ingress operator's
-    # CA, not the API-server CA exposed at the serviceaccount mount, so
-    # --cacert against the serviceaccount ca.crt fails verification (HTTP
-    # 000, observed in rehearsal build 2116737836412571648). Match the
-    # readiness step's precedent: curl -sk (insecure), with the mode
-    # disclosed here - this step collects evidence, it does not verify TLS.
-    CURL_TLS_OPTS="-k"
+    # TLS posture (INTEROP-9647): the `central` route is created with
+    # termination: passthrough (RHACS operator chart, 01-central-15-exposure),
+    # so the router does not terminate TLS and the client sees Central's own
+    # serving certificate from the `central-tls` secret (ca.pem/cert.pem/
+    # key.pem) in the Central namespace. Two plausible CAs are both wrong
+    # here: the API-server CA at the serviceaccount mount verifies the kube
+    # API, not the route (HTTP 000 in rehearsal build 2116737836412571648),
+    # and openshift-config-managed/default-ingress-cert is the ROUTER CA,
+    # which only applies when the router terminates (edge/reencrypt) and can
+    # never verify a passthrough route. Verify against Central's own CA, and
+    # exchange the admin password only after that verification succeeds.
+    TLS_MODE="unverified"
+    CURL_TLS_OPTS=""
+    CENTRAL_CA_FILE="${ARTIFACT_DIR}/acs-must-gather/central-ca.pem"
+    TLS_PREFLIGHT_ERR="${ARTIFACT_DIR}/acs-must-gather/tls-preflight.err"
+    CENTRAL_CA="$(oc get secret central-tls -n "${WORKLOAD_NS}" \
+      -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    if [[ -n "${CENTRAL_CA}" ]]; then
+        printf '%s\n' "${CENTRAL_CA}" > "${CENTRAL_CA_FILE}"
+        # Credential-free handshake check against the same endpoint the download
+        # uses: curl exit 0 means the served certificate chained to Central's CA
+        # (an unauthenticated 401 is still a verified handshake); non-zero means
+        # CA or hostname mismatch — no credential is involved either way.
+        if curl -s -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+              --connect-timeout 10 --max-time 30 -w '' \
+              "https://${CENTRAL_HOST}/v1/debug/diagnostics" 2>"${TLS_PREFLIGHT_ERR}"; then
+            TLS_MODE="verified"
+            CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE}"
+        fi
+    else
+        echo "central-tls ca.pem not readable in ${WORKLOAD_NS}" > "${TLS_PREFLIGHT_ERR}"
+    fi
+
+    if [[ "${TLS_MODE}" != "verified" ]]; then
+        # Never send the Central admin password over an unverified channel.
+        # Record what the route actually presents so the CA can be established
+        # from evidence instead of guessed.
+        curl -s -k -v -o /dev/null --connect-timeout 10 --max-time 30 \
+          "https://${CENTRAL_HOST}/v1/debug/diagnostics" \
+          2>"${ARTIFACT_DIR}/acs-must-gather/tls-presented-chain.txt" || true
+        echo "WARNING: Central TLS verification failed (see tls-preflight.err); not sending admin credentials."
+        echo "FAILED: tls-unverified" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
+        BUNDLE_STATUS="skipped:tls-unverified"
+        return 0
+    fi
 
     # Pass credentials via temp file to keep them out of /proc/cmdline
     CURL_CFG=$(mktemp)
@@ -540,4 +578,4 @@ else
     CENTRAL_EXISTS="ERROR"
   fi
 fi
-echo "VERDICT: RHACS subscriptions=${SUBSCRIPTION_COUNT} CRD=${CRD_EXISTS} Central=${CENTRAL_EXISTS} workload-ns=${WORKLOAD_NS:-unknown} bundle=${BUNDLE_STATUS:-not-attempted}"
+echo "VERDICT: RHACS subscriptions=${SUBSCRIPTION_COUNT} CRD=${CRD_EXISTS} Central=${CENTRAL_EXISTS} workload-ns=${WORKLOAD_NS:-unknown} bundle=${BUNDLE_STATUS:-not-attempted} tls=${TLS_MODE:-not-attempted}"
