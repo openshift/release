@@ -1,6 +1,9 @@
 ref:
   as: interop-opp-wait-mcp
   commands: interop-opp-wait-mcp-commands.sh
+  # Execute the commands file as a script (not via bash -c): the phase-0
+  # trap self-test forks this very file, so $0 must resolve to it.
+  run_as_script: true
   documentation: |-
     Waits for all non-paused MachineConfigPools to reach a stable state,
     then asserts all ClusterOperators are healthy and all nodes are Ready.
@@ -13,30 +16,79 @@ ref:
     Fails if any check is unhealthy, preventing misleading downstream
     test failures from degraded infrastructure.
 
-    Patches the worker MCP maxUnavailable to parallelize node rollout on
-    large clusters.
+    Does not patch the worker MCP (the former maxUnavailable=3 patch was
+    an unreverted SUT mutation; the serialized rollout fits the budget).
 
-    Supports progress-based timeout extension: when the ready count is
-    trending upward during the poll loop, the deadline is automatically
-    extended (up to MCP_WAIT_MAX_TIMEOUT) to avoid timing out on
-    slow-but-healthy rollouts common in multi-operator installs.
+    Progress-based timeout extension (INTEROP-9646 rewrite): the deadline
+    is extended only when the per-pool updated-machine count is rising
+    monotonically, or the ready count is recovering with bounded
+    regression - never while any pool is Degraded, and never once the
+    pool has failed to converge for MCP_PINNED_UPDATED_POLLS consecutive
+    polls without Degraded (sustained cycling). The trend window resets
+    on MachineConfig generation change (render churn).
 
-    On MCP timeout, classifies the failure mode:
-    - DEGRADED: Hard failure. One or more MCPs have Degraded=True, indicating
-      a product interop issue where policies caused nodes to enter a bad state.
-    - UPDATING (progressing): Hard failure. Ready count is increasing but
-      the rollout exceeded the timeout. Runs the health gate for diagnostics,
-      then exits 1 without continuing to downstream steps.
-    - UPDATING (oscillating): Hard failure. Ready count is not progressing,
-      suggesting nodes may be cycling due to conflicting configurations.
-    - UNKNOWN: Hard failure. Could not determine MCP state at timeout.
+    On MCP timeout, classifies the failure mode with fixed
+    FAILURE_CLASS tokens:
+    - storage-capacity-enospc: Degraded with a non-self-healing ENOSPC
+      signature (unchanged condition message across >= 2 polls), e.g.
+      the machine-config daemon unable to write the internal registry
+      pull-secret on an undersized node. Also fails fast in-loop.
+    - mcp-degraded: Degraded without the ENOSPC signature.
+    - mcp-deadline-exceeded: progressing but too slow for the timeout.
+    - mcp-rollout-not-converging: all machines updated but the pool
+      never went ready; ready count oscillated without Degraded.
+    - mcp-render-churn: MachineConfig generation changed at least
+      MCP_RENDER_CHURN_LIMIT times during the wait; classified ahead of
+      the state-based classes, so a churny timeout ending UPDATING or
+      DEGRADED still classifies as churn.
+    - cluster-api-unreachable: 5 consecutive failures of the in-loop
+      `oc get mcp` poll (failures of other oc calls do not count).
+    - Unknown timeout: none of the above.
+    On wait-path failures (deadline, degraded, not-converging, churn,
+    api-unreachable, in-loop health gate) a bounded evidence bundle (machines,
+    machinesets, policies, kubeletconfigs, MCPs, nodes) is collected to
+    the step's artifact directory so attribution needs no must-gather.
+    Invalid input and offline self-test failures exit before the wait
+    loop and do not collect a bundle.
+
+    Diagnostics (INTEROP-9646): phase 0 runs two offline self-tests
+    before touching the cluster - the predicate self-test (four recorded
+    run fixtures, pinned verdicts) and a trap self-test that forks this
+    script against a mock oc, SIGTERMs it in the poll loop, and asserts
+    the TERM contract (exit 143, JUnit failure reason, scrubbed xtrace
+    bundle, bounded grace). Either self-test failing the contract exits
+    2 (Invalid step input); environmental harness failures record
+    trap_selftest=warn and continue. The first Degraded sighting and the final
+    classification emit every non-paused MCP condition (type, status, reason,
+    message) verbatim into the build log, and the first degraded condition
+    verbatim into the JUnit failure body, so the
+    decisive evidence (e.g. an ENOSPC writing the internal registry
+    pull-secret) no longer exists only in must-gather. The exit trap preserves
+    the step's exit code (set-once; SIGTERM/SIGINT record 143) and the xtrace
+    bundle is truncated then scrubbed before upload - bounded so the whole
+    failure path fits the 5m termination grace. A phase-0 offline self-test
+    pins the progress-predicate behavior on fixtures extracted from real
+    runs and fails the step (exit 2) if a refactor changes its semantics.
+    Every failure-path oc call is bounded (health gate and final
+    classification: 30s request timeout with a 45s process timeout;
+    diagnostic calls: 10s request and process timeouts; evidence-bundle
+    calls: 10s request timeout inside a single 120s collector watchdog)
+    and the in-loop MCP poll is capped at 60s so a hung apiserver
+    is distinguishable from a slow rollout. Env values are validated before
+    use (exit 2 on non-integer or out-of-range).
   env:
   - default: "3"
     documentation: Number of consecutive clean polls required before declaring stable
     name: MCP_CONSECUTIVE_CHECKS
   - default: "3"
-    documentation: Patch worker MCP maxUnavailable to parallelize node rollout (default 3 nodes at a time)
+    documentation: Maximum ready-count regression tolerated within a progress window (bounded dips from rolling reboots)
     name: MCP_MAX_UNAVAILABLE
+  - default: "120"
+    documentation: Consecutive not-ready polls, with updated machines pinned at machineCount and no Degraded, after which the rollout is considered cycling (updated but never ready) and the step fails fast as mcp-rollout-not-converging (the phase-0 self-test pins the predicate at the reviewed defaults, so tuning this env is safe)
+    name: MCP_PINNED_UPDATED_POLLS
+  - default: "5"
+    documentation: MachineConfig generation changes (render churn) at which the timeout classifies as mcp-render-churn
+    name: MCP_RENDER_CHURN_LIMIT
   - default: "90"
     documentation: Seconds to wait before first poll, allowing MachineConfig rendering to propagate
     name: MCP_SETTLE_DELAY
@@ -44,7 +96,7 @@ ref:
     documentation: Absolute maximum wait time in seconds including all progress-based extensions (default 90 min)
     name: MCP_WAIT_MAX_TIMEOUT
   - default: "1200"
-    documentation: Seconds to extend the deadline when MCP ready count is progressing (default 20 min per extension)
+    documentation: Seconds to extend the deadline on progress (monotone updated-machine rise, or ready-count recovery with bounded regression; default 20 min per extension)
     name: MCP_WAIT_PROGRESS_EXTENSION
   - default: "30"
     documentation: Poll interval in seconds for checking MCP status. Increase for slower clusters.
@@ -56,6 +108,6 @@ ref:
   grace_period: 5m0s
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 200m
+      memory: 512Mi
   timeout: 6300s

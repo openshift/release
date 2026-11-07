@@ -16,7 +16,8 @@ Once the [openshift-plus-setup](https://github.com/stolostron/policy-collection/
 
 1. Clone the policy-collection repo.
 2. Deploy openshift-plus policy set using gitops.
-3. Waits for all policies to become compliant before proceeding.
+3. Waits for all policies (minus any listed in `SKIP_POLICIES`) to become compliant before proceeding.
+4. While `SKIP_POLICIES` is non-empty, writes one failing JUnit result per configured skip entry to `${ARTIFACT_DIR}/junit_skip_policies.xml` (INTEROP-9677 interim visibility). See the ref documentation for the artifact contract and the skip-ratio-gate isolation note.
 
 ## Requirements
 
