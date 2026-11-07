@@ -1,0 +1,64 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.17-openshift-4.11
+prowgen:
+  enable_secrets_store_csi_driver: true
+  expose: true
+  private: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-disconnected-acm-oc-mirror
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-sustaining-autorelease-412
+    env:
+      ACM_IIB_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1239602
+      ACM_VERSION: "2.13"
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      MCE_IIB_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1239572
+      MCE_VERSION: "2.8"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "acm-catalog-2.13", "channel": "release-2.13", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+    post:
+    - chain: gather-core-dump
+    - ref: acm-must-gather
+    - chain: ipi-aws-post-disconnected
+    pre:
+    - ref: acm-debug-ssh-key
+    - chain: ipi-aws-pre-disconnected
+    test:
+    - ref: acm-disconnected-oc-mirror
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-pods-health-check
+    workflow: openshift-e2e-aws-disconnected
+zz_generated_metadata:
+  branch: release-2.13
+  org: stolostron
+  repo: acmqe-autotest
+  variant: disconnected-ocp4.17
