@@ -1,0 +1,50 @@
+ref:
+  as: interop-opp-prow-analyzer
+  from_image:
+    namespace: ocp
+    name: builder
+    tag: rhel-9-golang-1.22-openshift-4.18
+  commands: interop-opp-prow-analyzer-commands.sh
+  timeout: 45m
+  grace_period: 10m
+  best_effort: true
+  credentials:
+  - collection: ieng--interop--ci-operator
+    group: ship-help-mcp
+    mount_path: /tmp/secrets/ship-help
+  - collection: ieng--interop--ci-operator
+    group: opp-discussion-webhook
+    mount_path: /tmp/secrets/opp-discussion-webhook
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  env:
+  - name: SHIP_HELP_MCP_URL
+    default: "https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+    documentation: |
+      Ship-help MCP endpoint the analyzer CLI posts to (persona ocp_ai_helpdesk).
+      The endpoint's certificate chain is signed by a Red Hat internal CA; the
+      image trust store must include it (verified in rehearsal).
+  - name: ANALYZER_SOURCE_URL
+    default: "https://api.github.com/repos/oramraz/prow-analyzer/tarball/cfe2cb6edcbb6f2d7bc366130cc03318d83a3ccd"
+    documentation: |
+      Pinned prow-analyzer source (public repo oramraz/prow-analyzer). The
+      step compiles the CLI from this archive and fails closed if the
+      sha256 does not match ANALYZER_SOURCE_SHA256.
+  - name: ANALYZER_SOURCE_SHA256
+    default: "1d46e51412efa76c473910f8975002295ee46cdd62feab3c91254f68f43efa34"
+    documentation: |
+      sha256 of the pinned source archive; mismatch means no analysis and an
+      error result line (fail closed).
+  documentation: |-
+    Best-effort, lane-neutral post step (INTEROP-9648): on a failed run,
+    fetch one AI failure analysis via the ship-help MCP and deliver it to
+    the internal #opp-discussion Slack channel; on a green run, skip.
+    Emits a versioned OPP-PROW-ANALYZER result line (skeleton before any
+    network call, exactly one terminal line on every graceful path) and
+    deliberately NO JUnit: a red JUnit under this product lane would
+    poison the run-verification evidence gate. Exit code is 0 on every
+    graceful path; only a hard kill (SIGKILL/OOM, bounded by the grace
+    period) can mark the job red. Public output is metadata-only; the
+    analysis prose is never written to public logs or artifacts.
