@@ -12,6 +12,15 @@ build_root:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM rosa-aws-cli
+      USER 0
+      RUN dnf install -y git make python3 gettext python3-pyyaml && dnf clean all
+      USER 1001
+    from: rosa-aws-cli
+    to: enmaas-deploy-image
 releases:
   latest:
     candidate:
@@ -714,6 +723,41 @@ tests:
     - chain: openshift-qe-hypershift-infra
     - ref: openshift-qe-perfscale-aws-data-path-sg
     - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts-hcp-mp
+- as: enmaas-perftest
+  cron: 0 4 * * 1
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: perf2
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.4xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      ENMAAS_BRANCH: main
+      ENMAAS_ENV: stage
+      HOSTED_CP: "true"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: m6i.8xlarge
+      MP_REPLICAS: "2"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-east-2
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
+    post:
+    - ref: enmaas-deprovision-rds
+    - chain: rosa-aws-sts-hcp-deprovision
+    - ref: send-results-to-reportportal
+    test:
+    - ref: enmaas-provision-rds
+    - chain: enmaas-setup
+    - ref: enmaas-run-perftest
     workflow: rosa-aws-sts-hcp-mp
 zz_generated_metadata:
   branch: main
