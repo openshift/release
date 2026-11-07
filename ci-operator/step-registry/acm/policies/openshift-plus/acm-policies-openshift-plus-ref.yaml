@@ -43,9 +43,15 @@ ref:
     interop-opp-skip-ratio-gate counts <skipped> results, and propagating
     failure rows would inflate the gate denominator and mask real
     skip-ratio breaches. Policy skips are counted via this per-step
-    artifact instead. Note (rehearsal-verified 2026-11-04): the gate's
-    scan root is populated only on lanes running the ExitTrap
-    MAP_TESTS/DR__RP__CR_COMP_NAME machinery; on lanes without it (both
-    full-stack--fips--aws jobs) the gate finds no corpus and reports
-    EVIDENCE-INCOMPLETE. FAIL_ON_BREACH=true is unsupported on any lane
-    with a non-empty SKIP_POLICIES.
+    artifact instead. Note: the gate is wired only into jobs that include
+    the interop-opp-skip-ratio-gate step (the RedHatQE
+    cr--full-stack--aws jobs and the stolostron policy-collection
+    interop-opp-aws / interop-opp-upgrade-aws jobs); neither
+    full-stack--fips--aws job includes it. Its scan root is JUNIT_DIR when
+    set, else SHARED_DIR when that tree already holds JUnit XML, else its
+    own ARTIFACT_DIR, where an empty tree makes the gate report
+    EVIDENCE-INCOMPLETE and exit 0. MAP_TESTS/DR__RP__CR_COMP_NAME do not
+    decide this: several steps (for example interop-opp-wait-mcp) write
+    JUnit XML into SHARED_DIR without that machinery.
+    FAIL_ON_BREACH=true is unsupported on any lane with a non-empty
+    SKIP_POLICIES.
