@@ -208,6 +208,9 @@ _classify() {
         # observed in rehearsal build 2116735878033313792. A successful read
         # with an EMPTY list is the same deterministic absence (the CRD is
         # simply not there), so only the read's success is gated here.
+        # Absence classified here is PROVISIONAL on a required lane: the main
+        # flow holds it for a bounded window before finalizing (provisional-
+        # hold block below), and it is final only for absent-by-design.
         if crdlist="$(oc get crd -o name 2>/dev/null)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
@@ -523,6 +526,26 @@ function PeriodicOperatorDiagnostics () {
 }
 
 # ---------------------------------------------------------------------------
+# Provisional-hold check (required lanes): succeeds once the Central CRD is
+# registered AND at least one Central CR exists. A missing CRD or an empty
+# Central list is a deterministic read result, but on a required lane it can
+# equally be a race with the step that provisions ACS: the ACM policies that
+# install the RHACS operator and create Central are applied by
+# acm-policies-openshift-plus but excluded from its policy-compliance wait
+# (they are listed in SKIP_POLICIES), so this step can read before Central
+# exists. The main flow therefore holds absent provisionally, bounded by
+# ACS_WAIT_TIMEOUT_S and the global budget, and finalizes it only when that
+# hold expires.
+# ---------------------------------------------------------------------------
+function CheckCentralPresent () {
+    typeset out="" items=""
+    oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || return 1
+    out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || return 1
+    items="$(printf '%s' "${out}" | JsonLength items)" || return 1
+    (( items > 0 ))
+}
+
+# ---------------------------------------------------------------------------
 # Main flow
 # ---------------------------------------------------------------------------
 
@@ -549,6 +572,21 @@ fi
 # Classification before any SHARED_DIR consumption (D4)
 _classify
 echo "[readiness] ACS state classified: ${_ACS_STATE}"
+
+# Provisional hold on a required lane: a deterministic-absent read must not
+# finalize acs-required-but-absent while ACS provisioning may still be in
+# flight. Bounded by ACS_WAIT_TIMEOUT_S (further capped by the global budget).
+# absent-by-design keeps the immediate verdict and does not wait at all;
+# unknown (a failed read) is never held and stays exit 3 below.
+if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "required" ]]; then
+    echo "[readiness] absent read on a required lane: holding provisionally (cap ${waitCap}s, budget remaining $(_budget_remaining)s)"
+    if WaitFor "Central CR present (ACS_EXPECTATION=required)" CheckCentralPresent PeriodicOperatorDiagnostics; then
+        _ACS_STATE="present"
+        echo "[readiness] ACS state re-classified after provisional hold: ${_ACS_STATE}"
+    else
+        echo "[readiness] provisional hold expired: finalizing absent"
+    fi
+fi
 
 if [[ "${_ACS_STATE}" == "unknown" ]]; then
     _add_classification "acs-state-indeterminate" failed "Classification" \

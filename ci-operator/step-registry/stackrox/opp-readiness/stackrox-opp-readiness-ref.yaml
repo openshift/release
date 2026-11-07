@@ -23,7 +23,8 @@ ref:
     default: "900"
     documentation: |-
       Per-check wait cap, in seconds (additionally bounded by the global
-      in-script budget).
+      in-script budget). Also caps the provisional hold applied to an
+      absent classification on a required lane.
   - name: ACS_BUDGET_S
     default: "3300"
     documentation: |-
@@ -46,6 +47,11 @@ ref:
     INTEROP-9647 contract: classifies the ACS state (present / absent /
     unknown) by its own query before any SHARED_DIR consumption, gated by
     the fail-closed ACS_EXPECTATION env (required | absent-by-design).
+    On a required lane an absent read is held provisionally, bounded by
+    ACS_WAIT_TIMEOUT_S and the in-script budget, and is finalized as
+    acs-required-but-absent only when that hold expires, so a race with
+    ACS provisioning cannot fail the step early; absent-by-design keeps
+    the immediate verdict and never waits.
     Emits a JUnit carrier (lp-interop--OPP--acs-readiness) on every exit
     path: one self-describing classification case, seven assertion cases
     (central-crd, securedcluster-crd, central-route,
