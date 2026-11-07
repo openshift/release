@@ -180,6 +180,7 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 #   source "${SHARED_DIR}/trt-telemetry.sh"
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 else
@@ -767,6 +768,11 @@ agentic_ci() {
         esac
     done
     local prompt="$1"; shift
+    # Codex may redact prompt text in OTEL. Preserve the initial harness prompt
+    # privately for extraction; resumed/nudge prompts must not replace it.
+    if [[ "${EVAL_MODE:-}" != "true" && ! -s "${SESSION_PROMPT_FILE}" ]]; then
+        (umask 077 && printf '%s' "${prompt}" > "${SESSION_PROMPT_FILE}")
+    fi
     if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-}" ]]; then
         echo "Applying Gangway override: AGENT_MODEL=${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL}"
     fi
@@ -892,7 +898,7 @@ agentic_ci() {
 }
 
 # Token totals come from Codex response.completed events. Dollar amounts come
-# from codex.cost.usage when agentic-ci has written that metric. Prints JSON:
+# from agentic_ci.codex.cost.usage when agentic-ci has written that metric. Prints JSON:
 #   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
 codex_otel_usage() {
     local otel_path=$1
@@ -913,6 +919,7 @@ models = defaultdict(lambda: {
 version = ""
 session_id = ""
 cost_from_metric = False
+cumulative_costs = {}
 
 
 def attribute_value(value):
@@ -974,7 +981,8 @@ with open(path) as handle:
             for resource in payload.get("resourceMetrics", []):
                 for scope in resource.get("scopeMetrics", []):
                     for metric in scope.get("metrics", []):
-                        if metric.get("name") != "codex.cost.usage":
+                        if metric.get("name") not in (
+                                "agentic_ci.codex.cost.usage", "codex.cost.usage"):
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
                         for point in data.get("dataPoints", []):
@@ -983,7 +991,19 @@ with open(path) as handle:
                                 continue
                             attrs = point_attributes(point)
                             model = str(attrs.get("model") or "unknown")
-                            models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+                            if ("sum" in metric
+                                    and data.get("aggregationTemporality") == 2):
+                                key = (model, str(point.get("startTimeUnixNano", "")))
+                                try:
+                                    timestamp = int(point.get("timeUnixNano", 0) or 0)
+                                except (TypeError, ValueError):
+                                    timestamp = 0
+                                previous = cumulative_costs.get(key)
+                                if previous is None or timestamp >= previous[0]:
+                                    cumulative_costs[key] = (timestamp, amount)
+                            else:
+                                models[model]["cost"] = round(
+                                    models[model].get("cost", 0) + amount, 6)
                             cost_from_metric = True
             continue
         if "/v1/logs" not in record_path:
@@ -1018,6 +1038,9 @@ with open(path) as handle:
                     models[model]["cache_read"] += as_int(attrs, "cached_token_count")
                     models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
 
+for (model, _start), (_timestamp, amount) in cumulative_costs.items():
+    models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+
 print(json.dumps({
     "version": version,
     "session_id": session_id,
@@ -1029,6 +1052,7 @@ PY
 
 finalize_session_metrics() {
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     # phase is "solve" or "review". Each step writes its own artifact so a
@@ -1037,63 +1061,47 @@ finalize_session_metrics() {
     rm -f "${SHARED_DIR}/claude-otel.jsonl" "${SHARED_DIR}/claude-session-metrics-autodl.json"
     if [[ "${phase}" != "solve" && "${phase}" != "review" ]]; then
         echo "Warning: finalize_session_metrics requires phase solve or review, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     if [[ ! -f "${EXTRACT_METRICS}" ]]; then
         echo "Warning: extract_metrics.py not found, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     if [[ ! -s "${OTEL_LOG}" ]]; then
         echo "Warning: No OTEL data collected, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    local metrics_tmp dest usage
+    local metrics_tmp dest metadata_file session_id
     metrics_tmp=$(mktemp)
     dest="${ARTIFACT_DIR}/claude-session-metrics-${phase}-autodl.json"
     local extract_rc=0
-    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" 2>&1 || extract_rc=$?
-    if [[ ! -s "${metrics_tmp}" ]]; then
+    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" \
+        --prompt-file "${SESSION_PROMPT_FILE}" 2>&1 || extract_rc=$?
+    if [[ "${extract_rc}" -ne 0 || ! -s "${metrics_tmp}" ]]; then
         echo "Warning: Failed to extract session metrics"
-        rm -f "${metrics_tmp}"
+        rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    if ! usage=$(codex_otel_usage "${OTEL_LOG}"); then
-        echo "Warning: Failed to read Codex usage, keeping extracted session metrics"
-        usage=""
-    fi
-    if [[ -n "${usage}" ]] && jq -e '(.models // {}) | length > 0' <<<"${usage}" >/dev/null 2>&1; then
-        local patched
-        patched=$(mktemp)
-        if jq --argjson usage "${usage}" '
-          .rows[0] as $r
-          | ($usage.models | to_entries | max_by(.value.input + .value.cache_read + .value.cache_create)) as $top
-          | ($top.key) as $model
-          | ($usage.models[$model]) as $tokens
-          | .rows[0] = ($r + {
-              model: (if ($r.model | length) > 0 then $r.model else $model end),
-              session_id: (if ($r.session_id | length) > 0 then $r.session_id else $usage.session_id end),
-              claude_code_version: (if ($r.claude_code_version | length) > 0 then $r.claude_code_version else $usage.version end),
-              num_turns: (if ($r.num_turns | tonumber) > 0 then $r.num_turns else ($tokens.turns | tostring) end),
-              input_tokens: (if ($r.input_tokens | tonumber) > 0 then $r.input_tokens else ($tokens.input | tostring) end),
-              output_tokens: (if ($r.output_tokens | tonumber) > 0 then $r.output_tokens else ($tokens.output | tostring) end),
-              cache_read_input_tokens: (if ($r.cache_read_input_tokens | tonumber) > 0 then $r.cache_read_input_tokens else ($tokens.cache_read | tostring) end),
-              cache_creation_input_tokens: (if ($r.cache_creation_input_tokens | tonumber) > 0 then $r.cache_creation_input_tokens else ($tokens.cache_create | tostring) end),
-              total_cost_usd: (if $usage.cost_from_metric then (([$usage.models[] | .cost // 0] | add // 0) | tostring) else $r.total_cost_usd end)
-            })
-        ' "${metrics_tmp}" > "${patched}"; then
-            mv "${patched}" "${metrics_tmp}"
+    # Carry the real session identity into the domain row used by dashboards.
+    # An atomic rewrite avoids leaving malformed metadata if jq fails.
+    metadata_file="${SHARED_DIR}/metrics-metadata-${phase}.json"
+    session_id=$(jq -r '.rows[0].session_id // ""' "${metrics_tmp}")
+    if [[ -n "${session_id}" && -f "${metadata_file}" ]]; then
+        local metadata_tmp
+        metadata_tmp=$(mktemp)
+        if jq --arg session_id "${session_id}" '.session_id = $session_id' \
+            "${metadata_file}" > "${metadata_tmp}"; then
+            mv "${metadata_tmp}" "${metadata_file}"
         else
-            echo "Warning: Failed to apply Codex usage to session metrics"
-            rm -f "${patched}"
+            rm -f "${metadata_tmp}"
+            echo "Warning: Failed to propagate session identity to metrics metadata"
         fi
     fi
-    if [[ "${extract_rc}" -ne 0 ]] && ! jq -e '(.rows[0].input_tokens | tonumber) > 0 or (.rows[0].output_tokens | tonumber) > 0' "${metrics_tmp}" >/dev/null 2>&1; then
-        echo "Warning: Failed to extract session metrics"
-        rm -f "${metrics_tmp}"
-        return 0
-    fi
     cp "${metrics_tmp}" "${dest}"
-    rm -f "${metrics_tmp}"
+    rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
     echo "Session metrics autodl written to ${dest}"
 }
 HEREDOC_EOF
