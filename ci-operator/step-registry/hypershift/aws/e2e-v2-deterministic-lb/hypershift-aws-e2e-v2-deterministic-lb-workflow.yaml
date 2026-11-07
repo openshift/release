@@ -1,0 +1,41 @@
+workflow:
+  as: hypershift-aws-e2e-v2-deterministic-lb
+  documentation: |-
+    The HyperShift AWS e2e v2 deterministic LoadBalancer IP workflow
+    provisions a nested management cluster, installs the HyperShift operator,
+    reserves an EIP in the management cluster account, creates AWS guest
+    clusters with the deterministic LB variant, runs the v2 test suite, and
+    releases the EIP after the guest clusters are destroyed.
+
+    The deterministic-lb variant is selected by the TEST_PLAN in the job. The
+    EIP and public subnet are written to SHARED_DIR/eip.env and consumed by the
+    create-guests and run-tests steps.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    - ref: hypershift-write-test-plan
+    - ref: hypershift-reserve-deterministic-lb-eip
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-aws-run-e2e-v2
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - ref: hypershift-release-deterministic-lb-eip
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: "aws"
+      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: "alias/hypershift-ci"
