@@ -61,6 +61,7 @@ tests:
         openshift/velero-plugin-for-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_AWS Dockerfile.ubi
         openshift/velero-plugin-for-legacy-aws RELATED_IMAGE_VELERO_PLUGIN_FOR_LEGACY_AWS Dockerfile.ubi
         openshift/oadp-operator MANAGER_IMAGE
+        openshift/oadp-operator TESTS_SOURCE
       OADP_BRANCH: oadp-1.5
       OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-1.5
       OO_INSTALL_MODE: OwnNamespace
@@ -163,7 +164,36 @@ tests:
           memory: 100Mi
     - as: e2e
       cli: latest
-      commands: make test-e2e
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        # A Depends-On: line naming an openshift/oadp-operator PR (resolved by
+        # oadp-depends-on-build, earlier in this test phase) can hand that PR's
+        # source over as a tarball, so its UNMERGED e2e TEST CODE runs here
+        # instead of this image's baked-in branch test code -- this job runs
+        # konveyor/oadp-operator-e2e-tests, whose build/ci-Dockerfile bakes a
+        # release branch's oadp-operator source in, so test-code changes in an
+        # unmerged oadp-operator PR would otherwise never execute here. No
+        # tarball (no Depends-On line, or the resolver degraded to a no-op on
+        # a GitHub fetch failure) -> the baked-in tests run, exactly as
+        # before.
+        TESTS_SOURCE_TARBALL="${SHARED_DIR}/depends-on-tests-source-openshift-oadp-operator.tar.gz"
+        if test -s "${TESTS_SOURCE_TARBALL}"; then
+          echo "Depends-On: running e2e from the resolved openshift/oadp-operator PR's source instead of this image's baked-in test code"
+          TESTS_SOURCE_DIR="$(mktemp -d)"
+          # Fresh directory rather than overwriting the baked-in checkout:
+          # files deleted in the PR must not linger and break the build.
+          tar xzf "${TESTS_SOURCE_TARBALL}" -C "${TESTS_SOURCE_DIR}" --strip-components=1
+          # Fail loudly on a wrong-repo tarball instead of silently falling
+          # back to the baked-in tests -- that would test the wrong thing.
+          if ! grep -q '^module github\.com/openshift/oadp-operator$' "${TESTS_SOURCE_DIR}/go.mod"; then
+            echo "Depends-On test source at ${TESTS_SOURCE_DIR} is not openshift/oadp-operator (go.mod mismatch) -- refusing to run it" >&2
+            exit 1
+          fi
+          cd "${TESTS_SOURCE_DIR}"
+        fi
+        make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
