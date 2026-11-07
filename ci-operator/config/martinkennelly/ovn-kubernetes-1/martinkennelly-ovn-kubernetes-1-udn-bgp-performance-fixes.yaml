@@ -1,0 +1,76 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.base
+    to: ovn-kubernetes-base
+  - dockerfile_path: Dockerfile
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes
+  - dockerfile_path: Dockerfile.microshift
+    from: ovn-kubernetes-base
+    to: ovn-kubernetes-microshift
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: udn-bgp-layer2-300-24nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      E2E_REPO: https://github.com/martinkennelly/e2e-benchmarking
+      E2E_VERSION: udn-bgp-ci-dependencies
+      ITERATIONS: "300"
+      KUBE_BURNER_OCP_REF: udn-bgp-ci-dependencies
+      KUBE_BURNER_OCP_REPO: https://github.com/martinkennelly/kube-burner-ocp
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PPROF: "true"
+      PPROF_INTERVAL: 10m
+      UDN_BGP_LAYER2: "true"
+    post:
+    - ref: openshift-qe-installer-aws-deprovision-bastion
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-installer-aws-provision-bastion
+    test:
+    - ref: openshift-qe-bgp-setup-udn-bgp
+    - ref: openshift-qe-udn-bgp
+    workflow: openshift-qe-installer-aws
+  timeout: 14h0m0s
+zz_generated_metadata:
+  branch: udn-bgp-performance-fixes
+  org: martinkennelly
+  repo: ovn-kubernetes-1
