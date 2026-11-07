@@ -1,0 +1,146 @@
+base_images:
+  bm-ssh:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: bm-tdx-sanity
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  restrict_network_access: false
+  steps:
+    env:
+      OSC_BM_JOB: |
+        {
+          "machine": {
+            "id": "virtlab26118sifo"
+          },
+          "ocp": {
+            "build": "ga",
+            "topology": "sno",
+            "version": "4.21.39"
+          },
+          "reservation": {
+            "release_on_error": true,
+            "release_on_fail": true
+          },
+          "runner": "0.1.0",
+          "schema_version": 1,
+          "test_plan": [
+            {
+              "profile": "default",
+              "suites": [
+                {
+                  "name": "simple",
+                  "tests": [
+                    "sanity"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      OSC_BM_PRE_SLEEP: 3h
+    post:
+    - as: bm-post
+      commands: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        : "${ARTIFACT_DIR:?}" "${SHARED_DIR:?}"
+        test -s "${SHARED_DIR}/bm-job" || exit 0
+        read -r job < "${SHARED_DIR}/bm-job"
+        [[ "${job}" =~ ^[0-9a-f]{32}$ ]]
+        identity="$(mktemp)"
+        trap 'rm -f "${identity}"' EXIT
+        cp -- /var/run/osc-bm-ssh/id_ed25519_pub "${identity}"
+        chmod 600 "${identity}"
+        bastion="$(< /var/run/osc-bm-ssh/bastion)"
+        [[ "${bastion}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]
+        ssh -T -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -o LogLevel=ERROR -o IdentitiesOnly=yes -o 'UserKnownHostsFile="/var/run/osc-bm-ssh/known_hosts"' -p 22 -i "${identity}" "prow@${bastion}" "/usr/local/bin/osc-bm --non-interactive collect ${job} --archive --timeout 840" \
+            | tar -xf - -C "${ARTIFACT_DIR}"
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-ssh
+        mount_path: /var/run/osc-bm-ssh
+      from: bm-ssh
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
+    pre:
+    - as: bm-pre
+      commands: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        if [[ "${OSC_BM_PRE_SLEEP:-0}" != 0 ]]; then
+            sleep "${OSC_BM_PRE_SLEEP}"
+        fi
+        : "${OSC_BM_JOB:?}" "${PROW_JOB_ID:?}" "${SHARED_DIR:?}"
+        case "${PROW_JOB_ID}" in
+            *[!a-zA-Z0-9._-]*) exit 2 ;;
+        esac
+        identity="$(mktemp)"
+        trap 'rm -f "${identity}"' EXIT
+        cp -- /var/run/osc-bm-ssh/id_ed25519_pub "${identity}"
+        chmod 600 "${identity}"
+        bastion="$(< /var/run/osc-bm-ssh/bastion)"
+        [[ "${bastion}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]
+        ssh -T -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -o LogLevel=ERROR -o IdentitiesOnly=yes -o 'UserKnownHostsFile="/var/run/osc-bm-ssh/known_hosts"' -p 22 -i "${identity}" "prow@${bastion}" \
+            "/usr/local/bin/osc-bm --non-interactive run --config - --runner 0.1.0 --async --id-only --external-id prow:${PROW_JOB_ID}" \
+            <<< "${OSC_BM_JOB}" > "${SHARED_DIR}/bm-job"
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-ssh
+        mount_path: /var/run/osc-bm-ssh
+      env:
+      - name: OSC_BM_JOB
+      - default: "0"
+        documentation: Temporary debugging delay before pre starts (seconds or h/m/s).
+        name: OSC_BM_PRE_SLEEP
+      from: bm-ssh
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h10m0s
+    test:
+    - as: bm-test
+      commands: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+        : "${SHARED_DIR:?}"
+        read -r job < "${SHARED_DIR}/bm-job"
+        [[ "${job}" =~ ^[0-9a-f]{32}$ ]]
+        identity="$(mktemp)"
+        trap 'rm -f "${identity}"' EXIT
+        cp -- /var/run/osc-bm-ssh/id_ed25519_pub "${identity}"
+        chmod 600 "${identity}"
+        bastion="$(< /var/run/osc-bm-ssh/bastion)"
+        [[ "${bastion}" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]
+        ssh -T -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=yes -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=60 -o ServerAliveInterval=60 -o ServerAliveCountMax=2 -o LogLevel=ERROR -o IdentitiesOnly=yes -o 'UserKnownHostsFile="/var/run/osc-bm-ssh/known_hosts"' -p 22 -i "${identity}" "prow@${bastion}" "/usr/local/bin/osc-bm --non-interactive logs ${job} --follow"
+      credentials:
+      - collection: sandboxed-containers-operator
+        group: osc-bm-ssh
+        mount_path: /var/run/osc-bm-ssh
+      from: bm-ssh
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h2m0s
+  timeout: 9h0m0s
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: bm
