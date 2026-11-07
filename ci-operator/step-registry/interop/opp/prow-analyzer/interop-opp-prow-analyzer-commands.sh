@@ -10,8 +10,11 @@
 # deviation, design doc section 8). Shell tracing is OFF for the whole
 # script; no env dumps; credentials by file-mounted secret -> environment
 # only, never argv; CLI streams redirect off the public artifact path.
+# Errexit is ON (set -e): every failure path routes through the EXIT trap,
+# which emits the terminal line and forces exit 0 - an unhandled command
+# failure degrades to outcome=error, never a red job.
 
-set -uo pipefail
+set -euo pipefail
 
 # ---------------------------------------------------------------- constants
 READONLY_PREFIX="OPP-PROW-ANALYZER"
@@ -417,14 +420,17 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
         # paths/URLs, never analysis prose or credentials). Spaces become ~ so
         # the key=value result-line grammar stays parseable. Skip go module
         # progress lines first (CodeRabbit r4429697363): with an empty module
-        # cache Go prints "go: downloading ..." before any failure, and
-        # head -1 would report the progress message instead of the error.
-        _GO_DETAIL="$(grep -vE '^go: (downloading|finding|fetching)' "${_GO_BUILD_ERR}" 2>/dev/null | grep -m1 . | head -c 200 | tr ' ' '~')"
+        # cache Go prints "go: downloading ..." before any failure, and a
+        # first-line pick would report the progress message instead of the
+        # error. Single awk process (no early-exit reader pipeline): under
+        # set -euo pipefail a grep -m1 | head pipeline can die on SIGPIPE and
+        # abort this error handler itself.
+        _GO_DETAIL="$(awk '!/^go: (downloading|finding|fetching)/ && NF { gsub(/ /, "~"); print substr($0, 1, 200); exit }' "${_GO_BUILD_ERR}" 2>/dev/null)"
         printf 'OPP-PROW-ANALYZER v=1 stage=note what=compile_failed detail=%s\n' "${_GO_DETAIL:-no_stderr}"
         _OUTCOME="error"; _GATE="compile_failed"
         exit 0
     fi
-    ANALYZER_CLI_PATH="$(find "${ANALYZER_CLI_PATH}" -name prow-analyzer -type f | head -1)"
+    ANALYZER_CLI_PATH="$(find "${ANALYZER_CLI_PATH}" -name prow-analyzer -type f -print -quit)"
 fi
 
 # Red Hat IT root CA: the MCP endpoint's chain terminates at the internal
@@ -552,7 +558,7 @@ PYEOF
 fi
 _PAYLOAD_CHARS="${PAYLOAD_CHARS}"
 
-WEBHOOK_URL="$(cat "${ANALYZER_WEBHOOK_FILE}" 2>/dev/null)"
+WEBHOOK_URL="$(cat "${ANALYZER_WEBHOOK_FILE}" 2>/dev/null || true)"
 SINK_STATUS_FILE="$(mktemp /tmp/prow-analyzer-sink.XXXXXX)"
 _CLEANUP_FILES="${_CLEANUP_FILES} ${SINK_STATUS_FILE}"
 SINK_RC=0
