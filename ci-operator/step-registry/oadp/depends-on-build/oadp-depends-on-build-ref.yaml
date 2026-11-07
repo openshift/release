@@ -47,6 +47,28 @@ ref:
       written, nothing downstream changes. Add more lines to test more
       repos (or more images per repo) together in one job; this script
       does not change.
+
+      The second field is normally a real `RELATED_IMAGE_*` env var name,
+      but two sentinel values are special-cased:
+      - `MANAGER_IMAGE` -- the candidate is oadp-operator's own manager
+        image, applied by patching the manager Deployment's container
+        image directly rather than a Subscription env var (consumed by
+        the KDM configs' inline set-related-image steps).
+      - `TESTS_SOURCE` -- the candidate's PR source is wanted as the e2e
+        TEST CODE, not as a container image. A one-line pointer file
+        (`${SHARED_DIR}/depends-on-tests-source-<org>-<name>.txt`,
+        containing the PR's archive URL) is written for this job's own
+        e2e test step, which fetches the tarball itself (SHARED_DIR is a
+        ~1 MiB Kubernetes Secret, far too small for a source archive)
+        and runs `make test-e2e` from it; nothing is appended to
+        depends-on-images.txt. For jobs running oadp-operator's e2e
+        suite from a pre-built image (the KDM and velero-family e2e
+        configs), so an unmerged oadp-operator PR's test-code changes
+        execute there.
+        Requires the e2e test image to carry the Go toolchain and the
+        repo's `make test-e2e` dependencies (konveyor/
+        oadp-operator-e2e-tests does). Dockerfile/context fields are
+        ignored for this sentinel.
   documentation: |-
     Generic N-candidate resolver for openshift/oadp-operator#2389 style
     cross-repo "test these unmerged PRs together" scenarios, following the
@@ -65,12 +87,17 @@ ref:
     MachineConfigPool rollout is needed, because the only consumer of the
     resulting image is that same cluster's own kubelet.
 
-    Consumed by the 4 kubevirt-datamover-controller/-plugin KDM e2e configs
-    (each declaring exactly 1 candidate: its sibling repo) and by
-    openshift-oadp-operator's own `e2e-test-aws` (oadp-dev, 5.0 variant),
-    which declares one candidate per RELATED_IMAGE_* it substitutes into
+    Consumed by the 8 kubevirt-datamover-controller/-plugin (KDM) e2e
+    configs (migtools + openshift-priv mirror, oadp-dev/oadp-1.6), the
+    32 velero/velero-plugin e2e configs (openshift/velero,
+    velero-plugin-for-aws, velero-plugin-for-legacy-aws,
+    openshift-velero-plugin; 4 branches each plus openshift-priv
+    mirrors), and openshift-oadp-operator's own e2e-test-aws variants,
+    which declare one candidate per RELATED_IMAGE_* it substitutes into
     its bundle (see that config's `operator.substitutions` and
     `config/manager/manager.yaml` in openshift/oadp-operator for the
-    authoritative repo/env-var/dockerfile mapping). Named/structured
-    generically so any future job can declare more candidates without any
-    change here.
+    authoritative repo/env-var/dockerfile mapping). Every pre-built-image
+    consumer also declares `openshift/oadp-operator TESTS_SOURCE` so an
+    unmerged oadp-operator PR's e2e test code runs in its job. Named/
+    structured generically so any future job can declare more candidates
+    without any change here.

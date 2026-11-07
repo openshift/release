@@ -207,7 +207,23 @@ while IFS= read -r line; do
     SRC_DIR=$(mktemp -d)
     TARBALL_FILE=$(mktemp)
     TARBALL_URL="https://github.com/${DEP_REPO}/archive/refs/pull/${DEP_PR}/head.tar.gz"
-    curl -sfL "${TARBALL_URL}" -o "${TARBALL_FILE}"
+    # A Depends-On line explicitly requested this PR's source, so a failed
+    # fetch fails the job LOUDLY (named repo/PR, retest hint, temp cleanup)
+    # rather than degrading to this job's default pre-built images/tests:
+    # silently running stale code after the author asked for the sibling
+    # PR's code would surface as a confusing test failure a full cluster
+    # run later, not as a fetch failure (the exact scenario TESTS_SOURCE
+    # exists to fix). --retry absorbs transient CDN hiccups first,
+    # mirroring the description fetch's retry pattern above; archive
+    # downloads are CDN-backed and not subject to the anonymous
+    # api.github.com rate limit that motivates that fetch's no-op
+    # fallback, which does NOT apply here.
+    if ! curl -sfL --retry 3 --retry-delay 5 "${TARBALL_URL}" -o "${TARBALL_FILE}"; then
+        echo "[$(date --utc +%FT%T.%3NZ)] ERROR: could not fetch ${DEP_REPO}#${DEP_PR} source from ${TARBALL_URL} after retries -- a Depends-On line requested it, so refusing to continue with this job's default (pre-built) code; /retest once GitHub is reachable" >&2
+        rm -rf "${SRC_DIR}"
+        rm -f "${TARBALL_FILE}"
+        exit 1
+    fi
     tar xzf "${TARBALL_FILE}" -C "${SRC_DIR}" --strip-components=1
     rm -f "${TARBALL_FILE}"
 
@@ -224,6 +240,39 @@ while IFS= read -r line; do
         # is then relative to that directory, as in ci-operator. Defaults to
         # the repo root when omitted.
         read -r _ RELATED_ENV CAND_DOCKERFILE CAND_CONTEXT <<< "${CAND_LINE}"
+
+        # TESTS_SOURCE sentinel: hand the depended-on PR's SOURCE to this
+        # job's own e2e test step instead of building a container image from
+        # it. For jobs whose e2e test container ships oadp-operator's test
+        # code PRE-BUILT from a release branch (the KDM and velero-family
+        # e2e configs run konveyor/oadp-operator-e2e-tests, whose
+        # build/ci-Dockerfile bakes the branch's source -- Go toolchain and
+        # all -- into the image): a Depends-On oadp-operator PR's TEST-CODE
+        # changes would otherwise never execute in that job, since
+        # MANAGER_IMAGE only swaps the operator's manager image, not the
+        # tests. A one-line POINTER file (the PR's archive URL) is written
+        # into ${SHARED_DIR} for the e2e step to read; the e2e step fetches
+        # the tarball itself. The tarball itself must NOT go through
+        # ${SHARED_DIR}: it is a ~1 MiB Kubernetes Secret (see the qe-agent/
+        # quay/stackrox step docs) while this repo's source archives are
+        # 10+ MB compressed. No Build, no ImageStream, and nothing is
+        # appended to depends-on-images.txt -- the image-apply consumers
+        # (oadp-apply-depends-on-images, the inline set-related-image steps)
+        # must never see this sentinel. Dockerfile/context fields are
+        # meaningless here and ignored.
+        if [[ "${RELATED_ENV}" == "TESTS_SOURCE" ]]; then
+            TESTS_PTR_DEST="${SHARED_DIR}/depends-on-tests-source-$(printf '%s' "${DEP_REPO}" | tr '/' '-').txt"
+            if ! printf '%s\n' "${TARBALL_URL}" > "${TESTS_PTR_DEST}"; then
+                echo "[$(date --utc +%FT%T.%3NZ)] Failed to write ${TESTS_PTR_DEST} -- is ${SHARED_DIR} writable and non-full?" >&2
+                rm -rf "${SRC_DIR}"
+                rm -f "${TARBALL_FILE}"
+                exit 1
+            fi
+            echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} test-source pointer saved for this job's e2e step via TESTS_SOURCE -> ${TESTS_PTR_DEST} (archive URL; the e2e step fetches the tarball itself, since it is far too large for SHARED_DIR)"
+            RESOLVED_ANY=true
+            continue
+        fi
+
         CAND_DOCKERFILE="${CAND_DOCKERFILE:-Dockerfile}"
         CAND_CONTEXT="${CAND_CONTEXT:-.}"
         if [[ "${CAND_CONTEXT}" == /* || "${CAND_CONTEXT}" == *..* ]]; then
