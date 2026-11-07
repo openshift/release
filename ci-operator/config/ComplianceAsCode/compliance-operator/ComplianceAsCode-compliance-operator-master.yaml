@@ -3,6 +3,14 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -39,6 +47,17 @@ images:
     - arm64
     dockerfile_path: images/openscap/Dockerfile
     to: testopenscap
+operator:
+  bundles:
+  - as: compliance-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-dev:master
+    with: pipeline:compliance-operator
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-content-dev:master
+    with: pipeline:testcontent
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-openscap-dev:master
+    with: pipeline:testopenscap
 promotion:
   to:
   - excluded_images:
@@ -659,6 +678,33 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-hypershift
+  optional: true
+  steps:
+    cluster_profile: aws-stackrox
+    dependencies:
+      OO_BUNDLE: compliance-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
+      USE_HOSTED_KUBECONFIG: "true"
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        export HYPERSHIFT_HOSTED_CONTROL_PLANE_NAMESPACE=$(oc get hcp -A -o jsonpath='{.items[0].metadata.namespace}')
+        export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        make e2e-hypershift
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-optional-operators
 - always_run: false
   as: e2e-rosa
   optional: true
