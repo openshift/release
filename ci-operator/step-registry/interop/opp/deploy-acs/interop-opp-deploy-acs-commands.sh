@@ -438,11 +438,23 @@ fi
 #     poll silently reads the wrong API. Query failures are counted; 3
 #     consecutive -> acs-subscription-query-failed (before the deadline
 #     check, so an error is never classified as a timeout).
+#     Deadline is ELAPSED time, not a sleep counter: a slow-but-successful
+#     response (each oc call carries --request-timeout=20s) must be
+#     charged against the budget, or the real wait overruns
+#     ACS_CSV_WAIT_TIMEOUT and breaks the multiply-out budget recorded in
+#     the step ref.yaml.
 echo ">>> PHASE: Waiting for ACS operator CSV (timeout: ${ACS_CSV_WAIT_TIMEOUT}s)"
 typeset csvName=""
-typeset -i waited=0
 typeset -i query_failures=0
-while [[ -z "${csvName}" ]] && (( waited < ACS_CSV_WAIT_TIMEOUT )); do
+typeset -i csv_deadline csv_now csv_left csv_diag_at
+typeset -i csv_elapsed=0
+csv_deadline=$(( $(date +%s) + ACS_CSV_WAIT_TIMEOUT ))
+csv_diag_at=$(( $(date +%s) + 30 ))
+while [[ -z "${csvName}" ]]; do
+    csv_now=$(date +%s)
+    csv_left=$(( csv_deadline - csv_now ))
+    csv_elapsed=$(( ACS_CSV_WAIT_TIMEOUT - csv_left ))
+    if (( csv_left <= 0 )); then break; fi
     if csvName=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
       query_failures=0
@@ -457,14 +469,17 @@ while [[ -z "${csvName}" ]] && (( waited < ACS_CSV_WAIT_TIMEOUT )); do
       fi
     fi
     if [[ -z "${csvName}" ]]; then
-        # Periodic condition diagnostics every 30s.
-        if (( waited > 0 && waited % 30 == 0 )); then
-            echo ">>> CSV poll: waited ${waited}/${ACS_CSV_WAIT_TIMEOUT}s — Subscription conditions:"
+        # Periodic condition diagnostics every 30s of elapsed time.
+        if (( csv_now >= csv_diag_at )); then
+            echo ">>> CSV poll: waited ${csv_elapsed}/${ACS_CSV_WAIT_TIMEOUT}s — Subscription conditions:"
             oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason} msg={.message}{"\n"}{end}' 2>/dev/null || true
+            csv_diag_at=$(( $(date +%s) + 30 ))
         fi
-        sleep 10
-        (( waited += 10 )) || true
+        # Never sleep past the deadline.
+        csv_left=$(( csv_deadline - $(date +%s) ))
+        if (( csv_left <= 0 )); then break; fi
+        if (( csv_left < 10 )); then sleep "${csv_left}"; else sleep 10; fi
     fi
 done
 
@@ -487,13 +502,36 @@ fi
 : "CSV: ${csvName}"
 _prop "csv_name" "${csvName}"
 
-# --- Wait for CSV Succeeded ---
+# --- Wait for CSV Succeeded. status.currentCSV is the CSV the Subscription
+#     is progressing TO: OLM publishes the name at InstallPlan resolution,
+#     before the InstallPlan executor creates the CSV object. `oc wait`
+#     aborts immediately on a missing named resource (IsNotFound is only
+#     ignored for --for=delete/--for=create), so waiting directly on a
+#     not-yet-created CSV records acs-csv-timeout at t~0 with phase
+#     unknown. Poll for existence first, then wait for the phase, both
+#     inside the single ACS_INSTALL_TIMEOUT budget.
+typeset -i install_deadline install_left
+typeset csv_probe_out=""
+install_deadline=$(( $(date +%s) + ACS_INSTALL_TIMEOUT ))
+while :; do
+    if csv_probe_out=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o name 2>&1); then
+        break
+    fi
+    install_left=$(( install_deadline - $(date +%s) ))
+    if (( install_left <= 0 )); then break; fi
+    if (( install_left < 5 )); then sleep "${install_left}"; else sleep 5; fi
+done
+install_left=$(( install_deadline - $(date +%s) ))
+(( install_left < 0 )) && install_left=0
+
 if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     --for=jsonpath='{.status.phase}'=Succeeded \
-    --timeout="${ACS_INSTALL_TIMEOUT}s" 2>&1; then
+    --timeout="${install_left}s" 2>&1; then
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
     if [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
+    elif [[ "${_phase}" == "unknown" ]] && printf '%s' "${csv_probe_out}" | grep -qi "not found"; then
+      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
     else
       _classify "acs-csv-timeout" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase})"
     fi
