@@ -1,0 +1,35 @@
+{# Geo-replication lane: two OCP clusters, shared external DB, two S3 buckets
+   in different AWS regions with FEATURE_STORAGE_REPLICATION enabled.
+
+   Cluster A is provisioned by the IPI workflow (clouds/aws.yaml.j2).
+   Cluster B is a second IPI cluster in the secondary region, provisioned
+   by a dedicated step that extracts openshift-install from the release payload.
+   Both share the same RDS database and geo-replicated storage config. #}
+{% import "tests/_e2e-install.defaults.j2" as d %}
+tests:
+- timeout: 8h0m0s
+  steps:
+    env:
+      ENABLE_BUILD_SUPPORT: "true"
+      PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
+{%- if source == "nightly" %}
+      PLAYWRIGHT_REF_MODE: strict
+{%- endif %}
+      QUAY_EXTRA_CONFIG: |
+{{ d.quay_extra_config(quay_version=quay_version | default("")) | indent(8, true) }}
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-provisioning-tls
+    - ref: quay-provisioning-builder
+    - ref: quay-deploy-mailpit
+    - ref: quay-deploy-jaeger
+{%- if database_provision_ref %}
+    - ref: "{{ database_provision_ref }}"
+{%- endif %}
+    - ref: quay-georep-provision-storage
+    - ref: quay-install-quay-operator
+    - ref: quay-install-external-storage
+    - ref: quay-georep-provision-cluster-b
+    - ref: quay-georep-deploy-cluster-b
+    - ref: quay-test-e2e

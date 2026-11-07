@@ -1,0 +1,24 @@
+ref:
+  as: quay-georep-deprovision-cluster-b
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-deprovision-cluster-b-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m
+  best_effort: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: aws
+    mount_path: /var/run/quay-qe-aws-secret
+  documentation: |-
+    Destroy the second IPI cluster created by quay-georep-provision-cluster-b.
+    Uses ${SHARED_DIR}/cluster-b-metadata.json and re-extracts openshift-install
+    from the release image to run destroy cluster with 3-attempt retry. Skips
+    if no metadata is found (provision step exited early).

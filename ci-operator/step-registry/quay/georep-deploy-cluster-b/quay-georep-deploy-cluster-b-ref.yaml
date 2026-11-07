@@ -1,0 +1,36 @@
+ref:
+  as: quay-georep-deploy-cluster-b
+  cli: latest
+  from_image:
+    name: quay-deploy-tools
+    namespace: ci
+    tag: latest
+  commands: quay-georep-deploy-cluster-b-commands.sh
+  timeout: 2h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - collection: quay-tests
+    group: quay
+    mount_path: /var/run/quay-qe-quay-secret
+  env:
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.16"
+  - name: QUAY_OPERATOR_SOURCE
+    documentation: The quay operator source
+    default: "redhat-operators"
+  - name: QUAY_EXTRA_CONFIG
+    documentation: |-
+      Additional Quay configuration YAML merged on top of the default config.
+      Values provided here override defaults. Should match cluster A config.
+    default: ""
+  documentation: |-
+    Deploy Quay on cluster B (the geo-replication secondary site) using
+    the kubeconfig from ${SHARED_DIR}/kubeconfig-cluster-b. Shares the
+    same external database and geo-rep storage config as cluster A.
+    Installs the Quay Operator and creates a QuayRegistry CR with the
+    geo-rep storage contract from quay-georep-provision-storage.
