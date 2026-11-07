@@ -62,9 +62,18 @@ echo ""
 echo "Creating namespace ${DRA_EXAMPLE_DRIVER_NAMESPACE}..."
 oc create namespace "${DRA_EXAMPLE_DRIVER_NAMESPACE}" 2>/dev/null || true
 
-# Grant privileged SCC for dra-example-driver service account (required for OpenShift)
+# Grant privileged SCC for dra-example-driver service account (required for OpenShift).
+# Use ClusterRoleBinding instead of namespace-scoped RoleBinding.
+# On claimed clusters, the CI SA may lack namespace-scoped rolebinding permissions
+# but can create cluster-scoped ClusterRoleBindings.
 echo "Adding privileged SCC for dra-example-driver service account..."
-oc adm policy add-scc-to-user privileged -z dra-example-driver-service-account -n "${DRA_EXAMPLE_DRIVER_NAMESPACE}"
+oc create clusterrolebinding dra-example-driver-scc-privileged \
+  --clusterrole=system:openshift:scc:privileged \
+  --serviceaccount="${DRA_EXAMPLE_DRIVER_NAMESPACE}:dra-example-driver-service-account" \
+  2>/dev/null || \
+oc adm policy add-scc-to-user privileged \
+  -z dra-example-driver-service-account \
+  -n "${DRA_EXAMPLE_DRIVER_NAMESPACE}"
 
 echo ""
 
