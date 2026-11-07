@@ -29,7 +29,8 @@ export ALLOWED_TOOLS="Read"
 agentic_ci "synthetic original prompt" >/dev/null
 agentic_ci "synthetic resume prompt" >/dev/null
 test "$(cat "${SESSION_PROMPT_FILE}")" = "synthetic original prompt"
-test "$(stat -c '%a' "${SESSION_PROMPT_FILE}")" = "600"
+python3 -c 'import os, stat, sys; assert stat.S_IMODE(os.stat(sys.argv[1]).st_mode) == 0o600' \
+    "${SESSION_PROMPT_FILE}"
 
 cat > "${work}/codex.jsonl" <<'EOF'
 {"path":"/v1/metrics","payload":{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"agentic_ci.codex.cost.usage","sum":{"aggregationTemporality":2,"isMonotonic":true,"dataPoints":[{"asDouble":1.0,"startTimeUnixNano":"100","timeUnixNano":"200","attributes":[{"key":"model","value":{"stringValue":"gpt-main"}}]}]}}]}]}]}}
@@ -75,7 +76,11 @@ row = {
     "cache_creation_input_tokens": "10",
     "cache_hit_rate_pct": "80.0",
 }
-output.write_text(json.dumps({"rows": [row]}))
+output.write_text(json.dumps({
+    "table_name": "claude_session_metrics",
+    "schema": {"session_id": "string"},
+    "rows": [row],
+}))
 PY
 chmod +x "${work}/extract-metrics.py"
 # shellcheck disable=SC2034 # Consumed by sourced finalize_session_metrics.
@@ -94,9 +99,18 @@ jq -e '.session_id == "session-123"' \
 
 emit_artifacts="${work}/emit-artifacts"
 mkdir -p "${emit_artifacts}"
+emit_log="${work}/emit.log"
 ARTIFACT_DIR="${emit_artifacts}" JOB_NAME="synthetic-job" BUILD_ID="123" \
-    bash "${repo_root}/ci-operator/step-registry/openshift/agentic/trt/emit-metrics/openshift-agentic-trt-emit-metrics-commands.sh"
+    bash "${repo_root}/ci-operator/step-registry/openshift/agentic/trt/emit-metrics/openshift-agentic-trt-emit-metrics-commands.sh" \
+    > "${emit_log}"
+grep -Fq "(1 rows)" "${emit_log}"
+if grep -Fq 'session-123' "${emit_log}" || grep -Fq '"session_id"' "${emit_log}"; then
+    echo "ERROR: emit-metrics disclosed a complete domain row" >&2
+    exit 1
+fi
 jq -e '.rows[0].session_id == "session-123"' \
+    "${emit_artifacts}/jira-agent-trt-autodl.json" >/dev/null
+jq -e '.rows[0].session_id | type == "string"' \
     "${emit_artifacts}/jira-agent-trt-autodl.json" >/dev/null
 
 # A failed extractor may leave debugging JSON, but finalize must not publish it.
@@ -112,6 +126,66 @@ PY
 EXTRACT_METRICS="${work}/failing-extractor.py"
 finalize_session_metrics review
 test ! -e "${ARTIFACT_DIR}/claude-session-metrics-review-autodl.json"
+
+# A success-exit extractor with malformed JSON must remain best-effort: no
+# invalid artifact, no task abort, and no retained private prompt handoff.
+cat > "${work}/malformed-extractor.py" <<'PY'
+#!/usr/bin/env python3
+import pathlib
+import sys
+pathlib.Path(sys.argv[2]).write_text("not-json", encoding="utf-8")
+PY
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+printf '%s' "synthetic malformed prompt" > "${SESSION_PROMPT_FILE}"
+EXTRACT_METRICS="${work}/malformed-extractor.py"
+finalize_session_metrics review
+test ! -e "${ARTIFACT_DIR}/claude-session-metrics-review-autodl.json"
+test ! -e "${SESSION_PROMPT_FILE}"
+
+# Structurally valid JSON with a non-string session identity is not a valid
+# autodl row and must follow the same cleanup path.
+cat > "${work}/wrong-type-extractor.py" <<'PY'
+#!/usr/bin/env python3
+import json
+import pathlib
+import sys
+payload = {
+    "table_name": "claude_session_metrics",
+    "schema": {"session_id": "string"},
+    "rows": [{"session_id": 123}],
+}
+pathlib.Path(sys.argv[2]).write_text(json.dumps(payload), encoding="utf-8")
+PY
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+printf '%s' "synthetic wrong-type prompt" > "${SESSION_PROMPT_FILE}"
+EXTRACT_METRICS="${work}/wrong-type-extractor.py"
+finalize_session_metrics review
+test ! -e "${ARTIFACT_DIR}/claude-session-metrics-review-autodl.json"
+test ! -e "${SESSION_PROMPT_FILE}"
+
+# An unreadable extractor result is also discarded without changing the task
+# result or retaining the prompt handoff.
+cat > "${work}/unreadable-extractor.py" <<'PY'
+#!/usr/bin/env python3
+import os
+import pathlib
+import sys
+output = pathlib.Path(sys.argv[2])
+output.write_text(
+    '{"table_name":"claude_session_metrics",'
+    '"schema":{"session_id":"string"},'
+    '"rows":[{"session_id":"synthetic-unreadable-session"}]}',
+    encoding="utf-8",
+)
+os.chmod(output, 0)
+PY
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+printf '%s' "synthetic unreadable prompt" > "${SESSION_PROMPT_FILE}"
+# shellcheck disable=SC2034 # Consumed by sourced finalize_session_metrics.
+EXTRACT_METRICS="${work}/unreadable-extractor.py"
+finalize_session_metrics review
+test ! -e "${ARTIFACT_DIR}/claude-session-metrics-review-autodl.json"
+test ! -e "${SESSION_PROMPT_FILE}"
 
 # Early skip paths must discard a captured prompt too.
 SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")

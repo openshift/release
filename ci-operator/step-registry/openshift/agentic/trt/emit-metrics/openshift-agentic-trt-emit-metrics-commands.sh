@@ -105,7 +105,7 @@ jq -n \
       expiration_days: 0,
       partition_column: ""
     }' > "${ARTIFACT_DIR}/jira-agent-trt-autodl.json"
-echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json (${ROWS} rows)"
+echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json (${#METADATA_FILES[@]} rows)"
 
 # --- JUnit XML for phase duration tracking ---
 echo "Generating JUnit XML..."

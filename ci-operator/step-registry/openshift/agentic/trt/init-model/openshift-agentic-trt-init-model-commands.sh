@@ -1088,7 +1088,21 @@ finalize_session_metrics() {
     # Carry the real session identity into the domain row used by dashboards.
     # An atomic rewrite avoids leaving malformed metadata if jq fails.
     metadata_file="${SHARED_DIR}/metrics-metadata-${phase}.json"
-    session_id=$(jq -r '.rows[0].session_id // ""' "${metrics_tmp}")
+    if ! session_id=$(jq -er '
+        select(type == "object")
+        | select(.table_name == "claude_session_metrics")
+        | select((.schema | type) == "object" and .schema.session_id == "string")
+        | select((.rows | type) == "array" and (.rows | length) == 1)
+        | .rows[0]
+        | select(type == "object")
+        | select([.[] | type] | all(. == "string"))
+        | .session_id
+        | select(type == "string" and length > 0)
+    ' "${metrics_tmp}" 2>/dev/null); then
+        echo "Warning: Extracted session metrics are invalid, skipping publication"
+        rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
+        return 0
+    fi
     if [[ -n "${session_id}" && -f "${metadata_file}" ]]; then
         local metadata_tmp
         metadata_tmp=$(mktemp)
