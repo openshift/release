@@ -300,7 +300,7 @@ for pod in d.get("items", []):
     else
         echo "[smoke] Scanner V4 matcher pods not Ready within ${ACS_SCANNER_WAIT_S}s:"
         oc get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide 2>/dev/null || true
-        _add_case "scanner-v4-not-ready" failed "Environment" "no Ready scanner-v4-matcher pod in ${_centralNs} within ${ACS_SCANNER_WAIT_S}s; scan-dependent test results may report MISSING_SCAN_DATA for environment reasons"
+        _add_case "scanner-v4-ready" failed "Environment" "no Ready scanner-v4-matcher pod in ${_centralNs} within ${ACS_SCANNER_WAIT_S}s; scan-dependent test results may report MISSING_SCAN_DATA for environment reasons"
     fi
 fi
 
