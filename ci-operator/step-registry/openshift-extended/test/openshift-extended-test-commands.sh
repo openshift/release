@@ -465,7 +465,7 @@ EOF
         exit $ret_value
     fi
 }
-
+sleep 10800
 # select the cases per FILTERS
 function handle_filters {
     filter_tmp="$1"
