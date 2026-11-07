@@ -1,0 +1,55 @@
+ref:
+  as: openshift-agentic-prepare-validation
+  from: agentic-validation
+  commands: openshift-agentic-prepare-validation-commands.sh
+  credentials:
+  - collection: test-platform-infra
+    group: jira-token-dptp-bot
+    mount_path: /var/run/jira-token
+  - collection: test-platform-infra
+    group: agent-validation-model
+    mount_path: /var/run/validation-model
+  env:
+  - name: VALIDATION_MODEL_URL
+    default: https://models.corp.redhat.com/oai/v1/chat/completions
+    documentation: HTTPS Chat Completions endpoint. Redirects are rejected.
+  - name: VALIDATION_PREPARE_MODEL
+    default: granite-3.1-8b-instruct
+    documentation: Planning model; validate compatibility and plan quality before enabling a job.
+  - name: VALIDATION_MODEL_TOKEN_FILE
+    default: /var/run/validation-model/token
+    documentation: Bearer token file; never shared with generated commands.
+  - name: JIRA_BASE_URL
+    default: https://redhat.atlassian.net
+    documentation: Jira origin for issue retrieval.
+  - name: JIRA_USERNAME
+    default: aos-team-dp-testplatform@redhat.com
+    documentation: Jira account for basic authentication.
+  - name: JIRA_TOKEN_FILE
+    default: /var/run/jira-token/password
+    documentation: Jira API token file. Retrieval failure is recorded and PR fallback is attempted.
+  - name: JIRA_ACCEPTANCE_FIELD
+    default: ""
+    documentation: Optional customfield_<number> containing acceptance criteria.
+  - name: VALIDATION_MAX_OUTPUT_TOKENS
+    default: "4096"
+    documentation: Maximum tokens requested per model response.
+  - name: VALIDATION_TOKEN_BUDGET
+    default: "100000"
+    documentation: Conservative total token allowance; input bytes count as an upper bound.
+  - name: VALIDATION_TIMEOUT_SECONDS
+    default: "600"
+    documentation: Preparation runtime limit, including source retrieval.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  timeout: 12m0s
+  grace_period: 1m0s
+  documentation: |-
+    Generates a Jira-first, revision-bound validation plan using the PR description
+    and tested diff as fallback. Publishes validation.md, validation.json and source
+    references; passes the checked plan through SHARED_DIR. Requires a single PR,
+    the agentic-validation image alias and model credentials. Reuses a source
+    checkout when available; otherwise fetches the exact tested Git trees.
+    Empty, ambiguous, contradictory and incomplete plans fail preparation.

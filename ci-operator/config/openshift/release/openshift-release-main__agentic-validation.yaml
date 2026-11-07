@@ -1,0 +1,59 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src AS source
+      FROM cli AS cli
+      FROM nested-podman
+      USER root
+      RUN dnf install -y python3.12 bash git && dnf clean all
+      RUN ln -sf /usr/bin/python3.12 /usr/bin/python3
+      COPY --from=cli /usr/bin/oc /usr/bin/oc
+      COPY --from=source /go/src/github.com/openshift/release/hack/agentic-validation /opt/agentic-validation
+      RUN chmod -R a+rX /opt/agentic-validation
+      WORKDIR /work
+    from: nested-podman
+    inputs:
+      cli:
+        as:
+        - cli
+      src:
+        as:
+        - src
+    to: agentic-validation
+  run_if_changed: ^(hack/agentic-validation/|ci-operator/step-registry/openshift/agentic/(prepare-validation|validate)/|ci-operator/config/openshift/release/openshift-release-main__agentic-validation.yaml)
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 512Mi
+tests:
+- as: helpers
+  commands: python3 -m unittest discover -s /opt/agentic-validation -p 'test_*.py'
+    -v
+  container:
+    from: agentic-validation
+  run_if_changed: ^(hack/agentic-validation/|ci-operator/step-registry/openshift/agentic/(prepare-validation|validate)/|ci-operator/config/openshift/release/openshift-release-main__agentic-validation.yaml)
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: agentic-validation
