@@ -1,0 +1,62 @@
+ref:
+  as: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc
+  cli: latest
+  commands: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc-commands.sh
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - collection: rhdh-plugin-export-overlays
+    group: osl-rc
+    field: release-json
+    as: release.json
+    mount_path: /var/run/vault/osl-rc
+  from_image:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
+  grace_period: 5m
+  resources:
+    limits:
+      cpu: "10"
+      memory: 5Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  timeout: 1h55m0s
+  documentation: |-
+    Runs the OSL RC smoke test on an OCP cluster.
+
+    The release.json manifest, stored as field osl-rc/release-json in the
+    rhdh-plugin-export-overlays Secret Manager collection, is mounted at
+    /var/run/vault/osl-rc and must provide:
+    - rhdhVersion and ocpVersion.
+    - A digest-pinned Logic IIB image in logic.iib.
+    - Exact Logic subscription and CSV expectations: logic.package,
+      logic.channel, logic.startingCSV, and logic.expectedVersion.
+      Logic uses manual InstallPlan approval; the initial plan is approved
+      only when it contains the expected Logic CSV and any other CSV is the
+      Serverless operator.
+
+    The Serverless subscription always uses serverless-operator from the stable
+    channel of redhat-operators in openshift-marketplace. It is installed in
+    openshift-operators with automatic approval and no starting CSV, so OLM
+    selects the latest version available in that channel. The installed CSV and
+    version are logged after installation. Serverless is not configured through
+    release.json.
+
+    Candidate Logic images referenced from registry.redhat.io are mirrored to
+    the matching Brew rh-osbs images named in the OSL release email.
+
+    Runs the full default Orchestrator E2E project with one worker. The suite
+    currently has 31 tests: 29 must pass, while the Kafka nightly-only test and
+    the known RHIDP-11839 product-bug test are intentional skips. No failures
+    or flakes are allowed.
+
+    The job creates the same short-lived cluster-admin tester-sa-2 token used by
+    the standard RHDH E2E jobs and exposes it as AUTH_TOKEN for Loki queries.
+
+    Credentials are mounted from openshift-qe/mirror-registry at
+    /var/run/vault/mirror-registry and must provide registry_brew.json and
+    registry_stage.json. The OSL-specific rhdh-plugin-export-overlays/osl-rc
+    mount is at /var/run/vault/osl-rc and must provide release.json.
