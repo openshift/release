@@ -15,6 +15,8 @@ promotion:
   to:
   - name: "5.1"
     namespace: ocp
+prowgen:
+  disable_sparse_checkout: true
 releases:
   initial:
     integration:
@@ -63,7 +65,29 @@ tests:
     from: src
 - as: verify-commits
   commands: |
-    commitchecker --start ${PULL_BASE_SHA:-main}
+    set -euo pipefail
+    start=$(jq -er '
+      . as $job |
+      [.refs, .extra_refs[]?] |
+      map(select(.org == "openshift" and .repo == "azure-service-operator")) |
+      if length != 1 then error("Expected exactly one azure-service-operator refs entry") else .[0] end |
+      if (.pulls // [] | length) > 0 then
+        .base_sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+      elif $job.type == "presubmit" and ($job.job | startswith("rehearse-")) and
+           $job.refs.org == "openshift" and $job.refs.repo == "release" and
+           .workdir == true and .base_ref == "main" then
+        "refs/heads/main"
+      else error("Expected ASO pull requests or a release rehearsal of ASO main") end
+    ' <<< "${JOB_SPEC:?JOB_SPEC must identify the ASO checkout}")
+    git rev-parse --verify "${start}^{commit}"
+    if [[ "$start" == refs/heads/main ]]; then
+      if [[ "$(git rev-parse "$start")" != "$(git rev-parse HEAD)" ]]; then
+        echo "ASO rehearsal checkout differs from main; refusing an empty commit range" >&2
+        exit 1
+      fi
+      echo "No ASO pull requests in this release rehearsal; checking the empty main..HEAD range"
+    fi
+    commitchecker --start "$start"
   container:
     from: commitchecker
   optional: true
