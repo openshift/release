@@ -247,8 +247,7 @@ EOF
         listing="$(mktemp /tmp/prow-analyzer-listing.XXXXXX)"
         _CLEANUP_FILES="${_CLEANUP_FILES} ${listing}"
         local prefix; prefix="$(gcs_prefix_for_job)"
-        for attempt in 1 2 3 4 5; do
-            [ "${attempt}" -gt "${GCS_POLL_ATTEMPTS}" ] && break
+        for attempt in $(seq 1 "${GCS_POLL_ATTEMPTS}"); do
             if gcs_list_build_objects "${prefix}/artifacts" "${listing}" \
                && grep -qE "${_MARKER_RE}|${_JUNIT_RE}" "${listing}"; then
                 saw_step_like=1
