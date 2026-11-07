@@ -2,11 +2,22 @@ ref:
   as: hypershift-kubevirt-health-check
   from: cli
   grace_period: 10m
-  timeout: 45m0s
+  timeout: 90m0s
   env:
     - name: MCE_VERSION
       default: ""
       documentation: "version of the mce if installed. (\"\", 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+    - name: ATTACH_DEFAULT_NETWORK
+      default: ""
+      documentation: |-
+        Passed through from hypershift-kubevirt-create. When localnet-multi, the node join
+        wait defaults to 60 minutes instead of 30.
+    - name: HYPERSHIFT_KUBEVIRT_NODE_JOIN_TIMEOUT
+      default: ""
+      documentation: |-
+        Seconds to wait for nested cluster node count to match NodePool replicas before
+        collecting VM debug logs and failing. Empty uses 1800s (30m), or 3600s (60m) when
+        ATTACH_DEFAULT_NETWORK=localnet-multi.
   commands: hypershift-kubevirt-health-check-commands.sh
   resources:
     requests:
