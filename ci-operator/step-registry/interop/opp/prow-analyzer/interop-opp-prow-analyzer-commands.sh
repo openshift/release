@@ -34,6 +34,7 @@ GCS_BUCKET="${GCS_BUCKET:-test-platform-results-public}"
 GCS_API_ROOT="${GCS_API_ROOT:-https://storage.googleapis.com/storage/v1/b/${GCS_BUCKET}/o}"
 GCS_MEDIA_ROOT="${GCS_MEDIA_ROOT:-https://storage.googleapis.com/${GCS_BUCKET}}"
 GCS_LIST_TIMEOUT="${GCS_LIST_TIMEOUT:-60}"
+GCS_FETCH_TIMEOUT="${GCS_FETCH_TIMEOUT:-60}"
 GCS_POLL_ATTEMPTS="${GCS_POLL_ATTEMPTS:-3}"
 GCS_POLL_INTERVAL="${GCS_POLL_INTERVAL:-15}"
 : "${SHARED_DIR:=/tmp}"
@@ -200,7 +201,7 @@ PYEOF
 }
 
 gcs_fetch_object() { # <object-name> <outfile>
-    curl -fsSL --max-time "${GCS_LIST_TIMEOUT}" "${GCS_MEDIA_ROOT}/$1" -o "$2"
+    curl -fsSL --max-time "${GCS_FETCH_TIMEOUT}" "${GCS_MEDIA_ROOT}/$1" -o "$2"
 }
 
 _MARKER_RE='(^|/)finished\.json$'
