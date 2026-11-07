@@ -57,7 +57,13 @@ ANALYZER_SOURCE_PATH="${ANALYZER_SOURCE_PATH:-}"      # local source archive (co
 ANALYZER_SOURCE_URL="${ANALYZER_SOURCE_URL:-https://api.github.com/repos/oramraz/prow-analyzer/tarball/cfe2cb6edcbb6f2d7bc366130cc03318d83a3ccd}"
 ANALYZER_SOURCE_SHA256="${ANALYZER_SOURCE_SHA256:-1d46e51412efa76c473910f8975002295ee46cdd62feab3c91254f68f43efa34}"
 ANALYZER_VERIFY_ONLY="${ANALYZER_VERIFY_ONLY:-0}"
-ANALYZER_JOB_URL="${ANALYZER_JOB_URL:-https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}}"
+# Empty means "derive from the build identity" (analyzer_job_url below):
+# the derivation needs the helpers, and a rehearsal or presubmit build does
+# not live under logs/ at all - rehearsals are published at
+# pr-logs/pull/<org_repo>/<N>/<JOB_NAME>/<BUILD_ID> (the same identity path
+# the admission gate already uses), so a logs/-only default pointed the
+# analyzer at a nonexistent build. An explicit ANALYZER_JOB_URL still wins.
+ANALYZER_JOB_URL="${ANALYZER_JOB_URL:-}"
 
 _START_EPOCH="$(date -u +%s)"
 _TERMINAL_EMITTED=0
@@ -141,13 +147,15 @@ EOF
 # skip only on the green conjunction; analyze:runtime_tree_unavailable
 # when no step-like evidence could be READ AT ALL (never a false
 # no_evidence - an unreadable tree is not evidence of absence).
-# Local override first (explicit ARTIFACT_BASE_DIR), else the build's
-# public GCS tree over HTTPS.
-gcs_prefix_for_job() {
-    if [ -n "${ARTIFACT_GCS_PREFIX:-}" ]; then
-        printf '%s' "${ARTIFACT_GCS_PREFIX}"
-        return 0
-    fi
+#
+# build_prow_path: the build's own Prow/GCS path, from its identity only
+# (JOB_NAME/BUILD_ID plus the Prow-injected PULL_NUMBER and
+# REPO_OWNER/REPO_NAME, which ci-operator passes into every step container).
+# pr-logs/pull/ carries both rehearsal and presubmit builds; only periodics
+# live under logs/. A rehearsal is recognised by its Prow-assigned name
+# (rehearse-<N>-<job>) - which is also the design-doc contract - and any
+# other build by PULL_NUMBER.
+build_prow_path() {
     local org_repo="openshift_release"
     if [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
         org_repo="${REPO_OWNER}_${REPO_NAME}"
@@ -156,12 +164,35 @@ gcs_prefix_for_job() {
     case "${JOB_NAME}" in
         rehearse-[0-9]*-*)
             pr="${JOB_NAME#rehearse-}"; pr="${pr%%-*}"
-            printf 'pr-logs/pull/%s/%s/%s/%s' "${org_repo}" "${pr}" "${JOB_NAME}" "${BUILD_ID}"
             ;;
         *)
-            printf 'logs/%s/%s' "${JOB_NAME}" "${BUILD_ID}"
+            pr="${PULL_NUMBER:-}"
             ;;
     esac
+    if [ -n "${pr}" ]; then
+        printf 'pr-logs/pull/%s/%s/%s/%s' "${org_repo}" "${pr}" "${JOB_NAME}" "${BUILD_ID}"
+    else
+        printf 'logs/%s/%s' "${JOB_NAME}" "${BUILD_ID}"
+    fi
+}
+
+gcs_prefix_for_job() {
+    # Local override first (explicit ARTIFACT_GCS_PREFIX), else the build's
+    # public GCS tree over HTTPS.
+    if [ -n "${ARTIFACT_GCS_PREFIX:-}" ]; then
+        printf '%s' "${ARTIFACT_GCS_PREFIX}"
+        return 0
+    fi
+    build_prow_path
+}
+
+# analyzer_job_url: the Prow view URL of the build the CLI should analyze.
+# Same identity path as the gate, but deliberately NOT ARTIFACT_GCS_PREFIX:
+# that override retargets the evidence source only, while an explicitly
+# supplied ANALYZER_JOB_URL is the way to analyze a different build.
+analyzer_job_url() {
+    printf 'https://prow.ci.openshift.org/view/gs/%s/%s' \
+        "${GCS_BUCKET}" "$(build_prow_path)"
 }
 
 # gcs_list_build_objects <prefix> <outfile>: object names, one per line,
@@ -353,6 +384,13 @@ extract_analysis_block() {
 
 # ---------------------------------------------------------------- main
 emit_skeleton
+
+# Resolve the analysis target once the helpers exist: an explicit
+# ANALYZER_JOB_URL is taken verbatim, otherwise the current build's own Prow
+# path (rehearsals and presubmits under pr-logs/pull/, periodics under logs/).
+if [ -z "${ANALYZER_JOB_URL}" ]; then
+    ANALYZER_JOB_URL="$(analyzer_job_url)"
+fi
 
 ARTIFACT_SNAPSHOT_EPOCH="$(date -u +%s)"
 # graceful degradation moved into the gate: an unreadable evidence source
