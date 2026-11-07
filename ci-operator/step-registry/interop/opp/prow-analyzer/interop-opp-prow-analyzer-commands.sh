@@ -319,6 +319,16 @@ EOF
                     any_unparseable=1
                 else
                     total_failures=$(( total_failures + tally ))
+                    # The gate reads total_failures first: a single positive
+                    # tally already decides analyze:failure_signal, so the
+                    # remaining JUnit fetches cannot change the outcome. Stop
+                    # here - a full-stack build publishes 26-28 matching
+                    # JUnit objects and each fetch is bounded by
+                    # GCS_LIST_TIMEOUT, so a full scan can eat most of the
+                    # ANALYZER_TOTAL_TIMEOUT budget before the first CLI call.
+                    if [ "${total_failures}" -gt 0 ]; then
+                        break
+                    fi
                 fi
             else
                 # an unreadable junit is not green proof either
