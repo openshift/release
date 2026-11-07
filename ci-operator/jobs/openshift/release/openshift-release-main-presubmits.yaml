@@ -839,23 +839,61 @@ presubmits:
       - ./ci-operator/jobs
       - ./ci-operator/step-registry
       - ./hack/validate-generated-config.sh
+      - ./hack/generators/scos-art-publication.py
+      - ./hack/generators/scos-art-publication.patch
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-main-generated-config
     rerun_command: /test generated-config
-    run_if_changed: ^ci-operator/(config|jobs)/.*
+    run_if_changed: ^(ci-operator/(config|jobs)/.*|ci-operator/step-registry/openshift/os-publish-art/.*|hack/(generators/scos-art-publication\.(py|patch)|validate-generated-config\.sh)|Makefile)$
     spec:
       containers:
       - args:
+        - hack/validate-generated-config.sh
         - ./
         command:
-        - hack/validate-generated-config.sh
-        image: quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
+        - /bin/bash
+        - -ceu
+        - |
+          for ((attempt = 0; attempt < 60; attempt++)); do
+            if [[ -f /validation-tools/ready ]]; then
+              exec "$@"
+            fi
+            sleep 1
+          done
+          echo 'Generated-config tools did not become ready' >&2
+          exit 1
+        - --
+        env:
+        - name: PATH
+          value: /validation-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
         imagePullPolicy: Always
-        name: ""
+        name: test
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /validation-tools
+          name: generated-config-tools
+          readOnly: true
+      - command:
+        - /bin/sh
+        - -ceu
+        - cp /usr/bin/ci-operator-prowgen /usr/bin/diff /validation-tools/ && touch
+          /validation-tools/ready
+        image: quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
+        imagePullPolicy: Always
+        name: validation-tools
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /validation-tools
+          name: generated-config-tools
+      volumes:
+      - emptyDir: {}
+        name: generated-config-tools
     trigger: ((?m)^/test generated-config,?(\s+|$))
   - agent: kubernetes
     always_run: false
