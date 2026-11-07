@@ -124,6 +124,9 @@ if [[ -n "${TEST_USE_PROVISIONED_BASTION-}" ]]; then
     chmod 0600 "${HOME}/.ssh/id_rsa"
 fi
 
+# TEMPORARY — do not merge: hold cluster open for manual EIP SNAT test
+echo "sleeping 5h for manual EIP test"; sleep 5h
+
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
