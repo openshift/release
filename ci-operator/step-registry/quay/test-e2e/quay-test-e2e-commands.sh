@@ -46,6 +46,14 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
+# Keycloak Route origin for @auth:OIDC specs, written by quay-deploy-rhbk. A
+# public URL, not a secret. Left unset when no Keycloak was deployed.
+if [[ -s "${SHARED_DIR}/keycloak_host" ]]; then
+  KEYCLOAK_HOST=$(cat "${SHARED_DIR}/keycloak_host")
+  export KEYCLOAK_HOST
+  echo "KEYCLOAK_HOST=${KEYCLOAK_HOST}"
+fi
+
 # Configure Playwright environment
 # PLAYWRIGHT_BASE_URL: browser navigation URL (Quay UI)
 # REACT_QUAY_APP_API_URL: backend API URL (same as UI on OCP)
