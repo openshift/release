@@ -1,0 +1,27 @@
+ref:
+  as: dpf-hypervisor-setup-cluster-access
+  commands: dpf-hypervisor-setup-cluster-access-commands.sh
+  credentials:
+  - mount_path: /var/run/dpf-ci
+    name: cluster-secrets-metal-dpf-doca8
+    namespace: ci
+  documentation: |-
+    Set up cluster access for CI pods running on prow.  Copies the
+    kubeconfig and deploys a squid proxy on the hypervisor so that
+    proxy-aware tools (oc, curl, etc.) can reach the cluster's
+    internal DNS zone.  Writes proxy-conf.sh to ${SHARED_DIR}, which
+    openshift-e2e-test sources automatically.
+
+    Required Vault secrets:
+    - private-key: SSH key for hypervisor
+  env:
+  - default: "10.6.135.45"
+    name: REMOTE_HOST
+    documentation: |-
+      The hypervisor bastion host to SSH into.
+  from: dpf-ci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 15m0s
