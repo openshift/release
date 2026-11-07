@@ -202,20 +202,27 @@ load_secrets
 configure_claude
 
 # Use the edge-tooling source pre-installed in the image
-SRC_DIR="${EDGE_TOOLING_DIR}"
+# SRC_DIR="${EDGE_TOOLING_DIR}"
+SRC_DIR="$(mktemp -d "$(pwd)/microshift-ci-XXXXX")"
 PLUGIN_DIR="${SRC_DIR}/plugins/microshift-ci"
 cd "${SRC_DIR}"
 
+#########################################
+#    TODO: Remove Temp scaffolding
+#########################################
+git clone --depth 1 -b ushift-7435-retire-create-bugs --single-branch https://github.com/copejon/edge-tooling.git .
+
+
 # Close duplicate rebase PRs before running the analysis to prevent them
 # from being included in the analysis and bug creation.
-echo "Running automatic closing of duplicate rebase PRs..."
-"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
-    --component microshift \
-    --mode close-duplicates \
-    --execute \
-    --author 'microshift-rebase-script[bot]' \
-    --filter 'NO-ISSUE: rebase-release'
-echo "Automatic closing of duplicate rebase PRs completed"
+# echo "Running automatic closing of duplicate rebase PRs..."
+# "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+#     --component microshift \
+#     --mode close-duplicates \
+#     --execute \
+#     --author 'microshift-rebase-script[bot]' \
+#     --filter 'NO-ISSUE: rebase-release'
+# echo "Automatic closing of duplicate rebase PRs completed"
 
 # Run the deterministic doctor pipeline.
 echo "Running CI doctor pipeline..."
@@ -227,12 +234,12 @@ python3 "${PLUGIN_DIR}/scripts/run-doctor.py" \
     --repo openshift/microshift
 echo "CI doctor pipeline completed"
 
-# Now attempt to restart failed rebase PRs tests. If the restarted tests
-# complete successfully, the PR will be automatically merged.
-echo "Running automatic restart of failed rebase PRs tests..."
-"${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
-    --component microshift \
-    --mode restart \
-    --execute \
-    --author 'microshift-rebase-script[bot]'
-echo "Automatic restart of failed rebase PRs tests completed"
+# # Now attempt to restart failed rebase PRs tests. If the restarted tests
+# # complete successfully, the PR will be automatically merged.
+# echo "Running automatic restart of failed rebase PRs tests..."
+# "${PLUGIN_DIR}/scripts/prow-jobs-for-pull-requests.sh" \
+#     --component microshift \
+#     --mode restart \
+#     --execute \
+#     --author 'microshift-rebase-script[bot]'
+# echo "Automatic restart of failed rebase PRs tests completed"
