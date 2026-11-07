@@ -2,12 +2,6 @@
 
 set -ex
 
-# Allow callers to redirect oc commands to a different cluster by setting
-# INSTALL_KUBECONFIG. Empty = use ci-operator default.
-if [[ -n "${INSTALL_KUBECONFIG:-}" ]]; then
-  export KUBECONFIG="${INSTALL_KUBECONFIG}"
-fi
-
 # Wait for OpenShift Virtualization operator to be ready
 echo "Waiting for OpenShift Virtualization operator to be ready..."
 oc wait deployment -n openshift-cnv virt-operator --for=condition=Available --timeout=10m
