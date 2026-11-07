@@ -74,6 +74,7 @@ ping ${BASTION_IP} -c 10 || true
 echo "exit" | ncat ${BASTION_IP} 22 && echo "SSH port is opened"|| echo "status = $?"
 
 # Choose for hypershift hosts for "sno" or "1b1v" - 1 baremetal host
+# shellcheck disable=SC2034  # unused while the cluster is pinned below
 ADDITIONAL_ARG="-e $CL_SEARCH --topology 1b1v --topology sno"
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -81,6 +82,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Find a cluster to run job
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfdr16": {"port": 6443, "ip": "10.6.193.23", "hvip": "10.6.193.11"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -91,7 +95,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -115,7 +119,8 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: echo "DEBUG - cluster held, not released"
+    #command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
