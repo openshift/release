@@ -922,6 +922,11 @@ else:
             fi
         else
             _signatureRepeat=0
+            # Recovery to non-Degraded: drop the captured condition. Without
+            # this the reason outlives the condition it describes and a later
+            # timeout (or the health gate) is reported with a condition the
+            # cluster no longer has.
+            _junit_reason=""
         fi
 
         # Progress-based timeout extension: if MCPs are making progress,
@@ -991,6 +996,16 @@ if (( _renderChurnCount >= renderChurnLimit )); then
 fi
 case "${classification}" in
     DEGRADED)
+        # Classify from the FINAL state, not from a polling-time capture: a
+        # transient condition (a one-poll ENOSPC blip) can clear while the pool
+        # stays Degraded for an unrelated reason, and the polled text would
+        # otherwise decide the failure class. The polled reason is kept only as
+        # a fallback when the final JSON yields no Degraded condition.
+        typeset _finalReason=""
+        _finalReason="$(FirstDegradedCondition "${finalJson}")"
+        if [[ -n "${_finalReason}" ]]; then
+            _junit_reason="${_finalReason}"
+        fi
         if [[ -n "${_junit_reason}" && "${_junit_reason}" =~ (no\ space\ left\ on\ device|disk\ full|could\ not\ write\ image\ pull\ secret) ]]; then
             echo "FAILURE CLASS: storage-capacity-enospc"
             _junit_class="storage-capacity-enospc"
@@ -1001,9 +1016,6 @@ case "${classification}" in
         echo "One or more MCPs have Degraded=True; conditions verbatim:"
         echo ""
         EmitMcpConditions "${finalJson}"
-        if [[ -z "${_junit_reason}" && -n "${finalJson}" ]]; then
-            _junit_reason="$(FirstDegradedCondition "${finalJson}")"
-        fi
         echo ""
         ocb get nodes -o wide
         exit 1
