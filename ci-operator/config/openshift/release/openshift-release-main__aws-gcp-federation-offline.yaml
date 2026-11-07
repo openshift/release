@@ -1,0 +1,42 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/python-312@sha256:19e1e927138b40454858f297884c2c4e2f13f5ba95b3f55faea174d3cbb57067
+      USER 0
+      RUN install -d -o 1001 -g 0 -m 0775 /go
+      USER 1001
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 256Mi
+test_binary_build_commands: |
+  python3 -m venv /tmp/gcp-federation-venv
+  /tmp/gcp-federation-venv/bin/python -m pip install --no-cache-dir -r ci-operator/config/openshift/release/_gcp-federation/requirements.txt
+  /tmp/gcp-federation-venv/bin/python -m pip check
+tests:
+- always_run: false
+  as: unit
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    node_architecture: amd64
+    test:
+    - as: check-offline
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        export PYTHONDONTWRITEBYTECODE=1
+        /tmp/gcp-federation-venv/bin/python ci-operator/config/openshift/release/_gcp-federation/test_diagnostic.py
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 10m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: aws-gcp-federation-offline
