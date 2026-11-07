@@ -861,7 +861,6 @@ else:
     updatedHistory+=("${totalUpdated}")
     machineCountHistory+=("${totalMachine}")
     degradedHistory+=("${anyDegraded}")
-    (( ${#machineCountHistory[@]} > 1 )) || true
     typeset -i elapsed=$(( SECONDS - startSeconds ))
 
     if [[ "${statusKey}" == "STABLE" ]]; then
