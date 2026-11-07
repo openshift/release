@@ -225,9 +225,7 @@ while IFS= read -r line; do
         exit 1
     fi
     tar xzf "${TARBALL_FILE}" -C "${SRC_DIR}" --strip-components=1
-    # TARBALL_FILE is kept around until after the candidate loop below: a
-    # TESTS_SOURCE candidate needs the tarball itself, not just the extracted
-    # tree the image-building candidates consume.
+    rm -f "${TARBALL_FILE}"
 
     while IFS= read -r CAND_LINE; do
         [[ -z "${CAND_LINE}" ]] && continue
@@ -246,30 +244,31 @@ while IFS= read -r line; do
         # TESTS_SOURCE sentinel: hand the depended-on PR's SOURCE to this
         # job's own e2e test step instead of building a container image from
         # it. For jobs whose e2e test container ships oadp-operator's test
-        # code PRE-BUILT from a release branch (the KDM e2e configs run
-        # konveyor/oadp-operator-e2e-tests, whose build/ci-Dockerfile bakes
-        # the branch's source -- Go toolchain and all -- into the image): a
-        # Depends-On oadp-operator PR's TEST-CODE changes would otherwise
-        # never execute in that job, since MANAGER_IMAGE only swaps the
-        # operator's manager image, not the tests. The PR's tarball is
-        # copied into ${SHARED_DIR} for the e2e step to unpack and run
-        # `make test-e2e` from; no Build, no ImageStream, and nothing is
+        # code PRE-BUILT from a release branch (the KDM and velero-family
+        # e2e configs run konveyor/oadp-operator-e2e-tests, whose
+        # build/ci-Dockerfile bakes the branch's source -- Go toolchain and
+        # all -- into the image): a Depends-On oadp-operator PR's TEST-CODE
+        # changes would otherwise never execute in that job, since
+        # MANAGER_IMAGE only swaps the operator's manager image, not the
+        # tests. A one-line POINTER file (the PR's archive URL) is written
+        # into ${SHARED_DIR} for the e2e step to read; the e2e step fetches
+        # the tarball itself. The tarball itself must NOT go through
+        # ${SHARED_DIR}: it is a ~1 MiB Kubernetes Secret (see the qe-agent/
+        # quay/stackrox step docs) while this repo's source archives are
+        # 10+ MB compressed. No Build, no ImageStream, and nothing is
         # appended to depends-on-images.txt -- the image-apply consumers
         # (oadp-apply-depends-on-images, the inline set-related-image steps)
         # must never see this sentinel. Dockerfile/context fields are
         # meaningless here and ignored.
         if [[ "${RELATED_ENV}" == "TESTS_SOURCE" ]]; then
-            TESTS_TARBALL_DEST="${SHARED_DIR}/depends-on-tests-source-$(printf '%s' "${DEP_REPO}" | tr '/' '-').tar.gz"
-            # Clean up the temp fetch on failure like the other error paths
-            # in this loop do, rather than exiting straight out of `cp` under
-            # errexit and leaking SRC_DIR/TARBALL_FILE into /tmp.
-            if ! cp "${TARBALL_FILE}" "${TESTS_TARBALL_DEST}"; then
-                echo "[$(date --utc +%FT%T.%3NZ)] Failed to copy ${DEP_REPO}#${DEP_PR} source to ${TESTS_TARBALL_DEST} -- is ${SHARED_DIR} writable and non-full?" >&2
+            TESTS_PTR_DEST="${SHARED_DIR}/depends-on-tests-source-$(printf '%s' "${DEP_REPO}" | tr '/' '-').txt"
+            if ! printf '%s\n' "${TARBALL_URL}" > "${TESTS_PTR_DEST}"; then
+                echo "[$(date --utc +%FT%T.%3NZ)] Failed to write ${TESTS_PTR_DEST} -- is ${SHARED_DIR} writable and non-full?" >&2
                 rm -rf "${SRC_DIR}"
                 rm -f "${TARBALL_FILE}"
                 exit 1
             fi
-            echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} source saved for this job's e2e step via TESTS_SOURCE -> ${TESTS_TARBALL_DEST}"
+            echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} test-source pointer saved for this job's e2e step via TESTS_SOURCE -> ${TESTS_PTR_DEST} (archive URL; the e2e step fetches the tarball itself, since it is far too large for SHARED_DIR)"
             RESOLVED_ANY=true
             continue
         fi
@@ -332,7 +331,6 @@ while IFS= read -r line; do
         RESOLVED_ANY=true
     done <<< "${MATCHED_CANDIDATES}"
     rm -rf "${SRC_DIR}"
-    rm -f "${TARBALL_FILE}"
 done <<< "${DEPENDS_ON_LINES}"
 
 if [[ "${RESOLVED_ANY}" != "true" ]]; then

@@ -55,10 +55,12 @@ ref:
         image directly rather than a Subscription env var (consumed by
         the KDM configs' inline set-related-image steps).
       - `TESTS_SOURCE` -- the candidate's PR source is wanted as the e2e
-        TEST CODE, not as a container image. The PR's tarball is copied
-        to `${SHARED_DIR}/depends-on-tests-source-<org>-<name>.tar.gz`
-        for this job's own e2e test step to unpack and run `make
-        test-e2e` from, and nothing is appended to
+        TEST CODE, not as a container image. A one-line pointer file
+        (`${SHARED_DIR}/depends-on-tests-source-<org>-<name>.txt`,
+        containing the PR's archive URL) is written for this job's own
+        e2e test step, which fetches the tarball itself (SHARED_DIR is a
+        ~1 MiB Kubernetes Secret, far too small for a source archive)
+        and runs `make test-e2e` from it; nothing is appended to
         depends-on-images.txt. For jobs running oadp-operator's e2e
         suite from a pre-built image (the KDM and velero-family e2e
         configs), so an unmerged oadp-operator PR's test-code changes
