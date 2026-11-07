@@ -660,6 +660,1040 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-workload-identity-operator
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-2
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-3
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-4
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-5
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-6
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-7
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-workload-identity-operator-8
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's head.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-osd-workload-identity-operator
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-03
+    env:
+      CHANNEL_GROUP: stable
+      COMPUTE_NODES: "3"
+      ENABLE_WIF: "yes"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east1
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: gather
+    - ref: osd-ccs-cluster-deprovision
+    - ref: osd-ccs-gcp-wif-config-deprovision
+    pre:
+    - ref: osd-ccs-gcp-wif-config-provision
+    - ref: osd-ccs-cluster-provision-gcp
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-cluster-operators-wait-ready
+    - as: wif-pool
+      commands: |
+        set -euo pipefail
+        # The operator's identity binds to the wif-config's pool and
+        # provider, and osd-ccs-gcp-wif-config-provision records only
+        # the wif-config's id.
+        token="$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)"
+        if [[ -n "${token}" ]]; then
+          ocm login --url "${OCM_LOGIN_ENV}" --token "${token}"
+        else
+          ocm login --url "${OCM_LOGIN_ENV}" \
+            --client-id "$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id")" \
+            --client-secret "$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret")"
+        fi
+        wif="$(ocm get "/api/clusters_mgmt/v1/gcp/wif_configs/$(cat "${SHARED_DIR}/wif-config-id")")"
+        [[ "$(jq -r '.kind' <<<"${wif}")" == WifConfig ]] || { echo "could not read the wif-config"; exit 1; }
+        jq -j '.gcp.workload_identity_pool.pool_id' <<<"${wif}" > "${SHARED_DIR}/wif-pool-id"
+        jq -j '.gcp.workload_identity_pool.identity_provider.identity_provider_id' <<<"${wif}" > "${SHARED_DIR}/wif-provider-id"
+        echo "pool $(cat "${SHARED_DIR}/wif-pool-id"), provider $(cat "${SHARED_DIR}/wif-provider-id")"
+      env:
+      - default: staging
+        name: OCM_LOGIN_ENV
+      from: ocm-cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # PROBE ONLY. main's bundle predates #198's GCP credentials, so
+        # this installs the bundle built from #198's operator.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace \
+          quay.io/amcdermo/bgp-cc:gcp-a77653c6-bundle
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        POOL_ID="$(cat "${SHARED_DIR}/wif-pool-id")" \
+          PROVIDER_ID="$(cat "${SHARED_DIR}/wif-provider-id")" \
+          hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # PROBE ONLY. The scripts are not on main yet: they are
+        # openshift/bgp-cloud-connector#198, so this step fetches that
+        # head rather than running the job's source.
+        src=/tmp/bgp-cloud-connector
+        git init -q "${src}"
+        git -C "${src}" fetch -q --depth 1 https://github.com/frobware/bgp-cloud-connector.git a363c5de8fc094b73d2051adbb4db05c2a98ecc0
+        git -C "${src}" checkout -q FETCH_HEAD
+        cd "${src}"
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
