@@ -1,0 +1,157 @@
+ref:
+  as: openshift-qe-windows-mssql
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-windows-mssql-commands.sh
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  - collection: perfci
+    group: benchmark-runner
+    field: windows_url
+    mount_path: /secret-perfci
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e-benchmarking version tag to use
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube-burner-ocp version tag to use
+  - name: GC
+    default: "true"
+    documentation: |-
+      Clean up workload resources after run (default true)
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Enable local indexing for artifact collection
+  - name: MSSQL_EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Additional flags passed to kube-burner-ocp windows-mssql workload
+  - name: STORAGE_CLASS
+    default: "lvms-nvme"
+    documentation: |-
+      StorageClass for DataVolumes (lvms-nvme for LVMS, ocs-storagecluster-ceph-rbd-virtualization for ODF)
+  - name: ACCESS_MODE
+    default: "RWO"
+    documentation: |-
+      PVC access mode: RWO for LVMS, RWX for ODF
+  - name: EVICTION_STRATEGY
+    default: "None"
+    documentation: |-
+      VM eviction strategy: None for LVMS, LiveMigrate for ODF
+  - name: PER_NODE_DV
+    default: "true"
+    documentation: |-
+      Create one source DataVolume per worker node (required for LVMS)
+  - name: USE_SNAPSHOT
+    default: "false"
+    documentation: |-
+      Use VolumeSnapshot API for data disk provisioning (ODF backend)
+  - name: TOTAL_VMS
+    default: "1"
+    documentation: |-
+      Total number of SQL Server VMs to create
+  - name: VM_CPU
+    default: "32"
+    documentation: |-
+      Number of CPUs for the SQL Server VM
+  - name: VM_CPU_REQUEST
+    default: "32"
+    documentation: |-
+      CPU request for the SQL Server VM
+  - name: VM_MEMORY
+    default: "32Gi"
+    documentation: |-
+      Memory allocation for the SQL Server VM
+  - name: VM_MEMORY_REQUEST
+    default: "32Gi"
+    documentation: |-
+      Memory request for the SQL Server VM
+  - name: IO_THREAD_COUNT
+    default: "8"
+    documentation: |-
+      Number of I/O threads for VM disk operations
+  - name: NODE_DISTRIBUTION
+    default: "sequential"
+    documentation: |-
+      VM distribution strategy across nodes (sequential or spread)
+  - name: ROOT_DISK_SIZE
+    default: "76Gi"
+    documentation: |-
+      Root disk size for Windows VM
+  - name: DATA_DISK_SIZE
+    default: "76Gi"
+    documentation: |-
+      Data disk size for SQL Server database
+  - name: CDI_SOURCE_TYPE
+    default: "http"
+    documentation: |-
+      CDI source type for VM image (http, registry, etc)
+  - name: DB_WAREHOUSES
+    default: "96"
+    documentation: |-
+      Number of TPC-C warehouses (database size)
+  - name: DB_TRANSACTIONS
+    default: "100000"
+    documentation: |-
+      Number of transactions to run in benchmark
+  - name: DB_ITERATIONS
+    default: "1"
+    documentation: |-
+      Number of benchmark iterations
+  - name: DB_RAMPUP
+    default: "1m"
+    documentation: |-
+      Ramp-up time before benchmark starts
+  - name: DB_RUNTIME
+    default: "1m"
+    documentation: |-
+      Runtime duration for the benchmark
+  - name: DB_USERS
+    default: "1,2,4,8,16,32"
+    documentation: |-
+      Comma-separated HammerDB user counts to test
+  - name: NAMESPACE
+    default: "windows-mssql"
+    documentation: |-
+      Namespace for windows-mssql workload resources
+  - name: SOURCE_DV_NAME
+    default: "windows-mssql-source-dv"
+    documentation: |-
+      Name for source DataVolume
+  - name: CLEAR_NODE_CACHES
+    default: "true"
+    documentation: |-
+      Clear node caches before benchmark
+  - name: BULK_SLEEP
+    default: "30s"
+    documentation: |-
+      Sleep duration between bulk operations
+  - name: SSH_CONCURRENCY_LIMIT
+    default: "20"
+    documentation: |-
+      Maximum concurrent SSH connections to VMs
+  - name: WINDOWS_IMAGE_URL
+    default: "http://10.26.8.107:8083/windows_server_2k25.qcow2"
+    documentation: |-
+      Override Windows image URL (read from Vault if not set)
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  documentation: >-
+    This step runs the windows-mssql workload via kube-burner-ocp. Measures SQL Server
+    TPC-C benchmark performance using HammerDB on Windows VMs with LVMS or ODF storage.
+  timeout: 5h
