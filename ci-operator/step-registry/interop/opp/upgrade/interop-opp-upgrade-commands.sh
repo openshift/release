@@ -77,7 +77,23 @@ typeset isForceUpdate="false"
 # ---------------------------------------------------------------------------
 function NotReadyOppPods () {
     # $1: `oc get pods --no-headers` output; prints the not-ready lines.
-    awk '$1 !~ /^installer-[0-9]+(-retry-[0-9]+)?-ip-/ && $1 !~ /^bootstrap-[0-9]+(-retry-[0-9]+)?-ip-/ && !/Completed/ && !/Running/ && !/Succeeded/' <<< "$1"
+    #
+    # `oc get pods --no-headers` columns: NAME READY STATUS RESTARTS AGE.
+    # The decision is made from those columns, never from a row-wide word
+    # match: STATUS `Running` alone does not mean ready, so a pod whose READY
+    # count is short (0/1 with a failing readiness probe, 1/2 with a
+    # crash-looping sidecar) must stay visible to the readiness check.
+    # Completed/Succeeded rows are terminated work, not failure.
+    # The CVO single-shot artifact exclusions (installer-N, bootstrap-N,
+    # optional -retry-N, -ip-<node hostname>) are name-column only.
+    awk '
+        $1 ~ /^installer-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $1 ~ /^bootstrap-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $3 == "Completed" || $3 == "Succeeded" { next }
+        $3 == "Running" && split($2, ready, "/") == 2 \
+            && ready[1] + 0 == ready[2] + 0 && ready[2] + 0 > 0 { next }
+        { print }
+    ' <<< "$1"
 }
 
 # --- Offline predicate self-test (phase 0) ----------------------------------
@@ -120,11 +136,26 @@ bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m
         (( failures += 1 ))
     fi
 
+    # Readiness case: STATUS `Running` is not proof of readiness. A pod whose
+    # READY count is short (failing readiness probe, crash-looping sidecar)
+    # must remain visible; only a fully ready x/y Running pod is filtered.
+    fixture="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m
+rhacs-operator-controller-7f6d8b9c-r5v8d      2/2     Running     0     60m"
+    expected="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: partially ready Running pods must stay visible and a fully ready Running pod must be filtered; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
     if (( failures > 0 )); then
         echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
         return 1
     fi
-    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept)"
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept)"
     true
 }
 
