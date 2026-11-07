@@ -41,6 +41,9 @@ if [[ -n "${EXTERNAL_WEBSERVER_IP}" ]]; then
 fi
 
 EXTRA_FLAGS+=" --profile-type=${PROFILE_TYPE}"
+if [[ -n "${KUBE_BURNER_LOG_LEVEL}" ]]; then
+  EXTRA_FLAGS+=" --log-level=${KUBE_BURNER_LOG_LEVEL}"
+fi
 
 export ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
 export WORKLOAD=evpn
