@@ -19,6 +19,7 @@ STORAGE_BY_CLOUD = {
     "aws": "s3",
     "gcp": "gcs",
     "azure": "blob",
+    "ibmcloud": "cos",
     "libvirt": "s3",
     # Bare metal (Equinix) has no cloud object store and the dev-scripts cluster
     # has no default StorageClass for ODF/NooBaa, so Quay uses an external AWS S3
@@ -33,6 +34,7 @@ DEPLOY_REF_BY_CLOUD = {
     "aws": "quay-deploy-aws-s3",
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
+    "ibmcloud": "quay-deploy-ibmcloud-cos",
     "libvirt": "quay-deploy-aws-s3",
     # Bare metal uses the external AWS S3 deploy step (bucket creds come from the
     # quay-tests vault, not the cluster profile).
