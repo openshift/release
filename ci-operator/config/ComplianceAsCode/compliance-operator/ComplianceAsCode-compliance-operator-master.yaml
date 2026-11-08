@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -43,6 +47,17 @@ images:
     - arm64
     dockerfile_path: images/openscap/Dockerfile
     to: testopenscap
+operator:
+  bundles:
+  - as: compliance-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-dev:master
+    with: pipeline:compliance-operator
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-content-dev:master
+    with: pipeline:testcontent
+  - pullspec: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-openscap-dev:master
+    with: pipeline:testopenscap
 promotion:
   to:
   - excluded_images:
@@ -668,12 +683,13 @@ tests:
   optional: true
   steps:
     cluster_profile: aws-stackrox
-    pre:
-    - chain: hypershift-setup-nested-management-cluster
-    - ref: hypershift-install
-    - chain: hypershift-aws-create
+    dependencies:
+      OO_BUNDLE: compliance-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-compliance
+      OO_INSTALL_TIMEOUT_MINUTES: "20"
     test:
-    - ref: ipi-install-rbac
     - as: test-ocp4-pci-dss-node
       cli: latest
       commands: SKIP_MCP_SETUP=1 make e2e-hypershift
@@ -681,9 +697,12 @@ tests:
       - env: IMAGE_FROM_CI
         name: compliance-operator
       from: src
+      grace_period: 10m0s
       resources:
         requests:
           cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
     workflow: hypershift-optional-operators
 - always_run: false
   as: e2e-rosa
