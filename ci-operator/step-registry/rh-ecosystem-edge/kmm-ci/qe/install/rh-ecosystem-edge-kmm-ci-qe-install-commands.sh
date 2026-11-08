@@ -107,6 +107,17 @@ collect_cluster_diagnostics() {
   echo "Comprehensive KMM diagnostics saved under ${diagnostics_dir}" >&2
 }
 
+if [[ -n "${KMM_DEBUG_SLEEP_SECONDS:-}" ]]; then
+  if [[ ! "${KMM_DEBUG_SLEEP_SECONDS}" =~ ^[0-9]+$ ]]; then
+    echo "Invalid KMM_DEBUG_SLEEP_SECONDS: ${KMM_DEBUG_SLEEP_SECONDS}" >&2
+    exit 1
+  fi
+  if (( KMM_DEBUG_SLEEP_SECONDS > 0 )); then
+    echo "Debug pause: sleeping ${KMM_DEBUG_SLEEP_SECONDS} seconds before KMM installation" >&2
+    sleep "${KMM_DEBUG_SLEEP_SECONDS}"
+  fi
+fi
+
 if ! KMM_CHANNEL="${KMM_CHANNEL:-release-2.7}" \
   KMM_CATALOG_PULL_SECRET_PATH="${KMM_CATALOG_PULL_SECRET_PATH:-}" \
   make cluster-operators; then
