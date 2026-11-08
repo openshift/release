@@ -174,6 +174,7 @@ token_models = set()
 
 
 def attribute_value(value):
+    """Return the scalar value from an OTLP AnyValue."""
     if not isinstance(value, dict):
         return None
     for key in ("stringValue", "intValue", "doubleValue", "boolValue"):
@@ -263,14 +264,28 @@ for case_name in "${CASE_LIST[@]}"; do
         CLAUDE_COST_STATUS=$(claude_cost_status "${CASE_OTEL}")
     fi
 
-    if jq -e '.rows[0]' "${METRICS_TMP}" >/dev/null 2>&1; then
+    # extract_metrics rejects a malformed OTEL line before writing rows, while
+    # codex_otel_usage deliberately skips malformed lines. Normalize empty or
+    # invalid extractor output so an observed Codex model remains recoverable.
+    if ! jq -e 'type == "object" and (.rows | type == "array")' \
+        "${METRICS_TMP}" >/dev/null 2>&1; then
+        printf '{"rows":[]}\n' > "${METRICS_TMP}"
+    fi
+    if ! jq -e 'type == "object" and ((.models // {}) | type == "object")' \
+        <<< "${CODEX_USAGE}" >/dev/null 2>&1; then
+        CODEX_USAGE='{"cost_from_metric":false,"models":{}}'
+    fi
+
+    if jq -e '(.rows[0] | type == "object")' "${METRICS_TMP}" >/dev/null 2>&1 \
+        || jq -e '(.models // {} | length) > 0' <<< "${CODEX_USAGE}" >/dev/null 2>&1; then
         jq --arg configured "${CONFIGURED_MODEL}" \
            --argjson usage "${CODEX_USAGE}" \
            --argjson claude_cost_status "${CLAUDE_COST_STATUS}" \
            --argjson exit_code "${CASE_EXIT_CODE}" '
           def number_or_zero: try tonumber catch 0;
           def first_nonempty: map(select(type == "string" and length > 0)) | first // "";
-          .rows[0] as $r
+          ((.rows[0] | type) == "object") as $has_row
+          | (if $has_row then .rows[0] else {} end) as $r
           | ($usage.models // {}) as $models
           | (($models | length) > 0) as $is_codex
           | (if $is_codex
@@ -337,7 +352,7 @@ for case_name in "${CASE_LIST[@]}"; do
               model: $model,
               agent: $harness,
               agent_version: $version,
-              duration_s: (($r.duration_ms | number_or_zero) / 1000),
+              duration_s: (if $has_row then (($r.duration_ms | number_or_zero) / 1000) else null end),
               cost_observed: $cost_observed,
               cost_usd: $cost,
               observed_cost_usd: $observed_cost,
@@ -364,7 +379,7 @@ for case_name in "${CASE_LIST[@]}"; do
           per_model_usage: {},
           per_model_turns: {}
         }' > "${CASE_RESULT_TMP}"
-        echo "WARNING: no usable metrics row for ${case_name}"
+        echo "WARNING: no usable metrics row or Codex usage for ${case_name}"
     fi
 
     jq --arg case_name "${case_name}" --slurpfile result "${CASE_RESULT_TMP}" \
