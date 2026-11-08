@@ -26,4 +26,4 @@ echo "Mirroring ${SPOKE_ARCH} architecture OCP release ${VERSION} to disconnecte
 # Preserve the hub release and operators already mirrored by preceding steps.
 ansible-playbook ./playbooks/mirror-ocp.yaml \
   -i ./inventories/ocp-deployment/build-inventory.py \
-  --extra-vars "release=${VERSION} arch=${SPOKE_ARCH} wipe_registry=false"
+  --extra-vars "release=${VERSION} arch=${SPOKE_ARCH} release_age_max_days=${MULTISTAGE_PARAM_OVERRIDE_RELEASE_AGE_MAX_DAYS}"
