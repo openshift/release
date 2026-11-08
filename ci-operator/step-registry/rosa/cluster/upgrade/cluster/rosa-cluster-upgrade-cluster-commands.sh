@@ -15,6 +15,7 @@ HOSTED_CP=${HOSTED_CP:-false}
 UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
+CHANNEL_GROUP=${CHANNEL_GROUP:-stable}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
 UPGRADE_START_EPOCH=""
@@ -165,6 +166,63 @@ function unset_proxy () {
     else
         log "no proxy setting found."
     fi
+}
+
+# List the available Y-streams (X.Y) for the configured channel group, version-sorted
+# and de-duplicated. This is deliberately the same query and the same ordering the
+# install side uses to honour VERSION_OFFSET_FROM_LATEST, so the upgrade target stays
+# consistent with the version the cluster was installed at. Returns non-zero when the
+# ROSA query fails, so callers can fail closed instead of guessing a target.
+list_available_y_streams() {
+  local raw
+  local -a version_cmd=(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json)
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    version_cmd+=(--hosted-cp)
+  fi
+  raw=$("${version_cmd[@]}") || return 1
+  echo "${raw}" | jq -r '.[].raw_id' | cut -d '.' -f1,2 | sort -Vu
+}
+
+# Print the first Y-stream in the version-ordered list that is strictly newer than the
+# cluster's current version. Returns non-zero (printing nothing) when the list holds no
+# newer stream, so the caller can fail closed rather than re-running the same version or
+# attempting a downgrade.
+next_y_stream_after() {
+  local current_version="$1" y_stream_list="$2"
+  local current_stream stream older
+  current_stream=$(echo "${current_version}" | cut -d '.' -f1,2)
+  while IFS= read -r stream; do
+    if [[ -z "${stream}" || "${stream}" == "${current_stream}" ]]; then
+      continue
+    fi
+    older=$(printf '%s\n%s\n' "${current_stream}" "${stream}" | sort -V | head -n1)
+    if [[ "${older}" == "${current_stream}" ]]; then
+      echo "${stream}"
+      return 0
+    fi
+  done <<< "$(printf '%s\n' "${y_stream_list}" | sort -V)"
+  return 1
+}
+
+# Record how the upgrade target was chosen, including on the failure paths above, so an
+# early exit is still diagnosable from the job artifacts. Only version strings and the
+# channel group are published: no cluster or account identifiers, no credentials and no
+# raw command output. Never aborts the step.
+write_target_selection_diagnostics() {
+  local current_stream="$1" target="$2" channel="$3" streams="$4"
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    return 0
+  fi
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  if ! {
+    printf 'channel_group: %s\n' "${CHANNEL_GROUP}"
+    printf 'current_y_stream: %s\n' "${current_stream}"
+    printf 'selected_target: %s\n' "${target:-<none>}"
+    printf 'selected_channel: %s\n' "${channel:-<none>}"
+    printf 'available_y_streams: %s\n' "$(printf '%s' "${streams}" | tr '\n' ' ')"
+  } > "${ARTIFACT_DIR}/upgrade-target-selection.txt"; then
+    log "WARNING: failed to write upgrade-target-selection.txt"
+  fi
 }
 
 function write_upgrade_discovery_diagnostics () {
@@ -473,17 +531,40 @@ UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
 UPGRADE_FROM_VERSION="${current_version}"
 
-# Auto-derive upgrade target from the cluster's current version when not explicitly set
+# Auto-derive upgrade target from the cluster's current version when not explicitly set.
+#
+# VERSION_OFFSET_FROM_LATEST, which selects the version the cluster is installed at,
+# is a *position* in the version-sorted list of available Y-streams rather than an
+# arithmetic offset on the minor number -- see the shared resolution logic in
+# rosa/cluster/provision and rosa/sts/account-roles/create. The matching upgrade target
+# is therefore the next Y-stream after the current one in that same ordered list (the
+# latest stream for offset 1). Incrementing the minor number instead yields a stream
+# that does not exist whenever the next Y-stream opens a new major (e.g. 4.22 -> 5.0),
+# and OCM rejects the resulting channel.
+current_y_stream=$(echo "$current_version" | cut -d '.' -f1,2)
 if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
-  current_x=$(echo "$current_version" | cut -d '.' -f1)
-  current_y=$(echo "$current_version" | cut -d '.' -f2)
-  UPGRADED_TO_VERSION="${current_x}.$((current_y + 1))"
-  log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION}"
+  if ! y_stream_list=$(list_available_y_streams); then
+    write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+    log "Error: could not list versions for channel group ${CHANNEL_GROUP}; refusing to guess an upgrade target."
+    exit 1
+  fi
+  if [[ -z "${y_stream_list}" ]]; then
+    write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+    log "Error: no Y-streams available in channel group ${CHANNEL_GROUP}; refusing to guess an upgrade target."
+    exit 1
+  fi
+  if ! UPGRADED_TO_VERSION=$(next_y_stream_after "${current_version}" "${y_stream_list}"); then
+    write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+    log "Error: no Y-stream newer than ${current_version} in channel group ${CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+    exit 1
+  fi
+  log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
 fi
 if [[ -z "${UPGRADE_CHANNEL}" ]]; then
   UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
   log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL}"
 fi
+write_target_selection_diagnostics "${current_y_stream}" "${UPGRADED_TO_VERSION}" "${UPGRADE_CHANNEL}" "${y_stream_list:-}"
 
 if [[ "$current_version" == "$UPGRADED_TO_VERSION" ]]; then
   log "The cluster has been in the version $UPGRADED_TO_VERSION"
