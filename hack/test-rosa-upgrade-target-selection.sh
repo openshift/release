@@ -28,15 +28,18 @@ trap 'rm -rf "${WORKDIR}"' EXIT
 
 failures=0
 
+# Report a failed assertion and record it so the suite exits non-zero at the end.
 fail() {
   echo "FAIL: $*"
   failures=$((failures + 1))
 }
 
+# Report a passed assertion.
 pass() {
   echo "PASS: $*"
 }
 
+# Print the body of shell function $2 as defined in script $1, braces included.
 extract_function() {
   sed -n "/^$2()/,/^}/p" "$1"
 }
@@ -87,14 +90,65 @@ done
 # do not fail; only the actual query shape and data schema are compared.
 squash() { tr -s ' ' ' ' < "$1" | tr -d "'\"" | sed 's/-d \./-d./g'; }
 
-assert_contains() {
-  local name="$1" file="$2" needle="$3"
-  if squash "${file}" | grep -qF -- "${needle}"; then
-    pass "${name}: contains '${needle}'"
-  else
-    fail "${name}: expected to contain '${needle}'"
-  fi
+# Returns 0 when the normalised contents of $1 contain the literal string $2, 1 when
+# they do not, and 2 when the file could not be read or normalised.
+#
+# The normalised text is captured in full before matching. Piping squash straight into
+# `grep -q` lets grep exit at the first match and close the pipe, which kills the
+# upstream filters with SIGPIPE (exit 141); under `set -o pipefail` that becomes the
+# pipeline's status and a successful match is reported as a failure. Command
+# substitution reads to EOF, so no writer is ever signalled.
+file_contains() {
+  local file="$1" needle="$2" haystack
+  haystack=$(squash "${file}") || return 2
+  grep -qF -- "${needle}" <<< "${haystack}"
 }
+
+# Assert that a file contains a literal string, reporting a read failure distinctly
+# from a genuine mismatch so a broken fixture is never mistaken for missing content.
+assert_contains() {
+  local name="$1" file="$2" needle="$3" status=0
+  file_contains "${file}" "${needle}" || status=$?
+  case "${status}" in
+    0) pass "${name}: contains '${needle}'" ;;
+    2) fail "${name}: could not read or normalise ${file}" ;;
+    *) fail "${name}: expected to contain '${needle}'" ;;
+  esac
+}
+
+# Regression coverage for the SIGPIPE false-failure described above. The fixture must
+# exceed the pipe buffer (64 KiB on Linux) and match on its first line, so that grep
+# would exit while squash is still writing. The files probed below are all well under
+# that, which is why the defect was latent rather than visible.
+LARGE_FIXTURE="${WORKDIR}/large-early-match.txt"
+{
+  echo "rosa list versions --channel-group"
+  seq 1 60000 | sed 's/^/filler padding padding /'
+} > "${LARGE_FIXTURE}"
+
+fixture_status=0
+file_contains "${LARGE_FIXTURE}" "rosa list versions --channel-group" || fixture_status=$?
+if [[ "${fixture_status}" -eq 0 ]]; then
+  pass "large early-match file matched ($(wc -c < "${LARGE_FIXTURE}") bytes, no SIGPIPE false-failure)"
+else
+  fail "large early-match file reported as missing (status ${fixture_status}) - SIGPIPE regression"
+fi
+
+fixture_status=0
+file_contains "${LARGE_FIXTURE}" "this-needle-is-definitely-absent" || fixture_status=$?
+if [[ "${fixture_status}" -eq 1 ]]; then
+  pass "absent needle in a large file is reported missing (status 1)"
+else
+  fail "absent needle expected status 1, got ${fixture_status}"
+fi
+
+fixture_status=0
+file_contains "${WORKDIR}/no-such-file.txt" "anything" || fixture_status=$?
+if [[ "${fixture_status}" -eq 2 ]]; then
+  pass "unreadable file is reported as a read failure (status 2), not as a mismatch"
+else
+  fail "unreadable file expected status 2, got ${fixture_status}"
+fi
 
 for probe in "rosa list versions --channel-group" "--hosted-cp" ".[].raw_id" "cut -d. -f1,2" "sort -Vu"; do
   assert_contains "install source (provision)" "${PROVISION_SCRIPT}" "${probe}"
@@ -114,6 +168,8 @@ assert_contains "upgrade step (HCP)" "${HCP_SCRIPT}" "--hosted-cp"
 # shellcheck disable=SC1090,SC1091
 source /dev/stdin <<< "$(extract_function "${CLASSIC_SCRIPT}" next_y_stream_after)"
 
+# Assert next_y_stream_after selects $4 as the target for current version $2 and
+# newline-separated candidate list $3.
 expect_target() {
   local name="$1" current="$2" list="$3" want="$4"
   local got status=0
@@ -127,6 +183,8 @@ expect_target() {
   fi
 }
 
+# Assert next_y_stream_after refuses (non-zero, no output) for current version $2 and
+# newline-separated candidate list $3.
 expect_failure() {
   local name="$1" current="$2" list="$3"
   local got status=0
@@ -200,9 +258,12 @@ for h in "${CLASSIC_HARNESS}" "${HCP_HARNESS}"; do
   fi
 done
 
-# run_case <name> <harness> <expected-exit> <env assignments...>
-# Exports ROSA_CALL_LOG/ARTIFACT_DIR per case and captures stdout/stderr.
 CASE_N=0
+
+# run_case <name> <harness> <expected-exit> <env assignments...>
+# Runs a harness in a subshell with per-case ROSA_CALL_LOG and ARTIFACT_DIR, captures
+# stdout/stderr, and asserts the exit status. Returns non-zero if the status differs,
+# so callers can skip their follow-up assertions.
 run_case() {
   local name="$1" harness="$2" want_exit="$3"; shift 3
   CASE_N=$((CASE_N + 1))
@@ -225,8 +286,10 @@ run_case() {
   return 0
 }
 
+# Read the value of a RESULT_* line emitted by the most recently run harness case.
 result_of() { grep "^$1=" "${CASE_DIR}/stdout" | cut -d= -f2- || true; }
 
+# Assert that observed value $2 equals expected value $3.
 assert_eq() {
   local name="$1" got="$2" want="$3"
   if [[ "${got}" == "${want}" ]]; then
@@ -236,6 +299,8 @@ assert_eq() {
   fi
 }
 
+# Assert the most recent harness case issued no `rosa` query at all, which is what the
+# explicit-override and Z_STREAM_UPGRADE bypass paths must do.
 assert_no_rosa_call() {
   local name="$1"
   if [[ -s "${CASE_LOG}" ]]; then
