@@ -164,7 +164,13 @@ function unset_proxy () {
 list_available_y_streams() {
   local raw
   raw=$(rosa list versions --channel-group "${CHANNEL_GROUP}" --hosted-cp -o json) || return 1
-  echo "${raw}" | jq -r '.[].raw_id' | cut -d '.' -f1,2 | sort -Vu
+  # `.raw_id // empty` drops entries whose raw_id is JSON null or absent: a bare
+  # `.[].raw_id` renders both as the literal string "null", which would otherwise
+  # survive into the candidate list and produce a bogus "<prefix>-null" channel. The
+  # trailing filter keeps only well-formed X.Y streams; an all-malformed response
+  # therefore yields an empty list and the caller fails closed.
+  echo "${raw}" | jq -r '.[].raw_id // empty' | cut -d '.' -f1,2 \
+    | { grep -E '^[0-9]+\.[0-9]+$' || true; } | sort -Vu
 }
 
 # Print the first Y-stream in the version-ordered list that is strictly newer than the
@@ -175,8 +181,13 @@ next_y_stream_after() {
   local current_version="$1" y_stream_list="$2"
   local current_stream stream older
   current_stream=$(echo "${current_version}" | cut -d '.' -f1,2)
+  if [[ ! "${current_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    return 1
+  fi
   while IFS= read -r stream; do
-    if [[ -z "${stream}" || "${stream}" == "${current_stream}" ]]; then
+    # Skip blanks and anything that is not a well-formed X.Y stream, so a malformed
+    # discovery response can never be selected as an upgrade target.
+    if [[ ! "${stream}" =~ ^[0-9]+\.[0-9]+$ || "${stream}" == "${current_stream}" ]]; then
       continue
     fi
     older=$(printf '%s\n%s\n' "${current_stream}" "${stream}" | sort -V | head -n1)
