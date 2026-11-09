@@ -1,0 +1,62 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.12
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aws-s3
+  optional: true
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:bc19b867a77b3044ff99087e7c3b71840a347cb9aa077ed1467ea8e8516c88d3
+      QUAY_EXTRA_CONFIG: |
+        SUPER_USERS:
+          - quayapici
+          - quaye2eci
+      QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      QUAY_INDEX_IMAGE_TAG: quay-3.13__v4.12__quay-rhel9-operator
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.13"
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-deploy-aws-s3
+    - ref: quay-test-e2e-legacy
+    - ref: quay-test-api-legacy
+    workflow: ipi-aws
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: redhat-3.13
+  org: quay
+  repo: quay
+  variant: aws-ocp412-e2e-legacy

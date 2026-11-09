@@ -8,6 +8,7 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-{{ ocp_version }}
+{% if test != "e2e-legacy" %}
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -18,6 +19,7 @@ images:
   - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
   skip_if_only_changed: ^(\.agents/|\.claude/|ci-generator/|docs/|.*\.md$)
+{% endif %}
 {% if layout == "base" and arch == "amd64" %}
 promotion:
   to:
@@ -27,11 +29,18 @@ promotion:
 {% endif %}
 releases:
   latest:
+{% if test == 'upgrade' %}
+    release:
+      architecture: amd64
+      channel: {{ ocp_channel }}
+      version: "{{ ocp_version }}"
+{% else %}
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
       version: "{{ ocp_version }}"
+{% endif %}
 resources:
   '*':
     limits:

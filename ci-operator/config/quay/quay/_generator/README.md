@@ -148,6 +148,7 @@ Top level:
 | `global_defaults.repo` | `org/repo` for filenames and metadata (`quay/quay`). A test in `REPO_BY_TEST` (`model.py`) writes to its own repo instead: `e2e-chainsaw` -> `quay/quay-operator`. |
 | `global_defaults.arch` | Default cluster arch (`amd64`). |
 | `global_defaults.image_source` | Reserved (`build`); no template reads it yet. |
+| `global_defaults.rehearsal_catalog_pins` | Optional OCP-version to immutable ART catalog pullspec mapping. When present for a version-bearing Quay cell, it sets `MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE`, forces the ART CatalogSource, and supplies both upgrade catalog images. |
 | `managed_files.active` | Every file the matrix must generate, exactly. |
 | `managed_files.retired` | Files the generator no longer owns; `--check` fails while any still exists. |
 | `managed_files.hand_maintained` | Hand-written configs in this directory, each mapped to the `as` of its tests. Prefer a matrix row; add an entry only for a config the generator cannot produce. |

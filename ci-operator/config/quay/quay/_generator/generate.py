@@ -326,6 +326,14 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
     org, repo = _parse_github_repo(str(defaults.get("repo") or "quay/quay"))
     default_arch = str(defaults.get("arch") or "amd64")
     image_source = str(defaults.get("image_source") or "build")
+    rehearsal_catalog_pins = defaults.get("rehearsal_catalog_pins") or {}
+    if not isinstance(rehearsal_catalog_pins, dict) or not all(
+        isinstance(ocp, str)
+        and isinstance(pullspec, str)
+        and re.match(r"^[^\s@]+@sha256:[a-f0-9]{64}$", pullspec)
+        for ocp, pullspec in rehearsal_catalog_pins.items()
+    ):
+        raise ValueError("global_defaults.rehearsal_catalog_pins must map OCP versions to image@sha256 pullspecs")
 
     cells: list[Cell] = []
     for release_index, release in enumerate(_quay_releases(matrix)):
@@ -487,6 +495,9 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         source=source,
                         arch=job_arch,
                         image_source=image_source,
+                        fbc_catalog_pullspec=(
+                            rehearsal_catalog_pins.get(ocp) if quay_version is not None else None
+                        ),
                         env=copy.deepcopy(merged_env),
                         as_name=as_name,
                         kind=kind,
@@ -566,6 +577,13 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
     layers = [render_template(env, base_template, context)]
     if cell.kind == "periodic":
         layers.append(render_template(env, f"sources/{cell.source}.yaml.j2", context))
+    elif cell.kind == "presubmit":
+        # Presubmits have no `source` field, but version-bearing release
+        # branches still require an ART FBC fallback. A final catalog-pin layer
+        # may replace this floating tag with an immutable catalog image.
+        catalog_template = f"{template_root}catalog.yaml.j2"
+        if (templates_dir / catalog_template).exists():
+            layers.append(render_template(env, catalog_template, context))
     layers.append(render_template(env, cloud_template, context))
     if cell.arch != "amd64":
         layers.append(render_template(env, f"arches/{cell.arch}.yaml.j2", context))
@@ -576,6 +594,11 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
         # Presubmit test layer is a delta on top of the shared periodic test
         # layer, not a byte-identical fork that would need editing twice.
         layers.append(render_template(env, presubmit_test_template, context))
+    catalog_pin_template = "catalog-pin.yaml.j2"
+    if cell.fbc_catalog_pullspec is not None and (templates_dir / catalog_pin_template).exists():
+        # This is intentionally last: it overrides the periodic source layer's
+        # floating ART tag and the stable source's production catalog selection.
+        layers.append(render_template(env, catalog_pin_template, context))
     config: YamlMap = {}
     for layer in layers:
         config = deep_merge(config, layer)

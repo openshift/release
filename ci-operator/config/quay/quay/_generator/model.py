@@ -73,6 +73,9 @@ class Cell:
     source: str | None
     arch: str = "amd64"
     image_source: str = "build"
+    # Immutable ART FBC catalog selected for this OCP minor by the rehearsal
+    # matrix. None preserves the normal floating-tag behavior.
+    fbc_catalog_pullspec: str | None = None
     env: dict[str, Any] = field(default_factory=dict)
     as_name: str | None = None
     kind: str = "periodic"
@@ -247,6 +250,8 @@ class Cell:
             ctx["operator_channel"] = self.operator_channel
             ctx["index_image_repo"] = self.index_image_repo
             ctx["index_image_tag"] = self.index_image_tag
+        if self.fbc_catalog_pullspec is not None:
+            ctx["fbc_catalog_pullspec"] = self.fbc_catalog_pullspec
         if self.upgrade_from is not None:
             ctx["upgrade_from"] = self.upgrade_from
             ctx["upgrade_from_nodot"] = self.upgrade_from_nodot
