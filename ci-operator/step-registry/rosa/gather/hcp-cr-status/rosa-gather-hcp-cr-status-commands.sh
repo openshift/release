@@ -11,6 +11,223 @@ log() {
   echo "[hcp-cr-status] $(date '+%Y-%m-%d %H:%M:%S') $*"
 }
 
+# ---- ocm-backplane CLI acquisition ------------------------------------------
+#
+# The release tarball is fetched over the build farm's egress, where a single
+# 504 from the CDN used to end the whole collection. The download is retried
+# for transient failures only, inside one wall-clock budget for the entire
+# phase, so the step can survive a blip without ever outliving the timeout the
+# ref already declares. A 404 or a 403 is a settled answer, not a blip, so it
+# is never retried: doing so only spends the budget that a real transient
+# failure needs.
+#
+# Diagnostics here are deliberately fixed-field and numeric. The request URL
+# can carry a signed query string, the environment can carry proxy
+# credentials, and curl's own error text quotes both; this step's logs and
+# artifacts are retained publicly, so none of them are ever logged, written to
+# the artifact, or exposed to xtrace.
+#
+# Everything above the "end of sourceable definitions" marker below is free of
+# top-level side effects so hack/test-rosa-gather-hcp-cr-status.sh can source
+# it and exercise these functions offline. Keep it that way.
+
+# Internal defaults and test seams, deliberately not declared in the ref's
+# env list: they are not step inputs, and a job cannot set them. The offline
+# test overrides them to drive the budget and backoff paths quickly.
+BP_DOWNLOAD_MAX_ATTEMPTS="${BP_DOWNLOAD_MAX_ATTEMPTS:-4}"
+BP_DOWNLOAD_BUDGET_SECONDS="${BP_DOWNLOAD_BUDGET_SECONDS:-300}"
+BP_DOWNLOAD_CONNECT_TIMEOUT="${BP_DOWNLOAD_CONNECT_TIMEOUT:-30}"
+BP_DOWNLOAD_RETRY_BASE_DELAY="${BP_DOWNLOAD_RETRY_BASE_DELAY:-5}"
+BP_DOWNLOAD_RETRY_MAX_DELAY="${BP_DOWNLOAD_RETRY_MAX_DELAY:-30}"
+
+# Indirection points for the offline test: it replaces these to drive a fake
+# clock and a fake interruptible sleep instead of waiting out real backoff.
+bp_now() {
+  date +%s
+}
+
+bp_sleep() {
+  sleep "$1"
+}
+
+# Transient enough to be worth another attempt: gateway and overload answers
+# from the CDN, plus curl's connection, TLS and timeout failures. Everything
+# else (404, 403, 401, malformed URL) is a fixed answer.
+bp_download_is_transient() {
+  local http_status="$1" curl_exit="$2"
+
+  case "${http_status}" in
+    408|425|429|500|502|503|504) return 0 ;;
+  esac
+
+  # 6 DNS, 7 connect, 16 HTTP/2, 18 partial transfer, 28 timeout,
+  # 35/52/55/56 TLS handshake, empty reply, send/recv error.
+  case "${curl_exit}" in
+    6|7|16|18|28|35|52|55|56) return 0 ;;
+  esac
+
+  return 1
+}
+
+# Fixed-field, sanitized record of how the acquisition went, for both the
+# success and the failure path. Every value is a number or one of the reason
+# constants used below, so the artifact cannot carry a URL, a proxy setting or
+# a transport error string.
+bp_write_download_status() {
+  local status_dir="$1" result="$2" reason="$3" attempts="$4" retries="$5"
+  local http_status="$6" curl_exit="$7" elapsed="$8"
+
+  [[ -d "${status_dir}" ]] || return 0
+  printf 'result=%s\nreason=%s\nattempts=%s\nretries=%s\nhttp_status=%s\ncurl_exit=%s\nelapsed_seconds=%s\nmax_attempts=%s\nbudget_seconds=%s\n' \
+    "${result}" "${reason}" "${attempts}" "${retries}" "${http_status}" \
+    "${curl_exit}" "${elapsed}" "${BP_DOWNLOAD_MAX_ATTEMPTS}" \
+    "${BP_DOWNLOAD_BUDGET_SECONDS}" \
+    > "${status_dir}/backplane-cli-download.txt" 2>/dev/null || true
+}
+
+# Unpack into a staging directory and promote the binary with a rename, so
+# ${bin_dir} is already on PATH but never holds a half-written ocm-backplane:
+# it either has the complete binary or nothing at all.
+BP_EXTRACT_REASON=""
+bp_extract_backplane() {
+  local archive="$1" bin_dir="$2" stage="$3"
+
+  BP_EXTRACT_REASON=""
+  rm -rf "${stage}"
+  if ! mkdir -p "${stage}"; then
+    BP_EXTRACT_REASON="stage_unavailable"
+    return 1
+  fi
+  # Read the table of contents first so a truncated or corrupt body is told
+  # apart from a well-formed archive that simply has no binary in it, then
+  # unpack that one member and nothing else.
+  if ! tar -tzf "${archive}" > /dev/null 2>&1; then
+    BP_EXTRACT_REASON="archive_unreadable"
+    return 1
+  fi
+  if ! tar -xzf "${archive}" -C "${stage}" ocm-backplane 2>/dev/null \
+    || [[ ! -f "${stage}/ocm-backplane" ]]; then
+    BP_EXTRACT_REASON="binary_missing"
+    return 1
+  fi
+  if ! chmod 0755 "${stage}/ocm-backplane"; then
+    BP_EXTRACT_REASON="chmod_failed"
+    return 1
+  fi
+  if ! mv -f "${stage}/ocm-backplane" "${bin_dir}/ocm-backplane"; then
+    BP_EXTRACT_REASON="install_failed"
+    return 1
+  fi
+  return 0
+}
+
+# Returns 0 only when ${bin_dir}/ocm-backplane is in place and executable.
+install_backplane_cli() {
+  local version="$1" bin_dir="$2" status_dir="$3"
+  local url="https://github.com/openshift/backplane-cli/releases/download/v${version}/ocm-backplane_${version}_Linux_x86_64.tar.gz"
+  local work_dir archive stage started deadline now remaining delay elapsed
+  local attempts=0 retries=0 http_status="000" curl_exit=0
+  local result="failure" reason="not_attempted" was_tracing
+
+  if ! work_dir="$(mktemp -d /tmp/backplane-download.XXXXXX)"; then
+    bp_write_download_status "${status_dir}" failure workdir_unavailable 0 0 000 0 0
+    log "ERROR: could not create a working directory for the ocm-backplane download"
+    return 1
+  fi
+  archive="${work_dir}/ocm-backplane.tar.gz"
+  stage="${work_dir}/stage"
+
+  started="$(bp_now)"
+  deadline=$((started + BP_DOWNLOAD_BUDGET_SECONDS))
+
+  while true; do
+    now="$(bp_now)"
+    remaining=$((deadline - now))
+    if (( remaining <= 0 )); then
+      reason="budget_exhausted"
+      break
+    fi
+    if (( attempts >= BP_DOWNLOAD_MAX_ATTEMPTS )); then
+      reason="attempts_exhausted"
+      break
+    fi
+    attempts=$((attempts + 1))
+
+    # Drop whatever the previous attempt left behind before writing again, so
+    # a truncated body is never handed to tar or promoted.
+    rm -f "${archive}"
+
+    # Keep the URL, the proxy environment and curl's error text out of the
+    # log: xtrace would echo the whole command line, and -S would write the
+    # transport error verbatim. Only the numeric status escapes this block.
+    was_tracing=false
+    [[ $- == *x* ]] && was_tracing=true
+    set +x
+    curl_exit=0
+    http_status="$(curl -s -o "${archive}" -w '%{http_code}' \
+      --fail --location --connect-timeout "${BP_DOWNLOAD_CONNECT_TIMEOUT}" \
+      --max-time "${remaining}" "${url}" 2>/dev/null)" || curl_exit=$?
+    $was_tracing && set -x
+
+    # Never let anything but three digits reach the log or the artifact.
+    [[ "${http_status}" =~ ^[0-9]{3}$ ]] || http_status="000"
+
+    if (( curl_exit == 0 )); then
+      if bp_extract_backplane "${archive}" "${bin_dir}" "${stage}"; then
+        result="success"
+        reason="ok"
+      else
+        reason="${BP_EXTRACT_REASON}"
+      fi
+      break
+    fi
+
+    if ! bp_download_is_transient "${http_status}" "${curl_exit}"; then
+      reason="not_retriable"
+      break
+    fi
+
+    if (( attempts >= BP_DOWNLOAD_MAX_ATTEMPTS )); then
+      reason="attempts_exhausted"
+      break
+    fi
+
+    delay=$((BP_DOWNLOAD_RETRY_BASE_DELAY * attempts))
+    if (( delay > BP_DOWNLOAD_RETRY_MAX_DELAY )); then
+      delay="${BP_DOWNLOAD_RETRY_MAX_DELAY}"
+    fi
+    now="$(bp_now)"
+    if (( deadline - now <= delay )); then
+      reason="budget_exhausted"
+      break
+    fi
+    # A sleep cut short means the step is being torn down; stop here rather
+    # than racing the grace period.
+    if ! bp_sleep "${delay}"; then
+      reason="interrupted"
+      break
+    fi
+    retries=$((retries + 1))
+  done
+
+  # Always clear the staging area: a failed attempt must not leave a partial
+  # archive or a half-unpacked tree behind in /tmp.
+  rm -rf "${work_dir}"
+
+  elapsed=$(( $(bp_now) - started ))
+  bp_write_download_status "${status_dir}" "${result}" "${reason}" \
+    "${attempts}" "${retries}" "${http_status}" "${curl_exit}" "${elapsed}"
+
+  if [[ "${result}" == "success" ]]; then
+    log "ocm-backplane CLI ready (attempts=${attempts} retries=${retries} elapsed=${elapsed}s)"
+    return 0
+  fi
+  log "ocm-backplane CLI acquisition failed (reason=${reason} attempts=${attempts} retries=${retries} http_status=${http_status} curl_exit=${curl_exit} elapsed=${elapsed}s)"
+  return 1
+}
+
+# ---- end of sourceable definitions ------------------------------------------
+
 # Always exit 0 so the step never blocks job completion.
 cleanup() {
   log "CR status collection complete."
@@ -47,16 +264,10 @@ bin_dir="$(mktemp -d /tmp/backplane-bin.XXXXXX)"
 export PATH="${bin_dir}:${PATH}"
 
 log "Installing ocm-backplane CLI v${bp_ver}..."
-bp_tar="$(mktemp /tmp/ocm-backplane.XXXXXX.tar.gz)"
-if ! curl -sSL --fail --connect-timeout 30 --max-time 300 -o "${bp_tar}" \
-  "https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"; then
+if ! install_backplane_cli "${bp_ver}" "${bin_dir}" "${CR_DIR}"; then
   log "ERROR: Failed to download ocm-backplane CLI"
-  rm -f "${bp_tar}"
   exit 0
 fi
-tar -xzf "${bp_tar}" -C "${bin_dir}" ocm-backplane 2>/dev/null || true
-chmod 0755 "${bin_dir}/ocm-backplane" 2>/dev/null || true
-rm -f "${bp_tar}"
 
 if [[ ! -x "${bin_dir}/ocm-backplane" ]]; then
   log "ERROR: ocm-backplane binary not found after extraction"
