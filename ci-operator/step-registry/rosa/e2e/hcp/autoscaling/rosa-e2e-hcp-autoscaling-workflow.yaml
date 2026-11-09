@@ -25,9 +25,11 @@ workflow:
     # Scoped to the rosa-e2e Feature:Autoscaling specs: the customer step
     # creates a dedicated node pool with min/max autoscaling and drives
     # scale-up under resource pressure and scale-down after workload removal.
-    # There are no autoscaling platform-plane specs, so the platform step is
-    # not run; the unscoped customer tail runs in the other rows of the
-    # ROSAENG-308 provision x validate matrix.
+    # The spec carries only the Feature:Autoscaling label (no Area or
+    # Platform labels), so this LABEL_FILTER is its sole selector: the slow,
+    # node-provisioning spec must not run in the general matrix rows
+    # (Area:DataPlane || Area:CustomerFeatures, Platform:HCP). There are no
+    # autoscaling platform-plane specs, so the platform step is not run.
     - ref: rosa-e2e-validate-customer
       env:
       - name: LABEL_FILTER
@@ -52,7 +54,10 @@ workflow:
     cluster (mc-kubeconfig from rosa-backplane-login).
 
     The platform plane is not run: there are no autoscaling platform-plane
-    specs. The customer plane requires corp-network reachability for
+    specs. The autoscaling spec is routed exclusively by its
+    Feature:Autoscaling label (it carries no Area or Platform labels), so it
+    runs only in this workflow and not in the general matrix rows. The
+    customer plane requires corp-network reachability for
     rosa-backplane-login: run this workflow only where backplane is reachable
     (capabilities: [intranet], restrict_network_access: false,
     network-access-rehearsals-ok label for rehearsals).
