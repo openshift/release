@@ -3,7 +3,13 @@ set -o nounset
 set -o pipefail
 # Do NOT set -o errexit: this script must always exit 0 (best_effort).
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# Bash defers this handler while a foreground command runs, so a TERM that
+# lands during a transfer is only seen once that transfer returns. Record it:
+# by then the retry loop would otherwise treat the transfer's own failure as a
+# transient blip and start another attempt. Set the flag first so it survives
+# whatever the kill/wait handling below does.
+BP_TERMINATED=false
+trap 'BP_TERMINATED=true; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # ---- helpers ----------------------------------------------------------------
 
@@ -150,6 +156,10 @@ install_backplane_cli() {
   deadline=$((started + BP_DOWNLOAD_BUDGET_SECONDS))
 
   while true; do
+    if [[ "${BP_TERMINATED}" == true ]]; then
+      reason="interrupted"
+      break
+    fi
     now="$(bp_now)"
     remaining=$((deadline - now))
     if (( remaining <= 0 )); then
@@ -180,6 +190,15 @@ install_backplane_cli() {
 
     # Never let anything but three digits reach the log or the artifact.
     [[ "${http_status}" =~ ^[0-9]{3}$ ]] || http_status="000"
+
+    # A TERM delivered while that transfer was running surfaces here, the
+    # first chance the shell gets. Stop before judging the result: whether the
+    # transfer failed or completed, the step is being torn down, so there is
+    # no attempt left to make and nothing to promote or report as a success.
+    if [[ "${BP_TERMINATED}" == true ]]; then
+      reason="interrupted"
+      break
+    fi
 
     if (( curl_exit == 0 )); then
       if bp_extract_backplane "${archive}" "${bin_dir}" "${stage}"; then

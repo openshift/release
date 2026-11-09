@@ -14,6 +14,7 @@ if [[ "${1:-}" != --case ]]; then
     transient-classification no-budget-no-attempt budget-exhausted \
     max-time-tracks-remaining-budget total-elapsed-within-budget \
     interrupted-sleep term-during-backoff-does-not-hang \
+    term-during-download-stops-retries term-during-download-skips-promotion \
     malformed-archive binary-missing-from-archive partial-cleanup \
     no-leak-under-xtrace real-script-no-cluster-id \
     real-script-download-failure-exits-zero; do
@@ -195,6 +196,99 @@ CHILD
   leftovers="$(comm -13 "$before_dirs" "$after_dirs")"
   [[ -z "$leftovers" ]] || fail "signal path left a working directory behind: ${leftovers}"
   [[ ! -e "$bin_dir/ocm-backplane" ]] || fail 'interrupted acquisition left a binary behind'
+  exit 0
+fi
+
+# A TERM that lands while a transfer is active is deferred by bash until that
+# transfer returns. When the transfer then reports a transient failure, the
+# retry loop used to treat it as an ordinary blip and keep going, spending
+# further attempts on a step that was already being torn down. The mock
+# transfer is a real foreground child, so the deferral is genuine rather than
+# simulated, and the signal goes to the step's own pid only.
+if [[ "$scenario" == term-during-download-stops-retries \
+   || "$scenario" == term-during-download-skips-promotion ]]; then
+  marker="$test_dir/child-ready"
+  counts="$test_dir/curl-count"
+  child="$test_dir/child.sh"
+  : > "$counts"
+  cat > "$child" <<'CHILD'
+#!/bin/bash
+# $5 is the script's argument; inside curl() the positionals are the
+# function's own, so keep the path in a variable.
+COUNTS="$5"
+source <(sed -n '1,/^# ---- end of sourceable definitions/p' "$1")
+curl() {
+  local arg prev='' output=''
+  for arg in "$@"; do
+    if [[ "$prev" == -o ]]; then output="$arg"; fi
+    prev="$arg"
+  done
+  echo attempt >> "$COUNTS"
+  if [[ -n "${FAKE_TRANSFER_BODY}" ]]; then
+    cp "${FAKE_TRANSFER_BODY}" "$output"
+  else
+    printf 'partial-body' > "$output"
+  fi
+  # An active transfer. A real child process, so a TERM to this shell waits.
+  sleep "${FAKE_TRANSFER_SECONDS}"
+  echo "${FAKE_TRANSFER_CODE}"
+  return "${FAKE_TRANSFER_EXIT}"
+}
+echo ready > "$2"
+install_backplane_cli 0.12.0 "$3" "$4"
+CHILD
+
+  # Either the transfer fails transiently (the loop would retry) or it
+  # completes (the loop would promote the binary). Termination must stop both.
+  body='' ; code=000 ; code_exit=28
+  if [[ "$scenario" == term-during-download-skips-promotion ]]; then
+    mkdir -p "$test_dir/payload"
+    printf '#!/bin/sh\necho ocm-backplane fixture\n' > "$test_dir/payload/ocm-backplane"
+    chmod 0755 "$test_dir/payload/ocm-backplane"
+    tar -czf "$test_dir/complete.tar.gz" -C "$test_dir/payload" ocm-backplane
+    body="$test_dir/complete.tar.gz" ; code=200 ; code_exit=0
+  fi
+
+  before_dirs="$test_dir/tmp-before"
+  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$before_dirs"
+  FAKE_TRANSFER_SECONDS=2 BP_DOWNLOAD_RETRY_BASE_DELAY=1 BP_DOWNLOAD_RETRY_MAX_DELAY=1 \
+    FAKE_TRANSFER_BODY="$body" FAKE_TRANSFER_CODE="$code" FAKE_TRANSFER_EXIT="$code_exit" \
+    bash "$child" "$script" "$marker" "$bin_dir" "$CR_DIR" "$counts" \
+    > "$test_dir/child.log" 2>&1 &
+  child_pid=$!
+  for _ in $(seq 1 100); do
+    [[ -s "$marker" ]] && break
+    sleep 0.1
+  done
+  [[ -s "$marker" ]] || fail 'the child step never started'
+  # Well inside the first transfer.
+  sleep 0.5
+
+  signalled="$(date +%s)"
+  # The step's pid only: the transfer keeps running, as it would when the
+  # signal does not reach it.
+  kill -TERM "$child_pid"
+  ( sleep 30; kill -KILL "$child_pid" 2>/dev/null ) &
+  killer=$!
+  wait "$child_pid" || true
+  reaction=$(( $(date +%s) - signalled ))
+  kill "$killer" 2>/dev/null || true
+  wait "$killer" 2>/dev/null || true
+
+  attempts_made="$(grep -c attempt "$counts" || true)"
+  (( attempts_made == 1 )) \
+    || fail "termination started further transfers: ${attempts_made} attempts, expected 1"
+  (( reaction < 30 )) || fail "the step did not finish after TERM (${reaction}s)"
+  assert_status result failure
+  assert_status reason interrupted
+  assert_status attempts 1
+  assert_status retries 0
+  [[ ! -e "$bin_dir/ocm-backplane" ]] \
+    || fail 'a terminated acquisition promoted a binary'
+  after_dirs="$test_dir/tmp-after"
+  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$after_dirs"
+  leftovers="$(comm -13 "$before_dirs" "$after_dirs")"
+  [[ -z "$leftovers" ]] || fail "termination left a working directory behind: ${leftovers}"
   exit 0
 fi
 
