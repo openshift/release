@@ -107,6 +107,10 @@ log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
 fi
+# A filter that selects no specs at all (e.g. the image predates the spec a
+# dedicated workflow scopes to) must fail instead of silently passing.
+# Skipped specs still count as selected, so this only fires on an empty match.
+GINKGO_ARGS+=("--ginkgo.fail-on-empty")
 
 log "Running customer-plane validation: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
 /usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"
