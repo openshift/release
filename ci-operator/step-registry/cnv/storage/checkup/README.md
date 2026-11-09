@@ -24,13 +24,15 @@ explicitly select a valid development image for the rehearsal.
    and CNV-managed golden images. It selects an explicit `CHECKUP_STORAGE_CLASS`,
    otherwise the virtualization default, otherwise the Kubernetes default. A
    missing or ambiguous effective default fails preparation.
-5. `cnv-storage-checkup-run` resolves its image from the prepared installed-CSV
+5. The AWS job configures snapshot-backed golden-image sources and waits until
+   their DataSources reference ready snapshots.
+6. `cnv-storage-checkup-run` resolves its image from the prepared installed-CSV
    context, creates a dedicated namespace and permissions, and runs the shipped
    checkup through its ConfigMap/Job interface. The Namespace, RBAC, ConfigMap,
    and Job manifests are in the run ref's `CHECKUP_*_MANIFEST` defaults, separate
    from the execution script. The script substitutes only the namespace, image,
    timeout, storage class, and checkup parameters.
-6. `cnv-storage-checkup-gather` collects diagnostics and removes the namespace and
+7. `cnv-storage-checkup-gather` collects diagnostics and removes the namespace and
    its cluster-reader binding. The platform's post chain then deletes OCP.
 
 ## Cloud workflows
@@ -42,12 +44,26 @@ virtualization enablement step. Each caller supplies the matching
 channel inputs required by `cnv-deploy-cnv`. Preparation checks for advertised
 KVM capacity rather than relying on the instance type alone.
 
-The product checkup defaults to ten concurrent VMs. The first AWS ten-VM
-rehearsal exceeded the EBS per-volume snapshot rate; four VMs passed on AWS,
-Azure, and GCP. The current jobs set `CHECKUP_NUM_VMS=6` to test additional
-concurrent-boot capacity on each platform. Rehearsals must establish whether
-six VMs fit each provider's storage and worker limits. Worker sizing must
-account for guest memory, virtualization overhead, boot-source imports, and CNV.
+The product checkup defaults to ten concurrent VMs. The cloud jobs explicitly
+use `CHECKUP_NUM_VMS=10` to exercise the concurrent-boot scale check in the
+[OpenShift Virtualization CSI certification policy](https://docs.redhat.com/en/documentation/red_hat_software_certification/2026/html/red_hat_openshift_software_certification_policy_guide/assembly-specialized-certifications-for-openshift-badges_openshift-sw-cert-policy-products-managed).
+The first AWS ten-VM rehearsal exceeded the EBS per-volume snapshot rate;
+four-VM rehearsals passed on AWS, Azure, and GCP, and six-VM rehearsals passed
+on Azure and GCP. Those reduced runs established functionality but do not
+validate the ten-VM configuration. Worker sizing must account for guest memory,
+virtualization overhead, boot-source imports, and CNV.
+
+The AWS source job asserts the EBS CSI provisioner, then patches the selected
+StorageProfile to use snapshot-backed DataImportCron boot sources. It waits for
+every managed golden-image DataSource to reference a ready VolumeSnapshot before
+running the checkup. CDI can restore many VM volumes from one prepared snapshot
+instead of creating a temporary snapshot of the same source PVC for each clone.
+The failed AWS run selected `gp3-csi`, whose StorageProfile reported
+`cloneStrategy=snapshot` and `dataImportCronSourceFormat=pvc`; its managed
+DataSources referenced PVCs.
+This AWS-specific configuration needs a ten-VM rehearsal; the other cloud jobs
+keep their existing boot-source configuration. The separate VM snapshot and
+restore checks remain required.
 
 For ODF or HPP, insert backend installation and default-class configuration
 before checkup preparation. A workflow `pre` override replaces the entire list;
@@ -79,11 +95,12 @@ expectations. The expressions allow generated resource names, timestamps, and
 durations to vary. These checks supplement the runner's required Job completion,
 successful overall result, empty failure reason, and core operation results.
 They match the result format observed in the successful manual CNV 5.0.0 run.
-These jobs require snapshot/restore support from the selected backend. Azure and
-GCP also set `CHECKUP_EXPECTED_PROVISIONER` to `disk.csi.azure.com` and
-`pd.csi.storage.gke.io`, respectively. Automatic default-class selection remains
-enabled; preparation fails if the selected class does not use the lane's CSI
-driver. The resolved class and provisioner are captured in the run context.
+These jobs require snapshot/restore support from the selected backend. AWS,
+Azure, and GCP set `CHECKUP_EXPECTED_PROVISIONER` to `ebs.csi.aws.com`,
+`disk.csi.azure.com`, and `pd.csi.storage.gke.io`, respectively. Automatic
+default-class selection remains enabled. Preparation fails if the selected
+class does not use the lane's CSI driver. The resolved class and provisioner
+are captured in the run context.
 
 The selected backend determines the clone strategy and migration capability.
 The common policy requires a non-skipped clone result and a reported migration
@@ -116,15 +133,17 @@ checkup, and 900 seconds for the Job. Each cloud source job supplies longer budg
 | `CHECKUP_JOB_TIMEOUT_SECONDS` | `2100` (35 minutes) |
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
-In the latest [AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
-the initial VM booted after about 16 minutes, but four of ten subsequent VMs
-stalled while AWS rejected concurrent snapshot requests from the same golden
-image EBS volume. AWS documents this as a per-volume rate limit and advises
+In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
+the first VM booted after about 16 minutes, but four subsequent VMs stalled
+while AWS rejected concurrent snapshot requests from the same golden-image EBS
+volume. A later [six-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118756154845696000)
+hit the same limit. AWS advises
 [at least 15 seconds between concurrent snapshots](https://docs.aws.amazon.com/ec2/latest/devguide/errors-overview.html).
 The shipped checkup has no setting to space its VM creation requests. A
-subsequent
-[AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408)
-passed with four VMs within the 30-minute checkup budget.
+[four-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408)
+passed within the 30-minute checkup budget. The AWS snapshot-backed boot-source
+setup moves source snapshot creation into the preparation phase; the ten-VM
+checkup still has a 30-minute deadline.
 Each parent job retains a five-hour limit, including installation and teardown.
 
 ### Collected artifacts
@@ -157,18 +176,18 @@ multi-architecture image index can resolve to a different platform digest.
 
 The [cloud jobs](../../../../config/openshift/release/openshift-release-main__cnv-storage-checkup.yaml)
 use shared profiles, three VM-capable workers per cluster, automatic StorageClass
-selection, and six checkup VMs. Their schedules are staggered in UTC:
+selection, and ten checkup VMs. Their schedules are staggered in UTC:
 
 | Job | Profile | Worker type | Expected CSI provisioner | Schedule |
 | --- | --- | --- | --- | --- |
-| AWS | `openshift-org-aws` | `m8i.4xlarge` | Recorded from the effective default | Daily 03:00 |
+| AWS | `openshift-org-aws` | `m8i.4xlarge` | `ebs.csi.aws.com` | Daily 03:00 |
 | Azure | `openshift-org-azure` | `Standard_D16s_v5` | `disk.csi.azure.com` | Daily 06:00 |
 | GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Daily 09:00 |
 
 The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
-build is selected separately. Four-VM rehearsals confirmed Azure and GCP driver
-selection, snapshot/restore behavior, and post-step cleanup. The six-VM setting
-still needs a rehearsal on each platform before it is treated as validated.
+build is selected separately. Reduced-VM rehearsals confirmed driver selection,
+snapshot/restore behavior, and post-step cleanup. The ten-VM setting still
+needs a rehearsal on each platform before it is treated as validated.
 The GCP PD coverage story [CNV-72113](https://redhat.atlassian.net/browse/CNV-72113)
 provides platform test context; [CNV-99261](https://redhat.atlassian.net/browse/CNV-99261)
 tracks its integration with this shared CNV checkup. Confirm the final
