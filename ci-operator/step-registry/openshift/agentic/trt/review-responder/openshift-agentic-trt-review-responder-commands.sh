@@ -758,7 +758,7 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
 
         if [[ "${has_review}" == "true" ]]; then
             echo "Invoking worker to address review comments..."
-            if agentic_ci --timeout 1800 \
+            if agentic_ci --timeout 3600 \
                 "Address review comments on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the Review Response Process instructions in your system prompt. This is CI mode (--ci).
 
 Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted on a comment, look for replies or activity from this login." \
@@ -779,7 +779,7 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
             CLASSIFICATION_FILE="${WORKDIR}/artifacts/ci-classification-${iteration}.json"
             printf '%s\n' "${extracted}" > "${CHECKS_FILE}"
             echo "Invoking worker to triage CI failures..."
-            if agentic_ci --timeout 1800 \
+            if agentic_ci --timeout 3600 \
                 "Triage CI failures on PR #${PR_NUM} in the ${UPSTREAM_REPO} repository. Follow the CI Failure Process instructions in your system prompt. This is CI mode (--ci).
 
 Read failing checks from ${CHECKS_FILE} and treat that JSON as --failing-checks.
