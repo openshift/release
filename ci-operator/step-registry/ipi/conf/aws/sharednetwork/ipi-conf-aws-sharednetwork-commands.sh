@@ -17,9 +17,9 @@ function version_le() {
 }
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_DEFAULT_REGION="${LEASED_RESOURCE}"
+export AWS_DEFAULT_REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH=/tmp/install-config-sharednetwork.yaml.patch
 

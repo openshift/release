@@ -1688,6 +1688,214 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-mewest1-ipi
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-mewest1-default-config
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-aws-default
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+- always_run: false
+  as: e2e-aws-mewest1-shared-vpc
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    post:
+    - chain: ipi-aws-post
+    - ref: ipi-deprovision-aws-custom-security-groups
+    - ref: aws-deprovision-security-group
+    - ref: ipi-deprovision-aws-sharednetwork
+    pre:
+    - chain: ipi-conf-aws-sharednetwork
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-security-groups
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+- always_run: false
+  as: e2e-aws-mewest1-private
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+      PUBLISH: Internal
+    post:
+    - ref: gather-installer-boostrap-logs-in-bastion
+    - chain: gather-network
+    - chain: gather-core-dump
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: aws-deprovision-security-group
+    - ref: aws-deprovision-stacks
+    - ref: aws-deprovision-s3buckets
+    pre:
+    - ref: ipi-conf
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-security-groups
+    - ref: proxy-config-generate
+    - chain: ipi-install
+    - ref: aws-provision-tags-for-byo-vpc
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-aws-private
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- always_run: false
+  as: e2e-aws-mewest1-sts
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    workflow: openshift-e2e-aws-manual-oidc-sts
+- always_run: false
+  as: e2e-aws-mewest1-upi
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    workflow: openshift-e2e-aws-upi
+- always_run: false
+  as: e2e-aws-mewest1-arm64
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_ARCH: arm64
+      COMPUTE_NODE_TYPE: m7g.xlarge
+      CONTROL_ARCH: arm64
+      CONTROL_PLANE_INSTANCE_TYPE: m7g.xlarge
+      OCP_ARCH: arm64
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-mewest1-heterogeneous
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_ARCH: amd64
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_ARCH: arm64
+      CONTROL_PLANE_INSTANCE_TYPE: m7g.xlarge
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
+    workflow: openshift-e2e-aws-heterogeneous-day-0
+- always_run: false
+  as: e2e-aws-mewest1-proxy
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-aws-mewest1-disconnected
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: openshift-e2e-aws-disconnected
+- always_run: false
+  as: e2e-aws-mewest1-custom-dns
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
+      USER_PROVISIONED_DNS: "yes"
+    workflow: openshift-e2e-aws-custom-dns
+- always_run: false
+  as: e2e-aws-mewest1-dualstack-ipv4-primary
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+      IP_FAMILY: DualStackIPv4Primary
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-mewest1-dualstack-ipv6-primary
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_REGION_OVERWRITE: me-west-1
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m7i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m7i.xlarge
+      IP_FAMILY: DualStackIPv6Primary
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

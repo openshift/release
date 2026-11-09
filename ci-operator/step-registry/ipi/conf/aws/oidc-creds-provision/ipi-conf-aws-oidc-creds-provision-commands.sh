@@ -28,7 +28,7 @@ MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"

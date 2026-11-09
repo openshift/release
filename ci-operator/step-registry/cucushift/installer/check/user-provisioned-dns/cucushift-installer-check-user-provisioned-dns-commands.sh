@@ -62,7 +62,7 @@ azure4|azuremag|azurestack)
     ;;
 esac
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 # CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
