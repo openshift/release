@@ -240,6 +240,18 @@ for _v in ACS_INSTALL_TIMEOUT ACS_CSV_WAIT_TIMEOUT; do
   fi
 done
 
+# Budget invariant (ref.yaml: timeout 30m (1800s) − grace 150s = 1650s
+# work; overhead 180s + precondition ≤120s + diagnostics ≤120s): the two
+# waits are sequential and each independently bounded, so the SUM must
+# multiply out — per-variable 1..900 alone admits 900s + 900s = 1800s of
+# waits, overrunning the budget so TERM records StepTerminated instead
+# of the acs-csv-timeout classification.
+if (( ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT > 1230 )); then
+  echo "ERROR: ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT must be ≤ 1230s (work budget 1650s − overhead 180s − precondition 120s − diagnostics 120s); got $((ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT))s"
+  _classify "acs-invalid-input" "wait sum ${ACS_CSV_WAIT_TIMEOUT}s + ${ACS_INSTALL_TIMEOUT}s exceeds the step work budget"
+  exit 2
+fi
+
 if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
     export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 fi
