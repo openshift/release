@@ -1108,8 +1108,10 @@ install_vault() {
   local vault_service_fqdn="${release_name}.${namespace}.svc"
   local values_file="/tmp/vault-values-${namespace}.yaml"
   local vault_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
-  local vault_storage_class data_storage_block server_platform_block
+  local vault_storage_class data_storage_block server_platform_block mode_block
+  local ha_replicas
 
+  ha_replicas="$(resolve_vault_ha_replicas "${release_name}")"
   vault_storage_class="$(resolve_vault_storage_class)"
   server_platform_block="$(vault_server_platform_values_block)"
   if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
@@ -1138,6 +1140,48 @@ EOF
 )"
   fi
 
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    # HA raft mode: replicas spread across nodes (chart default anti-affinity)
+    # and the chart's default PodDisruptionBudget (maxUnavailable (n/2)-1 = 1)
+    # keep the Service serving through a single-node drain or reboot.
+    echo "Vault mode: HA raft with ${ha_replicas} replicas"
+    mode_block="$(cat <<EOF
+  ha:
+    enabled: true
+    replicas: ${ha_replicas}
+    apiAddr: ${vault_api_addr}
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        listener "tcp" {
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_cert_file = "/var/run/tls/tls.crt"
+          tls_key_file = "/var/run/tls/tls.key"
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+EOF
+)"
+  else
+    mode_block="$(cat <<EOF
+  standalone:
+    enabled: true
+    config: |
+      listener "tcp" {
+        address = "[::]:8200"
+        tls_cert_file = "/var/run/tls/tls.crt"
+        tls_key_file = "/var/run/tls/tls.key"
+      }
+      storage "file" {
+        path = "/vault/data"
+      }
+EOF
+)"
+  fi
+
   cat > "${values_file}" <<EOF
 global:
   enabled: true
@@ -1150,20 +1194,8 @@ server:
     repository: ${VAULT_IMAGE_REPOSITORY}
     tag: "${VAULT_VERSION}"
 ${server_platform_block}
-  standalone:
-    enabled: true
-    config: |
-      listener "tcp" {
-        address = "[::]:8200"
-        tls_cert_file = "/var/run/tls/tls.crt"
-        tls_key_file = "/var/run/tls/tls.key"
-      }
-      storage "file" {
-        path = "/vault/data"
-      }
+${mode_block}
 ${data_storage_block}
-  ha:
-    apiAddr: "${vault_api_addr}"
   extraEnvironmentVars:
     VAULT_DISABLE_USER_LOCKOUT: "true"
   extraSecretEnvironmentVars:
@@ -1268,17 +1300,8 @@ EOF
     exit 1
   fi
 
-  # Helm references the serving cert before the service is annotated. Mark the volume
-  # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
-  # for cloud PVCs, then restart once the service-CA certificate is present.
-  restart_vault_statefulset "${namespace}" "${release_name}"
-  wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
-
-  echo "Initializing and unsealing Vault..."
-  initialize_or_unseal_vault "${namespace}" "${pod_name}"
-  oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
-
-  # Publish the stable service-CA bundle as the trust anchor.
+  # Read the service-CA bundle once for Raft joins and the published trust anchor.
+  local service_ca_bundle
   echo "Waiting for service-CA bundle ConfigMap..."
   service_ca_bundle_ready() {
     [[ -n "$(oc get configmap openshift-service-ca.crt -n "${namespace}" \
@@ -1286,25 +1309,60 @@ EOF
   }
   wait_until "service-ca.crt data in ${namespace}" 60 5 service_ca_bundle_ready
 
-  CA_CERT_TMP="/tmp/vault-ca-${namespace}.pem"
-  oc get configmap openshift-service-ca.crt -n "${namespace}" -o jsonpath='{.data.service-ca\.crt}' > "${CA_CERT_TMP}"
-  if [[ ! -s "${CA_CERT_TMP}" ]]; then
+  service_ca_bundle="$(oc get configmap openshift-service-ca.crt -n "${namespace}" \
+    -o jsonpath='{.data.service-ca\.crt}')"
+  if [[ -z "${service_ca_bundle}" ]]; then
     echo "Error: extracted service-CA bundle is empty"
     exit 1
   fi
   echo "  ✓ service-CA bundle extracted"
 
-  # Create or update ConfigMap with CA certificate in openshift-config
+  # Helm references the serving cert before the service is annotated. Mark the volume
+  # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
+  # for cloud PVCs, then restart once the service-CA certificate is present.
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    # Advertise the Service ClusterIP as api_addr: standby nodes answer requests
+    # with a 307 redirect to the active node's api_addr, and the KMS plugin runs
+    # next to a host-network kube-apiserver that cannot resolve Service DNS. With
+    # the ClusterIP here, redirects route back through this Service and the
+    # plugin's client retries until it reaches the active node.
+    local cluster_ip_api_addr
+    cluster_ip_api_addr="$(vault_service_cluster_ip_address "${namespace}" "${release_name}")"
+    echo "Setting apiAddr to the Service ClusterIP (${cluster_ip_api_addr}) and rolling the StatefulSet..."
+    sed -i "s|^    apiAddr: .*|    apiAddr: ${cluster_ip_api_addr}|" "${values_file}"
+    helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
+      --namespace "${namespace}" \
+      --version "${VAULT_CHART_VERSION}" \
+      -f "${values_file}" \
+      --timeout 10m
+    restart_vault_statefulset "${namespace}" "${release_name}"
+
+    wait_for_vault_ha_pods "${namespace}" "${release_name}" "${ha_replicas}" "${vault_storage_class}" || exit 1
+
+    echo "Initializing and unsealing Vault..."
+    initialize_or_unseal_vault "${namespace}" "${pod_name}"
+
+    echo "Forming the raft cluster..."
+    join_vault_raft_members "${namespace}" "${release_name}" "${ha_replicas}" "${service_ca_bundle}"
+
+    oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  else
+    restart_vault_statefulset "${namespace}" "${release_name}"
+    wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
+
+    echo "Initializing and unsealing Vault..."
+    initialize_or_unseal_vault "${namespace}" "${pod_name}"
+    oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  fi
+
+  # Publish the stable service-CA bundle as the trust anchor.
   echo ""
   echo "Creating ConfigMap ${ca_configmap} in openshift-config..."
   oc create configmap "${ca_configmap}" \
-    --from-file=ca-bundle.crt="${CA_CERT_TMP}" \
+    --from-literal=ca-bundle.crt="${service_ca_bundle}" \
     -n openshift-config \
     --dry-run=client -o yaml | oc apply -f -
   echo "  ✓ ConfigMap ${ca_configmap} created/updated"
-
-  # Clean up temporary CA file
-  rm -f "${CA_CERT_TMP}"
 
   echo ""
   echo "========================================="
@@ -1315,11 +1373,16 @@ EOF
   echo "  - Namespace: ${namespace}"
   echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "  - Service: https://${release_name}.${namespace}.svc:8200"
-  echo "  - Pod: ${pod_name} (Ready)"
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    echo "  - Pods: ${release_name}-0..$((ha_replicas - 1)) (raft HA, Ready)"
+    echo "  - Storage: raft backend on pvc/data-${release_name}-0..$((ha_replicas - 1)) (transit keys persist across restarts)"
+  else
+    echo "  - Pod: ${pod_name} (Ready)"
+    echo "  - Storage: file backend on pvc/data-${pod_name} (transit keys persist across restarts)"
+  fi
   echo "  - TLS: Enabled (OpenShift service-CA serving certificate)"
   echo "  - TLS cert: /var/run/tls/tls.crt (inside pod)"
   echo "  - TLS SAN: ${vault_service_fqdn}"
-  echo "  - Storage: file backend on pvc/data-${pod_name} (transit keys persist across restarts)"
   echo "  - Auto-unseal sidecar using vault-unseal-key secret"
   echo "  - Enterprise License: Configured"
   echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"
