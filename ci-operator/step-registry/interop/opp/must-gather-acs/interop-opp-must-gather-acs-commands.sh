@@ -82,6 +82,7 @@ collect_acs_diagnostics() {
     # exchange the admin password only after that verification succeeds.
     TLS_MODE="unverified"
     CURL_TLS_OPTS=""
+    CENTRAL_URL_HOST="${CENTRAL_HOST}"
     CENTRAL_CA_FILE="${ARTIFACT_DIR}/acs-must-gather/central-ca.pem"
     TLS_PREFLIGHT_ERR="${ARTIFACT_DIR}/acs-must-gather/tls-preflight.err"
     CENTRAL_CA="$(oc get secret central-tls -n "${WORKLOAD_NS}" \
@@ -92,11 +93,39 @@ collect_acs_diagnostics() {
         # uses: curl exit 0 means the served certificate chained to Central's CA
         # (an unauthenticated 401 is still a verified handshake); non-zero means
         # CA or hostname mismatch — no credential is involved either way.
-        if curl -s -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+        # -sS keeps successful output silent while surfacing preflight errors
+        # in tls-preflight.err (with -s alone a failing preflight left the file
+        # the warning points at empty).
+        if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
               --connect-timeout 10 --max-time 30 -w '' \
               "https://${CENTRAL_HOST}/v1/debug/diagnostics" 2>"${TLS_PREFLIGHT_ERR}"; then
             TLS_MODE="verified"
             CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE}"
+        else
+            # A passthrough route serving Central's generated certificate can
+            # have a route host outside the certificate's service DNS names:
+            # the direct preflight then fails hostname verification (curl exit
+            # 60) even though the CA is correct, and the bundle would be
+            # skipped. Retry against the route's backend service DNS name — the
+            # name the generated certificate covers — with --connect-to, so the
+            # connection still goes to the route host while SNI and hostname
+            # verification use the service name. Routes with a custom
+            # certificate that includes the route host pass the direct
+            # preflight above and never reach this retry.
+            _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
+              -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
+            if [[ -n "${_central_svc}" ]]; then
+                _central_svc_dns="${_central_svc}.${WORKLOAD_NS}.svc"
+                if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+                      --connect-to "${_central_svc_dns}:443:${CENTRAL_HOST}:443" \
+                      --connect-timeout 10 --max-time 30 -w '' \
+                      "https://${_central_svc_dns}/v1/debug/diagnostics" 2>>"${TLS_PREFLIGHT_ERR}"; then
+                    TLS_MODE="verified"
+                    CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_central_svc_dns}:443:${CENTRAL_HOST}:443"
+                    CENTRAL_URL_HOST="${_central_svc_dns}"
+                    echo "TLS verified via route backend service name ${_central_svc_dns} (route host outside certificate DNS names)"
+                fi
+            fi
         fi
     else
         echo "central-tls ca.pem not readable in ${WORKLOAD_NS}" > "${TLS_PREFLIGHT_ERR}"
@@ -123,7 +152,7 @@ collect_acs_diagnostics() {
 
     # shellcheck disable=SC2086
     HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
-      "https://${CENTRAL_HOST}/v1/debug/diagnostics" \
+      "https://${CENTRAL_URL_HOST}/v1/debug/diagnostics" \
       -o "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" 2>&1) || {
         echo "WARNING: curl failed to connect to Central."
         echo "FAILED: curl transport error" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
