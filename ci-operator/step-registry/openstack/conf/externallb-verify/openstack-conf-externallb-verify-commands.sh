@@ -177,3 +177,4 @@ if [[ -n "${base_domain}" ]] && ! printf '%s\n' "${mcs_urls}" | grep -qF ".${bas
     exit 1
 fi
 echo "MCS Ignition endpoint uses api-int FQDN (OCPBUGS-112483)"
+# rehearsal smoke test for prow-watch (no functional change); this PR will be closed.
