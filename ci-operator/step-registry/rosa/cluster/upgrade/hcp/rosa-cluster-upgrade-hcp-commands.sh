@@ -455,6 +455,7 @@ UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
+UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 # Auto-derive the upgrade channel when it is not explicitly set and this is not a
 # Z-stream upgrade.
 #
@@ -470,33 +471,54 @@ UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
 # hop: get_cluster_upgrade_path below remains the authority on which version is taken.
 current_y_stream=$(echo "$init_version" | cut -d '.' -f1,2)
 if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
-  if ! y_stream_list=$(list_available_y_streams); then
-    write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-    log "Error: could not list versions for channel group ${CHANNEL_GROUP}; refusing to guess an upgrade channel."
-    exit 1
-  fi
-  if [[ -z "${y_stream_list}" ]]; then
-    write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-    log "Error: no Y-streams available in channel group ${CHANNEL_GROUP}; refusing to guess an upgrade channel."
-    exit 1
-  fi
-  if [[ -n "${VERSION_OFFSET_FROM_LATEST}" ]]; then
-    if ! y_stream_at_offset "${VERSION_OFFSET_FROM_LATEST}" "${init_version}" "${y_stream_list}"; then
-      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
-      log "Error: ${TARGET_SELECTION_ERROR}"
+  if [[ -n "${UPGRADED_TO_VERSION}" ]]; then
+    # An explicit target already pins the hop, so the channel is simply that target's
+    # Y-stream and no discovery runs. get_cluster_upgrade_path below filters the
+    # recommendation list by UPGRADED_TO_VERSION, so deriving the channel from anything
+    # else opens a stream that cannot contain the target: the filter then matches nothing
+    # and the step reports "No available version for upgrade" and exits 0 without
+    # upgrading. Resolving by offset or discovery here would also let an unrelated catalog
+    # failure, or an offset that no longer matches the running cluster, abort a hop the job
+    # had already specified in full. This mirrors rosa/cluster/upgrade/cluster, which gates
+    # all of its discovery on UPGRADED_TO_VERSION being empty.
+    target_y_stream=$(echo "${UPGRADED_TO_VERSION}" | cut -d '.' -f1,2)
+    if [[ ! "${target_y_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: UPGRADED_TO_VERSION='${UPGRADED_TO_VERSION}' is not a well-formed version; refusing to build a channel from it."
       exit 1
     fi
-    next_y_stream="${SELECTED_Y_STREAM}"
-    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
-    log "Upgrade channel from install offset ${VERSION_OFFSET_FROM_LATEST}: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+    next_y_stream="${target_y_stream}"
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${target_y_stream}"
+    log "Upgrade channel from explicit UPGRADED_TO_VERSION ${UPGRADED_TO_VERSION}: ${UPGRADE_CHANNEL}"
   else
-    if ! next_y_stream=$(next_y_stream_after "${init_version}" "${y_stream_list}"); then
-      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
-      log "Error: no Y-stream newer than ${init_version} in channel group ${CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+    if ! y_stream_list=$(list_available_y_streams); then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: could not list versions for channel group ${CHANNEL_GROUP}; refusing to guess an upgrade channel."
       exit 1
     fi
-    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
-    log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+    if [[ -z "${y_stream_list}" ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: no Y-streams available in channel group ${CHANNEL_GROUP}; refusing to guess an upgrade channel."
+      exit 1
+    fi
+    if [[ -n "${VERSION_OFFSET_FROM_LATEST}" ]]; then
+      if ! y_stream_at_offset "${VERSION_OFFSET_FROM_LATEST}" "${init_version}" "${y_stream_list}"; then
+        write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+        log "Error: ${TARGET_SELECTION_ERROR}"
+        exit 1
+      fi
+      next_y_stream="${SELECTED_Y_STREAM}"
+      UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
+      log "Upgrade channel from install offset ${VERSION_OFFSET_FROM_LATEST}: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+    else
+      if ! next_y_stream=$(next_y_stream_after "${init_version}" "${y_stream_list}"); then
+        write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+        log "Error: no Y-stream newer than ${init_version} in channel group ${CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+        exit 1
+      fi
+      UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
+      log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+    fi
   fi
 fi
 write_target_selection_diagnostics "${current_y_stream}" "${next_y_stream:-}" "${UPGRADE_CHANNEL}" "${y_stream_list:-}"

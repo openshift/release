@@ -17,7 +17,7 @@ ref:
     documentation: Set to number of seconds for the control plane upgrade to timeout if it's not ready.
   - name: UPGRADED_TO_VERSION
     default: ""
-    documentation: upgrade ROSA HCP control plane to the specified version. Like 4.18
+    documentation: Upgrade the ROSA HCP control plane to the specified version, e.g. "4.18" or "4.18.7". The recommendation list is filtered to this version. When set and UPGRADE_CHANNEL is empty, the channel is derived from this target's Y-stream and no version discovery runs, so VERSION_OFFSET_FROM_LATEST and the catalog query cannot override or block an explicitly requested hop.
   - name: HOLD_TIME_BEFORE_UPGRADE
     default: ""
     documentation: Set to number of seconds before cluster upgrade action
@@ -26,10 +26,10 @@ ref:
     documentation: When set to "true", performs a Z stream upgrade (latest patch within the current Y stream). When "false" (default), performs a Y stream upgrade to UPGRADED_TO_VERSION.
   - name: UPGRADE_CHANNEL
     default: ""
-    documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty and Z_STREAM_UPGRADE is false, auto-derived as UPGRADE_CHANNEL_PREFIX-{target Y-stream}.
+    documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty and Z_STREAM_UPGRADE is false, auto-derived as UPGRADE_CHANNEL_PREFIX-{target Y-stream}, where the target Y-stream comes from UPGRADED_TO_VERSION when that is set, otherwise from VERSION_OFFSET_FROM_LATEST, otherwise from the next Y-stream newer than the cluster's current version.
   - name: VERSION_OFFSET_FROM_LATEST
     default: ""
-    documentation: The offset-from-latest the cluster was installed at, as passed to rosa/cluster/provision. When set, the upgrade channel is built from the Y-stream at offset-1 in the same version-sorted list of available Y-streams, so a y-minus-N cluster upgrades to y-minus-(N-1). The step fails rather than guessing when the offset is malformed, is 0 (no newer stream exists), exceeds the available streams, or no longer matches the version the cluster is actually running. Ignored when UPGRADE_CHANNEL is set or Z_STREAM_UPGRADE is "true".
+    documentation: The offset-from-latest the cluster was installed at, as passed to rosa/cluster/provision. When set, the upgrade channel is built from the Y-stream at offset-1 in the same version-sorted list of available Y-streams, so a y-minus-N cluster upgrades to y-minus-(N-1). The step fails rather than guessing when the offset is malformed, is 0 (no newer stream exists), exceeds the available streams, or no longer matches the version the cluster is actually running. Ignored when UPGRADED_TO_VERSION or UPGRADE_CHANNEL is set, or Z_STREAM_UPGRADE is "true".
   - name: AVAILABLE_UPGRADE
     default: "no"
     documentation: Must match the value given to rosa/cluster/provision. Set to 'yes' when the installed version was chosen from only those versions that advertise an available upgrade, so that resolving VERSION_OFFSET_FROM_LATEST here indexes the same list the install side indexed.
