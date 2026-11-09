@@ -172,12 +172,29 @@ metadata:
 EOF
 }
 
+# Run a learn catalog setup operation, collecting best-effort diagnostics on failure.
+# Diagnostic errors must not replace the original operation's exit status.
+function run_learn_catalog_command() {
+    local status=0
+    "$@" || status=$?
+    if [[ ${status} -ne 0 ]]; then
+        echo "Learn catalog setup failed (exit ${status}); collecting diagnostics..."
+        oc -n openshift-marketplace describe "deployment/${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace get pods -l "app=${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace describe pods -l "app=${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace get events --sort-by=.lastTimestamp || true
+        oc -n openshift-marketplace logs -l "app=${CATALOGSOURCE_NAME}" -c registry --tail=200 || true
+        oc -n openshift-marketplace logs -l "app=${CATALOGSOURCE_NAME}" -c registry --previous --tail=200 || true
+    fi
+    return "${status}"
+}
+
 # Serve the unchanged stage content together with pinned public learn bundles.
 # The additional FBC file is mounted only in this job's catalog pod.
 function create_catalog_source_with_learn() {
     local index_image="$1"
 
-    cat <<'EOF' | oc apply -f -
+    cat <<'EOF' | run_learn_catalog_command oc apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -350,7 +367,7 @@ data:
     schema: olm.bundle
 EOF
 
-    cat <<EOF | oc apply -f -
+    cat <<EOF | run_learn_catalog_command oc apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -374,7 +391,7 @@ spec:
       - name: registry
         image: ${index_image}
         command: ["/bin/opm"]
-        args: ["serve", "/configs", "--cache-dir=/tmp/cache"]
+        args: ["serve", "/configs", "--cache-dir=/tmp/cache", "--cache-enforce-integrity=false"]
         ports:
         - name: grpc
           containerPort: 50051
@@ -425,10 +442,10 @@ spec:
 EOF
 
     # A restarted pod reloads the ConfigMap even when the image tag is unchanged.
-    oc -n openshift-marketplace rollout restart "deployment/${CATALOGSOURCE_NAME}"
-    oc -n openshift-marketplace rollout status "deployment/${CATALOGSOURCE_NAME}" --timeout=600s
+    run_learn_catalog_command oc -n openshift-marketplace rollout restart "deployment/${CATALOGSOURCE_NAME}"
+    run_learn_catalog_command oc -n openshift-marketplace rollout status "deployment/${CATALOGSOURCE_NAME}" --timeout=600s
 
-    cat <<EOF | oc create -f -
+    cat <<EOF | run_learn_catalog_command oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
