@@ -145,6 +145,15 @@ else
     # cluster, so two jobs would overwrite each other's CA and the ConfigMap
     # would be left behind. The CLI has no flag to choose the name.
     #
+    # Why not a per-job namespace instead? HYPERSHIFT_NAMESPACE is a static env
+    # read by several shared steps (this one, the destroy, dump and KAS DNS
+    # steps). A per-job value would have to be derived the same way in all of
+    # them, or handed over through SHARED_DIR, which changes every job that uses
+    # them. It would also need namespace create/delete rights on the parent
+    # cluster, and a failed destroy would still leave an object behind (a
+    # namespace instead of a ConfigMap). Renaming the ConfigMap keeps the change
+    # on this opt-in path.
+    #
     # So we render the manifests instead of applying them, give the ConfigMap a
     # per-job name, add the image config reference, and apply them ourselves.
     # Rendering still creates the AWS infrastructure (and "destroy cluster"

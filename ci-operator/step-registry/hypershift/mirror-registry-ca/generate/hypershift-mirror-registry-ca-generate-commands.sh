@@ -5,8 +5,12 @@ set -euo pipefail
 # The tests deploy the mirror registry later, but the management cluster nodes
 # and the HyperShift operator must already trust it. Generate the CA here and
 # hand both halves to the tests through SHARED_DIR.
-cert="${SHARED_DIR}/${MIRROR_REGISTRY_CA_FILE_PREFIX}.crt"
-key="${SHARED_DIR}/${MIRROR_REGISTRY_CA_FILE_PREFIX}.key"
+# The file names are a contract with openshift/hypershift: the e2e v2 tests read
+# exactly these names (test/e2e/v2/lifecycle/mirrorregistry.go), and workflows
+# pass the certificate name to hypershift-setup-nested-management-cluster
+# (HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE). Change them in both repositories.
+cert="${SHARED_DIR}/mirror-registry-ho-ca.crt"
+key="${SHARED_DIR}/mirror-registry-ho-ca.key"
 # The step pod is discarded afterwards, so the temporary copy needs no cleanup.
 workdir="$(mktemp -d)"
 

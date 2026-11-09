@@ -9,14 +9,19 @@ workflow:
     run in their own job instead of e2e-v2-aws.
 
     Differences from hypershift-aws-e2e-v2:
-    - hypershift-mirror-registry-ca-generate writes a CA to SHARED_DIR before anything else. The tests sign the
-      mirror's serving certificate with it.
+    - hypershift-mirror-registry-ca-generate writes a CA to SHARED_DIR (mirror-registry-ho-ca.crt and .key, fixed
+      names shared with the tests) before anything else. The tests sign the mirror's serving certificate with it.
     - The nested management cluster is created with that CA (HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE) both as
       additional trust bundle, so its kubelets can pull the overridden control plane images from the mirror, and in
       its image.config.openshift.io/cluster spec.additionalTrustedCA, so the HyperShift operator installed next and,
       through its trust bundle, every control plane operator trust it.
 
     Test selection comes from TEST_PLAN in the job configuration.
+
+    The registry-overrides specs come from openshift/hypershift#10206. Until that change is on the tested branch,
+    the registry-overrides label filter selects no specs and Ginkgo passes an empty selection, so a green run covers
+    only the setup path and the smoke step. The test plan steps will set failOnEmpty (added by the same change) so
+    that an empty selection fails the job.
 
     The HyperShift launch capability is currently supported by the HyperShift
     team. For now, please direct all questions and comments to:
@@ -46,5 +51,4 @@ workflow:
     - chain: hypershift-destroy-nested-management-cluster
     env:
       HYPERSHIFT_PLATFORM: "aws"
-      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: "alias/hypershift-ci"
       HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE: "mirror-registry-ho-ca.crt"
