@@ -58,6 +58,17 @@ ref:
     default: "/var/run/vault/tests-private-account/kms-vault-license"
     documentation: |-
       Path to the Vault Enterprise license file on the CI test pod filesystem.
+  - name: VAULT_HA_REPLICAS
+    default: "1"
+    documentation: |-
+      Number of replicas for the primary Vault StatefulSet. 1 (default) is the
+      single-replica standalone layout. Set to 2 or more to deploy the primary
+      as an HA cluster with integrated raft storage, so the Service backing the
+      apiserver etcd encryption survives the loss of any single node; upgrade
+      jobs that reboot nodes while the KMS backend must stay available set 3.
+      Only the primary instance in VAULT_NAMESPACE is scaled; the secondary
+      stays single-replica, and bare metal is always single-replica (no
+      per-ordinal local PV provisioning).
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 

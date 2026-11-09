@@ -457,6 +457,173 @@ pick_vault_node() {
   echo "${node}"
 }
 
+# Number of replicas for the primary Vault instance. HA is opt-in via
+# VAULT_HA_REPLICAS: upgrade jobs set 3 so the Service backing the apiserver
+# etcd encryption survives the loss of any single node (node reboots during
+# the upgrade otherwise take the KMS backend down). The default is a single
+# replica. The secondary instance only serves rotation tests and stays
+# single-replica. Bare metal has no per-ordinal local PV provisioning for a
+# raft cluster and stays single-replica regardless.
+resolve_vault_ha_replicas() {
+  local release_name="$1"
+  if [[ "${release_name}" != "vault" ]]; then
+    echo 1
+    return
+  fi
+  if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo 1
+    return
+  fi
+  if [[ -n "${VAULT_HA_REPLICAS:-}" ]]; then
+    echo "${VAULT_HA_REPLICAS}"
+    return
+  fi
+  echo 1
+}
+
+# kube-apiserver runs host-network and cannot resolve Service names; standby
+# nodes redirect clients to the active node's api_addr, so HA mode must
+# advertise the Service ClusterIP to keep redirects routable from the plugin.
+vault_service_cluster_ip_address() {
+  local namespace="$1"
+  local service_name="$2"
+  local cluster_ip port
+
+  cluster_ip="$(oc get svc "${service_name}" -n "${namespace}" -o jsonpath='{.spec.clusterIP}')"
+  if [[ -z "${cluster_ip}" || "${cluster_ip}" == "None" ]]; then
+    echo "Error: Service ${service_name} in ${namespace} has no ClusterIP" >&2
+    return 1
+  fi
+  port="$(oc get svc "${service_name}" -n "${namespace}" -o jsonpath='{.spec.ports[?(@.name=="https")].port}')"
+  if [[ -z "${port}" ]]; then
+    echo "Error: Service ${service_name} in ${namespace} has no port named https" >&2
+    return 1
+  fi
+  # Bracket IPv6 so https://fd02::1:8200 becomes https://[fd02::1]:8200 (valid URL).
+  if [[ "${cluster_ip}" == *:* ]]; then
+    cluster_ip="[${cluster_ip}]"
+  fi
+  echo "https://${cluster_ip}:${port}"
+}
+
+# Join via the HTTP API: the CLI has -leader-ca-cert but no
+# -leader-tls-servername, and the joining Vault server verifies the leader
+# TLS independently of VAULT_SKIP_VERIFY on the local CLI. The serving cert is
+# issued for the client Service DNS name, while the join URL uses the pod's
+# headless DNS name, so both the service-CA bundle and an explicit server name
+# are required.
+vault_raft_join() {
+  local namespace="$1"
+  local pod_name="$2"
+  local leader_addr="$3"
+  local leader_ca_cert="$4"
+  local leader_tls_servername="$5"
+  local out rc=0
+
+  out="$(
+    oc exec -i -c vault "${pod_name}" -n "${namespace}" -- \
+      env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true \
+      vault write sys/storage/raft/join \
+        leader_api_addr="${leader_addr}" \
+        leader_ca_cert=- \
+        leader_tls_servername="${leader_tls_servername}" \
+      <<< "${leader_ca_cert}" 2>&1
+  )" || rc=$?
+
+  if [[ "${rc}" -ne 0 ]]; then
+    VAULT_RAFT_JOIN_LAST_ERROR="${out}"
+    return "${rc}"
+  fi
+  return 0
+}
+
+wait_for_vault_raft_join() {
+  local namespace="$1"
+  local pod_name="$2"
+  local leader_addr="$3"
+  local leader_ca_cert="$4"
+  local leader_tls_servername="$5"
+
+  VAULT_RAFT_JOIN_LAST_ERROR=""
+  if ! wait_until "raft join of ${pod_name} to ${leader_addr}" 30 10 \
+    vault_raft_join "${namespace}" "${pod_name}" "${leader_addr}" \
+      "${leader_ca_cert}" "${leader_tls_servername}"; then
+    echo "Last raft join error on ${pod_name}: ${VAULT_RAFT_JOIN_LAST_ERROR:-unknown}" >&2
+    return 1
+  fi
+}
+
+vault_raft_has_peer() {
+  local namespace="$1"
+  local pod_name="$2"
+  local node_id="$3"
+
+  vault_exec "${namespace}" "${pod_name}" vault operator raft list-peers -format=json 2>/dev/null \
+    | jq -e --arg node "${node_id}" '.data.config.servers[] | select(.node_id == $node)' >/dev/null
+}
+
+vault_raft_peer_count() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  vault_exec "${namespace}" "${pod_name}" vault operator raft list-peers -format=json 2>/dev/null | jq '.data.config.servers | length'
+}
+
+wait_for_vault_raft_peers() {
+  local namespace="$1"
+  local pod_name="$2"
+  local expected="$3"
+
+  raft_peer_count_ok() {
+    [[ "$(vault_raft_peer_count "${namespace}" "${pod_name}")" == "${expected}" ]]
+  }
+  wait_until "${expected} raft peers visible on ${pod_name}" 60 10 raft_peer_count_ok
+}
+
+# Wait for data volume and Running phase of every HA replica.
+wait_for_vault_ha_pods() {
+  local namespace="$1"
+  local release_name="$2"
+  local replicas="$3"
+  local storage_class="$4"
+  local ordinal
+
+  for ordinal in $(seq 0 $((replicas - 1))); do
+    wait_for_vault_data_volume "${namespace}" "${release_name}-${ordinal}" "${storage_class}" || return 1
+  done
+}
+
+# Join replicas 1..N-1 to the raft cluster initialized on ${release_name}-0.
+# Joining is idempotent: members already present in the peer list are skipped.
+join_vault_raft_members() {
+  local namespace="$1"
+  local release_name="$2"
+  local replicas="$3"
+  local leader_ca_cert="$4"
+  local ordinal leader_addr leader_tls_servername
+
+  leader_tls_servername="${release_name}.${namespace}.svc"
+
+  for ordinal in $(seq 1 $((replicas - 1))); do
+    if vault_raft_has_peer "${namespace}" "${release_name}-0" "${release_name}-${ordinal}"; then
+      echo "${release_name}-${ordinal} is already a raft peer, skipping join"
+      continue
+    fi
+    leader_addr="https://${release_name}-0.${release_name}-internal.${namespace}.svc:8200"
+    echo "Joining ${release_name}-${ordinal} to the raft cluster at ${leader_addr} (tlsServerName=${leader_tls_servername})..."
+    wait_for_vault_raft_join "${namespace}" "${release_name}-${ordinal}" "${leader_addr}" \
+      "${leader_ca_cert}" "${leader_tls_servername}"
+    # The joining node comes back sealed with the cluster's data; the
+    # auto-unseal sidecar unseals it with the shared unseal key.
+    wait_for_vault_unsealed "${namespace}" "${release_name}-${ordinal}"
+  done
+
+  wait_for_vault_raft_peers "${namespace}" "${release_name}-0" "${replicas}"
+  echo "Vault raft cluster in ${namespace}:"
+  vault_exec "${namespace}" "${release_name}-0" vault operator raft list-peers || true
+  oc get pods -n "${namespace}" -o wide || true
+}
+
 vault_scc_name() {
   # hostPath volumes on RHCOS bare metal need hostmount-anyuid so the Vault
   # pod (uid 100, fsGroup 1000) can write through a hostPath mount.
