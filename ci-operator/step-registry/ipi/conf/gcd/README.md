@@ -5,15 +5,22 @@ installer e2e tests on Google Cloud Dedicated (sovereign cloud).
 
 ## Overview
 
-The `e2e-gcd-ovn-private-techpreview` job installs a private OpenShift
-cluster on GCD using IPI with a service account key for authentication.
-GCD support is currently under TechPreview.
+The `e2e-gcd-ovn-private` job installs a private OpenShift cluster on GCD
+using IPI with a service account key for authentication.
 
 ## Authentication
 
 Authentication uses a GCD service account key (`gce.json`) stored in the
 `cluster-secrets-gcd` vault secret. The key is a standard
 `service_account` type JSON with a GCD-specific `universe_domain` field.
+
+Identity federation is **not** used. The installer rejects
+`external_account` and `external_account_authorized_user` credentials
+whose `universe_domain` is not `googleapis.com`, so while Workload and
+Workforce Identity Federation are supported for the cluster operators
+they cannot be used to authenticate `openshift-install` against GCD
+today (see `validateCredentialURLs` in
+`pkg/asset/installconfig/gcp/session.go` in openshift/installer).
 
 Each CI step reads the `universe_domain` from `gce.json` and calls
 `gcloud config set universe_domain` before authenticating with

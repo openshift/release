@@ -103,7 +103,7 @@ if args[0] == "-C" and args[2] == "checkout":
     sys.exit(status)
 if args[0] == "-C" and args[2] == "rev-parse":
     with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
-    print(os.environ["PINNED_REVISION"])
+    print(os.environ["EVAL_HARNESS_REVISION"], os.environ.get("PINNED_HEAD", os.environ["EVAL_HARNESS_REVISION"]), sep="\n")
     sys.exit(0)
 os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
 '''
@@ -200,7 +200,7 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root), "REAL_GIT": self.real_git,
             "CALLS": str(self.calls_path),
-            "PINNED_REVISION": config_bridge.HARNESS_REVISION,
+            "EVAL_HARNESS_REVISION": "v1.0.0",
             "EVAL_WORKDIR": str(self.repo), "PULL_BASE_SHA": self.base,
             "ARTIFACT_DIR": str(self.artifacts), "JOB_TYPE": "presubmit",
             "EVAL_CONFIG": "eval.yaml", "EVAL_DISCOVER": "",
@@ -358,8 +358,8 @@ class SelectionTests(Fixture):
         self.assertEqual((self.repo / self.entry["config"]).read_bytes(), original)
         self.assertIn("regression", self.calls())
         install_log = (self.artifacts / "runner/harness-install.log").read_text()
-        self.assertIn(f"Expected harness revision: {config_bridge.HARNESS_REVISION}", install_log)
-        self.assertIn(f"Verified harness revision: {config_bridge.HARNESS_REVISION}", install_log)
+        self.assertIn(f"Expected harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
+        self.assertIn(f"Verified harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
         summary = json.loads((self.artifacts / "evals-summary.json").read_text())
         self.assertIn("config-resolution.log", summary["evals"][0]["artifacts"])
 

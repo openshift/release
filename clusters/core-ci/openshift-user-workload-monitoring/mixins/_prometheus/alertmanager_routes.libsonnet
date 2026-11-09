@@ -1,6 +1,17 @@
 {
   alertmanagerRoutes+:: [
     {
+      receiver: 'slack-ops-testplatform',
+      group_by: ['alertname'],
+      group_wait: '30s',
+      group_interval: '4h',
+      repeat_interval: '24h',
+      match: {
+        alertname: 'ArgoCDApplicationOutOfSync',
+      },
+    },
+  ] + [
+    {
       receiver: 'slack-%s' % receiver_name,
       match: {
         team: '%s' % $._config.alertManagerReceivers[receiver_name].team,
