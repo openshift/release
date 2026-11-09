@@ -403,7 +403,7 @@ checkout_pr_head() {
     local expected_ref="refs/heads/${PR_HEAD_BRANCH}"
     local fetched_head
     local fork_fetch_urls fork_push_urls
-    local status_entry status_path worktree_status_file
+    local worktree_status
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
        [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
@@ -414,25 +414,15 @@ checkout_pr_head() {
         echo "ERROR: PR head branch is invalid"
         return 1
     fi
-    worktree_status_file=$(mktemp "${SETTINGS_DIR}/worktree-status.XXXXXX") || {
-        echo "ERROR: unable to allocate worktree status metadata"
-        return 1
-    }
-    if ! git status --porcelain=v1 -z --untracked-files=all > "${worktree_status_file}"; then
+    if ! worktree_status=$(git status --porcelain=v1 --untracked-files=all); then
         echo "ERROR: unable to verify that the worktree is clean"
-        rm -f "${worktree_status_file}"
+        return 1
+    # Gate/worker logs are pipeline-owned; allow only untracked artifacts.
+    elif [[ -n "${worktree_status}" ]] && \
+         grep -qv '^?? artifacts/' <<< "${worktree_status}"; then
+        echo "ERROR: refusing to check out the PR head with worktree changes"
         return 1
     fi
-    # Gate/worker logs are pipeline-owned; allow only untracked artifacts.
-    while IFS= read -r -d '' status_entry; do
-        status_path=${status_entry:3}
-        if [[ "${status_entry:0:3}" != "?? " || "${status_path}" != artifacts/* ]]; then
-            echo "ERROR: refusing to check out the PR head with worktree changes"
-            rm -f "${worktree_status_file}"
-            return 1
-        fi
-    done < "${worktree_status_file}"
-    rm -f "${worktree_status_file}"
     # get-url applies pushurl and url.* rewrite rules. Both effective
     # destinations must remain the configured fork before any fetch occurs.
     fork_fetch_urls=$(git remote get-url --all fork 2>/dev/null || true)
@@ -497,152 +487,6 @@ capture_expected_pr_head() {
     EXPECTED_PR_HEAD_BRANCH="${PR_HEAD_BRANCH}"
     EXPECTED_PR_HEAD_REF="refs/heads/${PR_HEAD_BRANCH}"
     EXPECTED_REMOTE_HEAD="${PR_HEAD_SHA}"
-}
-
-# Record the exact verified checkout state before either worker starts. Keep
-# this metadata outside the repository so a failed worker cannot make the
-# recovery data part of its own changes.
-capture_round_baseline() {
-    local baseline_head baseline_ref baseline_toplevel baseline_git_dir
-
-    if ! baseline_head=$(git rev-parse --verify 'HEAD^{commit}') || \
-       [[ "${baseline_head}" != "${EXPECTED_REMOTE_HEAD}" ]]; then
-        echo "ERROR: unable to capture the verified round baseline HEAD"
-        return 1
-    fi
-    if ! baseline_ref=$(git symbolic-ref --quiet HEAD) || \
-       [[ "${baseline_ref}" != "${EXPECTED_PR_HEAD_REF}" ]]; then
-        echo "ERROR: unable to capture the verified round baseline branch"
-        return 1
-    fi
-    if ! baseline_toplevel=$(git rev-parse --show-toplevel) || \
-       ! baseline_git_dir=$(git rev-parse --absolute-git-dir); then
-        echo "ERROR: unable to identify the round baseline worktree"
-        return 1
-    fi
-
-    ROUND_BASELINE_UNTRACKED_FILE=$(mktemp "${SETTINGS_DIR}/round-baseline-untracked.XXXXXX") || {
-        echo "ERROR: unable to allocate round baseline metadata"
-        return 1
-    }
-    if ! git ls-files --others --exclude-standard -z > "${ROUND_BASELINE_UNTRACKED_FILE}"; then
-        echo "ERROR: unable to capture pre-worker untracked files"
-        return 1
-    fi
-
-    ROUND_BASELINE_HEAD="${baseline_head}"
-    ROUND_BASELINE_REF="${baseline_ref}"
-    ROUND_BASELINE_TOPLEVEL="${baseline_toplevel}"
-    ROUND_BASELINE_GIT_DIR="${baseline_git_dir}"
-}
-
-# A failed worker's changes must not poison the next polling iteration. This
-# recovery is deliberately narrower than git clean: it restores tracked state
-# and the local branch to the verified pre-worker commit, then removes only
-# non-ignored, non-artifact untracked files created during this round.
-recover_failed_round() {
-    local baseline_path current_git_dir current_head current_ref current_toplevel path
-    local current_untracked_file
-    local path_was_present
-    local -a baseline_untracked=()
-    local -a remove_paths=()
-
-    if [[ -z "${ROUND_BASELINE_HEAD:-}" || -z "${ROUND_BASELINE_REF:-}" || \
-          -z "${ROUND_BASELINE_TOPLEVEL:-}" || -z "${ROUND_BASELINE_GIT_DIR:-}" || \
-          -z "${ROUND_BASELINE_UNTRACKED_FILE:-}" || \
-          ! -f "${ROUND_BASELINE_UNTRACKED_FILE}" ]]; then
-        echo "ERROR: failed-round recovery baseline is incomplete"
-        return 1
-    fi
-    if ! current_toplevel=$(git rev-parse --show-toplevel) || \
-       ! current_git_dir=$(git rev-parse --absolute-git-dir) || \
-       [[ "${current_toplevel}" != "${ROUND_BASELINE_TOPLEVEL}" ]] || \
-       [[ "${current_git_dir}" != "${ROUND_BASELINE_GIT_DIR}" ]]; then
-        echo "ERROR: refusing failed-round recovery in a different worktree"
-        return 1
-    fi
-    if ! current_ref=$(git symbolic-ref --quiet HEAD) || \
-       [[ "${current_ref}" != "${ROUND_BASELINE_REF}" ]]; then
-        echo "ERROR: refusing failed-round recovery on a different branch"
-        return 1
-    fi
-    if [[ "${ROUND_BASELINE_HEAD}" != "${EXPECTED_REMOTE_HEAD}" ]] || \
-       ! git cat-file -e "${ROUND_BASELINE_HEAD}^{commit}"; then
-        echo "ERROR: failed-round recovery baseline is no longer valid"
-        return 1
-    fi
-
-    # A mixed reset moves only this disposable local branch. Restoring tracked
-    # paths separately avoids git reset --hard deleting ignored runtime files
-    # that happen to obstruct a path from the baseline commit.
-    if ! git reset --mixed "${ROUND_BASELINE_HEAD}"; then
-        echo "ERROR: unable to reset the failed round's local commits"
-        return 1
-    fi
-    if ! git restore --source="${ROUND_BASELINE_HEAD}" --staged --worktree -- :/; then
-        echo "ERROR: unable to restore failed-round tracked files"
-        return 1
-    fi
-
-    mapfile -d '' -t baseline_untracked < "${ROUND_BASELINE_UNTRACKED_FILE}"
-
-    current_untracked_file=$(mktemp "${SETTINGS_DIR}/round-current-untracked.XXXXXX") || {
-        echo "ERROR: unable to allocate failed-round recovery metadata"
-        return 1
-    }
-    if ! git ls-files --others --exclude-standard -z > "${current_untracked_file}"; then
-        echo "ERROR: unable to inspect failed-round untracked files"
-        return 1
-    fi
-    while IFS= read -r -d '' path; do
-        path_was_present=false
-        for baseline_path in "${baseline_untracked[@]}"; do
-            if [[ "${path}" == "${baseline_path}" ]]; then
-                path_was_present=true
-                break
-            fi
-        done
-        if [[ "${path_was_present}" == "true" || "${path}" == artifacts/* ]]; then
-            continue
-        fi
-        case "${path}" in
-            /*|../*|*/../*)
-                echo "ERROR: refusing unsafe failed-round path: ${path}"
-                return 1
-                ;;
-        esac
-        remove_paths+=("${path}")
-    done < "${current_untracked_file}"
-    if [[ "${#remove_paths[@]}" -gt 0 ]] && ! rm -f -- "${remove_paths[@]}"; then
-        echo "ERROR: unable to remove failed-round untracked files"
-        return 1
-    fi
-
-    if ! current_head=$(git rev-parse --verify 'HEAD^{commit}') || \
-       [[ "${current_head}" != "${ROUND_BASELINE_HEAD}" ]] || \
-       ! git diff --quiet || ! git diff --cached --quiet; then
-        echo "ERROR: failed-round tracked state did not return to its baseline"
-        return 1
-    fi
-    if ! git ls-files --others --exclude-standard -z > "${current_untracked_file}"; then
-        echo "ERROR: unable to verify failed-round untracked cleanup"
-        return 1
-    fi
-    while IFS= read -r -d '' path; do
-        path_was_present=false
-        for baseline_path in "${baseline_untracked[@]}"; do
-            if [[ "${path}" == "${baseline_path}" ]]; then
-                path_was_present=true
-                break
-            fi
-        done
-        if [[ "${path_was_present}" != "true" && "${path}" != artifacts/* ]]; then
-            echo "ERROR: failed-round untracked file survived cleanup: ${path}"
-            return 1
-        fi
-    done < "${current_untracked_file}"
-
-    echo "Restored failed round to verified PR head ${ROUND_BASELINE_HEAD}."
 }
 
 note_push_failure() {
@@ -900,7 +744,6 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         idle_streak=0
         review_rounds=$(( review_rounds + 1 ))
         REVIEW_EXIT=0
-        failed_worker_exit=0
         ci_worker_succeeded=false
         workers_succeeded=true
 
@@ -910,10 +753,6 @@ Current HEAD_REF_OID: ${current_head:-<none>}" \
         fi
         if [[ "${EXPECTED_REMOTE_HEAD}" != "${current_head}" ]]; then
             echo "ERROR: PR head changed after gate evaluation"
-            exit 1
-        fi
-        if ! capture_round_baseline; then
-            echo "ERROR: refusing worker execution without a recoverable round baseline"
             exit 1
         fi
 
@@ -929,11 +768,9 @@ Your GitHub login is ${BOT_LOGIN}. When checking whether you have already acted 
                 --append-system-prompt-file "${SYSTEM_PROMPT}"; then
                 :
             else
-                worker_exit=$?
-                failed_worker_exit="${worker_exit}"
-                REVIEW_EXIT="${failed_worker_exit}"
+                REVIEW_EXIT=$?
                 workers_succeeded=false
-                echo "Review worker failed with exit status ${worker_exit}; skipping branch push."
+                echo "Review worker failed; skipping branch push."
             fi
         fi
 
@@ -955,21 +792,18 @@ Your GitHub login is ${BOT_LOGIN}." \
                 --append-system-prompt-file "${CI_PROMPT}"; then
                 ci_worker_succeeded=true
             else
-                worker_exit=$?
-                if [[ "${failed_worker_exit}" -eq 0 ]]; then
-                    failed_worker_exit="${worker_exit}"
-                fi
-                REVIEW_EXIT="${failed_worker_exit}"
+                REVIEW_EXIT=$?
                 workers_succeeded=false
-                echo "CI worker failed with exit status ${worker_exit}; leaving this HEAD pending for retry."
+                echo "CI worker failed; leaving this HEAD pending for retry."
             fi
         fi
 
         if [[ "${workers_succeeded}" != "true" ]]; then
-            echo "WARNING: at least one worker failed; restoring the unpushed round."
-            if ! recover_failed_round; then
-                echo "ERROR: failed-round recovery did not complete; stopping safely."
-                exit "${failed_worker_exit}"
+            echo "WARNING: at least one worker failed; resetting the unpushed round."
+            if ! git reset --hard "${EXPECTED_REMOTE_HEAD}" || \
+               ! git clean -fd -e artifacts/; then
+                echo "ERROR: unable to reset the failed worker round; stopping safely."
+                exit "${REVIEW_EXIT}"
             fi
         elif push_current_branch; then
             if [[ "${ci_worker_succeeded}" == "true" ]]; then
