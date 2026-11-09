@@ -52,9 +52,13 @@ def isolated_git_env(env):
 FAKE_GIT = r'''
 import os, pathlib, sys
 args = sys.argv[1:]
-if args[0] == "init":
+if "clone" in args:  # The runner's only clone is the harness release.
     with open(os.environ["CALLS"], "a") as out:
-        out.write('harness-init\n')
+        out.write('harness-clone\n')
+    status = int(os.environ.get("CLONE_EXIT", "0"))
+    if status:
+        print('fake harness clone failed', file=sys.stderr)
+        sys.exit(status)
     dest = pathlib.Path(args[-1])
     dest.mkdir(parents=True)
     if not os.environ.get("NO_CONFIG_API"):
@@ -99,20 +103,7 @@ def detect_regressions(judges, thresholds):
             for name, limit in thresholds.items()
             if judges[name]['pass_rate'] < limit['min_pass_rate']]
 """)
-    sys.exit(int(os.environ.get("INIT_EXIT", "0")))
-if args[0] == "-C" and args[2] == "remote":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-remote\n')
     sys.exit(0)
-if args[0] == "-C" and args[2] == "fetch":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-fetch\n')
-    status = int(os.environ.get("FETCH_EXIT", "0"))
-    if status: print('fake harness fetch failed', file=sys.stderr)
-    sys.exit(status)
-if args[0] == "-C" and args[2] == "checkout":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-checkout\n')
-    status = int(os.environ.get("CHECKOUT_EXIT", "0"))
-    if status: print('fake harness checkout failed', file=sys.stderr)
-    sys.exit(status)
 if args[0] == "-C" and args[2] == "rev-parse":
     with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
     print(os.environ["EVAL_HARNESS_REVISION"], os.environ.get("PINNED_HEAD", os.environ["EVAL_HARNESS_REVISION"]), sep="\n")

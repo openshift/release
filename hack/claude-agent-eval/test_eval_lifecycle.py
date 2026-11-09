@@ -209,31 +209,27 @@ class LifecycleTests(support.Fixture):
 
 
 class HarnessPreparationTests(support.Fixture):
-    def test_failed_harness_fetch_has_junit(self):
+    def test_failed_harness_clone_has_junit(self):
         self.change_skill()
-        self.assertNotEqual(self.run_step(FETCH_EXIT="1").returncode, 0)
+        self.assertNotEqual(self.run_step(CLONE_EXIT="1").returncode, 0)
         self.assertEqual(self.claude_calls(), [])
         self.assertEqual(self.junit().attrib["failures"], "1")
         self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "not_run")
         self.assertIn("runner/harness-install.log", self.index())
-        self.assertIn("fake harness fetch failed",
+        self.assertIn("fake harness clone failed",
                       (self.artifacts / "runner/harness-install.log").read_text())
 
-    def test_failed_checkout_or_wrong_harness_revision_has_junit(self):
+    def test_wrong_harness_revision_has_junit(self):
         self.change_skill()
-        for overrides, expected in (({"CHECKOUT_EXIT": "1"}, "fake harness checkout failed"),
-                                    ({"PINNED_HEAD": "wrong"}, "revision mismatch")):
-            with self.subTest(overrides=overrides):
-                self.calls_path.unlink(missing_ok=True)
-                result = self.run_step(**overrides)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(self.claude_calls(), [])
-                self.assertEqual(self.junit().attrib["failures"], "1")
-                install_log = (self.artifacts / "runner/harness-install.log").read_text()
-                self.assertIn(expected, install_log)
-                if "PINNED_HEAD" in overrides:  # the mismatch must name the revision and both revisions
-                    self.assertIn(f"{self.env['EVAL_HARNESS_REVISION']} resolves to", install_log)
-                    self.assertIn(overrides["PINNED_HEAD"], install_log)
+        result = self.run_step(PINNED_HEAD="wrong")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.claude_calls(), [])
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        install_log = (self.artifacts / "runner/harness-install.log").read_text()
+        self.assertIn("revision mismatch", install_log)
+        # The mismatch must name the revision and both revisions.
+        self.assertIn(f"{self.env['EVAL_HARNESS_REVISION']} resolves to", install_log)
+        self.assertIn("wrong", install_log)
 
 
 class ConfigValidationTests(support.Fixture):

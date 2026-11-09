@@ -23,36 +23,28 @@ HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
 # needs no token; GITHUB_TOKEN is attached when the environment provides one
 # only to lift shared-IP rate limits.
 HARNESS_LATEST_RELEASE = "https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest"
-# Set to an exact release tag or full commit SHA to stop following the latest
-# release, e.g. to bisect a harness regression; empty or unset means latest.
+# Set to an exact release tag to stop following the latest release, e.g. to
+# bisect a harness regression; empty or unset means latest.
 REVISION_OVERRIDE = "EVAL_HARNESS_REVISION"
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
-COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
 RESULT_SCHEMA_VERSION = 2
 
 
-def is_commit_sha(revision):
-    """True when the revision is a full commit SHA rather than a release tag."""
-    return bool(COMMIT_SHA.fullmatch(revision))
-
-
 def validate_harness_revision(revision):
-    """Accept only a release tag or a full commit SHA, never a moving branch.
+    """Accept only a release tag, never a moving branch or a bare commit.
 
-    The value reaches Git refspecs and rev-parse arguments, so anything that
-    is not exactly one of those two shapes is rejected outright.
+    The value reaches git clone --branch and rev-parse arguments, so anything
+    that is not exactly a release tag is rejected outright.
     """
-    if COMMIT_SHA.fullmatch(revision):
-        return revision.lower()
     if RELEASE_TAG.fullmatch(revision):
         return revision
-    raise EvalError(f"harness revision must be a release tag like v1.62.0 or a full "
-                    f"commit SHA, never a branch: {revision!r}")
+    raise EvalError(f"harness revision must be a release tag like v1.62.0, "
+                    f"never a branch or commit SHA: {revision!r}")
 
 
 def expected_commit_ref(revision):
-    """The ref naming the pinned commit: the tag's commit, or the SHA itself."""
-    return revision.lower() if is_commit_sha(revision) else f"refs/tags/{revision}^{{commit}}"
+    """The ref naming the pinned commit: the release tag's commit."""
+    return f"refs/tags/{revision}^{{commit}}"
 
 
 def latest_release_tag(document):
@@ -83,7 +75,7 @@ def resolve_latest_release(env, timeout):
 def resolve_harness_revision(env, timeout):
     """Return the revision this run uses and where it came from.
 
-    REVISION_OVERRIDE pins an exact tag or commit SHA when set (bisecting a
+    REVISION_OVERRIDE pins an exact release tag when set (bisecting a
     harness regression); otherwise the latest published release is resolved,
     so the step never runs the moving main branch, which may be broken.
     """
