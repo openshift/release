@@ -152,7 +152,7 @@ _terminate() {
 trap '_terminate TERM' TERM
 trap '_terminate INT' INT
 _jrc=0
-trap '_jrc=$?; set +e; set +x; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; _finalize; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; _finalize; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Env-seam validation (fail-closed, unconditional - runs even when
@@ -714,6 +714,17 @@ if [[ -z "${roxAdminPassword}" ]]; then
     _add_case "sensor-ready" skipped "StateAbsent" "no credentials"
     exit 1
 fi
+
+# Credentials go to a curl config file (0600, this step's pod-local
+# tmp), never argv: the must-gather sibling step's containment idiom -
+# /proc/cmdline never carries the password at any call site below.
+_curlCfg="$(mktemp)"
+chmod 600 "${_curlCfg}"
+# escape for curl config syntax: a password carrying '"' or '' would
+# otherwise terminate/alter the quoted token and break authentication
+_pwEsc="${roxAdminPassword//\\/\\\\}"
+_pwEsc="${_pwEsc//\"/\\\"}"
+printf 'user = "admin:%s"\n' "${_pwEsc}" > "${_curlCfg}"
 echo "[readiness] roxAdminPassword extracted successfully"
 
 # ---------------------------------------------------------------------------
@@ -723,7 +734,7 @@ echo "[readiness] roxAdminPassword extracted successfully"
 function CheckCentralApi () {
     typeset httpCode=""
     httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
-        -u "admin:${roxAdminPassword}" \
+        -K "${_curlCfg}" \
         "https://${centralUrl}/v1/metadata" --max-time 10)" || return 1
     [[ "${httpCode}" == "200" ]] || return 1
     true
@@ -747,7 +758,7 @@ fi
 # uncounted so an unexpected value fails closed instead of passing.
 function CheckClustersConnected () {
     typeset verdict=""
-    verdict="$(curl -sk -u "admin:${roxAdminPassword}" \
+    verdict="$(curl -sk -K "${_curlCfg}" \
         "https://${centralUrl}/v1/clusters" --max-time 10 \
         | python3 -c '
 import json, sys
@@ -860,7 +871,7 @@ fi
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
     typeset policyCount=""
-    policyCount="$(curl -sk -u "admin:${roxAdminPassword}" \
+    policyCount="$(curl -sk -K "${_curlCfg}" \
         "https://${centralUrl}/v1/policies?query=" --max-time 10 \
         | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"

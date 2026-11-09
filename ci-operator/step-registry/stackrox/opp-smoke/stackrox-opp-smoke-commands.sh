@@ -210,6 +210,23 @@ case "${ACS_EXPECTATION}" in
         ;;
 esac
 
+# --- Fail-closed scanner-seam validation (the readiness pattern): a
+# non-positive-integer seam must exit 2 with an InvalidInput carrier
+# case, never an arithmetic abort before the carrier exists. Runs
+# unconditionally, before the selftest and the connection read.
+# Defaults are applied first so an unset seam validates against its
+# default, never an empty string.
+ACS_SCANNER_WAIT_S="${ACS_SCANNER_WAIT_S:-600}"
+ACS_SCANNER_POLL_S="${ACS_SCANNER_POLL_S:-30}"
+for _seam in ACS_SCANNER_WAIT_S ACS_SCANNER_POLL_S; do
+    if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
+        _add_case "acs-env-invalid" failed "InvalidInput" \
+            "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
+        echo "[smoke] FATAL: invalid ${_seam}='${!_seam}'"
+        exit 2
+    fi
+done
+
 if [[ "${ACS_SELFTEST}" != "false" ]]; then
     if ! _run_selftest; then
         exit 2
@@ -260,8 +277,6 @@ echo "[smoke] Connection details loaded from SHARED_DIR"
 # matcher a bounded head start and record a named case either way, so the
 # failure attribution is explicit instead of implicit in the suite output.
 # ---------------------------------------------------------------------------
-ACS_SCANNER_WAIT_S="${ACS_SCANNER_WAIT_S:-600}"
-ACS_SCANNER_POLL_S="${ACS_SCANNER_POLL_S:-30}"
 _centralNs="$(cat "${SHARED_DIR}/CENTRAL_NS" 2>/dev/null || true)"
 if [[ -z "${_centralNs}" ]]; then
     _centralNs="stackrox"
