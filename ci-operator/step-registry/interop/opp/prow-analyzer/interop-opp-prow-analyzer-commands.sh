@@ -1,25 +1,32 @@
 #!/bin/bash
 # interop-opp-prow-analyzer step wrapper (INTEROP-9648).
-# Canonical source: this repo, tools/prow_analyzer_step/; delivered to
-# openshift/release as ci-operator/step-registry/interop/opp/prow-analyzer/
-# interop-opp-prow-analyzer-commands.sh. Design authority:
+# Canonical source: the opp-interop-testing workspace,
+# sub-projects/tools-session/src/tools_session/prow_analyzer_step/;
+# delivered to openshift/release as ci-operator/step-registry/interop/opp/
+# prow-analyzer/interop-opp-prow-analyzer-commands.sh. Design authority:
 # docs/design/prow-analyzer-step.md.
 #
 # Lane-neutral best-effort post step: exits 0 on every graceful path.
 # Emits a marker-first versioned result line; emits NO JUnit (deliberate
-# deviation, design doc section 8). Shell tracing is OFF for the whole
-# script; no env dumps; credentials by file-mounted secret -> environment
-# only, never argv; CLI streams redirect off the public artifact path.
+# deviation, design doc section 8). Shell tracing is ON (strict-mode
+# requirement) but scoped OFF around every credential-bearing read,
+# test, and invocation: the token and webhook URL never appear in the
+# trace, and analysis prose never transits a shell variable. No env
+# dumps; credentials by file-mounted secret -> environment only, never
+# argv; CLI streams redirect off the public artifact path.
 # Errexit is ON (set -e): every failure path routes through the EXIT trap,
 # which emits the terminal line and forces exit 0 - an unhandled command
 # failure degrades to outcome=error, never a red job.
 
-set -euo pipefail
+set -euxo pipefail
+shopt -s inherit_errexit
 
 # ---------------------------------------------------------------- constants
 READONLY_PREFIX="OPP-PROW-ANALYZER"
-: "${JOB_NAME:=unset-job}"
-: "${BUILD_ID:=unset-build}"
+# Prow injects JOB_NAME/BUILD_ID into every step container; they are
+# required after the traps are registered (see below) - a missing identity
+# degrades loudly to outcome=error instead of fabricating a well-formed
+# result line (job=unset-job reads as a real job in downstream evidence).
 # Evidence source (empirical, rehearsal 2117256157000110080, PR 88057):
 # each step pod owns an ISOLATED emptyDir, so the <test>/<step>/ tree the
 # admission gate needs does not exist in this container at all - the
@@ -41,8 +48,13 @@ GCS_FETCH_TIMEOUT="${GCS_FETCH_TIMEOUT:-60}"
 GCS_POLL_ATTEMPTS="${GCS_POLL_ATTEMPTS:-3}"
 GCS_POLL_INTERVAL="${GCS_POLL_INTERVAL:-15}"
 : "${SHARED_DIR:=/tmp}"
-SHIP_HELP_MCP_URL="${SHIP_HELP_MCP_URL:-${ANALYZER_MCP_URL:-https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp}}"
-ANALYZER_MCP_URL="${SHIP_HELP_MCP_URL}"
+# Step-config-declared variables (CIOP-4 double-underscore names). Their
+# values live ONLY in the step ref YAML (CIOP-5.3: no script-side defaults
+# - a second default here is a dual source of truth, and the two copies
+# have already drifted once):
+#   INTEROP__OPP__PROW_ANALYZER__SHIP_HELP_MCP_URL
+#   INTEROP__OPP__PROW_ANALYZER__SOURCE_URL
+#   INTEROP__OPP__PROW_ANALYZER__SOURCE_SHA256
 ANALYZER_SECRET_TOKEN_FILE="${ANALYZER_SECRET_TOKEN_FILE:-/tmp/secrets/ship-help/token}"
 ANALYZER_WEBHOOK_FILE="${ANALYZER_WEBHOOK_FILE:-/tmp/secrets/opp-discussion-webhook/url}"
 ANALYZER_ATTEMPT_TIMEOUT="${ANALYZER_ATTEMPT_TIMEOUT:-600}"
@@ -54,8 +66,6 @@ ANALYZER_PAYLOAD_LIMIT="${ANALYZER_PAYLOAD_LIMIT:-40000}"
 ANALYZER_STATE_FILE="${ANALYZER_STATE_FILE:-${SHARED_DIR}/prow-analyzer-delivery.key}"
 ANALYZER_CLI_PATH="${ANALYZER_CLI_PATH:-}"            # empty = compile from source
 ANALYZER_SOURCE_PATH="${ANALYZER_SOURCE_PATH:-}"      # local source archive (compile branch)
-ANALYZER_SOURCE_URL="${ANALYZER_SOURCE_URL:-https://api.github.com/repos/oramraz/prow-analyzer/tarball/cfe2cb6edcbb6f2d7bc366130cc03318d83a3ccd}"
-ANALYZER_SOURCE_SHA256="${ANALYZER_SOURCE_SHA256:-1d46e51412efa76c473910f8975002295ee46cdd62feab3c91254f68f43efa34}"
 ANALYZER_VERIFY_ONLY="${ANALYZER_VERIFY_ONLY:-0}"
 # Empty means "derive from the build identity" (analyzer_job_url below):
 # the derivation needs the helpers, and a rehearsal or presubmit build does
@@ -74,7 +84,8 @@ _RESPONSE_SHA="none"
 _RESPONSE_LEN="none"
 _PAYLOAD_CHARS="none"
 _IDEMPOTENCY_KEY="none"
-_CLEANUP_FILES=""
+_SINK_STATUS="none"
+typeset -a _CLEANUP_FILES=()
 
 # ---------------------------------------------------------------- helpers
 credential_present() {
@@ -82,7 +93,7 @@ credential_present() {
 }
 
 emit_skeleton() {
-    local cred="false"
+    typeset cred="false"
     if credential_present; then cred="true"; fi
     printf '%s v=1 stage=skeleton job=%s build_id=%s credential_present=%s\n' \
         "${READONLY_PREFIX}" "${JOB_NAME}" "${BUILD_ID}" "${cred}"
@@ -91,20 +102,22 @@ emit_skeleton() {
 emit_terminal() {
     [ "${_TERMINAL_EMITTED}" -eq 1 ] && return 0
     _TERMINAL_EMITTED=1
-    local cred="false"
+    typeset cred="false"
     if credential_present; then cred="true"; fi
-    local duration=$(( $(date -u +%s) - _START_EPOCH ))
-    printf '%s v=1 stage=terminal outcome=%s attempts=%s duration=%ss gate=%s job=%s build_id=%s executing_build=%s analyzed_build=%s artifact_snapshot_time=%s credential_present=%s response_sha256=%s response_length=%s payload_chars=%s idempotency_key=%s\n' \
-        "${READONLY_PREFIX}" "${_OUTCOME}" "${_ATTEMPTS}" "${duration}" "${_GATE}" "${JOB_NAME}" \
-        "${BUILD_ID}" "${BUILD_ID}" "${BUILD_ID}" "${ARTIFACT_SNAPSHOT_EPOCH:-${_START_EPOCH}}" \
-        "${cred}" "${_RESPONSE_SHA}" "${_RESPONSE_LEN}" "${_PAYLOAD_CHARS}" "${_IDEMPOTENCY_KEY}"
+    typeset duration=$(( $(date -u +%s) - _START_EPOCH ))
+    # JOB_NAME/BUILD_ID tolerate absence here only: the required-identity
+    # check below can fail before any value exists, and the EXIT trap must
+    # still emit a terminal line (outcome=error) and force exit 0.
+    printf '%s v=1 stage=terminal outcome=%s attempts=%s duration=%ss gate=%s job=%s build_id=%s executing_build=%s analyzed_build=%s artifact_snapshot_time=%s credential_present=%s response_sha256=%s response_length=%s payload_chars=%s idempotency_key=%s sink_status=%s\n' \
+        "${READONLY_PREFIX}" "${_OUTCOME}" "${_ATTEMPTS}" "${duration}" "${_GATE}" "${JOB_NAME:-unknown-job}" \
+        "${BUILD_ID:-unknown-build}" "${BUILD_ID:-unknown-build}" "${BUILD_ID:-unknown-build}" "${ARTIFACT_SNAPSHOT_EPOCH:-${_START_EPOCH}}" \
+        "${cred}" "${_RESPONSE_SHA}" "${_RESPONSE_LEN}" "${_PAYLOAD_CHARS}" "${_IDEMPOTENCY_KEY}" "${_SINK_STATUS}"
 }
 
 on_exit() {
     emit_terminal
-    if [ -n "${_CLEANUP_FILES}" ]; then
-        # shellcheck disable=SC2086
-        rm -f ${_CLEANUP_FILES} 2>/dev/null || true
+    if [ "${#_CLEANUP_FILES[@]}" -gt 0 ]; then
+        rm -f -- "${_CLEANUP_FILES[@]}" || true
     fi
     exit 0
 }
@@ -120,14 +133,30 @@ on_term() {
 trap on_exit EXIT
 trap on_term TERM INT
 
+# Required Prow identity (see constants): the expansion error routes
+# through the EXIT trap - terminal line outcome=error, exit 0.
+: "${JOB_NAME:?}"
+: "${BUILD_ID:?}"
+
 # sum_junit_failures FILE -> prints "<failures+errors>" or "unparseable"
 sum_junit_failures() {
-    local file="$1"
-    if ! grep -q '<testsuite' "${file}" 2>/dev/null; then
+    typeset file="$1"
+    if ! grep -q '<testsuite' "${file}"; then
         printf 'unparseable'
         return 0
     fi
-    local total=0 match value
+    typeset total=0 match value
+    # grep exits 1 on zero attribute matches; the empty result is handled
+    # below, so keep errexit out of the substitution.
+    typeset matches
+    matches="$(grep -oE '(failures|errors)="[0-9]*"' "${file}" || true)"
+    # A testsuite element without failures=/errors= attributes is malformed
+    # JUnit, not a green tally: counting it as 0 would fabricate green
+    # proof, and the gate's asymmetry rule requires positive green proof.
+    if [ -z "${matches}" ]; then
+        printf 'unparseable'
+        return 0
+    fi
     while IFS= read -r match; do
         value="${match#*\"}"
         value="${value%\"}"
@@ -136,7 +165,7 @@ sum_junit_failures() {
         esac
         total=$(( total + value ))
     done <<EOF
-$(grep -oE '(failures|errors)="[0-9]*"' "${file}" 2>/dev/null)
+${matches}
 EOF
     printf '%s' "${total}"
 }
@@ -156,11 +185,11 @@ EOF
 # (rehearse-<N>-<job>) - which is also the design-doc contract - and any
 # other build by PULL_NUMBER.
 build_prow_path() {
-    local org_repo="openshift_release"
+    typeset org_repo="openshift_release"
     if [ -n "${REPO_OWNER:-}" ] && [ -n "${REPO_NAME:-}" ]; then
         org_repo="${REPO_OWNER}_${REPO_NAME}"
     fi
-    local pr=""
+    typeset pr=""
     case "${JOB_NAME}" in
         rehearse-[0-9]*-*)
             pr="${JOB_NAME#rehearse-}"; pr="${pr%%-*}"
@@ -198,10 +227,10 @@ analyzer_job_url() {
 # gcs_list_build_objects <prefix> <outfile>: object names, one per line,
 # paginated; returns non-zero when the listing itself fails.
 gcs_list_build_objects() {
-    local prefix="$1" out="$2" token=""
+    typeset prefix="$1" out="$2" token=""
     # the pagination scratch files are temp files too: register them so
     # on_exit removes them (every other scratch file follows this pattern)
-    _CLEANUP_FILES="${_CLEANUP_FILES} ${out}.page ${out}.token"
+    _CLEANUP_FILES+=("${out}.page" "${out}.token")
     : > "${out}"
     while :; do
         if [ -n "${token}" ]; then
@@ -242,9 +271,9 @@ _MARKER_RE='(^|/)finished\.json$'
 _JUNIT_RE='(^|/)(junit_[^/]*|TEST-[^/]*)\.xml$|/junit/[^/]*\.xml$'
 
 gate_evaluate() {
-    local step_dir junit tally any_junit=0 any_unparseable=0
-    local total_failures=0 all_markers_passed=1 saw_marker=0
-    local listing obj fetched attempt saw_step_like=0
+    typeset step_dir junit tally any_junit=0 any_unparseable=0
+    typeset total_failures=0 all_markers_passed=1 saw_marker=0
+    typeset listing obj fetched attempt saw_step_like=0
     if [ -n "${ARTIFACT_BASE_DIR:-}" ]; then
         # explicit local override: the original scan semantics. A base that
         # cannot be scanned at all is runtime_tree_unavailable; a scanned
@@ -257,7 +286,7 @@ gate_evaluate() {
             [ -d "${step_dir}" ] || continue
             if [ -f "${step_dir}finished.json" ]; then
                 saw_marker=1; saw_step_like=1
-                if grep -q '"passed":[[:space:]]*false' "${step_dir}finished.json" 2>/dev/null; then
+                if grep -q '"passed":[[:space:]]*false' "${step_dir}finished.json"; then
                     all_markers_passed=0
                 fi
             fi
@@ -271,7 +300,7 @@ gate_evaluate() {
                     total_failures=$(( total_failures + tally ))
                 fi
             done <<EOF
-$(find "${step_dir}" -maxdepth 3 -type f \( -name 'junit_*.xml' -o -name 'TEST-*.xml' -o -path '*/junit/*.xml' \) 2>/dev/null)
+$(find "${step_dir}" -maxdepth 3 -type f \( -name 'junit_*.xml' -o -name 'TEST-*.xml' -o -path '*/junit/*.xml' \))
 EOF
         done
     else
@@ -279,8 +308,8 @@ EOF
         # the per-step syncer uploads progressively, and earlier steps
         # should already be visible when this post step starts.
         listing="$(mktemp /tmp/prow-analyzer-listing.XXXXXX)"
-        _CLEANUP_FILES="${_CLEANUP_FILES} ${listing}"
-        local prefix; prefix="$(gcs_prefix_for_job)"
+        _CLEANUP_FILES+=("${listing}")
+        typeset prefix; prefix="$(gcs_prefix_for_job)"
         for attempt in $(seq 1 "${GCS_POLL_ATTEMPTS}"); do
             if gcs_list_build_objects "${prefix}/artifacts" "${listing}" \
                && grep -qE "${_MARKER_RE}|${_JUNIT_RE}" "${listing}"; then
@@ -297,12 +326,12 @@ EOF
             [ -z "${obj}" ] && continue
             saw_marker=1
             fetched="$(mktemp /tmp/prow-analyzer-marker.XXXXXX)"
-            _CLEANUP_FILES="${_CLEANUP_FILES} ${fetched}"
+            _CLEANUP_FILES+=("${fetched}")
             if ! gcs_fetch_object "${obj}" "${fetched}"; then
                 # an unreadable marker is neither a pass nor a failure
                 # signal: it denies green proof and reads as unparseable
                 any_unparseable=1
-            elif grep -q '"passed":[[:space:]]*false' "${fetched}" 2>/dev/null; then
+            elif grep -q '"passed":[[:space:]]*false' "${fetched}"; then
                 all_markers_passed=0
             fi
         done <<EOF
@@ -312,7 +341,7 @@ EOF
             [ -z "${obj}" ] && continue
             any_junit=1
             fetched="$(mktemp /tmp/prow-analyzer-junit.XXXXXX)"
-            _CLEANUP_FILES="${_CLEANUP_FILES} ${fetched}"
+            _CLEANUP_FILES+=("${fetched}")
             if gcs_fetch_object "${obj}" "${fetched}"; then
                 tally="$(sum_junit_failures "${fetched}")"
                 if [ "${tally}" = "unparseable" ]; then
@@ -363,22 +392,23 @@ EOF
 
 # ---------------------------------------------------------------- source verify
 # Resolves the source archive path: either the pre-provisioned
-# ANALYZER_SOURCE_PATH, or a download from ANALYZER_SOURCE_URL. On success the
+# ANALYZER_SOURCE_PATH, or a download from the step-config-declared
+# INTEROP__OPP__PROW_ANALYZER__SOURCE_URL. On success the
 # sha256 has been verified and the resolved path is exported as
 # ANALYZER_SOURCE_RESOLVED (the caller extracts from THAT; the pre-rehearsal
 # build 2116229379922071552 failed extracting /dev/null because the downloaded
 # path never left this function).
 verify_source() {
-    local path="${ANALYZER_SOURCE_PATH}"
+    typeset path="${ANALYZER_SOURCE_PATH}"
     if [ -z "${path}" ]; then
         path="$(mktemp /tmp/prow-analyzer-src.XXXXXX.tar.gz)"
-        _CLEANUP_FILES="${_CLEANUP_FILES} ${path}"
-        if ! curl -fsSL --max-time 120 "${ANALYZER_SOURCE_URL}" -o "${path}"; then
+        _CLEANUP_FILES+=("${path}")
+        if ! curl -fsSL --max-time 120 "${INTEROP__OPP__PROW_ANALYZER__SOURCE_URL}" -o "${path}"; then
             return 1
         fi
     fi
     [ -f "${path}" ] || return 1
-    if echo "${ANALYZER_SOURCE_SHA256}  ${path}" | sha256sum -c - >/dev/null 2>&1; then
+    if echo "${INTEROP__OPP__PROW_ANALYZER__SOURCE_SHA256}  ${path}" | sha256sum -c - >/dev/null; then
         ANALYZER_SOURCE_RESOLVED="${path}"
         return 0
     fi
@@ -424,7 +454,7 @@ if [ "${_GATE}" = "skip:green_proof" ]; then
 fi
 
 # wrapper-side decline: a delivery for this build already happened in this run
-if [ -s "${ANALYZER_STATE_FILE}" ] && grep -q "^${BUILD_ID}:" "${ANALYZER_STATE_FILE}" 2>/dev/null; then
+if [ -s "${ANALYZER_STATE_FILE}" ] && grep -q "^${BUILD_ID}:" "${ANALYZER_STATE_FILE}"; then
     _OUTCOME="no_analysis"; _GATE="duplicate_delivery_suppressed"
     exit 0
 fi
@@ -448,7 +478,7 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
         exit 0
     fi
     ANALYZER_CLI_PATH="$(mktemp -d /tmp/prow-analyzer-build.XXXXXX)"
-    if ! tar -xzf "${ANALYZER_SOURCE_RESOLVED}" -C "${ANALYZER_CLI_PATH}" 2>/dev/null; then
+    if ! tar -xzf "${ANALYZER_SOURCE_RESOLVED}" -C "${ANALYZER_CLI_PATH}"; then
         _OUTCOME="error"; _GATE="source_extract_failed"
         exit 0
     fi
@@ -459,7 +489,7 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
     export GOCACHE="${GOCACHE:-/tmp/prow-analyzer-gocache}"
     export GOPATH="${GOPATH:-/tmp/prow-analyzer-gopath}"
     _GO_BUILD_ERR="$(mktemp /tmp/prow-analyzer-goerr.XXXXXX)"
-    _CLEANUP_FILES="${_CLEANUP_FILES} ${_GO_BUILD_ERR}"
+    _CLEANUP_FILES+=("${_GO_BUILD_ERR}")
     # -mod=mod overrides a builder-image GOFLAGS=-mod=vendor: the pinned
     # archive's vendor/modules.txt is stale, and CI golang images default to
     # vendored builds (rehearsal 2116335159719497728: "inconsistent vendoring").
@@ -473,7 +503,7 @@ if [ -z "${ANALYZER_CLI_PATH}" ]; then
         # error. Single awk process (no early-exit reader pipeline): under
         # set -euo pipefail a grep -m1 | head pipeline can die on SIGPIPE and
         # abort this error handler itself.
-        _GO_DETAIL="$(awk '!/^go: (downloading|finding|fetching)/ && NF { gsub(/ /, "~"); print substr($0, 1, 200); exit }' "${_GO_BUILD_ERR}" 2>/dev/null)"
+        _GO_DETAIL="$(awk '!/^go: (downloading|finding|fetching)/ && NF { gsub(/ /, "~"); print substr($0, 1, 200); exit }' "${_GO_BUILD_ERR}")"
         printf 'OPP-PROW-ANALYZER v=1 stage=note what=compile_failed detail=%s\n' "${_GO_DETAIL:-no_stderr}"
         _OUTCOME="error"; _GATE="compile_failed"
         exit 0
@@ -495,14 +525,19 @@ if [ -s "${ANALYZER_CA_FILE}" ] && [ -z "${SSL_CERT_FILE:-}" ]; then
     _SSL_CERT_FILE_WAS_SET=1
 fi
 
+# xtrace scoping: prefix assignments are traced with their values, so
+# the token-bearing CLI invocation runs with tracing off (BASH-1 requires
+# tracing; BASH-7 scopes it away from credentials).
+{ set +x; } 2>/dev/null
 TOKEN="$(cat "${ANALYZER_SECRET_TOKEN_FILE}")"
+{ set -x; } 2>/dev/null
 CLI_OUT="$(mktemp /tmp/prow-analyzer-cli-out.XXXXXX)"
 CLI_ERR="$(mktemp /tmp/prow-analyzer-cli-err.XXXXXX)"
 ANALYSIS_BLOCK="$(mktemp /tmp/prow-analyzer-block.XXXXXX)"
-_CLEANUP_FILES="${CLI_OUT} ${CLI_ERR} ${ANALYSIS_BLOCK}"
+_CLEANUP_FILES+=("${CLI_OUT}" "${CLI_ERR}" "${ANALYSIS_BLOCK}")
 
 attempt_loop() {
-    local attempt rc elapsed classification
+    typeset attempt rc elapsed classification
     for attempt in $(seq 1 "${ANALYZER_MAX_ATTEMPTS}"); do
         _ATTEMPTS="${attempt}"
         elapsed=$(( $(date -u +%s) - _START_EPOCH ))
@@ -511,11 +546,13 @@ attempt_loop() {
             return 0
         fi
         rc=0
-        SHIP_HELP_MCP_URL="${ANALYZER_MCP_URL}" \
+        { set +x; } 2>/dev/null
+        SHIP_HELP_MCP_URL="${INTEROP__OPP__PROW_ANALYZER__SHIP_HELP_MCP_URL}" \
         SHIP_HELP_MCP_TOKEN="${TOKEN}" \
         timeout --signal=TERM --kill-after=5 "${ANALYZER_ATTEMPT_TIMEOUT}" \
             "${ANALYZER_CLI_PATH}" analyze "${ANALYZER_JOB_URL}" \
             >"${CLI_OUT}" 2>"${CLI_ERR}" || rc=$?
+        { set -x; } 2>/dev/null
         if [ "${rc}" -eq 0 ]; then
             extract_analysis_block "${CLI_OUT}" > "${ANALYSIS_BLOCK}"
             if [ -s "${ANALYSIS_BLOCK}" ]; then
@@ -527,9 +564,9 @@ attempt_loop() {
         fi
         if [ "${rc}" -eq 124 ] || [ "${rc}" -eq 137 ]; then
             classification="timeout"
-        elif grep -qiE '429|rate.?limit|too many requests' "${CLI_ERR}" "${CLI_OUT}" 2>/dev/null; then
+        elif grep -qiE '429|rate.?limit|too many requests' "${CLI_ERR}" "${CLI_OUT}"; then
             classification="rate_limited"
-        elif grep -qiE 'HTTP 40[13]|HTTP 500|unauthorized|forbidden' "${CLI_ERR}" 2>/dev/null; then
+        elif grep -qiE 'HTTP 40[13]|HTTP 500|unauthorized|forbidden' "${CLI_ERR}"; then
             classification="auth_or_server"
         else
             classification="error"
@@ -554,9 +591,9 @@ attempt_loop() {
     _CLI_DETAIL="cli_error"
     if [ ! -s "${CLI_ERR}" ]; then
         _CLI_DETAIL="no_stderr"
-    elif grep -qiE 'certificate signed by unknown authority|x509:' "${CLI_ERR}" 2>/dev/null; then
+    elif grep -qiE 'certificate signed by unknown authority|x509:' "${CLI_ERR}"; then
         _CLI_DETAIL="tls_unknown_authority"
-    elif grep -qiE 'connection refused|no route to host|i/o timeout' "${CLI_ERR}" 2>/dev/null; then
+    elif grep -qiE 'connection refused|no route to host|i/o timeout' "${CLI_ERR}"; then
         _CLI_DETAIL="network_unreachable"
     fi
     printf 'OPP-PROW-ANALYZER v=1 stage=note what=cli_failed classification=%s detail=%s\n' \
@@ -579,7 +616,7 @@ _RESPONSE_LEN="$(wc -c < "${ANALYSIS_BLOCK}" | tr -d ' ')"
 _IDEMPOTENCY_KEY="${BUILD_ID}:${RESPONSE_SHA}"
 
 PAYLOAD_FILE="$(mktemp /tmp/prow-analyzer-payload.XXXXXX)"
-_CLEANUP_FILES="${_CLEANUP_FILES} ${PAYLOAD_FILE}"
+_CLEANUP_FILES+=("${PAYLOAD_FILE}")
 {
     printf '*Prow Analyzer* — %s — build %s\n`%s`\n\n' "${JOB_NAME}" "${BUILD_ID}" "${_IDEMPOTENCY_KEY}"
     cat "${ANALYSIS_BLOCK}"
@@ -606,13 +643,24 @@ PYEOF
 fi
 _PAYLOAD_CHARS="${PAYLOAD_CHARS}"
 
-WEBHOOK_URL="$(cat "${ANALYZER_WEBHOOK_FILE}" 2>/dev/null || true)"
+# xtrace scoping: the webhook URL is secret-mounted, and both the read
+# and the presence test would trace its value (test arguments are traced
+# expanded).
+{ set +x; } 2>/dev/null
+WEBHOOK_URL=""
+if [ -s "${ANALYZER_WEBHOOK_FILE}" ]; then
+    WEBHOOK_URL="$(cat "${ANALYZER_WEBHOOK_FILE}")"
+fi
+_WEBHOOK_PRESENT=0
+[ -n "${WEBHOOK_URL}" ] && _WEBHOOK_PRESENT=1
+{ set -x; } 2>/dev/null
 SINK_STATUS_FILE="$(mktemp /tmp/prow-analyzer-sink.XXXXXX)"
-_CLEANUP_FILES="${_CLEANUP_FILES} ${SINK_STATUS_FILE}"
+_CLEANUP_FILES+=("${SINK_STATUS_FILE}")
 SINK_RC=0
-if [ -z "${WEBHOOK_URL}" ]; then
+if [ "${_WEBHOOK_PRESENT}" -eq 0 ]; then
     SINK_RC=99
 else
+    { set +x; } 2>/dev/null
     OPP_SINK_WEBHOOK_URL="${WEBHOOK_URL}" \
     python3 - "$PAYLOAD_FILE" "$SINK_STATUS_FILE" <<'PYEOF' || SINK_RC=$?
 import json, os, sys, urllib.request
@@ -631,17 +679,24 @@ except Exception:
     open(status_file, "w").write("0")
     sys.exit(2)
 PYEOF
+    { set -x; } 2>/dev/null
 fi
 
+# sink_status on the terminal line makes the delivery outcome attributable
+# from public artifacts: a bare outcome=sink_error cannot distinguish a
+# missing webhook file from an HTTP rejection or a transport failure
+# (INTEROP-9648 follow-up from the #88323 combined rehearsal,
+# 2118352372378898432).
 if [ "${SINK_RC}" -eq 0 ]; then
+    _SINK_STATUS="$(cat "${SINK_STATUS_FILE}" || echo 0)"
     printf '%s:%s\n' "${BUILD_ID}" "${RESPONSE_SHA}" >> "${ANALYZER_STATE_FILE}"
 elif [ "${SINK_RC}" -eq 99 ]; then
-    _OUTCOME="sink_error"; _GATE="webhook_url_absent"
+    _OUTCOME="sink_error"; _GATE="webhook_url_absent"; _SINK_STATUS="absent"
 else
-    SINK_STATUS="$(cat "${SINK_STATUS_FILE}" 2>/dev/null || echo 0)"
-    case "${SINK_STATUS}" in
+    _SINK_STATUS="$(cat "${SINK_STATUS_FILE}" || echo 0)"
+    case "${_SINK_STATUS}" in
         2*|0) _OUTCOME="sink_error" ;;
-        4*) if [ "${SINK_STATUS}" = "429" ]; then _OUTCOME="sink_error"; else _OUTCOME="sink_rejected"; fi ;;
+        4*) if [ "${_SINK_STATUS}" = "429" ]; then _OUTCOME="sink_error"; else _OUTCOME="sink_rejected"; fi ;;
         *) _OUTCOME="sink_error" ;;
     esac
 fi
