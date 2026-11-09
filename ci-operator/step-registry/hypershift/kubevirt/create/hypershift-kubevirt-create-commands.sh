@@ -753,11 +753,85 @@ recover_stuck_localnet_multi_vmis() {
 # starting, reaching the hosted API, or registering. The guest kubeconfig is
 # written immediately before ensure_localnet_multi_worker_networking runs, so
 # the real node count is available here.
+#
+# A non-zero return status means the count could not be obtained. Callers must
+# never treat that as "zero nodes": a rejected kubeconfig (403 even on
+# discovery), an expired credential and an unreachable apiserver are all
+# indistinguishable from an empty node list to a bare `oc` call, and collapsing
+# them into 0 turns an infrastructure problem into a worker networking failure.
 localnet_multi_joined_node_count() {
   local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-  [[ -r "${kubeconfig}" ]] || { echo 0; return 0; }
-  oc --kubeconfig "${kubeconfig}" get nodes --no-headers --request-timeout=15s 2>/dev/null \
-    | awk '$2 ~ /^Ready/ {n++} END {print n+0}'
+  local output ready
+
+  if [[ ! -r "${kubeconfig}" ]]; then
+    echo "ERROR: guest kubeconfig not found at ${kubeconfig}" >&2
+    return 2
+  fi
+
+  if ! output=$(oc --kubeconfig "${kubeconfig}" get nodes --no-headers \
+                  --request-timeout=15s 2>&1); then
+    echo "ERROR: cannot list nodes in the hosted cluster: ${output}" >&2
+    return 2
+  fi
+
+  ready=$(awk '$2 ~ /^Ready/ {n++} END {print n+0}' <<<"${output}")
+  echo "${ready}"
+}
+
+# localnet_multi_nodes_summary prints "name=STATUS" for every node so the log
+# distinguishes "no node registered" from "nodes registered but not Ready".
+localnet_multi_nodes_summary() {
+  local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local output
+
+  output=$(oc --kubeconfig "${kubeconfig}" get nodes --no-headers --request-timeout=15s 2>&1) || {
+    echo "  (cannot list nodes: ${output})"
+    return 0
+  }
+  if [[ -z "${output}" ]]; then
+    echo "  (no nodes registered)"
+    return 0
+  fi
+  awk '{print "  " $1 "=" $2}' <<<"${output}"
+}
+
+# ensure_localnet_multi_guest_kubeconfig makes sure ${SHARED_DIR}/nested_kubeconfig
+# can actually read the hosted cluster before anything waits on it. `hcp create
+# kubeconfig` has been observed to emit a credential the hosted apiserver
+# rejects with 403 on discovery; fall back to the HCP admin secret before
+# declaring the run unverifiable.
+ensure_localnet_multi_guest_kubeconfig() {
+  local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local hcp_ns="${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
+  local tmp="${kubeconfig}.admin"
+  local err attempt
+
+  # The hosted apiserver is often still settling when the HostedCluster first
+  # reports Available, so one failed call proves nothing. Retry for about a
+  # minute before concluding that the credential itself is unusable.
+  for attempt in 1 2 3 4 5 6; do
+    if oc --kubeconfig "${kubeconfig}" get nodes --request-timeout=15s -o name \
+         >/dev/null 2>/tmp/guest-kubeconfig.err; then
+      return 0
+    fi
+    if [[ ${attempt} -lt 6 ]]; then
+      sleep 10
+    fi
+  done
+  err=$(tr '\n' ' ' </tmp/guest-kubeconfig.err)
+  echo "WARNING: generated guest kubeconfig cannot list nodes: ${err}" >&2
+  echo "WARNING: retrying with ${CLUSTER_NAME}-admin-kubeconfig from ${hcp_ns}" >&2
+
+  if oc -n "${hcp_ns}" get secret "${CLUSTER_NAME}-admin-kubeconfig" \
+       -o jsonpath='{.data.kubeconfig}' 2>/dev/null | base64 -d >"${tmp}" 2>/dev/null \
+     && [[ -s "${tmp}" ]] \
+     && oc --kubeconfig "${tmp}" get nodes --request-timeout=15s -o name >/dev/null 2>&1; then
+    mv "${tmp}" "${kubeconfig}"
+    echo "Using ${CLUSTER_NAME}-admin-kubeconfig for the hosted cluster" >&2
+    return 0
+  fi
+  rm -f "${tmp}" 2>/dev/null || true
+  return 1
 }
 
 # localnet_multi_agent_connected_count reports how many guests have booted.
@@ -768,6 +842,57 @@ localnet_multi_agent_connected_count() {
   oc get vmi -n "$1" --request-timeout=15s \
     -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="AgentConnected")].status}{"\n"}{end}' 2>/dev/null \
     | grep -c '^True$' || true
+}
+
+# dump_localnet_multi_api_diagnostics explains whether the guest kubeconfig
+# this step generated can talk to the hosted cluster at all. `oc get nodes`
+# dies in discovery, so every auth failure surfaces as "Forbidden" with no
+# further detail; SelfSubjectReview answers for any authenticated identity and
+# therefore separates "certificate rejected" from "certificate accepted but
+# authorization policy missing".
+dump_localnet_multi_api_diagnostics() {
+  local multi_ns="$1"
+  local guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local server cert_file key_file
+
+  echo "--- guest kubeconfig / hosted API ---"
+  if [[ ! -r "${guest_kubeconfig}" ]]; then
+    echo "  (no guest kubeconfig at ${guest_kubeconfig})"
+    return 0
+  fi
+
+  server=$(oc config view --raw --minify --kubeconfig "${guest_kubeconfig}" \
+             -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || true)
+  echo "  server: ${server:-unknown}"
+  echo "  /version: $(oc --kubeconfig "${guest_kubeconfig}" get --raw /version \
+             --request-timeout=15s 2>&1 || true)"
+
+  cert_file=$(mktemp)
+  key_file=$(mktemp)
+  if oc config view --raw --minify --kubeconfig "${guest_kubeconfig}" \
+       -o jsonpath='{.users[0].user.client-certificate-data}' 2>/dev/null \
+       | base64 -d >"${cert_file}" 2>/dev/null && [[ -s "${cert_file}" ]]; then
+    if command -v openssl >/dev/null 2>&1; then
+      echo "  client cert: $(openssl x509 -in "${cert_file}" -noout -subject -issuer -dates \
+             2>/dev/null | tr '\n' ' ' || true)"
+    fi
+    oc config view --raw --minify --kubeconfig "${guest_kubeconfig}" \
+      -o jsonpath='{.users[0].user.client-key-data}' 2>/dev/null \
+      | base64 -d >"${key_file}" 2>/dev/null || true
+    if [[ -s "${key_file}" ]] && command -v curl >/dev/null 2>&1 && [[ -n "${server}" ]]; then
+      echo "  selfsubjectreview: $(curl -sk --max-time 15 --cert "${cert_file}" --key "${key_file}" \
+             -H 'Content-Type: application/json' -X POST \
+             -d '{"apiVersion":"authentication.k8s.io/v1","kind":"SelfSubjectReview"}' \
+             "${server}/apis/authentication.k8s.io/v1/selfsubjectreviews" 2>&1 || true)"
+    fi
+  fi
+  rm -f "${cert_file}" "${key_file}" 2>/dev/null || true
+
+  echo "  kube-apiserver pods:"
+  oc get pods -n "${multi_ns}" -l app=kube-apiserver --request-timeout=30s \
+    -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,RESTARTS:.status.containerStatuses[0].restartCount 2>/dev/null \
+    | sed 's/^/    /' || true
+  echo ""
 }
 
 # dump_localnet_multi_diagnostics prints enough state to tell apart the failure
@@ -796,7 +921,10 @@ dump_localnet_multi_diagnostics() {
     -o custom-columns=NAME:.metadata.name,READY:.status.ready,PROVIDERID:.spec.providerID || true
   oc get kubevirtmachine -n "${multi_ns}" --request-timeout=30s \
     -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.conditions[*]}{.type}={.status}({.reason})@{.lastTransitionTime}{" "}{end}{"\n"}{end}' || true
-  oc get machine -n "${multi_ns}" -o wide --request-timeout=30s || true
+  # Qualify the group: on an OCP management cluster bare `machine` resolves to
+  # machines.machine.openshift.io, which never exists in the HCP namespace, so
+  # the unqualified form silently printed "No resources found" here.
+  oc get machines.cluster.x-k8s.io -n "${multi_ns}" -o wide --request-timeout=30s || true
 
   echo "--- capi-provider (cluster-api-provider-kubevirt) ---"
   oc get pods -n "${multi_ns}" -o wide --request-timeout=30s 2>/dev/null \
@@ -811,24 +939,25 @@ dump_localnet_multi_diagnostics() {
   oc get events -n "${multi_ns}" --sort-by=.lastTimestamp --request-timeout=30s 2>/dev/null | tail -40 || true
 
   # The guest console is the only place that separates "no DHCP lease" from
-  # "ignition failed" from "kubelet never started". Only dump it for guests that
-  # have not booted, to keep the build log bounded.
-  echo "--- guest console log for VMIs without AgentConnected ---"
+  # "ignition failed" from "kubelet never started". Dump it for every VMI: the
+  # case that matters here is a guest that booted (AgentConnected=True) but
+  # never became a node, and skipping those VMIs hid exactly that evidence.
+  echo "--- guest console log (AgentConnected labelled) ---"
   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
     agent=$(oc get vmi -n "${multi_ns}" "${vmi}" \
       -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
-    [[ "${agent}" == "True" ]] && continue
     launcher=$(oc get pods -n "${multi_ns}" -l kubevirt.io=virt-launcher -o name 2>/dev/null \
       | grep -- "virt-launcher-${vmi}-" | head -1)
     [[ -n "${launcher}" ]] || continue
-    echo "  === console: ${vmi} (${launcher}) ==="
-    oc logs -n "${multi_ns}" "${launcher}" -c guest-console-log --tail=150 2>&1 | tail -150 || true
+    echo "  === console: ${vmi} (AgentConnected=${agent:-unset}, ${launcher}) ==="
+    oc logs -n "${multi_ns}" "${launcher}" -c guest-console-log --tail=120 2>&1 | tail -120 || true
   done
 
   echo "--- hosted cluster nodes / CSRs ---"
+  dump_localnet_multi_api_diagnostics "${multi_ns}"
   if [[ -r "${guest_kubeconfig}" ]]; then
     oc --kubeconfig "${guest_kubeconfig}" get nodes -o wide --request-timeout=30s || true
-    oc --kubeconfig "${guest_kubeconfig}" get csr --request-timeout=30s 2>/dev/null | tail -20 || true
+    oc --kubeconfig "${guest_kubeconfig}" get csr --request-timeout=30s 2>&1 | tail -20 || true
   else
     echo "  (no guest kubeconfig at ${guest_kubeconfig})"
   fi
@@ -846,7 +975,7 @@ wait_for_localnet_multi_vmis_booted() {
   local network_count="${2:-}"
   local max_rounds="${3:-3}"
   local grace="${4:-600}"
-  local round attempt joined=0 booted=0 launcher_nodes
+  local round attempt joined=0 booted=0 launcher_nodes api_failures=0
 
   for round in $(seq 1 "${max_rounds}"); do
     # Reattach OVN DHCP options at the start of every round. Deleting a VMI
@@ -864,7 +993,24 @@ wait_for_localnet_multi_vmis_booted() {
     fi
 
     for attempt in $(seq 1 60); do
-      joined=$(localnet_multi_joined_node_count)
+      if ! joined=$(localnet_multi_joined_node_count); then
+        # A failed call is not proof that the cluster is unreadable; right after
+        # Available the apiserver can restart. Give it five minutes of
+        # consecutive failures before bailing out with an explicit message
+        # instead of reporting a node count we never observed.
+        api_failures=$((api_failures + 1))
+        if [[ ${api_failures} -ge 30 ]]; then
+          echo "ERROR: cannot read the hosted cluster through the generated" \
+               "kubeconfig (5 minutes of consecutive failures) -- refusing to report a node count" >&2
+          dump_localnet_multi_diagnostics "${multi_ns}"
+          return 1
+        fi
+        echo "  WARNING: hosted cluster node list unavailable" \
+             "(${api_failures}/30 before giving up)" >&2
+        sleep 10
+        continue
+      fi
+      api_failures=0
       if [[ "${joined}" -ge "${HYPERSHIFT_NODE_COUNT}" ]]; then
         echo "All ${joined} worker nodes joined the hosted cluster"
         return 0
@@ -880,6 +1026,7 @@ wait_for_localnet_multi_vmis_booted() {
     booted=$(localnet_multi_agent_connected_count "${multi_ns}")
     echo "Round ${round}: ${joined}/${HYPERSHIFT_NODE_COUNT} joined, ${booted}/${HYPERSHIFT_NODE_COUNT} booted;" \
          "checking for stuck VMIs"
+    localnet_multi_nodes_summary
     recover_stuck_localnet_multi_vmis "${multi_ns}" "${grace}"
   done
 
@@ -1712,6 +1859,17 @@ else
 fi
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+# Never let an unusable kubeconfig masquerade as a worker networking failure.
+if ! ensure_localnet_multi_guest_kubeconfig; then
+  if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" ]]; then
+    echo "ERROR: the guest kubeconfig cannot read the hosted cluster;" \
+         "refusing to run node verification" >&2
+    exit 1
+  fi
+  echo "WARNING: the guest kubeconfig cannot read the hosted cluster;" \
+       "guest-side checks below will fail" >&2
+fi
 
 if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet-multi" && "${LOCALNET_MULTI_DHCP_MODE_EFFECTIVE}" == "ovn" ]]; then
   # After HC is Available and VMIs are Running, configure OVN DHCP on each worker node
