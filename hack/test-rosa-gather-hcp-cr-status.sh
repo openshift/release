@@ -147,6 +147,28 @@ if [[ "$scenario" == term-during-backoff-does-not-hang ]]; then
   cat > "$child" <<'CHILD'
 #!/bin/bash
 source <(sed -n '1,/^# ---- end of sourceable definitions/p' "$1")
+# The step builds its working directory from a hardcoded /tmp template, which
+# TMPDIR cannot redirect, so a bare /tmp scan would also see directories other
+# processes happen to create. Rewrite absolute /tmp templates into this
+# scenario's own directory: the leak assertions then observe exactly what the
+# step created here and nothing else. Flags such as -d and the template's
+# XXXXXX suffix are passed through untouched.
+mktemp() {
+  local args=() a
+  for a in "$@"; do
+    case "$a" in
+      /tmp/*) args+=("${BP_TEST_TMP}/${a#/tmp/}") ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  local created
+  created="$(command mktemp "${args[@]}")" || return
+  # Record the interception so a scenario can prove the step's temporary
+  # files really landed here. Without this an assertion on an empty owned
+  # directory would also pass if the shim silently stopped matching.
+  printf '%s\n' "$created" >> "${BP_TEST_TMP_LOG}"
+  printf '%s\n' "$created"
+}
 curl() {
   local arg prev='' output=''
   for arg in "$@"; do
@@ -161,11 +183,12 @@ echo ready > "$2"
 install_backplane_cli 0.12.0 "$3" "$4"
 CHILD
 
-  # The child uses the real mktemp, so record what /tmp held beforehand to
-  # tell a leaked working directory from unrelated ones.
-  before_dirs="$test_dir/tmp-before"
-  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$before_dirs"
+  # Temporary directories the step creates land here, owned by this scenario.
+  owned_tmp="$test_dir/owned-tmp"
+  mkdir -p "$owned_tmp"
+  : > "$test_dir/owned-tmp-created"
   BP_DOWNLOAD_RETRY_BASE_DELAY=20 BP_DOWNLOAD_RETRY_MAX_DELAY=20 \
+    BP_TEST_TMP="$owned_tmp" BP_TEST_TMP_LOG="$test_dir/owned-tmp-created" \
     bash "$child" "$script" "$marker" "$bin_dir" "$CR_DIR" > "$test_dir/child.log" 2>&1 &
   child_pid=$!
   for _ in $(seq 1 100); do
@@ -191,9 +214,18 @@ CHILD
   assert_status reason interrupted
   assert_status attempts 1
   assert_status retries 0
-  after_dirs="$test_dir/tmp-after"
-  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$after_dirs"
-  leftovers="$(comm -13 "$before_dirs" "$after_dirs")"
+  # The step's temporary files must have been redirected here, otherwise the
+  # emptiness check below would prove nothing: an un-redirected step leaks
+  # into the real /tmp while the owned directory stays empty.
+  (( $(wc -l < "$test_dir/owned-tmp-created") >= 1 )) \
+    || fail 'the step created no temporary directory at all'
+  while IFS= read -r created_path; do
+    case "$created_path" in
+      "$owned_tmp"/*) ;;
+      *) fail "the step created a temporary file outside the scenario fixture: ${created_path}" ;;
+    esac
+  done < "$test_dir/owned-tmp-created"
+  leftovers="$(find "$owned_tmp" -mindepth 1 -maxdepth 1 -print 2>/dev/null)"
   [[ -z "$leftovers" ]] || fail "signal path left a working directory behind: ${leftovers}"
   [[ ! -e "$bin_dir/ocm-backplane" ]] || fail 'interrupted acquisition left a binary behind'
   exit 0
@@ -217,6 +249,28 @@ if [[ "$scenario" == term-during-download-stops-retries \
 # function's own, so keep the path in a variable.
 COUNTS="$5"
 source <(sed -n '1,/^# ---- end of sourceable definitions/p' "$1")
+# The step builds its working directory from a hardcoded /tmp template, which
+# TMPDIR cannot redirect, so a bare /tmp scan would also see directories other
+# processes happen to create. Rewrite absolute /tmp templates into this
+# scenario's own directory: the leak assertions then observe exactly what the
+# step created here and nothing else. Flags such as -d and the template's
+# XXXXXX suffix are passed through untouched.
+mktemp() {
+  local args=() a
+  for a in "$@"; do
+    case "$a" in
+      /tmp/*) args+=("${BP_TEST_TMP}/${a#/tmp/}") ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  local created
+  created="$(command mktemp "${args[@]}")" || return
+  # Record the interception so a scenario can prove the step's temporary
+  # files really landed here. Without this an assertion on an empty owned
+  # directory would also pass if the shim silently stopped matching.
+  printf '%s\n' "$created" >> "${BP_TEST_TMP_LOG}"
+  printf '%s\n' "$created"
+}
 curl() {
   local arg prev='' output=''
   for arg in "$@"; do
@@ -249,10 +303,13 @@ CHILD
     body="$test_dir/complete.tar.gz" ; code=200 ; code_exit=0
   fi
 
-  before_dirs="$test_dir/tmp-before"
-  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$before_dirs"
+  # Temporary directories the step creates land here, owned by this scenario.
+  owned_tmp="$test_dir/owned-tmp"
+  mkdir -p "$owned_tmp"
+  : > "$test_dir/owned-tmp-created"
   FAKE_TRANSFER_SECONDS=2 BP_DOWNLOAD_RETRY_BASE_DELAY=1 BP_DOWNLOAD_RETRY_MAX_DELAY=1 \
     FAKE_TRANSFER_BODY="$body" FAKE_TRANSFER_CODE="$code" FAKE_TRANSFER_EXIT="$code_exit" \
+    BP_TEST_TMP="$owned_tmp" BP_TEST_TMP_LOG="$test_dir/owned-tmp-created" \
     bash "$child" "$script" "$marker" "$bin_dir" "$CR_DIR" "$counts" \
     > "$test_dir/child.log" 2>&1 &
   child_pid=$!
@@ -285,9 +342,18 @@ CHILD
   assert_status retries 0
   [[ ! -e "$bin_dir/ocm-backplane" ]] \
     || fail 'a terminated acquisition promoted a binary'
-  after_dirs="$test_dir/tmp-after"
-  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$after_dirs"
-  leftovers="$(comm -13 "$before_dirs" "$after_dirs")"
+  # The step's temporary files must have been redirected here, otherwise the
+  # emptiness check below would prove nothing: an un-redirected step leaks
+  # into the real /tmp while the owned directory stays empty.
+  (( $(wc -l < "$test_dir/owned-tmp-created") >= 1 )) \
+    || fail 'the step created no temporary directory at all'
+  while IFS= read -r created_path; do
+    case "$created_path" in
+      "$owned_tmp"/*) ;;
+      *) fail "the step created a temporary file outside the scenario fixture: ${created_path}" ;;
+    esac
+  done < "$test_dir/owned-tmp-created"
+  leftovers="$(find "$owned_tmp" -mindepth 1 -maxdepth 1 -print 2>/dev/null)"
   [[ -z "$leftovers" ]] || fail "termination left a working directory behind: ${leftovers}"
   exit 0
 fi
