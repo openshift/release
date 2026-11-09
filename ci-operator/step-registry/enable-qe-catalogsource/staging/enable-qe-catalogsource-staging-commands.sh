@@ -390,6 +390,7 @@ spec:
       containers:
       - name: registry
         image: ${index_image}
+        imagePullPolicy: Always
         command: ["/bin/opm"]
         args: ["serve", "/configs", "--cache-dir=/tmp/cache", "--cache-enforce-integrity=false"]
         ports:
@@ -439,6 +440,23 @@ spec:
   - name: grpc
     port: 50051
     targetPort: grpc
+---
+# Address-based CatalogSources do not get OLM-managed network policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ${CATALOGSOURCE_NAME}-grpc-server
+  namespace: openshift-marketplace
+spec:
+  podSelector:
+    matchLabels:
+      app: ${CATALOGSOURCE_NAME}
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 50051
 EOF
 
     # A restarted pod reloads the ConfigMap even when the image tag is unchanged.
