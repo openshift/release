@@ -26,7 +26,13 @@ ref:
     documentation: When set to "true", performs a Z stream upgrade (latest patch within the current Y stream). When "false" (default), performs a Y stream upgrade to UPGRADED_TO_VERSION.
   - name: UPGRADE_CHANNEL
     default: ""
-    documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty and Z_STREAM_UPGRADE is false, auto-derived as UPGRADE_CHANNEL_PREFIX-{next Y-stream}.
+    documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty and Z_STREAM_UPGRADE is false, auto-derived as UPGRADE_CHANNEL_PREFIX-{target Y-stream}.
+  - name: VERSION_OFFSET_FROM_LATEST
+    default: ""
+    documentation: The offset-from-latest the cluster was installed at, as passed to rosa/cluster/provision. When set, the upgrade channel is built from the Y-stream at offset-1 in the same version-sorted list of available Y-streams, so a y-minus-N cluster upgrades to y-minus-(N-1). The step fails rather than guessing when the offset is malformed, is 0 (no newer stream exists), exceeds the available streams, or no longer matches the version the cluster is actually running. Ignored when UPGRADE_CHANNEL is set or Z_STREAM_UPGRADE is "true".
+  - name: AVAILABLE_UPGRADE
+    default: "no"
+    documentation: Must match the value given to rosa/cluster/provision. Set to 'yes' when the installed version was chosen from only those versions that advertise an available upgrade, so that resolving VERSION_OFFSET_FROM_LATEST here indexes the same list the install side indexed.
   - name: UPGRADE_CHANNEL_PREFIX
     default: "candidate"
     documentation: Prefix used to auto-derive UPGRADE_CHANNEL when it is not explicitly set (e.g., 'candidate' produces 'candidate-4.19').

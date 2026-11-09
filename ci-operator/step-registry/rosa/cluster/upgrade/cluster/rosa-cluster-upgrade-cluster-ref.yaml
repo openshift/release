@@ -17,7 +17,13 @@ ref:
     documentation: Enable the use of hosted control planes (HyperShift).
   - name: UPGRADED_TO_VERSION
     default: ""
-    documentation: The openshift version that the cluster will be upgraded to. If empty, auto-derived as the next Y-stream newer than the cluster's current version among those available in CHANNEL_GROUP. The step fails rather than guessing when no newer Y-stream is available.
+    documentation: The openshift version that the cluster will be upgraded to. If empty, it is auto-derived from the Y-streams available in CHANNEL_GROUP; when VERSION_OFFSET_FROM_LATEST is set the target is the stream one position newer than the installed one (offset-1), otherwise it is the next Y-stream newer than the cluster's current version. The step fails rather than guessing when no suitable Y-stream is available.
+  - name: VERSION_OFFSET_FROM_LATEST
+    default: ""
+    documentation: The offset-from-latest the cluster was installed at, as passed to rosa/cluster/provision. When set, the upgrade target is the Y-stream at offset-1 in the same version-sorted list of available Y-streams, so a y-minus-N cluster upgrades to y-minus-(N-1). The step fails rather than guessing when the offset is malformed, is 0 (no newer stream exists), exceeds the available streams, or no longer matches the version the cluster is actually running. Ignored when UPGRADED_TO_VERSION is set.
+  - name: AVAILABLE_UPGRADE
+    default: "no"
+    documentation: Must match the value given to rosa/cluster/provision. Set to 'yes' when the installed version was chosen from only those versions that advertise an available upgrade, so that resolving VERSION_OFFSET_FROM_LATEST here indexes the same list the install side indexed.
   - name: CHANNEL_GROUP
     default: "stable"
     documentation: The channel group from which to get the openshift version. The supported groups are [stable, candidate, nightly].
