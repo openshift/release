@@ -327,8 +327,6 @@ objects:
         }
 
 
-
-
         function create_api_fip() {
           LB_FIP_AND_ID=$(openstack floating ip create --description api.$CLUSTER_NAME.$BASE_DOMAIN $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
           LB_FIP_IP=$(echo $LB_FIP_AND_ID |awk '{print $1}')
@@ -735,7 +733,6 @@ objects:
         }
 
 
-
         function delete_bootstrap_resources() {
           #we need to look for the message: INFO It is now safe to remove the bootstrap resources" from opesnhift-install wait-for boostrap-complete
           echo "destroying bootstrap resources"
@@ -811,9 +808,6 @@ objects:
         approve_csrs_in_background
         wait_for_install_complete
         signal_setup_complete
-
-
-
 
 
     # Once the cluster is up, executes shared tests
@@ -1195,10 +1189,10 @@ objects:
             prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
           fi
           if [[ -n "${prometheus}" ]]; then
-          	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
-          	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+            echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+            queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
           else
-          	echo "Unable to find a Prometheus pod to snapshot."
+            echo "Unable to find a Prometheus pod to snapshot."
           fi
 
           # move private key to ~/.ssh/ so that installer can use it to gather logs
@@ -1368,4 +1362,3 @@ objects:
         signal_teardown_container_is_running
         allow_user_access
         wait_for_other_containers_to_exit
-

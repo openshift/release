@@ -236,7 +236,7 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
-        
+
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/setup-success; else touch /tmp/exit /tmp/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         cp "$(command -v openshift-install)" /tmp
@@ -483,10 +483,10 @@ objects:
             prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
           fi
           if [[ -n "${prometheus}" ]]; then
-          	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
-          	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+            echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+            queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
           else
-          	echo "Unable to find a Prometheus pod to snapshot."
+            echo "Unable to find a Prometheus pod to snapshot."
           fi
 
           echo "Running must-gather..."
