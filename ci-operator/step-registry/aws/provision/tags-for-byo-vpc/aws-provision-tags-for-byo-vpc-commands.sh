@@ -14,7 +14,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION=${REGION:-$LEASED_RESOURCE}
+REGION=${AWS_REGION_OVERWRITE:-${REGION:-$LEASED_RESOURCE}}
 
 if [[ -e ${SHARED_DIR}/metadata.json ]]; then
   # for OCP

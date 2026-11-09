@@ -17,7 +17,7 @@ fi
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 master_replicas=${CONTROL_PLANE_REPLICAS:-3}
 worker_replicas=${COMPUTE_NODE_REPLICAS:-3}
