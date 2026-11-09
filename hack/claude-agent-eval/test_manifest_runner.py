@@ -1,5 +1,8 @@
 """Offline tests of manifest behavior and the actual Prow shell entry point."""  # pylint: disable=too-many-lines
 
+import atexit
+import copy
+import functools
 import importlib.util
 import json
 import os
@@ -175,6 +178,32 @@ sys.exit(9 if behavior == "process_failure" else 0)
 class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
     commands = sync_commands.COMMANDS
 
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def base_repository():
+        """Build the committed base repository once; each test copies it.
+
+        Copying skips git init/config/add/commit per test, and every copy keeps
+        the same base SHA. Built on first use, so a Fixture constructed directly
+        gets it too.
+        """
+        template = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        atexit.register(template.cleanup)
+        builder = Fixture()  # Only the repository helpers are used.
+        builder.repo = Path(template.name).resolve() / "repo"
+        builder.repo.mkdir()
+        builder.real_git = shutil.which("git")
+        builder.git("init", "-q")
+        builder.git("config", "user.name", "Eval Test")
+        builder.git("config", "user.email", "eval-test@example.invalid")
+        builder.put("skills/foo/SKILL.md", "old skill")
+        builder.put("skills/foobar/SKILL.md", "other skill")
+        builder.put("docs/guide.md", "old docs")
+        entry = builder.make_entry("evals/eval-foo.yaml")
+        builder.write_manifest([entry])
+        builder.commit()
+        return builder.repo, builder.git("rev-parse", "HEAD").strip(), entry
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.addCleanup(self.temp.cleanup)
@@ -184,19 +213,11 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         environ.start()
         self.addCleanup(environ.stop)
         self.repo = self.root / "repo"
-        self.repo.mkdir()
+        base_repo, self.base, entry = self.base_repository()
+        shutil.copytree(base_repo, self.repo, symlinks=True)
+        self.entry = copy.deepcopy(entry)
         self.artifacts = self.root / "artifacts"
         self.real_git = shutil.which("git")
-        self.git("init", "-q")
-        self.git("config", "user.name", "Eval Test")
-        self.git("config", "user.email", "eval-test@example.invalid")
-        self.put("skills/foo/SKILL.md", "old skill")
-        self.put("skills/foobar/SKILL.md", "other skill")
-        self.put("docs/guide.md", "old docs")
-        self.entry = self.make_entry("evals/eval-foo.yaml")
-        self.write_manifest([self.entry])
-        self.commit()
-        self.base = self.git("rev-parse", "HEAD").strip()
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for name, source in (("git", FAKE_GIT), ("claude", FAKE_CLAUDE)):
