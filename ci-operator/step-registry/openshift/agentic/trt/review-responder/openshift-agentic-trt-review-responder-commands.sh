@@ -799,7 +799,12 @@ Your GitHub login is ${BOT_LOGIN}." \
         fi
 
         if [[ "${workers_succeeded}" != "true" ]]; then
-            echo "WARNING: at least one worker failed; leaving the branch unpushed."
+            echo "WARNING: at least one worker failed; resetting the unpushed round."
+            if ! git reset --hard "${EXPECTED_REMOTE_HEAD}" || \
+               ! git clean -fd -e artifacts/; then
+                echo "ERROR: unable to reset the failed worker round; stopping safely."
+                exit "${REVIEW_EXIT}"
+            fi
         elif push_current_branch; then
             if [[ "${ci_worker_succeeded}" == "true" ]]; then
                 ci_evaluated=true
