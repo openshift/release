@@ -18,9 +18,9 @@ cluster_id=$(cat "${SHARED_DIR}/cluster-id")
 
 HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
 CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
-# Channel group the target was discovered from; stays "<not queried>" when an explicit
-# target or channel, or a Z-stream upgrade, made discovery unnecessary, so the artifact
-# never names a group the step never asked about.
+# Channel group discovery queries. This step only discovers when UPGRADE_CHANNEL is empty,
+# so it is always UPGRADE_CHANNEL_PREFIX; it stays "<not queried>" for an explicit channel
+# or target, or a Z-stream upgrade, so the artifact never names an unqueried group.
 DISCOVERY_CHANNEL_GROUP="<not queried>"
 UPGRADE_START_EPOCH=""
 UPGRADE_START_ISO=""
@@ -159,15 +159,15 @@ function unset_proxy () {
     fi
 }
 
-# Print the HCP Y-streams (X.Y) offered by the UPGRADE_CHANNEL_PREFIX channel group,
-# version-sorted and de-duplicated. Discovery deliberately queries the same channel group
-# whose channel the cluster is moved to, so a stream that exists only there -- a candidate
-# release not yet in the stable install catalog -- is still a reachable target. Null and
-# non-X.Y ids are dropped, so a malformed response yields an empty list. Returns non-zero
-# when the ROSA query fails, so callers can fail closed instead of guessing.
+# Print the HCP Y-streams (X.Y) offered by DISCOVERY_CHANNEL_GROUP, version-sorted and
+# de-duplicated. That is the group of the channel the cluster will be moved to, so a
+# stream existing only there (a candidate release absent from the stable install catalog)
+# is still a reachable target. Null and non-X.Y ids are dropped, so a malformed response
+# yields an empty list. Returns non-zero when the ROSA query fails, so callers can fail
+# closed instead of guessing.
 list_available_y_streams() {
   local raw
-  raw=$(rosa list versions --channel-group "${UPGRADE_CHANNEL_PREFIX}" --hosted-cp -o json) || return 1
+  raw=$(rosa list versions --channel-group "${DISCOVERY_CHANNEL_GROUP}" --hosted-cp -o json) || return 1
   # `.raw_id // empty` drops a null or absent raw_id that a bare `.[].raw_id` would render
   # as the string "null" and turn into a bogus "<prefix>-null" channel.
   echo "${raw}" | jq -r '.[].raw_id // empty' | cut -d '.' -f1,2 \
@@ -398,17 +398,17 @@ if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
     DISCOVERY_CHANNEL_GROUP="${UPGRADE_CHANNEL_PREFIX}"
     if ! y_stream_list=$(list_available_y_streams); then
       write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-      log "Error: could not list versions for channel group ${UPGRADE_CHANNEL_PREFIX}; refusing to guess an upgrade channel."
+      log "Error: could not list versions for channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
       exit 1
     fi
     if [[ -z "${y_stream_list}" ]]; then
       write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-      log "Error: no Y-streams available in channel group ${UPGRADE_CHANNEL_PREFIX}; refusing to guess an upgrade channel."
+      log "Error: no Y-streams available in channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
       exit 1
     fi
     if ! next_y_stream=$(next_y_stream_after "${init_version}" "${y_stream_list}"); then
       write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
-      log "Error: no Y-stream newer than ${init_version} in channel group ${UPGRADE_CHANNEL_PREFIX}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+      log "Error: no Y-stream newer than ${init_version} in channel group ${DISCOVERY_CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
       exit 1
     fi
     UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
