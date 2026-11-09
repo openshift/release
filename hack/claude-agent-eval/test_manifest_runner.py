@@ -1,4 +1,4 @@
-"""Offline tests of manifest behavior and the actual Prow shell entry point."""
+"""Offline tests of manifest behavior and the actual Prow shell entry point."""  # pylint: disable=too-many-lines
 
 import importlib.util
 import json
@@ -35,6 +35,15 @@ config_bridge = load_sibling("eval_config")
 report = load_sibling("eval_report")
 runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
+
+
+def isolated_git_env(env):
+    """Keep fixture Git off the host's config, e.g. a developer's commit signing or hooks.
+
+    GIT_CONFIG_GLOBAL replaces both ~/.gitconfig and $XDG_CONFIG_HOME/git/config.
+    """
+    env = {key: value for key, value in env.items() if not key.startswith("GIT_CONFIG")}
+    return {**env, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
 FAKE_GIT = r'''
@@ -170,6 +179,10 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         self.temp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        # In-process runner calls (changed_files) run Git with this process's environment.
+        environ = mock.patch.dict(os.environ, isolated_git_env(os.environ), clear=True)
+        environ.start()
+        self.addCleanup(environ.stop)
         self.repo = self.root / "repo"
         self.repo.mkdir()
         self.artifacts = self.root / "artifacts"
@@ -197,6 +210,7 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         self.calls_path = self.root / "calls"
         self.last_result = None
         self.env = {
+            **isolated_git_env({}),
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root), "REAL_GIT": self.real_git,
             "CALLS": str(self.calls_path),
@@ -248,7 +262,7 @@ class EvalConfig:
 
     def git(self, *args):
         return subprocess.run([self.real_git, *args], cwd=self.repo, check=True,
-                              capture_output=True, text=True).stdout
+                              capture_output=True, text=True, env=isolated_git_env(os.environ)).stdout
 
     def commit(self):
         self.git("add", ".")
