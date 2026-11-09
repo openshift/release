@@ -11,7 +11,7 @@
 # dumps; the webhook credential is read from its mounted file by the
 # embedded delivery program only — never argv, never export.
 #
-# The JUnit parser below is GENERATED from src/opp_interop/junit.py by
+# The JUnit parser below is GENERATED from sub-projects/lib-opp-interop/src/opp_interop/junit.py by
 # embed.py between the sentinels; regenerate, never hand-edit. The
 # generated module must stay the FIRST code in its heredoc program
 # (its `from __future__ import annotations` is only legal at program
@@ -26,7 +26,16 @@
 if shopt -q patsub_replacement 2>/dev/null; then
     shopt -u patsub_replacement
 fi
-set -uo pipefail
+# errexit adopted with a companion audit (openshift/release#88057
+# precedent, 2026-11-07): every tolerable failure is explicitly guarded
+# — mktemp falls back, rm -f is || true, the two program dispatches are
+# || guarded with _REASON degradation, the emit printf sites are ||
+# true (closed stdout must not break the exits-0 contract), and
+# emit_terminal tolerates an unset _SENT_FILE so an early abort still
+# lands the fallback terminal line through the EXIT trap. Bash-level
+# aborts on genuinely fatal paths (mkdir of the sent dir) degrade to
+# the same one-terminal-line exit-0 outcome the trap always provided.
+set -euo pipefail
 
 # ------------------------------------------------- constants (reporter-owned)
 # Provenance classes (design doc section 5): repo-mirrored values are
@@ -36,7 +45,7 @@ set -uo pipefail
 OPP_SLACK_REPORTER_PREFIX="OPP-SLACK-REPORTER"
 OPP_SLACK_REPORTER_VERSION=1
 SLACK_TEXT_FIELD="${SLACK_TEXT_FIELD:-text}"
-SLACK_REPORTER_TEXT_CAP=40000          # chars of composed text (Slack limit)
+SLACK_REPORTER_TEXT_CAP="${SLACK_REPORTER_TEXT_CAP:-40000}"   # chars of composed text (Slack limit)
 SLACK_REPORTER_BODY_MAX_BYTES=131072   # serialized payload (MAX_ARG_STRLEN)
 SLACK_REPORTER_SCAN_DEADLINE="${SLACK_REPORTER_SCAN_DEADLINE:-120}"
 SLACK_REPORTER_HTTP_CONNECT_TIMEOUT="${SLACK_REPORTER_HTTP_CONNECT_TIMEOUT:-10}"
@@ -65,18 +74,18 @@ _STATE="UNVERIFIED"
 _REASON="in_progress"
 
 emit_skeleton() {
-    printf '%s\n' "${OPP_SLACK_REPORTER_PREFIX} v=${OPP_SLACK_REPORTER_VERSION} stage=skeleton state=${_STATE} reason=${_REASON}"
+    printf '%s\n' "${OPP_SLACK_REPORTER_PREFIX} v=${OPP_SLACK_REPORTER_VERSION} stage=skeleton state=${_STATE} reason=${_REASON}" || true
 }
 
 emit_terminal() {
     # Exactly one terminal line is ever emitted (design doc section 10):
     # either the embedded program emits it (and touches the sent file) or
     # this fallback does — never both.
-    if [ "${_TERMINAL_EMITTED}" -eq 1 ] || [ -e "${_SENT_FILE}" ]; then
+    if [ "${_TERMINAL_EMITTED}" -eq 1 ] || [ -e "${_SENT_FILE:-}" ]; then
         return 0
     fi
     _TERMINAL_EMITTED=1
-    printf '%s\n' "${OPP_SLACK_REPORTER_PREFIX} v=${OPP_SLACK_REPORTER_VERSION} stage=terminal state=${_STATE} reason=${_REASON}"
+    printf '%s\n' "${OPP_SLACK_REPORTER_PREFIX} v=${OPP_SLACK_REPORTER_VERSION} stage=terminal state=${_STATE} reason=${_REASON}" || true
 }
 
 on_term() {
@@ -287,15 +296,601 @@ def compare_version_tuples(left: str, right: str) -> int:
         return 1
     return 0
 # ---- END GENERATED: opp_interop.junit ----
+# ---- BEGIN GENERATED: scan_classify ----
+"""Scan and case classification for the slack-reporter step.
+
+Moved verbatim from the hand-written glue of the scan heredoc program in
+``interop-opp-slack-reporter-commands.sh`` (ADR 0052 stage a) and embedded
+back into that program GENERATED between sentinels by ``embed.py``
+(region ``scan_classify``). The module is therefore constrained exactly
+like the embedded JUnit parser:
+
+- stdlib-only runtime imports;
+- ``opp_interop.junit`` types appear only under ``TYPE_CHECKING``;
+- no repo imports at runtime (the shipped wrapper is self-contained).
+
+Design authority: ``docs/design/opp-slack-reporter-step.md`` (sections
+5-8). Behavior contract: the step's scenario matrix (characterization
+net) pins the wrapper's terminal lines; this module must not change
+any observable output. Environment reads and the interrupt flag are
+injected by the wrapper glue (``SLACK_REPORTER_SCAN_DEADLINE``,
+``SHARED_DIR``, ``JOB_NAME``/``BUILD_ID``, SIGTERM/SIGINT wiring) so
+the module is pure with respect to the process environment.
+"""
+
+
+import json
+import os
+import re
+import stat
+import time
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from opp_interop.junit import JunitResult
+
+PRUNE_RE = re.compile(r"(gather|must-gather)", re.IGNORECASE)
+JUNIT_NAME_RE = re.compile(r"^(junit_|test-)", re.IGNORECASE)
+TEST_PHASE_ROLES = ("test-authoritative", "test-best-effort")
+MAX_SCAN_ENTRIES = 200
+MAX_SCAN_DEPTH = 6
+
+
+class Marker(TypedDict):
+    """One stepstatus alignment result from ``finished.json``."""
+
+    result: str
+    passed: bool | None
+
+
+class JunitRecord(TypedDict):
+    """One parsed JUnit candidate as recorded in the evidence dict."""
+
+    file: str
+    step: str
+    complete: bool
+    error: str | None
+    counts: dict[str, int] | None
+    testcase_count: int
+    raw_sha256: str
+
+
+class Evidence(TypedDict, total=False):
+    """The scan evidence record consumed by :func:`classify`."""
+
+    test: str
+    markers: dict[str, Marker | None]
+    anomalies: list[str]
+    junit: list[JunitRecord]
+    degraded: list[dict[str, Any]]
+    unrecognized_dirs: list[dict[str, Any]]
+    pruned: list[dict[str, Any]]
+    role_dir_missing: list[str]
+    truncated: bool
+    deadline: bool
+    interrupted: bool
+    #: set by classify from the deduplicated complete records; consumed
+    #: by the wrapper glue's skip_ratio report field
+    testcase_total: int
+
+
+# ------------------------------------------------------ marker rule
+def read_marker(step_dir: str) -> tuple[Marker | None, str | None]:
+    """(marker_or_None, anomaly_or_None) for <step_dir>/finished.json.
+
+    Verbatim stepstatus alignment: uppercase SUCCESS; passed optional
+    (null = absent, isinstance(bool) guard); contradiction refused;
+    unparseable = partial_json; unreadable = OS failure."""
+    path = os.path.join(step_dir, "finished.json")
+    try:
+        info = os.lstat(path)
+    except OSError:
+        return None, None
+    if stat.S_ISLNK(info.st_mode):
+        return None, "marker_anomaly:unreadable"
+    try:
+        with open(path, "rb") as handle:
+            raw = handle.read(1 << 20)
+        value = json.loads(raw)
+    except (OSError, ValueError):
+        return None, "marker_anomaly:partial_json"
+    if not isinstance(value, dict):
+        return None, "marker_anomaly:not_object"
+    result = value.get("result")
+    if result not in ("SUCCESS", "FAILURE", "ABORTED"):
+        return None, "marker_anomaly:unknown_result"
+    passed = value.get("passed")
+    if passed is not None:
+        if not isinstance(passed, bool):
+            return None, "marker_anomaly:non_boolean_passed"
+        consistent = passed if result == "SUCCESS" else not passed
+        if not consistent:
+            return None, "marker_anomaly:contradiction"
+    return {"result": result, "passed": passed}, None
+
+
+# ------------------------------------------------------ file safety
+class SafeAccess:
+    """Per-file safety: lstat, S_ISLNK refusal, realpath containment,
+    /tmp/secrets and $SHARED_DIR exclusions (design doc section 6)."""
+
+    def __init__(self, root: str, shared_dir: str = ""):
+        self.root = os.path.realpath(root)
+        excludes = ["/tmp/secrets"]
+        if shared_dir:
+            excludes.append(shared_dir)
+        self.excludes = [os.path.realpath(p) for p in excludes if p]
+
+    def check(self, path: str) -> tuple[bool, str | None]:
+        """(ok, refusal_reason) for one file about to be opened."""
+        try:
+            info = os.lstat(path)
+        except OSError:
+            return False, "missing"
+        if stat.S_ISLNK(info.st_mode):
+            return False, "symlink_escape:%s" % os.path.basename(path)
+        real = os.path.realpath(path)
+        if real != self.root and not real.startswith(self.root + os.sep):
+            return False, "symlink_escape:%s" % os.path.basename(path)
+        for exclude in self.excludes:
+            if real == exclude or real.startswith(exclude + os.sep):
+                return False, "symlink_escape:%s" % os.path.basename(path)
+        return True, None
+
+    def read_capped(self, path: str, cap: int) -> tuple[bytes | None, str | None]:
+        """(data, None) or (None, refusal): stat-first, bounded cap+1 read."""
+        try:
+            size = os.stat(path).st_size
+        except OSError:
+            return None, "unreadable"
+        if size > cap:
+            return None, "junit_size_limit"
+        try:
+            with open(path, "rb") as handle:
+                data = handle.read(cap + 1)
+        except OSError:
+            return None, "unreadable"
+        if len(data) > cap:  # stat-then-grow race: bounded refusal
+            return None, "junit_size_limit"
+        return data, None
+
+
+# ------------------------------------------------------ scan
+def scan(
+    base: str,
+    table: dict[str, dict[str, str]],
+    roles: dict[str, str],
+    *,
+    parse_junit: Callable[[bytes, str], JunitResult],
+    deadline: float,
+    shared_dir: str = "",
+    interrupted: Callable[[], bool] | None = None,
+    max_junit_bytes: int = 4_000_000,
+) -> tuple[Evidence, str | None, list[str] | None]:
+    """Walk the scan base (the test dir); returns the evidence record.
+
+    ``parse_junit``, ``deadline``, ``shared_dir`` and ``interrupted`` are
+    injected by the caller (env reads and signal wiring live in the
+    wrapper glue), keeping this function pure with respect to the
+    process environment."""
+    safe = SafeAccess(base, shared_dir)
+    evidence: Evidence = {
+        "test": os.path.basename(base.rstrip("/")),
+        "markers": {},
+        "anomalies": [],
+        "junit": [],
+        "degraded": [],
+        "unrecognized_dirs": [],
+        "pruned": [],
+        "role_dir_missing": [],
+        "truncated": False,
+        "deadline": False,
+        "interrupted": False,
+    }
+
+    def junit_candidates(
+        dir_path: str,
+        depth: int = 0,
+        out: list[str] | None = None,
+        refusals: list[str] | None = None,
+    ) -> tuple[list[str], list[str]]:
+        """Bounded recursive junit-shaped discovery under one step dir.
+        JUnit-shaped symlinks are recorded as refusals, never skipped
+        silently (design doc section 6)."""
+        if out is None:
+            out = []
+        if refusals is None:
+            refusals = []
+        if depth > MAX_SCAN_DEPTH or len(out) >= MAX_SCAN_ENTRIES:
+            return out, refusals
+        try:
+            entries = sorted(os.scandir(dir_path), key=lambda e: e.name)
+        except OSError:
+            return out, refusals
+        if len(entries) > MAX_SCAN_ENTRIES:
+            evidence["truncated"] = True
+            entries = entries[:MAX_SCAN_ENTRIES]
+        for entry in entries:
+            if len(out) >= MAX_SCAN_ENTRIES:
+                evidence["truncated"] = True
+                break
+            if entry.is_symlink():
+                if JUNIT_NAME_RE.match(entry.name) and entry.name.lower().endswith(".xml"):
+                    refusals.append("symlink_escape:%s" % entry.name)
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                if PRUNE_RE.search(entry.name):
+                    continue
+                junit_candidates(entry.path, depth + 1, out, refusals)
+            elif JUNIT_NAME_RE.match(entry.name) and entry.name.lower().endswith(".xml"):
+                out.append(entry.path)
+        return out, refusals
+
+    try:
+        step_dirs = sorted(e.name for e in os.scandir(base) if e.is_dir(follow_symlinks=False))
+    except OSError:
+        return evidence, "CONFIG_ERROR", ["base_unresolvable"]
+    if len(step_dirs) > MAX_SCAN_ENTRIES:
+        evidence["truncated"] = True
+        step_dirs = step_dirs[:MAX_SCAN_ENTRIES]
+
+    for step in step_dirs:
+        if interrupted is not None and interrupted():
+            evidence["interrupted"] = True
+            break
+        if time.time() > deadline:
+            evidence["truncated"] = True
+            evidence["deadline"] = True
+            break  # finish the step dir before descending: checked between
+        step_path = os.path.join(base, step)
+        dir_ok, dir_refusal = safe.check(step_path)
+        if not dir_ok:
+            evidence["degraded"].append({"file": step, "reason": dir_refusal})
+            continue
+        role = roles.get(step)
+        marker, anomaly = read_marker(step_path)
+        if anomaly:
+            evidence["anomalies"].append("%s:%s" % (anomaly, step))
+        if role is None:
+            if PRUNE_RE.search(step):
+                # pruned dir: shallow probe for failure evidence only
+                probe_marker, _ = read_marker(step_path)
+                candidates: list[str] = []
+                try:
+                    probe_entries = list(os.scandir(step_path))
+                except OSError:
+                    probe_entries = []
+                has_evidence = probe_marker is not None and probe_marker["result"] in (
+                    "FAILURE",
+                    "ABORTED",
+                )
+                for probe in probe_entries[:MAX_SCAN_ENTRIES]:
+                    if JUNIT_NAME_RE.match(probe.name):
+                        has_evidence = has_evidence or probe_marker is None
+                        candidates.append(probe.name)
+                evidence["pruned"].append(
+                    {
+                        "name": step,
+                        "marker_result": probe_marker["result"] if probe_marker else None,
+                        "junit_candidates": candidates,
+                        "evidence": has_evidence,
+                    }
+                )
+                continue
+            # unrecognized closure: record regardless of marker state
+            candidates, rogue_refusals = junit_candidates(step_path)
+            for refusal in rogue_refusals:
+                evidence["degraded"].append({"file": step, "reason": refusal})
+            candidates = [os.path.basename(c) for c in candidates][:8]
+            has_artifacts = False
+            try:
+                has_artifacts = any(True for _ in os.scandir(step_path))
+            except OSError:
+                pass
+            evidence["unrecognized_dirs"].append(
+                {
+                    "name": step,
+                    "marker_result": marker["result"] if marker else None,
+                    "junit_candidates": candidates,
+                    "has_junit": bool(candidates),
+                    "has_artifacts": has_artifacts,
+                }
+            )
+            continue
+        evidence["markers"][step] = marker  # None = absent
+        if role in TEST_PHASE_ROLES:
+            candidates, refusals = junit_candidates(step_path)
+            for refusal in refusals:
+                evidence["degraded"].append({"file": "%s/%s" % (step, refusal), "reason": refusal})
+            for candidate in candidates:
+                rel = os.path.relpath(candidate, base)
+                ok, file_refusal = safe.check(candidate)
+                if not ok:
+                    if file_refusal not in ("missing",):
+                        evidence["degraded"].append({"file": rel, "reason": file_refusal})
+                    continue
+                data, cap_refusal = safe.read_capped(candidate, max_junit_bytes)
+                if data is None:
+                    evidence["degraded"].append(
+                        {
+                            "file": rel,
+                            "reason": cap_refusal,
+                            "size": (
+                                os.stat(candidate).st_size
+                                if cap_refusal == "junit_size_limit"
+                                else None
+                            ),
+                        }
+                    )
+                    continue
+                parsed = parse_junit(data, "file://" + rel)
+                evidence["junit"].append(
+                    {
+                        "file": rel,
+                        "step": step,
+                        "complete": parsed.complete,
+                        "error": parsed.error,
+                        "counts": parsed.counts if parsed.complete else None,
+                        "testcase_count": parsed.testcase_count,
+                        "raw_sha256": parsed.raw_sha256,
+                    }
+                )
+    # walk-completeness reconciliation (the table is an oracle)
+    for step, role in roles.items():
+        if role == "own":
+            continue
+        if step not in step_dirs and step not in evidence["markers"]:
+            evidence["role_dir_missing"].append(step)
+    return evidence, None, None
+
+
+# ------------------------------------------------------ enrichment
+#: ReportPortal launch link harvesting (design doc section 11): a raw
+#: candidate is accepted only when its host matches the pinned OPP
+#: ReportPortal instance exactly; the harvested value is REBUILT from
+#: the pinned host, the validated project key and the numeric launch
+#: id so no raw log content (session hash, userinfo, query string,
+#: arbitrary path) is ever echoed into the report or receipt. The
+#: project key is kept only in ReportPortal's own project-key alphabet
+#: (server-side PROJECT_NAME_REGEXP, 1-64 chars, leading alphanumeric)
+#: and only when it is not secret-shaped: a key containing a 32+
+#: character alphanumeric run is dropped at harvest (CodeRabbit deep
+#: pass, 2026-11-06). The delivery secret-shape check uses the wider
+#: base64 alphabet (including '/'), so its belt neutralizes the
+#: structural '/launches/all/<id>' tail before scanning: together the
+#: two checks guarantee no launch URL fails closed as secret-shaped
+#: and no token-shaped one is delivered (alphabet mismatch resolved
+#: 2026-11-07).
+LAUNCH_HOST = "reportportal-lp-interop.apps.dno.ocp-hub.prod.psi.redhat.com"
+_launch_candidate_re = re.compile(r"https://\S*reportportal\S*/launch\S*", re.IGNORECASE)
+_launch_shape_re = re.compile(r"/ui/#([A-Za-z0-9][A-Za-z0-9_-]{0,63})/launches/all/(\d{1,12})$")
+#: sentence punctuation commonly follows a URL pasted into a log line;
+#: trimmed before the shape match — everything the URL is rebuilt from
+#: (host, key, id) is still pinned and validated
+_trailing_punct_re = re.compile(r"[.,;:!\"')\]]+$")
+_secret_run_re = re.compile(r"[A-Za-z0-9]{32,}")
+
+
+def canonical_launch(raw: str) -> str | None:
+    """Rebuild the canonical launch URL from a raw log match.
+
+    Only the validated project key and the numeric launch id survive
+    from the raw string; host and path shape are pinned constants.
+    The project key is a route component, not decoration: the launch
+    route is /ui/#<project>/launches/all/<id>, and a URL without it
+    names a project called 'launches' and resolves to nothing. Returns
+    None (the caller counts the drop as omitted) for anything not the
+    pinned shape: other hosts, userinfo, query strings, fragments
+    without the approved <project>/launches/all/<digits> tail, project
+    keys outside ReportPortal's project-key alphabet, secret-shaped
+    project keys (a 32+ character alphanumeric run), or non-numeric
+    ids never reach the report (CodeRabbit No-Sensitive-Data-In-Logs,
+    2026-11-04; project-segment preservation 2026-11-05)."""
+    if not raw.lower().startswith("https://" + LAUNCH_HOST + "/ui/#"):
+        return None
+    if "?" in raw or "@" in raw:
+        return None
+    raw = _trailing_punct_re.sub("", raw)
+    found = _launch_shape_re.search(raw)
+    if not found:
+        return None
+    if _secret_run_re.search(found.group(1)):
+        return None
+    return "https://%s/ui/#%s/launches/all/%s" % (LAUNCH_HOST, found.group(1), found.group(2))
+
+
+def harvest_enrichment(
+    base: str,
+    evidence: Evidence,
+    roles: dict[str, str],
+    job: str = "",
+    build: str = "",
+    shared_dir: str = "",
+) -> dict[str, Any]:
+    """Bounded, boundary-validated link harvest from post-phase logs.
+
+    LPINTEROP links (pinned redhat.atlassian.net form) and a canonical
+    ReportPortal launch URL rebuilt from the pinned host, the validated
+    project key and the numeric launch id; anything not matching the
+    pinned shapes is dropped with an omitted-marker (design doc
+    section 11)."""
+    lpinterop_re = re.compile(r"https://redhat\.atlassian\.net/browse/(LPINTEROP-\d+)")
+    links: list[str] = []
+    launch: str | None = None
+    omitted = 0
+    safe = SafeAccess(base, shared_dir)
+    for step, role in roles.items():
+        if role != "post-phase":
+            continue
+        step_path = os.path.join(base, step)
+        for name in ("build-log.txt", "mpiit-data-router-reporter.log"):
+            path = os.path.join(step_path, name)
+            if not os.path.exists(path):
+                continue
+            ok, refusal = safe.check(path)
+            if not ok:
+                omitted += 1
+                continue
+            try:
+                with open(path, "rb") as handle:
+                    data = handle.read(16384)
+            except OSError:
+                omitted += 1
+                continue
+            text = data.decode("utf-8", "replace")
+            for match in lpinterop_re.finditer(text):
+                if match.group(0) not in links:
+                    links.append(match.group(0))
+            if launch is None:
+                found = _launch_candidate_re.search(text)
+                if found:
+                    canonical = canonical_launch(found.group(0))
+                    if canonical is None:
+                        omitted += 1
+                    else:
+                        launch = canonical
+    prow = (
+        "https://prow.ci.openshift.org/view/gs/"
+        "test-platform-results-public/logs/%s/%s" % (job, build)
+        if job and build
+        else None
+    )
+    return {"lpinterop": links[:8], "launch_url": launch, "prow_url": prow, "omitted": omitted}
+
+
+# ------------------------------------------------------ classification
+def classify(evidence: Evidence, roles: dict[str, str]) -> tuple[str, list[str], dict[str, int]]:
+    """(state, reasons, tallies) — residual default UNVERIFIED, never PASS."""
+    markers = evidence["markers"]
+
+    def failed(m: Marker | None) -> bool:
+        return m is not None and m["result"] in ("FAILURE", "ABORTED")
+
+    tallies = {"failed": 0, "error": 0, "skipped": 0}
+    seen_digests: dict[str, list[JunitRecord]] = {}
+    for record in evidence["junit"]:
+        if record["complete"]:
+            seen_digests.setdefault(record["raw_sha256"], []).append(record)
+    for _digest, records in seen_digests.items():  # dedupe: counting only
+        first = records[0]
+        for outcome in tallies:
+            tallies[outcome] += first["counts"][outcome]  # type: ignore[index]
+    # denominator for the wrapper's skip_ratio field: deduplicated
+    # testcase_count across complete records (skipped included once)
+    evidence["testcase_total"] = sum(
+        records[0]["testcase_count"] for records in seen_digests.values()
+    )
+    reasons: list[str] = []
+
+    # FAIL: authoritative failure, or failure inside an unrecognized dir
+    fail_steps = sorted(
+        step for step, m in markers.items() if roles.get(step) == "test-authoritative" and failed(m)
+    )
+    unrecognized_failed = sorted(
+        d["name"]
+        for d in evidence["unrecognized_dirs"]
+        if d["marker_result"] in ("FAILURE", "ABORTED")
+    )
+    if fail_steps or unrecognized_failed:
+        for step in fail_steps:
+            reasons.append("failed_steps:%s" % step)
+        for step in unrecognized_failed:
+            reasons.append("unrecognized_dir:%s" % step)
+        return "FAIL", reasons, tallies
+
+    # PWF: positive failure evidence without an authoritative failure
+    junit_red = tallies["failed"] + tallies["error"] > 0
+    be_failed = sorted(
+        step
+        for step, m in markers.items()
+        if roles.get(step) in ("test-best-effort", "post-phase") and failed(m)
+    )
+
+    # PWF needs positive evidence that the authoritative test steps ran;
+    # absent/aborted authoritative markers route to UNVERIFIED instead
+    # (openshift/release#88215 ba4af07 classification gate).
+    def succeeded(m: Marker | None) -> bool:
+        return m is not None and m["result"] == "SUCCESS"
+
+    authoritative_ok = all(
+        succeeded(markers.get(step)) for step, role in roles.items() if role == "test-authoritative"
+    )
+    if junit_red or (be_failed and authoritative_ok):
+        if junit_red:
+            reasons.append("test_failures:%d" % tallies["failed"])
+            reasons.append("test_errored:%d" % tallies["error"])
+        for step in be_failed:
+            reasons.append("failed_steps:%s" % step)
+        return "PASS_WITH_FAILURES", reasons, tallies
+
+    # UNVERIFIED: every reason the evidence can carry
+    test_phase = [s for s, r in roles.items() if r in TEST_PHASE_ROLES]
+    readable = [r for r in evidence["junit"] if r["complete"]]
+    for anomaly in evidence["anomalies"]:
+        reasons.append(anomaly)
+    for step in test_phase:
+        marker = markers.get(step)
+        if marker is None:
+            reasons.append("marker_absent:%s" % step)
+        elif marker["result"] == "ABORTED":
+            reasons.append("marker_aborted:%s" % step)
+    if not readable:
+        reasons.append("no_candidates" if not evidence["junit"] else "all_refused")
+    if readable and not any(r["testcase_count"] for r in readable):
+        reasons.append("zero_testcase")
+    for unrecognized in evidence["unrecognized_dirs"]:
+        if unrecognized["has_junit"] or (
+            unrecognized["marker_result"] is None and unrecognized["has_artifacts"]
+        ):
+            reasons.append("unrecognized_dir:%s" % unrecognized["name"])
+    for pruned in evidence["pruned"]:
+        if pruned["evidence"]:
+            reasons.append("pruned_dir:%s" % pruned["name"])
+    for step in evidence["role_dir_missing"]:
+        reasons.append("role_dir_missing:%s" % step)
+    for entry in evidence["degraded"]:
+        reasons.append(entry["reason"])
+    if evidence["truncated"]:
+        reasons.append("scan_deadline" if evidence.get("deadline") else "truncated")
+    if evidence["interrupted"]:
+        reasons.append("scan_interrupted")
+    if reasons:
+        return "UNVERIFIED", reasons, tallies
+
+    # PASS: the full conjunct, as the last branch
+    authoritative = [s for s, r in roles.items() if r == "test-authoritative"]
+    for step in authoritative:
+        marker = markers.get(step)
+        if marker is None or marker["result"] != "SUCCESS":
+            reasons.append("marker_absent:%s" % step)
+        elif not any(r["step"] == step and r["complete"] and r["testcase_count"] for r in readable):
+            reasons.append("no_junit:%s" % step)
+    observed_markers = [s for s in test_phase if markers.get(s) is not None]
+    if not observed_markers:
+        reasons.append("no_markers")
+    if not readable:
+        reasons.append("no_candidates")
+    if not any(r["testcase_count"] for r in readable):
+        reasons.append("zero_testcase")
+    if evidence["truncated"] or evidence["degraded"]:
+        reasons.append("truncated" if evidence["truncated"] else "degraded")
+    if reasons:
+        return "UNVERIFIED", reasons, tallies
+    return "PASS", [], tallies
+# ---- END GENERATED: scan_classify ----
 # ------------------------------------------------------------------ glue
-# Marker reading, bounded scan, classification, selfcheck modes (not
-# generated). One terminal result line, ever: the sent file is touched
-# immediately before printing it so the bash fallback cannot duplicate.
+# Signal wiring, escaping, terminal emission, role-table resolution,
+# selfcheck modes and the scan-program dispatch (not generated). The
+# marker/scan/classify machinery above is GENERATED from scan_classify.py
+# (embed.py); its environment seams (scan deadline, SHARED_DIR, the
+# interrupt flag, JUnit byte cap) are injected by mode_scan below. One
+# terminal result line, ever: the sent file is touched immediately
+# before printing it so the bash fallback cannot duplicate.
 import json
 import os
 import re
 import signal
-import stat
 import sys
 import time
 
@@ -306,11 +901,6 @@ MODE = ARGS[0] if ARGS else 'scan'
 PREFIX = 'OPP-SLACK-REPORTER'
 VERSION = 1
 STATES = ('PASS', 'PASS_WITH_FAILURES', 'UNVERIFIED', 'FAIL', 'CONFIG_ERROR')
-PRUNE_RE = re.compile(r'(gather|must-gather)', re.IGNORECASE)
-JUNIT_NAME_RE = re.compile(r'^(junit_|test-)', re.IGNORECASE)
-TEST_PHASE_ROLES = ('test-authoritative', 'test-best-effort')
-MAX_SCAN_ENTRIES = 200
-MAX_SCAN_DEPTH = 6
 
 _INTERRUPTED = {'flag': False}
 
@@ -381,433 +971,6 @@ def resolve_role_table():
         return None, None, source, ('CONFIG_ERROR', 'role_table_invalid')
     digest = hashlib.sha256(table_bytes).hexdigest()
     return table, digest, source, None
-
-
-# ------------------------------------------------------ marker rule
-def read_marker(step_dir):
-    """(marker_or_None, anomaly_or_None) for <step_dir>/finished.json.
-
-    Verbatim stepstatus alignment: uppercase SUCCESS; passed optional
-    (null = absent, isinstance(bool) guard); contradiction refused;
-    unparseable = partial_json; unreadable = OS failure."""
-    path = os.path.join(step_dir, 'finished.json')
-    try:
-        info = os.lstat(path)
-    except OSError:
-        return None, None
-    if stat.S_ISLNK(info.st_mode):
-        return None, 'marker_anomaly:unreadable'
-    try:
-        with open(path, 'rb') as handle:
-            raw = handle.read(1 << 20)
-        value = json.loads(raw)
-    except (OSError, ValueError):
-        return None, 'marker_anomaly:partial_json'
-    if not isinstance(value, dict):
-        return None, 'marker_anomaly:not_object'
-    result = value.get('result')
-    if result not in ('SUCCESS', 'FAILURE', 'ABORTED'):
-        return None, 'marker_anomaly:unknown_result'
-    passed = value.get('passed')
-    if passed is not None:
-        if not isinstance(passed, bool):
-            return None, 'marker_anomaly:non_boolean_passed'
-        consistent = passed if result == 'SUCCESS' else not passed
-        if not consistent:
-            return None, 'marker_anomaly:contradiction'
-    return {'result': result, 'passed': passed}, None
-
-
-# ------------------------------------------------------ file safety
-class SafeAccess:
-    """Per-file safety: lstat, S_ISLNK refusal, realpath containment,
-    /tmp/secrets and $SHARED_DIR exclusions (design doc section 6)."""
-
-    def __init__(self, root):
-        self.root = os.path.realpath(root)
-        excludes = ['/tmp/secrets']
-        shared = os.environ.get('SHARED_DIR', '')
-        if shared:
-            excludes.append(shared)
-        self.excludes = [os.path.realpath(p) for p in excludes if p]
-
-    def check(self, path):
-        """(ok, refusal_reason) for one file about to be opened."""
-        try:
-            info = os.lstat(path)
-        except OSError:
-            return False, 'missing'
-        if stat.S_ISLNK(info.st_mode):
-            return False, 'symlink_escape:%s' % os.path.basename(path)
-        real = os.path.realpath(path)
-        if real != self.root and not real.startswith(self.root + os.sep):
-            return False, 'symlink_escape:%s' % os.path.basename(path)
-        for exclude in self.excludes:
-            if real == exclude or real.startswith(exclude + os.sep):
-                return False, 'symlink_escape:%s' % os.path.basename(path)
-        return True, None
-
-    def read_capped(self, path, cap):
-        """(data, None) or (None, refusal): stat-first, bounded cap+1 read."""
-        try:
-            size = os.stat(path).st_size
-        except OSError:
-            return None, 'unreadable'
-        if size > cap:
-            return None, 'junit_size_limit'
-        try:
-            with open(path, 'rb') as handle:
-                data = handle.read(cap + 1)
-        except OSError:
-            return None, 'unreadable'
-        if len(data) > cap:  # stat-then-grow race: bounded refusal
-            return None, 'junit_size_limit'
-        return data, None
-
-
-# ------------------------------------------------------ scan
-def scan(base, table, roles):
-    """Walk the scan base (the test dir); returns the evidence record."""
-    safe = SafeAccess(base)
-    deadline = time.time() + int(
-        os.environ.get('SLACK_REPORTER_SCAN_DEADLINE', '120') or 120)
-    evidence = {
-        'test': os.path.basename(base.rstrip('/')),
-        'markers': {}, 'anomalies': [], 'junit': [], 'degraded': [],
-        'unrecognized_dirs': [], 'pruned': [], 'role_dir_missing': [],
-        'truncated': False, 'deadline': False, 'interrupted': False,
-    }
-
-    def junit_candidates(dir_path, depth=0, out=None, refusals=None):
-        """Bounded recursive junit-shaped discovery under one step dir.
-        JUnit-shaped symlinks are recorded as refusals, never skipped
-        silently (design doc section 6)."""
-        if out is None:
-            out = []
-        if refusals is None:
-            refusals = []
-        if depth > MAX_SCAN_DEPTH or len(out) >= MAX_SCAN_ENTRIES:
-            return out, refusals
-        try:
-            entries = sorted(os.scandir(dir_path), key=lambda e: e.name)
-        except OSError:
-            return out, refusals
-        if len(entries) > MAX_SCAN_ENTRIES:
-            evidence['truncated'] = True
-            entries = entries[:MAX_SCAN_ENTRIES]
-        for entry in entries:
-            if len(out) >= MAX_SCAN_ENTRIES:
-                evidence['truncated'] = True
-                break
-            if entry.is_symlink():
-                if (JUNIT_NAME_RE.match(entry.name)
-                        and entry.name.lower().endswith('.xml')):
-                    refusals.append('symlink_escape:%s' % entry.name)
-                continue
-            if entry.is_dir(follow_symlinks=False):
-                if PRUNE_RE.search(entry.name):
-                    continue
-                junit_candidates(entry.path, depth + 1, out, refusals)
-            elif (JUNIT_NAME_RE.match(entry.name)
-                    and entry.name.lower().endswith('.xml')):
-                out.append(entry.path)
-        return out, refusals
-
-    try:
-        step_dirs = sorted(e.name for e in os.scandir(base)
-                           if e.is_dir(follow_symlinks=False))
-    except OSError:
-        return evidence, 'CONFIG_ERROR', ['base_unresolvable']
-    if len(step_dirs) > MAX_SCAN_ENTRIES:
-        evidence['truncated'] = True
-        step_dirs = step_dirs[:MAX_SCAN_ENTRIES]
-
-    for step in step_dirs:
-        if _INTERRUPTED['flag']:
-            evidence['interrupted'] = True
-            break
-        if time.time() > deadline:
-            evidence['truncated'] = True
-            evidence['deadline'] = True
-            break  # finish the step dir before descending: checked between
-        step_path = os.path.join(base, step)
-        dir_ok, dir_refusal = safe.check(step_path)
-        if not dir_ok:
-            evidence['degraded'].append({'file': step, 'reason': dir_refusal})
-            evidence['anomalies'].append(dir_refusal)
-            continue
-        role = roles.get(step)
-        marker, anomaly = read_marker(step_path)
-        if anomaly:
-            evidence['anomalies'].append('%s:%s' % (anomaly, step))
-        if role is None:
-            if PRUNE_RE.search(step):
-                # pruned dir: shallow probe for failure evidence only
-                probe_marker, _ = read_marker(step_path)
-                candidates = []
-                try:
-                    probe_entries = list(os.scandir(step_path))
-                except OSError:
-                    probe_entries = []
-                has_evidence = (
-                    probe_marker is not None
-                    and probe_marker['result'] in ('FAILURE', 'ABORTED'))
-                for probe in probe_entries[:MAX_SCAN_ENTRIES]:
-                    if JUNIT_NAME_RE.match(probe.name):
-                        has_evidence = has_evidence or probe_marker is None
-                        candidates.append(probe.name)
-                evidence['pruned'].append({
-                    'name': step, 'marker_result':
-                        probe_marker['result'] if probe_marker else None,
-                    'junit_candidates': candidates, 'evidence': has_evidence})
-                continue
-            # unrecognized closure: record regardless of marker state
-            candidates, rogue_refusals = junit_candidates(step_path)
-            for refusal in rogue_refusals:
-                evidence['degraded'].append({'file': step, 'reason': refusal})
-            candidates = [os.path.basename(c) for c in candidates][:8]
-            has_artifacts = False
-            try:
-                has_artifacts = any(True for _ in os.scandir(step_path))
-            except OSError:
-                pass
-            evidence['unrecognized_dirs'].append({
-                'name': step,
-                'marker_result': marker['result'] if marker else None,
-                'junit_candidates': candidates, 'has_junit': bool(candidates),
-                'has_artifacts': has_artifacts})
-            continue
-        evidence['markers'][step] = marker  # None = absent
-        if role in TEST_PHASE_ROLES:
-            candidates, refusals = junit_candidates(step_path)
-            for refusal in refusals:
-                evidence['degraded'].append(
-                    {'file': '%s/%s' % (step, refusal), 'reason': refusal})
-            for candidate in candidates:
-                rel = os.path.relpath(candidate, base)
-                ok, refusal = safe.check(candidate)
-                if not ok:
-                    if refusal not in ('missing',):
-                        evidence['degraded'].append({'file': rel,
-                                                     'reason': refusal})
-                    continue
-                data, refusal = safe.read_capped(candidate, MAX_JUNIT_BYTES)
-                if data is None:
-                    evidence['degraded'].append({
-                        'file': rel, 'reason': refusal,
-                        'size': os.stat(candidate).st_size
-                        if refusal == 'junit_size_limit' else None})
-                    continue
-                parsed = parse_junit(data, 'file://' + rel)
-                evidence['junit'].append({
-                    'file': rel, 'step': step,
-                    'complete': parsed.complete, 'error': parsed.error,
-                    'counts': parsed.counts if parsed.complete else None,
-                    'testcase_count': parsed.testcase_count,
-                    'raw_sha256': parsed.raw_sha256})
-    # walk-completeness reconciliation (the table is an oracle)
-    for step, role in roles.items():
-        if role == 'own':
-            continue
-        if step not in step_dirs and step not in evidence['markers']:
-            evidence['role_dir_missing'].append(step)
-    return evidence, None, None
-
-
-def harvest_enrichment(base, evidence, roles):
-    """Bounded, boundary-validated link harvest from post-phase logs.
-
-    LPINTEROP links (pinned redhat.atlassian.net form) and a canonical
-    ReportPortal launch URL rebuilt from the pinned host plus the
-    numeric launch id; anything not matching the pinned shapes is
-    dropped with an omitted-marker (design doc section 11)."""
-    lpinterop_re = re.compile(
-        r'https://redhat\.atlassian\.net/browse/(LPINTEROP-\d+)')
-    # a raw candidate is accepted only when its host matches the pinned
-    # OPP ReportPortal instance exactly; the harvested value is REBUILT
-    # from the pinned host, the validated project key and the numeric
-    # launch id so no raw log content (userinfo, query string,
-    # arbitrary path) is ever echoed into the report or receipt. The
-    # project key is a route component, not decoration: the launch
-    # route is /ui/#<project>/launches/all/<id>, and a URL without it
-    # names a project called 'launches' and resolves to nothing.
-    launch_host = ('reportportal-lp-interop.apps.dno.ocp-hub.'
-                   'prod.psi.redhat.com')
-    launch_re = re.compile(r'https://\S*reportportal\S*/launch\S*',
-                           re.IGNORECASE)
-    # the project key is kept, but only in ReportPortal's own project
-    # key alphabet (server-side PROJECT_NAME_REGEXP, 1-64 chars,
-    # leading alphanumeric): no '/', '#', '?', '@', '%', whitespace or
-    # ':' can survive into the report. A key containing a 32+
-    # character alphanumeric run is secret-shaped content from an
-    # untrusted log and is rejected here, so the delivery secret-shape
-    # check never sees a launch URL that looks like a token.
-    launch_shape_re = re.compile(
-        r'/ui/#([A-Za-z0-9][A-Za-z0-9_-]{0,63})/launches/all/(\d{1,12})$')
-    secret_run_re = re.compile(r'[A-Za-z0-9]{32,}')
-
-    def canonical_launch(raw):
-        """Rebuild the canonical launch URL; None drops the candidate."""
-        if not raw.lower().startswith(
-                'https://' + launch_host + '/ui/#'):
-            return None
-        if '?' in raw or '@' in raw:
-            return None
-        found = launch_shape_re.search(raw)
-        if not found:
-            return None
-        if secret_run_re.search(found.group(1)):
-            return None
-        return 'https://%s/ui/#%s/launches/all/%s' % (
-            launch_host, found.group(1), found.group(2))
-    links, launch, omitted = [], None, 0
-    safe = SafeAccess(base)
-    for step, role in roles.items():
-        if role != 'post-phase':
-            continue
-        step_path = os.path.join(base, step)
-        for name in ('build-log.txt', 'mpiit-data-router-reporter.log'):
-            path = os.path.join(step_path, name)
-            if not os.path.exists(path):
-                continue
-            ok, refusal = safe.check(path)
-            if not ok:
-                omitted += 1
-                continue
-            try:
-                with open(path, 'rb') as handle:
-                    data = handle.read(16384)
-            except OSError:
-                omitted += 1
-                continue
-            text = data.decode('utf-8', 'replace')
-            for match in lpinterop_re.finditer(text):
-                if match.group(0) not in links:
-                    links.append(match.group(0))
-            if launch is None:
-                found = launch_re.search(text)
-                if found:
-                    canonical = canonical_launch(found.group(0))
-                    if canonical is None:
-                        omitted += 1
-                    else:
-                        launch = canonical
-    job = os.environ.get('JOB_NAME', '')
-    build = os.environ.get('BUILD_ID', '')
-    prow = ('https://prow.ci.openshift.org/view/gs/'
-            'test-platform-results-public/logs/%s/%s' % (job, build)
-            if job and build else None)
-    return {'lpinterop': links[:8], 'launch_url': launch, 'prow_url': prow,
-            'omitted': omitted}
-
-
-# ------------------------------------------------------ classification
-def classify(evidence, roles):
-    """(state, reasons, tallies) — residual default UNVERIFIED, never PASS."""
-    markers = evidence['markers']
-    failed = lambda m: m is not None and m['result'] in ('FAILURE', 'ABORTED')
-    tallies = {'failed': 0, 'error': 0, 'skipped': 0}
-    seen_digests = {}
-    for record in evidence['junit']:
-        if record['complete']:
-            seen_digests.setdefault(record['raw_sha256'], []).append(record)
-    for digest, records in seen_digests.items():  # dedupe: counting only
-        first = records[0]
-        for outcome in tallies:
-            tallies[outcome] += first['counts'][outcome]
-    evidence['testcase_total'] = sum(
-        records[0]['testcase_count'] for records in seen_digests.values())
-    reasons = []
-
-    # FAIL: authoritative failure, or failure inside an unrecognized dir
-    fail_steps = sorted(step for step, m in markers.items()
-                        if roles.get(step) == 'test-authoritative' and failed(m))
-    unrecognized_failed = sorted(
-        d['name'] for d in evidence['unrecognized_dirs']
-        if d['marker_result'] in ('FAILURE', 'ABORTED'))
-    if fail_steps or unrecognized_failed:
-        for step in fail_steps:
-            reasons.append('failed_steps:%s' % step)
-        for step in unrecognized_failed:
-            reasons.append('unrecognized_dir:%s' % step)
-        return 'FAIL', reasons, tallies
-
-    # PWF: positive failure evidence without an authoritative failure
-    junit_red = tallies['failed'] + tallies['error'] > 0
-    be_failed = sorted(step for step, m in markers.items()
-                        if roles.get(step) in ('test-best-effort', 'post-phase')
-                        and failed(m))
-    # PWF needs positive evidence that the authoritative test steps ran;
-    # absent/aborted authoritative markers route to UNVERIFIED instead.
-    authoritative_ok = all(
-        (markers.get(s) or {}).get('result') == 'SUCCESS'
-        for s, r in roles.items() if r == 'test-authoritative')
-    if junit_red or (be_failed and authoritative_ok):
-        if junit_red:
-            reasons.append('test_failures:%d' % tallies['failed'])
-            reasons.append('test_errored:%d' % tallies['error'])
-        for step in be_failed:
-            reasons.append('failed_steps:%s' % step)
-        return 'PASS_WITH_FAILURES', reasons, tallies
-
-    # UNVERIFIED: every reason the evidence can carry
-    test_phase = [s for s, r in roles.items() if r in TEST_PHASE_ROLES]
-    readable = [r for r in evidence['junit'] if r['complete']]
-    for anomaly in evidence['anomalies']:
-        reasons.append(anomaly)
-    for step in test_phase:
-        marker = markers.get(step)
-        if marker is None:
-            reasons.append('marker_absent:%s' % step)
-        elif marker['result'] == 'ABORTED':
-            reasons.append('marker_aborted:%s' % step)
-    if not readable:
-        reasons.append('no_candidates' if not evidence['junit']
-                       else 'all_refused')
-    if readable and not any(
-            r['testcase_count'] for r in readable):
-        reasons.append('zero_testcase')
-    for record in evidence['unrecognized_dirs']:
-        if record['has_junit'] or (record['marker_result'] is None
-                                   and record['has_artifacts']):
-            reasons.append('unrecognized_dir:%s' % record['name'])
-    for record in evidence['pruned']:
-        if record['evidence']:
-            reasons.append('pruned_dir:%s' % record['name'])
-    for step in evidence['role_dir_missing']:
-        reasons.append('role_dir_missing:%s' % step)
-    for entry in evidence['degraded']:
-        reasons.append(entry['reason'])
-    if evidence['truncated']:
-        reasons.append('scan_deadline' if evidence.get('deadline')
-                       else 'truncated')
-    if evidence['interrupted']:
-        reasons.append('scan_interrupted')
-    if reasons:
-        return 'UNVERIFIED', reasons, tallies
-
-    # PASS: the full conjunct, as the last branch
-    authoritative = [s for s, r in roles.items()
-                     if r == 'test-authoritative']
-    for step in authoritative:
-        marker = markers.get(step)
-        if marker is None or marker['result'] != 'SUCCESS':
-            reasons.append('marker_absent:%s' % step)
-        elif not any(r['step'] == step and r['complete'] and r['testcase_count']
-                     for r in readable):
-            reasons.append('no_junit:%s' % step)
-    observed_markers = [s for s in test_phase if markers.get(s) is not None]
-    if not observed_markers:
-        reasons.append('no_markers')
-    if not readable:
-        reasons.append('no_candidates')
-    if not any(r['testcase_count'] for r in readable):
-        reasons.append('zero_testcase')
-    if evidence['truncated'] or evidence['degraded']:
-        reasons.append('truncated' if evidence['truncated'] else 'degraded')
-    if reasons:
-        return 'UNVERIFIED', reasons, tallies
-    return 'PASS', [], tallies
 
 
 # ------------------------------------------------------ modes
@@ -895,7 +1058,13 @@ def mode_scan():
         tallies = {'failed': 0, 'error': 0, 'skipped': 0}
     else:
         roles = table[job]
-        evidence, config_state, config_reasons = scan(base, table, roles)
+        evidence, config_state, config_reasons = scan(
+            base, table, roles, parse_junit=parse_junit,
+            deadline=time.time() + int(
+                os.environ.get('SLACK_REPORTER_SCAN_DEADLINE', '120') or 120),
+            shared_dir=os.environ.get('SHARED_DIR', ''),
+            interrupted=lambda: _INTERRUPTED['flag'],
+            max_junit_bytes=MAX_JUNIT_BYTES)
         if config_state == 'CONFIG_ERROR':
             emit_terminal_line('CONFIG_ERROR', evidence['test'], {}, '0',
                                'none', config_reasons)
@@ -917,7 +1086,10 @@ def mode_scan():
         'junit': evidence['junit'], 'role_table_sha256': digest,
         'truncated': evidence['truncated'],
         'counts_as_pass_evidence': counts_pass,
-        'enrichment': harvest_enrichment(base, evidence, roles) if roles
+        'enrichment': harvest_enrichment(
+            base, evidence, roles, job=job,
+            build=os.environ.get('BUILD_ID', ''),
+            shared_dir=os.environ.get('SHARED_DIR', '')) if roles
         else {'lpinterop': [], 'launch_url': None, 'prow_url': None,
               'omitted': 0},
         'parser': {'name': JUNIT_PARSER, 'version': JUNIT_PARSER_VERSION},
@@ -986,6 +1158,13 @@ REHEARSAL_TEXT = ('[interop-opp-slack-reporter] rehearsal verification '
 _SAFE_CHAR = re.compile(r'[^A-Za-z0-9._=-]')
 _SECRET_SHAPED = re.compile(
     r'hooks\.slack\.com|/tmp/secrets|[A-Za-z0-9+/]{32,}')
+#: the pinned launch-URL tail is structural: harvest validates the
+#: project key per segment (no 32+ run) and caps the id at 12 digits,
+#: but '/' is in the base64 alphabet, so the tail would extend a
+#: legitimate key's run past the 32-char threshold and fail-close
+#: real launch URLs as delivery_blocked. Neutralize the tail before
+#: the belt scan; everything else in the text is still scanned raw.
+_LAUNCH_TAIL = re.compile(r'/launches/all/\d{1,12}')
 
 
 def esc(value):
@@ -1172,8 +1351,9 @@ def post(url, body):
             if sanitized in ACCEPT_SET:
                 return '1', str(status), 'delivered', {
                     'attempts': attempts, 'body_len': len(data)}
-            # response content is never copied into the receipt --
-            # status, length, and the fixed sink_error category only
+            #: response content is never copied into the receipt —
+            #: status, length, and the fixed sink_error category only
+            #: (CodeRabbit No-Sensitive-Data-In-Logs, 2026-11-04)
             return '0', str(status), 'sink_error', {
                 'attempts': attempts, 'body_len': len(data)}
         if status == 429 or 500 <= status < 600:
@@ -1272,8 +1452,11 @@ def main():
                 delivery.update(outcome='idempotent_skip')
             else:
                 text, body, digest = compose(report)
-                if _SECRET_SHAPED.search(text.rsplit('\n- interop-opp-'
-                                                     'slack-reporter', 1)[0]):
+                belt_text = _LAUNCH_TAIL.sub(
+                    '#',
+                    text.rsplit('\n- interop-opp-'
+                                'slack-reporter', 1)[0])
+                if _SECRET_SHAPED.search(belt_text):
                     reasons.append('delivery_blocked:secret_shaped_content')
                     delivery.update(
                         outcome='delivery_blocked:secret_shaped_content')
