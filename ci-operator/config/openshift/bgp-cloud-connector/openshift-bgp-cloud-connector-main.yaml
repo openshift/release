@@ -660,6 +660,92 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: e2e-gcp-workload-identity-operator
+  optional: true
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
