@@ -394,6 +394,8 @@ JUNIT_WRITTEN=false
 RECEIPT_WRITTEN=false
 GA_EXIT_CODE=0
 xml_escape() {
+    # bash >= 5.2 would expand '&' in the replacement to the match; keep it literal on every version.
+    shopt -u patsub_replacement 2>/dev/null || true
     local v="$1"
     v="${v//&/&amp;}"; v="${v//</&lt;}"; v="${v//>/&gt;}"; v="${v//\"/&quot;}"
     printf '%s' "${v}"
@@ -780,8 +782,10 @@ fi
 
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
-TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
-REPORT_TESTCASE="${PHASE_PREFIX} Claude should produce a triage duty report"
+# The prefix contains quotes: escape it once for the hand-built XML attributes below.
+PHASE_PREFIX_XML="$(xml_escape "${PHASE_PREFIX}")"
+TIMEOUT_TESTCASE="${PHASE_PREFIX_XML} Claude should complete in a reasonable time"
+REPORT_TESTCASE="${PHASE_PREFIX_XML} Claude should produce a triage duty report"
 
 FAILURE_COUNT=0
 
@@ -823,7 +827,7 @@ METRICS_FILE="${ARTIFACT_DIR}/claude-session-metrics-autodl.json"
 if [[ -f "${EXTRACT_METRICS}" ]] && [[ -f "${OTEL_LOG}" ]]; then
     METRICS_TEST_COUNT=1
     if python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${METRICS_FILE}"; then
-        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\"/>"
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX_XML} Session metrics extraction\" time=\"0\"/>"
 
         # Append authoritative session usage to the markdown report. This must
         # happen post-session: the model cannot observe its own final token
@@ -854,7 +858,7 @@ _Appended by the CI harness after the analysis session (extracted from OTEL tele
         fi
     else
         FAILURE_COUNT=$((FAILURE_COUNT + 1))
-        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX} Session metrics extraction\" time=\"0\">
+        METRICS_CASE="  <testcase name=\"${PHASE_PREFIX_XML} Session metrics extraction\" time=\"0\">
     <failure message=\"Failed to extract session metrics\">extract_metrics.py exited with an error. Check the output log.</failure>
   </testcase>"
     fi
