@@ -116,13 +116,49 @@ initialize_cluster_config() {
   if [[ -s "${CLUSTER_CONFIG_FILE}" ]] && jq empty "${CLUSTER_CONFIG_FILE}" >/dev/null 2>&1; then
     return
   fi
+  local multi_az_json=false
+  [[ "${MULTI_AZ:-false}" == "true" ]] && multi_az_json=true
   jq -n \
     --arg provider "azure" \
     --arg name "${CLUSTER_NAME}" \
     --arg resource_group "${CUSTOMER_RG_NAME}" \
     --arg location "${REGION}" \
     --arg subscription_id "${SUBSCRIPTION_ID}" \
-    '{provider: $provider, cluster: {name: $name, resource_group: $resource_group, location: $location, subscription_id: $subscription_id}, timers: {}, nodepools: {}}' \
+    --arg version "${OPENSHIFT_VERSION}" \
+    --arg channel_group "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" \
+    --arg replicas "${REPLICAS}" \
+    --arg provision_shard_id "${ARO_HCP_PROVISION_SHARD_ID:-}" \
+    --argjson multi_az "${multi_az_json}" \
+    '{
+      name: $name,
+      sts: false,
+      hypershift: true,
+      region: $location,
+      version: {major_version: $version, raw_id: $version, channel_group: $channel_group},
+      tags: {},
+      multi_az: $multi_az,
+      disable_scp_checks: false,
+      disable_workload_monitoring: false,
+      etcd_encryption: false,
+      enable_customer_managed_key: false,
+      fips: false,
+      private: false,
+      private_link: false,
+      default_ingress_private: false,
+      autoscaling: {enabled: false},
+      nodes: {install_nodes: $replicas, replicas: ($replicas | tonumber)},
+      properties: {provision_shard_id: $provision_shard_id},
+      subnets: {private_subnet_ids: "", public_subnet_ids: ""},
+      provider: $provider,
+      cluster: {name: $name, resource_group: $resource_group, location: $location, subscription_id: $subscription_id},
+      timers: {
+        install: {claim: 0, waiting: 0, validating: 0, pending: 0, installing: 0},
+        co_wait_time: 0,
+        destroy: 0,
+        sts_destroy: 0
+      },
+      nodepools: {}
+    }' \
     > "${CLUSTER_CONFIG_FILE}.tmp"
   mv "${CLUSTER_CONFIG_FILE}.tmp" "${CLUSTER_CONFIG_FILE}"
   chmod 600 "${CLUSTER_CONFIG_FILE}"
@@ -283,6 +319,11 @@ VNET_ID=$(az network vnet show --name "${CUSTOMER_VNET_NAME}" --resource-group "
 SUBNET_ID=$(az network vnet subnet show --name "${CUSTOMER_VNET_SUBNET1}" --vnet-name "${CUSTOMER_VNET_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
 VNET_INTEGRATION_SUBNET_ID=$(az network vnet subnet show --name "${CUSTOMER_VNET_INTEGRATION_SUBNET_NAME}" --vnet-name "${CUSTOMER_VNET_NAME}" --resource-group "${CUSTOMER_RG_NAME}" --query id --output tsv)
 log_step "Resolved the network resource IDs required by the HCP request."
+metadata_tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+jq --arg private_subnet_id "${SUBNET_ID}" \
+  '.subnets.private_subnet_ids = $private_subnet_id | .subnets.public_subnet_ids = (.subnets.public_subnet_ids // "")' \
+  "${CLUSTER_CONFIG_FILE}" > "${metadata_tmp}"
+mv "${metadata_tmp}" "${CLUSTER_CONFIG_FILE}"
 
 declare -A MI_ID
 declare -A MI_PID
@@ -695,14 +736,15 @@ record_timer "control_plane_install_seconds" "$((CONTROL_PLANE_READY - CONTROL_P
 # Resolve the newest enabled node-pool patch version after the HCP is ready.
 # The control plane accepts X.Y, but node pools require X.Y.Z.
 resolve_worker_nodepool_version() {
-  local cluster_version_json cluster_major_minor cluster_channel_group available_versions_json
+  local cluster_version_json cluster_version_id cluster_major_minor cluster_channel_group available_versions_json
 
   cluster_version_json=$(az aro hcp cluster show \
     --name "${CLUSTER_NAME}" \
     --resource-group "${CUSTOMER_RG_NAME}" \
     --query properties.version \
     --output json)
-  cluster_major_minor=$(jq -r '.id // empty' <<<"${cluster_version_json}" | awk -F. 'NF >= 2 { print $1 "." $2; exit }')
+  cluster_version_id=$(jq -r '.id // empty' <<<"${cluster_version_json}")
+  cluster_major_minor=$(awk -F. 'NF >= 2 { print $1 "." $2; exit }' <<<"${cluster_version_id}")
   cluster_channel_group=$(jq -r '.channelGroup // "stable"' <<<"${cluster_version_json}")
   : "${cluster_major_minor:?The HCP did not report a valid major.minor version}"
 
@@ -725,6 +767,11 @@ resolve_worker_nodepool_version() {
      | last // empty' <<<"${available_versions_json}")
   WORKER_CHANNEL_GROUP="${cluster_channel_group}"
   : "${WORKER_NODEPOOL_VERSION:?No enabled ${cluster_major_minor}.z node-pool version is available in ${REGION} for channel ${WORKER_CHANNEL_GROUP} }"
+  metadata_tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+  jq --arg raw_id "${cluster_version_id:-${OPENSHIFT_VERSION}}" --arg channel_group "${WORKER_CHANNEL_GROUP}" \
+    '.version.raw_id = $raw_id | .version.channel_group = $channel_group | .version.major_version = ($raw_id | split(".") | .[0:2] | join("."))' \
+    "${CLUSTER_CONFIG_FILE}" > "${metadata_tmp}"
+  mv "${metadata_tmp}" "${CLUSTER_CONFIG_FILE}"
   echo "Using latest available worker node pool version ${WORKER_NODEPOOL_VERSION} and channel group ${WORKER_CHANNEL_GROUP}."
 }
 

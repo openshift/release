@@ -52,6 +52,36 @@ record_timer() {
   mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
 }
 
+# Record a string-valued cluster-level readiness field.
+record_timer_string() {
+  local key="$1" value="$2" tmp
+  ensure_metadata
+  tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+  jq --arg key "${key}" --arg value "${value}" '.timers[$key] = $value' \
+    "${CLUSTER_CONFIG_FILE}" > "${tmp}"
+  mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
+}
+
+# Record a numeric control-plane install-state timer.
+record_install_timer() {
+  local key="$1" value="$2" tmp
+  ensure_metadata
+  tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+  jq --arg key "${key}" --argjson value "${value}" '.timers.install[$key] = $value' \
+    "${CLUSTER_CONFIG_FILE}" > "${tmp}"
+  mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
+}
+
+# Keep the install-state keys compatible with the ROSA metadata document.
+ensure_install_timers() {
+  local tmp
+  ensure_metadata
+  tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+  jq '.timers.install = ({claim: 0, waiting: 0, validating: 0, pending: 0, installing: 0} + (.timers.install // {}))' \
+    "${CLUSTER_CONFIG_FILE}" > "${tmp}"
+  mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
+}
+
 # Record a numeric readiness timer for one node pool.
 record_nodepool_timer() {
   local nodepool="$1" key="$2" value="$3" tmp
@@ -277,10 +307,23 @@ while (( SECONDS < deadline )); do
     record_timer guest_ready "${now}"
     record_timer global_end "${now}"
     global_start=$(jq -r '.timers.global_start // empty' "${CLUSTER_CONFIG_FILE}")
+    control_plane_start=$(jq -r '.timers.control_plane_install_start // .timers.global_start // empty' "${CLUSTER_CONFIG_FILE}")
+    control_plane_ready_at=$(jq -r '.timers.control_plane_ready // empty' "${CLUSTER_CONFIG_FILE}")
+    control_plane_ready_seconds=0
+    if [[ "${control_plane_start}" =~ ^[0-9]+$ ]]; then
+      if [[ "${control_plane_ready_at}" =~ ^[0-9]+$ ]]; then
+        control_plane_ready_seconds=$((control_plane_ready_at - control_plane_start))
+      else
+        control_plane_ready_seconds=$((now - control_plane_start))
+      fi
+      record_timer control_plane_install_seconds "${control_plane_ready_seconds}"
+    fi
     if [[ "${global_start}" =~ ^[0-9]+$ ]]; then
       record_timer cluster_ready_seconds "$((now - global_start))"
       record_timer total_install_time "$((now - global_start))"
-      record_timer cluster_ready "$((now - global_start))"
+      # ROSA's common cluster_ready/install_ready timers represent control-plane
+      # readiness; retain the full guest readiness duration separately.
+      record_timer cluster_ready "${control_plane_ready_seconds}"
     fi
     while IFS=$'\t' read -r name start; do
       [[ -z "${name}" ]] && continue
@@ -303,8 +346,13 @@ while (( SECONDS < deadline )); do
     fi
     (( workers_ready_seconds > 0 )) && record_timer nodepool_ready_seconds "${workers_ready_seconds}"
     record_timer nodes_ready "$((now - nodes_ready_start))"
-    install_ready=$(jq '[.timers.install // {} | to_entries[] | select(.value | type == "number") | .value] | add // 0' "${CLUSTER_CONFIG_FILE}")
-    record_timer install_ready "${install_ready}"
+    ensure_install_timers
+    install_state_total=$(jq '[.timers.install // {} | to_entries[] | select(.key | IN("claim", "waiting", "validating", "pending", "installing")) | (.value | tonumber? // 0)] | add // 0' "${CLUSTER_CONFIG_FILE}")
+    if [[ "${install_state_total}" == "0" && "${control_plane_ready_seconds}" -gt 0 ]]; then
+      record_install_timer installing "${control_plane_ready_seconds}"
+    fi
+    record_timer install_ready "${control_plane_ready_seconds}"
+    record_timer_string status ready
     mkdir -p "${ARTIFACT_DIR:-${SHARED_DIR}}"
     cp "${CLUSTER_CONFIG_FILE}" "${ARTIFACT_DIR:-${SHARED_DIR}}/cluster-config"
     echo "All ARO HCP readiness checks passed."
