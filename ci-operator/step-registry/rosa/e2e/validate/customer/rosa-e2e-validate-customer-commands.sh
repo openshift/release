@@ -28,6 +28,16 @@ if [[ -s "${SHARED_DIR}/bp-kubeconfig" ]]; then
   log "Backplane hosted-cluster kubeconfig available at BP_KUBECONFIG=${BP_KUBECONFIG}"
 fi
 
+# The management-cluster kubeconfig (mc-kubeconfig, also written by
+# rosa-backplane-login) is exported as MC_KUBECONFIG so the suite can verify
+# management-cluster state, e.g. the hypershift NodePool CR autoscaling bounds
+# for the Feature:Autoscaling spec. Not all provisioner heads run
+# rosa-backplane-login, so this is optional.
+if [[ -s "${SHARED_DIR}/mc-kubeconfig" ]]; then
+  export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
+  log "Management cluster kubeconfig available at MC_KUBECONFIG=${MC_KUBECONFIG}"
+fi
+
 # Customer plane validates from the guest cluster kubeconfig. Prefer the
 # provisioner-written kubeconfig (direct API), and fall back to BP_KUBECONFIG for
 # private-link clusters until the suite consumes BP_KUBECONFIG on its own.

@@ -1,0 +1,58 @@
+workflow:
+  as: rosa-e2e-hcp-autoscaling
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - chain: rosa-cluster-provision
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
+    # has provisioned the cluster.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig via backplane
+    # (ROSAENG-67580). The autoscaling spec verifies the NodePool CR
+    # autoScaling bounds on the management cluster when MC access is available.
+    - ref: rosa-backplane-login
+    test:
+    # Scoped to the rosa-e2e Feature:Autoscaling specs: the customer step
+    # creates a dedicated node pool with min/max autoscaling and drives
+    # scale-up under resource pressure and scale-down after workload removal.
+    # There are no autoscaling platform-plane specs, so the platform step is
+    # not run; the unscoped customer tail runs in the other rows of the
+    # ROSAENG-308 provision x validate matrix.
+    - ref: rosa-e2e-validate-customer
+      env:
+      - name: LABEL_FILTER
+        default: "Feature:Autoscaling"
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The autoscaling row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-63354): the rosa-CLI head provisions a standard HCP cluster, then
+    the customer validation step runs the rosa-e2e Feature:Autoscaling specs. A
+    dedicated node pool is created with autoscaling min/max bounds through the
+    OCM API, driven up to its maximum by a CPU-bound workload pinned to the
+    pool and back down to its minimum after the workload is removed, with the
+    bounds also verified on the hypershift NodePool CR on the management
+    cluster (mc-kubeconfig from rosa-backplane-login).
+
+    The platform plane is not run: there are no autoscaling platform-plane
+    specs. The customer plane requires corp-network reachability for
+    rosa-backplane-login: run this workflow only where backplane is reachable
+    (capabilities: [intranet], restrict_network_access: false,
+    network-access-rehearsals-ok label for rehearsals).
