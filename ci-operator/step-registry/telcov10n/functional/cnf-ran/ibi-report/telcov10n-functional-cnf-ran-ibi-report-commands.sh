@@ -22,21 +22,68 @@ from urllib.parse import urlsplit
 work = Path(sys.argv[1])
 config_file = work / "upload.json"
 os.umask(0o077)
-config = json.loads(config_file.read_text())
-config_file.unlink()
-phase = "reporter preparation"
+config = {}
+state = {"phase": "inputs", "upload": "not attempted"}
+
+
+def save_status():
+    temporary = work / "upload-status.tmp"
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    temporary.replace(work / "upload-status.json")
+
+
+def phase(name):
+    state["phase"] = name
+    save_status()
+
+
+def log_output(output):
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", errors="replace")
+    output = output or ""
+    request = re.search(r"Request:([0-9a-fA-F-]{36})\b", output)
+    if request:
+        state["request_id"] = request.group(1)
+    # Raw output remains private; only allowlisted status fields are published.
+    for key in ("username", "password"):
+        secret = config.get(key)
+        if isinstance(secret, str) and secret:
+            output = output.replace(secret, "[REDACTED]")
+    with (work / "upload.log").open("a") as stream:
+        stream.write("[" + state["phase"] + "]\n" + output + "\n")
+    return output.lower()
+
+
+def run(args, timeout):
+    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, errors="replace", timeout=timeout, check=False)
+    if result.returncode:
+        raise subprocess.CalledProcessError(result.returncode, args, output=result.stdout)
+    log_output(result.stdout)
+    return result.stdout
+
+
 try:
+    phase("inputs")
+    config = json.loads(config_file.read_text())
+    config_file.unlink()
     repo = work / "reporter"
-    subprocess.run(["git", "clone", "--depth", "1", "--recursive",
-                    config["repository"], str(repo)],
-                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                   timeout=180, check=True)
+    phase("clone")
+    run(["git", "clone", "--depth", "1", "--recursive", config["repository"], str(repo)], 180)
     os.chdir(repo)
+    phase("revision")
+    revision = run(["git", "rev-parse", "HEAD"], 30).strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("Invalid reporter revision")
+    state["reporter_revision"] = revision
+    phase("import")
+    sys.dont_write_bytecode = True
     sys.path.insert(0, str(repo / "cnf-polarion"))
     spec = importlib.util.spec_from_file_location(
         "rp_upload", repo / "cnf-polarion/upload_to_report_portal.py")
     uploader = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(uploader)
+    phase("metadata")
     results = work / "results"
     uploader.data_router_report_portal_config(
         str(results), config["version"], config["launch"],
@@ -46,38 +93,58 @@ try:
     if set(targets) != {"reportportal"}:
         raise ValueError("Unexpected upload destination")
     expected_host = targets["reportportal"]["config"]["hostname"]
-    phase = "ReportPortal upload"
-    result = subprocess.run(
+    state["upload"] = "completion unconfirmed"
+    phase("upload")
+    output = run(
         ["drouter/droute-linux-386", "send", "-v",
          "--url", "https://datarouter.dno.corp.redhat.com",
          "--username", config["username"], "--password", config["password"],
          "--metadata=" + str(metadata), "--wait",
-         "--results=" + str(results / "*.xml")],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, timeout=600, check=False)
-    # Keep diagnostic output private and remove credentials before saving it.
-    output = result.stdout
-    for secret in (config["username"], config["password"]):
-        output = output.replace(secret, "[REDACTED]")
-    (work / "upload.log").write_text(output)
+         "--results=" + str(results / "*.xml")], 600)
+    state["client_exit_code"] = 0
+    phase("response")
     urls = {json.loads(value) for value in re.findall(
-        r'"launch_url"\s*:\s*("(?:[^"\\]|\\.)*")', result.stdout)}
-    if result.returncode != 0 or len(urls) != 1:
-        raise RuntimeError("Upload failed or did not return one launch URL")
+        r'"launch_url"\s*:\s*("(?:[^"\\]|\\.)*")', output)}
+    state["launch_url_count"] = len(urls)
+    if len(urls) != 1:
+        raise ValueError("Upload did not return one launch URL")
     url = urls.pop()
-    if urlsplit(url).scheme != "https" or urlsplit(url).hostname != expected_host:
+    parsed = urlsplit(url)
+    if (parsed.scheme != "https" or parsed.hostname != expected_host or
+            parsed.username or parsed.password):
         raise ValueError("Unexpected launch URL")
-    revision = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], text=True).strip()
-    print(json.dumps({"url": url, "reporter_revision": revision}))
+    state.update(phase="complete", upload="completed", url=url)
 except Exception as error:
-    (work / "upload-error.txt").write_text(
-        phase + " failed: " + type(error).__name__ +
-        "; completion is unconfirmed. Check ReportPortal before retrying.\n")
-    # Exception/argv and clone output may contain credentials.
-    print("ReportPortal upload failed; inspect the private bastion work directory.",
-          file=sys.stderr)
-    sys.exit(1)
+    state["error_type"] = type(error).__name__
+    if isinstance(error, subprocess.CalledProcessError):
+        state["exit_code"] = error.returncode
+        if state["phase"] == "upload":
+            state["client_exit_code"] = error.returncode
+        detail = log_output(error.output)
+    elif isinstance(error, subprocess.TimeoutExpired):
+        state["timeout_seconds"] = error.timeout
+        detail = log_output(error.stdout)
+    else:
+        detail = log_output(str(error))
+    if isinstance(error, ModuleNotFoundError) and error.name:
+        state["missing_module"] = error.name
+    if isinstance(error, OSError) and error.errno is not None:
+        state["errno"] = error.errno
+    # Recognized messages become fixed public codes, never arbitrary log text.
+    for reason, patterns in (
+        ("tls_verification", ("certificate verify failed", "ssl certificate problem", "server certificate verification failed")),
+        ("authentication", ("authentication failed", "authentication required", "invalid username/password", "401 unauthorized")),
+        ("dns_resolution", ("could not resolve host", "name or service not known", "temporary failure in name resolution")),
+        ("connection_refused", ("connection refused",)),
+        ("permission_denied", ("permission denied", "403 forbidden")),
+    ):
+        if any(pattern in detail for pattern in patterns):
+            state["reason"] = reason
+            break
+    print("IBI reporter failed during " + state["phase"] + " (" + state["error_type"] + ").", file=sys.stderr)
+finally:
+    save_status()
+sys.exit(0 if state["upload"] == "completed" else 1)
 '''
 import json
 import os
@@ -124,12 +191,58 @@ def destination(prefix):
     return user + "@" + host
 
 
+class CommandError(RuntimeError):
+    def __init__(self, label, **details):
+        super().__init__(label + " failed")
+        self.details = {"command": label, **details}
+
+
 def command(args, label, timeout=180, text=None):
-    result = subprocess.run(args, input=text, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, timeout=timeout, check=False)
+    try:
+        result = subprocess.run(args, input=text, text=True, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        raise CommandError(label, timeout_seconds=timeout) from None
+    except OSError as error:
+        raise CommandError(label, errno=error.errno) from None
     if result.returncode:
-        raise RuntimeError(label + " failed")
+        raise CommandError(label, exit_code=result.returncode)
     return result.stdout
+
+
+def read_upload_status(path):
+    # The private file is never copied wholesale into public Prow artifacts.
+    value = json.loads(path.read_text())
+    if value.get("phase") not in ("inputs", "clone", "revision", "import", "metadata", "upload", "response", "complete"):
+        raise ValueError("Invalid reporter phase")
+    if value.get("upload") not in ("not attempted", "completion unconfirmed", "completed"):
+        raise ValueError("Invalid upload outcome")
+    public = {key: value[key] for key in ("phase", "upload")}
+    for key, pattern in {
+        "error_type": r"[A-Za-z_][A-Za-z0-9_]{0,79}",
+        "missing_module": r"[A-Za-z_][A-Za-z0-9_.]{0,199}",
+        "reporter_revision": r"[0-9a-f]{40}",
+        "request_id": r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}",
+        "reason": r"tls_verification|authentication|dns_resolution|connection_refused|permission_denied",
+    }.items():
+        if key in value:
+            if not isinstance(value[key], str) or not re.fullmatch(pattern, value[key]):
+                raise ValueError("Invalid reporter diagnostic field")
+            public[key] = value[key]
+    for key in ("exit_code", "client_exit_code", "timeout_seconds", "errno", "launch_url_count"):
+        if key in value:
+            if type(value[key]) is not int:
+                raise ValueError("Invalid reporter numeric diagnostic")
+            public[key] = value[key]
+    if value["upload"] == "completed":
+        url = value.get("url", "")
+        parsed = urlsplit(url)
+        if (value["phase"] != "complete" or not public.get("reporter_revision") or
+                value.get("client_exit_code") != 0 or value.get("launch_url_count") != 1 or
+                parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password):
+            raise ValueError("Invalid completed upload status")
+        public["url"] = url
+    return public
 
 
 def normalize(path, lane, output):
@@ -247,27 +360,51 @@ def main():
             command(["scp", "-q", "-r", *opts, str(ready), str(private),
                      target + ":" + remote + "/"], "Upload staging")
             summary["upload"] = "completion unconfirmed"
-            response = command(
-                ["ssh", *opts, target, "python3 - " + shlex.quote(remote)],
-                "ReportPortal upload", timeout=900, text=REMOTE_UPLOADER)
-            result = json.loads(response)
-            (artifacts / "reportportal-url.txt").write_text(result["url"] + "\n")
-            (shared / "ibi-reportportal-url").write_text(result["url"] + "\n")
-            summary["upload"] = "completed"
-            summary["reporter_revision"] = result["reporter_revision"]
-            print("ReportPortal upload completed; launch URL saved in artifacts.")
+            try:
+                command(["ssh", *opts, target, "python3 - " + shlex.quote(remote)],
+                        "Run reporter", timeout=900, text=REMOTE_UPLOADER)
+            except CommandError as error:
+                summary["reporter_transport"] = error.details
+                # A disconnected SSH session does not prove that upload failed.
+            finally:
+                try:
+                    command(["scp", "-q", *opts, target + ":" + remote + "/upload-status.json",
+                             str(scratch / "upload-status.json")], "Collect reporter status")
+                    result = read_upload_status(scratch / "upload-status.json")
+                    summary["reporter"] = result
+                    summary["upload"] = result["upload"]
+                    (artifacts / "upload-status.json").write_text(json.dumps(result, indent=2) + "\n")
+                    if result["upload"] == "completed":
+                        (artifacts / "reportportal-url.txt").write_text(result["url"] + "\n")
+                        (shared / "ibi-reportportal-url").write_text(result["url"] + "\n")
+                        summary["reporter_revision"] = result["reporter_revision"]
+                        print("ReportPortal upload completed; launch URL saved in artifacts.")
+                    else:
+                        print("IBI reporter last recorded phase: " + result["phase"] +
+                              "; see upload-status.json.", file=sys.stderr)
+                except Exception as error:
+                    summary["status_collection_error"] = (error.details if isinstance(error, CommandError)
+                                                          else {"error_type": type(error).__name__})
+                    problems.append("reporter status")
         finally:
-            # The remote uploader also removes this before starting.
-            command(["ssh", *opts, target,
-                     "rm -f -- " + shlex.quote(remote + "/upload.json")],
-                    "Remove private upload inputs")
-        return 1 if problems else 0
+            # Keep credential cleanup errors separate from the upload outcome.
+            try:
+                command(["ssh", *opts, target,
+                         "rm -f -- " + shlex.quote(remote + "/upload.json")],
+                        "Remove private upload inputs")
+                summary["credential_cleanup"] = "completed"
+            except CommandError as error:
+                summary["credential_cleanup"] = error.details
+                problems.append("credential cleanup")
+        return 1 if problems or summary["upload"] != "completed" else 0
 
 
 status = 1
 try:
     status = main()
-except Exception:
+except Exception as error:
+    summary["error"] = (error.details if isinstance(error, CommandError)
+                        else {"error_type": type(error).__name__})
     print("IBI reporting failed; see reporting-status.json and the private bastion reports.",
           file=sys.stderr)
 finally:
