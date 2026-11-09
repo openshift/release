@@ -13,6 +13,6 @@ then
   exit 0
 fi
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 aws ec2 delete-security-group --region ${REGION} --group-id "$(cat ${SHARED_DIR}/security_groups)" & 
 wait "$!"
