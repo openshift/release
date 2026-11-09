@@ -51,6 +51,13 @@ resources:
 tests:
 - as: "{{ test_as }}"
   timeout: 4h0m0s
+{% if test != 'upgrade' and quay_version is defined %}
+  # Versioned presubmits must not inherit the deploy step's stable-3.16 default.
+  # Master has no Quay version and keeps that existing default behavior.
+  steps:
+    env:
+      QUAY_OPERATOR_CHANNEL: "{{ operator_channel }}"
+{% endif %}
 zz_generated_metadata:
   branch: "{{ branch }}"
   org: "{{ org }}"

@@ -329,6 +329,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
     rehearsal_catalog_pins = defaults.get("rehearsal_catalog_pins") or {}
     if not isinstance(rehearsal_catalog_pins, dict) or not all(
         isinstance(ocp, str)
+        and re.fullmatch(r"\d+\.\d+", ocp)
         and isinstance(pullspec, str)
         and re.match(r"^[^\s@]+@sha256:[a-f0-9]{64}$", pullspec)
         for ocp, pullspec in rehearsal_catalog_pins.items()
@@ -514,6 +515,14 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         ocp_channel=ocp_channel or "stable",
                     )
                 )
+    unused_pins = sorted(
+        set(rehearsal_catalog_pins) - {cell.ocp_version for cell in cells if cell.quay_version is not None}
+    )
+    if unused_pins:
+        raise ValueError(
+            "global_defaults.rehearsal_catalog_pins contains OCP versions not used by "
+            f"the versioned Quay matrix: {', '.join(unused_pins)}"
+        )
     return cells
 
 

@@ -722,6 +722,34 @@ def test_comprehensive_matrix_is_complete_and_rehearsal_only() -> None:
     assert len(periodic) == 11
 
 
+def test_every_versioned_install_uses_its_matching_operator_channel() -> None:
+    """Versioned install cells must override the deploy step's stable-3.16 default."""
+    matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
+    cells = expand_cells(matrix)
+    expected_quay_versions = {f"3.{minor}" for minor in range(9, 19)}
+    expected_ocp_versions = {f"4.{minor}" for minor in range(12, 23)}
+    results, _retired = generate_all()
+
+    checked = 0
+    for group, _filename, config in results:
+        for cell, test in zip(group, config["tests"], strict=True):
+            if (
+                cell.quay_version not in expected_quay_versions
+                or cell.ocp_version not in expected_ocp_versions
+                or cell.test not in {"e2e-install", "e2e-legacy"}
+                or cell.cloud != "aws"
+                or cell.storage != "s3"
+                or cell.arch != "amd64"
+                or cell.database
+                or cell.fips
+            ):
+                continue
+            env = test["steps"]["env"]
+            assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{cell.quay_version}"
+            checked += 1
+    assert checked == 110
+
+
 def test_rehearsal_presubmit_uses_art_fbc_and_keeps_legacy_stage_auth() -> None:
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
@@ -1196,6 +1224,29 @@ def _matrix_with_job(
         "global_defaults": {"image_source": "build", "arch": "amd64", "repo": "quay/quay"},
         "quay": [release],
     }
+
+
+@pytest.mark.parametrize("pin_version", ["4.12 ", "v4.12", "4", "4.12.1"])
+def test_rehearsal_catalog_pin_keys_must_be_ocp_versions(pin_version: str) -> None:
+    matrix = _matrix_with_job(
+        {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    )
+    matrix["global_defaults"]["rehearsal_catalog_pins"] = {
+        pin_version: "quay.io/example/catalog@sha256:" + "a" * 64
+    }
+    with pytest.raises(ValueError, match="must map OCP versions"):
+        expand_cells(matrix)
+
+
+def test_rehearsal_catalog_pin_keys_must_be_used_by_versioned_matrix() -> None:
+    matrix = _matrix_with_job(
+        {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    )
+    matrix["global_defaults"]["rehearsal_catalog_pins"] = {
+        "4.99": "quay.io/example/catalog@sha256:" + "a" * 64
+    }
+    with pytest.raises(ValueError, match="not used by the versioned Quay matrix: 4.99"):
+        expand_cells(matrix)
 
 
 def test_kind_must_be_periodic_or_presubmit() -> None:
