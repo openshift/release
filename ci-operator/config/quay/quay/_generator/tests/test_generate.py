@@ -80,7 +80,11 @@ def test_expand_matrix_cells() -> None:
     assert master_cell.quay_version is None
     assert "QUAY_EXTRA_CONFIG" not in cell.env
 
-    upgrade_cell = next(c for c in cells if c.test == "upgrade")
+    upgrade_cell = next(
+        c
+        for c in cells
+        if c.test == "upgrade" and c.branch == "redhat-3.18" and c.ocp_version == "4.22"
+    )
     assert upgrade_cell.filename == "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml"
     assert upgrade_cell.upgrade_from == "3.17"
     assert upgrade_cell.test_as == "from-317"
@@ -504,28 +508,44 @@ def test_upgrade_nightlies() -> None:
     by_name = {filename: config for _group, filename, config in results}
     expected = {
         "quay-quay-redhat-3.17__aws-ocp422-s3-upgrade.yaml": (
-            "from-316", "stable", "4.22", "3.16", "3.17", "quay-3.17__v4.22__quay-rhel9-operator"
+            "from-316", "stable", "4.22", "3.16", "3.17",
+            "quay-3.17__v4.22__quay-rhel9-operator", "@daily",
         ),
         "quay-quay-redhat-3.18__aws-ocp422-s3-upgrade.yaml": (
             "from-317", "stable", "4.22", "3.17", "3.18",
-            "quay-operator-fbc-unified-4.22-20261022013012521155.ocp4.22",
+            "quay-operator-fbc-unified-4.22-20261022013012521155.ocp4.22", "@daily",
+        ),
+        "quay-quay-redhat-3.18__aws-ocp50-s3-upgrade.yaml": (
+            "from-317", "candidate", "5.0", "3.17", "3.18",
+            "quay-3.18__v5.0__quay-rhel9-operator", "@weekly",
         ),
         "quay-quay-redhat-5.0__aws-ocp50-s3-upgrade.yaml": (
-            "from-318", "candidate", "5.0", "3.18", "5.0", "quay-5.0__v5.0__quay-rhel9-operator"
+            "from-318", "candidate", "5.0", "3.18", "5.0",
+            "quay-5.0__v5.0__quay-rhel9-operator", "@daily",
         ),
     }
-    for filename, (as_name, channel, ocp, source, target, index_tag) in expected.items():
+    for filename, (as_name, channel, ocp, source, target, index_tag, cron) in expected.items():
         config = by_name[filename]
         assert config["releases"]["latest"] == {
             "release": {"architecture": "amd64", "channel": channel, "version": ocp}
         }
         test = config["tests"][0]
         assert test["as"] == as_name
-        assert test["cron"] == "@daily"
+        assert test["cron"] == cron
         env = test["steps"]["env"]
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
         assert env["QUAY_INDEX_IMAGE_TAG"] == index_tag
+
+    ocp50_env = by_name["quay-quay-redhat-3.18__aws-ocp50-s3-upgrade.yaml"]["tests"][0]["steps"]["env"]
+    assert ocp50_env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"].endswith(
+        "@sha256:5e3fd44df493c26ec3b152cae871c1380d30654d1a2ed7cfca9eb77d6d11cf74"
+    )
+    assert ocp50_env["PLAYWRIGHT_N_GIT_BRANCH"] == "e88fdd0b94651378ff2feaf69251898e6826eeb9"
+    assert ocp50_env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == (
+        "272c949abeb3905ee054d8b9e7b81af44556783c"
+    )
+    assert "PLAYWRIGHT_REF_MODE" not in ocp50_env
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
@@ -605,6 +625,12 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     )
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+    ocp50_env = ocp50["tests"][0]["steps"]["env"]
+    assert ocp50_env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"].endswith(
+        "@sha256:5e3fd44df493c26ec3b152cae871c1380d30654d1a2ed7cfca9eb77d6d11cf74"
+    )
+    assert ocp50_env["PLAYWRIGHT_GIT_BRANCH"] == "e88fdd0b94651378ff2feaf69251898e6826eeb9"
+    assert "PLAYWRIGHT_REF_MODE" not in ocp50_env
 
 
 def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:

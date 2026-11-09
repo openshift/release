@@ -10,6 +10,7 @@ managed_files:
     - quay-quay-master.yaml
     - quay-quay-redhat-3.18__aws-ocp422-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml
+    - quay-quay-redhat-3.18__aws-ocp50-s3-upgrade.yaml
     - quay-quay-redhat-3.18__aws-ocp414-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp415-e2e-install.yaml
     - quay-quay-redhat-3.18__aws-ocp416-e2e-install.yaml
@@ -98,6 +99,20 @@ quay:
         clouds: [aws]
         ocp: ["5.0"]
         test: e2e-install
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:5e3fd44df493c26ec3b152cae871c1380d30654d1a2ed7cfca9eb77d6d11cf74
+          PLAYWRIGHT_GIT_BRANCH: e88fdd0b94651378ff2feaf69251898e6826eeb9
+      - cron: weekly
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: upgrade
+        upgrade_from: "3.17"
+        ocp_channel: candidate
+        env:
+          MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:5e3fd44df493c26ec3b152cae871c1380d30654d1a2ed7cfca9eb77d6d11cf74
+          PLAYWRIGHT_N_GIT_BRANCH: e88fdd0b94651378ff2feaf69251898e6826eeb9
+          PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: 272c949abeb3905ee054d8b9e7b81af44556783c
       # oldest OCP Quay 3.18 supports with an ART nightly FBC (v4.12/v4.13 have none)
       - cron: weekly
         source: nightly
