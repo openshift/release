@@ -17,6 +17,621 @@ chain:
       }
       trap cleanup EXIT
 
+      # >>> BEGIN aws-failure-diagnostics (extracted verbatim by hack/tests/aws-failure-diagnostics)
+      # Bounded, best-effort capture of allowlisted AWS failure context. It runs only
+      # when AWS_FAILURE_DIAGNOSTICS is true and the suite already failed, it never
+      # changes the exit status, and it never emits credentials, raw environment
+      # values, raw log bodies or raw test names.
+      aws_failure_diagnostics_capture() {
+        local suite_exit_code="${1:-}"
+        local work_dir artifact_out shared_out
+        work_dir="$(mktemp -d /tmp/aws-failure-diagnostics.XXXXXX)" || return 0
+        artifact_out="${ARTIFACT_DIR:-/tmp}/aws-failure-diagnostics"
+        shared_out="${SHARED_DIR:-/tmp}/aws-failure-diagnostics"
+        if ! mkdir -p "${artifact_out}" "${shared_out}" 2>/dev/null; then
+          rm -rf "${work_dir}" 2>/dev/null
+          return 0
+        fi
+
+        # Node and infrastructure reads are bounded and their stderr is discarded so
+        # that a kubeconfig path or token in an error message cannot reach the log.
+        timeout 60 oc get nodes \
+          -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.providerID}{"\n"}{end}' \
+          > "${work_dir}/nodes.txt" 2>/dev/null || true
+        timeout 60 oc get infrastructure cluster \
+          -o jsonpath='{.status.platformStatus.aws.region}' \
+          > "${work_dir}/infra-region.txt" 2>/dev/null || true
+
+        cat > "${work_dir}/capture.py" <<'AWS_FAILURE_DIAGNOSTICS_PY'
+      #!/usr/bin/env python3
+      """Build an allowlisted AWS failure context from openshift-tests artifacts.
+
+      This runs inside the conformance test step, which is the only pod that can see
+      ${ARTIFACT_DIR}/junit, and writes a small JSON document that a later post step
+      can consume through ${SHARED_DIR}.
+
+      Safety contract (enforced by construction, not by redaction of a blob):
+        * Only these kinds of values are ever emitted: enum/status codes, AWS region
+          names, availability zones, node names, providerIDs, EC2 instance IDs, AWS
+          service/operation names, AWS error codes, AWS request IDs, HTTP status
+          codes, RFC3339 timestamps, hashed test identifiers and counters.
+        * Every emitted string is matched against a strict allowlist pattern first; a
+          value that does not match is dropped and replaced by a status code. The
+          patterns are shaped after the AWS identifiers they accept, so neither free
+          prose nor an opaque token can ride along in a field whose value the suite
+          under test controls, and looks_like_secret() refuses credential shapes a
+          second time independently of which field they appeared in.
+        * Environment variables are only ever inspected, never copied out: their
+          values reach the document solely as booleans or as a region name that
+          matched the region pattern.
+        * Log bodies, <system-out>, raw test names, ARNs, account IDs, credentials and
+          complete API objects are never read into the output.
+      """
+
+      import argparse
+      import hashlib
+      import json
+      import os
+      import re
+      import sys
+      import xml.etree.ElementTree as ET
+
+      SCHEMA_VERSION = 1
+      PRODUCER = "hypershift-conformance/aws-failure-diagnostics"
+
+      MAX_JUNIT_FILES = 20
+      MAX_JUNIT_BYTES = 64 * 1024 * 1024
+      MAX_ERRORS = 25
+      MAX_NODES = 25
+      MAX_FAILURE_TEXT = 8192
+      SCAN_CHUNK_BYTES = 1024 * 1024
+      SCAN_OVERLAP_BYTES = 16
+
+      RE_REGION = re.compile(r"^[a-z]{2,4}(?:-[a-z0-9]+){1,3}-\d{1,2}$")
+      RE_AZ = re.compile(r"^([a-z]{2,4}(?:-[a-z0-9]+){1,3}-\d{1,2})[a-z]$")
+      RE_INSTANCE = re.compile(r"^i-[0-9a-f]{8,17}$")
+      RE_NODE = re.compile(r"^[a-z0-9][a-z0-9.\-]{0,252}$")
+      RE_PROVIDER_ID = re.compile(r"^aws:///[a-z0-9\-]{1,64}/i-[0-9a-f]{8,17}$")
+      # An AWS SDK service ID: up to four capitalised words, as in "EC2" or
+      # "Elastic Load Balancing v2". Prose between "operation error " and the
+      # operation name does not match, so a log fragment cannot ride along.
+      RE_SERVICE = re.compile(r"^[A-Z][A-Za-z0-9]{0,31}(?: [A-Za-z0-9]{1,31}){0,3}$")
+      RE_OPERATION = re.compile(r"^[A-Z][A-Za-z0-9]{0,63}$")
+      # An AWS error code: capitalised, dot or hyphen separated, as in
+      # "InvalidInstanceID.NotFound".
+      RE_ERROR_CODE = re.compile(r"^[A-Z][A-Za-z0-9]{0,47}(?:[.\-][A-Za-z0-9]{1,47}){0,3}$")
+      # An AWS request ID is either a dashed UUID or an uppercase alphanumeric
+      # token containing at least one letter, which excludes a bare account ID.
+      RE_REQUEST_ID = re.compile(
+          r"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+          r"|(?=[0-9A-Z]*[A-Z])[0-9A-Z]{8,64})$"
+      )
+      RE_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$")
+      # AWS resource-ID prefixes that are never a diagnostic value.
+      RE_KEY_LIKE = re.compile(r"^(?:AKIA|ASIA|AIDA|AROA|ANPA|ANVA|APKA|AGPA)")
+      # A long opaque run mixing case and digits with no word separator is the
+      # shape of a secret key, a session token or a JWT segment, and is never
+      # the shape of an AWS service name, operation, error code or request ID.
+      RE_OPAQUE_TOKEN = re.compile(
+          r"^(?=[^a-z]*[a-z])(?=[^A-Z]*[A-Z])(?=[^0-9]*[0-9])[A-Za-z0-9+/=_-]{32,}$"
+      )
+
+      FIND_SERVICE_OPERATION = re.compile(
+          r"operation error ([A-Za-z][A-Za-z0-9 ]{0,63}?): ([A-Za-z][A-Za-z0-9]{0,63})"
+      )
+      FIND_STATUS = re.compile(r"StatusCode: (\d{3})\b")
+      FIND_REQUEST_ID = re.compile(r"RequestID: ([0-9A-Za-z._\-]{8,64})")
+      FIND_ERROR_CODE = re.compile(r"api error ([A-Za-z][A-Za-z0-9._\-]{0,63})")
+      FIND_INSTANCE = re.compile(r"\bi-[0-9a-f]{8,17}\b")
+
+      # Ordered (needle tuple -> enum) map. The raw test name is never emitted; it is
+      # reduced to one of these enum values plus a truncated digest. The digest only
+      # correlates records that came from the same test; test names are public, so it
+      # is pseudonymisation for correlation and not a confidentiality control.
+      TEST_CLASSES = (
+          (("cloud-provider-aws-e2e", "transition from"), "cloud-provider-aws-nlb-sg-transition"),
+          (("cloud-provider-aws-e2e", "BYO Security Group"), "cloud-provider-aws-nlb-byo-sg"),
+          (("cloud-provider-aws-e2e", "BYO SG"), "cloud-provider-aws-nlb-byo-sg"),
+          (("cloud-provider-aws",), "cloud-provider-aws-other"),
+      )
+
+
+      def looks_like_secret(value):
+          """Report values whose shape is a credential rather than an identifier."""
+          return bool(RE_KEY_LIKE.match(value) or RE_OPAQUE_TOKEN.match(value))
+
+
+      def allow(value, pattern):
+          """Return value when it matches the allowlist pattern, else None.
+
+          Every emitted string goes through here, so the shape rejection applies
+          to all of them and not only to request IDs. The patterns are the
+          allowlist; looks_like_secret is a second, independent refusal for
+          anything that still reads as an opaque credential.
+          """
+          if value is None:
+              return None
+          value = value.strip()
+          if not value:
+              return None
+          if looks_like_secret(value):
+              return None
+          return value if pattern.match(value) else None
+
+
+      def env_region(name):
+          """Report an environment variable as a region name or as a status only."""
+          raw = os.environ.get(name)
+          if raw is None:
+              return {"status": "unset", "value": None}
+          value = allow(raw, RE_REGION)
+          if value is None:
+              # The value is deliberately not echoed: it is not known to be a region.
+              return {"status": "set-not-a-region", "value": None}
+          return {"status": "set", "value": value}
+
+
+      def classify_test(name):
+          for needles, enum_value in TEST_CLASSES:
+              if all(needle in name for needle in needles):
+                  return enum_value
+          return "other"
+
+
+      def digest(name):
+          return hashlib.sha256(name.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+      def parse_aws_error(text):
+          """Extract allowlisted AWS API error fields from a failure message."""
+          if not text:
+              return None
+          text = text[:MAX_FAILURE_TEXT]
+
+          service = operation = None
+          match = FIND_SERVICE_OPERATION.search(text)
+          if match:
+              service = allow(match.group(1), RE_SERVICE)
+              operation = allow(match.group(2), RE_OPERATION)
+
+          request_id = None
+          match = FIND_REQUEST_ID.search(text)
+          if match:
+              request_id = allow(match.group(1), RE_REQUEST_ID)
+
+          error_code = None
+          match = FIND_ERROR_CODE.search(text)
+          if match:
+              error_code = allow(match.group(1), RE_ERROR_CODE)
+
+          http_status = None
+          match = FIND_STATUS.search(text)
+          if match:
+              candidate = int(match.group(1))
+              if 100 <= candidate <= 599:
+                  http_status = candidate
+
+          instance_id = None
+          match = FIND_INSTANCE.search(text)
+          if match:
+              instance_id = allow(match.group(0), RE_INSTANCE)
+
+          if request_id is None and error_code is None and operation is None:
+              # Not recognisable as an AWS API error: record nothing at all rather
+              # than risk carrying unrelated failure text into the document.
+              return None
+
+          return {
+              "service": service,
+              "operation": operation,
+              "http_status": http_status,
+              "error_code": error_code,
+              "request_id": request_id,
+              "instance_id": instance_id,
+          }
+
+
+      def junit_files(junit_dir, notes):
+          """List the JUnit files to scan, suite results first.
+
+          openshift-tests writes the suite results as junit_e2e_*.xml alongside
+          monitor-test files, so the suite results are ordered first and the
+          file-count bound can never silently drop them.
+          """
+          try:
+              names = sorted(
+                  name for name in os.listdir(junit_dir) if name.endswith(".xml")
+              )
+          except OSError:
+              return None
+          names.sort(key=lambda name: (not name.startswith("junit"), name))
+          if len(names) > MAX_JUNIT_FILES:
+              notes.append("junit-files-truncated")
+              names = names[:MAX_JUNIT_FILES]
+          return [os.path.join(junit_dir, name) for name in names]
+
+
+      def safe_to_parse(path, notes):
+          """Refuse inputs that could make the XML parser unbounded.
+
+          The suite under test writes these files, so an oversized file or an
+          entity declaration must cost a note rather than the pod's memory.
+          The whole file is scanned rather than only its prolog, because a
+          declaration placed after padding would otherwise slip through and
+          expat has no expansion limit of its own.
+          """
+          try:
+              if os.path.getsize(path) > MAX_JUNIT_BYTES:
+                  notes.append("junit-file-too-large")
+                  return False
+              carry = b""
+              with open(path, "rb") as handle:
+                  while True:
+                      chunk = handle.read(SCAN_CHUNK_BYTES)
+                      if not chunk:
+                          break
+                      window = carry + chunk
+                      if b"<!DOCTYPE" in window or b"<!ENTITY" in window:
+                          notes.append("junit-doctype-rejected")
+                          return False
+                      carry = window[-SCAN_OVERLAP_BYTES:]
+          except OSError:
+              notes.append("junit-read-error")
+              return False
+          return True
+
+
+      def collect_errors(junit_dir, notes):
+          """Scan JUnit <failure>/<error> text only; <system-out> is never read."""
+          errors = []
+          truncated = False
+          paths = junit_files(junit_dir, notes)
+          if paths is None:
+              notes.append("junit-dir-unreadable")
+              return errors, truncated
+          if not paths:
+              notes.append("junit-files-absent")
+              return errors, truncated
+
+          for path in paths:
+              if not safe_to_parse(path, notes):
+                  continue
+              try:
+                  context = ET.iterparse(path, events=("start", "end"))
+                  _, root = next(context)
+                  for event, element in context:
+                      if event != "end" or element.tag != "testcase":
+                          continue
+                      name = element.get("name") or ""
+                      for child in element:
+                          if child.tag not in ("failure", "error"):
+                              continue
+                          parsed = parse_aws_error(child.text or "")
+                          if parsed is None:
+                              continue
+                          if len(errors) >= MAX_ERRORS:
+                              truncated = True
+                              break
+                          parsed.update(
+                              {
+                                  "source": "junit-failure",
+                                  "test_class": classify_test(name),
+                                  "test_digest": digest(name),
+                                  "test_started_at": allow(
+                                      element.get("start-time"), RE_TIMESTAMP
+                                  ),
+                                  "test_ended_at": allow(
+                                      element.get("end-time"), RE_TIMESTAMP
+                                  ),
+                              }
+                          )
+                          errors.append(parsed)
+                      # Detach the finished testcase so a large file streams
+                      # instead of accumulating in memory.
+                      element.clear()
+                      root.clear()
+                      if truncated:
+                          break
+              except ET.ParseError:
+                  notes.append("junit-parse-error")
+              except OSError:
+                  notes.append("junit-read-error")
+              if truncated:
+                  break
+
+          if truncated:
+              notes.append("aws-api-errors-truncated")
+          return errors, truncated
+
+
+      def collect_nodes(nodes_file, notes):
+          nodes = []
+          truncated = False
+          try:
+              with open(nodes_file, "r", encoding="utf-8", errors="replace") as handle:
+                  lines = handle.read().splitlines()
+          except OSError:
+              notes.append("nodes-unavailable")
+              return nodes, truncated
+
+          for line in lines:
+              fields = line.split()
+              if len(fields) < 2:
+                  continue
+              if len(nodes) >= MAX_NODES:
+                  truncated = True
+                  break
+              name = allow(fields[0], RE_NODE)
+              provider_id = allow(fields[1], RE_PROVIDER_ID)
+              zone = instance_id = region = None
+              if provider_id:
+                  _, _, tail = provider_id.partition("aws:///")
+                  zone_part, _, instance_part = tail.partition("/")
+                  zone = allow(zone_part, RE_AZ)
+                  instance_id = allow(instance_part, RE_INSTANCE)
+                  if zone:
+                      region = RE_AZ.match(zone).group(1)
+              nodes.append(
+                  {
+                      "name": name,
+                      "provider_id": provider_id,
+                      "instance_id": instance_id,
+                      "availability_zone": zone,
+                      "region": region,
+                  }
+              )
+
+          if not nodes:
+              notes.append("nodes-unavailable")
+          if truncated:
+              notes.append("nodes-truncated")
+          return nodes, truncated
+
+
+      def read_region_file(path, notes, missing_note):
+          try:
+              with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                  value = allow(handle.read(), RE_REGION)
+          except OSError:
+              value = None
+          if value is None:
+              notes.append(missing_note)
+          return value
+
+
+      def read_cluster_config_region(path, notes):
+          try:
+              with open(path, "r", encoding="utf-8", errors="replace") as handle:
+                  document = json.load(handle)
+          except (OSError, ValueError):
+              notes.append("cluster-config-unreadable")
+              return None
+          if not isinstance(document, dict):
+              notes.append("cluster-config-unreadable")
+              return None
+          value = document.get("region")
+          value = allow(value, RE_REGION) if isinstance(value, str) else None
+          if value is None:
+              notes.append("cluster-config-region-unusable")
+          return value
+
+
+      def credential_context():
+          """Describe the credential chain visible to this step as booleans only."""
+          shared = os.environ.get("AWS_SHARED_CREDENTIALS_FILE")
+          profile_dir = os.environ.get("CLUSTER_PROFILE_DIR")
+          if shared and profile_dir:
+              matches = shared == os.path.join(profile_dir, ".awscred")
+              matches_status = "yes" if matches else "no"
+          elif shared:
+              matches_status = "unknown-no-cluster-profile-dir"
+          else:
+              matches_status = "unknown-not-set"
+
+          overrides = {
+              "aws_access_key_id_env_present": bool(os.environ.get("AWS_ACCESS_KEY_ID")),
+              "aws_secret_access_key_env_present": bool(
+                  os.environ.get("AWS_SECRET_ACCESS_KEY")
+              ),
+              "aws_session_token_env_present": bool(os.environ.get("AWS_SESSION_TOKEN")),
+              "aws_profile_env_present": bool(
+                  os.environ.get("AWS_PROFILE") or os.environ.get("AWS_DEFAULT_PROFILE")
+              ),
+              "aws_web_identity_token_file_env_present": bool(
+                  os.environ.get("AWS_WEB_IDENTITY_TOKEN_FILE")
+              ),
+              "aws_container_credentials_env_present": bool(
+                  os.environ.get("AWS_CONTAINER_CREDENTIALS_FULL_URI")
+                  or os.environ.get("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
+              ),
+          }
+
+          reason = None
+          provable = matches_status == "yes" and not any(overrides.values())
+          if matches_status != "yes":
+              reason = "shared-credentials-file-not-cluster-profile"
+          elif any(overrides.values()):
+              reason = "higher-precedence-credential-source-present"
+
+          context = {
+              "aws_shared_credentials_file_set": bool(shared),
+              "aws_shared_credentials_file_is_cluster_profile": matches_status,
+              "effective_credential_chain_provable": provable,
+              "unprovable_reason": reason,
+          }
+          context.update(overrides)
+          return context
+
+
+      def region_evidence(args, notes):
+          lease = os.environ.get("LEASED_RESOURCE")
+          if lease is None:
+              lease_region = {"status": "unset", "value": None}
+          else:
+              # Only the region component of the lease name is ever emitted.
+              candidate = allow(lease.split("--", 1)[0], RE_REGION)
+              lease_region = (
+                  {"status": "parsed", "value": candidate}
+                  if candidate
+                  else {"status": "set-no-region-component", "value": None}
+              )
+
+          infrastructure = read_region_file(
+              args.infra_region_file, notes, "infrastructure-region-unavailable"
+          )
+          cluster_config = read_cluster_config_region(args.cluster_config, notes)
+
+          return {
+              "configured": {
+                  "cluster_config_region": {
+                      "value": cluster_config,
+                      "provenance": "configured:shared-dir:cluster-config:.region",
+                  },
+                  "lease_region": {
+                      "value": lease_region["value"],
+                      "status": lease_region["status"],
+                      "provenance": "derived:region-component-of-lease-env",
+                  },
+              },
+              "observed": {
+                  "aws_region_env": dict(
+                      env_region("AWS_REGION"),
+                      provenance="observed:test-step-process-env:AWS_REGION",
+                  ),
+                  "aws_default_region_env": dict(
+                      env_region("AWS_DEFAULT_REGION"),
+                      provenance="observed:test-step-process-env:AWS_DEFAULT_REGION",
+                  ),
+                  "infrastructure_region": {
+                      "value": infrastructure,
+                      "provenance": "observed:cluster:infrastructure/cluster"
+                      ".status.platformStatus.aws.region",
+                  },
+              },
+              "test_process_resolved_region": {
+                  "value": None,
+                  "status": "unknown",
+                  "reason": "the payload test binary resolves its own AWS region"
+                  " internally; the value it used is not observable from this step",
+              },
+          }
+
+
+      def region_consistency(evidence, nodes):
+          node_regions = {node["region"] for node in nodes if node["region"]}
+          cluster_regions = set(node_regions)
+          for value in (
+              evidence["observed"]["infrastructure_region"]["value"],
+              evidence["configured"]["cluster_config_region"]["value"],
+          ):
+              if value:
+                  cluster_regions.add(value)
+
+          candidates = {
+              value
+              for value in (
+                  evidence["configured"]["lease_region"]["value"],
+                  evidence["observed"]["aws_region_env"]["value"],
+                  evidence["observed"]["aws_default_region_env"]["value"],
+              )
+              if value
+          }
+
+          if not cluster_regions:
+              status = "unknown"
+          elif len(cluster_regions) > 1:
+              status = "cluster-region-ambiguous"
+          elif not candidates:
+              status = "unknown"
+          elif candidates <= cluster_regions:
+              status = "all-match"
+          else:
+              status = "divergent"
+
+          return {
+              "status": status,
+              "cluster_region_sources": sorted(cluster_regions),
+              "candidate_region_input_count": len(candidates),
+              "note": "compares recorded region values only; it does not establish"
+              " which region the test process actually used",
+          }
+
+
+      def main(argv=None):
+          parser = argparse.ArgumentParser(add_help=True)
+          parser.add_argument("--junit-dir", required=True)
+          parser.add_argument("--nodes-file", required=True)
+          parser.add_argument("--infra-region-file", required=True)
+          parser.add_argument("--cluster-config", required=True)
+          parser.add_argument("--test-exit-code", required=True)
+          parser.add_argument("--test-started-at", default="")
+          parser.add_argument("--test-ended-at", default="")
+          parser.add_argument("--captured-at", default="")
+          parser.add_argument("--output", required=True)
+          args = parser.parse_args(argv)
+
+          notes = []
+
+          try:
+              exit_code = int(args.test_exit_code)
+          except ValueError:
+              exit_code = None
+              notes.append("test-exit-code-unknown")
+
+          nodes, _ = collect_nodes(args.nodes_file, notes)
+          errors, _ = collect_errors(args.junit_dir, notes)
+          evidence = region_evidence(args, notes)
+
+          document = {
+              "schema_version": SCHEMA_VERSION,
+              "producer": PRODUCER,
+              "captured_at": allow(args.captured_at, RE_TIMESTAMP),
+              "suite_started_at": allow(args.test_started_at, RE_TIMESTAMP),
+              "suite_ended_at": allow(args.test_ended_at, RE_TIMESTAMP),
+              "suite_exit_code": exit_code,
+              "credential_context": credential_context(),
+              "region_evidence": evidence,
+              "region_consistency": region_consistency(evidence, nodes),
+              "nodes": nodes,
+              "node_count": len(nodes),
+              "aws_api_errors": errors,
+              "aws_api_error_count": len(errors),
+              "capture_status": "partial" if notes else "ok",
+              "capture_notes": sorted(set(notes)),
+          }
+
+          with open(args.output, "w", encoding="utf-8") as handle:
+              json.dump(document, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          return 0
+
+
+      if __name__ == "__main__":
+          sys.exit(main())
+      AWS_FAILURE_DIAGNOSTICS_PY
+
+        if timeout 300 python3 -I "${work_dir}/capture.py" \
+          --junit-dir "${ARTIFACT_DIR:-/tmp}/junit" \
+          --nodes-file "${work_dir}/nodes.txt" \
+          --infra-region-file "${work_dir}/infra-region.txt" \
+          --cluster-config "${SHARED_DIR:-/tmp}/cluster-config" \
+          --test-exit-code "${suite_exit_code}" \
+          --test-started-at "${AWS_FAILURE_DIAGNOSTICS_STARTED_AT:-}" \
+          --test-ended-at "${AWS_FAILURE_DIAGNOSTICS_ENDED_AT:-}" \
+          --captured-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+          --output "${work_dir}/test-context.json" 2>"${work_dir}/capture.err"; then
+          cp "${work_dir}/test-context.json" "${artifact_out}/test-context.json" 2>/dev/null || true
+          cp "${work_dir}/test-context.json" "${shared_out}/test-context.json" 2>/dev/null || true
+          echo "aws-failure-diagnostics: wrote ${artifact_out}/test-context.json"
+        else
+          # The stderr file is deliberately neither printed nor kept.
+          echo "aws-failure-diagnostics: capture failed, continuing"
+        fi
+        rm -rf "${work_dir}" 2>/dev/null
+        return 0
+      }
+      # <<< END aws-failure-diagnostics
+
       function patch_image_streams() {
         # with OCP <= 4.17,
         # imagestreams on the hosted cluster are ignoring
@@ -276,12 +891,21 @@ chain:
           done
       fi
 
+      AWS_FAILURE_DIAGNOSTICS_STARTED_AT=""
+      AWS_FAILURE_DIAGNOSTICS_ENDED_AT=""
+      if [[ "${AWS_FAILURE_DIAGNOSTICS:-false}" == "true" ]]; then
+        AWS_FAILURE_DIAGNOSTICS_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      fi
+
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-tests.log
 
       exit_code=${PIPESTATUS[0]}
+      if [[ "${AWS_FAILURE_DIAGNOSTICS:-false}" == "true" ]]; then
+        AWS_FAILURE_DIAGNOSTICS_ENDED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      fi
 
       # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
       # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
@@ -290,6 +914,17 @@ chain:
       then
         echo "overriding Monitor Test Failure"
         exit_code=0
+      fi
+
+      # Gated, best-effort AWS failure context capture. Nothing below changes
+      # ${exit_code}: the suite result is reported exactly as openshift-tests
+      # left it.
+      if [[ "${AWS_FAILURE_DIAGNOSTICS:-false}" == "true" ]] && [[ "${exit_code}" -ne 0 ]]; then
+        # Disable tracing for the capture, then restore the previous state.
+        [[ $- == *x* ]] && AWS_FAILURE_DIAGNOSTICS_WAS_TRACING=true || AWS_FAILURE_DIAGNOSTICS_WAS_TRACING=false
+        set +x
+        aws_failure_diagnostics_capture "${exit_code}" || true
+        ${AWS_FAILURE_DIAGNOSTICS_WAS_TRACING} && set -x
       fi
 
       exit ${exit_code}
@@ -363,6 +998,15 @@ chain:
     - name: HOSTED_CP
       default: ""
       documentation: Execute against a ROSA hosted control plane
+    - name: AWS_FAILURE_DIAGNOSTICS
+      default: "false"
+      documentation: |-
+        When "true" and the suite fails, write an allowlisted AWS failure context
+        document to ${ARTIFACT_DIR}/aws-failure-diagnostics/test-context.json and to
+        ${SHARED_DIR}/aws-failure-diagnostics/test-context.json for a later post step.
+        The capture is bounded and best effort and never changes the suite exit status.
+        It records AWS request/error IDs, node providerIDs and region evidence only;
+        no credentials, environment values, log bodies or raw test names.
     - name: IGNORE_EMPTY_TEST_SKIPS
       default: "false"
       documentation: |-

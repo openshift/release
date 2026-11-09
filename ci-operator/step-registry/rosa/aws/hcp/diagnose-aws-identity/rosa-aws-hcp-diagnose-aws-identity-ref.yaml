@@ -1,0 +1,41 @@
+ref:
+  as: rosa-aws-hcp-diagnose-aws-identity
+  from: rosa-aws-cli
+  grace_period: 2m
+  commands: rosa-aws-hcp-diagnose-aws-identity-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      Region used only to let the AWS CLI resolve an endpoint for the single
+      sts:GetCallerIdentity call. Falls back to the region recorded in
+      ${SHARED_DIR}/cluster-config and then to the region component of
+      LEASED_RESOURCE. It has no effect on the test, which has already finished.
+  documentation: |-
+    Publishes an account-match status for the AWS failure context that the
+    conformance step captured when AWS_FAILURE_DIAGNOSTICS was enabled.
+
+    The step is a no-op, exiting 0 immediately, unless
+    ${SHARED_DIR}/aws-failure-diagnostics/test-context.json exists, so it is
+    harmless in workflows that do not enable the capture.
+
+    When the context is present, it makes a single bounded read-only
+    sts:GetCallerIdentity invocation, capped at one SDK retry and sixty seconds,
+    with the cluster profile credentials, and compares
+    the result with an independent, authoritative reference for the account that
+    owns the cluster, taken from ${SHARED_DIR}/account-roles-arns or from the
+    role ARN recorded in ${SHARED_DIR}/cluster-config. Account IDs and ARNs are
+    compared in memory and are never emitted: the artifact carries only an enum
+    status, a reason code and the name of the reference source.
+
+    Because it runs in a post pod, the identity it reads is not an observation
+    of the credential chain in effect inside the test process at the time of the
+    original AWS call. The artifact records comparison_observed_at and the
+    provenance of every value, and reports "unknown" rather than a guessed match
+    whenever the reference, the caller identity or the test-time credential
+    chain cannot be established. It runs before deprovisioning and always exits
+    0 so that best-effort cleanup is preserved.
