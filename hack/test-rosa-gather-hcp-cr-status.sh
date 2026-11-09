@@ -10,9 +10,10 @@ script="${step_dir}/rosa-gather-hcp-cr-status-commands.sh"
 if [[ "${1:-}" != --case ]]; then
   logs="$(mktemp -d)"
   for scenario in success-first-attempt retry-504-then-success exhausted-504 \
-    retry-timeout-then-success no-retry-404 no-retry-403 \
+    retry-timeout-then-success no-retry-404 no-retry-403 no-retry-401 \
     transient-classification no-budget-no-attempt budget-exhausted \
-    max-time-tracks-remaining-budget interrupted-sleep \
+    max-time-tracks-remaining-budget total-elapsed-within-budget \
+    interrupted-sleep term-during-backoff-does-not-hang \
     malformed-archive binary-missing-from-archive partial-cleanup \
     no-leak-under-xtrace real-script-no-cluster-id \
     real-script-download-failure-exits-zero; do
@@ -84,6 +85,10 @@ export BP_DOWNLOAD_RETRY_MAX_DELAY=30
 case "$scenario" in
   no-budget-no-attempt) export BP_DOWNLOAD_BUDGET_SECONDS=0 ;;
   budget-exhausted) export BP_DOWNLOAD_BUDGET_SECONDS=100 ;;
+  # Production-like: the whole budget and the real attempt ceiling, so the
+  # elapsed accounting is checked against the limits the step actually ships.
+  total-elapsed-within-budget)
+    export BP_DOWNLOAD_BUDGET_SECONDS=300 BP_DOWNLOAD_MAX_ATTEMPTS=4 ;;
   *) export BP_DOWNLOAD_BUDGET_SECONDS=300 ;;
 esac
 
@@ -115,6 +120,68 @@ if [[ "$scenario" == transient-classification ]]; then
       fail "curl exit ${probe} is not transient and must not be retried"
     fi
   done
+  exit 0
+fi
+
+# A real SIGTERM during backoff must be acted on at once. A foreground sleep
+# would defer the step's TERM handler for the whole delay, outlasting the
+# grace period the ref declares, so this runs the actual script in a child
+# process and signals it for real rather than mocking the sleep away.
+if [[ "$scenario" == term-during-backoff-does-not-hang ]]; then
+  marker="$test_dir/child-ready"
+  child="$test_dir/child.sh"
+  cat > "$child" <<'CHILD'
+#!/bin/bash
+source <(sed -n '1,/^# ---- end of sourceable definitions/p' "$1")
+curl() {
+  local arg prev='' output=''
+  for arg in "$@"; do
+    if [[ "$prev" == -o ]]; then output="$arg"; fi
+    prev="$arg"
+  done
+  printf 'partial-body' > "$output"
+  echo 504
+  return 22
+}
+echo ready > "$2"
+install_backplane_cli 0.12.0 "$3" "$4"
+CHILD
+
+  # The child uses the real mktemp, so record what /tmp held beforehand to
+  # tell a leaked working directory from unrelated ones.
+  before_dirs="$test_dir/tmp-before"
+  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$before_dirs"
+  BP_DOWNLOAD_RETRY_BASE_DELAY=20 BP_DOWNLOAD_RETRY_MAX_DELAY=20 \
+    bash "$child" "$script" "$marker" "$bin_dir" "$CR_DIR" > "$test_dir/child.log" 2>&1 &
+  child_pid=$!
+  for _ in $(seq 1 100); do
+    [[ -s "$marker" ]] && break
+    sleep 0.1
+  done
+  [[ -s "$marker" ]] || fail 'the child step never started'
+  # Let it settle into the 20s backoff before signalling.
+  sleep 2
+
+  signalled="$(date +%s)"
+  kill -TERM "$child_pid"
+  ( sleep 10; kill -KILL "$child_pid" 2>/dev/null ) &
+  killer=$!
+  wait "$child_pid" || true
+  reaction=$(( $(date +%s) - signalled ))
+  kill "$killer" 2>/dev/null || true
+  wait "$killer" 2>/dev/null || true
+
+  (( reaction < 10 )) \
+    || fail "the step hung ${reaction}s after TERM instead of unwinding the backoff"
+  assert_status result failure
+  assert_status reason interrupted
+  assert_status attempts 1
+  assert_status retries 0
+  after_dirs="$test_dir/tmp-after"
+  find /tmp -maxdepth 1 -name 'backplane-download.*' -print 2>/dev/null | sort > "$after_dirs"
+  leftovers="$(comm -13 "$before_dirs" "$after_dirs")"
+  [[ -z "$leftovers" ]] || fail "signal path left a working directory behind: ${leftovers}"
+  [[ ! -e "$bin_dir/ocm-backplane" ]] || fail 'interrupted acquisition left a binary behind'
   exit 0
 fi
 
@@ -169,6 +236,7 @@ bp_sleep() {
 case "$scenario" in
   budget-exhausted) attempt_seconds=60 ;;
   max-time-tracks-remaining-budget) attempt_seconds=30 ;;
+  total-elapsed-within-budget) attempt_seconds=90 ;;
 esac
 
 if [[ "$scenario" == no-leak-under-xtrace ]]; then
@@ -197,7 +265,14 @@ curl() {
   echo "$max_time" >> "$max_times_file"
   calls=$(( $(cat "$calls_file") + 1 ))
   echo "$calls" > "$calls_file"
-  advance_clock "$attempt_seconds"
+  # Real curl gives up at --max-time, so an attempt can never burn more than
+  # the budget it was handed. A mock that ignored this would let the step
+  # appear to overrun a limit that curl actually enforces.
+  if (( attempt_seconds > max_time )); then
+    advance_clock "$max_time"
+  else
+    advance_clock "$attempt_seconds"
+  fi
 
   # Real curl leaves whatever arrived before the failure on disk; reproduce it
   # so partial-body cleanup is genuinely exercised.
@@ -223,7 +298,7 @@ curl() {
     retry-timeout-then-success)
       if (( calls == 1 )); then partial; echo 000; return 28; fi
       complete_body; echo 200; return 0 ;;
-    exhausted-504|partial-cleanup|budget-exhausted|interrupted-sleep|max-time-tracks-remaining-budget)
+    exhausted-504|partial-cleanup|budget-exhausted|interrupted-sleep|max-time-tracks-remaining-budget|total-elapsed-within-budget)
       partial; echo 504; return 22 ;;
     no-leak-under-xtrace)
       partial; noisy_stderr; echo 504; return 22 ;;
@@ -231,6 +306,8 @@ curl() {
       echo 404; return 22 ;;
     no-retry-403)
       echo 403; return 22 ;;
+    no-retry-401)
+      echo 401; return 22 ;;
     malformed-archive)
       printf 'this is not a gzip archive' > "$output"; echo 200; return 0 ;;
     binary-missing-from-archive)
@@ -289,7 +366,7 @@ case "$scenario" in
     assert_status attempts "$BP_DOWNLOAD_MAX_ATTEMPTS"
     assert_status http_status 504
     ;;
-  no-retry-404|no-retry-403)
+  no-retry-404|no-retry-403|no-retry-401)
     [[ "$rc" != 0 ]] || fail 'a permanent status must not report success'
     [[ "$(curl_calls)" == 1 ]] || fail "a permanent status was retried: $(curl_calls) requests"
     [[ ! -e "$bin_dir/ocm-backplane" ]] || fail 'failed acquisition left a binary behind'
@@ -322,6 +399,16 @@ case "$scenario" in
       fi
       previous="$observed"
     done
+    ;;
+  total-elapsed-within-budget)
+    [[ "$rc" != 0 ]] || fail 'repeated 504 must not report success'
+    # Network time and backoff both come out of the one budget.
+    elapsed="$(sed -n 's/^elapsed_seconds=//p' "$status_file")"
+    (( elapsed <= BP_DOWNLOAD_BUDGET_SECONDS )) \
+      || fail "elapsed ${elapsed}s exceeded the ${BP_DOWNLOAD_BUDGET_SECONDS}s budget"
+    (( $(sed -n 's/^retries=//p' "$status_file") >= 2 )) \
+      || fail 'expected the run to include backoff sleeps'
+    (( elapsed >= 180 )) || fail "expected a long run, got ${elapsed}s"
     ;;
   budget-exhausted)
     [[ "$rc" != 0 ]] || fail 'an exhausted budget must not report success'
@@ -360,6 +447,13 @@ case "$scenario" in
     done
     ;;
 esac
+
+# No run may ever report spending more than the whole budget.
+if [[ -f "$status_file" ]]; then
+  recorded_elapsed="$(sed -n 's/^elapsed_seconds=//p' "$status_file")"
+  (( recorded_elapsed <= BP_DOWNLOAD_BUDGET_SECONDS )) \
+    || fail "recorded elapsed ${recorded_elapsed}s exceeds the budget"
+fi
 
 # The artifact is a fixed-field record: no URLs, no proxy, no transport text.
 if [[ -f "$status_file" ]]; then

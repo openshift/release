@@ -47,7 +47,13 @@ bp_now() {
 }
 
 bp_sleep() {
-  sleep "$1"
+  # Sleep as a background job and wait on it. A foreground sleep would defer
+  # this script's TERM handler for the whole delay -- long enough to outlast
+  # the grace period the ref declares -- and would swallow the signal instead
+  # of reporting it. As a job it is both reachable by that handler and
+  # interruptible here, so wait returns non-zero and the caller stops.
+  sleep "$1" &
+  wait $!
 }
 
 # Transient enough to be worth another attempt: gateway and overload answers
