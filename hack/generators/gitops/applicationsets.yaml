@@ -27,7 +27,9 @@ applicationsets:
         - group: apps
           kind: Deployment
           jqPathExpressions:
-          - .spec.template.spec.containers[].image
+          # Deck and Gangway need the configured Prow version when job config
+          # flags change. Keep their main container images managed by GitOps.
+          - .spec.template.spec.containers[] | select(.name != "deck" and .name != "gangway") | .image
         - kind: Namespace
           jqPathExpressions:
           - .metadata.labels["kubernetes.io/metadata.name"]
