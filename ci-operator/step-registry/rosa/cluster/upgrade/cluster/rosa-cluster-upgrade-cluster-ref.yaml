@@ -17,16 +17,7 @@ ref:
     documentation: Enable the use of hosted control planes (HyperShift).
   - name: UPGRADED_TO_VERSION
     default: ""
-    documentation: The openshift version that the cluster will be upgraded to. If empty, it is auto-derived from the Y-streams available in CHANNEL_GROUP; when VERSION_OFFSET_FROM_LATEST is set the target is the stream one position newer than the installed one (offset-1), otherwise it is the next Y-stream newer than the cluster's current version. The step fails rather than guessing when no suitable Y-stream is available.
-  - name: VERSION_OFFSET_FROM_LATEST
-    default: ""
-    documentation: The offset-from-latest the cluster was installed at, as passed to rosa/cluster/provision. When set, the upgrade target is the Y-stream at offset-1 in the same version-sorted list of available Y-streams, so a y-minus-N cluster upgrades to y-minus-(N-1). The step fails rather than guessing when the offset is malformed, is 0 (no newer stream exists), exceeds the available streams, or no longer matches the version the cluster is actually running. Ignored when UPGRADED_TO_VERSION is set.
-  - name: AVAILABLE_UPGRADE
-    default: "no"
-    documentation: Must match the value given to rosa/cluster/provision. Set to 'yes' when the installed version was chosen from only those versions that advertise an available upgrade, so that resolving VERSION_OFFSET_FROM_LATEST here indexes the same list the install side indexed.
-  - name: CHANNEL_GROUP
-    default: "stable"
-    documentation: The channel group from which to get the openshift version. The supported groups are [stable, candidate, nightly].
+    documentation: The openshift version that the cluster will be upgraded to. If empty, it is auto-derived as the next Y-stream newer than the cluster's current version among those offered by the UPGRADE_CHANNEL_PREFIX channel group. The step fails rather than guessing when the version query fails or no newer Y-stream is available.
   - name: CLUTER_UPGRADE_TIMEOUT
     default: "14400"
     documentation: Set to number of seconds for the cluster to timeout if it's not ready.
@@ -44,7 +35,7 @@ ref:
     documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty, auto-derived as UPGRADE_CHANNEL_PREFIX-UPGRADED_TO_VERSION.
   - name: UPGRADE_CHANNEL_PREFIX
     default: "candidate"
-    documentation: Prefix used to auto-derive UPGRADE_CHANNEL when it is not explicitly set (e.g., 'candidate' produces 'candidate-4.19').
+    documentation: Prefix used to auto-derive UPGRADE_CHANNEL when it is not explicitly set (e.g., 'candidate' produces 'candidate-4.19'). It is also the channel group queried to discover the target Y-stream, so the target is always drawn from the same group the cluster is moved to, independently of the channel group the cluster was installed from. It must therefore name one of the supported channel groups [stable, candidate, nightly].
   - name: HCP_NODE_UPGRADE_ENABLED
     default: "true"
     documentation: upgrade ROSA HCP worker nodes after control plane upgrade, default is to enable worker nodes upgrade

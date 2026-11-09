@@ -15,13 +15,12 @@ HOSTED_CP=${HOSTED_CP:-false}
 UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
-CHANNEL_GROUP=${CHANNEL_GROUP:-stable}
-VERSION_OFFSET_FROM_LATEST=${VERSION_OFFSET_FROM_LATEST:-}
-AVAILABLE_UPGRADE=${AVAILABLE_UPGRADE:-no}
 CLUTER_UPGRADE_TIMEOUT=${CLUTER_UPGRADE_TIMEOUT:-"14400"}
 NODE_UPGRADE_TIMEOUT=${NODE_UPGRADE_TIMEOUT:-"7200"}
-TARGET_SELECTION_ERROR=""
-SELECTED_Y_STREAM=""
+# Channel group the target was discovered from; stays "<not queried>" when an explicit
+# target or channel made discovery unnecessary, so the artifact never names a group the
+# step never asked about.
+DISCOVERY_CHANNEL_GROUP="<not queried>"
 UPGRADE_START_EPOCH=""
 UPGRADE_START_ISO=""
 UPGRADE_FROM_VERSION=""
@@ -172,115 +171,29 @@ function unset_proxy () {
     fi
 }
 
-# List the available Y-streams (X.Y) for the configured channel group, version-sorted
-# and de-duplicated. The query, the AVAILABLE_UPGRADE filtering and the ordering track
-# rosa/cluster/provision so that an index into this list means what it means there. The
-# match is close but not bit-exact: this step additionally drops null and non-X.Y ids,
-# which provision keeps, and both sides depend on being given the same CHANNEL_GROUP. A
-# divergence therefore shifts the indexes, which the install-position check in
-# y_stream_at_offset detects and refuses rather than silently mis-selecting. Returns
-# non-zero when the ROSA query fails, so callers can fail closed instead of guessing.
+# Print the Y-streams (X.Y) offered by the UPGRADE_CHANNEL_PREFIX channel group,
+# version-sorted and de-duplicated. Discovery deliberately queries the same channel group
+# whose channel the cluster is moved to, so a stream that exists only there -- a candidate
+# release not yet in the stable install catalog -- is still a reachable target. Null and
+# non-X.Y ids are dropped, so a malformed response yields an empty list. Returns non-zero
+# when the ROSA query fails, so callers can fail closed instead of guessing.
 list_available_y_streams() {
-  local raw jq_filter
-  local -a version_cmd=(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json)
+  local raw
+  local -a version_cmd=(rosa list versions --channel-group "${UPGRADE_CHANNEL_PREFIX}" -o json)
   if [[ "${HOSTED_CP}" == "true" ]]; then
     version_cmd+=(--hosted-cp)
   fi
-  # Mirror the install-side filter: with AVAILABLE_UPGRADE=yes the provision step keeps
-  # only versions that advertise an upgrade, which shortens the list and shifts every
-  # index in it. Applying a different filter here would silently resolve the offset
-  # against a different list than the one the cluster was installed from. Only the
-  # offset path indexes the list, so the filter is confined to it: the discovery path
-  # must keep seeing every stream, or a newest stream that advertises no upgrade of its
-  # own would be dropped and discovery would report no newer stream at all.
-  if [[ "${AVAILABLE_UPGRADE}" == "yes" && -n "${VERSION_OFFSET_FROM_LATEST}" ]]; then
-    jq_filter='.[] | select(.available_upgrades != null) | .raw_id // empty'
-  else
-    jq_filter='.[].raw_id // empty'
-  fi
   raw=$("${version_cmd[@]}") || return 1
-  # `.raw_id // empty` drops entries whose raw_id is JSON null or absent: a bare
-  # `.[].raw_id` renders both as the literal string "null", which would otherwise
-  # survive into the candidate list and produce a bogus "<prefix>-null" channel. The
-  # trailing filter keeps only well-formed X.Y streams; an all-malformed response
-  # therefore yields an empty list and the caller fails closed.
-  echo "${raw}" | jq -r "${jq_filter}" | cut -d '.' -f1,2 \
+  # `.raw_id // empty` drops a null or absent raw_id that a bare `.[].raw_id` would render
+  # as the string "null" and turn into a bogus "<prefix>-null" channel.
+  echo "${raw}" | jq -r '.[].raw_id // empty' | cut -d '.' -f1,2 \
     | { grep -E '^[0-9]+\.[0-9]+$' || true; } | sort -Vu
 }
 
-# Resolve the upgrade target stream from the offset the cluster was installed at.
-#
-# VERSION_OFFSET_FROM_LATEST is a *position* in the list above, not arithmetic on the
-# minor number: rosa/cluster/provision and rosa/sts/account-roles/create install at
-# index (total - offset - 1). The matching upgrade target is one position newer --
-# offset-1, i.e. index (total - offset) -- which is exactly what the y-minus-N jobs
-# mean when they upgrade a y-minus-N cluster. Deriving the target as minor+1 instead
-# ignores the catalog entirely and breaks outright at a major boundary (4.22 -> 5.0);
-# deriving it from the cluster's current version alone cannot notice that the cluster is
-# no longer at the offset the job asked for.
-#
-# Sets SELECTED_Y_STREAM and returns 0 on success. On failure sets
-# TARGET_SELECTION_ERROR to the reason and returns non-zero, so the caller fails closed
-# rather than upgrading to a stream nobody asked for. Globals rather than stdout: the
-# caller needs the reason, and a command substitution would discard it with the
-# subshell. Failure cases: a malformed offset;
-# an offset of 0, where the cluster is already on the newest stream and no newer target
-# exists; an offset larger than the catalog can satisfy; and catalog drift, where the
-# install index no longer holds the version the cluster is actually running.
-y_stream_at_offset() {
-  local offset="$1" current_version="$2" y_stream_list="$3"
-  local -a ordered_streams=()
-  local stream current_stream total install_index target_index target oldest_first
-  TARGET_SELECTION_ERROR=""
-  SELECTED_Y_STREAM=""
-
-  current_stream=$(echo "${current_version}" | cut -d '.' -f1,2)
-  if [[ ! "${current_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-    TARGET_SELECTION_ERROR="cluster version '${current_version}' is not a well-formed version"
-    return 1
-  fi
-  # Deliberately stricter than ^[0-9]+$: bash reads a zero-padded "08" as octal, and
-  # the resulting arithmetic error would abort the caller's compound command before it
-  # could exit, turning a malformed offset into a fail-open.
-  if [[ ! "${offset}" =~ ^(0|[1-9][0-9]*)$ ]]; then
-    TARGET_SELECTION_ERROR="VERSION_OFFSET_FROM_LATEST='${offset}' is not a non-negative integer without leading zeros"
-    return 1
-  fi
-  while IFS= read -r stream; do
-    if [[ -n "${stream}" ]]; then
-      ordered_streams+=("${stream}")
-    fi
-  done <<< "${y_stream_list}"
-  total=${#ordered_streams[@]}
-
-  install_index=$(( total - offset - 1 ))
-  target_index=$(( total - offset ))
-  if (( install_index < 0 )); then
-    TARGET_SELECTION_ERROR="offset ${offset} needs at least $(( offset + 1 )) Y-streams, channel group ${CHANNEL_GROUP} offers ${total}: ${ordered_streams[*]}"
-    return 1
-  fi
-  if (( target_index > total - 1 )); then
-    TARGET_SELECTION_ERROR="offset ${offset} selects the newest available stream ${ordered_streams[${install_index}]}; there is no newer Y-stream to upgrade to"
-    return 1
-  fi
-  if [[ "${ordered_streams[${install_index}]}" != "${current_stream}" ]]; then
-    TARGET_SELECTION_ERROR="catalog drift: offset ${offset} now points at ${ordered_streams[${install_index}]} but the cluster is running ${current_stream}; available: ${ordered_streams[*]}"
-    return 1
-  fi
-
-  target="${ordered_streams[${target_index}]}"
-  oldest_first=$(printf '%s\n%s\n' "${current_stream}" "${target}" | sort -V | head -n1)
-  if [[ "${target}" == "${current_stream}" || "${oldest_first}" != "${current_stream}" ]]; then
-    TARGET_SELECTION_ERROR="selected target ${target} is not newer than ${current_stream}"
-    return 1
-  fi
-  SELECTED_Y_STREAM="${target}"
-}
-
-# Print the first Y-stream in the version-ordered list that is strictly newer than the
-# cluster's current version. Returns non-zero (printing nothing) when the list holds no
-# newer stream, so the caller can fail closed rather than re-running the same version or
-# attempting a downgrade.
+# Print the oldest Y-stream in the list that is strictly newer than the cluster's current
+# version, comparing with `sort -V` so a major boundary (4.22 -> 5.0) needs no minor-number
+# arithmetic. Returns non-zero (printing nothing) when no newer stream exists, so the
+# caller can fail closed rather than re-running the same version or downgrading.
 next_y_stream_after() {
   local current_version="$1" y_stream_list="$2"
   local current_stream stream older
@@ -304,9 +217,9 @@ next_y_stream_after() {
 }
 
 # Record how the upgrade target was chosen, including on the failure paths above, so an
-# early exit is still diagnosable from the job artifacts. Only version strings and the
-# channel group are published: no cluster or account identifiers, no credentials and no
-# raw command output. Never aborts the step.
+# early exit is still diagnosable from the job artifacts. Publishes only version strings
+# and the channel prefix: no cluster or account identifiers, no credentials and no raw
+# command output. Never aborts the step.
 write_target_selection_diagnostics() {
   local current_stream="$1" target="$2" channel="$3" streams="$4"
   if [[ -z "${ARTIFACT_DIR:-}" ]]; then
@@ -314,9 +227,7 @@ write_target_selection_diagnostics() {
   fi
   mkdir -p "${ARTIFACT_DIR}" || return 0
   if ! {
-    printf 'channel_group: %s\n' "${CHANNEL_GROUP}"
-    printf 'available_upgrade_filter: %s\n' "${AVAILABLE_UPGRADE}"
-    printf 'install_version_offset: %s\n' "${VERSION_OFFSET_FROM_LATEST:-<unset>}"
+    printf 'discovery_channel_group: %s\n' "${DISCOVERY_CHANNEL_GROUP}"
     printf 'current_y_stream: %s\n' "${current_stream}"
     printf 'selected_target: %s\n' "${target:-<none>}"
     printf 'selected_channel: %s\n' "${channel:-<none>}"
@@ -632,45 +543,31 @@ UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
 UPGRADE_FROM_VERSION="${current_version}"
 
-# Auto-derive the upgrade target when it is not explicitly set.
-#
-# When the job pins the installed version with VERSION_OFFSET_FROM_LATEST, the target is
-# the stream at offset-1 in the same list the install side indexed, resolved by
-# y_stream_at_offset: a y-minus-3 cluster upgrades to y-minus-2, so source and target are
-# both expressed as positions in one list rather than inferred from the cluster alone.
-# While the catalog is unchanged that position is also the next stream after the current
-# one; the value of resolving it by offset is that y_stream_at_offset first confirms the
-# cluster really is at the offset the job configured, and refuses when it is not. Without
-# an offset the job pinned no position, so we keep discovering the next supported stream
-# after the cluster's current version.
+# Auto-derive the upgrade target when the job did not pin one: the next Y-stream after
+# the cluster's current version within the UPGRADE_CHANNEL_PREFIX channel group, which is
+# the group the upgrade channel below is built from. Anchoring on the running version
+# rather than on an install-side position keeps the two catalogs independent: the cluster
+# may have been provisioned from a different (e.g. stable) group that does not list the
+# target stream at all. An explicit UPGRADED_TO_VERSION skips discovery entirely.
 current_y_stream=$(echo "$current_version" | cut -d '.' -f1,2)
 if [[ -z "${UPGRADED_TO_VERSION}" ]]; then
+  DISCOVERY_CHANNEL_GROUP="${UPGRADE_CHANNEL_PREFIX}"
   if ! y_stream_list=$(list_available_y_streams); then
     write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-    log "Error: could not list versions for channel group ${CHANNEL_GROUP}; refusing to guess an upgrade target."
+    log "Error: could not list versions for channel group ${UPGRADE_CHANNEL_PREFIX}; refusing to guess an upgrade target."
     exit 1
   fi
   if [[ -z "${y_stream_list}" ]]; then
     write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-    log "Error: no Y-streams available in channel group ${CHANNEL_GROUP}; refusing to guess an upgrade target."
+    log "Error: no Y-streams available in channel group ${UPGRADE_CHANNEL_PREFIX}; refusing to guess an upgrade target."
     exit 1
   fi
-  if [[ -n "${VERSION_OFFSET_FROM_LATEST}" ]]; then
-    if ! y_stream_at_offset "${VERSION_OFFSET_FROM_LATEST}" "${current_version}" "${y_stream_list}"; then
-      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
-      log "Error: ${TARGET_SELECTION_ERROR}"
-      exit 1
-    fi
-    UPGRADED_TO_VERSION="${SELECTED_Y_STREAM}"
-    log "Upgrade target from install offset ${VERSION_OFFSET_FROM_LATEST}: ${UPGRADED_TO_VERSION} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
-  else
-    if ! UPGRADED_TO_VERSION=$(next_y_stream_after "${current_version}" "${y_stream_list}"); then
-      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
-      log "Error: no Y-stream newer than ${current_version} in channel group ${CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
-      exit 1
-    fi
-    log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+  if ! UPGRADED_TO_VERSION=$(next_y_stream_after "${current_version}" "${y_stream_list}"); then
+    write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+    log "Error: no Y-stream newer than ${current_version} in channel group ${UPGRADE_CHANNEL_PREFIX}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+    exit 1
   fi
+  log "Auto-derived upgrade target: ${UPGRADED_TO_VERSION} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
 fi
 if [[ -z "${UPGRADE_CHANNEL}" ]]; then
   UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
@@ -728,6 +625,9 @@ else
   fi
   upgrade_cluster_to $UPGRADED_TO_VERSION
   if [[ "$HOSTED_CP" == "true" && "$HCP_NODE_UPGRADE_ENABLED" == "true" ]]; then
-    upgrade_machinepool_to "$start_version_x.$y"
+    # $y is set only by the same-major loop above, so it is unbound here (fatal under
+    # `set -u`); $start_version_x names the source major. The target of this branch is
+    # UPGRADED_TO_VERSION itself.
+    upgrade_machinepool_to "${UPGRADED_TO_VERSION}"
   fi
 fi
