@@ -147,6 +147,12 @@ umask "${old_umask}"
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
   echo "JOB_LINK=${JOB_LINK}"
+  if [[ -n "${JOB_NAME_SAFE:-}" ]]; then
+    echo "JOB_NAME_SAFE=${JOB_NAME_SAFE}"
+  fi
+  if [[ -n "${OCM_FVT_ARTIFACT_STEP_NAME:-}" ]]; then
+    echo "OCM_FVT_ARTIFACT_STEP_NAME=${OCM_FVT_ARTIFACT_STEP_NAME}"
+  fi
   echo "SLACK_WEBHOOK_URL=$(cat /usr/local/cs-qe-credentials/slack_webhook_url)"
   echo "CONSOLE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/console_client_secret)"
 } > "${podman_env_file}"
@@ -406,49 +412,6 @@ podman run \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
-
-# Publish a direct matrix-report link card in Spyglass. The matrix report itself
-# remains in ocm-fvt-results/test-result-*/; the html lens also renders it inline.
-matrix_report="$(find "${ocm_fvt_output}" -type f -name 'custom-link-test-matrix-report.html' -print -quit 2>/dev/null || true)"
-if [[ -z "${matrix_report}" ]]; then
-  # Keep the direct link working for runs produced before the report filename
-  # changes to the existing Spyglass custom-link convention.
-  matrix_report="$(find "${ocm_fvt_output}" -type f -name 'test-matrix-report.html' -print -quit 2>/dev/null || true)"
-fi
-if [[ -n "${matrix_report}" && -n "${JOB_NAME_SAFE:-}" ]]; then
-  prow_gcs_prefix="https://prow.ci.openshift.org/view/gs/test-platform-results-public/"
-  if [[ "${JOB_LINK}" == "${prow_gcs_prefix}"* ]]; then
-    gcs_job_path="${JOB_LINK#"${prow_gcs_prefix}"}"
-    gcs_job_root="https://gcs.ci.openshift.org/gcs/test-platform-results-public/${gcs_job_path}"
-    report_relative_path="${matrix_report#"${ocm_fvt_output}/"}"
-    matrix_report_url="${gcs_job_root}/artifacts/${JOB_NAME_SAFE}/${OCM_FVT_ARTIFACT_STEP_NAME:-rosa-e2e-ocm-fvt}/artifacts/ocm-fvt-results/${report_relative_path}"
-    if python3 - "${matrix_report_url}" "${ARTIFACT_DIR}/custom-link-test-matrix.html" <<'PY'
-import html
-import sys
-
-url = html.escape(sys.argv[1], quote=True)
-with open(sys.argv[2], "w", encoding="utf-8") as artifact:
-    artifact.write(f"""<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>ROSA FVT test matrix</title></head>
-<body><p><a target="_blank" rel="noopener" href="{url}">Open the standalone test matrix report</a></p></body>
-</html>
-""")
-PY
-    then
-      echo "Published Spyglass link to the standalone test matrix report"
-    else
-      rm -f "${ARTIFACT_DIR}/custom-link-test-matrix.html"
-      echo "WARNING: failed to write the Spyglass matrix report link"
-    fi
-  else
-    echo "WARNING: unable to derive matrix report GCS URL from JOB_LINK; Spyglass will still render the report inline"
-  fi
-elif [[ -z "${matrix_report}" ]]; then
-  echo "No matrix HTML report found; skipping the Spyglass matrix link"
-else
-  echo "WARNING: JOB_NAME_SAFE is unavailable; skipping the direct Spyglass matrix link"
-fi
 
 (
   umask 022
