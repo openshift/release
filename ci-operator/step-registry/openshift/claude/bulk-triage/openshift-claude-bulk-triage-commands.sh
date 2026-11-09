@@ -242,7 +242,7 @@ render_summary_html() {
             + (if (.triggers | length) == 0 then "No trigger fired.\n" else
                 ([.triggers[] | "- **\(.level) \(.kind)** `\(.cluster_id)`: \((.reasons // []) | join("; "))"] | join("\n")) + "\n" end)
             + "\n## Views\n\n| View | Fetch | Open | Open untriaged | Opened 7d | Closed 7d |\n|---|---|---|---|---|---|\n"
-            + ([.observation.views[] | "| \(.view) | \(.fetch) | \(.open) | \(.open_untriaged) | \(.opened_7d) | \(.closed_7d) |"] | join("\n")) + "\n"' \
+            + ([.observation.views[] | "| \(.view) | \(.fetch) | \(.open // "—") | \(.open_untriaged // "—") | \(.opened_7d // "—") | \(.closed_7d // "—") |"] | join("\n")) + "\n"' \
             "${ARTIFACT_DIR}/burst-status.json" > "${src}" 2>/dev/null || return 0
     fi
     [[ -s "${src}" ]] || return 0
@@ -354,10 +354,21 @@ while i < len(lines):
     i += 1
 flush()
 
-css = ("body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;margin:16px;color:#1f2328}"
-       "table{border-collapse:collapse;margin:8px 0}th,td{border:1px solid #d0d7de;padding:4px 8px;text-align:left;vertical-align:top}"
-       "th{background:#f6f8fa}code{background:#f6f8fa;padding:1px 4px;border-radius:4px}pre{background:#f6f8fa;padding:8px;overflow:auto}"
-       "blockquote{border-left:4px solid #d0d7de;margin:0;padding:0 12px;color:#57606a}")
+# Explicit colours for both schemes: Prow shows this page in a transparent iframe, so without a background the
+# job page's own (often dark) theme shows through and dark text becomes unreadable.
+css = (":root{color-scheme:light dark;--fg:#1f2328;--bg:#ffffff;--muted:#57606a;--line:#d0d7de;--soft:#f6f8fa;--link:#0969da}"
+       "@media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--bg:#0d1117;--muted:#9198a1;--line:#3d444d;--soft:#161b22;--link:#4493f8}}"
+       "html{background:var(--bg)}body{background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;"
+       "font-size:14px;line-height:1.5;margin:0;padding:16px;overflow-wrap:anywhere}"
+       "h1,h2,h3,h4,h5,h6{color:var(--fg);margin:20px 0 8px;line-height:1.25}h1{font-size:1.6em}h2{font-size:1.35em;"
+       "border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:1.15em}a{color:var(--link)}"
+       "table{border-collapse:collapse;margin:8px 0;display:block;max-width:100%;overflow-x:auto}"
+       "th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}th{background:var(--soft)}"
+       "tbody tr:nth-child(even){background:var(--soft)}"
+       "code{background:var(--soft);color:var(--fg);padding:1px 4px;border-radius:4px;font-size:90%}"
+       "pre{background:var(--soft);padding:8px;overflow:auto}pre code{padding:0}"
+       "hr{border:0;border-top:1px solid var(--line);margin:16px 0}"
+       "blockquote{border-left:4px solid var(--line);margin:0;padding:0 12px;color:var(--muted)}")
 with open(out, "w", encoding="utf-8") as f:
     f.write('<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>%s</title><style>%s</style></head><body>\n%s\n</body></html>\n'
             % (html.escape(title), css, "\n".join(body)))
