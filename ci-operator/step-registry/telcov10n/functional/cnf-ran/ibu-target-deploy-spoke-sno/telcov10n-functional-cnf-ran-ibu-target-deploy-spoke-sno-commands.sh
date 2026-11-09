@@ -34,12 +34,18 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/k
 
 cd /eco-ci-cd
 
-ZTP_CLUSTERS_PATH="${VERSION}/ibu-target/clusterinstance"
-ZTP_POLICIES_PATH="${VERSION}/ibu-target/policygentemplate"
+# IBU Git paths use ibu-target even when the spoke is named after its hardware.
+ZTP_TARGET_NAME="ibu-target"
+if [[ "$(echo "${TARGET_SPOKE_CLUSTER}" | tr -d "[]'\" ")" == "ibi-target" ]]; then
+    ZTP_TARGET_NAME="ibi-target"
+fi
+
+ZTP_CLUSTERS_PATH="${VERSION}/${ZTP_TARGET_NAME}/clusterinstance"
+ZTP_POLICIES_PATH="${VERSION}/${ZTP_TARGET_NAME}/policygentemplate"
 
 # 4.16 predates the siteconfig operator: the clusters dir holds a SiteConfig CR
 if [[ ${VERSION} == "4.16" ]]; then
-    ZTP_CLUSTERS_PATH="${VERSION}/ibu-target/siteconfig"
+    ZTP_CLUSTERS_PATH="${VERSION}/${ZTP_TARGET_NAME}/siteconfig"
 fi
 
 echo "Running ZTP deployment for target SNO spoke cluster: ${TARGET_SPOKE_CLUSTER}"
