@@ -24,11 +24,7 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
     echo "Applying Gangway override: CLAUDE_MODEL=${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
     CLAUDE_MODEL="${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL}"
 fi
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY:-}" ]]; then
-    echo "Applying Gangway override: TRIAGE_EXISTING_ONLY=${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY}"
-    TRIAGE_EXISTING_ONLY="${MULTISTAGE_PARAM_OVERRIDE_TRIAGE_EXISTING_ONLY}"
-fi
-for var in TRIAGE_VIEWS TRIAGE_POLICY TRIAGE_WRITE_MODE TRIAGE_MODE TRIAGE_BASELINE POSTGA_ACK_RECEIPT; do
+for var in TRIAGE_VIEWS TRIAGE_WRITES TRIAGE_ACK_RECEIPT; do
     override_var="MULTISTAGE_PARAM_OVERRIDE_${var}"
     if [[ -n "${!override_var:-}" ]]; then
         echo "Applying Gangway override: ${var}=${!override_var}"
@@ -36,23 +32,43 @@ for var in TRIAGE_VIEWS TRIAGE_POLICY TRIAGE_WRITE_MODE TRIAGE_MODE TRIAGE_BASEL
     fi
 done
 
-# --- Post-GA policy knobs (defaults keep the historical pre-GA behaviour) ---
-TRIAGE_POLICY="${TRIAGE_POLICY:-pre-ga}"
-TRIAGE_WRITE_MODE="${TRIAGE_WRITE_MODE:-auto}"
-TRIAGE_MODE="${TRIAGE_MODE:-weekly}"
+# --- Policy knobs (defaults keep the historical devel behaviour) ---
+# TRIAGE_POLICY: devel (release in development) or ga (released versions); pre-ga/post-ga are accepted aliases.
+TRIAGE_POLICY="${TRIAGE_POLICY:-devel}"
+case "${TRIAGE_POLICY}" in
+    devel|pre-ga|duty) TRIAGE_POLICY="devel" ;;
+    ga|post-ga) TRIAGE_POLICY="ga" ;;
+    *) echo "ERROR: TRIAGE_POLICY must be devel or ga (got '${TRIAGE_POLICY}')."; exit 1 ;;
+esac
+TRIAGE_ANALYSIS="${TRIAGE_ANALYSIS:-full}"
+case "${TRIAGE_ANALYSIS}" in
+    full|quick) ;;
+    *) echo "ERROR: TRIAGE_ANALYSIS must be full or quick (got '${TRIAGE_ANALYSIS}')."; exit 1 ;;
+esac
+# TRIAGE_WRITES: none (report only) | existing (only for matches to existing bugs) | all (may also file new bugs).
+if [[ -z "${TRIAGE_WRITES:-}" ]]; then
+    if [[ "${TRIAGE_POLICY}" == "ga" ]]; then TRIAGE_WRITES="none"; else TRIAGE_WRITES="all"; fi
+fi
+case "${TRIAGE_POLICY}/${TRIAGE_WRITES}" in
+    ga/none|ga/existing|devel/existing|devel/all) ;;
+    ga/all) echo "ERROR: TRIAGE_WRITES=all is not allowed with TRIAGE_POLICY=ga (the GA policy never files new bugs)."; exit 1 ;;
+    devel/none) echo "ERROR: TRIAGE_WRITES=none is only supported with TRIAGE_POLICY=ga."; exit 1 ;;
+    *) echo "ERROR: TRIAGE_WRITES must be none, existing or all (got '${TRIAGE_WRITES}')."; exit 1 ;;
+esac
+# Internal flags the skill and the audit scripts understand.
+TRIAGE_EXISTING_ONLY="false"
+if [[ "${TRIAGE_WRITES}" != "all" ]]; then TRIAGE_EXISTING_ONLY="true"; fi
+WRITE_MODE_REQUESTED="auto"
+if [[ "${TRIAGE_WRITES}" == "none" ]]; then WRITE_MODE_REQUESTED="report"; fi
 TRIAGE_BASELINE="${TRIAGE_BASELINE:-auto}"
 TRIAGE_VIEWS="${TRIAGE_VIEWS:-}"
-POSTGA_ACK_RECEIPT="${POSTGA_ACK_RECEIPT:-}"
+TRIAGE_ACK_RECEIPT="${TRIAGE_ACK_RECEIPT:-}"
 # Where the ai-helpers bulk-triage scripts live (overridable for rehearsal from a checkout).
 AIH_SCRIPTS_DIR="${AIH_SCRIPTS_DIR:-/opt/ai-helpers/plugins/ci/skills/bulk-triage-regressions/scripts}"
 # Optional local inventory for the pre-pass (testing/rehearsal only; skips Sippy and the oracle).
 TRIAGE_INVENTORY_FILE="${TRIAGE_INVENTORY_FILE:-}"
 GCS_BUCKET="${GCS_BUCKET:-test-platform-results}"
 RUN_START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    # post-ga is existing-only by definition (spec §6.1); never file new JIRA issues.
-    TRIAGE_EXISTING_ONLY="true"
-fi
 
 # --- Load JIRA credentials (read + write) ---
 # Mounted from the openshift-qse-jira-sa test-credentials secret: an
@@ -90,7 +106,7 @@ if [[ -f "${DPCR_TOKEN_PATH:-}" ]]; then
 else
     echo "Warning: DPCR token not found (DPCR_TOKEN_PATH); Sippy triage writes and the reevaluate probe will be unavailable."
 fi
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
     # The agent gets the loaded values only, never the mount paths.
     unset JIRA_EMAIL_PATH JIRA_PAT_PATH DPCR_TOKEN_PATH
 fi
@@ -117,7 +133,7 @@ if [[ -n "${AI_HELPERS_REPO:-}" ]]; then
 fi
 
 if [[ -n "${TRIAGE_VIEWS}" ]]; then
-    # Multi-view run (post-GA): the first view keeps legacy single-view variables meaningful.
+    # Multi-view run (GA): the first view keeps legacy single-view variables meaningful.
     TRIAGE_VIEW="${TRIAGE_VIEWS%% *}"
 fi
 if [[ -z "${TRIAGE_VIEW:-}" ]]; then
@@ -131,6 +147,15 @@ if [[ -z "${TRIAGE_VIEW:-}" ]]; then
     echo "Auto-selected view: ${TRIAGE_VIEW}"
 fi
 TRIAGE_VIEWS="${TRIAGE_VIEWS:-${TRIAGE_VIEW}}"
+
+# Skill flag and rulebook for the GA policy. ai-helpers renamed post-ga to ga (keeping post-ga as an alias);
+# use whichever the installed copy has so the step works before and after the image picks up the rename.
+GA_POLICY_FLAG="ga"
+GA_POLICY_DOC="references/ga-policy.md"
+if [[ ! -f "${AIH_SCRIPTS_DIR}/../${GA_POLICY_DOC}" && -f "${AIH_SCRIPTS_DIR}/../references/post-ga-policy.md" ]]; then
+    GA_POLICY_FLAG="post-ga"
+    GA_POLICY_DOC="references/post-ga-policy.md"
+fi
 
 # Resolve component scope. An empty value or the sentinel "all"
 # (case-insensitive) means triage every component in the view: run
@@ -158,9 +183,9 @@ if [[ "${TRIAGE_EXISTING_ONLY,,}" == "true" ]]; then
 fi
 
 echo "Starting claude bulk-triage-regressions run"
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
     echo "Views: ${TRIAGE_VIEWS}"
-    echo "Policy: post-ga (mode ${TRIAGE_MODE}, write-mode ${TRIAGE_WRITE_MODE}, baseline ${TRIAGE_BASELINE})"
+    echo "Policy: ga (skill --policy ${GA_POLICY_FLAG}; analysis ${TRIAGE_ANALYSIS}, writes ${TRIAGE_WRITES}, baseline ${TRIAGE_BASELINE})"
 else
     echo "View: ${TRIAGE_VIEW}"
 fi
@@ -180,7 +205,7 @@ if [[ "${TRIAGE_EXISTING_ONLY:-false}" == "true" ]]; then
     JIRA_BUG_SCOPE=""
     EXISTING_ONLY_REPORT=" Because --existing-only is set, do NOT file any JIRA issue; the report must also contain the 'Proposed new bugs (not filed)' section (even if empty)."
 fi
-echo "Existing-only: ${TRIAGE_EXISTING_ONLY:-false}"
+echo "Writes: ${TRIAGE_WRITES} (existing-only ${TRIAGE_EXISTING_ONLY})"
 
 # Install gcloud CLI for GCS artifact access (no root required)
 echo "Installing gcloud CLI..."
@@ -193,18 +218,161 @@ WORKDIR=$(mktemp -d /tmp/claude-bulk-triage-XXXXXX)
 cd "${WORKDIR}"
 
 REPORT_FILE="triage-duty-report-${TRIAGE_VIEW}.md"
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    REPORT_FILE="triage-duty-report-post-ga.md"
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
+    REPORT_FILE="ga-triage-duty-report.md"
 fi
+# HTML copy of the report for the Prow job page (the spyglass html lens shows artifacts named *-summary*.html).
+SUMMARY_HTML="ga-triage-summary.html"
+if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
+    SUMMARY_HTML="ga-burst-summary.html"
+elif [[ "${TRIAGE_POLICY}" != "ga" ]]; then
+    SUMMARY_HTML="triage-summary-${TRIAGE_VIEW}.html"
+fi
+# Test-name prefix: failures of this job are routed to the Test Framework component.
+PHASE_PREFIX='[Jira:"Test Framework"]'
+
+render_summary_html() {
+    # Deterministic markdown -> HTML (stdlib only, no LLM). Quick runs summarise burst-status.json instead.
+    local src="${WORKDIR:-}/${REPORT_FILE}" title="${REPORT_FILE}"
+    if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
+        [[ -s "${ARTIFACT_DIR}/burst-status.json" ]] || return 0
+        src="${WORKDIR}/burst-summary.md"
+        title="Component Readiness burst tripwire"
+        jq -r '"# Component Readiness burst tripwire\n\nObserved \(.observation.time) over the last \(.observation.window_hours) hours.\n\n## Triggers (\(.triggers | length))\n\n"
+            + (if (.triggers | length) == 0 then "No trigger fired.\n" else
+                ([.triggers[] | "- **\(.level) \(.kind)** `\(.cluster_id)`: \((.reasons // []) | join("; "))"] | join("\n")) + "\n" end)
+            + "\n## Views\n\n| View | Fetch | Open | Open untriaged | Opened 7d | Closed 7d |\n|---|---|---|---|---|---|\n"
+            + ([.observation.views[] | "| \(.view) | \(.fetch) | \(.open) | \(.open_untriaged) | \(.opened_7d) | \(.closed_7d) |"] | join("\n")) + "\n"' \
+            "${ARTIFACT_DIR}/burst-status.json" > "${src}" 2>/dev/null || return 0
+    fi
+    [[ -s "${src}" ]] || return 0
+    python3 - "${src}" "${ARTIFACT_DIR}/${SUMMARY_HTML}" "${title}" <<'PYEOF' || echo "Warning: could not render ${SUMMARY_HTML}."
+import html, re, sys
+
+src, out, title = sys.argv[1:4]
+lines = open(src, encoding="utf-8", errors="replace").read().splitlines()
+
+
+def inline(t):
+    codes = []
+
+    def keep(m):
+        codes.append("<code>%s</code>" % html.escape(m.group(1)))
+        return "\x00%d\x00" % (len(codes) - 1)
+
+    t = re.sub(r"`([^`]+)`", keep, t)
+    t = html.escape(t, quote=False)
+    links = []
+
+    def link(href, text):
+        links.append('<a href="%s">%s</a>' % (href.replace('"', "%22"), text))
+        return "\x01%d\x01" % (len(links) - 1)
+
+    t = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", lambda m: link(m.group(2), m.group(1)), t)
+    t = re.sub(r"https?://[^\s<)\]]+", lambda m: link(m.group(0), m.group(0)), t)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+    t = re.sub(r"(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])", r"<em>\1</em>", t)
+    t = re.sub(r"\x01(\d+)\x01", lambda m: links[int(m.group(1))], t)
+    return re.sub(r"\x00(\d+)\x00", lambda m: codes[int(m.group(1))], t)
+
+
+def cells(row):
+    row = row.strip()
+    if row.startswith("|"):
+        row = row[1:]
+    if row.endswith("|"):
+        row = row[:-1]
+    return [c.strip() for c in re.split(r"(?<!\\)\|", row)]
+
+
+body, para, i = [], [], 0
+
+
+def flush():
+    if para:
+        body.append("<p>%s</p>" % inline(" ".join(para)))
+        para.clear()
+
+
+while i < len(lines):
+    s = lines[i].strip()
+    if s.startswith("```"):
+        flush()
+        i += 1
+        code = []
+        while i < len(lines) and not lines[i].strip().startswith("```"):
+            code.append(lines[i])
+            i += 1
+        body.append("<pre><code>%s</code></pre>" % html.escape("\n".join(code)))
+    elif not s:
+        flush()
+    elif re.match(r"^#{1,6}\s", s):
+        flush()
+        n = len(s) - len(s.lstrip("#"))
+        body.append("<h%d>%s</h%d>" % (n, inline(s[n:].strip()), n))
+    elif re.match(r"^(-{3,}|\*{3,}|_{3,})$", s):
+        flush()
+        body.append("<hr>")
+    elif s.startswith("|") and i + 1 < len(lines) and re.match(r"^\|?\s*:?-{2,}", lines[i + 1].strip()):
+        flush()
+        head = cells(s)
+        i += 2
+        rows = []
+        while i < len(lines) and lines[i].strip().startswith("|"):
+            rows.append(cells(lines[i]))
+            i += 1
+        body.append("<table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>" % (
+            "".join("<th>%s</th>" % inline(c) for c in head),
+            "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % inline(c) for c in r) for r in rows)))
+        continue
+    elif re.match(r"^([-*+]|\d+[.)])\s", s):
+        flush()
+        tag = "ol" if s[0].isdigit() else "ul"
+        items = []
+        while i < len(lines) and lines[i].strip():
+            t = lines[i].strip()
+            m = re.match(r"^([-*+]|\d+[.)])\s+(.*)$", t)
+            if m:
+                items.append(m.group(2))
+            elif items:
+                items[-1] += " " + t
+            else:
+                break
+            i += 1
+        body.append("<%s>%s</%s>" % (tag, "".join("<li>%s</li>" % inline(x) for x in items), tag))
+        continue
+    elif s.startswith(">"):
+        flush()
+        quote = []
+        while i < len(lines) and lines[i].strip().startswith(">"):
+            quote.append(lines[i].strip()[1:].strip())
+            i += 1
+        body.append("<blockquote>%s</blockquote>" % inline(" ".join(quote)))
+        continue
+    else:
+        para.append(s)
+    i += 1
+flush()
+
+css = ("body{font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;margin:16px;color:#1f2328}"
+       "table{border-collapse:collapse;margin:8px 0}th,td{border:1px solid #d0d7de;padding:4px 8px;text-align:left;vertical-align:top}"
+       "th{background:#f6f8fa}code{background:#f6f8fa;padding:1px 4px;border-radius:4px}pre{background:#f6f8fa;padding:8px;overflow:auto}"
+       "blockquote{border-left:4px solid #d0d7de;margin:0;padding:0 12px;color:#57606a}")
+with open(out, "w", encoding="utf-8") as f:
+    f.write('<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>%s</title><style>%s</style></head><body>\n%s\n</body></html>\n'
+            % (html.escape(title), css, "\n".join(body)))
+PYEOF
+}
 
 # Ensure the report and session logs are copied to artifacts even if the script exits early
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying reports to artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.md" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        render_summary_html || true
     fi
-    if [[ "${TRIAGE_POLICY:-pre-ga}" == "post-ga" ]]; then
-        postga_finalize_on_exit
+    if [[ "${TRIAGE_POLICY:-devel}" == "ga" ]]; then
+        ga_finalize_on_exit
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
@@ -218,13 +386,13 @@ copy_reports() {
 }
 trap copy_reports EXIT TERM INT
 
-# --- Post-GA helpers: junit, job history, finalizer ---
+# --- GA helpers: junit, job history, finalizer ---
 JUNIT_EXTRA_CASES=""
 JUNIT_EXTRA_COUNT=0
 JUNIT_EXTRA_FAILURES=0
 JUNIT_WRITTEN=false
 RECEIPT_WRITTEN=false
-POSTGA_EXIT_CODE=0
+GA_EXIT_CODE=0
 xml_escape() {
     local v="$1"
     v="${v//&/&amp;}"; v="${v//</&lt;}"; v="${v//>/&gt;}"; v="${v//\"/&quot;}"
@@ -233,7 +401,7 @@ xml_escape() {
 junit_case() {
     # junit_case <name> <ok:true|false> <message>
     local name msg
-    name="$(xml_escape "[sig-claude] $1")"
+    name="$(xml_escape "${PHASE_PREFIX} $1")"
     msg="$(xml_escape "${3:-}")"
     JUNIT_EXTRA_COUNT=$(( JUNIT_EXTRA_COUNT + 1 ))
     if [[ "$2" == "true" ]]; then
@@ -300,7 +468,7 @@ fetch_prev_artifact() {
 
 PROW_RUN_URL="https://prow.ci.openshift.org/view/gs/${HISTORY_BUCKET}/${HISTORY_PREFIX}/${JOB_NAME:-unknown-job}/${BUILD_ID:-0}"
 PREV_RUN=""
-MODE_EFFECTIVE="${TRIAGE_WRITE_MODE}"
+MODE_EFFECTIVE="${WRITE_MODE_REQUESTED}"
 MODE_REASON=""
 DECISION_LINE=""
 DECISION="configured"
@@ -329,7 +497,7 @@ write_receipt_now() {
         [[ -s "${WORKDIR:-}/previous-receipt.json" ]] && extra+=(--previous-receipt "${WORKDIR}/previous-receipt.json")
     fi
     if python3 "${AIH_SCRIPTS_DIR}/audit.py" receipt-write --out "${ARTIFACT_DIR}/runner-receipt.json" \
-        --run-id "${BUILD_ID:-local}" --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${mode}" \
+        --run-id "${BUILD_ID:-local}" --mode-requested "${WRITE_MODE_REQUESTED}" --mode-effective "${mode}" \
         --jira-creations "${jira}" --sippy-diff "${sippy}" ${extra[@]+"${extra[@]}"}; then
         RECEIPT_WRITTEN=true
         return 0
@@ -337,26 +505,26 @@ write_receipt_now() {
     return 1
 }
 
-postga_finalize_on_exit() {
+ga_finalize_on_exit() {
     # Runs from the EXIT trap: guarantees a receipt and a junit exist, and that JSON artifacts reach $ARTIFACT_DIR.
     for f in prepass.json triage-manifest.json; do
         if [[ -d "${WORKDIR:-}" && -s "${WORKDIR}/${f}" && ! -s "${ARTIFACT_DIR}/${f}" ]]; then
             cp "${WORKDIR}/${f}" "${ARTIFACT_DIR}/${f}" || true
         fi
     done
-    if [[ "${TRIAGE_MODE:-weekly}" != "tripwire" && "${RECEIPT_WRITTEN:-false}" != "true" ]]; then
+    if [[ "${TRIAGE_ANALYSIS:-full}" != "quick" && "${RECEIPT_WRITTEN:-false}" != "true" ]]; then
         echo "Run ended early: writing a failure receipt (next run stays in report mode)."
         write_receipt_now report || true
     fi
     if [[ "${JUNIT_WRITTEN:-false}" != "true" ]]; then
         if [[ "${JUNIT_EXTRA_COUNT}" -eq 0 ]]; then
-            junit_case "post-GA: run completed" false "the runner exited before producing its results"
+            junit_case "GA: run completed" false "the runner exited before producing its results"
         fi
         write_extra_junit || true
     fi
 }
 
-if [[ "${TRIAGE_POLICY}" == "post-ga" || "${TRIAGE_MODE}" == "tripwire" ]]; then
+if [[ "${TRIAGE_POLICY}" == "ga" || "${TRIAGE_ANALYSIS}" == "quick" ]]; then
     PREV_RUN="$(latest_preceding_attempt)"
     if [[ -z "${PREV_RUN}" ]]; then
         echo "No preceding attempt found in $(history_url "${JOB_NAME:-}") (or job history unreadable); baseline none."
@@ -365,7 +533,7 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" || "${TRIAGE_MODE}" == "tripwire" ]]; then
     fi
 fi
 
-if [[ "${TRIAGE_MODE}" == "tripwire" ]]; then
+if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
     # Tripwire never invokes the agent and never writes, whatever the policy.
     echo "Tripwire mode: deterministic pre-pass over the last 24h, no LLM call, no writes."
     PREV_STATUS_ARG="none"
@@ -373,21 +541,21 @@ if [[ "${TRIAGE_MODE}" == "tripwire" ]]; then
         PREV_STATUS_ARG="${WORKDIR}/previous-burst-status.json"
     fi
     echo "Previous status: ${PREV_STATUS_ARG}"
-    # Growth of known clusters is judged against the latest WEEKLY manifest (a different job): derive its
+    # Growth of known clusters is judged against the latest full-analysis manifest (a different job): derive its
     # name from ours unless given explicitly.
-    BASELINE_JOB="${TRIAGE_BASELINE_JOB:-${JOB_NAME/cr-burst-tripwire/bulk-triage-post-ga}}"
-    WEEKLY_BASELINE_ARG="none"
-    WEEKLY_RUN=""
+    BASELINE_JOB="${TRIAGE_BASELINE_JOB:-${JOB_NAME/cr-burst-tripwire/bulk-triage-ga}}"
+    FULL_BASELINE_ARG="none"
+    FULL_RUN=""
     if [[ "${TRIAGE_BASELINE}" == "auto" && -n "${BASELINE_JOB}" ]]; then
-        WEEKLY_RUN="$(latest_preceding_attempt "${BASELINE_JOB}")"
-        if [[ -n "${WEEKLY_RUN}" ]] && fetch_prev_artifact "${WEEKLY_RUN}" triage-manifest.json "${WORKDIR}/weekly-baseline.json" "${BASELINE_JOB}"; then
-            WEEKLY_BASELINE_ARG="${WORKDIR}/weekly-baseline.json"
+        FULL_RUN="$(latest_preceding_attempt "${BASELINE_JOB}")"
+        if [[ -n "${FULL_RUN}" ]] && fetch_prev_artifact "${FULL_RUN}" triage-manifest.json "${WORKDIR}/full-baseline.json" "${BASELINE_JOB}"; then
+            FULL_BASELINE_ARG="${WORKDIR}/full-baseline.json"
         fi
     fi
-    echo "Weekly baseline: ${WEEKLY_BASELINE_ARG}${WEEKLY_RUN:+ (run ${WEEKLY_RUN} of ${BASELINE_JOB})}"
+    echo "Full-analysis baseline: ${FULL_BASELINE_ARG}${FULL_RUN:+ (run ${FULL_RUN} of ${BASELINE_JOB})}"
     TRIPWIRE_OK=true
     python3 "${AIH_SCRIPTS_DIR}/prepass.py" --tripwire --views "${TRIAGE_VIEWS_ARR[@]}" \
-        --window-hours 24 --previous-status "${PREV_STATUS_ARG}" --baseline "${WEEKLY_BASELINE_ARG}" --run-id "${BUILD_ID:-local}" \
+        --window-hours 24 --previous-status "${PREV_STATUS_ARG}" --baseline "${FULL_BASELINE_ARG}" --run-id "${BUILD_ID:-local}" \
         ${PREPASS_INVENTORY_ARGS[@]+"${PREPASS_INVENTORY_ARGS[@]}"} --out "${ARTIFACT_DIR}/burst-status.json" || TRIPWIRE_OK=false
     if [[ "${TRIPWIRE_OK}" == "true" && -s "${ARTIFACT_DIR}/burst-status.json" ]]; then
         junit_case "tripwire: burst-status.json produced" true ""
@@ -397,18 +565,19 @@ if [[ "${TRIAGE_MODE}" == "tripwire" ]]; then
     fi
     write_extra_junit
     trap - EXIT TERM INT
+    render_summary_html || true
     if [[ "${JUNIT_EXTRA_FAILURES}" -gt 0 ]]; then exit 1; fi
     exit 0
 fi
 
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
     # Receipt check (independent of TRIAGE_BASELINE): the latest preceding attempt's audit can force report mode.
     RECEIPT_PATH="/nonexistent/runner-receipt.json"
     if [[ -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" runner-receipt.json "${WORKDIR}/previous-receipt.json"; then
         RECEIPT_PATH="${WORKDIR}/previous-receipt.json"
     fi
     DECIDE_ARGS=(receipt-decide --receipt "${RECEIPT_PATH}")
-    if [[ -n "${POSTGA_ACK_RECEIPT}" ]]; then DECIDE_ARGS+=(--ack "${POSTGA_ACK_RECEIPT}"); fi
+    if [[ -n "${TRIAGE_ACK_RECEIPT}" ]]; then DECIDE_ARGS+=(--ack "${TRIAGE_ACK_RECEIPT}"); fi
     DECISION_LINE="$(python3 "${AIH_SCRIPTS_DIR}/audit.py" "${DECIDE_ARGS[@]}" 2>/dev/null || printf 'report\t\treceipt-decide failed')"
     # Exact three-field parse (IFS-based read would collapse an empty origin field).
     DECISION="${DECISION_LINE%%$'\t'*}"
@@ -423,7 +592,7 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
     elif [[ -n "${MODE_REASON}" ]]; then
         echo "Receipt decision: ${MODE_REASON}"
     fi
-    echo "Effective write mode: ${MODE_EFFECTIVE} (requested ${TRIAGE_WRITE_MODE})"
+    echo "Effective write mode: ${MODE_EFFECTIVE} (requested ${WRITE_MODE_REQUESTED}, TRIAGE_WRITES=${TRIAGE_WRITES})"
 
     if [[ "${TRIAGE_BASELINE}" == "auto" && -n "${PREV_RUN}" ]] && fetch_prev_artifact "${PREV_RUN}" triage-manifest.json "${WORKDIR}/baseline-manifest.json"; then
         BASELINE_ARG="${WORKDIR}/baseline-manifest.json"
@@ -440,10 +609,10 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
         --out "${WORKDIR}/prepass.json" || PREPASS_OK=false
     if [[ "${PREPASS_OK}" == "true" && -s "${WORKDIR}/prepass.json" ]]; then
         cp "${WORKDIR}/prepass.json" "${ARTIFACT_DIR}/prepass.json"
-        junit_case "post-GA: pre-pass produced prepass.json" true ""
+        junit_case "GA: pre-pass produced prepass.json" true ""
         echo "Pre-pass clusters: $(jq -r '.clusters | length' "${WORKDIR}/prepass.json" 2>/dev/null || echo unknown)"
     else
-        junit_case "post-GA: pre-pass produced prepass.json" false "prepass.py failed; the agent cannot run without an inventory"
+        junit_case "GA: pre-pass produced prepass.json" false "prepass.py failed; the agent cannot run without an inventory"
         exit 1   # the EXIT trap writes the failure receipt and the junit
     fi
 fi
@@ -502,16 +671,16 @@ PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_
 
 Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}. The report must contain: the untriaged-regression inventory table, the bucket list with member regression IDs and evidence (error signatures, failure stage, representative run links, suspect PRs), the recommended disposition per bucket (extend triage <id> / link to <JIRA> / file new bug against <component> with a draft summary), deliberately-untriaged leftovers with reasons, and cross-cutting observations. Every claim must cite artifact paths or run URLs.${EXISTING_ONLY_REPORT}"
 
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
-    POSTGA_WRITE_CLAUSE="You ARE authorized, in --write-mode auto, to create or extend Sippy triage records (use \$DPCR_TOKEN) and to perform the JIRA writes allowed by references/post-ga-policy.md (ci:add-jira-triage-link and the backport-candidate comment) — and nothing else."
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
+    GA_WRITE_CLAUSE="You ARE authorized, in --write-mode auto, to create or extend Sippy triage records (use \$DPCR_TOKEN) and to perform the JIRA writes allowed by ${GA_POLICY_DOC} (ci:add-jira-triage-link and the backport-candidate comment) — and nothing else."
     if [[ "${MODE_EFFECTIVE}" == "report" ]]; then
-        POSTGA_WRITE_CLAUSE="This run is --write-mode report: you are NOT authorized to perform ANY write to Sippy or JIRA (no triage records, no triage links, no comments). Record every intended action in the manifest with status skipped-report-mode."
+        GA_WRITE_CLAUSE="This run is --write-mode report: you are NOT authorized to perform ANY write to Sippy or JIRA (no triage records, no triage links, no comments). Record every intended action in the manifest with status skipped-report-mode."
     fi
     SYSTEM_PROMPT="${SYSTEM_PROMPT}
 
-**POST-GA POLICY**: This is a post-GA (released versions) run under --policy post-ga --write-mode ${MODE_EFFECTIVE}. ${POSTGA_WRITE_CLAUSE} Phase 0 is already done by the runner: ${WORKDIR}/prepass.json is the complete inventory and cluster list — do not re-derive clusters and do not call the Sippy list/details/related-triages APIs for inventory. Analyse clusters in file order (HIGH first) under the time budget. A symptom_probe.status other than ok is UNKNOWN, never 'no symptoms matched'. Follow references/post-ga-policy.md for everything else."
+**GA POLICY**: This is a GA (released versions) run under --policy ${GA_POLICY_FLAG} --write-mode ${MODE_EFFECTIVE}. ${GA_WRITE_CLAUSE} Phase 0 is already done by the runner: ${WORKDIR}/prepass.json is the complete inventory and cluster list — do not re-derive clusters and do not call the Sippy list/details/related-triages APIs for inventory. Analyse clusters in file order (HIGH first) under the time budget. A symptom_probe.status other than ok is UNKNOWN, never 'no symptoms matched'. Follow ${GA_POLICY_DOC} for everything else."
 
-    PROMPT="Load and follow the ci:bulk-triage-regressions skill with --policy post-ga --write-mode ${MODE_EFFECTIVE} --views ${TRIAGE_VIEWS} covering ${COMPONENTS_CLAUSE}, with --existing-only. Phase 0 is complete: read ${WORKDIR}/prepass.json and treat its clusters as the batch. Execute Phases 1-5 per references/post-ga-policy.md. ${POSTGA_WRITE_CLAUSE}
+    PROMPT="Load and follow the ci:bulk-triage-regressions skill with --policy ${GA_POLICY_FLAG} --write-mode ${MODE_EFFECTIVE} --views ${TRIAGE_VIEWS} covering ${COMPONENTS_CLAUSE}, with --existing-only. Phase 0 is complete: read ${WORKDIR}/prepass.json and treat its clusters as the batch. Execute Phases 1-5 per ${GA_POLICY_DOC}. ${GA_WRITE_CLAUSE}
 
 Write ${WORKDIR}/triage-manifest.json by assembling dispositions.json, actions.json and extra.json as the policy describes and running ${AIH_SCRIPTS_DIR}/manifest.py merge --prepass ${WORKDIR}/prepass.json ... --out ${WORKDIR}/triage-manifest.json, then ${AIH_SCRIPTS_DIR}/manifest.py validate ${WORKDIR}/triage-manifest.json (it must exit 0; fix the data, never weaken it). Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}: inventory per view, every cluster with its blast radius, disposition, evidence (own run links, artifact paths), bug decisions and action or proposed action, the watch list, catch-all admissions, backport candidates, unanalysed clusters, and cross-cutting observations. Every claim must cite artifact paths or run URLs.${EXISTING_ONLY_REPORT}"
 fi
@@ -539,13 +708,13 @@ fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
 
-if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
+if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
     RUN_END="$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)"
-    # Agent outcome (a timeout is handled by the duty junit cases; any other failure is a post-GA failure).
+    # Agent outcome (a timeout is handled by the duty junit cases; any other failure is a GA-run failure).
     if [[ "${CLAUDE_EXIT}" -eq 0 || "${CLAUDE_EXIT}" -eq 124 ]]; then
-        junit_case "post-GA: agent completed" true ""
+        junit_case "GA: agent completed" true ""
     else
-        junit_case "post-GA: agent completed" false "agentic-ci exited with code ${CLAUDE_EXIT}"
+        junit_case "GA: agent completed" false "agentic-ci exited with code ${CLAUDE_EXIT}"
     fi
     # Sippy triage catalogue after the agent; diff against the declared actions.
     python3 "${AIH_SCRIPTS_DIR}/audit.py" snapshot --out "${ARTIFACT_DIR}/sippy-triages-after.json" || true
@@ -561,9 +730,9 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
         printf '{"status": "unknown", "error": "catalogue snapshots missing or diff failed"}\n' > "${ARTIFACT_DIR}/sippy-catalog-diff.json"
     fi
     if [[ "${SIPPY_DIFF_STATUS}" == "match" ]]; then
-        junit_case "post-GA: Sippy writes match the report" true ""
+        junit_case "GA: Sippy writes match the report" true ""
     else
-        junit_case "post-GA: Sippy writes match the report" false "Sippy catalogue diff status: ${SIPPY_DIFF_STATUS}"
+        junit_case "GA: Sippy writes match the report" false "Sippy catalogue diff status: ${SIPPY_DIFF_STATUS}"
     fi
     # Account-wide JIRA creations in the run window (shared service account: attribution is best-effort).
     python3 "${AIH_SCRIPTS_DIR}/audit.py" jql --start "${RUN_START}" --end "${RUN_END}" \
@@ -572,9 +741,9 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
     JIRA_STATUS="$(jq -r '.status // "unknown"' "${ARTIFACT_DIR}/jira-creations.json" 2>/dev/null || echo unknown)"
     JIRA_TRUNCATED="$(jq -r '.truncated // false' "${ARTIFACT_DIR}/jira-creations.json" 2>/dev/null || echo true)"
     if [[ "${JIRA_STATUS}" == "ok" && "${JIRA_CREATED}" == "0" && "${JIRA_TRUNCATED}" == "false" ]]; then
-        junit_case "post-GA: no Jira issues created by the job" true ""
+        junit_case "GA: no Jira issues created by the job" true ""
     else
-        junit_case "post-GA: no Jira issues created by the job" false "account-wide creations in window: ${JIRA_CREATED} (status ${JIRA_STATUS}, truncated ${JIRA_TRUNCATED}; shared account — see jira-creations.json)"
+        junit_case "GA: no Jira issues created by the job" false "account-wide creations in window: ${JIRA_CREATED} (status ${JIRA_STATUS}, truncated ${JIRA_TRUNCATED}; shared account — see jira-creations.json)"
     fi
     echo "Jira creations in window (account-wide): ${JIRA_CREATED} (status ${JIRA_STATUS}, truncated ${JIRA_TRUNCATED}); Sippy diff: ${SIPPY_DIFF_STATUS}"
     # Permissions observation (transparency only, never a gate).
@@ -586,32 +755,31 @@ if [[ "${TRIAGE_POLICY}" == "post-ga" ]]; then
             --out "${ARTIFACT_DIR}/triage-manifest.json" \
             --jira-creations "${ARTIFACT_DIR}/jira-creations.json" --sippy-diff "${ARTIFACT_DIR}/sippy-catalog-diff.json" \
             --permissions "${ARTIFACT_DIR}/jira-permissions.json" \
-            --mode-requested "${TRIAGE_WRITE_MODE}" --mode-effective "${MODE_EFFECTIVE}" \
+            --mode-requested "${WRITE_MODE_REQUESTED}" --mode-effective "${MODE_EFFECTIVE}" \
             --decision "${DECISION_LINE}" --job "${JOB_NAME:-unknown-job}" --run-id "${BUILD_ID:-local}" \
             --url "${PROW_RUN_URL}" --started "${RUN_START}" ${PREV_RUN:+--previous-run "${PREV_RUN}"} \
             --existing-only true 2> "${WORKDIR}/manifest-validate.err"; then
-            junit_case "post-GA: manifest validates" true ""
+            junit_case "GA: manifest validates" true ""
         else
             [[ -s "${ARTIFACT_DIR}/triage-manifest.json" ]] || cp "${WORKDIR}/triage-manifest.json" "${ARTIFACT_DIR}/triage-manifest.json" || true
-            junit_case "post-GA: manifest validates" false "manifest.py finalize/validate failed: $(head -c 400 "${WORKDIR}/manifest-validate.err")"
+            junit_case "GA: manifest validates" false "manifest.py finalize/validate failed: $(head -c 400 "${WORKDIR}/manifest-validate.err")"
         fi
     else
-        junit_case "post-GA: manifest validates" false "triage-manifest.json was not produced"
+        junit_case "GA: manifest validates" false "triage-manifest.json was not produced"
     fi
     # Receipt for the next run.
     if write_receipt_now "${MODE_EFFECTIVE}"; then
-        junit_case "post-GA: receipt written" true ""
+        junit_case "GA: receipt written" true ""
     else
-        junit_case "post-GA: receipt written" false "audit.py receipt-write failed"
+        junit_case "GA: receipt written" false "audit.py receipt-write failed"
     fi
     if [[ "${JUNIT_EXTRA_FAILURES}" -gt 0 ]]; then
-        POSTGA_EXIT_CODE=1
+        GA_EXIT_CODE=1
     fi
 fi
 
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
-PHASE_PREFIX="[sig-claude]"
 TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
 REPORT_TESTCASE="${PHASE_PREFIX} Claude should produce a triage duty report"
 
@@ -713,7 +881,7 @@ else
     echo "ERROR: No markdown report was generated."
     exit 1
 fi
-if [[ "${TRIAGE_POLICY}" == "post-ga" && "${POSTGA_EXIT_CODE}" -ne 0 ]]; then
-    echo "ERROR: post-GA checks failed (see junit); exiting non-zero."
-    exit "${POSTGA_EXIT_CODE}"
+if [[ "${TRIAGE_POLICY}" == "ga" && "${GA_EXIT_CODE}" -ne 0 ]]; then
+    echo "ERROR: GA checks failed (see junit); exiting non-zero."
+    exit "${GA_EXIT_CODE}"
 fi
