@@ -469,6 +469,9 @@ UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
 # it is not. Without an offset the job pinned no position, so we keep discovering the
 # next supported stream after the cluster's current version. The channel only opens the
 # hop: get_cluster_upgrade_path below remains the authority on which version is taken.
+#
+# Precedence: an explicit UPGRADED_TO_VERSION wins, then VERSION_OFFSET_FROM_LATEST,
+# then discovery of the next stream after the cluster's current version.
 current_y_stream=$(echo "$init_version" | cut -d '.' -f1,2)
 if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
   if [[ -n "${UPGRADED_TO_VERSION}" ]]; then
@@ -481,14 +484,18 @@ if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
     # failure, or an offset that no longer matches the running cluster, abort a hop the job
     # had already specified in full. This mirrors rosa/cluster/upgrade/cluster, which gates
     # all of its discovery on UPGRADED_TO_VERSION being empty.
-    target_y_stream=$(echo "${UPGRADED_TO_VERSION}" | cut -d '.' -f1,2)
-    if [[ ! "${target_y_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    #
+    # The target must be major.minor. get_cluster_upgrade_path matches the recommendation
+    # list with a trailing separator, so a patch-level value such as 4.18.7 can never
+    # match an entry and the step would quietly find nothing to upgrade to. Reject it
+    # here rather than narrowing it silently, so the misconfiguration is visible.
+    if [[ ! "${UPGRADED_TO_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
       write_target_selection_diagnostics "${current_y_stream}" "" "" ""
-      log "Error: UPGRADED_TO_VERSION='${UPGRADED_TO_VERSION}' is not a well-formed version; refusing to build a channel from it."
+      log "Error: UPGRADED_TO_VERSION='${UPGRADED_TO_VERSION}' must be a major.minor Y-stream such as 4.18; a patch-level or malformed value cannot be matched against the recommended upgrades."
       exit 1
     fi
-    next_y_stream="${target_y_stream}"
-    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${target_y_stream}"
+    next_y_stream="${UPGRADED_TO_VERSION}"
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
     log "Upgrade channel from explicit UPGRADED_TO_VERSION ${UPGRADED_TO_VERSION}: ${UPGRADE_CHANNEL}"
   else
     if ! y_stream_list=$(list_available_y_streams); then
