@@ -257,6 +257,11 @@ cloned harness's `detect_regressions()` rules; an eval YAML edited during the
 run cannot change its own verdict. Missing summaries or thresholded judges
 still fail the eval. If the step deadline passes before scoring, the eval
 fails as deadline-expired rather than as a scorer timeout.
+Before scoring, `run_result.json` must show that the harness ran exactly the
+preflight-resolved config chain, `models.skill` model, skill, and case set:
+the requested `--cases`, or every subdirectory of `dataset.path` for a full
+run. An edited copy of the config, missing or unexpected cases, a non-`case`
+execution mode, or any absent field fails the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 An unreadable, truncated, or non-mapping `run_result.json` and non-integer
