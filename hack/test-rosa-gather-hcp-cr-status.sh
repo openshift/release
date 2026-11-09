@@ -31,6 +31,19 @@ fi
 
 scenario="$2"
 test_dir="$(mktemp -d)"
+# Clear the fixtures when the scenario passes, so a full run does not leave a
+# directory per scenario behind, and keep them when it fails, where the
+# tarballs, logs and status file are the evidence. Name the retained path:
+# the outer runner reports where the captured output went, not the fixtures.
+# This is an EXIT trap; the TERM trap the sourced step installs is separate
+# and must keep working for the signal scenario.
+trap 'rc=$?;
+  if (( rc == 0 )); then
+    rm -rf "$test_dir"
+  else
+    printf "fixtures retained: %s\n" "$test_dir" >&2
+  fi
+  exit $rc' EXIT
 export ARTIFACT_DIR="$test_dir/artifacts"
 export SHARED_DIR="$test_dir/shared"
 export OCM_LOGIN_ENV=integration

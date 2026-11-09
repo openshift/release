@@ -27,9 +27,12 @@ log() {
 # artifacts are retained publicly, so none of them are ever logged, written to
 # the artifact, or exposed to xtrace.
 #
-# Everything above the "end of sourceable definitions" marker below is free of
-# top-level side effects so hack/test-rosa-gather-hcp-cr-status.sh can source
-# it and exercise these functions offline. Keep it that way.
+# hack/test-rosa-gather-hcp-cr-status.sh sources everything above the "end of
+# sourceable definitions" marker below to exercise these functions offline.
+# Sourcing that region does run the shell options at the top of the file and
+# install the TERM trap -- the signal test depends on that trap being there --
+# but it must not reach the cluster, the network or ${ARTIFACT_DIR}. Keep new
+# top-level work below the marker.
 
 # Internal defaults and test seams, deliberately not declared in the ref's
 # env list: they are not step inputs, and a job cannot set them. The offline
