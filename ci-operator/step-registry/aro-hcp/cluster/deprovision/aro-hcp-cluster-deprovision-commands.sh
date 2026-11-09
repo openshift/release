@@ -18,7 +18,7 @@ source "${STATE_FILE}"
 
 export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-delete"
 mkdir -p "${AZURE_CONFIG_DIR}"
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing; cannot authenticate for cleanup." >&2
   exit 1

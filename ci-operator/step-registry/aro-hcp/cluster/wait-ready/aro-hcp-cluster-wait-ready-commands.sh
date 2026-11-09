@@ -65,7 +65,7 @@ record_nodepool_timer() {
 export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-ready"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing; cannot authenticate readiness checks." >&2
   exit 1
@@ -190,7 +190,6 @@ check_cluster_operators() {
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get clusteroperators -o json 2>/dev/null || true)
   [[ -n "${json}" ]] || { echo "Waiting for ClusterOperators."; return 1; }
   bad=$(jq -r '.items[] |
-    select(.metadata.name != "console") |
     select((any(.status.conditions[]?; .type == "Available" and .status == "True") | not) or
            any(.status.conditions[]?; .type == "Progressing" and .status == "True") or
            any(.status.conditions[]?; .type == "Degraded" and .status == "True")) |

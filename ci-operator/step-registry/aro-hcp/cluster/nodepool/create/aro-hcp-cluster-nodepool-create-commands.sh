@@ -46,7 +46,7 @@ export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-nodepool"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
 
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing; cannot authenticate for node-pool creation." >&2
   exit 1

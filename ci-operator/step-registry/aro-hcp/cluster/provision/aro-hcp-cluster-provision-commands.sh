@@ -31,7 +31,7 @@ export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config"
 mkdir -p "${AZURE_CONFIG_DIR}"
 umask 077
 
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
 log_step "Loading the Azure service principal from the cluster profile."
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing from the selected Azure cluster profile." >&2

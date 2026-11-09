@@ -49,7 +49,7 @@ if (( ${#EXTERNAL_AUTH_NAME} > 15 )); then
 fi
 
 GUEST_KUBECONFIG="${KUBECONFIG:-${SHARED_DIR}/kubeconfig}"
-SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
 if [[ ! -s "${SP_FILE}" ]]; then
   echo "${SP_FILE} is missing from the selected Azure cluster profile." >&2
   exit 1
