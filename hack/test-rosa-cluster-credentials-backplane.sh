@@ -22,6 +22,8 @@ touch "$test_dir/started"
 client_id_sentinel="sso-client-id-SENTINEL"
 client_secret_sentinel="sso-client-secret-SENTINEL"
 cluster_id_sentinel="clusteridSENTINEL000000000000000"
+# An invalid BACKPLANE_DOWNLOAD_RETRIES override must never be echoed back.
+override_sentinel="RETRIESSENTINEL"
 pinned_url_path="releases/download/v0.12.0/ocm-backplane_0.12.0_Linux_x86_64.tar.gz"
 
 stub_dir="$test_dir/bin"
@@ -147,15 +149,17 @@ assert_file_has() {
 }
 
 # run_case <scenario> <curl plan> <exit> <attempts> <delays> <outcome> <extractions> <extra env>
+#          [max-times]
 # <delays> is the comma-joined backoff sequence ("-" when no retry is expected);
 # <extra env> is "-" or KEY=VAL pairs, with the token "xtrace" running the step
-# under `bash -x` to prove the credential tracing guard holds.
+# under `bash -x` to prove the credential tracing guard holds; [max-times] is the
+# comma-joined per-attempt curl --max-time sequence, defaulting to 300 each.
 run_case() {
     scenario="$1"
     local plan="$2" expected_status="$3" expected_attempts="$4" expected_delays="$5" \
-        expected_outcome="$6" expected_extractions="$7" extra="$8"
-    local case_dir="$test_dir/$scenario" result=0 trace="" delays
-    local -a case_env=()
+        expected_outcome="$6" expected_extractions="$7" extra="$8" expected_max_times="${9:--}"
+    local case_dir="$test_dir/$scenario" result=0 delays max_times i
+    local -a case_env=() bash_flags=()
     mkdir -p "$case_dir"/{shared,artifacts,profile,home}
     printf '%s\n' "$plan" >"$case_dir/curl-plan"
     printf '0\n' >"$case_dir/curl-count"
@@ -167,7 +171,13 @@ run_case() {
     printf '%s\n' "$client_secret_sentinel" >"$case_dir/profile/sso-client-secret"
     if [[ "$extra" != "-" ]]; then
         for item in $extra; do
-            if [[ "$item" == xtrace ]]; then trace="-x"; else case_env+=("$item"); fi
+            if [[ "$item" == xtrace ]]; then bash_flags+=(-x); else case_env+=("$item"); fi
+        done
+    fi
+    if [[ "$expected_max_times" == - ]]; then
+        expected_max_times=""
+        for ((i = 0; i < expected_attempts; i++)); do
+            expected_max_times+="${expected_max_times:+,}300"
         done
     fi
 
@@ -181,8 +191,9 @@ run_case() {
         ARTIFACT_DIR="$case_dir/artifacts" \
         OCM_LOGIN_ENV=staging \
         BACKPLANE_LOGIN_RETRIES=1 \
-        "${case_env[@]}" \
-        bash $trace "$script" >"$case_dir/stdout" 2>"$case_dir/stderr" || result=$?
+        ${case_env[@]+"${case_env[@]}"} \
+        bash ${bash_flags[@]+"${bash_flags[@]}"} "$script" \
+        >"$case_dir/stdout" 2>"$case_dir/stderr" || result=$?
 
     local diag="$case_dir/artifacts/backplane-cli-download.txt"
     if [[ "$result" != "$expected_status" ]]; then
@@ -199,25 +210,36 @@ run_case() {
         fail "expected backoff delays [$expected_delays], got [${delays:--}]"
         return 1
     fi
-    assert_file_has "$pinned_url_path" "$case_dir/curl-args" "download did not use the pinned release URL" || return 1
+    # Every attempt must use the pinned URL and a --max-time within the budget.
+    max_times="$(sed -n 's/.*--max-time \([0-9]*\).*/\1/p' "$case_dir/curl-args" | paste -sd,)"
+    if [[ "$max_times" != "$expected_max_times" ]]; then
+        fail "expected curl --max-time sequence [$expected_max_times], got [$max_times]"
+        return 1
+    fi
+    if [[ "$expected_attempts" -gt 0 ]]; then
+        assert_file_has "$pinned_url_path" "$case_dir/curl-args" "download did not use the pinned release URL" || return 1
+    fi
     if ! grep -Fqx "outcome: $expected_outcome" "$diag"; then
         fail "diagnostics missing \"outcome: $expected_outcome\""
         return 1
     fi
     if [[ "$(grep -c '^  attempt=' "$diag")" -ne "$expected_attempts" ]] ||
-       ! grep -Eq '^  attempt=1 http_code=[0-9]+ curl_exit=[0-9]+ elapsed=[0-9]+s result=' "$diag"; then
+       { [[ "$expected_attempts" -gt 0 ]] &&
+         ! grep -Eq '^  attempt=1 http_code=[0-9]+ curl_exit=[0-9]+ elapsed=[0-9]+s result=' "$diag"; }; then
         fail "diagnostics lack per-attempt HTTP/exit/elapsed evidence"
         return 1
     fi
     # Diagnostics must stay free of credentials, cluster id, URLs and headers.
-    if grep -Fq -e "$client_id_sentinel" -e "$client_secret_sentinel" -e "$cluster_id_sentinel" "$diag" ||
+    if grep -Fq -e "$client_id_sentinel" -e "$client_secret_sentinel" -e "$cluster_id_sentinel" \
+            -e "$override_sentinel" "$diag" ||
        grep -Eq 'https?://|[Aa]uthorization' "$diag"; then
         fail "download diagnostics leaked sensitive detail"
         return 1
     fi
-    if grep -Fq -e "$client_id_sentinel" -e "$client_secret_sentinel" \
+    # Credentials, and an arbitrary invalid override, must stay out of the log.
+    if grep -Fq -e "$client_id_sentinel" -e "$client_secret_sentinel" -e "$override_sentinel" \
         "$case_dir/stdout" "$case_dir/stderr" "$diag"; then
-        fail "credentials reached the step log"
+        fail "credentials or a raw invalid override reached the step log"
         return 1
     fi
 
@@ -264,9 +286,22 @@ run_case() {
 run_case transient-504     $'504 22 x\n504 22 x\n200 0 ocm-backplane-archive'  0    3        '5,10'       succeeded         1   -
 run_case retries-exhausted $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   -
 run_case retries-override  $'503 22 x'                                         1    2        '5'          failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=2
-run_case budget-exhausted  $'504 22 x'                                         1    2        '5'          failed-exhausted  0   DATE_STEP=120
+run_case budget-exhausted  $'504 22 x'                                         1    1        '5'          failed-exhausted  0   DATE_STEP=120
 run_case permanent-404     $'404 22 x'                                         1    1        -            failed-permanent  0   -
 run_case permanent-403     $'403 22 x'                                         1    1        -            failed-permanent  0   -
 run_case corrupt-archive   $'200 0 truncated'                                  1    5        '5,10,20,30' failed-exhausted  0   -
 run_case transport-error   $'000 28 x\n200 0 ocm-backplane-archive'            0    2        '5'          succeeded         1   -
 run_case xtrace-redaction  $'200 0 ocm-backplane-archive'                      0    1        -            succeeded         1   xtrace
+# An invalid BACKPLANE_DOWNLOAD_RETRIES falls back to the default 5 attempts:
+# a non-numeric value otherwise aborts the shell mid-loop, 0 skips all retries,
+# a leading zero is read as octal (or errors), and a huge value never trips the
+# attempt limit at all. The raw value is never echoed back.
+run_case bad-retries-word  $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=abcRETRIESSENTINEL
+run_case bad-retries-zero  $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=0
+run_case bad-retries-08    $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=08
+run_case bad-retries-010   $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=010
+run_case bad-retries-huge  $'504 22 x'                                         1    5        '5,10,20,30' failed-exhausted  0   BACKPLANE_DOWNLOAD_RETRIES=99999999999999999999
+# No single attempt may outlive the remaining budget, and an exhausted budget
+# stops the loop before another download starts.
+run_case max-time-capped   $'504 22 x'                                         1    2        '5'          failed-exhausted  0   DATE_STEP=80  '300,200'
+run_case budget-pre-stop   $'504 22 x'                                         1    0        -            failed-exhausted  0   DATE_STEP=600

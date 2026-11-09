@@ -31,7 +31,18 @@ bp_ver="${BACKPLANE_CLI_VERSION:-0.12.0}"
 bp_asset="ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"
 bp_url="https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/${bp_asset}"
 bp_tar="$(mktemp /tmp/ocm-backplane.XXXXXX.tar.gz)"
-bp_dl_retries="${BACKPLANE_DOWNLOAD_RETRIES:-5}"
+bp_dl_retries_default=5
+bp_dl_retries="${BACKPLANE_DOWNLOAD_RETRIES:-${bp_dl_retries_default}}"
+# Bash arithmetic reads a non-numeric limit as a variable name (which aborts the
+# step under `set -o nounset`), a leading zero as octal, and never satisfies the
+# attempt limit for 0 or an out-of-range value. Accept only 1..999 and fall back
+# to the default. The rejected value is not echoed back: the override is
+# free-form text and this log is published with the job artifacts.
+if [[ ! "${bp_dl_retries}" =~ ^[1-9][0-9]{0,2}$ ]]; then
+  echo "WARN: BACKPLANE_DOWNLOAD_RETRIES is not an integer in 1..999;" \
+    "using the default ${bp_dl_retries_default}" >&2
+  bp_dl_retries="${bp_dl_retries_default}"
+fi
 # Upper bound on the whole download, so a hanging mirror cannot stretch the step
 # to retries x --max-time.
 bp_dl_max_seconds=600
@@ -73,12 +84,27 @@ record_attempt() {
 # completely, so a failed or partial download is never executed.
 download_backplane_cli() {
   local attempt=1 delay=5 curl_rc http_code started deadline elapsed outcome retryable
+  local remaining max_time
   deadline=$(( $(date +%s) + bp_dl_max_seconds ))
   while :; do
+    # No single attempt may outlive the budget: cap --max-time at what is left
+    # (it also bounds the connect phase), and stop before starting an attempt
+    # that has no time at all.
+    remaining=$(( deadline - $(date +%s) ))
+    if [[ "${remaining}" -le 0 ]]; then
+      log "ocm-backplane download budget of ${bp_dl_max_seconds}s exhausted before attempt ${attempt}"
+      rm -f "${bp_tar}"
+      write_download_diagnostics "failed-exhausted"
+      return 1
+    fi
+    max_time=300
+    if [[ "${remaining}" -lt "${max_time}" ]]; then
+      max_time="${remaining}"
+    fi
     started="$(date +%s)"
     rm -f "${bp_tar}"
     curl_rc=0
-    http_code="$(curl -sSL --fail --connect-timeout 30 --max-time 300 \
+    http_code="$(curl -sSL --fail --connect-timeout 30 --max-time "${max_time}" \
       --write-out '%{http_code}' -o "${bp_tar}" "${bp_url}")" || curl_rc=$?
     elapsed=$(( $(date +%s) - started ))
 
