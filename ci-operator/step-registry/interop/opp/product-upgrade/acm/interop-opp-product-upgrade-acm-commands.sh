@@ -408,26 +408,45 @@ function ValidateHubHealth () {
     # Check MultiClusterHub phase, policy propagator readiness, and managed cluster availability.
     echo "Validating ACM hub health post-upgrade..."
 
-    typeset mchStatus
-    mchStatus="$(oc get multiclusterhub -A \
-        -o jsonpath='{.items[0].status.phase}' || true)"
-    echo "  MultiClusterHub phase: ${mchStatus}"
+    # Topology tolerance (INTEROP-9683 class): the stolostron policy-collection
+    # lanes install ACM 2.17.z via OLM subscription without a MultiClusterHub
+    # CR — the MCH is the hub resource of the MCH-managed topology, and the
+    # product deliberately does not create one under MCE/operator management.
+    # Failing the lane for its absence asks upstream to place a resource this
+    # topology never provisions. Classify the topology explicitly
+    # (not-provisioned) and skip only the MCH wait: the policy-propagator and
+    # managed-cluster checks below still run, so the hub is still validated.
+    # Never a silent skip — the classification is echoed and recorded in the
+    # upgrade summary artifact.
+    typeset mchNames
+    mchNames="$(oc get multiclusterhub -A \
+        -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
+    if [[ -z "${mchNames}" ]]; then
+        MCH_TOPOLOGY="not-provisioned (MCE/operator-managed ACM topology)"
+        echo "  MultiClusterHub: ${MCH_TOPOLOGY} — skipping the MCH Running wait; validating the hub via the policy propagator and managed clusters"
+    else
+        MCH_TOPOLOGY="MCH Running"
+        typeset mchStatus
+        mchStatus="$(oc get multiclusterhub -A \
+            -o jsonpath='{.items[0].status.phase}' || true)"
+        echo "  MultiClusterHub phase: ${mchStatus}"
 
-    if [[ "${mchStatus}" != "Running" ]]; then
-        echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
-        typeset timeoutEnd
-        timeoutEnd="$(( $(date +%s) + 300 ))"
-        while (( $(date +%s) < timeoutEnd )); do
-            mchStatus="$(oc get multiclusterhub -A \
-                -o jsonpath='{.items[0].status.phase}' || true)"
-            if [[ "${mchStatus}" == "Running" ]]; then
-                break
-            fi
-            sleep 15
-        done
         if [[ "${mchStatus}" != "Running" ]]; then
-            echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
-            return 1
+            echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
+            typeset timeoutEnd
+            timeoutEnd="$(( $(date +%s) + 300 ))"
+            while (( $(date +%s) < timeoutEnd )); do
+                mchStatus="$(oc get multiclusterhub -A \
+                    -o jsonpath='{.items[0].status.phase}' || true)"
+                if [[ "${mchStatus}" == "Running" ]]; then
+                    break
+                fi
+                sleep 15
+            done
+            if [[ "${mchStatus}" != "Running" ]]; then
+                echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
+                return 1
+            fi
         fi
     fi
 
@@ -760,6 +779,7 @@ function Main () {
         printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
         printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
         printf 'CSV:      %s\n' "${newCsv}"
+        printf 'Hub:      %s\n' "${MCH_TOPOLOGY:-MCH unchecked}"
         printf 'Status:   SUCCESS\n'
     } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
 
