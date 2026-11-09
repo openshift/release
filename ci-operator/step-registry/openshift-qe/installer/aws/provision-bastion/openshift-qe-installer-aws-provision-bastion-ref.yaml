@@ -20,13 +20,19 @@ ref:
       default: "1.23.4"
       documentation: |-
         Go version to install on the bastion for FRR demo.sh build steps.
+    - name: UDN_BGP_IMPORT_CIDR
+      default: "20.0.0.0/12"
+      documentation: |-
+        IPv4 range used as the source of routed-CUDN import probes. Explicitly
+        allowed through the node and control-plane security groups for ICMP.
   documentation: >-
     Provisions an AWS EC2 bastion for network workload tests (EVPN, UDN-BGP). The primary
     ENI is in the public subnet (CI SSH access). A secondary ENI in the worker
     subnet provides the private IP used for EVPN/BGP/VXLAN with OCP nodes. Uses
     the node security group and opens TCP/179 (BGP) and UDP/4789 (VXLAN). Disables
     and verifies source/destination checking on every cluster node's primary ENI
-    and on both bastion ENIs to allow routed CUDN traffic. Installs
+    and on the bastion's worker-subnet ENI to allow routed CUDN traffic. Opens ICMP
+    from the import CIDR on the node and control-plane security groups. Installs
     bastion tools (podman via SPAL, iproute, git, curl-minimal, tar, util-linux,
     python3, oc, go) and copies kubeconfig to /root/.kube/config. Writes bastion_public_address,
     bastion_private_address, bastion_ssh_user, bastion_ssh_key, evpn-bastion-resources.json, and
