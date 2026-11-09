@@ -73,17 +73,48 @@ cleanup_on_failure() {
   fi
 }
 
+# Keep ingress setup idempotent without hiding permission, quota, or API failures.
+authorize_security_group_ingress() {
+  local output status
+  if output=$(aws --region "${REGION}" ec2 authorize-security-group-ingress "$@" 2>&1); then
+    return 0
+  else
+    status=$?
+  fi
+
+  if [[ "${output}" == *"(InvalidPermission.Duplicate)"* ]]; then
+    echo "Security group rule already exists; continuing."
+    return 0
+  fi
+
+  printf 'ERROR: Failed to authorize security group ingress: %s\n' "${output}" >&2
+  return "${status}"
+}
+
 authorize_sg_ingress() {
   local group_id=$1
   local protocol=$2
   local port=$3
   local source_group=$4
   echo "Opening ${protocol}/${port} on ${group_id} from SG ${source_group}..."
-  aws --region "${REGION}" ec2 authorize-security-group-ingress \
+  authorize_security_group_ingress \
     --group-id "${group_id}" \
     --protocol "${protocol}" \
     --port "${port}" \
-    --source-group "${source_group}" 2>/dev/null || true
+    --source-group "${source_group}"
+}
+
+authorize_sg_ingress_cidr() {
+  local group_id=$1
+  local protocol=$2
+  local port=$3
+  local cidr=$4
+  echo "Opening ${protocol}/${port} on ${group_id} from ${cidr}..."
+  authorize_security_group_ingress \
+    --group-id "${group_id}" \
+    --protocol "${protocol}" \
+    --port "${port}" \
+    --cidr "${cidr}"
 }
 
 configure_evpn_security_groups() {
@@ -109,6 +140,29 @@ configure_evpn_security_groups() {
   fi
 
   echo "EVPN security group rules configured"
+}
+
+# Import probes for routed CUDNs are sourced from addresses in the import CIDR
+# that are not assigned to any AWS network interface. The installer's ICMP rule
+# is scoped to the node and control-plane security groups, and security-group
+# referencing only matches the private addresses of member ENIs, so it never
+# matches those spoofed sources. Authorize the range explicitly on both groups.
+configure_cudn_icmp_ingress() {
+  local node_sg=$1
+  local cp_sg=$2
+  local import_cidr=${UDN_BGP_IMPORT_CIDR:-20.0.0.0/8}
+
+  echo "=== Allowing CUDN import ICMP from ${import_cidr} ==="
+
+  authorize_sg_ingress_cidr "${node_sg}" icmp -1 "${import_cidr}"
+
+  if [[ -n "${cp_sg}" && "${cp_sg}" != "None" ]]; then
+    authorize_sg_ingress_cidr "${cp_sg}" icmp -1 "${import_cidr}"
+  else
+    echo "WARNING: Control-plane security group not found; CUDN import ICMP rule only applied to node SG" >&2
+  fi
+
+  echo "CUDN import ICMP rules configured"
 }
 
 # Allow routed CUDN traffic on all existing nodes' primary ENIs and both bastion
@@ -259,11 +313,12 @@ if [[ -z "${CONTROL_PLANE_SG}" || "${CONTROL_PLANE_SG}" == "None" ]]; then
 fi
 
 configure_evpn_security_groups "${NODE_SG}" "${CONTROL_PLANE_SG}"
+configure_cudn_icmp_ingress "${NODE_SG}" "${CONTROL_PLANE_SG}"
 
 # Authorize SSH from anywhere (for CI pod access)
-aws --region "${REGION}" ec2 authorize-security-group-ingress \
+authorize_security_group_ingress \
   --group-id "${NODE_SG}" \
-  --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+  --protocol tcp --port 22 --cidr 0.0.0.0/0
 
 # Create SSH key pair
 AWS_INSTANCE_NAME="${INFRA_ID}-bastion"
