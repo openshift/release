@@ -4,7 +4,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-trap 'children=$(jobs -p); if [[ -n "${children}" ]]; then kill ${children} 2>/dev/null || true; wait ${children} 2>/dev/null || true; fi' TERM INT
+cleanup_children() {
+  local children
+  children=$(jobs -p) || true
+  if [[ -n "${children}" ]]; then
+    kill ${children} && wait
+  fi
+}
+trap 'cleanup_children; exit 1' TERM INT
 
 STATE_FILE="${SHARED_DIR}/aro-hcp.env"
 if [[ ! -s "${STATE_FILE}" ]]; then
