@@ -1,0 +1,37 @@
+workflow:
+  as: rosa-e2e-hcp
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "2"
+    pre:
+      - chain: rosa-aws-sts-hcp-provision
+      - ref: rosa-cluster-wait-ready-hosted-cp
+      - ref: rosa-cluster-wait-ready-nodes
+      - ref: rosa-cluster-credentials-hypershift-mgmt
+    test:
+      - ref: rosa-e2e-test
+    post:
+      - ref: rosa-gap-analysis-api-resources-and-crd
+        best_effort: true
+      - ref: rosa-gap-analysis-critical-alerts
+        best_effort: true
+      - ref: rosa-gap-analysis-cluster-install-delete-metrics
+        best_effort: true
+      - chain: rosa-cluster-deprovision
+        best_effort: true
+      - chain: rosa-sts-oidc-config-delete
+        best_effort: true
+      - ref: rosa-e2e-cleanup-vpc
+        best_effort: true
+      - ref: aws-deprovision-stacks
+        best_effort: true
+      - chain: rosa-gather-hcp-diagnostics
+        best_effort: true
+  documentation: |-
+    This workflow provisions a ROSA HCP cluster, runs the rosa-e2e managed service
+    validation suite, writes rosa-gap-analysis snapshots (API/CRDs, alerts, and
+    cluster install health) from both the hosted/guest cluster (customer data
+    plane) and the management cluster (Red Hat control plane) while the cluster
+    is still up, then tears down the cluster.

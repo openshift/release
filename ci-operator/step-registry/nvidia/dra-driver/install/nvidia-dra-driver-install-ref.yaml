@@ -1,0 +1,38 @@
+ref:
+  as: nvidia-dra-driver-install
+  from: cli
+  commands: nvidia-dra-driver-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: NVIDIA_DRA_DRIVER_VERSION
+    default: "25.12.0"
+    documentation: |-
+      Version of NVIDIA DRA driver to install via Helm.
+      Check https://github.com/NVIDIA/k8s-dra-driver/releases for available versions.
+  - name: NVIDIA_DRA_DRIVER_NAMESPACE
+    default: "nvidia-dra-driver"
+    documentation: |-
+      Namespace where NVIDIA DRA driver will be installed.
+  - name: NVIDIA_DRA_FEATURE_GATES
+    default: ""
+    documentation: |-
+      Comma-separated list of feature gates to enable in the NVIDIA DRA driver.
+      Example: "DynamicMIG=true,PassthroughSupport=true"
+      Note: DynamicMIG requires H100+ GPUs and is mutually exclusive with MPSSupport,
+      NVMLDeviceHealthCheck, and PassthroughSupport.
+  documentation: |-
+    Installs NVIDIA DRA driver via Helm for upstream Kubernetes DRA testing.
+
+    Prerequisites:
+    - GPU Operator must be installed with CDI enabled
+    - GPU nodes must be present and labeled
+
+    This step:
+    - Installs Helm if not present
+    - Adds NVIDIA Helm repository
+    - Installs k8s-dra-driver chart
+    - Waits for driver pods to be ready
+    - Verifies DeviceClass nvidia.com/gpu is created

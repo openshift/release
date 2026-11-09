@@ -1,0 +1,224 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  system-tests-builder:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    optional: true
+    to: storage-based-remediation
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip gettext && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+      COPY sbr-src/ /opt/sbr-ci-src/
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: sbr-src/
+          source_path: /go/src/github.com/medik8s/storage-based-remediation/.
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: pr-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM quay.io/operator-framework/operator-sdk:v1.42.2 AS operator-sdk
+      FROM docker.io/mikefarah/yq:4.53.2 AS yq
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip gettext && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=operator-sdk /usr/local/bin/operator-sdk /usr/local/bin/operator-sdk
+      COPY --from=yq /usr/bin/yq /usr/local/bin/yq
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+      COPY sbr-src/ /opt/sbr-ci-src/
+    from: nested-podman
+    inputs:
+      src:
+        paths:
+        - destination_dir: sbr-src/
+          source_path: /go/src/github.com/medik8s/storage-based-remediation/.
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: source-upgrade-test-runner
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM docker.io/mikefarah/yq:4.53.2 AS yq
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=yq /usr/bin/yq /usr/local/bin/yq
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- always_run: false
+  as: e2e-system-tests-sbr-pr-aws-odf
+  capabilities:
+  - nested-podman
+  - intranet
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
+      SOURCE_OPERATOR: sbr
+      TEST_NAME: e2e-system-tests-sbr-pr-aws-odf
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-source-build-and-install
+    - ref: medik8s-deploy-odf-dev-catalog
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        exec > >(tee "$ARTIFACT_DIR/e2e-test.log") 2>&1
+
+        export GOPATH=/tmp/sbr-go
+        export GOMODCACHE="$GOPATH/pkg/mod"
+        export GOCACHE=/tmp/sbr-go-build-cache
+        mkdir -p "$GOMODCACHE" "$GOCACHE"
+
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; this job skips that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+
+        echo '==> Clone openshift/rhwa-system-tests main'
+        git clone --depth=1 --branch main \
+          https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+        git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+        git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
+
+        export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}/reports"
+        mkdir -p "$ECO_REPORTS_DUMP_DIR"
+
+        echo '==> Run system-tests (sbr-operator)'
+        make -C /tmp/system-tests run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: pr-test-runner
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-sbr-upstream-pr-upgrade
+  capabilities:
+  - nested-podman
+  cron: 0 7 * * *
+  optional: true
+  presubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
+      SOURCE_OPERATOR: sbr
+      TEST_NAME: e2e-system-tests-sbr-upstream-pr-upgrade
+      TEST_STEPS: medik8s-source-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: medik8s-source-upgrade
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-sbr-fbc-upgrade
+  cron: 30 7 * * *
+  optional: true
+  presubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
+      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/storage-based-remediation-rhel9-operator@sha256:f926781dee775939ae43899eb92e3a2e26c8cca6833b6f525cf4cd950f8f8680
+      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/storage-based-remediation/sbr-operator-5-8
+      FBC_OPERATOR: sbr
+      TEST_NAME: e2e-system-tests-sbr-fbc-upgrade
+      TEST_STEPS: medik8s-fbc-upgrade
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: medik8s-fbc-upgrade
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: storage-based-remediation
+  variant: "5.0"

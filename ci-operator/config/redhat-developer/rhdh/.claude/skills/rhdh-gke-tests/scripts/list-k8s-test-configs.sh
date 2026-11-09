@@ -1,0 +1,1 @@
+../../rhdh-aks-tests/scripts/list-k8s-test-configs.sh

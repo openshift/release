@@ -1,0 +1,81 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+OO_INSTALL_NAMESPACE=openshift-operators
+
+SOURCE=${QUAY_OPERATOR_SOURCE:-redhat-operators}
+SOURCE_NAMESPACE=${QUAY_OPERATOR_SOURCE_NAMESPACE:-openshift-marketplace}
+
+CHANNEL_SPEC=""
+if [ -n "${QUAY_OPERATOR_CHANNEL-}" ]; then
+    CHANNEL_SPEC="  channel: $QUAY_OPERATOR_CHANNEL"
+fi
+
+if [ -n "${QUAY_OPERATOR_INDEX_IMAGE-}" ]; then
+    INDEX_IMAGE_DIGEST=$(oc image info --show-multiarch "$QUAY_OPERATOR_INDEX_IMAGE" -o json | jq -r 'if type=="array" then .[0].listDigest else .digest end')
+    INDEX_IMAGE="${QUAY_OPERATOR_INDEX_IMAGE##%%:*}@$INDEX_IMAGE_DIGEST"
+
+    echo >&2 "Index image $QUAY_OPERATOR_INDEX_IMAGE is resolved into $INDEX_IMAGE"
+
+    oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: quay-operator
+  namespace: $OO_INSTALL_NAMESPACE
+spec:
+  sourceType: grpc
+  image: $INDEX_IMAGE
+EOF
+
+    SOURCE=quay-operator
+    SOURCE_NAMESPACE=$OO_INSTALL_NAMESPACE
+fi
+
+CONFIG_SPEC=""
+if [[ "${QUAY_OPERATOR_STS}" == "true" ]]; then
+    ROLE_ARN=$(cat "${SHARED_DIR}/STS_ROLE_ARN")
+    CONFIG_SPEC="  config:
+    env:
+    - name: ROLEARN
+      value: $ROLE_ARN"
+fi
+
+SUB=$(
+    cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: quay-operator
+  namespace: $OO_INSTALL_NAMESPACE
+spec:
+  installPlanApproval: Automatic
+  name: quay-operator 
+  source: $SOURCE
+  sourceNamespace: $SOURCE_NAMESPACE
+$CHANNEL_SPEC
+$CONFIG_SPEC
+EOF
+)
+
+for _ in {1..60}; do
+    CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+    if [[ -n "$CSV" ]]; then
+        if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+            echo "ClusterServiceVersion \"$CSV\" ready"
+            exit 0
+        fi
+    fi
+    STATUS=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.conditions[?(@.type=="InstallPlanFailed")].status}' || true)
+    if [[ "$STATUS" == "True" ]]; then
+        MESSAGE=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{range .status.conditions[?(@.type=="InstallPlanFailed")]}{.type}{" ("}{.reason}{"): "}{.message}{end}')
+        echo "quay-operator: $MESSAGE"
+        exit 1
+    fi
+    sleep 10
+done
+echo "Timed out waiting for CSV to become ready"
+exit 1

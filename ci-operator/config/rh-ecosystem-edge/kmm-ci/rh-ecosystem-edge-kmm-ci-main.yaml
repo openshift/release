@@ -1,0 +1,107 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.24-openshift-4.21
+images:
+  items:
+  - dockerfile_path: Containerfile
+    to: kmm-ci
+  - dockerfile_literal: |
+      FROM quay.io/ocp-edge-qe/eco-gotests@sha256:f10fd90ee8fc1d97889218678794146cd83ac5ca746b44e98d24451e062694d2
+      USER 0
+      RUN dnf install -y jq && dnf clean all
+      RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+      RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    to: eco-gotests
+  run_if_changed: x^
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: kmm-qe-smoke-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    env:
+      ECO_TEST_LABELS: module && !kmm-longrun && !dra && !automount-satoken && !filestosign-glob
+        && !filestosign-glob-webhook && !rebuild-trigger && !rebuild-trigger-noop
+        && !87952
+      KMM_CHANNEL: release-2.5
+    workflow: rh-ecosystem-edge-kmm-ci-qe
+- always_run: false
+  as: kmm-qe-smoke
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    env:
+      KMM_CHANNEL: release-2.7
+    workflow: rh-ecosystem-edge-kmm-ci-qe
+- as: kmm-qe-nightly-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 6 * * *
+  reporter_config:
+    channel: '#kmm-nfd-gpu-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      ECO_TEST_LABELS: module && !kmm-longrun && !dra && !automount-satoken && !filestosign-glob
+        && !filestosign-glob-webhook && !rebuild-trigger && !rebuild-trigger-noop
+        && !87952
+      KMM_CHANNEL: release-2.5
+    workflow: rh-ecosystem-edge-kmm-ci-qe
+- as: kmm-qe-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-ecosystem-edge
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 2 * * *
+  reporter_config:
+    channel: '#kmm-nfd-gpu-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    env:
+      KMM_CHANNEL: release-2.7
+    workflow: rh-ecosystem-edge-kmm-ci-qe
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: kmm-ci

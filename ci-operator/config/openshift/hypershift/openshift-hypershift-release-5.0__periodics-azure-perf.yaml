@@ -1,0 +1,47 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-self-managed-performance
+  cron: 0 8 * * 1
+  steps:
+    cluster_profile: hypershift-azure
+    env:
+      AZURE_SELF_MANAGED: "true"
+      CLOUD_PROVIDER: Azure
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_BASE_DOMAIN: hcp-sm-azure.azure.devcluster.openshift.com
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: sm.hcp-sm-azure.azure.devcluster.openshift.com
+    workflow: hypershift-azure-performance-test
+  timeout: 3h0m0s
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: hypershift
+  variant: periodics-azure-perf

@@ -1,0 +1,1 @@
+../openshift-hyperfleet-e2e-test-commands.sh

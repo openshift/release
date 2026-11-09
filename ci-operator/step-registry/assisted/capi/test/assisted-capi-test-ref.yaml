@@ -1,0 +1,40 @@
+ref:
+  as: assisted-capi-test
+  from: src
+  grace_period: 10m
+  timeout: 5h0m0s
+  commands: assisted-capi-test-commands.sh
+  credentials:
+  - collection: edge-group
+    group: capi-versioning-app-credentials
+    mount_path: /var/run/vault/capi-versioning-app-credentials
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 2Gi
+  env:
+  - name: DRY_RUN
+    default: "false"
+  - name: TEST_TARGET
+    default: "e2e-test"
+  - name: CLUSTER_TOPOLOGY
+    default: "multinode"
+    documentation: Cluster topology to deploy. Valid values are "sno" or "multinode".
+  - name: NUMBER_OF_NODES
+    default: "7"
+    documentation: Number of nodes to provision. Use "1" for SNO, "7" for multinode.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: |-
+      OCP version to deploy. A "major.minor" value (e.g. "5.0") is resolved
+      at run time to the latest available release and matching RHCOS image.
+      Leave empty to use the test playbook default.
+  - name: RHCOS_IMAGE_URL
+    default: ""
+    documentation: |-
+      RHCOS image URL. Normally left empty and derived from OPENSHIFT_VERSION
+      at run time; set explicitly to override the resolved image.
+  documentation: |-
+    The Baremetal DS E2E assisted step executes the common end-to-end test suite.

@@ -1,0 +1,37 @@
+base_images:
+  base:
+    name: "4.13"
+    namespace: ocp
+    tag: base
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.rhel7
+    from: base
+    to: cli-manager
+promotion:
+  to:
+  - name: "4.13"
+    namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.13"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify-gofmt
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: cli-manager

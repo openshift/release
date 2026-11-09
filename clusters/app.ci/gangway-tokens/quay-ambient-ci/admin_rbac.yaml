@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: quay-ambient-ci
+  annotations:
+    openshift.io/description: Service Accounts for quay-ambient-ci
+    openshift.io/display-name: quay-ambient-ci CI
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: periodic-job-bot
+  namespace: quay-ambient-ci
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: api-token-secret
+  namespace: quay-ambient-ci
+  annotations:
+    kubernetes.io/service-account.name: periodic-job-bot
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: secret-owner
+  namespace: quay-ambient-ci
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["api-token-secret"]
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: secret-owner-quay-ambient-ci
+  namespace: quay-ambient-ci
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: quay-ambient-ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

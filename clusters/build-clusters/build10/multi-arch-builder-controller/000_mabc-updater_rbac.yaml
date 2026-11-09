@@ -1,0 +1,37 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: mabc-updater
+rules:
+- apiGroups:
+  - ci.openshift.io
+  resources:
+  - multiarchbuildconfigs
+  verbs:
+  - '*'
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: mabc-updater
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: self-provisioner-mabc-updater
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mabc-updater
+subjects:
+- kind: ServiceAccount
+  name: mabc-updater
+  namespace: ci

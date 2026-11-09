@@ -1,0 +1,1 @@
+This step is OBSOLETE. stackrox/stackrox/e2e-test should be used instead.

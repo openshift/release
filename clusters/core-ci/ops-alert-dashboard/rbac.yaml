@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ops-alert-dashboard
+  namespace: ci
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.ops-alert-dashboard: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"ops-alert-dashboard"}}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-alert-dashboard-view
+  namespace: ci
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  resourceNames: ["ops-alert-dashboard"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-alert-dashboard-view
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ops-alert-dashboard-view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: test-platform-ci-admins
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-alert-dashboard-rules
+  namespace: ci-monitoring
+rules:
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["prometheusrules"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-alert-dashboard-rules
+  namespace: ci-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ops-alert-dashboard-rules
+subjects:
+- kind: ServiceAccount
+  name: ops-alert-dashboard
+  namespace: ci
