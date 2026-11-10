@@ -113,12 +113,14 @@ tests:
         chmod 755 /tmp/bin/osv-scanner
 
         git config --global --add safe.directory "$(pwd)"
+        if ! git remote get-url origin >/dev/null 2>&1; then
+          git remote add origin https://github.com/openshift/ansible-operator-plugins.git
+        fi
         if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
           export GITHUB_TOKEN=$("$GITHUB_TOKEN_COMMAND")
           export GH_TOKEN="$GITHUB_TOKEN"
           git config --local --replace-all credential.helper ''
           git config --local --add credential.helper '!gh auth git-credential'
-          git remote set-url origin https://github.com/openshift/ansible-operator-plugins.git
           FIXTURE_SHA=d5e7b16a163e2184c7672f728ca8d0e2a37bd88d
           REHEARSAL_BASE=oape-987-security-rehearsal-v1421-v1423-20261110104814-checked
           git fetch https://github.com/neha037/ansible-operator-plugins.git "refs/heads/${REHEARSAL_BASE}"
@@ -159,7 +161,6 @@ tests:
         name: ci-pull-credentials
         namespace: test-credentials
       from: auto-rebase-runner
-      timeout: 2h0m0s
       nested_podman: true
       resources:
         limits:
@@ -167,6 +168,7 @@ tests:
         requests:
           cpu: 800m
           memory: 2Gi
+      timeout: 2h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
