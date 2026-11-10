@@ -1,5 +1,5 @@
-{# Operator-channel upgrade lane (n-1 -> n). The edge env (PLAYWRIGHT_N_*,
-   QUAY_UPGRADE_*_CHANNEL) is derived here from quay_version + upgrade_from; the
+{# Operator-channel upgrade lane (n-1 -> n). The edge env (QUAY_UPGRADE_*_CHANNEL)
+   is derived here from quay_version + upgrade_from; the
    matrix row sets only upgrade_from. The OCP cluster is a stable release (see
    base.yaml.j2), and the OCP e2e releases block is unused. QUAY_EXTRA_CONFIG and
    PLAYWRIGHT_GREP_INVERT are shared with the e2e-install lane via
@@ -10,18 +10,19 @@ tests:
   steps:
     allow_best_effort_post_steps: true
     env:
-      # Upgrade edge, all derived from quay_version (n) + upgrade_from (n-1):
-      #   target channel = stable-<quay_version>, source channel = stable-<upgrade_from>,
-      #   n branch = the release branch, n-1 branch = redhat-<upgrade_from>.
+      # Upgrade edge, derived from quay_version (n) + upgrade_from (n-1):
+      #   target channel = stable-<quay_version>, source channel = stable-<upgrade_from>.
       QUAY_UPGRADE_TARGET_CHANNEL: "{{ operator_channel }}"
       QUAY_UPGRADE_SOURCE_CHANNEL: "stable-{{ upgrade_from }}"
-      PLAYWRIGHT_N_GIT_BRANCH: "{{ branch }}"
-      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "redhat-{{ upgrade_from }}"
-      # Static upgrade-lane settings (not version-specific). The per-phase repos
-      # default to PLAYWRIGHT_GIT_REPO (base.yaml.j2), so only branches differ.
+      # Static upgrade-lane settings (not version-specific). No PLAYWRIGHT_N*_GIT_BRANCH:
+      # with strict mode each phase clones the suite at the commit label of the quay-app
+      # image deployed at that point (n-1 for seed, n after the upgrade), as e2e-install
+      # does. Strict already refuses a derived or fallback ref, so it replaces the
+      # upgrade chains' PLAYWRIGHT_REQUIRE_EXPLICIT_REF guard, which needs a branch.
       PLAYWRIGHT_USE_IMAGE_TESTS: "false"
 {%- if source == "nightly" %}
       PLAYWRIGHT_REF_MODE: strict
+      PLAYWRIGHT_REQUIRE_EXPLICIT_REF: "false"
 {%- endif %}
       # Shared by seed, verify, and functional Playwright phases (steps.env).
       PLAYWRIGHT_WORKERS: "4"

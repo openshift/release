@@ -493,7 +493,7 @@ def test_upgrade_from_only_valid_for_upgrade() -> None:
 
 
 def test_upgrade_edge_is_derived_from_versions() -> None:
-    # A different n-1 must derive a different source channel / n-1 branch / job name,
+    # A different n-1 must derive a different source channel / job name,
     # with the target derived from quay_version (the branch) — nothing hand-set.
     cell = _phase0_cell(test="upgrade", upgrade_from="3.16")
     assert cell.test_as == "from-316"
@@ -501,8 +501,6 @@ def test_upgrade_edge_is_derived_from_versions() -> None:
     env = config["tests"][0]["steps"]["env"]
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.16"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
-    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
 
 
 def test_ocp_channel_only_valid_for_upgrade() -> None:
@@ -588,8 +586,12 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert "QUAY_OPERATOR_CHANNEL" not in env
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
-    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    # The suite runs at each deployed image's commit label, never a branch tip.
+    assert "PLAYWRIGHT_N_GIT_BRANCH" not in env
+    assert "PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH" not in env
+    assert env["PLAYWRIGHT_REF_MODE"] == "strict"
+    # The chains default the guard to "true", which fails any phase without a branch.
+    assert env["PLAYWRIGHT_REQUIRE_EXPLICIT_REF"] == "false"
     assert env["PLAYWRIGHT_WORKERS"] == "4"
     assert env["QUAYNAMESPACE"] == "quay"
     # ART FBC env still comes from the nightly source layer.
