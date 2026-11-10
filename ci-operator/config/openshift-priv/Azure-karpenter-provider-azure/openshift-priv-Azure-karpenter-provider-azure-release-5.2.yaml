@@ -1,3 +1,12 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 binary_build_commands: make openshift-toolchain
 build_root:
   from_repository: true
@@ -42,6 +51,25 @@ tests:
   commands: make openshift-test
   container:
     from: bin
+- always_run: false
+  as: e2e-aks-hypershift
+  optional: true
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|\.mdc$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      HYPERSHIFT_AZURE_KARPENTER_IDENTITY: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-azure-aks-e2e
 zz_generated_metadata:
   branch: release-5.2
   org: openshift-priv

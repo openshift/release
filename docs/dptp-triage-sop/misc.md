@@ -38,7 +38,7 @@ The logs can be deleted in case of leak of secrets or other sensitive informatio
 quay-io-image-mirroring-failures
 ================================
 
-**Alert:** `quay-io-image-mirroring-failures` — **cluster:** `app.ci`. **Rules:** [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `quay-io-image-mirroring`. **Severity:** `critical`.
+**Alert:** `quay-io-image-mirroring-failures` — **cluster:** `app.ci`. **Rules:** [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `quay-io-image-mirroring`. **Severity:** `critical`.
 
 The alert is fired if there are many failures of `oc image mirror` in `ci-images-mirror`.
 

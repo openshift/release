@@ -235,6 +235,7 @@ deck:
       openshift/open-telemetry-opentelemetry-operator: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/openshift-tests-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/verification-tests: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      zhiqiangf/nhe-sriov-prow: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     gcs_browser_prefixes_by_bucket:
       '*': https://gcs.ci.openshift.org/gcs/
       origin-ci-private: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -399,10 +400,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20261103-43ed23400
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20261103-43ed23400
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20261103-43ed23400
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20261103-43ed23400
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20261107-86b2c4908
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20261107-86b2c4908
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20261107-86b2c4908
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20261107-86b2c4908
   - config:
       censoring_options:
         exclude_directories:
@@ -547,6 +548,13 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-eng/ship-help-bot
   - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: zhiqiangf/nhe-sriov-prow
+  - config:
       timeout: 12h0m0s
     repo: openshift/ovn-kubernetes
   - config:
@@ -595,6 +603,7 @@ plank:
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/verification-tests: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    zhiqiangf/nhe-sriov-prow: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
   job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/test-platform-results-public/{{end}}
     {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
@@ -667,6 +676,9 @@ plank:
     openshift/verification-tests: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    zhiqiangf/nhe-sriov-prow: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
 presets:
 - env: null
@@ -729,6 +741,10 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift-online/socketcd
+- cluster: '*'
+  config:
+    tenant_id: qe-private
+  repo: zhiqiangf/nhe-sriov-prow
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
@@ -1810,11 +1826,14 @@ tide:
                 - ci/prow/terraform-plan
           rosa-seaplane-api:
             skip-unknown-contexts: true
+          rosa-seaplane-ecr-creds-sync:
+            skip-unknown-contexts: true
           rosa-seaplane-kube-applier:
             skip-unknown-contexts: true
           rosa-seaplane-zoa:
             from-branch-protection: true
             required-if-present-contexts:
+            - Konflux kflux-prd-rh02 / zoa-boundary-on-pull-request
             - Konflux kflux-prd-rh02 / zoa-lambda-on-pull-request
             - Konflux kflux-prd-rh02 / zoa-runner-on-pull-request
             skip-unknown-contexts: true
@@ -2791,6 +2810,7 @@ tide:
     openshift/grafana-tempo-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    zhiqiangf/nhe-sriov-prow: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
   priority:
   - labels:
     - priority/ci-critical

@@ -113,6 +113,31 @@ cluster_groups:
 dptp_collection: test-platform-infra
 
 bundles:
+  # Authentication-only pilot. Seed the two role ARN fields before deploying.
+  - name: cluster-secrets-gcp-aws-federation-pilot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcp-aws-federation-pilot
+        fields:
+          - name: hub_role_arn
+          - name: target_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build07
+        namespace: ci
+
+  - name: kmm-quay-push
+    gsm_secrets:
+      - collection: kernel-module-management
+        group: kmm-quay-push
+        fields:
+          - name: quay-auth
+            as: kmm-pull-secret
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [non_app_ci]
+        namespace: ci
+
   - name: gce-sa-credentials-gcs-publisher
     gsm_secrets:
       - collection: test-platform-infra
@@ -13385,6 +13410,20 @@ bundles:
         namespace: ci
         type: kubernetes.io/dockerconfigjson
 
+  - name: registry-push-credentials-quay-io-openshift-eng-kit
+    gsm_secrets:
+      - collection: openshift-eng-kit
+        group: quay
+        fields:
+          - name: robot-account
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
   - name: registry-push-credentials-quay.io-ovirt
     gsm_secrets:
       - collection: test-platform-infra
@@ -15760,3 +15799,15 @@ bundles:
     targets:
       - cluster_groups: [build_farm]
         namespace: test-credentials
+
+  - name: crt-redhat-acm-tenant-stone-prd-rh01-kubeconfig
+    gsm_secrets:
+      - collection: hypershift-team
+        group: ci-release
+        fields:
+          - name: crt-redhat-acm-tenant-stone-prd-rh01-kubeconfig
+            as: kubeconfig
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release

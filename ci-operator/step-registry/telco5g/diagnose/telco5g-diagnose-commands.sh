@@ -90,14 +90,18 @@ elif [[ "$DIAGNOSE_BASENAME" == "diagnose-telco5g-cluster-setup" ]]; then
 Cluster: ${CLUSTER_NAME:-unknown}, Kcli plan: ${PLAN_NAME:-unknown}
 The cluster was being installed using kcli and ansible playbooks on baremetal nodes.
 You have the step log in /tmp/logfile to identify the root cause of the installation failure.
-Look for ansible task failures, network connectivity issues, node provisioning errors,
-or OpenShift installer errors. You should connect to installer host if it exists as root@$<IP>
+Look for ansible task failures, network connectivity issues, node provisioning or inspection errors,
+or OpenShift installer errors. You should connect to installer host if it exists as root@<installer-IP>
 and run there 'oc' commands and IP you can see by running: kcli show vm ${CLUSTER_NAME}-installer .
 The main log in this host is in /var/log/cloud-init-output.log and it desribes the whole preparation
 and cluster installation. Scripts that run in this log are in /root/scripts of installer host.
 **Important! the log may contain red herrings, not every
 error there is true issue, you need to run oc commands to make sure it's an issue**.
 Make sure you identify the real root cause and not judging just by looking at errors in logs!
+If you see baremetal nodes stuck on registering or inspection, you must discover exact reason why they
+are stuck, use oc client on installer machine to query cluster, to check logs, ssh to machine itself if need
+as core@${CLUSTER_NAME} and check logs on the node. You can check its BMC IP from install-config or Ironic,
+and check BMC logs and status. Credentials for BMC are in secrets of Openshift cluster.
 Start from running basic oc commands to discover a status of the cluster.
 You can connect to any node in cluster with user 'core' and IP you can see running 'kcli list vm',
 your nodes have ${CLUSTER_NAME} in their name. Provide a summary of what went wrong and suggest fixes."

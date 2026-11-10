@@ -21,16 +21,13 @@ metadata:
   name: hostpath-provisioner
   namespace: openshift-cnv
 spec:
-  storagePools:
-    - pvcTemplate:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 100Gi
-      name: local
-      path: "/var/hpvolumes"
   imagePullPolicy: IfNotPresent
+  storagePools:
+    - name: local
+      path: "/var/hpvolumes"
+  workload:
+    nodeSelector:
+      kubernetes.io/os: linux
 EOF
 
 # Wait for HostPathProvisioner to be ready
@@ -70,33 +67,11 @@ oc patch storageclass ${STORAGE_CLASS_NAME} -p \
 echo "Verifying StorageClass configuration..."
 oc get storageclass ${STORAGE_CLASS_NAME} -o yaml | grep -A 2 "annotations:"
 
-# Wait for HPP pool daemonset/deployments/pods to be ready
-echo "Waiting for HPP pool pods (hpp-pool-*) in openshift-cnv to be Running and Ready..."
-HPP_TIMEOUT=600
-HPP_INTERVAL=10
-HPP_ELAPSED=0
-while [[ ${HPP_ELAPSED} -lt ${HPP_TIMEOUT} ]]; do
-  HPP_PODS=$(oc get po -n openshift-cnv --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep '^hpp-pool-' || true)
-  if [[ -n "${HPP_PODS}" ]]; then
-    NOT_RUNNING=$(oc get po -n openshift-cnv --no-headers 2>/dev/null | grep '^hpp-pool-' | grep -v ' Running ' || true)
-    if [[ -z "${NOT_RUNNING}" ]]; then
-      echo "All HPP pool pods are running:"
-      oc get po -n openshift-cnv -l k8s-app=hostpath-provisioner -o wide || oc get po -n openshift-cnv | grep '^hpp-pool-' || true
-      break
-    fi
-  fi
-  echo "HPP pool pods not ready yet (${HPP_ELAPSED}s elapsed), waiting..."
-  sleep ${HPP_INTERVAL}
-  HPP_ELAPSED=$((HPP_ELAPSED + HPP_INTERVAL))
-done
-
-if [[ ${HPP_ELAPSED} -ge ${HPP_TIMEOUT} ]]; then
-  echo "WARNING/ERROR: HPP pool pods did not become ready within ${HPP_TIMEOUT}s"
-  oc get po -n openshift-cnv | grep '^hpp-pool-' || true
-  oc get pvc -n openshift-cnv | grep '^hpp-pool-' || true
-  oc get po -n openshift-cnv --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep '^hpp-pool-' | xargs -r oc describe po -n openshift-cnv || true
-  exit 1
-fi
+# Wait for HPP CSI DaemonSet to be ready
+echo "Waiting for HPP CSI DaemonSet in openshift-cnv to be ready..."
+oc rollout status daemonset/hostpath-provisioner-csi -n openshift-cnv --timeout=10m
+oc wait pod -l k8s-app=hostpath-provisioner -n openshift-cnv \
+  --for=condition=Ready --timeout=5m || true
 
 # List all storage classes to confirm default
 echo "All storage classes:"

@@ -18,16 +18,16 @@ fi
 
 echo "Creating htpasswd file for cluster: ${CLUSTER_NAME}"
 USER_PASSWORD=$(openssl rand -base64 16)
-echo "user1:${USER_PASSWORD}" > "${SHARED_DIR}/users"
-echo "$USER_PASSWORD" | htpasswd -c -B -i "${SHARED_DIR}/users.htpasswd" user1
+echo "user1:${USER_PASSWORD}" > "${SHARED_DIR}/users.tmp"
+echo "$USER_PASSWORD" | htpasswd -c -B -i "${SHARED_DIR}/users.htpasswd.tmp" user1
 for x in {2..5}; do
 	USER_PASSWORD=$(openssl rand -base64 16)
-	echo "user${x}:${USER_PASSWORD}" >> "${SHARED_DIR}/users"
-	echo "$USER_PASSWORD" | htpasswd -B -i "${SHARED_DIR}/users.htpasswd" user$x
+	echo "user${x}:${USER_PASSWORD}" >> "${SHARED_DIR}/users.tmp"
+	echo "$USER_PASSWORD" | htpasswd -B -i "${SHARED_DIR}/users.htpasswd.tmp" user$x
 done
 echo "Creating htpasswd secret: htpasswd-${CLUSTER_NAME} in namespace: clusters"
-oc --kubeconfig=${MGMT_KUBECONFIG} -n clusters create secret generic htpasswd-${CLUSTER_NAME} --from-file=htpasswd="${SHARED_DIR}/users.htpasswd"
-oc --kubeconfig=${MGMT_KUBECONFIG} -n clusters create secret generic htpasswd-plain-${CLUSTER_NAME} --from-file=credentials="${SHARED_DIR}/users"
+oc --kubeconfig=${MGMT_KUBECONFIG} -n clusters create secret generic htpasswd-${CLUSTER_NAME} --from-file=htpasswd="${SHARED_DIR}/users.htpasswd.tmp"
+oc --kubeconfig=${MGMT_KUBECONFIG} -n clusters create secret generic htpasswd-plain-${CLUSTER_NAME} --from-file=credentials="${SHARED_DIR}/users.tmp"
 
 echo "Patching hostedcluster to enable htpasswd OAuth provider"
 cat > /tmp/oauth_patch.yaml <<EOF
@@ -59,7 +59,7 @@ auth_ready=false
 count=0
 
 while [[ $count -lt 40 ]]; do
-	if cat "${SHARED_DIR}/users" | head -n1 | cut -d: -f2 | oc --kubeconfig="$HOSTED_KUBECONFIG" login --username=user1 &>/dev/null; then
+	if cat "${SHARED_DIR}/users.tmp" | head -n1 | cut -d: -f2 | oc --kubeconfig="$HOSTED_KUBECONFIG" login --username=user1 &>/dev/null; then
         auth_ready=true
         echo "Successfully logged in with htpasswd credentials after $(( 15 * $count )) seconds"
         break
@@ -74,5 +74,9 @@ if [[ $auth_ready == "false" ]]; then
     echo "Error: Unable to login with htpasswd credentials after 10 minutes"
     exit 1
 fi
+
+# Publish users last because the EphemeralCluster controller uses it as a readiness signal.
+mv "${SHARED_DIR}/users.htpasswd.tmp" "${SHARED_DIR}/users.htpasswd"
+mv "${SHARED_DIR}/users.tmp" "${SHARED_DIR}/users"
 
 echo "htpasswd OAuth provider configured and verified successfully for ${CLUSTER_NAME}"

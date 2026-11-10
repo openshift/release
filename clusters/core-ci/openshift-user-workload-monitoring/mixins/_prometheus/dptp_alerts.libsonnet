@@ -16,8 +16,8 @@ local deprovisionCleanupJobPattern = '^(' + stripAnchors(cleanupJobPattern) + '|
 // The birth term (v>0 unless v offset 15m) catches a counter born at 1 on its first
 // increment or re-created after a prow-controller-manager restart, which increase()
 // alone would miss.
-local lastTransition(states, pattern, window) =
-  local sel = 'prowjob_state_transitions{job="prow-controller-manager",job_name=~"%(p)s",state=~"%(s)s"}' % { p: pattern, s: states };
+local lastTransition(states, jobMatch, window) =
+  local sel = 'prowjob_state_transitions{job="prow-controller-manager",%(jm)s,state=~"%(s)s"}' % { jm: jobMatch, s: states };
   |||
     max by (job_name) (
       max_over_time(
@@ -33,11 +33,18 @@ local lastTransition(states, pattern, window) =
 // later success has not overtaken (or it has never succeeded) -- a timestamp
 // comparison, NOT "a failure in the window and no success in the window", so a
 // success followed by a later failure still fires and a failure followed by a later
-// success resolves (addresses the window-contains ambiguity).
-local latestRunFailed(pattern, window) =
-  local fail = lastTransition('failure|error', pattern, window);
-  local succ = lastTransition('success', pattern, window);
-  '(\n' + fail + ')\nunless on (job_name)\n(\n(\n' + succ + ') >= on (job_name) (\n' + fail + ')\n)';
+// success resolves (addresses the window-contains ambiguity). `jobMatch` is the full
+// job_name matcher placed inside the selector (e.g. 'job_name=~"..."' for name-selected
+// jobs, or 'job_name!~"rehearse.*"' for jobs selected by a label instead of by name).
+// `restrictJoin`, when non-empty, is multiplied in via `* on (job_name) group_left
+// <join>` so the result keeps only the jobs carrying a given prow_job_labels label
+// (e.g. role=infra); those jobs have no name pattern, so they are filtered by the join.
+local latestRunFailed(jobMatch, window, restrictJoin='') =
+  local fail = lastTransition('failure|error', jobMatch, window);
+  local succ = lastTransition('success', jobMatch, window);
+  local core = '(\n' + fail + ')\nunless on (job_name)\n(\n(\n' + succ + ') >= on (job_name) (\n' + fail + ')\n)';
+  if restrictJoin == '' then core
+  else '(\n' + core + '\n)\n* on (job_name) group_left ' + restrictJoin;
 local infraJobAnnotations = {
   ops_color: '{{ if match %s $labels.job_name }}yellow{{ else }}orange{{ end }}' % std.manifestJson(cleanupJobPattern),
   ops_category: '{{ if match %s $labels.job_name }}repo_automation{{ else if match %s $labels.job_name }}cluster_fleet{{ else if match %s $labels.job_name }}cloud_cleanup{{ else }}ci_platform{{ end }}' % [
@@ -55,27 +62,19 @@ local infraJobAnnotations = {
         rules: [
           {
             alert: 'ci-tools-postsubmit-failures',
-            expr: |||
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[24h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
-                > 0
-              )
-              unless on (job_name)
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[12h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})
-                > 0
-              )
-            |||,
+            // Latest-transition comparison (latestRunFailed): fire while the most recent
+            // terminal run of an e2e-oo-post postsubmit is a failure/error with no newer
+            // success. Previously increase(failure[24h]) unless increase(success[12h]) --
+            // the asymmetric 24h/12h windows re-fired ~12h after a recovery when the
+            // success aged out of the shorter window while the failure still sat in the
+            // longer one (a spurious page with nothing newly broken). These jobs are
+            // selected by the e2e-oo-post metadata_target label (restrictJoin), not by
+            // name; 24h bounds how long a never-rerun failure keeps paging.
+            expr: latestRunFailed(
+              'job_name!~"rehearse.*"',
+              '24h',
+              'max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_metadata_target="e2e-oo-post"})'
+            ),
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -88,27 +87,19 @@ local infraJobAnnotations = {
           },
           {
             alert: 'infrastructure-job-failures',
-            expr: |||
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="failure"}[13h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
-                > 0
-              )
-              unless on (job_name)
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator",state="success"}[7h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})
-                > 0
-              )
-            |||,
+            // Latest-transition comparison (latestRunFailed): fire while the most recent
+            // terminal run of a role=infra job is a failure/error with no newer success.
+            // Previously increase(failure[13h]) unless increase(success[7h]) -- the
+            // asymmetric 13h/7h windows re-fired ~7h after a recovery when the success
+            // aged out of the shorter window while the failure stayed in the longer one,
+            // so a flaky-but-recovering job double-paged for one failure. Jobs are
+            // selected by the role=infra label (restrictJoin), not by name; 13h bounds
+            // how long a never-rerun failure keeps paging.
+            expr: latestRunFailed(
+              'job_name!~"rehearse.*|periodic-prow-auto-sippy-config-generator"',
+              '13h',
+              'max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"})'
+            ),
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -121,27 +112,17 @@ local infraJobAnnotations = {
           },
           {
             alert: 'plank-job-with-infra-internal-role-failures',
-            expr: |||
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[13h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
-                > 0
-              )
-              unless on (job_name)
-              (
-                sum by (job_name) (
-                  increase(
-                    prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="success"}[7h]
-                  )
-                )
-                * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})
-                > 0
-              )
-            |||,
+            // Latest-transition comparison (latestRunFailed): fire while the most recent
+            // terminal run of a role=infra-internal job is a failure/error with no newer
+            // success. Previously increase(failure[13h]) unless increase(success[7h]) --
+            // same asymmetric-window age-out re-fire as infrastructure-job-failures above.
+            // Jobs are selected by the role=infra-internal label (restrictJoin), not by
+            // name; 13h bounds how long a never-rerun failure keeps paging.
+            expr: latestRunFailed(
+              'job_name!~"rehearse.*"',
+              '13h',
+              'max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"})'
+            ),
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -163,7 +144,7 @@ local infraJobAnnotations = {
             // failure-in-window / success-in-window) so a success later overtaken by a
             // failure still fires and a recovered job resolves. 2d window covers these
             // jobs' <=daily cadence.
-            expr: latestRunFailed(deprovisionCleanupJobPattern, '2d'),
+            expr: latestRunFailed('job_name=~"%s"' % deprovisionCleanupJobPattern, '2d'),
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -176,18 +157,30 @@ local infraJobAnnotations = {
           },
           {
             alert: 'ci-tools-image-build-failures',
-            // Only the POSTSUBMIT (branch-ci) ci-tools image builds: they run on
-            // merge to main and promote the images, so a failure means the ci-tools
-            // images on main are broken. The presubmit (pull-ci) image builds are
-            // intentionally NOT alerted -- their failures reflect individual
-            // in-progress PRs (and prowjob_state_transitions has no per-PR label, so
-            // all PR runs collapse into one series), are already surfaced to the
-            // author as a required PR check, and are not an ops signal. Latest-transition
-            // comparison (an earlier success cannot mask a later failing build). 2d is
-            // the longest lookback the ci-metrics evaluator is confirmed to serve (it
-            // matches configmap_alerts' predict_linear[2d]); a broken postsubmit with no
-            // rebuild for >2d ages out until the next merge re-evaluates it.
-            expr: latestRunFailed('^branch-ci-openshift-ci-tools(-standalone)?-main-images$', '2d'),
+            // Only the POSTSUBMIT (branch-ci) ci-tools image builds: they run on merge
+            // to main and promote the images. These builds are flaky from transient
+            // infrastructure -- CentOS Stream mirror/dnf blips (DockerBuildFailed) and
+            // build-pod scheduling pressure (pod_pending) -- so paging on each failed
+            // build is noise. Fire only on SUSTAINED breakage: a failure/error in the
+            // last 6h with NO successful build in the last 6h (a later successful merge
+            // clears it). Presubmit (pull-ci) builds are intentionally excluded -- their
+            // failures are per-PR (and prowjob_state_transitions has no per-PR label),
+            // not platform health. 6h is within the evaluator's confirmed lookback.
+            expr: |||
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state=~"failure|error"}[6h])
+                )
+                > 0
+              )
+              unless on (job_name)
+              (
+                sum by (job_name) (
+                  increase(prowjob_state_transitions{job="prow-controller-manager",job_name=~"^branch-ci-openshift-ci-tools(-standalone)?-main-images$",state="success"}[6h])
+                )
+                > 0
+              )
+            |||,
             'for': '1m',
             labels: {
               severity: 'critical',
@@ -195,7 +188,7 @@ local infraJobAnnotations = {
             annotations: {
               ops_color: 'orange',
               ops_category: 'ci_platform',
-              message: 'The ci-tools image postsubmit {{ $labels.job_name }} is failing on merge to main and has not succeeded since, so the ci-tools images on main may be stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.',
+              message: 'No successful ci-tools image postsubmit {{ $labels.job_name }} build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>.',
             },
           },
         ],
@@ -351,11 +344,18 @@ local infraJobAnnotations = {
           },
           {
             alert: 'ProbeFailing',
+            // Blackbox targets (e.g. build-cluster consoles such as build02) have brief
+            // intermittent reachability blips. for:2m requires a sustained failure (not a
+            // single missed scrape) before paging, and keep_firing_for:15m coalesces
+            // blips that recur within 15m into one firing instead of a fire/resolve/
+            // re-fire train. keep_firing_for only extends firing AFTER recovery, so it
+            // never masks a sustained outage (that keeps probe_success==0 and stays
+            // firing regardless of the hysteresis).
             expr: |||
               up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
             |||,
-            'for': '1m',
-            'keep_firing_for': '3m',
+            'for': '2m',
+            'keep_firing_for': '15m',
             labels: {
               severity: 'critical',
             },
@@ -367,11 +367,14 @@ local infraJobAnnotations = {
           },
           {
             alert: 'ProbeFailing-Lenient',
+            // Same resolve-side hysteresis as ProbeFailing: keep_firing_for:15m (was 3m,
+            // which was shorter than for:5m and so still flapped on recurring >5m blips)
+            // coalesces recurring blips into one firing without masking a sustained outage.
             expr: |||
               up{job="blackbox-lenient"} == 0 or probe_success{job="blackbox-lenient"} == 0
             |||,
             'for': '5m',
-            'keep_firing_for': '3m',
+            'keep_firing_for': '15m',
             labels: {
               severity: 'critical',
             },

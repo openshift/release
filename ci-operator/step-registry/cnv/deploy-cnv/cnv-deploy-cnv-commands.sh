@@ -100,6 +100,7 @@ function apply_brew_idms() {
 env::hash | grep -e "^CNV_" -e "^HCO_" | sort
 
 if [[ -n $CNV_CATALOG_IMAGE ]]; then
+  CNV_CATALOG_IMAGE="${CNV_CATALOG_IMAGE/registry-proxy.engineering.redhat.com/brew.registry.redhat.io}"
   CNV_CATALOG_SOURCE=${CNV_IIB_CATALOG_NAME}
   create_cnv_catalog_source "${CNV_IIB_CATALOG_NAME}" "${CNV_CATALOG_IMAGE}"
   make_sure_all_catalog_source_are_healthy 600 10

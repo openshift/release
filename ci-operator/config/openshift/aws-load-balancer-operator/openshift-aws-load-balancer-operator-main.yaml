@@ -15,12 +15,16 @@ build_root:
   from_repository: true
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
     to: aws-load-balancer-operator
   skip_if_only_changed: ^renovate\.json$
 operator:
   bundles:
   - as: aws-load-balancer-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
     skip_if_only_changed: ^renovate\.json$
@@ -41,6 +45,12 @@ releases:
       include_built_images: true
       name: "4.22"
       namespace: ocp
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -48,6 +58,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  aws-load-balancer-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 2Gi
 tests:
 - as: verify
   commands: make verify
@@ -83,6 +99,41 @@ tests:
       cli: latest
       commands: |
         env
+        oc create ns aws-load-balancer-operator
+        operator-sdk run bundle -n aws-load-balancer-operator --timeout=10m --security-context-config restricted --install-mode AllNamespaces "$OO_BUNDLE"
+        oc -n aws-load-balancer-operator wait --for condition=Available deployment/aws-load-balancer-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: aws-load-balancer-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install
+- as: e2e-aws-arm64-operator
+  capabilities:
+  - arm64
+  skip_if_only_changed: ^docs/|^\.tekton/|^catalog/|^bundle-hack/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      OCP_ARCH: arm64
+      OO_APPLY_RESOURCES: "false"
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      ZONES_COUNT: "2"
+    test:
+    - as: install
+      cli: latest
+      commands: |
         oc create ns aws-load-balancer-operator
         operator-sdk run bundle -n aws-load-balancer-operator --timeout=10m --security-context-config restricted --install-mode AllNamespaces "$OO_BUNDLE"
         oc -n aws-load-balancer-operator wait --for condition=Available deployment/aws-load-balancer-operator-controller-manager
