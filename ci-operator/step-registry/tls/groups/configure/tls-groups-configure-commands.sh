@@ -109,7 +109,7 @@ ensure_tls_groups_feature_gate() {
     ;;
   esac
 
-  oc adm wait-for-stable-cluster --timeout=3h
+  oc adm wait-for-stable-cluster --timeout=30m
   wait_feature_observed "${version}" "${TLS_GROUPS_FEATURE_GATE}"
 }
 
@@ -143,7 +143,7 @@ echo "Patching apiservers/cluster:"
 echo "${apiserver_patch}" | jq .
 oc patch apiservers/cluster --type=merge -p "${apiserver_patch}"
 
-oc adm wait-for-stable-cluster --timeout=3h
+oc adm wait-for-stable-cluster --timeout=30m
 
 observed_type=$(oc get apiserver/cluster -ojson | jq -r .spec.tlsSecurityProfile.type)
 observed_groups=$(oc get apiserver/cluster -ojson | jq -c '.spec.tlsSecurityProfile.custom.groups // []')
