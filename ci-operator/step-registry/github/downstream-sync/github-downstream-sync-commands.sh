@@ -464,6 +464,8 @@ delete_ds_merge_branches() {
   done <<< "${refs}"
 }
 
+echo "⚠️  DNM TEST BUILD: rehearsal only. Do not merge this revision."
+
 echo "🔐 Generating JWT…"
 # create the JWT needed to get an app install token needed for API requests
 # the token is short-lived and will expire after EXP below
@@ -526,21 +528,21 @@ done <<< "${OPEN_PR_INFO}"
 
 if [[ ${#OPEN_PR_NUMS[@]} -gt 0 ]]; then
   echo "ℹ️  Found open downstream-merge PR(s): ${OPEN_PR_NUMS[*]} (branches: ${OPEN_PR_BRANCHES[*]})"
-  delete_ds_merge_branches "${OPEN_PR_BRANCHES[@]}"
-  echo "ℹ️  Exiting without creating a new merge PR."
-  exit 0
+  echo "⚠️  DNM TEST: not exiting; existing open merge PR branches will be left untouched."
 fi
 
-# no open PRs: remove every leftover d/s-merge branch before creating a new one
-delete_ds_merge_branches
+# DNM TEST: never delete d/s-merge branches. This keeps
+# openshift/ovn-kubernetes#3621 (d/s-merge-11-09-2026) intact.
+echo "⚠️  DNM TEST: skipping d/s-merge branch cleanup"
 
 echo "📊 Counting new commits upstream…"
 # to save on overhead we don't need to open a new d/s merge PR until we have enough commits to bring in
 NEW_COMMITS=$(git rev-list origin/"${DEFAULT_BRANCH}"..upstream/"${UPSTREAM_BRANCH}" --count)
 echo "Found $NEW_COMMITS new commits upstream."
-(( NEW_COMMITS < MIN_COMMITS )) && { echo "⚠️  Not enough commits (min=${MIN_COMMITS}); exiting."; exit 0; }
+echo "⚠️  DNM TEST: skipping MIN_COMMITS gate (have ${NEW_COMMITS}, min=${MIN_COMMITS})"
 
-BRANCH="d/s-merge-$(date +%m-%d-%Y)"
+# Unique name so we cannot collide with d/s-merge-11-09-2026 or today's dated branch.
+BRANCH="d/s-merge-DNM-TEST-$(date +%m-%d-%Y-%H%M%S)"
 
 echo "🌿 Creating merge branch ${BRANCH} and merging…"
 # if we made it this far, we can create the merge and push the PR
@@ -670,7 +672,7 @@ GIT_CONFIG_VALUE_0="Authorization: Basic ${GIT_AUTH_HEADER}" \
   retry_git "push downstream merge branch" "" "${WORKFLOW_DEADLINE_SECONDS}" git push origin "$BRANCH"
 
 echo "✏️  Opening Pull Request…"
-PR_TITLE="NO-JIRA: DownStream Merge [$(date +%m-%d-%Y)]"
+PR_TITLE="DNM-TEST: DownStream Merge [$(date +%m-%d-%Y)]"
 PR_BODY="Automated merge of upstream/${UPSTREAM_BRANCH} → ${DEFAULT_BRANCH}."
 if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
   PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of \`openshift/go.mod\` with upstream dependencies (\`go mod tidy\`)."
@@ -712,8 +714,9 @@ if [[ "${TEST_LIST_MISMATCH:-false}" == "true" ]]; then
     PR_BODY="${PR_BODY}"$'\n\n'"New tests (exist but not in tests.go):"$'\n\n'"<details><summary>Click to expand</summary>"$'\n\n'"<pre>${NEW_TESTS}</pre></details>"
   fi
 fi
-# Make it a draft if we detected conflicts or go mod failures (keeps Prow from auto-running presubmits).
-DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" || "${TEST_LIST_MISMATCH:-false}" == "true" || "${TEST_VALIDATION_FAILED:-false}" == "true" ]] && echo true || echo false )
+# DNM TEST: always open as a draft so ovn-kubernetes presubmits are not auto-triggered.
+DRAFT=true
+echo "⚠️  DNM TEST: opening the merge PR as a draft"
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
@@ -775,14 +778,7 @@ if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
 else
-  echo "💬 Posting payload commands and pipeline required…"
-  COMMENT_BODY="/payload ${RELEASE} ci blocking
-/payload ${RELEASE} nightly blocking
-/pipeline required"
-  COMMENT_PAYLOAD=$(jq -nc --arg body "$COMMENT_BODY" '{body: $body}')
-  github_api_request "trigger downstream merge pull request tests" "${WORKFLOW_DEADLINE_SECONDS}" token "${GITHUB_TOKEN}" -X POST \
-       -d "$COMMENT_PAYLOAD" \
-       "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
+  echo "⚠️  DNM TEST: skipping /payload and /pipeline comments so this test PR does not trigger payload jobs"
 fi
 
 # Credentials are no longer needed. Clear them before restoring inherited
