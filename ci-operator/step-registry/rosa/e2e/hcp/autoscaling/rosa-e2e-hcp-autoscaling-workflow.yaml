@@ -4,11 +4,13 @@ workflow:
     env:
       CHANNEL_GROUP: stable
       HOSTED_CP: "true"
-      # Provision the default node pool with autoscaling (min 2 / max 4) so
+      # Provision the default node pool with autoscaling (min 3 / max 6) so
       # the autoscaling row validates day-1 autoscaling on the default pool.
+      # Both bounds must be multiples of the VPC's private subnet count
+      # (3 for the rosa-e2e shared VPC) or rosa create cluster rejects them.
       ENABLE_AUTOSCALING: "true"
-      MIN_REPLICAS: "2"
-      MAX_REPLICAS: "4"
+      MIN_REPLICAS: "3"
+      MAX_REPLICAS: "6"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
@@ -53,7 +55,8 @@ workflow:
   documentation: |-
     The autoscaling row of the ROSAENG-308 provision x validate matrix
     (ROSAENG-63354): the rosa-CLI head provisions an HCP cluster with
-    autoscaling enabled on the default node pool (min 2 / max 4), then the
+    autoscaling enabled on the default node pool (min 3 / max 6, a multiple
+    of the shared VPC's 3 private subnets), then the
     customer validation step runs the rosa-e2e Feature:Autoscaling specs. The
     default node pool is driven up to its maximum by a CPU-bound workload
     pinned to the worker nodes and back down to its minimum after the workload
