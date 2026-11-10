@@ -305,3 +305,11 @@ run_case bad-retries-huge  $'504 22 x'                                         1
 # stops the loop before another download starts.
 run_case max-time-capped   $'504 22 x'                                         1    2        '5'          failed-exhausted  0   DATE_STEP=80  '300,200'
 run_case budget-pre-stop   $'504 22 x'                                         1    0        -            failed-exhausted  0   DATE_STEP=600
+# The rest of the retry classification: a throttled (429) or timed-out (408)
+# request recovers on the next attempt, while an authentication failure (401)
+# and a transport error that a retry cannot fix (curl 60, the server
+# certificate failed verification) fail on the first attempt.
+run_case transient-429     $'429 22 x\n200 0 ocm-backplane-archive'            0    2        '5'          succeeded         1   -
+run_case transient-408     $'408 22 x\n200 0 ocm-backplane-archive'            0    2        '5'          succeeded         1   -
+run_case permanent-401     $'401 22 x'                                         1    1        -            failed-permanent  0   -
+run_case permanent-curl-60 $'000 60 x'                                         1    1        -            failed-permanent  0   -
