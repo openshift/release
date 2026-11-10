@@ -3,14 +3,27 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: cli
-  obs-tests-runner:
-    name: obs-tests-runner
-    namespace: logging
-    tag: main
   upi-installer:
     name: "4.22"
     namespace: ocp
     tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM pipeline:src
+      RUN make build && \
+          install -m 0755 bin/openshift-logging-e2e-tests-tests-ext /usr/local/bin/openshift-logging-e2e-tests-tests-ext
+      RUN dnf install -y jq && dnf clean all && jq --version
+      RUN curl -fsSL https://claude.ai/install.sh | bash \
+          && install -m 0755 "$HOME/.local/bin/claude" /usr/local/bin/claude \
+          && claude --version
+    from: src
+    to: obs-tests-runner
 releases:
   latest:
     release:
@@ -36,7 +49,7 @@ tests:
       AGENT_SKILL: cluster-logging
       BASE_DOMAIN: devobscluster.devcluster.openshift.com
       JIRA_PROJECT: LOG
-      TEST_MAX_CONCURRENCY: "3"
+      TEST_MAX_CONCURRENCY: "1"
       TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator/all
     post:
     - ref: openshift-observability-qe-agent
@@ -52,7 +65,7 @@ tests:
     env:
       AGENT_SKILL: cluster-logging
       BASE_DOMAIN: devobscluster.devcluster.openshift.com
-      TEST_MAX_CONCURRENCY: "3"
+      TEST_MAX_CONCURRENCY: "1"
       TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
     post:
     - ref: openshift-observability-qe-agent

@@ -1,9 +1,6 @@
 ref:
   as: openshift-observability-logging-e2e-tests
-  from_image:
-    namespace: logging
-    name: obs-tests-runner
-    tag: main
+  from: obs-tests-runner
   cli: latest
   commands: openshift-observability-logging-e2e-tests-commands.sh
   timeout: 6h0m0s
@@ -39,6 +36,12 @@ ref:
     The openshift-observability-logging-e2e-tests step runs one suite from the OpenShift Logging tests extension binary
     (https://github.com/openshift-eng/openshift-logging-e2e-tests) against the cluster in KUBECONFIG and
     writes a JUnit report to ARTIFACT_DIR.
+
+    The step runs in the obs-tests-runner image, which the using configuration must provide: either
+    build it from the test suite source with an images entry (so the suites exercise the pull request
+    under test), or import the promoted logging/obs-tests-runner:main stream with a base_images entry
+    (to run the merged suites). Configurations that provide neither fail when the step pod starts,
+    after the cluster has been provisioned, because the image cannot be found.
 
     The suites expect cluster-logging-operator and loki-operator to be installed before the step runs,
     as subscriptions in the openshift-logging and openshift-operators-redhat namespaces. Tests that need
