@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: ./mage build
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    from: base
+    to: reference-addon-manager
+promotion:
+  to:
+  - name: reference-addon-manager
+    namespace: reference-addon
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: ./mage cache-ci-deps
+tests:
+- as: lint
+  commands: ./mage lint
+  container:
+    from: test-bin
+- as: unit
+  commands: ./mage test-unit
+  container:
+    from: test-bin
+- as: integration
+  commands: ./mage test-integration
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: reference-addon

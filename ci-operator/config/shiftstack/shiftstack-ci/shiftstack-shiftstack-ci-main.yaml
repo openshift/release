@@ -1,0 +1,45 @@
+base_images:
+  openstack-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: openstack-installer
+build_root:
+  image_stream_tag:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+images:
+  items:
+  - dockerfile_literal: |-
+      FROM src
+      RUN ./hack/dnf_safe -y install python3-openstackclient python3-octaviaclient jq yq && dnf clean all
+      ADD openshift-install /usr/bin/openshift-install
+    from: src
+    inputs:
+      openstack-installer:
+        paths:
+        - destination_dir: .
+          source_path: /bin/openshift-install
+    to: shiftstack-scripts-image
+promotion:
+  to:
+  - additional_images:
+      scripts: shiftstack-scripts-image
+    name: tooling
+    namespace: shiftstack
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: find . -type f -name "*.sh" | xargs --verbose --no-run-if-empty shellcheck
+  container:
+    from: shiftstack-scripts-image
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: shiftstack-ci

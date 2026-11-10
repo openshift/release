@@ -1,0 +1,37 @@
+workflow:
+  as: openshift-e2e-aws-csi-fsx-ontap-alerts
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - chain: storage-conf-csi-aws-fsx-ontap
+    - as: csi-device-volume-exporter-check
+      commands: |
+        #!/bin/bash
+        # TODO: remove this step when nightlies contain implementation of the feature
+        set -euo pipefail
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          # shellcheck disable=SC1090
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        NAMESPACE=openshift-cluster-storage-operator
+        echo "Checking that DaemonSet ${NAMESPACE}/volume-condition-exporter exists"
+        oc get daemonset volume-condition-exporter -n "${NAMESPACE}" && exit 0
+        oc get daemonset csi-volume-condition-exporter -n "${NAMESPACE}" && exit 0
+
+        echo "Neither DaemonSet ${NAMESPACE}/volume-condition-exporter nor ${NAMESPACE}/csi-volume-condition-exporter exists"
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-destroy-csi-aws-fsx-ontap
+    - chain: ipi-aws-post
+  documentation: |-
+    Provisions FSx for NetApp ONTAP and Trident and runs the disruptive CSO
+    storage-path alert suite using the standard openshift-tests payload
+    extension discovery. The existing FSxN/Trident destroy step runs before
+    AWS cluster teardown.

@@ -1,0 +1,45 @@
+ref:
+  as: rosa-aws-cleanup-resources
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 10m
+  commands: rosa-aws-cleanup-resources-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      Single AWS region to scan when REGIONS is empty. Defaults to the region
+      supplied by the cluster profile lease.
+  - name: REGIONS
+    default: ""
+    documentation: |-
+      Space- or comma-separated AWS regions to scan in dry-run mode. Live
+      cleanup requires a single region because aws-deprovision-stacks accepts
+      one REGION per run.
+  - name: RESOURCE_AGE_HOURS
+    default: "24"
+    documentation: Minimum resource age in hours before it is eligible for cleanup.
+  - name: CLEAN_IAM
+    default: "true"
+    documentation: |-
+      Whether to clean expired ROSA CI IAM roles, customer-managed policies,
+      and ROSA-managed OIDC providers.
+  - name: DRY_RUN
+    default: "true"
+    documentation: Report eligible resources without deleting them when set to true.
+  documentation: |-
+    Finds ROSA CI resources older than the configured age. VPC stacks must
+    follow the ci-op namespace naming convention and carry the expirationDate
+    tag. IAM roles and policies must follow the generated
+    ci-rosa[-h|-s]-xxxx naming convention. OIDC providers must carry the
+    red-hat-managed=true tag added by ROSA and must not be trusted by a retained
+    IAM role. Eligible VPC stacks are passed to aws-deprovision-stacks through
+    SHARED_DIR; IAM dependencies are removed before their roles, policies, and
+    OIDC providers are deleted. A policy is retained when any attached IAM
+    principal is not independently eligible for cleanup.

@@ -1,0 +1,29 @@
+ref:
+  as: mco-conf-day2-os-image-stream-default
+  from: cli
+  commands: mco-conf-day2-os-image-stream-default-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT
+      default: ""
+      documentation: |
+        Name of the osImageStream to set as the default stream in the OSImageStream cluster resource.
+        When set, the step patches the OSImageStream CR's spec.defaultStream field, which causes ALL
+        MachineConfigPools in the cluster to use the specified stream.
+        If the value is empty, this step will be skipped.
+        Example: "rhel-10"
+    - name: MCO_CONF_DAY2_OS_IMAGE_STREAM_DEFAULT_TIMEOUT
+      default: "50m"
+      documentation: |
+        Maximum time that we will wait for a single pool to be updated with the new osImageStream.
+        The default 50m value is configured for 3 masters and 3 workers.
+        If configuring pools with more nodes, increase this value accordingly.
+  documentation: |-
+    This step sets the default osImageStream in the OSImageStream cluster resource,
+    which causes all nodes in the cluster to switch to the specified OS stream.
+    After configuration, it waits for all MachineConfigPools to finish rolling out
+    and verifies each node is running the correct OS image.
+    This requires the OSStreams feature gate to be enabled (TechPreviewNoUpgrade).

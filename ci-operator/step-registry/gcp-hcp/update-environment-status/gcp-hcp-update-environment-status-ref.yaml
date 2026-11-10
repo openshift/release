@@ -1,0 +1,35 @@
+ref:
+  as: gcp-hcp-update-environment-status
+  from: src
+  commands: gcp-hcp-update-environment-status-commands.sh
+  env:
+  - name: E2E_STATUS_CONTEXT
+    default: ""
+    documentation: "GitHub commit status context for the deployed environment test"
+  - name: E2E_STATUS_TARGETS
+    default: ""
+    documentation: "JSON array with exactly one target matching the postsubmit promotion branch and its required deployment statuses or check runs"
+  - name: E2E_STATUS_WAIT_SECONDS
+    default: "1800"
+    documentation: "Maximum time to wait for Terraform and ArgoCD deployment checks"
+  - name: E2E_STATUS_POLL_SECONDS
+    default: "60"
+    documentation: "Interval between deployment status checks"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  timeout: 35m0s
+  credentials:
+  - namespace: ci
+    bundle: github-credentials-openshift-ci-robot-private-git-cloner
+    mount_path: /etc/github-private
+  documentation: |-
+    For a promotion-branch postsubmit, captures the pushed commit SHA and posts
+    a pending GitHub status. Waits up to 30 minutes for the configured
+    Terraform and ArgoCD commit statuses or check runs to become successful
+    before testing; a re-posted status can recover during the wait. A job
+    whose event commit was superseded before it starts skips the lifecycle and
+    status publication.
+    Ordinary presubmits do not publish deployed-commit statuses. Prow's
+    pj-rehearse does not run postsubmit jobs.

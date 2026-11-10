@@ -1,0 +1,43 @@
+workflow:
+  as: openshift-e2e-aws-windows-node-tls-adherence
+  steps:
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \\[node-proxy\\]
+      TEST_SUITE: windows-machine-config-operator/all
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf
+      - ref: ovn-conf-hybrid-manifest
+      - chain: ipi-install
+      - ref: tls-adherence
+    test:
+      - as: wmco-setup
+        cli: latest
+        commands: |
+          export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+          export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+          hack/run-ci-e2e-test.sh -t setup-only -s
+        dependencies:
+        - env: OPERATOR_IMAGE
+          name: windows-machine-config-operator-test
+        from: windows-machine-config-operator-test
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 400Mi
+        timeout: 2h15m0s
+      - ref: ipi-conf-aws-windows-machineset
+      - ref: openshift-tests-extension-setup-out-of-payload
+      - ref: openshift-e2e-test
+    post:
+      - chain: ipi-aws-post
+  documentation: |-
+    The OpenShift E2E AWS Windows Node TLS Adherence workflow provisions a normal AWS IPI
+    OVNKubernetes hybrid cluster, enables only TLSAdherence with CustomNoUpgrade while
+    retaining the Intermediate TLS profile, installs WMCO from the promoted 5.1 test image,
+    creates Windows Machine API workers, and runs the out-of-payload WMCO extension suite.

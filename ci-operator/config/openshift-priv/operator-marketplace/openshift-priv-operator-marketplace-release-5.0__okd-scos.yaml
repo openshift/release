@@ -1,0 +1,50 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.0
+  origin_scos-5.0_base-stream9:
+    name: scos-5.0
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp-priv
+    tag: rhel-9-golang-1.26-openshift-5.0
+canonical_go_repository: github.com/operator-framework/operator-marketplace
+images:
+  items:
+  - build_args:
+    - name: TAGS
+      value: scos
+    dockerfile_path: Dockerfile.okd
+    from: origin_scos-5.0_base-stream9
+    inputs:
+      ocp_builder_rhel-9-golang-1.26-openshift-5.0:
+        as:
+        - builder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
+    to: operator-marketplace
+promotion:
+  to:
+  - disabled: true
+    name: scos-5.0
+    namespace: origin
+prowgen:
+  private: true
+releases:
+  latest:
+    integration:
+      name: scos-5.0
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: operator-marketplace
+  variant: okd-scos

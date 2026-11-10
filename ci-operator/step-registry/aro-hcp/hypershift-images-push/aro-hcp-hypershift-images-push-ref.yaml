@@ -1,0 +1,43 @@
+ref:
+  as: aro-hcp-hypershift-images-push
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-hypershift-images-push-commands.sh
+  grace_period: 1m0s
+  timeout: 20m0s
+  credentials:
+    - collection: hcm-aro
+      group: aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: |-
+      Selects which environment's cluster secrets to use (dev, int, stg, prod).
+  - name: ARO_HCP_DEPLOY_ENV
+    default: "prow"
+    documentation: |-
+      Config environment name. Also used to select the infrastructure
+      subscription from Vault (infra-{ARO_HCP_DEPLOY_ENV}-subscription-id).
+  - name: PUSH_CPO_IMAGE
+    default: "false"
+    documentation: |-
+      When "true", also pushes the CPO image to the OCP ACR and writes
+      SHARED_DIR/hypershift-cpo-override.env. Set by jobs that test CPO
+      from the PR (e.g. e2e-aro-hcp-presubmit).
+  dependencies:
+  - name: hypershift-operator
+    env: HYPERSHIFT_OPERATOR_IMAGE
+  - name: hypershift
+    env: HYPERSHIFT_CPO_IMAGE
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  documentation: |-
+    Pushes the CI-built hypershift-operator (HO) image to the service ACR.
+    Writes SHARED_DIR/hypershift-image-overrides.yaml with HO config overlay
+    (hypershift.image.repository + hypershift.image.digest), merged by
+    hack/ci/provision-environment.sh during provisioning.
+    When PUSH_CPO_IMAGE is "true", also pushes the control-plane-operator
+    (CPO) image (HYPERSHIFT_CPO_IMAGE) to the OCP ACR and writes
+    SHARED_DIR/hypershift-cpo-override.env with the CPO_IMAGE_OVERRIDE ref.

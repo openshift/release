@@ -1,0 +1,49 @@
+workflow:
+  as: aws-neuron-operator-kserve-e2e-rosa
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ENABLE_BYOVPC: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "inf2.8xlarge"
+      REPLICAS: "2"
+      OCM_LOGIN_ENV: "production"
+      REGION: "us-west-2"
+    pre:
+    # Clean up stale VPC stack from previous failed runs, then provision
+    - ref: aws-neuron-operator-cleanup-vpc
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    # OIDC and account roles setup
+    - chain: rosa-sts-oidc-config-create
+    # Custom cluster provision step that handles "zero egress" CLI bug
+    - ref: aws-neuron-operator-rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: aws-provision-tags-for-byo-vpc
+    # Additional configuration
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    # Install Neuron operators (NFD, KMM, Neuron operator + DeviceConfig)
+    - ref: aws-neuron-operator-install-operators
+    # Install KServe inference stack (Service Mesh, Serverless, RHOAI, DSC, ServingRuntime)
+    - ref: aws-neuron-operator-install-kserve-deps
+    test:
+    - ref: aws-neuron-operator-kserve-test
+    post:
+    - ref: aws-neuron-operator-gather
+    - ref: aws-neuron-operator-rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+      timeout: 30m
+  documentation: |-
+    Provisions a ROSA HCP cluster with AWS Inferentia (inf2.8xlarge) nodes,
+    installs the Neuron operator stack and KServe inference stack. On OCP < 4.21,
+    uses Serverless mode (Service Mesh 2.x + Serverless + RHOAI). On OCP >= 4.21,
+    uses RawDeployment mode (RHOAI only, no Service Mesh or Serverless). Runs
+    KServe inference tests using the vllm-neuron ServingRuntime with eco-gotests.

@@ -1,0 +1,27 @@
+workflow:
+  as: openshift-e2e-aws-csi-efs-sts-cross-account
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws-oidc-creds-provision
+    - chain: ipi-install
+    - chain: storage-conf-csi-optional-aws-efs-sts-cross-account
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-destroy-csi-aws-efs
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - ref: aws-deprovision-stacks
+    - chain: cucushift-installer-rehearse-aws-ipi-cco-manual-security-token-service-deprovision
+    env:
+     ENABLE_CROSS_ACCOUNT: "yes"
+     TEST_SUITE: openshift/csi
+     TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+     TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-aws-efs.yaml
+
+  documentation: |-
+    The Openshift E2E AWS `csi` workflow executes the `openshift/csi` end-to-end test suite on AWS EFS CSI driver cross account STS cluster
+     that was configured during cluster setup.

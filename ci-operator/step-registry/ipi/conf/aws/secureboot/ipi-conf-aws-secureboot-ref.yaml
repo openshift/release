@@ -1,0 +1,28 @@
+ref:
+  as: ipi-conf-aws-secureboot
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: ipi-conf-aws-secureboot-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AWS_SECUREBOOT_ENABLED
+    default: ""
+    documentation: |-
+      Set to "true" to enable UEFI Secure Boot on worker nodes. When empty
+      (the default), this step is a no-op.
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    This step enables UEFI Secure Boot for AWS worker nodes. It creates a
+    custom RHCOS AMI with Secure Boot keys enrolled (Red Hat PK, KEK, and
+    Microsoft UEFI certificates) and patches install-config.yaml to use it
+    on compute nodes. Only Nitro-based instance types are supported.
+    The custom AMI and copied snapshot are cleaned up by the
+    aws-deprovision-secureboot post step.
