@@ -98,52 +98,10 @@ tests:
         export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
         git config --global --add safe.directory "$(pwd)"
-        # TEMPORARY: exercise the simplified wrapper from a genuine v1.42.1 base.
-        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
-          REHEARSAL_BRANCH=oape-987-rehearsal-v1421-v1423-20261110074912
-          REHEARSAL_SHA=7e13c5ac473d595d628fc6da64dba72be3e859a9
-          export GH_TOKEN="$GITHUB_TOKEN"
-          git config --local --replace-all credential.helper ''
-          git config --local --add credential.helper '!gh auth git-credential'
-          if git remote get-url origin >/dev/null 2>&1; then
-            git remote set-url origin https://github.com/openshift/ansible-operator-plugins.git
-          else
-            git remote add origin https://github.com/openshift/ansible-operator-plugins.git
-          fi
-          git fetch --no-tags https://github.com/neha037/ansible-operator-plugins.git "refs/heads/${REHEARSAL_BRANCH}"
-          [[ "$(git rev-parse FETCH_HEAD)" == "$REHEARSAL_SHA" ]] || { echo 'Rehearsal snapshot SHA mismatch' >&2; exit 1; }
-          git fetch --no-tags https://github.com/operator-framework/ansible-operator-plugins.git \
-            refs/tags/v1.42.1:refs/tags/v1.42.1 refs/tags/v1.42.3:refs/tags/v1.42.3
-          [[ "$(git show "${REHEARSAL_SHA}:UPSTREAM-VERSION")" == v1.42.1 ]] || exit 1
-          git merge-base --is-ancestor refs/tags/v1.42.1 "$REHEARSAL_SHA"
-          if git merge-base --is-ancestor refs/tags/v1.42.3 "$REHEARSAL_SHA"; then
-            echo 'Rehearsal base already includes the target tag' >&2
-            exit 1
-          fi
-          existing_ref=$(git ls-remote origin "refs/heads/${REHEARSAL_BRANCH}")
-          [[ -z "$existing_ref" ]] || { echo 'Rehearsal branch already exists; refusing to overwrite it' >&2; exit 1; }
-          git push origin "${REHEARSAL_SHA}:refs/heads/${REHEARSAL_BRANCH}"
-          git fetch origin "refs/heads/${REHEARSAL_BRANCH}:refs/remotes/origin/${REHEARSAL_BRANCH}"
-          git checkout -B "$REHEARSAL_BRANCH" "origin/$REHEARSAL_BRANCH"
-          export REBASE_BRANCH="$REHEARSAL_BRANCH"
-          export OVERRIDE_TAG=v1.42.3
-          export DEST_ORG_REPO=openshift/ansible-operator-plugins
-        fi
-
         export FORCE_REMOTE_URLS=1
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
-        rebase_status=0
-        ./hack/auto-rebase.sh || rebase_status=$?
-        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
-          rehearsal_pr=$(gh pr list --repo "$DEST_ORG_REPO" --state all \
-            --head "v1.42.3-rebase-${REBASE_BRANCH}" --base "$REBASE_BRANCH" --json number --jq '.[0].number // empty')
-          if [[ -n "$rehearsal_pr" ]]; then
-            gh api --method PATCH "repos/${DEST_ORG_REPO}/pulls/${rehearsal_pr}" -f 'title=[Rehearsal] Rebase v1.42.1 to v1.42.3' --silent
-            printf 'Rehearsal PR: https://github.com/%s/pull/%s\n' "$DEST_ORG_REPO" "$rehearsal_pr"
-          fi
-        fi
-        exit "$rebase_status"
+        ./hack/auto-rebase.sh
       credentials:
       - mount_path: /var/run/github-app
         name: openshift-app-platform-shift-github-bot
