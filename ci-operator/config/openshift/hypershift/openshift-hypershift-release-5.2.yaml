@@ -268,7 +268,7 @@ tests:
     env:
       ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
       ARO_HCP_CLOUD: dev
-      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_DEPLOY_ENV: ci02
       ARO_HCP_E2E_SUITE: hypershift-presubmit/parallel
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
@@ -317,6 +317,32 @@ tests:
       NODEPOOL_N1_VERSION: "5.0"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-registry-overrides
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_run_if_changed: ^(support/(releaseinfo|imageregistry|util/registryoverride|globalconfig)/|hypershift-operator/(main|init)\.go$|hypershift-operator/controllers/hostedcluster/|control-plane-operator/main\.go$|control-plane-operator/controllers/hostedcontrolplane/hostedcontrolplane_controller\.go$|control-plane-operator/controllers/hostedcontrolplane/(imageprovider|v2/(controlplaneoperator|configoperator|ignitionserver|assets/(control-plane-operator|hosted-cluster-config-operator|ignition-server)))/|control-plane-operator/hostedclusterconfigoperator/cmd\.go$|ignition-server/|cmd/install/(install|install_render|install_helm|render)\.go$|cmd/install/assets/hypershift_operator\.go$|test/e2e/v2/(util/mirrorregistry|lifecycle|cmd/run-tests)/|test/e2e/v2/tests/registry_overrides)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN: |
+        name: registry-overrides
+        platform: aws
+        testMatrix:
+          sequential:
+          - name: registry-overrides
+            steps:
+            - name: registry-overrides
+              variant: public
+              labelFilter: registry-overrides
+            - name: registry-overrides-smoke
+              variant: public
+              labelFilter: hosted-cluster-health || control-plane-workloads
+    workflow: hypershift-aws-e2e-v2-registry-overrides
 - always_run: false
   as: e2e-v2-aws-backuprestore
   capabilities:
