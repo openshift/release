@@ -44,6 +44,8 @@ matrix.yaml.in ──> generate.py ──> config files by filename ──> make
 - Each cell is rendered by deep-merging Jinja templates from `templates/`
   (base, source, cloud, arch, test; see [Layer order](#layer-order)).
 - Cells that share a filename merge into one file; their tests are listed in matrix order.
+- Every `redhat-*` periodic posts `failure` and `error` runs to Slack
+  `#team-quay-downstream-interruptions` (`DOWNSTREAM_REPORTER_CONFIG` in `generate.py`).
 - `matrix.yaml.in` lists every file the generator owns under `managed_files.active`.
   Generation fails if that list and the expanded matrix disagree.
 - Hand-written configs here (such as `quay-quay-master__claim.yaml`) are listed under

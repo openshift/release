@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `high-ci-operator-infra-error-rate` |
 | **Cluster** | `app.ci` (user workload monitoring) |
-| **Rule group** | `ci-operator-infra-error` in [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) |
+| **Rule group** | `ci-operator-infra-error` in [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) |
 | **Severity** | `critical` |
 | **Related** | [`high-ci-operator-error-rate.md`](high-ci-operator-error-rate.md) — non-infra variant (higher rate threshold, no multi-job correlation). Slack text for this alert may omit an SOP URL; use this document whenever the alert name matches. |
 
@@ -21,7 +21,7 @@ The rule keeps failing CI Operator executions for one **`reason`** above **0.02/
 
 ## Common `reason` values
 
-(See [`dptp_alerts.libsonnet`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/_prometheus/dptp_alerts.libsonnet) — rule `high-ci-operator-infra-error-rate`.)
+(See [`dptp_alerts.libsonnet`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/_prometheus/dptp_alerts.libsonnet) — rule `high-ci-operator-infra-error-rate`.)
 
 - `executing_graph:step_failed:creating_release_images`
 - `executing_graph:step_failed:tagging_input_image`

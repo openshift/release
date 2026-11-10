@@ -152,21 +152,17 @@ fi
 info "git: committing updated image digests"
 git commit --all --quiet --message "chore: execute image-updater for all components"
 
-# ACM: Render ACM helm-charts
-info "acm: rendering ACM helm-charts"
-run make -C acm helm-charts
-
-# Render helm chart
-debug "acm: running yaml formatting and updating helm fixtures"
+# Render: format YAML and regenerate helm fixtures
+debug "render: running yaml formatting and updating helm fixtures"
 run make yamlfmt
 run make update-helm-fixtures
 
-# Check if helm chart rendering produced changes
+# Check if formatting or fixture regeneration produced changes
 if [[ $(git status --porcelain) != "" ]]; then
-  info "git: committing rendered helm charts"
-  git commit --all --quiet --message "chore: render ACM helm-charts"
+  info "git: committing updated helm fixtures"
+  git commit --all --quiet --message "chore: update helm fixtures"
 else
-  info "acm: no changes after helm chart rendering and formatting"
+  info "render: no changes after helm fixture regeneration and formatting"
 fi
 
 # Configuration: Materialize final configuration

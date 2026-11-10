@@ -32,7 +32,7 @@ flowchart TD
         S1["<b>github-app-auth</b><br/>JWT → /app slug → bot login<br/>Installation tokens → SHARED_DIR"]
         S2["<b>init</b><br/>Validate tokens, fetch JIRA JSON"]
         S3["<b>jira-solver</b><br/>Setup devcontainer services<br/>Install Claude Code<br/>Claude implements fix<br/>Push to fork, create PR"]
-        S4["<b>review-responder</b><br/>Poll 5 min for comments/CI failures<br/>Claude addresses feedback<br/>Exit after 6+ iters, 3 idle"]
+        S4["<b>review-responder</b><br/>Poll 5 min for comments/CI failures/needs-rebase<br/>Claude addresses feedback, rebases<br/>Pipeline /retests flakes and infra failures (max 2 per HEAD)<br/>Exit after 6+ iters, 3 idle"]
         S1 --> S2 --> S3 --> S4
     end
 
@@ -105,7 +105,7 @@ All steps live under [`ci-operator/step-registry/openshift/agentic/trt/`][regist
 | **init** | [`init-ref.yaml`][init-ref] | [`init-commands.sh`][init-sh] | `JIRA_ISSUE_KEY`, tokens from SHARED_DIR | `jira-issue-key`, `jira-issue.json` |
 | **jira-solver** | [`jira-solver-ref.yaml`][solver-ref] | [`jira-solver-commands.sh`][solver-sh] | JIRA JSON, tokens, `SETUP_SCRIPT`, `ALLOWED_TOOLS` | `pr-number`, `claude-output.log`, PR on fork |
 | **pr-followup** | [`pr-followup-ref.yaml`][followup-ref] | [`pr-followup-commands.sh`][followup-sh] | JIRA key, tokens | `pr-number` |
-| **review-responder** | [`review-responder-ref.yaml`][responder-ref] | [`review-responder-commands.sh`][responder-sh] | `pr-number`, tokens, `gh-app-bot-login` | Comment replies, pushed fixes |
+| **review-responder** | [`review-responder-ref.yaml`][responder-ref] | [`review-responder-commands.sh`][responder-sh] | `pr-number`, tokens, `gh-app-bot-login` | Comment replies, pushed fixes and rebases, `/retest` comments, `metrics-metadata-review.json` |
 
 [registry]: https://github.com/openshift/release/tree/main/ci-operator/step-registry/openshift/agentic/trt
 [auth-ref]: https://github.com/openshift/release/blob/main/ci-operator/step-registry/openshift/agentic/trt/github-app-auth/openshift-agentic-trt-github-app-auth-ref.yaml

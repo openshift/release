@@ -101,6 +101,21 @@ tests:
     env:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-ovn-ipv4-storage-symlinks
+- as: periodic-e2e-aws-csi-fsx-ontap-alerts
+  cron: 17 3 * * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: cso/storage-path-alerting
+    workflow: openshift-e2e-aws-csi-fsx-ontap-alerts
 zz_generated_metadata:
   branch: release-5.1
   org: openshift

@@ -66,10 +66,21 @@ while [[ $fd_idx -lt $FDS ]]; do
 
     # A failure domain can be on a different vCenter than the pool govc.sh was
     # seeded from, so source this domain's per-pool govc file for credentials
-    # that match GOVC_URL.  Pool names are <server>-<datacenter>-<cluster>, the
-    # same format as status.poolInfo[].name.  Leases without poolInfo (legacy
-    # single-pool leases) have no per-pool files and keep the govc.sh credentials.
-    pool_filename=$(echo "${GOVC_URL}-${GOVC_DATACENTER}-$(basename "${CLUSTER}")" | tr '.' '_' | tr ':' '_')
+    # that match GOVC_URL.  Use platform.json's poolName verbatim: VCM's pool
+    # name lowercases the datacenter/cluster segments (e.g. datacenter
+    # "wldn-120-DC" becomes "wldn-120-dc"), so reconstructing it from
+    # server+datacenter+cluster can silently build the wrong (case-mismatched)
+    # filename and fall back to govc.sh's credentials for the wrong vCenter.
+    # platform.json files written before poolName existed have no such field;
+    # fall back to the old reconstruction for those, and leases without
+    # poolInfo (legacy single-pool leases) have no per-pool files at all and
+    # keep the govc.sh credentials.
+    pool_name=$(echo "${FD}" | jq -r '.poolName // empty')
+    if [[ -n "${pool_name}" ]]; then
+        pool_filename=$(echo "${pool_name}" | tr '.' '_' | tr ':' '_')
+    else
+        pool_filename=$(echo "${GOVC_URL}-${GOVC_DATACENTER}-$(basename "${CLUSTER}")" | tr '.' '_' | tr ':' '_')
+    fi
     if [[ -f "${SHARED_DIR}/govc_${pool_filename}.sh" ]]; then
         echo "$(date -u --rfc-3339=seconds) - Sourcing govc_${pool_filename}.sh for failure domain ${fd_idx} credentials"
         # shellcheck source=/dev/null

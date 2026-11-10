@@ -64,8 +64,14 @@ ref:
     Polls every 5 minutes until at least 6 iterations have passed AND
     3 consecutive idle iterations occur. A small-model gate runs the
     has-review-work skill. COMMENT_WORK=yes invokes address-review-pr;
-    failing required CI invokes address-ci-failures once per PR HEAD. Review
-    comments are evaluated independently.
+    failing required CI invokes address-ci-failures once per PR HEAD and set
+    of failing runs. Review comments are evaluated independently.
+    A needs-rebase label reaches the CI worker as a rebase entry; the worker
+    rebases and the pipeline publishes it with the lease push below.
+    When the CI worker classifies a failing Prow check as flake or
+    infrastructure, the pipeline posts /retest, at most twice per HEAD
+    (counted from this bot's PR comments), and only when the round pushed
+    nothing. Review metrics are written on every exit.
     A short CI/security block matching jira-solver is prepended;
     repo-specific REVIEW.md is appended last on the
     review worker. Credential-dumping shell tools are disallowed. Bash

@@ -24,7 +24,8 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override.yaml"
 
 unset GOFLAGS
-make -o tooling/templatize/templatize cleanup-entrypoint/Region \
+export TEMPLATIZE_USE_PREBUILT=1
+make cleanup-entrypoint/Region \
   DEPLOY_ENV="${DEPLOY_ENV}" \
   OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" \
   CLEANUP_DRY_RUN=false \
