@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: appset-cluster-build-shared
   namespace: openshift-gitops
 spec:
@@ -50,17 +52,6 @@ spec:
       destination:
         name: '{{.name}}'
         namespace: openshift-gitops
-      ignoreDifferences:
-        - group: rbac.authorization.k8s.io
-          jsonPointers:
-            - /rules
-          kind: ClusterRole
-          name: ci-admins-aggregated
-        - group: '*'
-          jsonPointers:
-            - /imagePullSecrets
-            - /secrets
-          kind: ServiceAccount
       project: build-clusters-common
       source:
         directory:
@@ -79,5 +70,4 @@ spec:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true

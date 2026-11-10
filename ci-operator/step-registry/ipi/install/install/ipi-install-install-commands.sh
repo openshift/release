@@ -406,6 +406,19 @@ function prepare_next_steps() {
   fi
 }
 
+# download_fcct downloads the fcct binary from ${1} to ${2}. It is meant to be
+# wrapped by retry-ipi-install-command: every attempt starts from an empty
+# destination so a partial or failed earlier attempt is never kept. errexit is
+# suppressed inside that helper, so keep the explicit && chain.
+function download_fcct() {
+  local url="${1}"
+  local output="${2}"
+
+  rm -f "${output}" &&
+    curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 -o "${output}" "${url}" &&
+    [[ -s "${output}" ]]
+}
+
 function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
   export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
@@ -551,7 +564,21 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-"$(uname -m)"-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
+  local fcct_url
+  fcct_url="https://github.com/coreos/butane/releases/download/v0.7.0/fcct-$(uname -m)-unknown-linux-gnu"
+  local -r fcct_download=/tmp/fcct.download
+  # Never run, or leave behind, a stale, partial, or error-page download.
+  rm -f /tmp/fcct "${fcct_download}"
+  if ! retry-ipi-install-command "fcct v0.7.0 download" download_fcct "${fcct_url}" "${fcct_download}"; then
+    rm -f "${fcct_download}" || true
+    echo "ERROR: failed to download fcct from ${fcct_url}; cannot inject promtail into bootstrap.ign" >&2
+    exit 1
+  fi
+  if ! chmod ug+x "${fcct_download}" || ! mv "${fcct_download}" /tmp/fcct; then
+    rm -f "${fcct_download}" /tmp/fcct || true
+    echo "ERROR: failed to install the downloaded fcct binary" >&2
+    exit 1
+  fi
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 

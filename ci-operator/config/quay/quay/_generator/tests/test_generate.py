@@ -144,6 +144,18 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("ocp_version", "sts", "expected"),
+    [("4.12", True, "false"), ("4.13", True, "false"), ("4.14", True, None), ("4.13", False, None)],
+)
+def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
+    ocp_version: str, sts: bool, expected: str | None
+) -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(env, "clouds/aws.yaml.j2", _phase0_cell(ocp_version=ocp_version, sts=sts).context())
+    assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
@@ -196,6 +208,24 @@ def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
         _phase0_cell(cron="17 3 * * 1"),
     )
     assert custom["tests"][0]["cron"] == "17 3 * * 1"
+
+
+def test_kind_settings_downstream_periodic_reports_failures_to_slack() -> None:
+    downstream = apply_kind_settings({"tests": [{"steps": {}}]}, _phase0_cell())
+    reporter = downstream["tests"][0]["reporter_config"]
+    assert reporter["channel"] == "#team-quay-downstream-interruptions"
+    assert reporter["job_states_to_report"] == ["failure", "error"]
+    assert "{{.Status.URL}}" in reporter["report_template"]
+
+    upstream = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(branch="master", quay_version=None)
+    )
+    assert "reporter_config" not in upstream["tests"][0]
+
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(kind="presubmit", cron=None)
+    )
+    assert "reporter_config" not in presubmit["tests"][0]
 
 
 def test_cron_alias_resolves_to_interval() -> None:
@@ -350,6 +380,31 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_redhat_50_aws_metal_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-5.0__aws-metal-ocp50-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    # Naming derives from the cloud key: variant and as carry the aws-metal token.
+    assert test["as"] == "aws-metal-s3-nightly"
+    assert test["cron"] == "@weekly"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert steps["workflow"] == "ipi-aws"
+    # The only metal-specific input: full physical hosts as workers.
+    assert steps["env"]["COMPUTE_NODE_TYPE"] == "c5.metal"
+    assert steps["env"]["BASE_DOMAIN"] == "quayqe.devcluster.openshift.com"
+    # Like every other ipi-aws cell in this fleet, the lane installs via STS.
+    assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+    assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
+    test_refs = [step["ref"] for step in steps["test"] if "ref" in step]
+    assert "quay-deploy-aws-s3" in test_refs
+    # No Equinix machinery on this lane.
+    assert "dev-scripts" not in config.get("base_images", {})
 
 
 def test_upgrade_requires_upgrade_from() -> None:
@@ -578,6 +633,48 @@ def test_redhat_318_oldest_ocp_keeps_build_root_floor() -> None:
     assert config["tests"][0]["steps"]["env"]["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.14__quay-rhel9-operator"
     ocp50 = by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]
     assert ocp50["build_root"]["image_stream_tag"]["tag"] == "rhel-9-release-golang-1.25-openshift-5.0"
+
+
+def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
+    results, _retired = generate_all()
+    config = {name: cfg for _group, name, cfg in results}["quay-quay-redhat-3.15__aws-ocp419-e2e-legacy.yaml"]
+    # Containerfile.playwright does not exist on redhat-3.15.
+    assert "images" not in config
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert not [key for key in steps["env"] if key.startswith("PLAYWRIGHT_")]
+    assert steps["env"]["QUAY_VERSION"] == "3.15"
+    # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
+    assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
+    assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert [step["ref"] for step in steps["test"]] == [
+        "quay-enable-catalogsource-art",
+        "quay-deploy-aws-s3",
+        "quay-test-e2e-legacy",
+        "quay-test-api-legacy",
+    ]
+    post = [step.get("ref") or step.get("chain") for step in steps["post"]]
+    assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
+@pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
+def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
+    results, _retired = generate_all()
+    name = f"quay-quay-redhat-{quay}__aws-ocp{ocp.replace('.', '')}-e2e-legacy.yaml"
+    config = {filename: cfg for _group, filename, cfg in results}[name]
+    assert "images" not in config
+    assert config["releases"]["latest"]["candidate"]["version"] == ocp
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    env = test["steps"]["env"]
+    assert env["QUAY_VERSION"] == quay
+    assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
+    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
 
 
 def test_master_presubmit_expands_all_clouds() -> None:
@@ -1446,6 +1543,41 @@ def test_redhat_318_database_shares_cloud_files() -> None:
     assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
         "azure-blob-postgres-nightly"
     ]["steps"]["post"]
+
+
+def test_redhat_317_and_50_database_shares_cloud_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    for branch, ocp in (("redhat-3.17", "ocp422"), ("redhat-5.0", "ocp50")):
+        aws = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__aws-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert "aws-s3-rds-nightly" in aws
+        rds = aws["aws-s3-rds-nightly"]
+        assert rds["cron"] == "@weekly"
+        assert {"ref": "quay-database-intg-aws-rds"} in rds["steps"]["test"]
+        assert rds["steps"]["test"].index(
+            {"ref": "quay-database-intg-aws-rds"}
+        ) < rds["steps"]["test"].index({"ref": "quay-deploy-aws-s3"})
+        assert {"ref": "quay-database-intg-aws-rds-deprovision"} in rds["steps"]["post"]
+        assert (
+            {"ref": "quay-database-intg-aws-rds"}
+            not in aws["aws-s3-nightly"]["steps"]["test"]
+        )
+
+        azure = {
+            test["as"]: test
+            for test in by_name[f"quay-quay-{branch}__azure-{ocp}-e2e-install.yaml"]["tests"]
+        }
+        assert set(azure) == {"azure-blob-nightly", "azure-blob-postgres-nightly"}
+        assert {"ref": "quay-database-intg-azure-postgres"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["test"]
+        assert {"ref": "quay-database-intg-azure-postgres-deprovision"} in azure[
+            "azure-blob-postgres-nightly"
+        ]["steps"]["post"]
 
 
 def test_database_rejects_unsupported_cloud() -> None:

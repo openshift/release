@@ -44,6 +44,8 @@ matrix.yaml.in ──> generate.py ──> config files by filename ──> make
 - Each cell is rendered by deep-merging Jinja templates from `templates/`
   (base, source, cloud, arch, test; see [Layer order](#layer-order)).
 - Cells that share a filename merge into one file; their tests are listed in matrix order.
+- Every `redhat-*` periodic posts `failure` and `error` runs to Slack
+  `#team-quay-downstream-interruptions` (`DOWNSTREAM_REPORTER_CONFIG` in `generate.py`).
 - `matrix.yaml.in` lists every file the generator owns under `managed_files.active`.
   Generation fails if that list and the expanded matrix disagree.
 - Hand-written configs here (such as `quay-quay-master__claim.yaml`) are listed under
@@ -73,7 +75,7 @@ new file (`...__aws-ocp423-e2e-install.yaml`):
         ocp: ["4.22", "4.23"]
 ```
 
-**Add a cloud.** Extend `clouds` (`aws`, `gcp`, `azure`, `libvirt`). Each cloud
+**Add a cloud.** Extend `clouds` (`aws`, `aws-metal`, `gcp`, `azure`, `libvirt`). Each cloud
 gets its own file and its default storage (`STORAGE_BY_CLOUD` in `model.py`).
 
 **Add a stable-catalog job next to a nightly one.** `source` is not part of the
@@ -167,15 +169,15 @@ Per job, `quay[].jobs[]`:
 | `kind` | `periodic` (default) or `presubmit` (renders `templates/presubmit/` where present). |
 | `cron` | Periodic only, required: `daily` or `nightly` (both `@daily`), `weekly` (`@weekly`), or a raw 5-field cron used verbatim. Changes timing only, never the test name. |
 | `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
-| `clouds` | `aws`, `gcp`, `azure`, `libvirt`. |
+| `clouds` | `aws`, `aws-metal`, `gcp`, `azure`, `libvirt`. |
 | `ocp` | OCP versions, as strings (`"4.22"`). |
 | `arches` | `amd64`, `arm64`, `s390x`; defaults to `[global_defaults.arch]`. |
 | `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic) or `{cloud}-{storage}` (presubmit). Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
 | `env` | Job env; overrides branch env key by key. |
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
-| `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
-| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp` or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
+| `sts` | Default `true`, `aws` and `aws-metal` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
+| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `aws-metal`, `gcp`, or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
 | `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
@@ -228,6 +230,8 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   `quay-deprovision` skips bucket teardown.
 - **`libvirt` / `s390x`**: S3 storage; the `s390x` cell installs through the
   IBM Z libvirt workflow (`quay-tests-libvirt-s390x`).
+- **`aws-metal`**: S3 storage and the standard AWS IPI workflow with physical
+  `c5.metal` workers. Control-plane nodes remain regular virtual machines.
 - **`arches`**: `releases.latest` stays `amd64` for build tooling; the arch
   layer adds the test cluster's release. A non-`amd64` `layout: base` file
   never promotes.

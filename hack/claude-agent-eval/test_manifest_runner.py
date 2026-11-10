@@ -1,5 +1,8 @@
-"""Offline tests of manifest behavior and the actual Prow shell entry point."""
+"""Offline tests of manifest behavior and the actual Prow shell entry point."""  # pylint: disable=too-many-lines
 
+import atexit
+import copy
+import functools
 import importlib.util
 import json
 import os
@@ -37,12 +40,25 @@ runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
 
 
+def isolated_git_env(env):
+    """Keep fixture Git off the host's config, e.g. a developer's commit signing or hooks.
+
+    GIT_CONFIG_GLOBAL replaces both ~/.gitconfig and $XDG_CONFIG_HOME/git/config.
+    """
+    env = {key: value for key, value in env.items() if not key.startswith("GIT_CONFIG")}
+    return {**env, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+
+
 FAKE_GIT = r'''
 import os, pathlib, sys
 args = sys.argv[1:]
-if args[0] == "init":
+if "clone" in args:  # The runner's only clone is the harness release.
     with open(os.environ["CALLS"], "a") as out:
-        out.write('harness-init\n')
+        out.write('harness-clone\n')
+    status = int(os.environ.get("CLONE_EXIT", "0"))
+    if status:
+        print('fake harness clone failed', file=sys.stderr)
+        sys.exit(status)
     dest = pathlib.Path(args[-1])
     dest.mkdir(parents=True)
     if not os.environ.get("NO_CONFIG_API"):
@@ -87,23 +103,10 @@ def detect_regressions(judges, thresholds):
             for name, limit in thresholds.items()
             if judges[name]['pass_rate'] < limit['min_pass_rate']]
 """)
-    sys.exit(int(os.environ.get("INIT_EXIT", "0")))
-if args[0] == "-C" and args[2] == "remote":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-remote\n')
     sys.exit(0)
-if args[0] == "-C" and args[2] == "fetch":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-fetch\n')
-    status = int(os.environ.get("FETCH_EXIT", "0"))
-    if status: print('fake harness fetch failed', file=sys.stderr)
-    sys.exit(status)
-if args[0] == "-C" and args[2] == "checkout":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-checkout\n')
-    status = int(os.environ.get("CHECKOUT_EXIT", "0"))
-    if status: print('fake harness checkout failed', file=sys.stderr)
-    sys.exit(status)
 if args[0] == "-C" and args[2] == "rev-parse":
     with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
-    print(os.environ["PINNED_REVISION"])
+    print(os.environ["EVAL_HARNESS_REVISION"], os.environ.get("PINNED_HEAD", os.environ["EVAL_HARNESS_REVISION"]), sep="\n")
     sys.exit(0)
 os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
 '''
@@ -166,24 +169,46 @@ sys.exit(9 if behavior == "process_failure" else 0)
 class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
     commands = sync_commands.COMMANDS
 
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def base_repository():
+        """Build the committed base repository once; each test copies it.
+
+        Copying skips git init/config/add/commit per test, and every copy keeps
+        the same base SHA. Built on first use, so a Fixture constructed directly
+        gets it too.
+        """
+        template = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        atexit.register(template.cleanup)
+        builder = Fixture()  # Only the repository helpers are used.
+        builder.repo = Path(template.name).resolve() / "repo"
+        builder.repo.mkdir()
+        builder.real_git = shutil.which("git")
+        builder.git("init", "-q")
+        builder.git("config", "user.name", "Eval Test")
+        builder.git("config", "user.email", "eval-test@example.invalid")
+        builder.put("skills/foo/SKILL.md", "old skill")
+        builder.put("skills/foobar/SKILL.md", "other skill")
+        builder.put("docs/guide.md", "old docs")
+        entry = builder.make_entry("evals/eval-foo.yaml")
+        builder.write_manifest([entry])
+        builder.commit()
+        return builder.repo, builder.git("rev-parse", "HEAD").strip(), entry
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        # In-process runner calls (changed_files) run Git with this process's environment.
+        environ = mock.patch.dict(os.environ, isolated_git_env(os.environ), clear=True)
+        environ.start()
+        self.addCleanup(environ.stop)
         self.repo = self.root / "repo"
-        self.repo.mkdir()
+        base_repo, self.base, entry = self.base_repository()
+        shutil.copytree(base_repo, self.repo, symlinks=True)
+        self.entry = copy.deepcopy(entry)
         self.artifacts = self.root / "artifacts"
         self.real_git = shutil.which("git")
-        self.git("init", "-q")
-        self.git("config", "user.name", "Eval Test")
-        self.git("config", "user.email", "eval-test@example.invalid")
-        self.put("skills/foo/SKILL.md", "old skill")
-        self.put("skills/foobar/SKILL.md", "other skill")
-        self.put("docs/guide.md", "old docs")
-        self.entry = self.make_entry("evals/eval-foo.yaml")
-        self.write_manifest([self.entry])
-        self.commit()
-        self.base = self.git("rev-parse", "HEAD").strip()
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for name, source in (("git", FAKE_GIT), ("claude", FAKE_CLAUDE)):
@@ -197,10 +222,11 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         self.calls_path = self.root / "calls"
         self.last_result = None
         self.env = {
+            **isolated_git_env({}),
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
             "HOME": str(self.root), "REAL_GIT": self.real_git,
             "CALLS": str(self.calls_path),
-            "PINNED_REVISION": config_bridge.HARNESS_REVISION,
+            "EVAL_HARNESS_REVISION": "v1.0.0",
             "EVAL_WORKDIR": str(self.repo), "PULL_BASE_SHA": self.base,
             "ARTIFACT_DIR": str(self.artifacts), "JOB_TYPE": "presubmit",
             "EVAL_CONFIG": "eval.yaml", "EVAL_DISCOVER": "",
@@ -248,7 +274,7 @@ class EvalConfig:
 
     def git(self, *args):
         return subprocess.run([self.real_git, *args], cwd=self.repo, check=True,
-                              capture_output=True, text=True).stdout
+                              capture_output=True, text=True, env=isolated_git_env(os.environ)).stdout
 
     def commit(self):
         self.git("add", ".")
@@ -358,8 +384,8 @@ class SelectionTests(Fixture):
         self.assertEqual((self.repo / self.entry["config"]).read_bytes(), original)
         self.assertIn("regression", self.calls())
         install_log = (self.artifacts / "runner/harness-install.log").read_text()
-        self.assertIn(f"Expected harness revision: {config_bridge.HARNESS_REVISION}", install_log)
-        self.assertIn(f"Verified harness revision: {config_bridge.HARNESS_REVISION}", install_log)
+        self.assertIn(f"Expected harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
+        self.assertIn(f"Verified harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
         summary = json.loads((self.artifacts / "evals-summary.json").read_text())
         self.assertIn("config-resolution.log", summary["evals"][0]["artifacts"])
 

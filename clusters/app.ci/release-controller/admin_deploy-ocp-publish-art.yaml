@@ -11,6 +11,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp
 ---
@@ -24,6 +26,8 @@ kind: Secret
 metadata:
   annotations:
     kubernetes.io/service-account.name: art-publish
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-secret
   namespace: ocp
 type: kubernetes.io/service-account-token
@@ -38,6 +42,8 @@ type: kubernetes.io/service-account-token
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-manage-art-equivalent-buildconfigs
   namespace: ci
 rules:
@@ -69,6 +75,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-manage-art-equivalent-buildconfigs
   namespace: ci
 roleRef:
@@ -88,6 +96,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: openshift
 roleRef:
@@ -106,6 +116,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: openshift
 rules:
@@ -144,6 +156,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: openshift
 roleRef:
@@ -163,6 +177,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: origin
 roleRef:
@@ -181,6 +197,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: origin
 rules:
@@ -219,6 +237,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: origin
 roleRef:
@@ -238,6 +258,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: origin-arm64
 roleRef:
@@ -256,6 +278,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: origin-arm64
 rules:
@@ -294,6 +318,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: origin-arm64
 roleRef:
@@ -313,6 +339,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-priv
 roleRef:
@@ -331,6 +359,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-priv
 rules:
@@ -369,6 +399,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-priv
 roleRef:
@@ -388,6 +420,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-prowjob
   namespace: ci
 rules:
@@ -411,6 +445,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-create-prowjobs
   namespace: ci
 roleRef:
@@ -430,6 +466,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-release-admin
   namespace: ocp
 rules:
@@ -460,6 +498,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-release-admin-binding
   namespace: ocp
 roleRef:
@@ -478,7 +518,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -487,6 +586,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp
 ---
@@ -497,6 +598,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest
   namespace: ocp
 ---
@@ -507,6 +610,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp
 ---
@@ -517,6 +622,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest
   namespace: ocp
 ---
@@ -527,6 +634,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp
 ---
@@ -537,6 +646,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest
   namespace: ocp
 ---
@@ -547,6 +658,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp
 ---
@@ -557,6 +670,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest
   namespace: ocp
 ---
@@ -567,6 +682,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp
 ---
@@ -577,6 +694,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest
   namespace: ocp
 ---
@@ -587,6 +706,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp
 ---
@@ -597,6 +718,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest
   namespace: ocp
 ---
@@ -607,6 +730,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp
 ---
@@ -617,6 +742,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest
   namespace: ocp
 ---
@@ -627,6 +754,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp
 ---
@@ -637,6 +766,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest
   namespace: ocp
 ---
@@ -647,6 +778,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp
 ---
@@ -657,6 +790,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest
   namespace: ocp
 ---
@@ -667,6 +802,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp
 ---
@@ -677,6 +814,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest
   namespace: ocp
 ---
@@ -687,6 +826,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp
 ---
@@ -697,6 +838,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest
   namespace: ocp
 ---
@@ -707,6 +850,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp
 ---
@@ -717,6 +862,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest
   namespace: ocp
 ---
@@ -727,6 +874,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp
 ---
@@ -737,6 +886,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest
   namespace: ocp
 ---
@@ -747,6 +898,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp
 ---
@@ -757,6 +910,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest
   namespace: ocp
 ---
@@ -767,6 +922,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp
 ---
@@ -777,6 +934,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest
   namespace: ocp
 ---
@@ -787,6 +946,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp
 ---
@@ -797,6 +958,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest
   namespace: ocp
 ---
@@ -807,6 +970,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp
 ---
@@ -817,6 +982,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest
   namespace: ocp
 ---
@@ -827,6 +994,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp
 ---
@@ -837,6 +1006,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest
   namespace: ocp
 ---
@@ -847,6 +1018,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp
 ---
@@ -857,6 +1030,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest
   namespace: ocp
 ---
@@ -867,6 +1042,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp
 ---
@@ -877,6 +1054,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest
   namespace: ocp
 ---
@@ -887,6 +1066,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp
 rules:
@@ -925,6 +1106,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp
 rules:
@@ -944,6 +1127,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp
 roleRef:
@@ -962,6 +1147,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp
 roleRef:
@@ -980,6 +1167,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp
 roleRef:
@@ -998,7 +1187,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-s390x
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-s390x
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-s390x
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -1007,6 +1255,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-s390x
 ---
@@ -1017,6 +1267,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1027,6 +1279,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-s390x
 ---
@@ -1037,6 +1291,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1047,6 +1303,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-s390x
 ---
@@ -1057,6 +1315,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1067,6 +1327,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-s390x
 ---
@@ -1077,6 +1339,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1087,6 +1351,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-s390x
 ---
@@ -1097,6 +1363,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1107,6 +1375,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-s390x
 ---
@@ -1117,6 +1387,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1127,6 +1399,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-s390x
 ---
@@ -1137,6 +1411,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1147,6 +1423,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-s390x
 ---
@@ -1157,6 +1435,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1167,6 +1447,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-s390x
 ---
@@ -1177,6 +1459,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1187,6 +1471,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-s390x
 ---
@@ -1197,6 +1483,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1207,6 +1495,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-s390x
 ---
@@ -1217,6 +1507,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1227,6 +1519,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-s390x
 ---
@@ -1237,6 +1531,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1247,6 +1543,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-s390x
 ---
@@ -1257,6 +1555,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1267,6 +1567,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-s390x
 ---
@@ -1277,6 +1579,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1287,6 +1591,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-s390x
 ---
@@ -1297,6 +1603,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1307,6 +1615,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-s390x
 ---
@@ -1317,6 +1627,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1327,6 +1639,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-s390x
 ---
@@ -1337,6 +1651,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1347,6 +1663,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-s390x
 ---
@@ -1357,6 +1675,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1367,6 +1687,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-s390x
 ---
@@ -1377,6 +1699,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1387,6 +1711,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-s390x
 ---
@@ -1397,6 +1723,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-s390x
   namespace: ocp-s390x
 ---
@@ -1407,6 +1735,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-s390x
 rules:
@@ -1445,6 +1775,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-s390x
 rules:
@@ -1464,6 +1796,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-s390x
 roleRef:
@@ -1482,6 +1816,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-s390x
 roleRef:
@@ -1500,6 +1836,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-s390x
 roleRef:
@@ -1518,7 +1856,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-ppc64le
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-ppc64le
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-ppc64le
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -1527,6 +1924,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-ppc64le
 ---
@@ -1537,6 +1936,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1547,6 +1948,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-ppc64le
 ---
@@ -1557,6 +1960,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1567,6 +1972,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-ppc64le
 ---
@@ -1577,6 +1984,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1587,6 +1996,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-ppc64le
 ---
@@ -1597,6 +2008,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1607,6 +2020,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-ppc64le
 ---
@@ -1617,6 +2032,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1627,6 +2044,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-ppc64le
 ---
@@ -1637,6 +2056,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1647,6 +2068,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-ppc64le
 ---
@@ -1657,6 +2080,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1667,6 +2092,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-ppc64le
 ---
@@ -1677,6 +2104,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1687,6 +2116,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-ppc64le
 ---
@@ -1697,6 +2128,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1707,6 +2140,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-ppc64le
 ---
@@ -1717,6 +2152,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1727,6 +2164,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-ppc64le
 ---
@@ -1737,6 +2176,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1747,6 +2188,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-ppc64le
 ---
@@ -1757,6 +2200,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1767,6 +2212,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-ppc64le
 ---
@@ -1777,6 +2224,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1787,6 +2236,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-ppc64le
 ---
@@ -1797,6 +2248,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1807,6 +2260,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-ppc64le
 ---
@@ -1817,6 +2272,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1827,6 +2284,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-ppc64le
 ---
@@ -1837,6 +2296,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1847,6 +2308,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-ppc64le
 ---
@@ -1857,6 +2320,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1867,6 +2332,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-ppc64le
 ---
@@ -1877,6 +2344,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1887,6 +2356,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-ppc64le
 ---
@@ -1897,6 +2368,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1907,6 +2380,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-ppc64le
 ---
@@ -1917,6 +2392,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-ppc64le
   namespace: ocp-ppc64le
 ---
@@ -1927,6 +2404,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-ppc64le
 rules:
@@ -1965,6 +2444,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-ppc64le
 rules:
@@ -1984,6 +2465,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-ppc64le
 roleRef:
@@ -2002,6 +2485,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-ppc64le
 roleRef:
@@ -2020,6 +2505,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-ppc64le
 roleRef:
@@ -2038,7 +2525,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-arm64
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-arm64
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-arm64
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -2047,6 +2593,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-arm64
 ---
@@ -2057,6 +2605,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2067,6 +2617,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-arm64
 ---
@@ -2077,6 +2629,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2087,6 +2641,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-arm64
 ---
@@ -2097,6 +2653,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2107,6 +2665,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-arm64
 ---
@@ -2117,6 +2677,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2127,6 +2689,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-arm64
 ---
@@ -2137,6 +2701,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2147,6 +2713,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-arm64
 ---
@@ -2157,6 +2725,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2167,6 +2737,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-arm64
 ---
@@ -2177,6 +2749,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2187,6 +2761,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-arm64
 ---
@@ -2197,6 +2773,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2207,6 +2785,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-arm64
 ---
@@ -2217,6 +2797,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2227,6 +2809,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-arm64
 ---
@@ -2237,6 +2821,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2247,6 +2833,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-arm64
 ---
@@ -2257,6 +2845,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2267,6 +2857,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-arm64
 ---
@@ -2277,6 +2869,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2287,6 +2881,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-arm64
 ---
@@ -2297,6 +2893,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2307,6 +2905,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-arm64
 ---
@@ -2317,6 +2917,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2327,6 +2929,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-arm64
 ---
@@ -2337,6 +2941,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2347,6 +2953,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-arm64
 ---
@@ -2357,6 +2965,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2367,6 +2977,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-arm64
 ---
@@ -2377,6 +2989,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2387,6 +3001,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-arm64
 ---
@@ -2397,6 +3013,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2407,6 +3025,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-arm64
 ---
@@ -2417,6 +3037,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2427,6 +3049,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-arm64
 ---
@@ -2437,6 +3061,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-arm64
   namespace: ocp-arm64
 ---
@@ -2447,6 +3073,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-arm64
 rules:
@@ -2485,6 +3113,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-arm64
 rules:
@@ -2504,6 +3134,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-arm64
 roleRef:
@@ -2522,6 +3154,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-arm64
 roleRef:
@@ -2540,6 +3174,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-arm64
 roleRef:
@@ -2558,7 +3194,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-multi
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -2567,6 +3262,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-multi
 ---
@@ -2577,6 +3274,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2587,6 +3286,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-multi
 ---
@@ -2597,6 +3298,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2607,6 +3310,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-multi
 ---
@@ -2617,6 +3322,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2627,6 +3334,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-multi
 ---
@@ -2637,6 +3346,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2647,6 +3358,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-multi
 ---
@@ -2657,6 +3370,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2667,6 +3382,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-multi
 ---
@@ -2677,6 +3394,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2687,6 +3406,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-multi
 ---
@@ -2697,6 +3418,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2707,6 +3430,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-multi
 ---
@@ -2717,6 +3442,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2727,6 +3454,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-multi
 ---
@@ -2737,6 +3466,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2747,6 +3478,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-multi
 ---
@@ -2757,6 +3490,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2767,6 +3502,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-multi
 ---
@@ -2777,6 +3514,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2787,6 +3526,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-multi
 ---
@@ -2797,6 +3538,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2807,6 +3550,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-multi
 ---
@@ -2817,6 +3562,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2827,6 +3574,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-multi
 ---
@@ -2837,6 +3586,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2847,6 +3598,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-multi
 ---
@@ -2857,6 +3610,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2867,6 +3622,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-multi
 ---
@@ -2877,6 +3634,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2887,6 +3646,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-multi
 ---
@@ -2897,6 +3658,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2907,6 +3670,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-multi
 ---
@@ -2917,6 +3682,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2927,6 +3694,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-multi
 ---
@@ -2937,6 +3706,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2947,6 +3718,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-multi
 ---
@@ -2957,6 +3730,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-multi
   namespace: ocp-multi
 ---
@@ -2967,6 +3742,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-multi
 rules:
@@ -3005,6 +3782,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-multi
 rules:
@@ -3024,6 +3803,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-multi
 roleRef:
@@ -3042,6 +3823,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-multi
 roleRef:
@@ -3060,6 +3843,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-multi
 roleRef:
@@ -3078,7 +3863,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-priv
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -3087,6 +3931,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-priv
 ---
@@ -3097,6 +3943,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3107,6 +3955,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-priv
 ---
@@ -3117,6 +3967,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3127,6 +3979,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-priv
 ---
@@ -3137,6 +3991,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3147,6 +4003,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-priv
 ---
@@ -3157,6 +4015,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3167,6 +4027,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-priv
 ---
@@ -3177,6 +4039,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3187,6 +4051,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-priv
 ---
@@ -3197,6 +4063,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3207,6 +4075,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-priv
 ---
@@ -3217,6 +4087,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3227,6 +4099,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-priv
 ---
@@ -3237,6 +4111,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3247,6 +4123,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-priv
 ---
@@ -3257,6 +4135,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3267,6 +4147,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-priv
 ---
@@ -3277,6 +4159,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3287,6 +4171,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-priv
 ---
@@ -3297,6 +4183,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3307,6 +4195,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-priv
 ---
@@ -3317,6 +4207,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3327,6 +4219,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-priv
 ---
@@ -3337,6 +4231,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3347,6 +4243,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-priv
 ---
@@ -3357,6 +4255,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3367,6 +4267,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-priv
 ---
@@ -3377,6 +4279,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3387,6 +4291,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-priv
 ---
@@ -3397,6 +4303,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3407,6 +4315,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-priv
 ---
@@ -3417,6 +4327,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3427,6 +4339,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-priv
 ---
@@ -3437,6 +4351,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3447,6 +4363,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-priv
 ---
@@ -3457,6 +4375,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3467,6 +4387,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-priv
 ---
@@ -3477,6 +4399,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-priv
   namespace: ocp-priv
 ---
@@ -3487,6 +4411,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-priv
 rules:
@@ -3525,6 +4451,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-priv
 rules:
@@ -3544,6 +4472,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-priv
 roleRef:
@@ -3562,6 +4492,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-priv
 roleRef:
@@ -3580,6 +4512,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-priv
 roleRef:
@@ -3598,7 +4532,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-s390x-priv
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-s390x-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -3607,6 +4600,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-s390x-priv
 ---
@@ -3617,6 +4612,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3627,6 +4624,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-s390x-priv
 ---
@@ -3637,6 +4636,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3647,6 +4648,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-s390x-priv
 ---
@@ -3657,6 +4660,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3667,6 +4672,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-s390x-priv
 ---
@@ -3677,6 +4684,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3687,6 +4696,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-s390x-priv
 ---
@@ -3697,6 +4708,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3707,6 +4720,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-s390x-priv
 ---
@@ -3717,6 +4732,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3727,6 +4744,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-s390x-priv
 ---
@@ -3737,6 +4756,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3747,6 +4768,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-s390x-priv
 ---
@@ -3757,6 +4780,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3767,6 +4792,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-s390x-priv
 ---
@@ -3777,6 +4804,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3787,6 +4816,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-s390x-priv
 ---
@@ -3797,6 +4828,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3807,6 +4840,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-s390x-priv
 ---
@@ -3817,6 +4852,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3827,6 +4864,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-s390x-priv
 ---
@@ -3837,6 +4876,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3847,6 +4888,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-s390x-priv
 ---
@@ -3857,6 +4900,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3867,6 +4912,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-s390x-priv
 ---
@@ -3877,6 +4924,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3887,6 +4936,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-s390x-priv
 ---
@@ -3897,6 +4948,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3907,6 +4960,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-s390x-priv
 ---
@@ -3917,6 +4972,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3927,6 +4984,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-s390x-priv
 ---
@@ -3937,6 +4996,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3947,6 +5008,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-s390x-priv
 ---
@@ -3957,6 +5020,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3967,6 +5032,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-s390x-priv
 ---
@@ -3977,6 +5044,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -3987,6 +5056,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-s390x-priv
 ---
@@ -3997,6 +5068,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-s390x-priv
   namespace: ocp-s390x-priv
 ---
@@ -4007,6 +5080,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-s390x-priv
 rules:
@@ -4045,6 +5120,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-s390x-priv
 rules:
@@ -4064,6 +5141,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-s390x-priv
 roleRef:
@@ -4082,6 +5161,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-s390x-priv
 roleRef:
@@ -4100,6 +5181,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-s390x-priv
 roleRef:
@@ -4118,7 +5201,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-ppc64le-priv
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-ppc64le-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -4127,6 +5269,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-ppc64le-priv
 ---
@@ -4137,6 +5281,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4147,6 +5293,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-ppc64le-priv
 ---
@@ -4157,6 +5305,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4167,6 +5317,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-ppc64le-priv
 ---
@@ -4177,6 +5329,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4187,6 +5341,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-ppc64le-priv
 ---
@@ -4197,6 +5353,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4207,6 +5365,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-ppc64le-priv
 ---
@@ -4217,6 +5377,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4227,6 +5389,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-ppc64le-priv
 ---
@@ -4237,6 +5401,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4247,6 +5413,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-ppc64le-priv
 ---
@@ -4257,6 +5425,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4267,6 +5437,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-ppc64le-priv
 ---
@@ -4277,6 +5449,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4287,6 +5461,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-ppc64le-priv
 ---
@@ -4297,6 +5473,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4307,6 +5485,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-ppc64le-priv
 ---
@@ -4317,6 +5497,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4327,6 +5509,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-ppc64le-priv
 ---
@@ -4337,6 +5521,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4347,6 +5533,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-ppc64le-priv
 ---
@@ -4357,6 +5545,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4367,6 +5557,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-ppc64le-priv
 ---
@@ -4377,6 +5569,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4387,6 +5581,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-ppc64le-priv
 ---
@@ -4397,6 +5593,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4407,6 +5605,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-ppc64le-priv
 ---
@@ -4417,6 +5617,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4427,6 +5629,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-ppc64le-priv
 ---
@@ -4437,6 +5641,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4447,6 +5653,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-ppc64le-priv
 ---
@@ -4457,6 +5665,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4467,6 +5677,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-ppc64le-priv
 ---
@@ -4477,6 +5689,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4487,6 +5701,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-ppc64le-priv
 ---
@@ -4497,6 +5713,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4507,6 +5725,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-ppc64le-priv
 ---
@@ -4517,6 +5737,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-ppc64le-priv
   namespace: ocp-ppc64le-priv
 ---
@@ -4527,6 +5749,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-ppc64le-priv
 rules:
@@ -4565,6 +5789,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-ppc64le-priv
 rules:
@@ -4584,6 +5810,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-ppc64le-priv
 roleRef:
@@ -4602,6 +5830,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-ppc64le-priv
 roleRef:
@@ -4620,6 +5850,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-ppc64le-priv
 roleRef:
@@ -4638,7 +5870,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-arm64-priv
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-arm64-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -4647,6 +5938,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-arm64-priv
 ---
@@ -4657,6 +5950,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4667,6 +5962,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-arm64-priv
 ---
@@ -4677,6 +5974,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4687,6 +5986,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-arm64-priv
 ---
@@ -4697,6 +5998,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4707,6 +6010,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-arm64-priv
 ---
@@ -4717,6 +6022,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4727,6 +6034,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-arm64-priv
 ---
@@ -4737,6 +6046,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4747,6 +6058,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-arm64-priv
 ---
@@ -4757,6 +6070,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4767,6 +6082,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-arm64-priv
 ---
@@ -4777,6 +6094,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4787,6 +6106,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-arm64-priv
 ---
@@ -4797,6 +6118,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4807,6 +6130,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-arm64-priv
 ---
@@ -4817,6 +6142,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4827,6 +6154,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-arm64-priv
 ---
@@ -4837,6 +6166,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4847,6 +6178,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-arm64-priv
 ---
@@ -4857,6 +6190,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4867,6 +6202,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-arm64-priv
 ---
@@ -4877,6 +6214,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4887,6 +6226,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-arm64-priv
 ---
@@ -4897,6 +6238,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4907,6 +6250,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-arm64-priv
 ---
@@ -4917,6 +6262,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4927,6 +6274,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-arm64-priv
 ---
@@ -4937,6 +6286,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4947,6 +6298,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-arm64-priv
 ---
@@ -4957,6 +6310,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4967,6 +6322,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-arm64-priv
 ---
@@ -4977,6 +6334,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -4987,6 +6346,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-arm64-priv
 ---
@@ -4997,6 +6358,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -5007,6 +6370,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-arm64-priv
 ---
@@ -5017,6 +6382,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -5027,6 +6394,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-arm64-priv
 ---
@@ -5037,6 +6406,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-arm64-priv
   namespace: ocp-arm64-priv
 ---
@@ -5047,6 +6418,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-arm64-priv
 rules:
@@ -5085,6 +6458,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-arm64-priv
 rules:
@@ -5104,6 +6479,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-arm64-priv
 roleRef:
@@ -5122,6 +6499,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-arm64-priv
 roleRef:
@@ -5140,6 +6519,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-arm64-priv
 roleRef:
@@ -5158,7 +6539,66 @@ subjects:
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: ocp-multi-priv
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-multi-priv
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods/log
+  verbs:
+  - get
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to read jobs, pods, and pod logs in the CI jobs namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: art-publish-read-jobs
+  namespace: ci-release-multi-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-read-jobs
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
 ---
 #---------------------------------------------------------------------------------
 # art_publish_permissions.py added the following resource
@@ -5167,6 +6607,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.10'
   namespace: ocp-multi-priv
 ---
@@ -5177,6 +6619,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.10-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5187,6 +6631,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.11'
   namespace: ocp-multi-priv
 ---
@@ -5197,6 +6643,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.11-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5207,6 +6655,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.12'
   namespace: ocp-multi-priv
 ---
@@ -5217,6 +6667,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.12-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5227,6 +6679,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.13'
   namespace: ocp-multi-priv
 ---
@@ -5237,6 +6691,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.13-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5247,6 +6703,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.14'
   namespace: ocp-multi-priv
 ---
@@ -5257,6 +6715,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.14-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5267,6 +6727,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.15'
   namespace: ocp-multi-priv
 ---
@@ -5277,6 +6739,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.15-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5287,6 +6751,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.16'
   namespace: ocp-multi-priv
 ---
@@ -5297,6 +6763,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.16-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5307,6 +6775,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.17'
   namespace: ocp-multi-priv
 ---
@@ -5317,6 +6787,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.17-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5327,6 +6799,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.18'
   namespace: ocp-multi-priv
 ---
@@ -5337,6 +6811,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.18-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5347,6 +6823,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.19'
   namespace: ocp-multi-priv
 ---
@@ -5357,6 +6835,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.19-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5367,6 +6847,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.20'
   namespace: ocp-multi-priv
 ---
@@ -5377,6 +6859,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.20-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5387,6 +6871,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.21'
   namespace: ocp-multi-priv
 ---
@@ -5397,6 +6883,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.21-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5407,6 +6895,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.22'
   namespace: ocp-multi-priv
 ---
@@ -5417,6 +6907,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.22-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5427,6 +6919,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.23'
   namespace: ocp-multi-priv
 ---
@@ -5437,6 +6931,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.23-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5447,6 +6943,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.6'
   namespace: ocp-multi-priv
 ---
@@ -5457,6 +6955,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.6-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5467,6 +6967,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.7'
   namespace: ocp-multi-priv
 ---
@@ -5477,6 +6979,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.7-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5487,6 +6991,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.8'
   namespace: ocp-multi-priv
 ---
@@ -5497,6 +7003,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.8-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5507,6 +7015,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '4.9'
   namespace: ocp-multi-priv
 ---
@@ -5517,6 +7027,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 4.9-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5527,6 +7039,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.0'
   namespace: ocp-multi-priv
 ---
@@ -5537,6 +7051,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.0-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5547,6 +7063,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: '5.1'
   namespace: ocp-multi-priv
 ---
@@ -5557,6 +7075,8 @@ metadata:
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: 5.1-art-latest-multi-priv
   namespace: ocp-multi-priv
 ---
@@ -5567,6 +7087,8 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-multi-priv
 rules:
@@ -5605,6 +7127,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-multi-priv
 rules:
@@ -5624,6 +7148,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish-modify-release
   namespace: ocp-multi-priv
 roleRef:
@@ -5642,6 +7168,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-backup-upgrade-graph
   namespace: ocp-multi-priv
 roleRef:
@@ -5660,6 +7188,8 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: art-publish
   namespace: ocp-multi-priv
 roleRef:

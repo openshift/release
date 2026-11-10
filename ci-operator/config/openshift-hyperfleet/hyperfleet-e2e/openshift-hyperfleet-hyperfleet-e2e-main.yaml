@@ -1,8 +1,8 @@
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-4.23
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23
+      RUN dnf install -y jq && dnf clean all
 resources:
   '*':
     limits:
@@ -20,6 +20,15 @@ tests:
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     unset GOFLAGS
     make lint
+  container:
+    from: src
+- as: unit
+  commands: |
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    unset GOFLAGS
+    make test
   container:
     from: src
 zz_generated_metadata:

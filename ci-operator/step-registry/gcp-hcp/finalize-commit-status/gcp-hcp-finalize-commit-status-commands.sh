@@ -2,11 +2,18 @@
 
 set -euo pipefail
 
+readonly status_context="${E2E_STATUS_CONTEXT:-e2e/platform}"
 readonly target_org="openshift-online"
 readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
+readonly skip_status_path="${SHARED_DIR}/gcp-hcp-skip-commit-status"
+
+if [[ -e "${skip_status_path}" ]]; then
+  echo "This run does not test a commit of ${target_org}/${target_repo}; skipping the ${status_context} commit status"
+  exit 0
+fi
 
 if [[ ! -s "${tested_sha_path}" ]]; then
   echo "ERROR: tested commit SHA is missing or empty" >&2
@@ -41,14 +48,15 @@ readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID
 payload="$(jq -cn \
   --arg state "${state}" \
   --arg description "${description}" \
-  --arg target_url "${target_url}" '{
+  --arg target_url "${target_url}" \
+  --arg context "${status_context}" '{
   state: $state,
-  context: "e2e/platform",
+  context: $context,
   description: $description,
   target_url: $target_url
 }')"
 
-echo "Posting ${state} e2e/platform status to ${target_org}/${target_repo}@${tested_sha}"
+echo "Posting ${state} ${status_context} status to ${target_org}/${target_repo}@${tested_sha}"
 curl \
   --fail-with-body \
   --silent \
@@ -65,4 +73,4 @@ curl \
   --data "${payload}" \
   "https://api.github.com/repos/${target_org}/${target_repo}/statuses/${tested_sha}" \
   >/dev/null
-echo "GitHub accepted the ${state} e2e/platform status"
+echo "GitHub accepted the ${state} ${status_context} status"

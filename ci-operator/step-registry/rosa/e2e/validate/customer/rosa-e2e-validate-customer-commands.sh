@@ -28,6 +28,16 @@ if [[ -s "${SHARED_DIR}/bp-kubeconfig" ]]; then
   log "Backplane hosted-cluster kubeconfig available at BP_KUBECONFIG=${BP_KUBECONFIG}"
 fi
 
+# The management-cluster kubeconfig (mc-kubeconfig, also written by
+# rosa-backplane-login) is exported as MC_KUBECONFIG so the suite can verify
+# management-cluster state, e.g. the hypershift NodePool CR autoscaling bounds
+# for the Feature:Autoscaling spec. Not all provisioner heads run
+# rosa-backplane-login, so this is optional.
+if [[ -s "${SHARED_DIR}/mc-kubeconfig" ]]; then
+  export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
+  log "Management cluster kubeconfig available at MC_KUBECONFIG=${MC_KUBECONFIG}"
+fi
+
 # Customer plane validates from the guest cluster kubeconfig. Prefer the
 # provisioner-written kubeconfig (direct API), and fall back to BP_KUBECONFIG for
 # private-link clusters until the suite consumes BP_KUBECONFIG on its own.
@@ -97,6 +107,10 @@ log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
 fi
+# A filter that selects no specs at all (e.g. the image predates the spec a
+# dedicated workflow scopes to) must fail instead of silently passing.
+# Skipped specs still count as selected, so this only fires on an empty match.
+GINKGO_ARGS+=("--ginkgo.fail-on-empty")
 
 log "Running customer-plane validation: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
 /usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"

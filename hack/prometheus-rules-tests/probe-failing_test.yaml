@@ -1,0 +1,47 @@
+# promtool unit tests for ProbeFailing.
+# Verifies the retuned hysteresis (for:2m, keep_firing_for:15m): a single missed
+# scrape does not page (for:2m), and a brief probe recovery does NOT resolve the
+# alert (keep_firing_for:15m holds it firing), so recurring blips coalesce into one
+# firing instead of a fire/resolve/re-fire train.
+rule_files:
+  - .rendered-rules.yaml
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="blackbox", instance="https://svc"}'
+        values: "1x30"
+      - series: 'probe_success{job="blackbox", instance="https://svc"}'
+        values: "1 1 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+    alert_rule_test:
+      # probe_success==0 from t=2m; for:2m not yet satisfied at t=3m -> not firing
+      - eval_time: 3m
+        alertname: ProbeFailing
+        exp_alerts: []
+      # for:2m satisfied at t=4m -> fires
+      - eval_time: 4m
+        alertname: ProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox
+              instance: "https://svc"
+            exp_annotations:
+              ops_category: ci_platform
+              ops_color: orange
+              message: 'Blackbox probe is failing for service https://svc for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.'
+      # probe recovers at t=6m, but keep_firing_for:15m holds it firing through t=21m
+      - eval_time: 15m
+        alertname: ProbeFailing
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox
+              instance: "https://svc"
+            exp_annotations:
+              ops_category: ci_platform
+              ops_color: orange
+              message: 'Blackbox probe is failing for service https://svc for the past minute. Please check the service and follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/blackbox-probe-service-failing.md|SOP>.'
+      # keep_firing_for window ends at t=21m (recovered 6m + 15m) -> resolved by t=25m
+      - eval_time: 25m
+        alertname: ProbeFailing
+        exp_alerts: []

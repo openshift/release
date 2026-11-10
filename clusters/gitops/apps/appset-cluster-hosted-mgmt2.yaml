@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: appset-cluster-hosted-mgmt2
   namespace: openshift-gitops
 spec:
@@ -22,20 +24,6 @@ spec:
       destination:
         name: hosted-mgmt2
         namespace: openshift-gitops
-      ignoreDifferences:
-        - group: hive.openshift.io
-          jsonPointers:
-            - /spec/hibernationConfig
-          kind: ClusterPool
-        - group: rbac.authorization.k8s.io
-          jsonPointers:
-            - /rules
-          kind: ClusterRole
-          name: ci-admins-aggregated
-        - group: machine.openshift.io
-          kind: MachineSet
-          jqPathExpressions:
-            - .spec.template.spec.providerSpec.value.ami
       project: hosted-mgmt2
       source:
         directory:
@@ -54,5 +42,4 @@ spec:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true

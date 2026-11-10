@@ -4,6 +4,7 @@ kind: Service
 metadata:
   namespace: ci
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: crier
   name: crier
@@ -23,6 +24,7 @@ metadata:
   namespace: ci
   name: crier
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: crier
 spec:
@@ -66,7 +68,7 @@ spec:
           readOnly: true
       containers:
       - name: crier
-        image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20261007-6ed406f29
+        image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20261107-86b2c4908
         args:
         - --github-workers=30
         - --config-path=/etc/config/config.yaml
@@ -74,6 +76,7 @@ spec:
         # Keep git-sync's published link (release) in the path. Never point the
         # recursive job loader at the git-sync root containing .git/.worktrees.
         - --job-config-path=/etc/jobs/git/release/ci-operator/jobs
+        - --job-config-path=/etc/jobs/efs
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
@@ -105,8 +108,6 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
-        - name: combined-jobs
-          mountPath: /etc/jobs
         - name: job-configs
           mountPath: /etc/jobs/efs
           readOnly: true
@@ -161,8 +162,6 @@ spec:
         configMap:
           name: config
       - name: release
-        emptyDir: {}
-      - name: combined-jobs
         emptyDir: {}
       - name: job-configs
         persistentVolumeClaim:

@@ -1,0 +1,24 @@
+workflow:
+  as: agent-sandbox-kata-e2e-azure
+  steps:
+    env:
+      OSC_INSTALL: "true"
+      AGENT_SANDBOX_INSTALL: "true"
+      SANDBOX_RUNTIME_CLASS: "kata"
+      COMPUTE_NODE_REPLICAS: "2"
+    pre:
+    - chain: sandboxed-containers-operator-ipi-azure-pre
+    - ref: sandboxed-containers-operator-env-cm
+    - ref: sandboxed-containers-operator-install-osc-operator
+    - ref: agent-sandbox-install-operator
+    test:
+    - ref: agent-sandbox-kata-e2e-test
+    post:
+    - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - chain: ipi-azure-post
+  documentation: |-
+    Provisions an Azure OCP cluster, installs OSC (kata runtime) and the
+    agent-sandbox operator, then runs runtime-class e2e tests (lifecycle +
+    startup comparison) against kata sandboxes.

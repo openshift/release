@@ -78,6 +78,10 @@ else
     ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]} "
 fi
 
+if [[ "$JOB_NAME" != *"telcov10n-"* ]]; then
+    ADDITIONAL_ARG=" $ADDITIONAL_ARG --exclude-env computeqe "
+fi
+
 # Choose topology for different job types:
 # Run cnftests job with either 1 baremetal and 1 virtual node or 2 baremetal nodes.
 # Periodic cnftests job will use 2b(as we hardcoded to cnfdu1 and cnfdu3)
@@ -86,14 +90,7 @@ fi
 # Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
 # Run sno job with SNO topology
 
-
-if [ "$REPO_OWNER" == "openshift-kni" ]; then
-  # Run PR job on openshift-kni repo with 1b1v topology and exclude cnfdu5, cnfdu6, cnfdu7, cnfdu8
-  # as they are used for nightly jobs
-  TOPOLOGY_SELECTION="--topology 1b1v --exclude cnfdu5 --exclude cnfdu6 --exclude cnfdu7 --exclude cnfdu8"
-else
-  TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
-fi
+TOPOLOGY_SELECTION="--topology 1b1v --topology 2b"
 
 if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
     ADDITIONAL_ARG="$ADDITIONAL_ARG $TOPOLOGY_SELECTION"

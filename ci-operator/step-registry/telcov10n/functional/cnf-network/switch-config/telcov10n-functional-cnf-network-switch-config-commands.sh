@@ -56,9 +56,16 @@ echo CLUSTER_NAME="${CLUSTER_NAME}"
 echo "Create host_vars directory"
 mkdir ${ECO_CI_CD_INVENTORY_PATH}/host_vars
 
+SWITCH_SOURCE_CLUSTER=""
 if [[ "$CLUSTER_NAME" == *hlxcl* ]]; then
+  SWITCH_SOURCE_CLUSTER="hlxcl2"
+elif [[ "$CLUSTER_NAME" == "kni-qe-98" ]]; then
+  SWITCH_SOURCE_CLUSTER="kni-qe-92"
+fi
+
+if [[ -n "$SWITCH_SOURCE_CLUSTER" ]]; then
   mkdir /tmp/"${CLUSTER_NAME}"
-  cp -r ${MOUNTED_HOST_INVENTORY}/hlxcl2/switch /tmp/"${CLUSTER_NAME}"/switch
+  cp -r ${MOUNTED_HOST_INVENTORY}/"${SWITCH_SOURCE_CLUSTER}"/switch /tmp/"${CLUSTER_NAME}"/switch
   cp -r ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/* /tmp/"${CLUSTER_NAME}"/
   ls -l /tmp/"${CLUSTER_NAME}"/
   MOUNTED_HOST_INVENTORY="/tmp"

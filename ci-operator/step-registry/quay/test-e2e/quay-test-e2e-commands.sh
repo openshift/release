@@ -22,14 +22,6 @@ if [[ -z "${QUAY_ROUTE}" ]]; then
 fi
 echo "Quay route: ${QUAY_ROUTE}"
 
-# Read credentials
-# Disable tracing due to password handling
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-$WAS_TRACING && set -x
-
 # Configure Playwright environment
 # PLAYWRIGHT_BASE_URL: browser navigation URL (Quay UI)
 # REACT_QUAY_APP_API_URL: backend API URL (same as UI on OCP)
@@ -39,8 +31,6 @@ export PLAYWRIGHT_JUNIT_OUTPUT_NAME="${ARTIFACT_DIR}/junit_playwright.xml"
 # results.json is a structured Prow artifact from the Playwright json reporter (ref quay/quay#7049)
 export PLAYWRIGHT_JSON_OUTPUT_NAME="${ARTIFACT_DIR}/results.json"
 export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
-export QUAY_USERNAME
-export QUAY_PASSWORD
 export CI=true
 
 # Mailpit HTTP API base URL for email-dependent specs. utils/mailpit.ts reads
@@ -859,9 +849,12 @@ function probe_route() {
     "${DISCOVERY_URL}" 2>/dev/null)" || curl_exit=$?
   read -r http_code t_dns t_conn t_tls t_ttfb <<<"${metrics:-000 0 0 0 0}"
 
-  if [[ -z "${dns}" || "${curl_exit}" -eq 6 ]]; then
+  # curl exit 6 means the route did not resolve; exit 5 means a configured proxy
+  # did not resolve. Both are transient DNS failures while a fresh cluster's
+  # ingress records propagate. getent stays in the log as additional evidence.
+  if [[ "${curl_exit}" -eq 5 || "${curl_exit}" -eq 6 ]]; then
     PROBE_CLASS=dns
-    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit})"
+    PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit}, local getent='${dns:-empty}')"
   elif [[ "${curl_exit}" -ne 0 ]]; then
     PROBE_CLASS=transport
     PROBE_DETAIL="curl exit ${curl_exit} talking to ${DISCOVERY_URL}"

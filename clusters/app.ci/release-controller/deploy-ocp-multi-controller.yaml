@@ -16,6 +16,8 @@
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-bootstrap
   namespace: ocp-multi
 spec:
@@ -38,6 +40,8 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-ocp-multi
   namespace: ci
 spec:
@@ -59,6 +63,7 @@ metadata:
   annotations: {}
   labels:
     app: release-controller-ocp-multi
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-ocp-multi
   namespace: ci
 spec:
@@ -79,6 +84,7 @@ metadata:
   annotations: {}
   labels:
     app: release-controller-api-ocp-multi
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-api-ocp-multi
   namespace: ci
 spec:
@@ -97,6 +103,8 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   annotations: {}
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-ocp-multi
   namespace: ci
 spec:
@@ -116,6 +124,8 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   annotations: {}
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-api-ocp-multi
   namespace: ci
 spec:
@@ -142,6 +152,8 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-ocp-multi
   namespace: ci
 spec:
@@ -162,17 +174,21 @@ spec:
         - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
         name: git-sync
         resources:
           requests:
-            cpu: '0.5'
-            memory: 1Gi
+            cpu: 50m
+            memory: 50Mi
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /usr/bin/release-controller
         - --release-namespace=ocp-multi
@@ -203,6 +219,10 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
+        - name: GOMEMLIMIT
+          value: 3584MiB
+        - name: GOMAXPROCS
+          value: '2'
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
         imagePullPolicy: Always
         livenessProbe:
@@ -221,7 +241,8 @@ spec:
           timeoutSeconds: 600
         resources:
           requests:
-            memory: 11Gi
+            cpu: 300m
+            memory: 4Gi
         volumeMounts:
         - mountPath: /etc/config
           name: config
@@ -254,6 +275,7 @@ spec:
         - --one-time=true
         - --depth=1
         - --link=release
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
@@ -261,10 +283,13 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /bin/bash
         - -c
-        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\n                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
+        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I --connect-timeout 10 --max-time 60 -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted || true)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s --connect-timeout 10 --max-time 60 https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty' || true)\n                TO=$(curl -s --connect-timeout 10 --max-time 60 https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty' || true)\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                timeout 900 oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64 || echo \"Unable to Pre-populate the git cache!\"\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
         env:
         - name: HOME
           value: /tmp/home
@@ -290,6 +315,9 @@ spec:
         name: config
       - emptyDir: {}
         name: release
+      - configMap:
+          name: release-controller-sparse-checkout
+        name: sparse-checkout
       - name: oauth
         secret:
           defaultMode: 420
@@ -330,6 +358,8 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-api-ocp-multi
   namespace: ci
 spec:
@@ -406,7 +436,7 @@ spec:
       - command:
         - /bin/bash
         - -c
-        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\n                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
+        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I --connect-timeout 10 --max-time 60 -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted || true)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s --connect-timeout 10 --max-time 60 https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty' || true)\n                TO=$(curl -s --connect-timeout 10 --max-time 60 https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty' || true)\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                timeout 900 oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64 || echo \"Unable to Pre-populate the git cache!\"\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
         env:
         - name: HOME
           value: /tmp/home
@@ -460,6 +490,8 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-jobs-binding
   namespace: ocp-multi
 roleRef:
@@ -482,6 +514,8 @@ subjects:
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: files-cache
   namespace: ci-release-multi
 spec:
@@ -498,6 +532,8 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: files-cache
   namespace: ci-release-multi
 spec:

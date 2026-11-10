@@ -73,6 +73,46 @@ tests:
     test:
     - ref: cluster-health-analyzer
     workflow: generic-claim
+- as: e2e-integration-long
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 2 * * *
+  disable_rehearsal: true
+  reporter_config:
+    channel: '#cluster-health-analyzer-qe-ci'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :x: Job
+      *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
+  steps:
+    test:
+    - as: cluster-health-analyzer-long
+      cli: latest
+      commands: |
+        make test-integration-long
+      dependencies:
+      - env: CHA_IMAGE
+        name: cluster-health-analyzer
+      from: src
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 3h0m0s
+    workflow: generic-claim
+  timeout: 5h0m0s
 - always_run: false
   as: e2e-incidents-ui
   cluster_claim:

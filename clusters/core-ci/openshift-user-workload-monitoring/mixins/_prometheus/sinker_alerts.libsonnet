@@ -14,6 +14,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Sinker has not removed any Pods in the last hour, likely indicating an outage in the service.',
             },
           },
@@ -27,6 +29,8 @@
               severity: 'critical',
             },
             annotations: {
+              ops_color: 'orange',
+              ops_category: 'ci_platform',
               message: 'Sinker has not removed any Prow jobs in the last hour, likely indicating an outage in the service.',
             },
           }

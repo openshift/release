@@ -20,6 +20,9 @@ STORAGE_BY_CLOUD = {
     "gcp": "gcs",
     "azure": "blob",
     "libvirt": "s3",
+    # True AWS bare metal: metal workers with the same external S3 registry
+    # storage as the aws lane (see templates/clouds/aws-metal.yaml.j2).
+    "aws-metal": "s3",
 }
 # Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
 EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
@@ -30,6 +33,8 @@ DEPLOY_REF_BY_CLOUD = {
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
+    # True AWS bare metal reuses the aws lane's deploy step unchanged.
+    "aws-metal": "quay-deploy-aws-s3",
 }
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",

@@ -1,6 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: appset-cluster-app-ci
   namespace: openshift-gitops
 spec:
@@ -20,11 +22,6 @@ spec:
       destination:
         name: app.ci
         namespace: openshift-gitops
-      ignoreDifferences:
-        - group: ""
-          kind: PersistentVolumeClaim
-          jsonPointers:
-            - /spec/volumeName
       project: app-ci
       source:
         directory:
@@ -42,5 +39,15 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
+  templatePatch: |
+    {{- if eq .path.basename "supplemental-ci-images" }}
+    metadata:
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=false
+    spec:
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+    {{- end }}

@@ -22,6 +22,81 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
+- as: sync-upstream-istio-1.30
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    # Resolve istio.deps conflicts with upstream. The hook also handles trivial
+    # merges, where Git skips the driver, and restores only our proxy/ztunnel hashes.
+    echo 'istio.deps merge=istio-deps' > /tmp/gitattributes
+    export GIT_CONFIG_GLOBAL=/tmp/gitconfig
+    git config --global core.attributesFile /tmp/gitattributes
+    git config --global merge.istio-deps.name 'take upstream istio.deps'
+    git config --global merge.istio-deps.driver 'cp %B %A'
+    # Requires maistra/test-infra#461. origin/<branch> remains at the pre-merge
+    # downstream commit in the automator's clone, even after a successful merge.
+    cat > /tmp/post-merge-istio-deps.sh <<'EOF'
+    #!/usr/bin/env bash
+    set -euo pipefail
+    downstream=$(git rev-parse "origin/${AUTOMATOR_BRANCH}")
+    # Never amend an existing downstream commit on an already-up-to-date run.
+    [[ $(git rev-parse HEAD) != "${downstream}" ]] || exit 0
+    if [[ $(git rev-parse HEAD^1) != "${downstream}" ]]; then
+      echo 'Expected a new merge commit with the downstream branch as its first parent' >&2
+      exit 1
+    fi
+    tmp=$(mktemp -d)
+    trap 'rm -rf "${tmp}"' EXIT
+    git show "${downstream}:istio.deps" > "${tmp}/downstream"
+    git show "upstream/${AUTOMATOR_BRANCH}:istio.deps" > "${tmp}/upstream"
+    jq -e --slurpfile downstream "${tmp}/downstream" '
+      reduce ["PROXY_REPO_SHA", "ZTUNNEL_REPO_SHA"][] as $name (. ;
+        ($downstream[0] | map(select(.name == $name))) as $pin
+        | if ($pin | length) != 1
+            or ($pin[0].lastStableSHA | type) != "string"
+            or ($pin[0].lastStableSHA | length) == 0
+            or (map(select(.name == $name)) | length) != 1
+          then error("Missing, duplicate, or invalid pin: " + $name)
+          else map(if .name == $name then .lastStableSHA = $pin[0].lastStableSHA else . end)
+          end)
+    ' "${tmp}/upstream" > "${tmp}/merged"
+    cp "${tmp}/merged" istio.deps
+    git add istio.deps
+    if ! git diff --cached --quiet -- istio.deps; then
+      git -c "user.name=$(git show -s --format=%cn HEAD)" \
+          -c "user.email=$(git show -s --format=%ce HEAD)" commit --amend --no-edit
+    fi
+    EOF
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=istio \
+    --branch=release-1.30 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=tide/merge-method-merge,auto-merge" \
+    --modifier=merge_upstream_istio_1.30 \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=release-1.30 \
+    --merge-strategy=merge \
+    --post-merge-hook=/tmp/post-merge-istio-deps.sh
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  reporter_config:
+    channel: '#istio-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  secrets:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
 - as: lint
   commands: |
     make lint \
@@ -40,15 +115,11 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-d868c62ea286fa9370c5202c29c25e755eaa71d6
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-eb39224ee48cc78838959ec5de9c75d007973435
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
       TEST_HUB: quay.io/sail-dev
       TEST_SUITE: helm
-      TEST_SUITE_DESC: Istio Integration helm
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-images-build
@@ -62,15 +133,11 @@ tests:
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-d868c62ea286fa9370c5202c29c25e755eaa71d6
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-eb39224ee48cc78838959ec5de9c75d007973435
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
       TEST_HUB: quay.io/sail-dev
       TEST_SUITE: security
-      TEST_SUITE_DESC: Istio Integration security
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-images-build
@@ -83,15 +150,11 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-d868c62ea286fa9370c5202c29c25e755eaa71d6
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-eb39224ee48cc78838959ec5de9c75d007973435
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
       TEST_HUB: quay.io/sail-dev
       TEST_SUITE: pilot
-      TEST_SUITE_DESC: Istio Integration pilot
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-images-build
@@ -104,15 +167,11 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-d868c62ea286fa9370c5202c29c25e755eaa71d6
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-eb39224ee48cc78838959ec5de9c75d007973435
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
       TEST_HUB: quay.io/sail-dev
       TEST_SUITE: telemetry
-      TEST_SUITE_DESC: Istio Integration telemetry
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-images-build
@@ -126,15 +185,11 @@ tests:
     env:
       AMBIENT: "true"
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-d868c62ea286fa9370c5202c29c25e755eaa71d6
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.30-eb39224ee48cc78838959ec5de9c75d007973435
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      REPORT_TO_REPORT_PORTAL: "true"
-      TEST_FILE_NAME: junit.xml
       TEST_HUB: quay.io/sail-dev
       TEST_SUITE: ambient
-      TEST_SUITE_DESC: Istio Integration ambient
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-images-build
@@ -152,6 +207,7 @@ tests:
       "-c go mod edit -replace="istio.io/istio=github.com/openshift-service-mesh/istio@release-1.30";go mod tidy;make gen" \
       '-t [release-3.4] Automator: Update Istio module' \
       -m bump-istio-mod-1.30 \
+      -l auto-merge \
       -b release-3.4
   container:
     from: src

@@ -49,7 +49,6 @@ Deploys the HyperShift operator to the management cluster. Key controls:
 
 - `hypershift-dump` chain: `bin/hypershift dump cluster` collects artifacts
 - `hypershift-debug`: outputs debug tool links
-- `hypershift-k8sgpt`: AI-powered K8s diagnostics
 - Azure has additional `hypershift-dump-azure-diagnostics` step
 
 ## E2E V2 Framework
@@ -100,8 +99,8 @@ Deploys the HyperShift operator to the management cluster. Key controls:
 **MCE**: mce/ (Multicluster Engine with agent, kubevirt, power, ibmz support)
 **Operations**: install/, hostedcluster/, conformance/, e2e-v2/, e2e-backuprestore/, operatorhub/, optional-operators/, performanceprofile/
 **Infrastructure**: setup-nested-management-cluster/, setup-root-management-cluster/, destroy-nested-management-cluster/
-**Diagnostics**: dump/, debug/, analyze-e2e-failure/, k8sgpt/
-**AI/Automation**: agentic-qe/, review-agent/, jira-agent/, dependabot-triage/
+**Diagnostics**: dump/, debug/, analyze-e2e-failure/
+**AI/Automation**: agentic-qe/, jira-agent/, dependabot-triage/
 
 ## Timeouts
 

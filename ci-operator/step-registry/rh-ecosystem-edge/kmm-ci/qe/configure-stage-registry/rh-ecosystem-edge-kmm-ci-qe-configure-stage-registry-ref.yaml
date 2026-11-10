@@ -1,0 +1,36 @@
+ref:
+  as: rh-ecosystem-edge-kmm-ci-qe-configure-stage-registry
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  cli: latest
+  commands: rh-ecosystem-edge-kmm-ci-qe-configure-stage-registry-commands.sh
+  credentials:
+  - mount_path: /var/run/secrets/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: ci
+  grace_period: 10m
+  timeout: 10m
+  env:
+  - name: KMM_STAGE_REGISTRY
+    default: registry.stage.redhat.io
+    documentation: Staging registry hostname containing the KMM operand images.
+  - name: KMM_IMAGE_MIRROR_NAME
+    default: kmm-stage-registry
+    documentation: Name of the ImageDigestMirrorSet or ImageContentSourcePolicy.
+  - name: KMM_STAGE_CA_CONFIGMAP_NAME
+    default: kmm-stage-registry-ca
+    documentation: Name of the ConfigMap containing the staging registry CA.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Configures the cluster to pull KMM images from registry.stage.redhat.io.
+
+    The KMM bundles reference registry.redhat.io, while the QE Konflux images
+    are published in registry.stage.redhat.io. This step installs the staging
+    registry CA and applies an image digest mirror before KMM is installed.
+    The step uses the existing ci-pull-credentials bundle for staging registry
+    authentication and updates the cluster pull secret only when needed.

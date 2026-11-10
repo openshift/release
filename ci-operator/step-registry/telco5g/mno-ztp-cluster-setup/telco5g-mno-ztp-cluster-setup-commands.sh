@@ -388,7 +388,6 @@ ANSIBLE_LOG_PATH=$ARTIFACT_DIR/ansible.log ANSIBLE_STDOUT_CALLBACK=debug ansible
     -e sno_release=$MGMT_RELEASE \
     -e ztp_tag=$T5CI_VERSION \
     -e ztp_release=$T5CI_JOB_ZTP_RELEASE_TYPE \
-    -e ztphub_wait_install_timeout=90 \
     -e ztphub_app_autosync=true \
     -e disconnected_env=true \
     -e disconnected_env_pull_secret=/home/kni/pull-secret.txt \

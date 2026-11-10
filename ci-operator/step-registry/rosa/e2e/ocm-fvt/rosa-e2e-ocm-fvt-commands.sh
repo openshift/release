@@ -153,6 +153,12 @@ umask "${old_umask}"
   echo "AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-cred"
   echo "SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/credentials/aws-shared-vpc-credentials"
   echo "JOB_LINK=${JOB_LINK}"
+  if [[ -n "${JOB_NAME_SAFE:-}" ]]; then
+    echo "JOB_NAME_SAFE=${JOB_NAME_SAFE}"
+  fi
+  if [[ -n "${OCM_FVT_ARTIFACT_STEP_NAME:-}" ]]; then
+    echo "OCM_FVT_ARTIFACT_STEP_NAME=${OCM_FVT_ARTIFACT_STEP_NAME}"
+  fi
   echo "SLACK_WEBHOOK_URL=$(cat /usr/local/cs-qe-credentials/slack_webhook_url)"
   echo "CONSOLE_CLIENT_SECRET=$(cat /usr/local/cs-qe-credentials/console_client_secret)"
 } > "${podman_env_file}"
@@ -411,6 +417,7 @@ podman run \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
+
 (
   umask 022
   python3 "${ocm_fvt_helpers}" metadata "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-artifact-metadata.json"

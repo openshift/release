@@ -4,6 +4,8 @@
 import argparse
 import contextlib
 import io
+import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -13,7 +15,8 @@ from unittest import mock
 
 import yaml
 
-from eval_config import EvalError, HARNESS_REVISION, resolve_config  # pylint: disable=import-error
+from eval_config import (EvalError, REVISION_OVERRIDE, expected_commit_ref,  # pylint: disable=import-error
+                         resolve_config, validate_harness_revision)
 from eval_plan import artifact_name  # pylint: disable=import-error
 import eval_regression  # pylint: disable=import-error
 
@@ -200,9 +203,12 @@ class RealHarnessContractTests(unittest.TestCase):
         )
 
         def score(config):
+            # The runner resolves thresholds once at preflight and hands the
+            # helper that result, so the orchestrator cannot lower them later.
+            thresholds = resolve_config(self.harness, self.repo, config).settings["thresholds"]
             arguments = [
-                "eval_regression.py", "--harness", str(self.harness), "--repo", str(self.repo),
-                "--config", str(config), "--run-dir", str(run_dir),
+                "eval_regression.py", "--harness", str(self.harness),
+                "--run-dir", str(run_dir), "--thresholds", json.dumps(thresholds),
             ]
             with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stdout(io.StringIO()):
                 return eval_regression.main()
@@ -212,13 +218,28 @@ class RealHarnessContractTests(unittest.TestCase):
 
 
 def checked_harness(path):
-    result = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True, timeout=10,
-    )
-    actual = result.stdout.strip()
-    if actual != HARNESS_REVISION:
-        raise ValueError(f"expected harness {HARNESS_REVISION}, got {actual or '<empty>'}")
+    """Require an exact harness revision: the override pin, or any release tag."""
+    revision = os.environ.get(REVISION_OVERRIDE, "").strip()
+    if revision:
+        revision = validate_harness_revision(revision)
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", expected_commit_ref(revision), "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        lines = result.stdout.split()
+        if result.returncode or len(lines) != 2:
+            detail = result.stderr.strip() or result.stdout.strip() or "<no output>"
+            raise ValueError(f"cannot resolve {revision} in {path}: {detail}")
+        if lines[0] != lines[1]:
+            raise ValueError(f"expected harness at {revision} ({lines[0]}), got {lines[1]}")
+    else:
+        described = subprocess.run(
+            ["git", "-C", str(path), "describe", "--tags", "--exact-match", "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        if described.returncode or not described.stdout.strip():
+            raise ValueError(f"{path} is not checked out at an exact release tag; "
+                             "pass a release tag checkout, not a moving branch")
     if not (path / "agent_eval/config.py").is_file():
         raise ValueError(f"{path} does not contain agent_eval/config.py")
     return path

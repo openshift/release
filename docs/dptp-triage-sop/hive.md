@@ -19,7 +19,7 @@ oc --context hosted-mgmt get clusterdeployment -n ci-ocp-4-10-amd64-aws-us-east-
 }
 ```
 
-* Find out the owners of the cluster pool (they are usually the owners of the cloud account used by the cluster pool) in [clusters/hive/pools](https://github.com/openshift/release/tree/master/clusters/hive/pools) and let them be aware of the case.
+* Find out the owners of the cluster pool (they are usually the owners of the cloud account used by the cluster pool) in [clusters/hosted-mgmt/hive-pools-*](https://github.com/openshift/release/tree/master/clusters/hosted-mgmt) and let them be aware of the case.
 The deprovision could be blocked by any of the following reasons:
     * A bug of OpenShift installer: collect the deprovision logs for the installer team to debug.
     * Something went wrong on the cloud platform: create a ticket to the cloud platform.

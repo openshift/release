@@ -1,0 +1,27 @@
+ref:
+  as: ocp-art-validate-build-data
+  from: src
+  commands: ocp-art-validate-build-data-commands.sh
+  env:
+  - name: ART_TOOLS_REF
+    default: main
+    documentation: ART tools branch, tag or commit providing validator.ci. Use owner:ref for a fork; an unqualified ref uses openshift-eng/art-tools.
+  - name: KONFLUX_APPLICATION
+    documentation: Application whose stage/prod RPAs should be checked. Set explicitly in each branch CI configuration.
+  - name: RELEASE_DATA_REF
+    default: main
+    documentation: Branch or tag of the internal konflux-release-data repository to validate against.
+  credentials:
+  - bundle: ci-pull-credentials
+    namespace: ci
+    mount_path: /var/run/secrets/ci-pull-credentials
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 30m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs shared schema, metadata, source branch/Dockerfile, dependency and RPA validation
+    for LP and OCP build data using anonymous GitHub source checks. Writes validation.json
+    to the job artifacts. Does not provision a test cluster or change remote repositories.

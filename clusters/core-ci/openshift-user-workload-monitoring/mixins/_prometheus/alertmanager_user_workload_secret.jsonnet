@@ -3,7 +3,10 @@
   "apiVersion": "template.openshift.io/v1",
   "metadata": {
     "name": "alertmanager-user-workload-secret",
-    "namespace": "openshift"
+    "namespace": "openshift",
+    "labels": {
+      "ci.openshift.io/gitops-managed": "true"
+    }
   },
   "parameters": [
       {
@@ -27,7 +30,7 @@
       {
         "description": "monitoring namespace",
         "name": "MONITORING_NAMESPACE",
-        "value": "openshift-user-workload-monitoring"
+        "value": "ci-monitoring"
       },
     ],
   "objects": [
@@ -37,6 +40,9 @@
       metadata: {
         name: 'alertmanager-user-workload',
         namespace: '${MONITORING_NAMESPACE}',
+        labels: {
+          'ci.openshift.io/gitops-managed': 'true',
+        },
       },
       stringData: {
         "alertmanager.yaml": |||

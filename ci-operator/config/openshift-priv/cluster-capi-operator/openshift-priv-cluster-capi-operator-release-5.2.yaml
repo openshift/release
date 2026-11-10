@@ -72,6 +72,15 @@ tests:
   container:
     from: src
 - always_run: false
+  as: e2e-aws-customnoupgrade-clusterapioperator-feature
+  pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_GATES: '["ClusterAPIOperator=true","CRDCompatibilityRequirementOperator=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^manifests/
   steps:
@@ -112,7 +121,11 @@ tests:
       - observers-resource-watch
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -126,7 +139,11 @@ tests:
     cluster_profile: openshift-org-aws
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -148,11 +165,15 @@ tests:
       - observers-resource-watch
     test:
     - as: test
+      cli: latest
       commands: |-
         if test -f "${SHARED_DIR}/proxy-conf.sh"; then
           source "${SHARED_DIR}/proxy-conf.sh"
         fi
         make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -176,7 +197,11 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -201,7 +226,11 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -233,7 +262,11 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -245,11 +278,16 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      FEATURE_GATES: '["MachineAPIMigration=true","MachineAPIMigrationVSphere=true","ClusterAPIMachineManagement=true","ClusterAPIMachineManagementVSphere=true"]'
+      FEATURE_GATES: '["MachineAPIMigration=true","MachineAPIMigrationVSphere=true","ClusterAPIMachineManagement=true","ClusterAPIMachineManagementVSphere=true",
+        "CRDCompatibilityRequirementOperator=true","ClusterAPIOperator=true"]'
       FEATURE_SET: CustomNoUpgrade
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -272,12 +310,55 @@ tests:
         ENABLE_CAPI_E2E="true"
     test:
     - as: test
+      cli: latest
       commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-nutanix-capi-techpreview
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-nutanix
+- always_run: false
+  as: e2e-ibmcloud-capi-techpreview
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: OPENSHIFT_AVAILABLE_UPDATE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-ibmcloud
 - always_run: false
   as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
