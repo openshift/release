@@ -132,6 +132,39 @@ if [[ -n "${AI_HELPERS_REPO:-}" ]]; then
     echo "Replaced /opt/ai-helpers with ${AI_HELPERS_REPO}@${AI_HELPERS_REF} ($(git -C /opt/ai-helpers rev-parse --short HEAD 2>/dev/null || echo 'unknown rev'))"
 fi
 
+# TRIAGE_VIEWS=auto: every released OCP version Sippy still tracks. A version is included when Sippy's
+# /api/releases gives it a GA date on or before today and Component Readiness, and its <version>-main view
+# exists with regression tracking enabled. TRT maintains both lists, so new GA versions join and retired views
+# leave without a config change. A failed lookup fails the run (see VIEWS_RESOLVE_ERROR) rather than
+# monitoring less than intended.
+SIPPY_API="https://sippy.dptools.openshift.org/api"
+VIEWS_SOURCE="explicit"
+VIEWS_RESOLVE_ERROR=""
+resolve_ga_views() {
+    local releases views today
+    today="$(date -u +%F)"
+    releases="$(curl -sSf --retry 3 --retry-delay 5 --max-time 60 "${SIPPY_API}/releases")" || { echo "GET ${SIPPY_API}/releases failed"; return 1; }
+    views="$(curl -sSf --retry 3 --retry-delay 5 --max-time 60 "${SIPPY_API}/component_readiness/views")" || { echo "GET ${SIPPY_API}/component_readiness/views failed"; return 1; }
+    jq -nr --argjson rel "${releases}" --argjson views "${views}" --arg today "${today}" '
+        [$views[] | select((.name // "") | test("^[0-9]+\\.[0-9]+-main$"))
+                  | select(.regression_tracking.enabled == true) | .name] as $tracked
+        | [($rel.release_attrs // {}) | to_entries[] | .value
+           | select(.product == "OCP" and .capabilities.componentReadiness == true)
+           | select((.ga // "") != "" and .ga[0:10] <= $today)
+           | (.name + "-main") | select(. as $v | $tracked | index($v))]
+        | sort_by(rtrimstr("-main") | split(".") | map(tonumber)) | join(" ")'
+}
+if [[ "${TRIAGE_VIEWS}" == "auto" ]]; then
+    VIEWS_SOURCE="sippy"
+    if RESOLVED_VIEWS="$(resolve_ga_views)" && [[ -n "${RESOLVED_VIEWS}" ]]; then
+        TRIAGE_VIEWS="${RESOLVED_VIEWS}"
+        echo "Resolved TRIAGE_VIEWS=auto from Sippy: ${TRIAGE_VIEWS}"
+    else
+        VIEWS_RESOLVE_ERROR="could not resolve TRIAGE_VIEWS=auto from Sippy: ${RESOLVED_VIEWS:-empty result}"
+        echo "ERROR: ${VIEWS_RESOLVE_ERROR}"
+        TRIAGE_VIEWS="unresolved-main"
+    fi
+fi
 if [[ -n "${TRIAGE_VIEWS}" ]]; then
     # Multi-view run (GA): the first view keeps legacy single-view variables meaningful.
     TRIAGE_VIEW="${TRIAGE_VIEWS%% *}"
@@ -537,6 +570,33 @@ ga_finalize_on_exit() {
     fi
 }
 
+if [[ -n "${VIEWS_RESOLVE_ERROR}" ]]; then
+    junit_case "GA: views resolved from Sippy" false "${VIEWS_RESOLVE_ERROR}"
+    exit 1   # the EXIT trap writes the junit (and, for a full run, the failure receipt)
+fi
+
+record_views() {
+    # record_views <previous-artifact|none> <jq path to the previous view names>; writes views.json and
+    # prints a one-line summary of views added/removed since the previous run.
+    local prev="$1" path="$2" prev_views="null"
+    if [[ "${prev}" != "none" && -s "${prev}" ]]; then
+        prev_views="$(jq -c "[${path}] | map(select(type == \"string\"))" "${prev}" 2>/dev/null || echo null)"
+    fi
+    jq -n --arg source "${VIEWS_SOURCE}" --arg views "${TRIAGE_VIEWS}" --argjson prev "${prev_views}" \
+        --arg prev_run "${PREV_RUN}" '
+        ($views | split(" ") | map(select(. != ""))) as $now
+        | {source: $source, views: $now, previous_run: (if $prev_run == "" then null else $prev_run end),
+           previous_views: $prev,
+           added: (if $prev == null then null else ($now - $prev) end),
+           removed: (if $prev == null then null else ($prev - $now) end)}' > "${ARTIFACT_DIR}/views.json"
+    jq -r '"Views (\(.source)): \(.views | join(" "))"
+        + (if .previous_views == null then "; no previous run to compare with"
+           elif (.added | length) + (.removed | length) == 0 then "; unchanged since the previous run"
+           else "; added since the previous run: \(if (.added | length) > 0 then .added | join(" ") else "none" end)"
+                + ", removed: \(if (.removed | length) > 0 then .removed | join(" ") else "none" end)" end)' \
+        "${ARTIFACT_DIR}/views.json"
+}
+
 if [[ "${TRIAGE_POLICY}" == "ga" || "${TRIAGE_ANALYSIS}" == "quick" ]]; then
     PREV_RUN="$(latest_preceding_attempt)"
     if [[ -z "${PREV_RUN}" ]]; then
@@ -554,6 +614,9 @@ if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
         PREV_STATUS_ARG="${WORKDIR}/previous-burst-status.json"
     fi
     echo "Previous status: ${PREV_STATUS_ARG}"
+    VIEWS_LINE="$(record_views "${PREV_STATUS_ARG}" '.observation.views[]?.view' || true)"
+    echo "${VIEWS_LINE}"
+    [[ "${VIEWS_SOURCE}" == "sippy" ]] && junit_case "GA: views resolved from Sippy" true ""
     # Growth of known clusters is judged against the latest full-analysis manifest (a different job): derive its
     # name from ours unless given explicitly.
     BASELINE_JOB="${TRIAGE_BASELINE_JOB:-${JOB_NAME/cr-burst-tripwire/bulk-triage-ga}}"
@@ -611,6 +674,9 @@ if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
         BASELINE_ARG="${WORKDIR}/baseline-manifest.json"
     fi
     echo "Baseline: ${BASELINE_ARG}"
+    VIEWS_LINE="$(record_views "${BASELINE_ARG}" '.observation.views[]?' || true)"
+    echo "${VIEWS_LINE}"
+    [[ "${VIEWS_SOURCE}" == "sippy" ]] && junit_case "GA: views resolved from Sippy" true ""
 
     # Sippy triage catalogue before the agent runs (authoritative record of Sippy writes).
     python3 "${AIH_SCRIPTS_DIR}/audit.py" snapshot --out "${ARTIFACT_DIR}/sippy-triages-before.json" || true
@@ -696,6 +762,9 @@ if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
     PROMPT="Load and follow the ci:bulk-triage-regressions skill with --policy ${GA_POLICY_FLAG} --write-mode ${MODE_EFFECTIVE} --views ${TRIAGE_VIEWS} covering ${COMPONENTS_CLAUSE}, with --existing-only. Phase 0 is complete: read ${WORKDIR}/prepass.json and treat its clusters as the batch. Execute Phases 1-5 per ${GA_POLICY_DOC}. ${GA_WRITE_CLAUSE}
 
 Write ${WORKDIR}/triage-manifest.json by assembling dispositions.json, actions.json and extra.json as the policy describes and running ${AIH_SCRIPTS_DIR}/manifest.py merge --prepass ${WORKDIR}/prepass.json ... --out ${WORKDIR}/triage-manifest.json, then ${AIH_SCRIPTS_DIR}/manifest.py validate ${WORKDIR}/triage-manifest.json (it must exit 0; fix the data, never weaken it). Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}: inventory per view, every cluster with its blast radius, disposition, evidence (own run links, artifact paths), bug decisions and action or proposed action, the watch list, catch-all admissions, backport candidates, unanalysed clusters, and cross-cutting observations. Every claim must cite artifact paths or run URLs.${EXISTING_ONLY_REPORT}"
+    if [[ -n "${VIEWS_LINE:-}" ]]; then
+        PROMPT="${PROMPT} Start the report's inventory section with this line from the runner, verbatim: '${VIEWS_LINE}'."
+    fi
 fi
 
 PHASE_ANALYSIS_START=$(date +%s)
