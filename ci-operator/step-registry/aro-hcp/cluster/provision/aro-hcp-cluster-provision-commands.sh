@@ -28,6 +28,11 @@ if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
   echo "REPLICAS must be a positive integer." >&2
   exit 1
 fi
+if [[ ! "${WORKER_NODEPOOL_COUNT:-1}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "WORKER_NODEPOOL_COUNT must be a positive integer." >&2
+  exit 1
+fi
+WORKER_NODEPOOL_COUNT="${WORKER_NODEPOOL_COUNT:-1}"
 if [[ "${MULTI_AZ:-false}" == "true" && ! "${ZONES_COUNT:-}" =~ ^[1-9][0-9]*$ ]]; then
   echo "ZONES_COUNT must be a positive integer when MULTI_AZ=true." >&2
   exit 1
@@ -265,6 +270,7 @@ CUSTOMER_VNET_NAME=${CUSTOMER_VNET_NAME}
 CUSTOMER_VNET_SUBNET1=${CUSTOMER_VNET_SUBNET1}
 CUSTOMER_VNET_INTEGRATION_SUBNET_NAME=${CUSTOMER_VNET_INTEGRATION_SUBNET_NAME}
 NP_NAME=${NP_NAME}
+WORKER_NODEPOOL_COUNT=${WORKER_NODEPOOL_COUNT}
 NODEPOOL_NAMES=${NODEPOOL_NAMES}
 KEYVAULT_NAME=${KEYVAULT_NAME}
 KMS_KEY_NAME=${KMS_KEY_NAME}
@@ -640,13 +646,19 @@ select_worker_zones() {
   fi
 }
 
-# Build the worker node-pool name, adding a zone suffix for multi-AZ pools.
+# Build a worker node-pool name. A single group retains the existing name;
+# multiple groups receive a numeric suffix before the optional zone suffix.
 worker_nodepool_name_for_zone() {
-  local zone="$1"
+  local nodepool_index="$1"
+  local zone="$2"
+  local base_name="${NP_NAME}"
+  if (( WORKER_NODEPOOL_COUNT > 1 )); then
+    base_name="${NP_NAME}-${nodepool_index}"
+  fi
   if [[ "${MULTI_AZ:-false}" != "true" ]]; then
-    printf '%s\n' "${NP_NAME}"
+    printf '%s\n' "${base_name}"
   else
-    printf '%s-az%s\n' "${NP_NAME}" "${zone}"
+    printf '%s-az%s\n' "${base_name}" "${zone}"
   fi
 }
 
@@ -821,20 +833,27 @@ else
   WORKER_ZONES=("")
 fi
 
-if (( ${#WORKER_ZONES[@]} > 1 )); then
-  if (( REPLICAS % ${#WORKER_ZONES[@]} != 0 )); then
-    echo "REPLICAS (${REPLICAS}) must be evenly divisible by ZONES_COUNT (${#WORKER_ZONES[@]}) for MULTI_AZ=true." >&2
-    exit 1
-  fi
-  WORKER_REPLICAS_PER_ZONE=$((REPLICAS / ${#WORKER_ZONES[@]}))
-else
-  WORKER_REPLICAS_PER_ZONE="${REPLICAS}"
+WORKER_ZONE_COUNT=${#WORKER_ZONES[@]}
+WORKER_NODEPOOL_DIVISOR=$((WORKER_NODEPOOL_COUNT * WORKER_ZONE_COUNT))
+if (( REPLICAS < WORKER_NODEPOOL_DIVISOR )); then
+  echo "REPLICAS (${REPLICAS}) is less than the ${WORKER_NODEPOOL_DIVISOR} generated node pools; each node pool must receive at least one replica." >&2
+  exit 1
 fi
+WORKER_BASE_REPLICAS_PER_NODEPOOL=$((REPLICAS / WORKER_NODEPOOL_DIVISOR))
+WORKER_REPLICA_REMAINDER=$((REPLICAS % WORKER_NODEPOOL_DIVISOR))
+log_step "Allocating ${REPLICAS} worker replicas across ${WORKER_NODEPOOL_COUNT} node-pool group(s) and ${WORKER_ZONE_COUNT} zone(s): ${WORKER_BASE_REPLICAS_PER_NODEPOOL} base replicas per pool, with ${WORKER_REPLICA_REMAINDER} pool(s) receiving one additional replica."
 
 WORKER_NODEPOOL_NAMES=()
-for availability_zone in "${WORKER_ZONES[@]}"; do
-  nodepool_name=$(worker_nodepool_name_for_zone "${availability_zone}")
-  WORKER_NODEPOOL_NAMES+=("${nodepool_name}")
+declare -A WORKER_NODEPOOL_ZONES WORKER_NODEPOOL_REPLICAS
+worker_nodepool_ordinal=0
+for ((nodepool_index = 1; nodepool_index <= WORKER_NODEPOOL_COUNT; nodepool_index++)); do
+  for availability_zone in "${WORKER_ZONES[@]}"; do
+    nodepool_name=$(worker_nodepool_name_for_zone "${nodepool_index}" "${availability_zone}")
+    WORKER_NODEPOOL_NAMES+=("${nodepool_name}")
+    WORKER_NODEPOOL_ZONES["${nodepool_name}"]="${availability_zone}"
+    WORKER_NODEPOOL_REPLICAS["${nodepool_name}"]=$((WORKER_BASE_REPLICAS_PER_NODEPOOL + (worker_nodepool_ordinal < WORKER_REPLICA_REMAINDER ? 1 : 0)))
+    worker_nodepool_ordinal=$((worker_nodepool_ordinal + 1))
+  done
 done
 NODEPOOL_NAMES=$(IFS=,; echo "${WORKER_NODEPOOL_NAMES[*]}")
 printf '%s\n' "${WORKER_NODEPOOL_NAMES[@]}" >"${SHARED_DIR}/aro-hcp-worker-nodepools"
@@ -845,15 +864,14 @@ WORKER_INSTALL_START=$(date +%s)
 log_step "Submitting worker node pool create requests concurrently: ${NODEPOOL_NAMES}."
 declare -A NODEPOOL_INSTALL_STARTS
 NODEPOOL_CREATE_PIDS=()
-for index in "${!WORKER_ZONES[@]}"; do
-  nodepool_name="${WORKER_NODEPOOL_NAMES[${index}]}"
+for nodepool_name in "${WORKER_NODEPOOL_NAMES[@]}"; do
   nodepool_install_start=$(date +%s)
   NODEPOOL_INSTALL_STARTS["${nodepool_name}"]="${nodepool_install_start}"
   record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
   create_worker_nodepool \
     "${nodepool_name}" \
-    "${WORKER_ZONES[${index}]}" \
-    "${WORKER_REPLICAS_PER_ZONE}" &
+    "${WORKER_NODEPOOL_ZONES[${nodepool_name}]}" \
+    "${WORKER_NODEPOOL_REPLICAS[${nodepool_name}]}" &
   NODEPOOL_CREATE_PIDS+=("$!")
 done
 
