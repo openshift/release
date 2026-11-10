@@ -32,11 +32,6 @@ oc version || true
     -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status'
 } > "${ARTIFACT_DIR}/nodes.txt" 2>&1 || true
 
-if [[ -n "${KMM_QE_DEBUG_SLEEP:-}" ]]; then
-  echo "KMM QE debug pause: sleeping ${KMM_QE_DEBUG_SLEEP} before starting the test suite"
-  sleep "${KMM_QE_DEBUG_SLEEP}"
-fi
-
 set +e
 ./scripts/test-runner.sh \
   --junit-report=junit-kmm.xml \
