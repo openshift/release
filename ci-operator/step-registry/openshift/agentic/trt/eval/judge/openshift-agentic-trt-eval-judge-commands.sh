@@ -40,8 +40,8 @@ set -o errexit
 # Verify after judging so cost problems do not suppress quality reports. Zero
 # is a valid observed cost; missing, non-finite, negative, or misassigned cost
 # is an explicit eval verification failure.
-set +o errexit
-python3 - "${RUN_DIR}/run_result.json" "${SHARED_DIR}/eval-cases" <<'PY'
+verify_eval_costs() {
+python3 - "$@" <<'PY'
 import json
 import math
 import sys
@@ -53,10 +53,15 @@ with open(result_path) as handle:
     result = json.load(handle)
 
 errors = []
+if not expected_cases:
+    errors.append("eval case list is empty")
 per_case = result.get("per_case")
 if not isinstance(per_case, dict) or set(per_case) != set(expected_cases):
     actual = sorted(per_case) if isinstance(per_case, dict) else []
-    errors.append(f"case keys differ: expected={sorted(expected_cases)} actual={actual}")
+    errors.append(
+        f"case keys differ: expected_count={len(expected_cases)} "
+        f"actual_count={len(actual)} expected={sorted(expected_cases)} actual={actual}"
+    )
     per_case = per_case if isinstance(per_case, dict) else {}
 
 costs = []
@@ -76,7 +81,10 @@ root_cost = result.get("cost_usd")
 if result.get("execution_mode") != "case":
     errors.append("execution_mode is not case")
 if result.get("num_cases") != len(expected_cases):
-    errors.append("num_cases does not match the eval case list")
+    errors.append(
+        f"num_cases does not match: expected={len(expected_cases)} "
+        f"actual={result.get('num_cases')!r}"
+    )
 if result.get("cost_observed") is not True:
     errors.append("root cost is incomplete")
 if isinstance(root_cost, bool) or not isinstance(root_cost, (int, float)):
@@ -93,6 +101,10 @@ if errors:
     sys.exit(1)
 print(f"Verified observed per-case costs for {len(expected_cases)} cases")
 PY
+}
+
+set +o errexit
+verify_eval_costs "${RUN_DIR}/run_result.json" "${SHARED_DIR}/eval-cases"
 COST_STATUS=$?
 set -o errexit
 

@@ -181,6 +181,17 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+
+require_session_metrics_extractor() {
+    if [[ ! -f "${EXTRACT_METRICS}" ]] \
+        || ! grep -qF -- "--prompt-file" "${EXTRACT_METRICS}" \
+        || ! grep -qF -- "agentic_ci.codex.cost.usage" "${EXTRACT_METRICS}" \
+        || ! grep -qF -- "_producer_key" "${EXTRACT_METRICS}"; then
+        echo "ERROR: session metrics extractor lacks required prompt, Codex, or producer support" >&2
+        return 1
+    fi
+}
+
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 else
@@ -897,11 +908,9 @@ agentic_ci() {
     return $rc
 }
 
-# Fallback per-model usage for evals when extract_metrics cannot produce a row.
-# Token totals come from Codex response.completed events. Dollar amounts come
-# from agentic_ci.codex.cost.usage when agentic-ci has written that metric. Prints JSON:
-#   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
-codex_otel_usage() {
+# Fallback usage and cost-observation metadata for evals. The authoritative
+# session totals still come from extract_metrics whenever it produces a row.
+otel_usage() {
     local otel_path=$1
     python3 - "${otel_path}" << 'PY'
 import json
@@ -921,10 +930,16 @@ version = ""
 session_id = ""
 cost_from_metric = False
 cumulative_costs = {}
+claude_cost_models = set()
+claude_token_models = set()
+malformed_token_events = 0
 
 CODEX_COST_ALIASES = {
     "codex.cost.usage": "agentic_ci.codex.cost.usage",
 }
+CODEX_COST_METRIC = "agentic_ci.codex.cost.usage"
+CLAUDE_COST_METRIC = "claude_code.cost.usage"
+CLAUDE_TOKEN_METRIC = "claude_code.token.usage"
 
 
 def attribute_value(value):
@@ -958,19 +973,27 @@ def producer_key(value):
     )
 
 
-def as_int(attrs, key):
+def token_count(attrs, key):
+    """Return a nonnegative integral token count, or None when malformed."""
     raw = attrs.get(key)
     if raw is None or raw == "":
         return 0
+    if isinstance(raw, bool):
+        return None
     try:
-        return int(float(raw))
+        value = float(raw)
     except (TypeError, ValueError, OverflowError):
-        return 0
+        return None
+    if not math.isfinite(value) or value < 0 or not value.is_integer():
+        return None
+    return int(value)
 
 
 def point_attributes(point):
     attrs = {}
-    for attr in point.get("attributes", []):
+    for attr in point.get("attributes", []) or []:
+        if not isinstance(attr, dict):
+            continue
         key = attr.get("key")
         if key:
             attrs[key] = attribute_value(attr.get("value"))
@@ -1007,18 +1030,34 @@ with open(path) as handle:
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        record_path = record.get("path", "")
+        if not isinstance(record, dict):
+            continue
+        record_path = str(record.get("path") or "")
         payload = record.get("payload") or {}
+        if not isinstance(payload, dict):
+            continue
         if "/v1/metrics" in record_path:
-            for resource in payload.get("resourceMetrics", []):
-                for scope in resource.get("scopeMetrics", []):
-                    for metric in scope.get("metrics", []):
+            for resource in payload.get("resourceMetrics", []) or []:
+                if not isinstance(resource, dict):
+                    continue
+                for scope in resource.get("scopeMetrics", []) or []:
+                    if not isinstance(scope, dict):
+                        continue
+                    for metric in scope.get("metrics", []) or []:
+                        if not isinstance(metric, dict):
+                            continue
                         name = CODEX_COST_ALIASES.get(
                             metric.get("name", ""), metric.get("name", ""))
-                        if name != "agentic_ci.codex.cost.usage":
+                        if name not in (CODEX_COST_METRIC,
+                                        CLAUDE_COST_METRIC,
+                                        CLAUDE_TOKEN_METRIC):
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
-                        for point in data.get("dataPoints", []):
+                        if not isinstance(data, dict):
+                            continue
+                        for point in data.get("dataPoints", []) or []:
+                            if not isinstance(point, dict):
+                                continue
                             amount = point_number(point)
                             if amount is None:
                                 continue
@@ -1026,6 +1065,12 @@ with open(path) as handle:
                             if attrs is None:
                                 continue
                             model = str(attrs.get("model") or "unknown")
+                            if name == CLAUDE_COST_METRIC:
+                                claude_cost_models.add(model)
+                                continue
+                            if name == CLAUDE_TOKEN_METRIC:
+                                claude_token_models.add(model)
+                                continue
                             if ("sum" in metric
                                     and data.get("aggregationTemporality") == 2):
                                 resource_identity = {
@@ -1057,14 +1102,18 @@ with open(path) as handle:
             continue
         if "/v1/logs" not in record_path:
             continue
-        for resource in payload.get("resourceLogs", []):
-            for scope in resource.get("scopeLogs", []):
-                for item in scope.get("logRecords", []):
-                    attrs = {}
-                    for attr in item.get("attributes", []):
-                        key = attr.get("key")
-                        if key:
-                            attrs[key] = attribute_value(attr.get("value"))
+        for resource in payload.get("resourceLogs", []) or []:
+            if not isinstance(resource, dict):
+                continue
+            for scope in resource.get("scopeLogs", []) or []:
+                if not isinstance(scope, dict):
+                    continue
+                for item in scope.get("logRecords", []) or []:
+                    if not isinstance(item, dict):
+                        continue
+                    attrs = point_attributes(item)
+                    if attrs is None:
+                        continue
                     if not version and attrs.get("app.version"):
                         version = str(attrs["app.version"])
                     if not session_id and attrs.get("conversation.id"):
@@ -1075,26 +1124,55 @@ with open(path) as handle:
                         continue
                     if not model:
                         model = "unknown"
+                    counts = {
+                        key: token_count(attrs, key)
+                        for key in (
+                            "input_token_count",
+                            "output_token_count",
+                            "cached_token_count",
+                            "cache_write_token_count",
+                        )
+                    }
+                    if any(value is None for value in counts.values()):
+                        malformed_token_events += 1
+                        continue
                     fresh = max(
-                        as_int(attrs, "input_token_count")
-                        - as_int(attrs, "cached_token_count")
-                        - as_int(attrs, "cache_write_token_count"),
+                        counts["input_token_count"]
+                        - counts["cached_token_count"]
+                        - counts["cache_write_token_count"],
                         0,
                     )
                     models[model]["turns"] += 1
                     models[model]["input"] += fresh
-                    models[model]["output"] += as_int(attrs, "output_token_count")
-                    models[model]["cache_read"] += as_int(attrs, "cached_token_count")
-                    models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
+                    models[model]["output"] += counts["output_token_count"]
+                    models[model]["cache_read"] += counts["cached_token_count"]
+                    models[model]["cache_create"] += counts["cache_write_token_count"]
 
 for (_name, _resource, _scope, model, _start), (_timestamp, amount) in cumulative_costs.items():
     models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
 
+if malformed_token_events:
+    print(
+        f"WARNING: skipped {malformed_token_events} Codex response events "
+        "with malformed token counts",
+        file=sys.stderr,
+    )
+
 print(json.dumps({
-    "version": version,
-    "session_id": session_id,
-    "cost_from_metric": cost_from_metric,
-    "models": models,
+    "codex": {
+        "version": version,
+        "session_id": session_id,
+        "cost_from_metric": cost_from_metric,
+        "models": models,
+    },
+    "claude_cost": {
+        "present": bool(claude_cost_models or claude_token_models),
+        "observed": bool(claude_cost_models),
+        "complete": bool(
+            claude_cost_models
+            and claude_token_models.issubset(claude_cost_models)
+        ),
+    },
 }))
 PY
 }
@@ -1113,8 +1191,8 @@ finalize_session_metrics() {
         rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    if [[ ! -f "${EXTRACT_METRICS}" ]]; then
-        echo "Warning: extract_metrics.py not found, skipping session metrics"
+    if ! require_session_metrics_extractor; then
+        echo "Warning: incompatible session metrics extractor, skipping publication"
         rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
@@ -1160,7 +1238,7 @@ finalize_session_metrics() {
             mv "${metadata_tmp}" "${metadata_file}"
         else
             rm -f "${metadata_tmp}"
-            echo "Warning: Failed to propagate session identity to metrics metadata"
+            echo "Warning: Failed to propagate session identity to ${metadata_file##*/}"
         fi
     fi
     cp "${metrics_tmp}" "${dest}"

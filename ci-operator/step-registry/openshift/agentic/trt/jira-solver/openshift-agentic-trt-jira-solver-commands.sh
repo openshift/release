@@ -24,10 +24,14 @@ solver_cleanup() {
     if declare -F copy_artifacts >/dev/null; then
         copy_artifacts
     fi
-    rm -f "${SESSION_PROMPT_FILE}" || true
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
     return "${rc}"
 }
 trap solver_cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+require_session_metrics_extractor
 
 load_github_tokens
 configure_github_git_credentials
@@ -108,7 +112,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
     }
-    trap solver_cleanup EXIT TERM INT
 fi
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---

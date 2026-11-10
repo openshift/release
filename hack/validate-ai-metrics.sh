@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Validates that every step-registry command script which runs a *billable* AI
 # coding-agent call (Claude or Codex) also emits session-cost metrics, so its
-# Vertex/API spend is reported on the CI cost dashboards
+# provider/API spend is reported on the CI cost dashboards
 # (BigQuery claude_session_metrics table).
 #
 # Rationale: agents invoked without emitting claude-session-metrics-autodl.json
@@ -83,12 +83,12 @@ while IFS= read -r -d '' script; do
 done < <(find "${registry_dir}" -name '*-commands.sh' -print0)
 
 if [[ ${#missing[@]} -gt 0 ]]; then
-  echo "ERROR: the following step-registry scripts run a billable Claude agent but do not emit session-cost metrics:"
+  echo "ERROR: the following step-registry scripts run a billable AI agent but do not emit session-cost metrics:"
   printf '  - %s\n' "${missing[@]}"
   cat <<'EOF'
 
-Each of these invokes a Claude agent (via `agentic-ci run` or a direct
-`claude -p/--print` call) that spends money on Vertex, but produces no
+Each of these invokes a Claude or Codex agent (via `agentic-ci run` or a direct
+`claude -p/--print` call) that incurs provider/API cost, but produces no
 claude-session-metrics-autodl.json, so the spend is invisible on the CI cost
 dashboards.
 

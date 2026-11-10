@@ -16,7 +16,11 @@ load_github_tokens
 configure_github_git_credentials
 
 # --- Read case list ---
-mapfile -t CASE_LIST < "${SHARED_DIR}/eval-cases"
+mapfile -t CASE_LIST < <(sed '/^[[:space:]]*$/d' "${SHARED_DIR}/eval-cases")
+if [[ ${#CASE_LIST[@]} -eq 0 ]]; then
+    echo "ERROR: eval-cases contains no cases" >&2
+    exit 1
+fi
 MAX_PARALLEL="${EVAL_PARALLELISM:-5}"
 echo "Cases (${#CASE_LIST[@]}): ${CASE_LIST[*]} | Parallelism: ${MAX_PARALLEL}"
 
@@ -66,9 +70,16 @@ copy_artifacts() {
         tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
             -C "${HOME}/.claude" projects/ 2>/dev/null || true
     fi
-    rm -f "${METRICS_TEMP_FILES[@]}"
 }
-trap copy_artifacts EXIT TERM INT
+cleanup_eval_solve() {
+    local rc=$?
+    copy_artifacts
+    rm -f "${METRICS_TEMP_FILES[@]}" || echo "WARNING: failed to remove eval metrics temporary files" >&2
+    return "${rc}"
+}
+trap cleanup_eval_solve EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 # --- Per-case dispatch ---
 # Each subshell gets a temp SHARED_DIR with standard filenames the solver expects:
@@ -163,75 +174,11 @@ else
     echo "WARNING: no OTEL JSONL collected from any case"
 fi
 
-claude_cost_status() {
-    python3 - "$1" <<'PY'
-import json
-import math
-import sys
-
-cost_models = set()
-token_models = set()
-
-
-def attribute_value(value):
-    """Return the scalar value from an OTLP AnyValue."""
-    if not isinstance(value, dict):
-        return None
-    for key in ("stringValue", "intValue", "doubleValue", "boolValue"):
-        if key in value:
-            return value[key]
-    return None
-
-
-with open(sys.argv[1]) as handle:
-    for line in handle:
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if "/v1/metrics" not in record.get("path", ""):
-            continue
-        for resource in (record.get("payload") or {}).get("resourceMetrics", []):
-            for scope in resource.get("scopeMetrics", []):
-                for metric in scope.get("metrics", []):
-                    name = metric.get("name")
-                    if name not in ("claude_code.cost.usage", "claude_code.token.usage"):
-                        continue
-                    data = metric.get("sum", metric.get("gauge", {}))
-                    for point in data.get("dataPoints", []):
-                        raw = point.get("asDouble", point.get("asInt"))
-                        try:
-                            observed = math.isfinite(float(raw))
-                        except (TypeError, ValueError, OverflowError):
-                            observed = False
-                        if not observed:
-                            continue
-                        attrs = {
-                            attr.get("key"): attribute_value(attr.get("value"))
-                            for attr in point.get("attributes", [])
-                            if attr.get("key")
-                        }
-                        try:
-                            hash(tuple(sorted(attrs.items())))
-                        except TypeError:
-                            continue
-                        model = str(attrs.get("model") or "unknown")
-                        if name == "claude_code.cost.usage":
-                            cost_models.add(model)
-                        else:
-                            token_models.add(model)
-print(json.dumps({
-    "present": bool(cost_models or token_models),
-    "observed": bool(cost_models),
-    "complete": bool(cost_models and token_models.issubset(cost_models)),
-}))
-PY
-}
-
 PER_CASE_TMP=$(mktemp)
 METRICS_TEMP_FILES+=("${PER_CASE_TMP}")
 echo '{}' > "${PER_CASE_TMP}"
 CONFIGURED_MODEL="${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-${AGENT_MODEL:-}}"
+EMPTY_OTEL_USAGE='{"codex":{"cost_from_metric":false,"models":{}},"claude_cost":{"present":false,"observed":false,"complete":false}}'
 
 for case_name in "${CASE_LIST[@]}"; do
     CASE_RESULT_TMP=$(mktemp)
@@ -243,59 +190,60 @@ for case_name in "${CASE_LIST[@]}"; do
     CASE_OTEL="${OTEL_DIR}/${case_name}.claude-otel.jsonl"
     METRICS_TMP=$(mktemp)
     METRICS_TEMP_FILES+=("${METRICS_TMP}")
-    CODEX_USAGE='{"cost_from_metric":false,"models":{}}'
-    CLAUDE_COST_STATUS='{"present":false,"observed":false,"complete":false}'
+    OTEL_USAGE="${EMPTY_OTEL_USAGE}"
 
     if [[ -s "${CASE_OTEL}" ]]; then
         if ! python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
             "${CASE_OTEL}" "${METRICS_TMP}"; then
             echo "WARNING: metrics extraction failed for ${case_name}"
         fi
-        if ! CODEX_USAGE=$(
+        if ! OTEL_USAGE=$(
             # Source the generated shared implementation rather than carrying
-            # an eval-only Codex parser. Remove the source-time prompt file in
+            # an eval-only OTLP parser. Remove the source-time prompt file in
             # this subshell; eval metrics never need prompt handoff.
             # shellcheck disable=SC1091
             source "${REAL_SHARED_DIR}/trt-telemetry.sh"
-            usage=""
             usage_status=0
-            usage=$(codex_otel_usage "${CASE_OTEL}") || usage_status=$?
-            rm -f "${SESSION_PROMPT_FILE}"
-            [[ ${usage_status} -eq 0 ]] || exit "${usage_status}"
-            printf '%s\n' "${usage}"
+            otel_usage "${CASE_OTEL}" || usage_status=$?
+            rm -f "${SESSION_PROMPT_FILE}" \
+                || echo "WARNING: failed to remove metrics prompt temporary file" >&2
+            exit "${usage_status}"
         ); then
-            CODEX_USAGE='{"cost_from_metric":false,"models":{}}'
+            OTEL_USAGE="${EMPTY_OTEL_USAGE}"
         fi
-        CLAUDE_COST_STATUS=$(claude_cost_status "${CASE_OTEL}")
     fi
 
     # extract_metrics rejects a malformed OTEL line before writing rows, while
-    # codex_otel_usage deliberately skips malformed lines. Normalize empty or
+    # otel_usage deliberately skips malformed lines. Normalize empty or
     # invalid extractor output so an observed Codex model remains recoverable.
     if ! jq -e 'type == "object" and (.rows | type == "array")' \
         "${METRICS_TMP}" >/dev/null 2>&1; then
         printf '{"rows":[]}\n' > "${METRICS_TMP}"
     fi
-    if ! jq -e 'type == "object" and ((.models // {}) | type == "object")' \
-        <<< "${CODEX_USAGE}" >/dev/null 2>&1; then
-        CODEX_USAGE='{"cost_from_metric":false,"models":{}}'
+    if ! jq -e '
+        type == "object"
+        and ((.codex.models // {}) | type == "object")
+        and ((.claude_cost // {}) | type == "object")
+    ' <<< "${OTEL_USAGE}" >/dev/null 2>&1; then
+        OTEL_USAGE="${EMPTY_OTEL_USAGE}"
     fi
 
     if jq -e '(.rows[0] | type == "object")' "${METRICS_TMP}" >/dev/null 2>&1 \
-        || jq -e '(.models // {} | length) > 0' <<< "${CODEX_USAGE}" >/dev/null 2>&1; then
+        || jq -e '(.codex.models // {} | length) > 0' <<< "${OTEL_USAGE}" >/dev/null 2>&1; then
         jq --arg configured "${CONFIGURED_MODEL}" \
-           --argjson usage "${CODEX_USAGE}" \
-           --argjson claude_cost_status "${CLAUDE_COST_STATUS}" \
+           --argjson otel_usage "${OTEL_USAGE}" \
            --argjson exit_code "${CASE_EXIT_CODE}" '
           def number_or_zero: try tonumber catch 0;
           def first_nonempty: map(select(type == "string" and length > 0)) | first // "";
           ((.rows[0] | type) == "object") as $has_row
           | (if $has_row then .rows[0] else {} end) as $r
-          | ($usage.models // {}) as $models
+          | $otel_usage.codex as $codex
+          | $otel_usage.claude_cost as $claude_cost_status
+          | ($codex.models // {}) as $models
           | (($models | length) > 0) as $codex_present
           | ($claude_cost_status.present == true) as $claude_present
-          | ($usage.cost_from_metric == true) as $codex_cost_observed
-          | (($usage.cost_from_metric == true)
+          | ($codex.cost_from_metric == true) as $codex_cost_observed
+          | (($codex.cost_from_metric == true)
              and ([$models[] | has("cost")] | all)) as $codex_cost_complete
           | ($codex_cost_observed or ($claude_cost_status.observed == true)) as $cost_any_observed
           | ($cost_any_observed
@@ -309,10 +257,10 @@ for case_name in "${CASE_LIST[@]}"; do
              else "unknown" end) as $model
           | (if ($model | startswith("gpt-")) then "codex" else "claude-code" end) as $harness
           | (if $harness == "codex"
-             then ([$usage.version, $r.codex_version, $r.claude_code_version] | first_nonempty)
+             then ([$codex.version, $r.codex_version, $r.claude_code_version] | first_nonempty)
              else ([$r.claude_code_version] | first_nonempty) end) as $version
           # A valid extractor row is authoritative for normalized session-wide
-          # totals. codex_otel_usage is only the malformed-JSONL fallback and
+          # totals. otel_usage is only the malformed-JSONL fallback and
           # the source of per-model detail.
           | (if $has_row
              then ($r.num_turns | number_or_zero)
@@ -342,18 +290,21 @@ for case_name in "${CASE_LIST[@]}"; do
              else 0 end) as $observed_cost
           | (if $cost_observed then $observed_cost else null end) as $cost
           | (if $codex_present
-             then ($models | to_entries | map({
-               key: .key,
-               value: {
-                 input: (.value.input // 0),
-                 output: (.value.output // 0),
-                 cache_read: (.value.cache_read // 0),
-                 cache_create: (.value.cache_create // 0),
-                 cost_observed: (.value | has("cost")),
-                 cost_usd: (if (.value | has("cost")) then .value.cost else null end),
-                 observed_cost_usd: (.value.cost // 0)
-               }
-             }) | from_entries)
+             then ($models | to_entries | map(
+               .value as $usage
+               | {
+                   key: .key,
+                   value: {
+                     input: ($usage.input // 0),
+                     output: ($usage.output // 0),
+                     cache_read: ($usage.cache_read // 0),
+                     cache_create: ($usage.cache_create // 0),
+                     cost_observed: ($usage | has("cost")),
+                     cost_usd: (if ($usage | has("cost")) then $usage.cost else null end),
+                     observed_cost_usd: ($usage.cost // 0)
+                   }
+                 }
+             ) | from_entries)
              else {($model): ($tokens + {
                cost_observed: $cost_observed,
                cost_usd: $cost,
@@ -402,10 +353,8 @@ for case_name in "${CASE_LIST[@]}"; do
     rm -f "${METRICS_TMP}" "${CASE_RESULT_TMP}"
 done
 
-WALL_CLOCK_S=$(( $(date +%s) - SOLVE_STARTED_AT ))
-RUN_RESULT_TMP=$(mktemp)
-METRICS_TEMP_FILES+=("${RUN_RESULT_TMP}")
-python3 - "${PER_CASE_TMP}" "${RUN_RESULT_TMP}" "${CONFIGURED_MODEL}" "${WALL_CLOCK_S}" <<'PY'
+aggregate_eval_run_result() {
+python3 - "$@" <<'PY'
 import json
 import math
 import sys
@@ -509,6 +458,13 @@ with open(output_path, "w") as handle:
     json.dump(run_result, handle, indent=2, allow_nan=False)
     handle.write("\n")
 PY
+}
+
+WALL_CLOCK_S=$(( $(date +%s) - SOLVE_STARTED_AT ))
+RUN_RESULT_TMP=$(mktemp)
+METRICS_TEMP_FILES+=("${RUN_RESULT_TMP}")
+aggregate_eval_run_result \
+    "${PER_CASE_TMP}" "${RUN_RESULT_TMP}" "${CONFIGURED_MODEL}" "${WALL_CLOCK_S}"
 
 mv "${RUN_RESULT_TMP}" "${REAL_SHARED_DIR}/eval-solve-run-result.json"
 cp "${REAL_SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"
