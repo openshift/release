@@ -1,6 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OSL_MODE:-}" ]]; then
+    if [[ "${MULTISTAGE_PARAM_OVERRIDE_OSL_MODE}" != rc || "${JOB_TYPE:-}" != periodic ]]; then
+        echo "ERROR: invalid OSL mode for the standard E2E step" >&2
+        exit 1
+    fi
+    case "${JOB_NAME:-}" in
+        periodic-ci-redhat-developer-rhdh-plugin-export-overlays-main-e2e-ocp-helm-nightly|periodic-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-helm-nightly)
+            echo "Skipping standard E2E for OSL RC"
+            exit 0
+            ;;
+        *)
+            echo "ERROR: OSL RC mode is available only on the main and release-2.1 Helm nightlies" >&2
+            exit 1
+            ;;
+    esac
+fi
+
 # =============================================================================
 # RHDH Plugin Export Overlays - E2E Test Runner (OpenShift CI)
 #
