@@ -109,6 +109,10 @@ seeds an organization, private repository plus image tag, robot, team, member,
 and permission, verifies all of it after the channel move, and removes the
 organization only after verification succeeds. Set the catalog pin explicitly
 in the matrix; never substitute a source catalog merely to enable an edge.
+When the target OCP catalog cannot install the source channel, an approved
+legacy row may set `upgrade_source_catalog_pullspec` to a separate immutable
+`image@sha256` pullspec. It is used for the initial CatalogSource and source
+installation only; the normal OCP catalog pin remains the upgrade target.
 
 **Add a quay-operator Chainsaw job.** One row plus its
 `quay-quay-operator-{branch}__aws-ocp{ocp_nodot}-e2e-chainsaw.yaml` line in

@@ -54,6 +54,7 @@ managed_files:
     - quay-quay-redhat-3.12__aws-ocp420-e2e-legacy.yaml
     - quay-quay-redhat-3.12__aws-ocp421-e2e-legacy.yaml
     - quay-quay-redhat-3.12__aws-ocp422-e2e-legacy.yaml
+    - quay-quay-redhat-3.12__aws-ocp422-s3-upgrade-legacy.yaml
     - quay-quay-redhat-3.13__aws-ocp412-e2e-legacy.yaml
     - quay-quay-redhat-3.13__aws-ocp413-e2e-legacy.yaml
     - quay-quay-redhat-3.13__aws-ocp414-e2e-legacy.yaml
@@ -474,6 +475,16 @@ quay:
         ocp: ["4.12", "4.13", "4.14", "4.15", "4.16", "4.18", "4.19", "4.20", "4.21", "4.22"]
         test: e2e-legacy
         as: aws-s3
+        always_run: false
+        optional: true
+      # The 4.22 target catalog lacks stable-3.11. Install the approved source
+      # 3.11.9 from its immutable catalog, then switch to the target 4.22 pin.
+      - kind: presubmit
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: upgrade-legacy
+        upgrade_from: "3.11"
+        upgrade_source_catalog_pullspec: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:e9a7f5414a727fbaf73721ddcb1d7b337c1fc95be681093da534f257c054010c
         always_run: false
         optional: true
   # 3.11 is likewise covered through the unified catalog channel.

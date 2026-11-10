@@ -82,6 +82,7 @@ JOB_KEYS = {
     "fips",
     "storage",
     "upgrade_from",
+    "upgrade_source_catalog_pullspec",
     "ocp_channel",
     "sts",
     "database",
@@ -452,6 +453,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
+            upgrade_source_catalog_pullspec = _job_str_field(job, "upgrade_source_catalog_pullspec", where)
             ocp_channel = _job_str_field(job, "ocp_channel", where)
             if test in UPGRADE_TESTS:
                 if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
@@ -473,8 +475,15 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         f"{where} test {test!r} supports only aws with s3 storage, "
                         f"got clouds {clouds!r}, storage {storage!r}"
                     )
+                if upgrade_source_catalog_pullspec is not None:
+                    if test != "upgrade-legacy":
+                        raise ValueError(f"{where}.upgrade_source_catalog_pullspec is only valid for test: upgrade-legacy")
+                    if not re.match(r"^[^\s@]+@sha256:[a-f0-9]{64}$", upgrade_source_catalog_pullspec):
+                        raise ValueError(f"{where}.upgrade_source_catalog_pullspec must be an image@sha256 pullspec")
             elif upgrade_from is not None:
                 raise ValueError(f"{where} upgrade_from is only valid for test: upgrade or upgrade-legacy")
+            elif upgrade_source_catalog_pullspec is not None:
+                raise ValueError(f"{where} upgrade_source_catalog_pullspec is only valid for test: upgrade-legacy")
             elif ocp_channel is not None:
                 raise ValueError(f"{where} ocp_channel is only valid for test: upgrade or upgrade-legacy")
             as_name = _job_as_name(job, where)
@@ -500,6 +509,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         fbc_catalog_pullspec=(
                             rehearsal_catalog_pins.get(ocp) if quay_version is not None else None
                         ),
+                        upgrade_source_catalog_pullspec=upgrade_source_catalog_pullspec,
                         env=copy.deepcopy(merged_env),
                         as_name=as_name,
                         kind=kind,

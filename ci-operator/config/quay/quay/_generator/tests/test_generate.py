@@ -704,12 +704,13 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
 
 
 def test_legacy_upgrade_cells_are_exact_and_strict() -> None:
-    """Only the four approved OCP 4.22 n-1 edges use the legacy adapter."""
+    """Only the five approved OCP 4.22 n-1 edges use the legacy adapter."""
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     expected = {
         "quay-quay-redhat-3.9__aws-ocp422-s3-upgrade-legacy.yaml": ("3.8", "3.9"),
         "quay-quay-redhat-3.10__aws-ocp422-s3-upgrade-legacy.yaml": ("3.9", "3.10"),
+        "quay-quay-redhat-3.12__aws-ocp422-s3-upgrade-legacy.yaml": ("3.11", "3.12"),
         "quay-quay-redhat-3.14__aws-ocp422-s3-upgrade-legacy.yaml": ("3.13", "3.14"),
         "quay-quay-redhat-3.15__aws-ocp422-s3-upgrade-legacy.yaml": ("3.14", "3.15"),
     }
@@ -725,7 +726,13 @@ def test_legacy_upgrade_cells_are_exact_and_strict() -> None:
         assert "cron" not in test
         assert test["always_run"] is False and test["optional"] is True
         env = test["steps"]["env"]
-        assert env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"].endswith(
+        source_catalog = env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"]
+        if source == "3.11":
+            assert source_catalog.endswith("sha256:e9a7f5414a727fbaf73721ddcb1d7b337c1fc95be681093da534f257c054010c")
+        else:
+            assert source_catalog.endswith("sha256:fcebc181f4a760e98981aeb47dc596f601f7582b630c12e8827a8500b086171a")
+        assert env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == source_catalog
+        assert env["QUAY_UPGRADE_TARGET_CATALOG_IMAGE"].endswith(
             "sha256:fcebc181f4a760e98981aeb47dc596f601f7582b630c12e8827a8500b086171a"
         )
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
@@ -752,6 +759,8 @@ def test_legacy_upgrade_cells_are_exact_and_strict() -> None:
     [
         {"kind": "presubmit", "clouds": ["gcp"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3.8"},
         {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3-8"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade", "upgrade_from": "3.8", "upgrade_source_catalog_pullspec": "quay.io/example/catalog@sha256:e9a7f5414a727fbaf73721ddcb1d7b337c1fc95be681093da534f257c054010c"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3.8", "upgrade_source_catalog_pullspec": "quay.io/example/catalog:latest"},
     ],
 )
 def test_legacy_upgrade_rejects_invalid_source_or_platform(job: dict[str, Any]) -> None:
@@ -900,13 +909,17 @@ def test_rehearsal_catalog_pins_cover_every_canonical_cell() -> None:
             continue
         for test in config["tests"]:
             env = test["steps"]["env"]
-            assert env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"] == pins[cell.ocp_version]
+            assert env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"] == (
+                cell.upgrade_source_catalog_pullspec or pins[cell.ocp_version]
+            )
             assert {
                 key for key in env if key.startswith("MULTISTAGE_PARAM_OVERRIDE_")
             } == {"MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"}
             assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
-            if cell.test == "upgrade":
-                assert env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == pins[cell.ocp_version]
+            if cell.test in {"upgrade", "upgrade-legacy"}:
+                assert env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == (
+                    cell.upgrade_source_catalog_pullspec or pins[cell.ocp_version]
+                )
                 assert env["QUAY_UPGRADE_TARGET_CATALOG_IMAGE"] == pins[cell.ocp_version]
 
 
