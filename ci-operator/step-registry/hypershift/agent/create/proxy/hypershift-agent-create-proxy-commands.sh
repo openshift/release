@@ -41,8 +41,8 @@ if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
     echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
     exit 1
   fi
-  # Builds clone from GitHub and resolve Red Hat builder images; guest pods extract the release image.
-  hosts=$(printf '%s\n' "${hosts}" github.com "${release_registry}" registry.access.redhat.com registry.redhat.io brew.registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
+  # Builds clone from GitHub and resolve Red Hat builder images; guest pods extract the release image from its registry and R2 blob storage.
+  hosts=$(printf '%s\n' "${hosts}" github.com "${release_registry}" .r2.cloudflarestorage.com registry.access.redhat.com registry.redhat.io brew.registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
 
   printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"
