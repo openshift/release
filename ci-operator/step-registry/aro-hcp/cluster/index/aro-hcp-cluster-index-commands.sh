@@ -44,7 +44,7 @@ PROVISION_SHARD_ID_DEFAULT="${ARO_HCP_PROVISION_SHARD_ID:-}"
 curl_es() {
   # Suppress curl diagnostics because the endpoint can contain basic-auth
   # credentials. Callers emit sanitized, generic failure messages instead.
-  curl --fail --silent --connect-timeout 15 --max-time 90 "$@"
+  curl --silent --connect-timeout 15 --max-time 90 "$@"
 }
 
 if ! curl_es "${ES_SERVER}" | jq -e '.cluster_name != null' >/dev/null 2>&1; then
@@ -120,7 +120,9 @@ jq \
        raw_id: ($version.raw_id // $version_default),
        channel_group: ($version.channel_group // $channel_group_default)
      },
-     tags: ($doc.tags // {}),
+     # rosa-metadata maps tags as a text field, so do not send the ARO
+     # cluster-config placeholder object ({}) to the shared index.
+     tags: (if (($doc.tags // "") | type) == "string" then ($doc.tags // "") else "" end),
      multi_az: ($doc.multi_az // false),
      disable_scp_checks: ($doc.disable_scp_checks // false),
      disable_workload_monitoring: ($doc.disable_workload_monitoring // false),
@@ -159,10 +161,18 @@ jq \
      })
    }' "${metadata_path}" > "${payload}"
 
-if ! curl_es -X POST "${ES_SERVER}/${ES_INDEX_VALUE}/_doc" \
+http_status=$(curl_es -X POST "${ES_SERVER}/${ES_INDEX_VALUE}/_doc" \
   -H 'Content-Type: application/json' \
-  --data-binary "@${payload}" > "${response}"; then
-  echo "Elasticsearch indexing request failed." >&2
+  --data-binary "@${payload}" \
+  -o "${response}" \
+  -w '%{http_code}' || true)
+if [[ ! "${http_status}" =~ ^2[0-9][0-9]$ ]]; then
+  error_reason=$(jq -r '.error.reason // .error.type // .message // empty' "${response}" 2>/dev/null || true)
+  if [[ -n "${error_reason}" ]]; then
+    echo "Elasticsearch indexing request failed (HTTP ${http_status}): ${error_reason}" >&2
+  else
+    echo "Elasticsearch indexing request failed (HTTP ${http_status})." >&2
+  fi
   exit 1
 fi
 
