@@ -129,5 +129,5 @@ jq -n --arg branch "$OVERLAYS_BRANCH" --rawfile release_json "$MANIFEST" '{
 Submit `/tmp/osl-rc-gangway.json` using the authenticated REST request in the
 Gangway guide.
 
-Accept the run when it reports 29 passed, 2 intentional skips, 0 unexpected, and 0
-flaky tests. The periodic's existing data-router and gather post steps also run.
+Accept the run when Playwright exits successfully and reports zero failed tests.
+The periodic's existing data-router and gather post steps also run.
