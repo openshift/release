@@ -32,11 +32,12 @@ def attributes(values):
     return [{"key": key, "value": any_value(value)} for key, value in values.items()]
 
 
-def cost_metric(name, amount, start, timestamp, model, broken=None):
+def cost_metric(name, point, model, malformed_attribute=None):
     """Build one cumulative cost point."""
+    amount, start, timestamp = point
     attrs = {"model": model}
-    if broken is not None:
-        attrs["broken"] = broken
+    if malformed_attribute is not None:
+        attrs["broken"] = malformed_attribute
     value_key = "asDouble" if isinstance(amount, float) else "asInt"
     return {"name": name, "sum": {"aggregationTemporality": 2, "dataPoints": [{
         value_key: amount,
@@ -123,20 +124,22 @@ class TrtMetricsTests(unittest.TestCase):
         """Return producer-aware multi-model usage with malformed neighbors."""
         metrics = {"path": "/v1/metrics", "payload": {"resourceMetrics": [
             resource("producer-a", [
-                cost_metric("codex.cost.usage", 1, "same", "1", "gpt-primary"),
-                cost_metric("agentic_ci.codex.cost.usage", 2, "same", "2", "gpt-primary"),
-                cost_metric("agentic_ci.codex.cost.usage", 4, "resume", "4", "gpt-primary"),
-                cost_metric("agentic_ci.codex.cost.usage", 1.25, "helper", "1", "gpt-helper"),
-                cost_metric("agentic_ci.codex.cost.usage", 10**400, "bad", "1", "overflow"),
-                cost_metric("agentic_ci.codex.cost.usage", "NaN", "bad", "2", "nan"),
-                cost_metric("agentic_ci.codex.cost.usage", 8, "bad-list", "1", "broken-list", []),
-                cost_metric("agentic_ci.codex.cost.usage", 8, "bad-dict", "1", "broken-dict", {}),
+                cost_metric("codex.cost.usage", (1, "same", "1"), "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (2, "same", "2"), "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (4, "resume", "4"), "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (1.25, "helper", "1"), "gpt-helper"),
+                cost_metric("agentic_ci.codex.cost.usage", (10**400, "bad", "1"), "overflow"),
+                cost_metric("agentic_ci.codex.cost.usage", ("NaN", "bad", "2"), "nan"),
+                cost_metric("agentic_ci.codex.cost.usage", (8, "bad-list", "1"),
+                            "broken-list", []),
+                cost_metric("agentic_ci.codex.cost.usage", (8, "bad-dict", "1"),
+                            "broken-dict", {}),
             ]),
             resource("producer-b", [
-                cost_metric("agentic_ci.codex.cost.usage", 3, "same", "3", "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (3, "same", "3"), "gpt-primary"),
             ]),
             resource("producer-a", [
-                cost_metric("agentic_ci.codex.cost.usage", 0.5, "same", "3", "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (0.5, "same", "3"), "gpt-primary"),
             ], scope_name="synthetic-scope-b"),
         ]}}
         logs = {"path": "/v1/logs", "payload": {"resourceLogs": [{"scopeLogs": [{
@@ -222,7 +225,7 @@ class TrtMetricsTests(unittest.TestCase):
         """Both real eval jq consumers retain valid usage after a bad JSONL line."""
         metrics = {"path": "/v1/metrics", "payload": {"resourceMetrics": [
             resource("producer", [
-                cost_metric("agentic_ci.codex.cost.usage", 2, "start", "1", "gpt-primary"),
+                cost_metric("agentic_ci.codex.cost.usage", (2, "start", "1"), "gpt-primary"),
             ]),
         ]}}
         logs = {"path": "/v1/logs", "payload": {"resourceLogs": [{"scopeLogs": [{
@@ -275,7 +278,7 @@ class TrtMetricsTests(unittest.TestCase):
                        'require_session_metrics_extractor; rc=$?; '
                        'rm -f "$SESSION_PROMPT_FILE"; exit "$rc"')
             result = subprocess.run(["bash", "-c", command, "_", str(self.helper),
-                                     str(extractor)], capture_output=True, text=True)
+                                     str(extractor)], capture_output=True, text=True, check=False)
             self.assertEqual(result.returncode, expected)
 
         blocks = [
@@ -295,7 +298,8 @@ class TrtMetricsTests(unittest.TestCase):
                         'require_session_metrics_extractor(){ :; }; '
                     )
                     result = subprocess.run(["bash", "-c", prelude + block + action,
-                                             "_", str(prompt)], capture_output=True, text=True)
+                                             "_", str(prompt)], capture_output=True, text=True,
+                                            check=False)
                     self.assertEqual(result.returncode, expected, result.stderr)
                     self.assertFalse(prompt.exists())
 
@@ -308,7 +312,8 @@ class TrtMetricsTests(unittest.TestCase):
             setup_failure = "" if "require_session_metrics_extractor" in block else "false"
             expected_setup_status = 17 if not setup_failure else 1
             result = subprocess.run(["bash", "-c", prelude + block + setup_failure,
-                                     "_", str(prompt)], capture_output=True, text=True)
+                                     "_", str(prompt)], capture_output=True, text=True,
+                                    check=False)
             self.assertEqual(result.returncode, expected_setup_status)
             self.assertFalse(prompt.exists())
 
@@ -317,7 +322,8 @@ class TrtMetricsTests(unittest.TestCase):
             prelude = ('set -e; SESSION_PROMPT_FILE="$1"; copy_artifacts(){ :; }; '
                        'require_session_metrics_extractor(){ :; }; rm(){ return 1; }; ')
             result = subprocess.run(["bash", "-c", prelude + block + "exit 23",
-                                     "_", str(prompt)], capture_output=True, text=True)
+                                     "_", str(prompt)], capture_output=True, text=True,
+                                    check=False)
             self.assertEqual(result.returncode, 23)
             self.assertIn("failed to remove private prompt temporary file", result.stderr)
 
@@ -333,7 +339,7 @@ class TrtMetricsTests(unittest.TestCase):
         }))
         cases_path.write_text("")
         process = subprocess.run([sys.executable, "-", str(result_path), str(cases_path)],
-                                 input=program, capture_output=True, text=True)
+                                 input=program, capture_output=True, text=True, check=False)
         self.assertEqual(process.returncode, 1)
         self.assertIn("eval case list is empty", process.stderr)
         self.assertIn("expected_count=0 actual_count=1", process.stderr)
@@ -348,7 +354,7 @@ class TrtMetricsTests(unittest.TestCase):
                "ARTIFACT_DIR": str(self.root / "artifacts"),
                "UPSTREAM_REPO": "synthetic/repo", "FORK_REPO": "synthetic/fork"}
         process = subprocess.run(["bash", str(SOLVE)], env=env,
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True, check=False)
         self.assertEqual(process.returncode, 1)
         self.assertIn("eval-cases contains no cases", process.stderr)
         self.assertNotIn("Cloning into", process.stderr)
