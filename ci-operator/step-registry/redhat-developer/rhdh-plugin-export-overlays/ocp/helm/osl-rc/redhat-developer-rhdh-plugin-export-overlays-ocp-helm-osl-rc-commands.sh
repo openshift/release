@@ -87,6 +87,39 @@ worker_mcp_diagnostic_summary() {
     printf '%s\n' "${summary:-worker status unavailable}"
 }
 
+worker_config_has_osl_mirror() {
+    local config="$1"
+    local machine_config
+    machine_config=$(oc get mc "${config}" -o json 2>/dev/null) || return 1
+    # This OSL-only entry identifies the rendered configuration produced from the mirror policy.
+    jq -e '
+        [.spec.config.storage.files[]?
+            | select(.path == "/etc/containers/registries.conf")
+            | .contents.source
+            | select(type == "string" and startswith("data:") and contains(";base64,"))
+            | split(",")[1] | @base64d | split("[[registry]]")[]
+            | select(contains("registry.redhat.io/openshift-serverless-1/logic-swf-devmode-rhel9")
+                and contains("brew.registry.redhat.io/rh-osbs/openshift-serverless-1-logic-swf-devmode-rhel9"))]
+        | length > 0
+    ' <<< "${machine_config}" >/dev/null 2>&1
+}
+
+worker_config_has_registry_credentials() {
+    local config="$1"
+    local machine_config
+    machine_config=$(oc get mc "${config}" -o json 2>/dev/null) || return 1
+    jq -e --slurpfile expected "${AUTHFILE}" '
+        [.spec.config.storage.files[]?
+            | select(.path == "/var/lib/kubelet/config.json")
+            | .contents.source
+            | select(type == "string" and startswith("data:") and contains(";base64,"))
+            | split(",")[1] | @base64d | fromjson
+            | select(.auths["brew.registry.redhat.io"].auth == $expected[0].auths["brew.registry.redhat.io"].auth
+                and .auths["registry.stage.redhat.io"].auth == $expected[0].auths["registry.stage.redhat.io"].auth)]
+        | length > 0
+    ' <<< "${machine_config}" >/dev/null 2>&1
+}
+
 sanitize_playwright_counts() {
     jq -cs '
         def safe_count: if type == "number" and . >= 0 and floor == . then . else null end;
@@ -276,6 +309,7 @@ approve_initial_install_plan() {
 
 wait_for_worker_mcp_rollout() {
     local baseline="$1"
+    local required_content="$2"
     local state
     echo "Waiting for worker MachineConfigPool to apply a new rendered configuration"
     for _ in $(seq 1 60); do
@@ -291,11 +325,20 @@ wait_for_worker_mcp_rollout() {
             and .status.unavailableMachineCount == 0
             and .status.degradedMachineCount == 0
         ' <<< "${state}" >/dev/null 2>&1; then
-            return 0
+            local config
+            config=$(jq -r '.status.configuration.name' <<< "${state}")
+            case "${required_content}" in
+                credentials) if worker_config_has_registry_credentials "${config}"; then return 0; fi ;;
+                mirror) if worker_config_has_osl_mirror "${config}"; then return 0; fi ;;
+            esac
         fi
         sleep 10
     done
-    echo "ERROR: worker MachineConfigPool did not finish applying a new rendered configuration within 10m" >&2
+    if [[ "${required_content}" == mirror ]]; then
+        echo "ERROR: worker MachineConfigPool did not apply the OSL image mirror within 10m" >&2
+    else
+        echo "ERROR: worker MachineConfigPool did not apply the registry credentials within 10m" >&2
+    fi
     local status=""
     status=$(oc get mcp worker -o json 2>/dev/null || true)
     printf '  %s\n' "$(worker_mcp_diagnostic_summary "${status}")" >&2
@@ -401,7 +444,7 @@ if ! jq -e --slurpfile merged "${AUTHFILE}" '. == $merged[0]' "${CLUSTER_AUTH}" 
         exit 1
     fi
     # Finish the secret's rollout before using the next configuration change to verify the mirrors.
-    wait_for_worker_mcp_rollout "${MCP_BASELINE}"
+    wait_for_worker_mcp_rollout "${MCP_BASELINE}" credentials
     if ! MCP_BASELINE=$(oc get mcp worker -o jsonpath='{.status.configuration.name}'); then
         echo "ERROR: failed to capture worker MachineConfigPool configuration after pull-secret rollout" >&2
         exit 1
@@ -409,7 +452,7 @@ if ! jq -e --slurpfile merged "${AUTHFILE}" '. == $merged[0]' "${CLUSTER_AUTH}" 
 fi
 
 apply_osl_candidate_mirrors
-wait_for_worker_mcp_rollout "${MCP_BASELINE}"
+wait_for_worker_mcp_rollout "${MCP_BASELINE}" mirror
 
 create_catalogsource "${LOGIC_CATALOG}" "${LOGIC_IIB}"
 wait_for_catalogsource "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}"
