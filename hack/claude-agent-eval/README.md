@@ -103,12 +103,13 @@ published release from the public GitHub `releases/latest` API — never the
 moving `main` branch, which may be broken mid-development. The API call uses
 the mounted `GITHUB_TOKEN` when present, only to lift unauthenticated rate
 limits. `EVAL_HARNESS_REVISION` overrides the resolution with an exact release
-tag or full commit SHA, e.g. to bisect a harness regression; unset means
-latest. The runner fetches exactly the resolved revision, verifies the
-checkout is that revision's commit, and uses that checkout for configuration
-resolution, the Claude plugin, and regression scoring. The resolved revision
-and its commit SHA are recorded in `runner/harness-install.log`, so every run
-stays traceable to an exact commit. The runner resolves
+tag such as `v1.62.0`, e.g. to bisect a harness regression across releases;
+unset means latest. Branches and commit SHAs are rejected. The runner makes a
+shallow clone of exactly the resolved tag (`git clone --depth 1 --branch
+<tag>`), verifies the checkout is that tag's commit, and uses that checkout
+for configuration resolution, the Claude plugin, and regression scoring. The
+resolved tag and its commit SHA are recorded in `runner/harness-install.log`,
+so every run stays traceable to an exact commit. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 harness's rules. Resolution happens once, at preflight; the orchestrator runs

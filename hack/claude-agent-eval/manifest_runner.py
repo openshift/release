@@ -23,14 +23,14 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                              resolve_harness_revision, validate_resolution_result)
+    from .eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                              validate_resolution_result)
     from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                             resolve_harness_revision, validate_resolution_result)
+    from eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                             validate_resolution_result)
     from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
@@ -470,13 +470,6 @@ def remaining(deadline):
     return deadline - time.monotonic()
 
 
-def harness_fetch_targets(revision):
-    """Map a resolved revision to its fetch refspec and checkout target."""
-    if is_commit_sha(revision):  # a bisect pin, fetched as one exact commit
-        return revision, "FETCH_HEAD"
-    return f"refs/tags/{revision}:refs/tags/{revision}", f"refs/tags/{revision}"
-
-
 def verified_revisions(verified):
     """Split captured rev-parse output into (named commit, checked-out HEAD)."""
     lines = [line.strip() for line in verified.strip().splitlines()]
@@ -484,7 +477,7 @@ def verified_revisions(verified):
 
 
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Resolve the harness revision, fetch exactly it, and verify the checkout."""
+    """Resolve the harness release tag, clone exactly it, and verify the checkout."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
     left = remaining(deadline)
@@ -492,45 +485,39 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         raise EvalError("step time limit reached while resolving the harness revision")
     revision, source = resolve_harness_revision(env, min(30, left))
     install_log.write_text(f"Expected harness revision: {revision} ({source})\n", encoding="utf-8")
-    fetch_spec, checkout_ref = harness_fetch_targets(revision)
-    steps = (
-        (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
-        (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
-         60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1", "origin", fetch_spec],
-         300, "fetch the resolved harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", checkout_ref],
-         60, "check out the resolved harness revision"),
-    )
-    for args, timeout, action in steps:
-        left = remaining(deadline)
-        if left <= 0:
-            raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    # A release tag clones directly, detached at the tag's commit.
+    args = ["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
+            "--branch", revision, HARNESS_URL, str(harness)]
+    action = "clone the resolved harness release"
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    with install_log.open("ab") as output:
+        output.write(("$ " + shlex.join(args) + "\n").encode())
+    try:
+        status = command(args, repo, env, install_log, min(300, left), append=True)
+    except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
-            output.write(("$ " + shlex.join(args) + "\n").encode())
-        try:
-            status = command(args, repo, env, install_log, min(timeout, left), append=True)
-        except subprocess.TimeoutExpired as error:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
-            raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
-        except OSError as error:
-            with install_log.open("ab") as output:
-                output.write(f"{type(error).__name__}: {error}\n".encode())
-            raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
-        if status:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} exited with status {status}\n".encode())
-            raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
+            output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
+        raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
+    except OSError as error:
+        with install_log.open("ab") as output:
+            output.write(f"{type(error).__name__}: {error}\n".encode())
+        raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
+    if status:
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: {action} exited with status {status}\n".encode())
+        raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
 
     left = remaining(deadline)
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        # rev-parse prints one line per argument: the commit the resolved
-        # revision names, then the checked-out HEAD. Requiring both to be
-        # the same commit verifies the checkout; the resolved SHA is logged
-        # so a run stays traceable to an exact commit even if a tag moves.
+        # rev-parse prints one line per argument: the commit the release tag
+        # names, then the checked-out HEAD. Requiring both to be the same
+        # commit verifies the checkout (--branch also accepts a branch name);
+        # the resolved SHA is logged so a run stays traceable to an exact
+        # commit even if a tag moves.
         status, verified = command(["git", "-C", str(harness), "rev-parse",
                                     expected_commit_ref(revision), "HEAD"],
                                    repo, env, install_log, min(30, left),

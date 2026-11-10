@@ -239,7 +239,7 @@ def checked_harness(path):
         )
         if described.returncode or not described.stdout.strip():
             raise ValueError(f"{path} is not checked out at an exact release tag; "
-                             "pass a tag or commit checkout, not a moving branch")
+                             "pass a release tag checkout, not a moving branch")
     if not (path / "agent_eval/config.py").is_file():
         raise ValueError(f"{path} does not contain agent_eval/config.py")
     return path
