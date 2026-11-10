@@ -48,7 +48,11 @@ tests:
       commands: |
         set -euo pipefail
 
-        # --- Mint a GitHub App installation token (openshift-app-platform-shift-bot) ---
+        # An executable provider refreshes the one-hour installation token at publication.
+        mkdir -p /tmp/bin
+        cat > /tmp/bin/github-app-token <<'TOKEN_PROVIDER'
+        #!/usr/bin/env bash
+        set -euo pipefail
         APP_ID=$(cat /var/run/github-app/app-id)
         PEM_PATH="/var/run/github-app/private-key.pem"
         HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
@@ -85,7 +89,11 @@ tests:
           echo "ERROR: Failed to mint installation token (HTTP ${T_CODE})" >&2
           exit 1
         fi
-        export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+        echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])"
+
+        TOKEN_PROVIDER
+        chmod 700 /tmp/bin/github-app-token
+        export GITHUB_TOKEN_COMMAND=/tmp/bin/github-app-token
 
         # Install gh + oc CLIs (not in the base src image).
         # oc is required by update_golang_builder / _resolve_builder_ocp.
@@ -97,8 +105,14 @@ tests:
           | tar -xz -C /tmp/bin oc
         export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
+        OSV_VERSION=2.7.1
+        curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_amd64" \
+          -o /tmp/bin/osv-scanner
+        printf '%s  %s\n' fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8 /tmp/bin/osv-scanner \
+          | sha256sum --check --strict
+        chmod 755 /tmp/bin/osv-scanner
+
         git config --global --add safe.directory "$(pwd)"
-        export FORCE_REMOTE_URLS=1
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
         ./hack/auto-rebase.sh
