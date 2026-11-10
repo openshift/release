@@ -3,7 +3,6 @@
 set -x
 set -e
 
-sleep 10
 # Hosted Control Plane parameters
 HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HC_NAME
