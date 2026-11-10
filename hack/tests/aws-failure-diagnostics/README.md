@@ -53,10 +53,17 @@ handing the post step the producer's own directory.
   status even when the two account values are identical;
 * account match, mismatch, missing reference, malformed reference and failed
   STS read;
-* rejection of credential-shaped values in every position the suite under test
-  controls: a key-like or secret-key-shaped error code, a JWT, a secret-shaped
-  request ID, a bare account ID offered as a request ID, and prose offered as
-  an AWS service name;
+* refusal of every value the suite under test offers in the fields read out of
+  JUnit, unless it is a member of the declared finite set for a service,
+  operation or error code, a canonical lowercase-hex UUID for a request ID, an
+  exact EC2 instance ID, or a timestamp that re-derives from a real calendar
+  date at whole-second precision; and no record at all when nothing was
+  accepted. The adversarial fixture covers a short low-entropy password as an
+  error code, an uppercase opaque token as a request ID, prose as a service
+  name, an invented operation, an uppercase-hex UUID and an over-long instance
+  ID, and asserts that none of them reaches either report or either stream;
+* the genuine request IDs from the failure this capture was built for surviving
+  the shared-directory handoff unchanged, with their provenance;
 * decoding of XML entity escapes, asserted with a numeric escape that cannot be
   matched around;
 * refusal of a JUnit file that declares a DTD anywhere in the file, and of an

@@ -65,12 +65,32 @@ chain:
           pseudonymisation for correlation and not a confidentiality control: the
           digest is unsalted and the hostname space is small, so a reader who
           knows the naming scheme can recover the name.
-        * Every emitted string is matched against a strict allowlist pattern first; a
-          value that does not match is dropped and replaced by a status code. The
-          patterns are shaped after the AWS identifiers they accept, so neither free
-          prose nor an opaque token can ride along in a field whose value the suite
-          under test controls, and looks_like_secret() refuses credential shapes a
-          second time independently of which field they appeared in.
+        * Nine emitted values come from JUnit the suite under test writes: the
+          service, operation, error code, request ID, HTTP status and instance ID
+          parsed out of <failure> text, and the start-time, end-time and name
+          attributes of the <testcase>. The service, operation and error code are
+          emitted only when they are members of the finite sets declared below;
+          anything else becomes a status. The request ID is emitted only when it
+          is a canonical lowercase-hex UUID, the instance ID only when it has the
+          exact EC2 form, the HTTP status only in 100-599, the timestamps only
+          after being re-derived from a real calendar date at whole-second
+          precision, and the name only as an enum plus a digest. A failure from
+          which nothing was accepted produces no record at all.
+        * Shape validation is used for the remaining values, which come from the
+          cluster or from this step's own environment. Matching a shape does not
+          prove a value is not a secret, and this document makes no such claim:
+          it bounds what an arbitrary string can become, and looks_like_secret()
+          refuses obvious credential shapes on top of that.
+        * Known residual exposure, accepted deliberately. A producer able to
+          write arbitrary JUnit can still choose, per record, a 128-bit request
+          ID, a 68-bit instance ID, two whole-second timestamps, an HTTP status
+          and a 48-bit test digest, and can choose how many records there are up
+          to MAX_ERRORS. The capture is bounded, not a confidentiality boundary
+          against its own producer: across a full document that is on the order
+          of a few hundred bytes of producer-chosen data. It is accepted because
+          the original AWS request IDs are the diagnostic this capture exists to
+          preserve, and because the producer is the test binary from the payload
+          under test rather than an untrusted third party.
         * Environment variables are only ever inspected, never copied out: their
           values reach the document solely as booleans or as a region name that
           matched the region pattern.
@@ -79,6 +99,7 @@ chain:
       """
 
       import argparse
+      import datetime
       import hashlib
       import json
       import os
@@ -99,22 +120,65 @@ chain:
 
       RE_REGION = re.compile(r"^[a-z]{2,4}(?:-[a-z0-9]+){1,3}-\d{1,2}$")
       RE_AZ = re.compile(r"^([a-z]{2,4}(?:-[a-z0-9]+){1,3}-\d{1,2})[a-z]$")
-      RE_INSTANCE = re.compile(r"^i-[0-9a-f]{8,17}$")
+      RE_INSTANCE = re.compile(r"^i-(?:[0-9a-f]{8}|[0-9a-f]{17})$")
       RE_NODE = re.compile(r"^[a-z0-9][a-z0-9.\-]{0,252}$")
-      RE_PROVIDER_ID = re.compile(r"^aws:///[a-z0-9\-]{1,64}/i-[0-9a-f]{8,17}$")
-      # An AWS SDK service ID: up to four capitalised words, as in "EC2" or
-      # "Elastic Load Balancing v2". Prose between "operation error " and the
-      # operation name does not match, so a log fragment cannot ride along.
-      RE_SERVICE = re.compile(r"^[A-Z][A-Za-z0-9]{0,31}(?: [A-Za-z0-9]{1,31}){0,3}$")
-      RE_OPERATION = re.compile(r"^[A-Z][A-Za-z0-9]{0,63}$")
-      # An AWS error code: capitalised, dot or hyphen separated, as in
-      # "InvalidInstanceID.NotFound".
-      RE_ERROR_CODE = re.compile(r"^[A-Z][A-Za-z0-9]{0,47}(?:[.\-][A-Za-z0-9]{1,47}){0,3}$")
-      # An AWS request ID is either a dashed UUID or an uppercase alphanumeric
-      # token containing at least one letter, which excludes a bare account ID.
+      RE_PROVIDER_ID = re.compile(
+          r"^aws:///[a-z0-9\-]{1,64}/i-(?:[0-9a-f]{8}|[0-9a-f]{17})$"
+      )
+      # The service, operation and error code are read out of JUnit failure text
+      # that the suite under test writes, so they are never copied: a value is
+      # emitted only when it is a member of one of these finite sets, which are
+      # taken from the SDK and the test source the payload actually links.
+      #
+      # aws-sdk-go-v2 service/ec2/api_client.go: ServiceID = "EC2"
+      # aws-sdk-go-v2 service/elasticloadbalancingv2/api_client.go:
+      #   ServiceID = "Elastic Load Balancing v2"
+      AWS_SERVICES = frozenset({"EC2", "Elastic Load Balancing v2"})
+      # Every AWS call the cloud-provider-aws loadbalancer e2e tests make, from
+      # k8s.io/cloud-provider-aws tests/e2e/loadbalancer.go.
+      AWS_OPERATIONS = frozenset({
+          "AuthorizeSecurityGroupIngress",
+          "CreateSecurityGroup",
+          "DeleteSecurityGroup",
+          "DescribeInstances",
+          "DescribeListeners",
+          "DescribeSecurityGroups",
+          "DescribeTargetGroupAttributes",
+          "DescribeTargetGroups",
+          "DescribeTargetHealth",
+      })
+      # The code this capture exists for, plus every code named in the SDK the
+      # payload links: aws/retry/standard.go DefaultThrottleErrorCodes and
+      # aws/retry/middleware.go credential and clock-skew codes. This is a safety
+      # allowlist and not a catalogue of AWS error codes, so a real code outside
+      # it, for example UnauthorizedOperation, is reported as a status rather
+      # than copied.
+      AWS_ERROR_CODES = frozenset({
+          "InvalidInstanceID.NotFound",
+          "AuthFailure",
+          "BandwidthLimitExceeded",
+          "EC2ThrottledException",
+          "LimitExceededException",
+          "PriorRequestNotComplete",
+          "ProvisionedThroughputExceededException",
+          "RequestLimitExceeded",
+          "RequestThrottled",
+          "RequestThrottledException",
+          "SlowDown",
+          "RequestExpired",
+          "RequestInTheFuture",
+          "SignatureDoesNotMatch",
+          "ThrottledException",
+          "Throttling",
+          "ThrottlingException",
+          "TooManyRequestsException",
+          "TransactionInProgressException",
+      })
+      # Only a canonical lowercase-hex UUID is kept as a request ID. Every
+      # request ID in the failures this capture was built for has that form, and
+      # an opaque alphanumeric token does not.
       RE_REQUEST_ID = re.compile(
-          r"^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-          r"|(?=[0-9A-Z]*[A-Z])[0-9A-Z]{8,64})$"
+          r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
       )
       RE_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$")
       # AWS resource-ID prefixes that are never a diagnostic value.
@@ -132,7 +196,7 @@ chain:
       FIND_STATUS = re.compile(r"StatusCode: (\d{3})\b")
       FIND_REQUEST_ID = re.compile(r"RequestID: ([0-9A-Za-z._\-]{8,64})")
       FIND_ERROR_CODE = re.compile(r"api error ([A-Za-z][A-Za-z0-9._\-]{0,63})")
-      FIND_INSTANCE = re.compile(r"\bi-[0-9a-f]{8,17}\b")
+      FIND_INSTANCE = re.compile(r"\bi-(?:[0-9a-f]{8}|[0-9a-f]{17})\b")
 
       # Ordered (needle tuple -> enum) map. The raw test name is never emitted; it is
       # reduced to one of these enum values plus a truncated digest. The digest only
@@ -198,31 +262,83 @@ chain:
           return hashlib.sha256(name.encode("utf-8", "replace")).hexdigest()[:12]
 
 
+      def allow_timestamp(value):
+          """Return a whole-second RFC3339 UTC timestamp, or None.
+
+          The JUnit timestamps are written by the suite under test, so the value
+          is re-derived from a real calendar date instead of being accepted on
+          shape. That rejects impossible components and drops the sub-second
+          digits, which would otherwise be free bytes for a hostile producer.
+          """
+          if value is None:
+              return None
+          value = value.strip()
+          if not RE_TIMESTAMP.match(value):
+              return None
+          base = value.split(".", 1)[0].rstrip("Z")
+          try:
+              parsed = datetime.datetime.strptime(base, "%Y-%m-%dT%H:%M:%S")
+          except ValueError:
+              return None
+          return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+      def from_enum(value, members):
+          """Return value when it is a member of a finite set, with a status.
+
+          The caller supplies text that the suite under test controls, so the
+          value is matched against a known set rather than a shape: a value that
+          is not a member is reported as a status and never copied.
+          """
+          if value is None:
+              return None, "absent"
+          value = value.strip()
+          if not value:
+              return None, "absent"
+          if value in members:
+              return value, "known"
+          return None, "not-in-allowlist"
+
+
       def parse_aws_error(text):
-          """Extract allowlisted AWS API error fields from a failure message.
+          """Extract AWS API error fields from a failure message.
 
           Returns None when the text is not recognisable as an AWS API error, so
           an unrelated failure contributes nothing at all to the document.
+
+          Six things can come out of this text: a service, an operation and an
+          error code, each of which must be a member of a finite set declared
+          above; a request ID, which must be a canonical lowercase-hex UUID; an
+          instance ID in the exact EC2 form; and an HTTP status in 100-599.
+          Everything else about the message is discarded, and if none of the
+          service, operation, error code or request ID is accepted the message
+          produces no record at all.
           """
           if not text:
               return None
           text = text[:MAX_FAILURE_TEXT]
 
           service = operation = None
+          service_status = operation_status = "absent"
           match = FIND_SERVICE_OPERATION.search(text)
           if match:
-              service = allow(match.group(1), RE_SERVICE)
-              operation = allow(match.group(2), RE_OPERATION)
+              service, service_status = from_enum(match.group(1), AWS_SERVICES)
+              operation, operation_status = from_enum(match.group(2), AWS_OPERATIONS)
 
           request_id = None
+          request_id_status = "absent"
           match = FIND_REQUEST_ID.search(text)
           if match:
               request_id = allow(match.group(1), RE_REQUEST_ID)
+              request_id_status = (
+                  "canonical-uuid" if request_id else "not-canonical-uuid"
+              )
 
           error_code = None
           match = FIND_ERROR_CODE.search(text)
-          if match:
-              error_code = allow(match.group(1), RE_ERROR_CODE)
+          error_code, error_code_status = from_enum(
+              match.group(1) if match else None, AWS_ERROR_CODES
+          )
 
           http_status = None
           match = FIND_STATUS.search(text)
@@ -232,22 +348,32 @@ chain:
                   http_status = candidate
 
           instance_id = None
+          instance_id_status = "absent"
           match = FIND_INSTANCE.search(text)
           if match:
               instance_id = allow(match.group(0), RE_INSTANCE)
+              instance_id_status = "parsed" if instance_id else "malformed"
 
-          if request_id is None and error_code is None and operation is None:
-              # Not recognisable as an AWS API error: record nothing at all rather
-              # than risk carrying unrelated failure text into the document.
+          if operation is None and error_code is None and request_id is None:
+              # Nothing was accepted, so this is not recognisable as an AWS API
+              # error we can describe. Record nothing at all: a record built only
+              # from refusals would still carry an instance ID, an HTTP status and
+              # two timestamps out of text we decided not to trust, and would
+              # consume a slot that a real AWS error needs.
               return None
 
           return {
               "service": service,
+              "service_status": service_status,
               "operation": operation,
+              "operation_status": operation_status,
               "http_status": http_status,
               "error_code": error_code,
+              "error_code_status": error_code_status,
               "request_id": request_id,
+              "request_id_status": request_id_status,
               "instance_id": instance_id,
+              "instance_id_status": instance_id_status,
           }
 
 
@@ -337,11 +463,11 @@ chain:
                                   "source": "junit-failure",
                                   "test_class": classify_test(name),
                                   "test_digest": digest(name),
-                                  "test_started_at": allow(
-                                      element.get("start-time"), RE_TIMESTAMP
+                                  "test_started_at": allow_timestamp(
+                                      element.get("start-time")
                                   ),
-                                  "test_ended_at": allow(
-                                      element.get("end-time"), RE_TIMESTAMP
+                                  "test_ended_at": allow_timestamp(
+                                      element.get("end-time")
                                   ),
                               }
                           )
@@ -627,9 +753,9 @@ chain:
           document = {
               "schema_version": SCHEMA_VERSION,
               "producer": PRODUCER,
-              "captured_at": allow(args.captured_at, RE_TIMESTAMP),
-              "suite_started_at": allow(args.test_started_at, RE_TIMESTAMP),
-              "suite_ended_at": allow(args.test_ended_at, RE_TIMESTAMP),
+              "captured_at": allow_timestamp(args.captured_at),
+              "suite_started_at": allow_timestamp(args.test_started_at),
+              "suite_ended_at": allow_timestamp(args.test_ended_at),
               "suite_exit_code": exit_code,
               "credential_context": credential_context(),
               "region_evidence": evidence,

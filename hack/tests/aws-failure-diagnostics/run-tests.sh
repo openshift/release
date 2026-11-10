@@ -34,6 +34,10 @@ SENTINELS=(
   "eyJhbGciOiJSUzI1NiIs"
   "ip-10-0-107-53"
   "compute.internal"
+  "PrivatePassword123"
+  "CUSTOMERSESSION1234567890"
+  "Hunter2 Secret Token"
+  "LeakedOperationName"
 )
 
 PASS=0
@@ -155,7 +159,9 @@ check_eq "captures the original request IDs" \
   "34c5f203-7490-4304-bfbd-b7be20abaf1f 8139035b-902f-4bb2-80d9-b80a73e3438b ccd6a6f2-c4b8-4410-8b3f-9a9466e61e30" \
   "$(jq -r '[.aws_api_errors[].request_id | select(. != null)] | sort | join(" ")' "${OUT}")"
 check_eq "drops a key-like request id" "1" \
-  "$(jq -r '[.aws_api_errors[] | select(.request_id == null and .error_code == "UnauthorizedOperation")] | length' "${OUT}")"
+  "$(jq -r '[.aws_api_errors[] | select(.request_id == null and .request_id_status == "not-canonical-uuid" and .http_status == 403)] | length' "${OUT}")"
+check_eq "an error code outside the allowlist is a status, not a value" "1" \
+  "$(jq -r '[.aws_api_errors[] | select(.error_code == null and .error_code_status == "not-in-allowlist")] | length' "${OUT}")"
 check_eq "captures the AWS error code" "InvalidInstanceID.NotFound" \
   "$(jq -r '.aws_api_errors[0].error_code' "${OUT}")"
 check_eq "captures the HTTP status" "400" "$(jq -r '.aws_api_errors[0].http_status' "${OUT}")"
@@ -365,6 +371,8 @@ check_eq "a secret-shaped request id is dropped" "null" \
   "$(jq -r '.aws_api_errors[1].request_id' "${OUT_CRED}")"
 check_eq "the surrounding allowlisted fields survive" "EC2 DescribeInstances 403" \
   "$(jq -r '.aws_api_errors[0] | "\(.service) \(.operation) \(.http_status)"' "${OUT_CRED}")"
+check_eq "the refusals are recorded as statuses" "not-in-allowlist not-canonical-uuid" \
+  "$(jq -r '"\(.aws_api_errors[0].error_code_status) \(.aws_api_errors[1].request_id_status)"' "${OUT_CRED}")"
 check_no_sentinels "no credential-shaped value reaches the document" "${OUT_CRED}"
 
 # Fields whose value the suite under test controls must not accept prose or an
@@ -389,6 +397,46 @@ check_eq "a bare account id in the request id position is dropped" "null" \
 check_eq "a JWT in the error code position is dropped" "null" \
   "$(jq -r '.aws_api_errors[3].error_code' "${OUT_LEAK}")"
 check_no_sentinels "no leak attempt reaches the document" "${OUT_LEAK}"
+
+# Short, low-entropy and uppercase-opaque values are the class that shape rules
+# cannot separate from a real identifier, so every field read out of failure
+# text is a finite set or a canonical UUID. One fixture exercises all four.
+OUT_ADVERSARIAL="${WORK}/context-adversarial.json"
+env LEASED_RESOURCE="us-west-2--x-0" CLUSTER_PROFILE_DIR="/secrets/profile" \
+  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
+  python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-adversarial-fields" \
+    --nodes-file "${NODES}" --infra-region-file "${INFRA}" \
+    --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
+    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_ADVERSARIAL}"
+check_eq "a short password offered as an error code is refused" "null not-in-allowlist" \
+  "$(jq -r '.aws_api_errors[0] | "\(.error_code) \(.error_code_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "an uppercase session token offered as a request ID is refused" "null not-canonical-uuid" \
+  "$(jq -r '.aws_api_errors[0] | "\(.request_id) \(.request_id_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "prose offered as a service name is refused" "null not-in-allowlist" \
+  "$(jq -r '.aws_api_errors[1] | "\(.service) \(.service_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "an invented operation name is refused" "null not-in-allowlist" \
+  "$(jq -r '.aws_api_errors[1] | "\(.operation) \(.operation_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "an uppercase-hex UUID is refused as non-canonical" "null not-canonical-uuid" \
+  "$(jq -r '.aws_api_errors[2] | "\(.request_id) \(.request_id_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "a sixteen hex digit instance id is not an instance id" "null absent" \
+  "$(jq -r '.aws_api_errors[2] | "\(.instance_id) \(.instance_id_status)"' "${OUT_ADVERSARIAL}")"
+check_eq "sub-second digits are dropped from a suite timestamp" "2026-11-06T05:19:10Z" \
+  "$(jq -r '.aws_api_errors[3].test_started_at' "${OUT_ADVERSARIAL}")"
+check_eq "an impossible calendar timestamp is refused" "null" \
+  "$(jq -r '.aws_api_errors[3].test_ended_at' "${OUT_ADVERSARIAL}")"
+check_eq "a failure with nothing acceptable produces no record at all" "4" \
+  "$(jq -r '.aws_api_error_count' "${OUT_ADVERSARIAL}")"
+check_eq "the refused failure contributes no instance id or status" "0" \
+  "$(jq -r '[.aws_api_errors[] | select(.http_status == 418)] | length' "${OUT_ADVERSARIAL}")"
+check_no_sentinels "no adversarial value reaches the document" "${OUT_ADVERSARIAL}"
+
+# The finite sets must actually be finite: a member is kept, a near miss is not.
+check_eq "every emitted service is a declared member" "true" \
+  "$(jq -r '[.aws_api_errors[].service | select(. != null)] | (length > 0) and all(. == "EC2" or . == "Elastic Load Balancing v2")' "${OUT_ADVERSARIAL}")"
+check_eq "every emitted operation is a declared member" "true" \
+  "$(jq -r --argjson members '["AuthorizeSecurityGroupIngress","CreateSecurityGroup","DeleteSecurityGroup","DescribeInstances","DescribeListeners","DescribeSecurityGroups","DescribeTargetGroupAttributes","DescribeTargetGroups","DescribeTargetHealth"]' '[.aws_api_errors[].operation | select(. != null)] | (length > 0) and all(. as $o | $members | index($o) != null)' "${OUT_ADVERSARIAL}")"
+check_eq "every emitted request ID is a canonical UUID" "true" \
+  "$(jq -r '[.aws_api_errors[].request_id | select(. != null)] | (length > 0) and all(test("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"))' "${OUT_ADVERSARIAL}")"
 
 # XML entity escapes must be decoded, not pattern-matched around.
 OUT_ESC="${WORK}/context-escapes.json"
@@ -843,14 +891,14 @@ simulate_shared_dir_transport() {
 }
 
 run_handoff() {
-  # run_handoff <name> <producer-shared-dir-writer>
-  local name="$1" layout="$2"
+  # run_handoff <name> <layout> [junit-fixture-dir]
+  local name="$1" layout="$2" fixture="${3:-junit-aws-errors}"
   local root="${WORK}/handoff-${name}"
   local produced="${root}/produced" consumed="${root}/consumed"
   local artifacts="${root}/artifacts" post_artifacts="${root}/post-artifacts"
   local profile="${root}/profile" bin="${root}/bin"
   mkdir -p "${produced}" "${artifacts}/junit" "${post_artifacts}" "${profile}" "${bin}"
-  cp "${FIXTURES}/junit-aws-errors/"*.xml "${artifacts}/junit/"
+  cp "${FIXTURES}/${fixture}/"*.xml "${artifacts}/junit/"
   printf '[default]\naws_access_key_id = fixture\n' > "${profile}/.awscred"
   # Written by the provisioning steps, at the top level of SHARED_DIR.
   printf 'arn:aws:iam::123456789012:role/Fixture-Installer-Role\n' > "${produced}/account-roles-arns"
@@ -898,8 +946,13 @@ else
 fi
 check_eq "the post step runs the comparison after the transport" "match" \
   "$(jq -r '.account_match.status' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
-check_eq "the original request IDs cross the boundary" "3" \
-  "$(jq -r '[.test_context.aws_api_errors[].request_id | select(. != null)] | length' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_eq "the original request IDs cross the boundary unchanged" \
+  "34c5f203-7490-4304-bfbd-b7be20abaf1f 8139035b-902f-4bb2-80d9-b80a73e3438b ccd6a6f2-c4b8-4410-8b3f-9a9466e61e30" \
+  "$(jq -r '[.test_context.aws_api_errors[].request_id | select(. != null)] | sort | join(" ")' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_eq "they are carried with their provenance" "canonical-uuid canonical-uuid canonical-uuid" \
+  "$(jq -r '[.test_context.aws_api_errors[] | select(.request_id != null) | .request_id_status] | join(" ")' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_eq "the observed EC2 failure is still fully described" "EC2 DescribeInstances InvalidInstanceID.NotFound 400" \
+  "$(jq -r '.test_context.aws_api_errors[0] | "\(.service) \(.operation) \(.error_code) \(.http_status)"' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
 check_eq "the post step exits zero after the transport" "0" "$(cat "${root}/post-status")"
 check_no_sentinels "no sentinel crosses the transport into the identity report" \
   "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json"
@@ -909,6 +962,24 @@ check_eq "no node hostname reaches the post step output" "0" \
   "$(cat "${root}/post-stdout.txt" "${root}/post-stderr.txt" | grep -cF -e 'ip-10-0-107-53' -e 'compute.internal' || true)"
 check_no_sentinels "no node hostname reaches the capture stdout" "${root}/produce-stdout.txt"
 check_no_sentinels "no node hostname reaches the capture stderr" "${root}/produce-stderr.txt"
+
+# The same path, with a producer that writes adversarial failure text: nothing
+# it offered may appear in either report or in either stream.
+root="$(run_handoff adversarial flat junit-adversarial-fields)"
+check_eq "the adversarial handoff still reaches the comparison" "match" \
+  "$(jq -r '.account_match.status' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_no_sentinels "no adversarial value reaches the capture document" \
+  "${root}/artifacts/aws-failure-diagnostics/test-context.json"
+check_no_sentinels "no adversarial value reaches the identity report" \
+  "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json"
+check_no_sentinels "no adversarial value reaches the identity summary" \
+  "${root}/post-artifacts/aws-failure-diagnostics/identity-check.txt"
+check_no_sentinels "no adversarial value reaches the capture stdout" "${root}/produce-stdout.txt"
+check_no_sentinels "no adversarial value reaches the capture stderr" "${root}/produce-stderr.txt"
+check_no_sentinels "no adversarial value reaches the post step stdout" "${root}/post-stdout.txt"
+check_no_sentinels "no adversarial value reaches the post step stderr" "${root}/post-stderr.txt"
+check_eq "the adversarial fields are carried as statuses only" "not-in-allowlist not-canonical-uuid" \
+  "$(jq -r '.test_context.aws_api_errors[0] | "\(.error_code_status) \(.request_id_status)"' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
 
 # Negative control: the subdirectory layout is dropped by the transport, so the
 # post step never runs its comparison. This is what the flat case guards.
