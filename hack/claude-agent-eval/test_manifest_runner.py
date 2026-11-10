@@ -68,21 +68,22 @@ if "clone" in args:  # The runner's only clone is the harness release.
         (package / "config.py").write_text("""from pathlib import Path
 import os, time
 class EvalConfig:
-    def __init__(self, path, raw):
+    def __init__(self, raw, chain):  # Paths resolve from the chain root, as in the harness.
         self.models = type('Models', (), {'skill': (raw.get('models') or {}).get('skill')})()
         self.thresholds = raw.get('thresholds', {})
         self.dataset = type('Dataset', (), {'path': (raw.get('dataset') or {}).get('path', '')})()
-        self.base = Path(path).resolve().parent
-        self.raw, self.stem = raw, Path(path).stem
+        self.base = Path(chain[0]).parent
+        self.raw, self.stem = raw, Path(chain[0]).stem
+    def resolve_skill(self):
+        return (self.raw.get('execution') or {}).get('skill') or self.raw.get('skill') or None
     def eval_name(self):  # Same priority as the harness: skill under test, then name, then stem.
-        return ((self.raw.get('execution') or {}).get('skill') or self.raw.get('skill')
-                or self.raw.get('name') or self.stem)
+        return self.resolve_skill() or self.raw.get('name') or self.stem
     def resolve_path(self, value):
         path = Path(value)
         return path if path.is_absolute() else self.base / path
     @classmethod
     def from_yaml(cls, path):
-        return cls(path, load_raw(path)[0])
+        return cls(*load_raw(path))
 def load_raw(path):
     import yaml
     time.sleep(float(os.environ.get('RESOLVER_SLEEP', '0')))
@@ -90,7 +91,10 @@ def load_raw(path):
     raw = yaml.safe_load(path.read_text()) or {}
     if not isinstance(raw, dict):
         raise ValueError('config must be a mapping')
-    return raw, [str(path)]
+    if 'extends' not in raw:
+        return raw, [str(path)]
+    merged, chain = load_raw(path.parent / raw.pop('extends'))
+    return {**merged, **raw}, [*chain, str(path)]
 """)
     script = dest / "skills/eval-run/scripts/score.py"
     script.parent.mkdir(parents=True)
@@ -131,22 +135,40 @@ with open(os.environ["CALLS"], "a") as out:
 run_id = flag("--run-id")
 root = pathlib.Path(os.environ.get("AGENT_EVAL_RUNS_DIR", "eval/runs"))
 behavior = json.loads(os.environ.get("BEHAVIORS", "{}" )).get(config, "pass")
-import yaml  # The harness names runs after EvalConfig.eval_name(); a guessed name is never scored.
+import functools, yaml
+from agent_eval.config import EvalConfig, load_raw  # The fake harness checkout on PYTHONPATH.
 raw = yaml.safe_load(pathlib.Path(config).read_text()) or {}
-eval_name = ((raw.get("execution") or {}).get("skill") or raw.get("skill") or raw.get("name")
-             or pathlib.Path(config).stem)
-run = root / ("config-name" if behavior == "wrong_name_only" else eval_name) / run_id
+harness_config = EvalConfig.from_yaml(config)  # Runs are named after its eval_name(), never a guess.
+chain = [os.path.relpath(p) for p in load_raw(config)[1]]  # Recorded relative to the harness's cwd.
+chain = {"substituted_config": [f"tmp/{pathlib.Path(config).stem}-fixed.yaml"],  # An edited copy (CI).
+         "extra_chain_file": ["evals/extra-base.yaml", *chain], "missing_chain_file": chain[1:],
+         "absolute_chain": [os.path.abspath(item) for item in chain]}.get(behavior, chain)
+case_ids = sorted(d.name for d in harness_config.resolve_path(harness_config.dataset.path).iterdir() if d.is_dir())
+# workspace.py's rule: a nonempty --cases keeps matching directories and silently drops unknown IDs.
+case_ids = [case for case in case_ids if not row["cases"] or behavior == "ignore_cases" or case in row["cases"]]
+case_ids = case_ids[:-1] if behavior == "stop_early" else case_ids
+skill = "other:skill" if behavior == "wrong_skill" else harness_config.resolve_skill()
+mode = "batch" if behavior == "batch_mode" else "case"  # Batch runs record no per-case results.
+eval_params = {"execution_mode": mode, "config_chain": chain, **({"skill": skill} if skill else {})}
+run_result = {"exit_code": 1 if behavior == "case_failure" else 0, "execution_mode": mode, "eval_params": eval_params,
+              "model": "other-model" if behavior == "wrong_model" else row["model"],
+              **({} if mode == "batch" else {"per_case": {case: {"exit_code": 0} for case in case_ids}})}
+if behavior.startswith("drop:"):
+    *parents, field = behavior[len("drop:"):].split(".")
+    del functools.reduce(dict.get, parents, run_result)[field]
+run = root / ("config-name" if behavior == "wrong_name_only" else harness_config.eval_name()) / run_id
 run.mkdir(parents=True)
 if behavior == "run_alias":
     alias = root / "config-name" / run_id
     alias.parent.mkdir(parents=True)
     alias.symlink_to(run, target_is_directory=True)
 if behavior != "missing_result":
-    (run / "run_result.json").write_text(json.dumps({"exit_code": 1 if behavior == "case_failure" else 0}))
+    (run / "run_result.json").write_text(json.dumps(run_result))
 if behavior == "tamper_thresholds": pathlib.Path(config).write_text(yaml.safe_dump({**raw, "thresholds": {"quality": {"min_pass_rate": 0.0}}}))
 if behavior != "missing_summary":
     rate = 0.0 if behavior in ("threshold_failure", "tamper_thresholds") else 1.0
-    (run / "summary.yaml").write_text('judges: {quality: {pass_rate: ' + str(rate) + '}}\n')
+    scored = case_ids + ["case-ghost"] if behavior == "summary_mismatch" else case_ids
+    (run / "summary.yaml").write_text(yaml.safe_dump({"judges": {"quality": {"pass_rate": rate}}, "per_case": dict.fromkeys(scored, {})}))
 if behavior == "removed_alias":
     alias = root / "config-name"
     alias.symlink_to(run.parent, target_is_directory=True)
@@ -240,32 +262,6 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         target.write_text(f"#!{sys.executable}\n" + source)
         target.chmod(0o755)
 
-    def make_fake_harness(self):
-        root = self.root / "standalone-harness"
-        package = root / "agent_eval"
-        package.mkdir(parents=True)
-        (package / "__init__.py").write_text("")
-        (package / "config.py").write_text("""from pathlib import Path
-from types import SimpleNamespace
-import yaml
-def load_raw(path):
-    path = Path(path).resolve()
-    return yaml.safe_load(path.read_text()) or {}, [str(path)]
-class EvalConfig:
-    @classmethod
-    def from_yaml(cls, path):
-        raw, _ = load_raw(path)
-        value = cls()
-        value.models = SimpleNamespace(skill=(raw.get('models') or {}).get('skill'))
-        value.thresholds = raw.get('thresholds', {})
-        value.dataset = SimpleNamespace(path=(raw.get('dataset') or {}).get('path', ''))
-        value.resolve_path = lambda path: Path(path)
-        value.eval_name = lambda: ((raw.get('execution') or {}).get('skill') or raw.get('skill')
-                                   or raw.get('name') or Path(path).stem)
-        return value
-""")
-        return root
-
     def put(self, path, text):
         target = self.repo / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -281,13 +277,28 @@ class EvalConfig:
         self.git("commit", "-qm", "fixture")
 
     def make_entry(self, config, **settings):
+        stem = Path(config).stem  # Each eval gets a one-case dataset, as real evals have.
         self.put(config, yaml.safe_dump({
             "name": "example", "skill": "example:foo", "models": {"skill": "model-from-eval"},
             "execution": {"timeout": 17, "max_budget_usd": 0.25},
+            "dataset": {"path": f"cases/{stem}"},
             "thresholds": {"quality": {"min_pass_rate": 1.0}},
         }))
+        self.put((Path(config).parent / "cases" / stem / "case-001/input.yaml").as_posix(), "input: x\n")
         return {"config": config, "run": "pr", "parallelism": 5, "max_turns": 2500,
                 "triggers": ["skills/foo/"], **settings}
+
+    def enable_case_subsets(self):  # Changed case directories can then select a --cases subset.
+        self.entry["eval_cases_dir"] = "evals/cases/foo/"
+        self.entry["triggers"] += ["evals/cases/foo/", "evals/eval-foo.yaml", "evals.yaml"]
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        config["dataset"] = {"path": "cases/foo"}
+        self.put(self.entry["config"], yaml.safe_dump(config))
+        for case in ("case-001", "case-002", "case-003"):
+            self.put(f"evals/cases/foo/{case}/input.yaml", "input: original\n")
+        self.write_manifest([self.entry])
+        self.commit()
+        self.env["PULL_BASE_SHA"] = self.base = self.git("rev-parse", "HEAD").strip()
 
     def write_manifest(self, entries):
         self.put("evals.yaml", yaml.safe_dump({"evals": entries}))
@@ -488,18 +499,7 @@ class SelectionTests(Fixture):
 class CaseSelectionTests(Fixture):
     def setUp(self):
         super().setUp()
-        self.entry["eval_cases_dir"] = "evals/cases/foo/"
-        self.entry["triggers"] += ["evals/cases/foo/", "evals/eval-foo.yaml", "evals.yaml"]
-        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
-        config["dataset"] = {"path": "cases/foo"}
-        self.put(self.entry["config"], yaml.safe_dump(config))
-        self.put("evals/cases/foo/case-001/input.yaml", "input: original\n")
-        self.put("evals/cases/foo/case-002/input.yaml", "input: original\n")
-        self.put("evals/cases/foo/case-003/input.yaml", "input: original\n")
-        self.write_manifest([self.entry])
-        self.commit()
-        self.base = self.git("rev-parse", "HEAD").strip()
-        self.env["PULL_BASE_SHA"] = self.base
+        self.enable_case_subsets()
 
     def test_sibling_trigger_path_does_not_expand_case_subset(self):
         self.entry["triggers"] = ["skills/foo", "evals/cases/foo"]
@@ -909,7 +909,7 @@ class ExecutionTests(Fixture):
         self.assertEqual(self.junit().attrib["failures"], "0")
 
     def test_missing_thresholded_judge_is_failure(self):
-        self.put(self.entry["config"], "models: {skill: model}\nthresholds: {missing: {min_mean: 1}}")
+        self.put(self.entry["config"], "models: {skill: model}\ndataset: {path: cases/eval-foo}\nthresholds: {missing: {min_mean: 1}}")
         self.change_skill()
         self.assertNotEqual(self.run_step().returncode, 0)
         self.assertIn("missing thresholded judge", self.last_result.stdout)
