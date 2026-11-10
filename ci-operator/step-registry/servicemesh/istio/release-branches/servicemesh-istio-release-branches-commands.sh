@@ -43,10 +43,25 @@ for release_line in "${supported_versions[@]}"; do
   source_commit=$(git rev-parse "${source}^{commit}")
   tag_commit=$(git rev-parse "refs/tags/${tag}^{commit}")
   if git merge-base --is-ancestor "${tag_commit}" "${source_commit}"; then
-    # Branch at the tagged commit, excluding any later y-stream commits.
+    # A sync creates two merge commits: the automation merges upstream into its
+    # working branch (including conflict resolutions), then GitHub merges that PR
+    # into release-X.Y. Follow first parents to stay on release-X.Y, skipping the
+    # inner merge on the PR's working branch. Select the earliest GitHub PR merge
+    # containing the tag, retaining downstream changes but excluding later syncs.
+    branch_commit=
+    while read -r merge_commit; do
+      if git merge-base --is-ancestor "${tag_commit}" "${merge_commit}"; then
+        branch_commit=${merge_commit}
+        break
+      fi
+    done < <(git rev-list --first-parent --merges --reverse "${tag_commit}..${source_commit}")
+    if [[ -z ${branch_commit} ]]; then
+      echo "ERROR: No merge commit for tag ${tag} in ${source#refs/remotes/midstream/}" >&2
+      exit 1
+    fi
     gh api --method POST "repos/${repo}/git/refs" \
-      -f ref="refs/heads/${target}" -f sha="${tag_commit}" >/dev/null
-    echo "Created ${target} at tag ${tag} commit ${tag_commit}, verified in ${source#refs/remotes/midstream/}"
+      -f ref="refs/heads/${target}" -f sha="${branch_commit}" >/dev/null
+    echo "Created ${target} at merge ${branch_commit} for tag ${tag}, verified in ${source#refs/remotes/midstream/}"
     continue
   else
     status=$?
