@@ -15,16 +15,51 @@ STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
+new_legacy_password() {
+  local password
+  # tr exits with SIGPIPE once head has received the requested bytes. Capture
+  # that intentionally bounded pipeline with pipefail disabled, then restore
+  # it before returning to this strict shell.
+  set +o pipefail
+  password="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 32)"
+  set -o pipefail
+  [[ ${#password} -eq 32 ]] || return 1
+  printf '%s' "${password}"
+}
+strict_junit_success() {
+  local pattern="$1" files=() file tests=0
+  shopt -s nullglob
+  files=( ${pattern} )
+  shopt -u nullglob
+  (( ${#files[@]} > 0 )) || return 1
+  for file in "${files[@]}"; do
+    [[ -s "${file}" ]] || return 1
+    # mocha-junit-reporter emits a testsuite root and closing tag. Reject the
+    # truncated report a count-only grep used to accept.
+    grep -q '<testsuite\|<testsuites' "${file}" || return 1
+    grep -q '</testsuite>\|</testsuites>' "${file}" || return 1
+    grep -Eq '<(failure|error|skipped)([[:space:]/>])|failures="[1-9][0-9]*"|errors="[1-9][0-9]*"|skipped="[1-9][0-9]*"' "${file}" && return 1
+    tests=$((tests + $(grep -o '<testcase[[:space:]>]' "${file}" | wc -l)))
+  done
+  (( tests > 0 ))
+}
+registry_tag_present() {
+  local route="$1" owner="$2" password="$3" organization="$4" repository="$5"
+  local token host
+  host="${route#https://}"
+  # quay-api-tests old-UI consumer uses Quay /v2/auth: Basic only obtains a
+  # token; the registry tags request is always Bearer authenticated.
+  token="$(curl -sk --fail --get -u "${owner}:${password}" --data-urlencode "service=${host}" --data-urlencode "scope=repository:${organization}/${repository}:pull" "${route}/v2/auth" | jq -r '.token // .access_token // empty' || true)"
+  [[ -n "${token}" ]] || return 1
+  curl -sk --fail -H "Authorization: Bearer ${token}" "${route}/v2/${organization}/${repository}/tags/list" | jq -e '.tags | index("upgrade-legacy") != null' >/dev/null
+}
+restore_trace() { [[ "$1" == true ]] && set -x; return 0; }
 [[ "${PHASE}" == seed || "${PHASE}" == verify ]] || fail "QUAY_UPGRADE_LEGACY_STATE_PHASE must be seed or verify"
 [[ "${STRICT}" == true || "${STRICT}" == false ]] || fail "QUAY_UPGRADE_LEGACY_CYPRESS_STRICT must be true or false"
 [[ -s "${ROUTE_FILE}" ]] || fail "missing Quay route from quay-operator-upgrade-prepare-e2e"
 ROUTE="$(<"${ROUTE_FILE}")"
 [[ "${ROUTE}" =~ ^https://[^/]+$ ]] || fail "Quay route must be a bare HTTPS endpoint"
 HOST="${ROUTE#https://}"
-
-new_password() {
-  LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 32
-}
 
 register_user() {
   local username="$1" password="$2" cookies body csrf code
@@ -33,7 +68,7 @@ register_user() {
   csrf="$(curl -sk -c "${cookies}" "${ROUTE}/csrf_token" | jq -r '.csrf_token // empty' || true)"
   [[ -n "${csrf}" ]] || { rm -f "${cookies}" "${body}"; fail "could not obtain CSRF token for legacy state user"; }
   code="$(jq -n --arg username "${username}" --arg password "${password}" \
-    '{username:$username,password:$password,email:($username + "@example.invalid")}' | \
+    '{username:$username,password:$password,repeatPassword:$password,email:($username + "@example.invalid")}' | \
     curl -sk -o "${body}" -w '%{http_code}' -X POST "${ROUTE}/api/v1/user/" \
       -b "${cookies}" -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' --data @- || true)"
   rm -f "${cookies}"
@@ -106,8 +141,9 @@ describe("legacy Quay upgrade persisted state", () => {
         expect(response.status).to.eq(200);
         expect(response.body.role).to.eq("write");
       });
-    });
-    it("cleans up only after successful verification", () => {
+      // Cypress stops its command queue on any assertion failure above, so the
+      // destructive cleanup is causally unreachable until every state check
+      // has succeeded.
       request("DELETE", `/api/v1/organization/${org}`).then((response) => expect(response.status).to.eq(204));
     });
   }
@@ -116,7 +152,8 @@ EOF
 }
 
 run_cypress() {
-  local rc=0 tests
+  local rc=0
+  rm -f "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml
   (cd quay-api-tests && \
     CYPRESS_UPGRADE_ROUTE="${ROUTE}" \
     CYPRESS_UPGRADE_OWNER="${OWNER}" \
@@ -131,11 +168,11 @@ run_cypress() {
       --reporter mocha-junit-reporter \
       --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state-[hash].xml" \
       --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") || rc=$?
-  tests="$(cat "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml 2>/dev/null | grep -o '<testcase' | wc -l || true)"
-  echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}, JUnit test cases: ${tests}"
+  echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}"
   if [[ "${STRICT}" == true ]]; then
-    [[ "${tests}" -gt 0 ]] || fail "legacy upgrade ${PHASE} JUnit output has 0 tests"
     [[ "${rc}" -eq 0 ]] || fail "legacy upgrade ${PHASE} Cypress failed"
+    strict_junit_success "${ARTIFACT_DIR}/junit_upgrade_legacy_state-*.xml" \
+      || fail "legacy upgrade ${PHASE} JUnit output is missing, empty, malformed, skipped, or failed"
   fi
 }
 
@@ -150,8 +187,8 @@ if [[ "${PHASE}" == seed ]]; then
   REPOSITORY="upgraderepo${suffix}"
   TEAM="upgradeteam${suffix}"
   ROBOT="upgraderobot${suffix}"
-  OWNER_PASSWORD="$(new_password)"
-  MEMBER_PASSWORD="$(new_password)"
+  OWNER_PASSWORD="$(new_legacy_password)" || fail "could not generate owner password"
+  MEMBER_PASSWORD="$(new_legacy_password)" || fail "could not generate member password"
   register_user "${OWNER}" "${OWNER_PASSWORD}"
   register_user "${MEMBER}" "${MEMBER_PASSWORD}"
   umask 077
@@ -172,9 +209,9 @@ EOF
   # No shell trace and no credential-containing command output. The image/tag
   # is validated by the registry API before the OLM channel move continues.
   skopeo copy --dest-tls-verify=false --dest-creds "${OWNER}:${OWNER_PASSWORD}" \
-    docker://quay.io/quay/clair:latest "docker://${HOST}/${ORG}/${REPOSITORY}:upgrade-legacy" >/dev/null
-  curl -sk --fail -u "${OWNER}:${OWNER_PASSWORD}" "${ROUTE}/v2/${ORG}/${REPOSITORY}/tags/list" \
-    | jq -e '.tags | index("upgrade-legacy") != null' >/dev/null \
+    docker://registry.access.redhat.com/ubi9/ubi-micro@sha256:d3499a0896e2d6a1642f922615831bc5c2fd513bbb34f3446cabba530d9d54a2 \
+    "docker://${HOST}/${ORG}/${REPOSITORY}:upgrade-legacy" >/dev/null
+  registry_tag_present "${ROUTE}" "${OWNER}" "${OWNER_PASSWORD}" "${ORG}" "${REPOSITORY}" \
     || fail "pushed source image tag is not present"
 else
   [[ -s "${STATE_FILE}" ]] || fail "missing persisted legacy state from seed"
@@ -182,8 +219,7 @@ else
   # the per-run users needed to authenticate the source and target checks.
   # shellcheck disable=SC1090
   source "${STATE_FILE}"
-  curl -sk --fail -u "${OWNER}:${OWNER_PASSWORD}" "${ROUTE}/v2/${ORG}/${REPOSITORY}/tags/list" \
-    | jq -e '.tags | index("upgrade-legacy") != null' >/dev/null \
+  registry_tag_present "${ROUTE}" "${OWNER}" "${OWNER_PASSWORD}" "${ORG}" "${REPOSITORY}" \
     || fail "persisted image tag is missing after upgrade"
   write_cypress_spec
   run_cypress
@@ -191,4 +227,4 @@ else
 fi
 
 rm -f quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
-$WAS_TRACING && set -x
+restore_trace "${WAS_TRACING}"
