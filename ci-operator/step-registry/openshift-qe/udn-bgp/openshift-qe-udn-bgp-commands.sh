@@ -89,6 +89,152 @@ bastion_scp() {
   fi
 }
 
+# ---------------------------------------------------------------------------
+# frr-k8s webhook live profiling and admission metrics
+# ---------------------------------------------------------------------------
+FRR_K8S_PERF_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/frr-k8s-webhook-perf"
+FRR_K8S_WEBHOOK_NAME="frrconfigurationsvalidationwebhook.metallb.io"
+FRR_K8S_PPROF_PID=""
+
+# Fetch one pprof endpoint from the statuscleaner. The frr-k8s image is alpine,
+# so busybox wget over oc exec keeps the listener on the pod's loopback.
+capture_statuscleaner_profile() {
+  local endpoint=$1
+  local output=$2
+  local pod
+  pod=$(oc get pods -n openshift-frr-k8s -l component=frr-k8s-statuscleaner \
+    --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [[ -z "${pod}" ]]; then
+    echo "WARNING: no running frr-k8s-statuscleaner pod for ${endpoint}" >&2
+    return 1
+  fi
+  timeout 300 oc exec -n openshift-frr-k8s "${pod}" -c frr-k8s-statuscleaner -- \
+    wget -q -O - "http://127.0.0.1:6060/debug/pprof/${endpoint}" > "${output}"
+}
+
+start_frr_k8s_webhook_pprof() {
+  if [[ "${FRR_K8S_WEBHOOK_PERF:-false}" != "true" ]]; then
+    return
+  fi
+  mkdir -p "${FRR_K8S_PERF_DIR}/pprof"
+  echo "=== Start frr-k8s statuscleaner pprof capture ==="
+  (
+    set +o errexit
+    index=0
+    while true; do
+      index=$((index + 1))
+      stamp=$(date -u +%Y%m%dT%H%M%SZ)
+      capture_statuscleaner_profile "profile?seconds=60" \
+        "${FRR_K8S_PERF_DIR}/pprof/${stamp}-cpu-${index}.pprof"
+      capture_statuscleaner_profile "allocs" \
+        "${FRR_K8S_PERF_DIR}/pprof/${stamp}-allocs-${index}.pprof"
+      capture_statuscleaner_profile "goroutine?debug=1" \
+        "${FRR_K8S_PERF_DIR}/pprof/${stamp}-goroutine-${index}.txt"
+      sleep "${FRR_K8S_WEBHOOK_PPROF_INTERVAL:-300}"
+    done
+  ) > "${FRR_K8S_PERF_DIR}/pprof-capture.log" 2>&1 &
+  FRR_K8S_PPROF_PID=$!
+  trap stop_frr_k8s_webhook_pprof EXIT
+  echo "pprof capture running in background (pid ${FRR_K8S_PPROF_PID})"
+}
+
+stop_frr_k8s_webhook_pprof() {
+  if [[ -z "${FRR_K8S_PPROF_PID:-}" ]]; then
+    return
+  fi
+  echo "=== Stop frr-k8s statuscleaner pprof capture ==="
+  if command -v pkill >/dev/null 2>&1; then
+    pkill -P "${FRR_K8S_PPROF_PID}" 2>/dev/null || true
+  fi
+  kill "${FRR_K8S_PPROF_PID}" 2>/dev/null || true
+  wait "${FRR_K8S_PPROF_PID}" 2>/dev/null || true
+  FRR_K8S_PPROF_PID=""
+
+  # oc exec can truncate a stream, so drop profiles that are not valid gzip.
+  if command -v gzip >/dev/null 2>&1; then
+    local profile
+    while IFS= read -r profile; do
+      if ! gzip -t "${profile}" >/dev/null 2>&1; then
+        echo "WARNING: discarding truncated profile ${profile}" >&2
+        rm -f "${profile}"
+      fi
+    done < <(find "${FRR_K8S_PERF_DIR}/pprof" -type f -name '*.pprof')
+  fi
+}
+
+# Snapshot kube-apiserver's own view of the webhook at one instant.
+capture_frr_k8s_webhook_metrics() {
+  if [[ "${FRR_K8S_WEBHOOK_PERF:-false}" != "true" ]]; then
+    return
+  fi
+  local phase=$1
+  local timestamp=$2
+  local metrics_dir="${FRR_K8S_PERF_DIR}/metrics"
+  local buckets="${metrics_dir}/${phase}-${timestamp}-buckets.json"
+  mkdir -p "${metrics_dir}"
+
+  if ! thanos_query \
+      "apiserver_admission_webhook_admission_duration_seconds_bucket{name=\"${FRR_K8S_WEBHOOK_NAME}\"}" \
+      "${timestamp}" > "${buckets}"; then
+    echo "WARNING: kube-apiserver webhook admission metrics unavailable (${phase})" >&2
+    return
+  fi
+  if [[ "$(jq -r '.data.result | length' "${buckets}" 2>/dev/null)" == "0" ]]; then
+    echo "WARNING: no apiserver_admission_webhook_admission_duration_seconds series for ${FRR_K8S_WEBHOOK_NAME}" >&2
+  fi
+
+  thanos_query "apiserver_admission_webhook_request_total{name=\"${FRR_K8S_WEBHOOK_NAME}\"}" \
+    "${timestamp}" > "${metrics_dir}/${phase}-${timestamp}-requests.json" || true
+  thanos_query "apiserver_admission_webhook_rejection_count{name=\"${FRR_K8S_WEBHOOK_NAME}\"}" \
+    "${timestamp}" > "${metrics_dir}/${phase}-${timestamp}-rejections.json" || true
+  thanos_query "apiserver_admission_webhook_fail_open_count{name=\"${FRR_K8S_WEBHOOK_NAME}\"}" \
+    "${timestamp}" > "${metrics_dir}/${phase}-${timestamp}-fail-open.json" || true
+  echo "Captured frr-k8s webhook admission metrics (${phase})"
+}
+
+# Record the webhook latency timeline over the workload window.
+capture_frr_k8s_webhook_metrics_timeline() {
+  if [[ "${FRR_K8S_WEBHOOK_PERF:-false}" != "true" ]]; then
+    return
+  fi
+  local start=$1
+  local end=$2
+  local metrics_dir="${FRR_K8S_PERF_DIR}/metrics"
+  local selector="apiserver_admission_webhook_admission_duration_seconds_bucket{name=\"${FRR_K8S_WEBHOOK_NAME}\"}"
+  local pair name quantile
+  mkdir -p "${metrics_dir}"
+
+  for pair in p50:0.5 p90:0.9 p99:0.99; do
+    name=${pair%%:*}
+    quantile=${pair##*:}
+    thanos_query_range \
+      "histogram_quantile(${quantile}, sum by (le) (rate(${selector}[5m])))" \
+      "${start}" "${end}" 60 > "${metrics_dir}/timeline-${name}.json" || true
+  done
+  thanos_query_range \
+    "sum(rate(apiserver_admission_webhook_request_total{name=\"${FRR_K8S_WEBHOOK_NAME}\"}[5m]))" \
+    "${start}" "${end}" 60 > "${metrics_dir}/timeline-requests.json" || true
+  echo "Captured frr-k8s webhook latency timeline"
+}
+
+thanos_query() {
+  local query=$1
+  local timestamp=$2
+  local encoded
+  encoded=$(printf '%s' "${query}" | jq -sRr @uri)
+  oc get --raw "/api/v1/namespaces/openshift-monitoring/services/https:thanos-querier:9091/proxy/api/v1/query?query=${encoded}&time=${timestamp}"
+}
+
+thanos_query_range() {
+  local query=$1
+  local start=$2
+  local end=$3
+  local step=$4
+  local encoded
+  encoded=$(printf '%s' "${query}" | jq -sRr @uri)
+  oc get --raw "/api/v1/namespaces/openshift-monitoring/services/https:thanos-querier:9091/proxy/api/v1/query_range?query=${encoded}&start=${start}&end=${end}&step=${step}"
+}
+
 echo "=== Run UDN-BGP kube-burner from bastion ==="
 
 # ssh concatenates remote argv without quoting, so values with spaces
@@ -122,6 +268,10 @@ BASTION_ENV=( \
   UDN_BGP_LAYER2="${UDN_BGP_LAYER2:-true}" \
   UUID="${UUID}" \
 )
+
+WORKLOAD_START_EPOCH=$(date +%s)
+capture_frr_k8s_webhook_metrics before "${WORKLOAD_START_EPOCH}"
+start_frr_k8s_webhook_pprof
 
 set +o errexit
 set +x
@@ -169,6 +319,11 @@ EOF
 RUN_EXIT_CODE=$?
 $WAS_TRACING && set -x
 set -o errexit
+
+WORKLOAD_END_EPOCH=$(date +%s)
+stop_frr_k8s_webhook_pprof
+capture_frr_k8s_webhook_metrics after "${WORKLOAD_END_EPOCH}"
+capture_frr_k8s_webhook_metrics_timeline "${WORKLOAD_START_EPOCH}" "${WORKLOAD_END_EPOCH}"
 
 METRICS_FOLDER="${BASTION_WORK_DIR}/e2e-benchmarking/workloads/kube-burner-ocp-wrapper/collected-metrics-${UUID}"
 if bastion_ssh "test -f ${METRICS_FOLDER}/jobSummary.json"; then
