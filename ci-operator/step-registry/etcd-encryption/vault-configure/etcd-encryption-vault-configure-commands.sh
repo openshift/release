@@ -9,7 +9,6 @@ fi
 
 VAULT_SECRET_ROOT_TOKEN_PATH="/vault/secrets/root/token"
 VAULT_KMS_CONFIG_OPENSHIFT_NS="openshift-config"
-VAULT_KMS_CONFIG_CRD_URL="https://raw.githubusercontent.com/kevinrizza/vault-kms-plugin-openshift-provider/main/bundle/manifests/kms.openshift.io_vaultkmsconfigs.yaml"
 
 resolve_vault_kms_plugin_image() {
   if [[ -n "${VAULT_KMS_PLUGIN_IMAGE:-}" ]]; then
@@ -35,11 +34,6 @@ resolve_vault_kms_plugin_update_image() {
     tr -d '[:space:]' < "${SHARED_DIR}/vault-kms-plugin-image-update"
     return
   fi
-}
-
-install_vault_kms_config_crd() {
-  echo "Installing VaultKMSConfig CRD (mock operator API)..."
-  curl -fsSL "${VAULT_KMS_CONFIG_CRD_URL}" | oc apply -f -
 }
 
 # Inline the manifest because sibling files are not shipped into the step pod.
@@ -381,53 +375,7 @@ resolve_vault_service_address() {
   echo "https://${cluster_ip}:${port}"
 }
 
-# Apply a cluster VaultKMSConfig matching library-go test/library/encryption/kms/vault.go defaults.
-apply_vault_kms_config() {
-  local cr_name="$1"
-  local service_name="$2"
-  local vault_namespace="$3"
-  local key_name="$4"
-  local ca_bundle_name="$5"
-  local approle_secret_name="$6"
-  local vault_address=""
-  local server_name="${service_name}.${vault_namespace}.svc"
-  local vault_key_path="transit/keys/${key_name}"
-  local plugin_image=""
-
-  vault_address="$(resolve_vault_service_address "${vault_namespace}" "${service_name}")"
-  echo "Resolved Vault address for ${cr_name}: ${vault_address} (serverName: ${server_name})"
-
-  echo "Applying VaultKMSConfig ${cr_name}..."
-  oc apply -f - <<EOF
-apiVersion: kms.openshift.io/v1alpha1
-kind: VaultKMSConfig
-metadata:
-  name: ${cr_name}
-spec:
-  vaultAddress: ${vault_address}
-  vaultNamespace: ${VAULT_ENTERPRISE_NS}
-  vaultKeyPath: ${vault_key_path}
-  authentication:
-    type: AppRole
-    appRole:
-      secret:
-        name: ${approle_secret_name}
-  tls:
-    caBundle:
-      name: ${ca_bundle_name}
-    serverName: ${server_name}
-EOF
-
-  plugin_image="$(resolve_vault_kms_plugin_image)"
-  echo "Setting VaultKMSConfig status.kmsPluginImage (normally set by the operator)..."
-  oc patch vaultkmsconfigs.kms.openshift.io "${cr_name}" --type=merge --subresource=status \
-    -p "$(jq -n --arg img "${plugin_image}" '{status:{kmsPluginImage:$img}}')"
-
-  apply_vault_kms_config_v1 "${cr_name}-v1" "${service_name}" "${vault_namespace}" "${key_name}" "${ca_bundle_name}" "${approle_secret_name}"
-}
-
 # Apply a cluster VaultKMSConfig on the new kms.hashicorp.com/v1 API.
-# Coexists with the kms.openshift.io/v1alpha1 CR until the old CRD/CR are removed.
 apply_vault_kms_config_v1() {
   local cr_name="$1"
   local service_name="$2"
@@ -698,10 +646,9 @@ POLICY
   echo ""
 
   ensure_vault_approle_secret "${namespace}" "${approle_secret_name}"
-  apply_vault_kms_config "${namespace}" "${service_name}" "${namespace}" "${key_name}" "${ca_bundle_name}" "${approle_secret_name}"
+  apply_vault_kms_config_v1 "${namespace}-v1" "${service_name}" "${namespace}" "${key_name}" "${ca_bundle_name}" "${approle_secret_name}"
 }
 
-install_vault_kms_config_crd
 install_vault_kms_config_crd_v1
 
 # Persist update image the same way install records VAULT_KMS_PLUGIN_IMAGE into SHARED_DIR
