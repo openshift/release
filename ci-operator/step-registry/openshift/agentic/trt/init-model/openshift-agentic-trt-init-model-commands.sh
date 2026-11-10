@@ -180,6 +180,42 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 #   source "${SHARED_DIR}/trt-telemetry.sh"
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+
+# Verify the extractor's public behavior before any paid agent work. A valid
+# zero-cost row intentionally returns nonzero, so capability is determined by
+# the emitted autodl row rather than the process status.
+verify_session_metrics_extractor() {
+    local probe_dir status=0
+    if [[ ! -r "${EXTRACT_METRICS}" ]]; then
+        echo "ERROR: session metrics extractor is unavailable" >&2
+        return 1
+    fi
+    if ! probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/trt-extractor-probe.XXXXXX"); then
+        echo "ERROR: unable to create session metrics extractor probe directory" >&2
+        return 1
+    fi
+    printf '%s\n' '{"path":"/v1/metrics","payload":{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"agentic_ci.codex.cost.usage","sum":{"aggregationTemporality":2,"dataPoints":[{"asDouble":0,"startTimeUnixNano":"1","timeUnixNano":"2","attributes":[{"key":"model","value":{"stringValue":"capability-probe"}}]}]}}]}]}]}}' \
+        > "${probe_dir}/otel.jsonl" || status=1
+    printf '%s' capability-probe > "${probe_dir}/prompt" || status=1
+    if [[ "${status}" -eq 0 ]]; then
+        python3 "${EXTRACT_METRICS}" "${probe_dir}/otel.jsonl" \
+            "${probe_dir}/output.json" --prompt-file "${probe_dir}/prompt" \
+            >/dev/null 2>&1 || true
+        jq -e '
+            .table_name == "claude_session_metrics"
+            and .rows[0].model == "capability-probe"
+            and .rows[0].total_cost_usd == "0.000000"
+            and .rows[0].prompt == "capability-probe"
+        ' "${probe_dir}/output.json" >/dev/null 2>&1 || status=1
+    fi
+    rm -rf "${probe_dir}" || status=1
+    if [[ "${status}" -ne 0 ]]; then
+        echo "ERROR: session metrics extractor lacks Codex or --prompt-file support" >&2
+    fi
+    return "${status}"
+}
+
+verify_session_metrics_extractor
 SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
 
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
@@ -985,8 +1021,9 @@ def point_attributes(point):
         if not isinstance(attr, dict):
             continue
         key = attr.get("key")
-        if key:
-            attrs[key] = attribute_value(attr.get("value"))
+        if not isinstance(key, str) or not key:
+            return None
+        attrs[key] = attribute_value(attr.get("value"))
     attrs_key = tuple(sorted(attrs.items()))
     try:
         hash(attrs_key)
@@ -998,15 +1035,27 @@ def point_attributes(point):
 def point_number(point):
     if "asDouble" in point:
         raw = point["asDouble"]
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return None
     elif "asInt" in point:
         raw = point["asInt"]
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, str):
+            # OTLP JSON maps int64 values to decimal strings. Keep that public
+            # encoding while rejecting floats and arbitrary numeric strings.
+            if not raw.isascii() or not raw.isdigit():
+                return None
+            raw = int(raw, 10)
+        elif not isinstance(raw, int):
+            return None
     else:
         return None
     try:
         value = float(raw)
     except (TypeError, ValueError, OverflowError):
         return None
-    if not math.isfinite(value):
+    if not math.isfinite(value) or value < 0:
         return None
     return value
 
@@ -1036,8 +1085,10 @@ with open(path) as handle:
                     for metric in scope.get("metrics", []) or []:
                         if not isinstance(metric, dict):
                             continue
-                        name = CODEX_COST_ALIASES.get(
-                            metric.get("name", ""), metric.get("name", ""))
+                        raw_name = metric.get("name", "")
+                        if not isinstance(raw_name, str):
+                            continue
+                        name = CODEX_COST_ALIASES.get(raw_name, raw_name)
                         if name not in (CODEX_COST_METRIC,
                                         CLAUDE_COST_METRIC,
                                         CLAUDE_TOKEN_METRIC):
@@ -1197,10 +1248,13 @@ finalize_session_metrics() {
     local extract_rc=0
     python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" \
         --prompt-file "${SESSION_PROMPT_FILE}" 2>&1 || extract_rc=$?
-    if [[ "${extract_rc}" -ne 0 || ! -s "${metrics_tmp}" ]]; then
+    if [[ ! -s "${metrics_tmp}" ]]; then
         echo "Warning: Failed to extract session metrics"
         rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
         return 0
+    fi
+    if [[ "${extract_rc}" -ne 0 ]]; then
+        echo "Warning: session metrics extractor returned ${extract_rc}; validating emitted row"
     fi
     # Carry the real session identity into the domain row used by dashboards.
     # An atomic rewrite avoids leaving malformed metadata if jq fails.
@@ -1222,10 +1276,12 @@ finalize_session_metrics() {
     fi
     if [[ -n "${session_id}" && -f "${metadata_file}" ]]; then
         local metadata_tmp
-        metadata_tmp=$(mktemp)
-        if jq --arg session_id "${session_id}" '.session_id = $session_id' \
-            "${metadata_file}" > "${metadata_tmp}"; then
-            mv "${metadata_tmp}" "${metadata_file}"
+        if ! metadata_tmp=$(mktemp "${metadata_file}.tmp.XXXXXX"); then
+            echo "Warning: Failed to create temporary metadata file next to ${metadata_file##*/}"
+        elif jq --arg session_id "${session_id}" '.session_id = $session_id' \
+            "${metadata_file}" > "${metadata_tmp}" \
+            && mv "${metadata_tmp}" "${metadata_file}"; then
+            :
         else
             rm -f "${metadata_tmp}"
             echo "Warning: Failed to propagate session identity to ${metadata_file##*/}"

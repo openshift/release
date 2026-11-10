@@ -69,8 +69,8 @@ copy_artifacts() {
 }
 cleanup_eval_solve() {
     local rc=$?
-    copy_artifacts
     rm -f "${METRICS_TEMP_FILES[@]}" || echo "WARNING: failed to remove eval metrics temporary files" >&2
+    copy_artifacts || echo "WARNING: failed to copy eval solve artifacts" >&2
     return "${rc}"
 }
 trap cleanup_eval_solve EXIT

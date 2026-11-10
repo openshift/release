@@ -21,11 +21,11 @@ source "${SHARED_DIR}/trt-telemetry.sh"
 # this task shell. Existing artifact cleanup is chained without trap eval.
 solver_cleanup() {
     local rc=$?
-    if declare -F copy_artifacts >/dev/null; then
-        copy_artifacts
-    fi
     rm -f "${SESSION_PROMPT_FILE}" \
         || echo "WARNING: failed to remove private prompt temporary file" >&2
+    if declare -F copy_artifacts >/dev/null; then
+        copy_artifacts || echo "WARNING: failed to copy solver artifacts" >&2
+    fi
     return "${rc}"
 }
 trap solver_cleanup EXIT

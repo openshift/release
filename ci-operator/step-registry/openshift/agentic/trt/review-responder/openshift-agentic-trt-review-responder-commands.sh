@@ -129,13 +129,13 @@ on_exit() {
         [[ "${rc}" -ne 0 ]] && REVIEW_EXIT="${rc}"
         write_review_metrics || echo "WARNING: failed to write review metrics"
     fi
-    if declare -F copy_artifacts >/dev/null; then
-        copy_artifacts
-    fi
     # write_review_metrics normally consumes and removes this file. Retain a
     # final fallback for abrupt metrics failures after a worker captured it.
     rm -f "${SESSION_PROMPT_FILE}" \
         || echo "WARNING: failed to remove private prompt temporary file" >&2
+    if declare -F copy_artifacts >/dev/null; then
+        copy_artifacts || echo "WARNING: failed to copy review artifacts" >&2
+    fi
     return "${rc}"
 }
 trap on_exit EXIT
