@@ -576,11 +576,13 @@ if [[ -n "${VIEWS_RESOLVE_ERROR}" ]]; then
 fi
 
 record_views() {
-    # record_views <previous-artifact|none> <jq path to the previous view names>; writes views.json and
+    # record_views <previous-artifact|none>; writes views.json and
     # prints a one-line summary of views added/removed since the previous run.
-    local prev="$1" path="$2" prev_views="null"
+    local prev="$1" prev_views="null"
     if [[ "${prev}" != "none" && -s "${prev}" ]]; then
-        prev_views="$(jq -c "[${path}] | map(select(type == \"string\"))" "${prev}" 2>/dev/null || echo null)"
+        # Manifest and burst status both list views as objects with .view; accept plain names too.
+        prev_views="$(jq -c '[.observation.views[]? | if type == "object" then .view else . end | select(type == "string")]
+            | if length == 0 then null else . end' "${prev}" 2>/dev/null || echo null)"
     fi
     jq -n --arg source "${VIEWS_SOURCE}" --arg views "${TRIAGE_VIEWS}" --argjson prev "${prev_views}" \
         --arg prev_run "${PREV_RUN}" '
@@ -614,7 +616,7 @@ if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
         PREV_STATUS_ARG="${WORKDIR}/previous-burst-status.json"
     fi
     echo "Previous status: ${PREV_STATUS_ARG}"
-    VIEWS_LINE="$(record_views "${PREV_STATUS_ARG}" '.observation.views[]?.view' || true)"
+    VIEWS_LINE="$(record_views "${PREV_STATUS_ARG}" || true)"
     echo "${VIEWS_LINE}"
     [[ "${VIEWS_SOURCE}" == "sippy" ]] && junit_case "GA: views resolved from Sippy" true ""
     # Growth of known clusters is judged against the latest full-analysis manifest (a different job): derive its
@@ -674,7 +676,7 @@ if [[ "${TRIAGE_POLICY}" == "ga" ]]; then
         BASELINE_ARG="${WORKDIR}/baseline-manifest.json"
     fi
     echo "Baseline: ${BASELINE_ARG}"
-    VIEWS_LINE="$(record_views "${BASELINE_ARG}" '.observation.views[]?' || true)"
+    VIEWS_LINE="$(record_views "${BASELINE_ARG}" || true)"
     echo "${VIEWS_LINE}"
     [[ "${VIEWS_SOURCE}" == "sippy" ]] && junit_case "GA: views resolved from Sippy" true ""
 
