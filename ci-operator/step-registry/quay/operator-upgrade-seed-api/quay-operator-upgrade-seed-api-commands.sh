@@ -22,11 +22,12 @@ csrf=""
 api() {
   local data=()
   (( $# > 2 )) && data=(--data "$3")
+  rm -f "${work}/body"
   code="$(curl -sk --max-time 60 -o "${work}/body" -w '%{http_code}' -b "${jar}" -c "${jar}" -X "$1" \
     -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' "${data[@]}" "${route}$2")" || code=000
 }
 expect() {
-  [[ "${code}" == "$1" ]] || fail "$2 returned HTTP ${code}: $(head -c 500 "${work}/body")"
+  [[ "${code}" == "$1" ]] || fail "$2 returned HTTP ${code}: $(jq -r '.error_message // .detail // .message // empty' "${work}/body" 2>/dev/null | head -c 300)"
 }
 refresh_csrf() {
   csrf="$(curl -sk --max-time 60 -b "${jar}" -c "${jar}" "${route}/csrf_token" | jq -r '.csrf_token // empty')"
