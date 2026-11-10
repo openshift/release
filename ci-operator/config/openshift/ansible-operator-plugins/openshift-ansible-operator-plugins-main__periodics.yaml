@@ -100,7 +100,7 @@ tests:
         git config --global --add safe.directory "$(pwd)"
         # TEMPORARY: exercise the simplified wrapper from a genuine v1.42.1 base.
         if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
-          REHEARSAL_BRANCH=oape-987-rehearsal-v1421-v1423-20261110070705
+          REHEARSAL_BRANCH=oape-987-rehearsal-v1421-v1423-20261110074912
           REHEARSAL_SHA=7e13c5ac473d595d628fc6da64dba72be3e859a9
           export GH_TOKEN="$GITHUB_TOKEN"
           git config --local --replace-all credential.helper ''
@@ -139,7 +139,7 @@ tests:
           rehearsal_pr=$(gh pr list --repo "$DEST_ORG_REPO" --state all \
             --head "v1.42.3-rebase-${REBASE_BRANCH}" --base "$REBASE_BRANCH" --json number --jq '.[0].number // empty')
           if [[ -n "$rehearsal_pr" ]]; then
-            gh pr edit "$rehearsal_pr" --repo "$DEST_ORG_REPO" --title '[Rehearsal] Rebase v1.42.1 to v1.42.3'
+            gh api --method PATCH "repos/${DEST_ORG_REPO}/pulls/${rehearsal_pr}" -f 'title=[Rehearsal] Rebase v1.42.1 to v1.42.3' --silent
             printf 'Rehearsal PR: https://github.com/%s/pull/%s\n' "$DEST_ORG_REPO" "$rehearsal_pr"
           fi
         fi
