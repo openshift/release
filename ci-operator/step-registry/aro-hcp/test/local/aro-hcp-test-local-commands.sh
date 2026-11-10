@@ -56,11 +56,12 @@ if [[ -n "${HYPERSHIFT_V2_BINARY:-}" ]]; then
     ho_image=$(yq -r ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image | .registry + \"/\" + .repository + \"@\" + .digest" "${SHARED_DIR}/hypershift-image-overrides.yaml")
     jq -n \
       --arg test_runner_image "${ARO_HCP_TEST_RUNNER_IMAGE}" \
+      --arg upstream_test_image "${HYPERSHIFT_V2_TEST_IMAGE}" \
       --arg test_binary_sha256 "$(sha256sum "${HYPERSHIFT_V2_BINARY}" | cut -d ' ' -f 1)" \
       --arg pull_refs "${PULL_REFS:-}" \
       --arg ho_image "${ho_image}" \
       --arg cpo_image "${CPO_IMAGE_OVERRIDE:?CPO image override is required for HyperShift v2}" \
-      '{test_runner_image: $test_runner_image, test_binary_sha256: $test_binary_sha256, pull_refs: $pull_refs, ho_image: $ho_image, cpo_image: $cpo_image}' \
+      '{test_runner_image: $test_runner_image, upstream_test_image: $upstream_test_image, test_binary_sha256: $test_binary_sha256, pull_refs: $pull_refs, ho_image: $ho_image, cpo_image: $cpo_image}' \
       > "${ARTIFACT_DIR}/hypershift-v2-provenance.json"
 fi
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
@@ -74,12 +75,39 @@ make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 echo "Selected ARO HCP e2e suite: ${ARO_HCP_E2E_SUITE:-rp-api-compat-all/parallel}"
+if [[ -n "${HYPERSHIFT_V2_BINARY:-}" ]]; then
+    # Ignore reports left by earlier invocations, including local reruns.
+    v2_run_marker=$(mktemp "${ARTIFACT_DIR}/hypershift-v2-started.XXXXXX")
+fi
 make e2e-local/run -o test/aro-hcp-tests \
   FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" \
   ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}" \
   SKIP_CERT_VERIFICATION=true \
   ARO_HCP_CLOUD="dev" \
   ARO_HCP_E2E_SUITE="${ARO_HCP_E2E_SUITE:-rp-api-compat-all/parallel}"
+
+if [[ -n "${HYPERSHIFT_V2_BINARY:-}" ]]; then
+    # An older promoted ARO-HCP image can ignore the v2 opt-in. Require evidence
+    # independently so that rollout cannot silently pass with smoke checks only.
+    python3 - "${ARTIFACT_DIR}" "${v2_run_marker}" <<'PY'
+from pathlib import Path
+import sys
+import xml.etree.ElementTree as ET
+
+root, marker = map(Path, sys.argv[1:])
+reports = [p for p in root.rglob("junit_hypershift_v2.xml")
+           if p.stat().st_mtime_ns > marker.stat().st_mtime_ns]
+if len(reports) != 1:
+    sys.exit(f"Expected one fresh HyperShift v2 JUnit report, found {len(reports)}. "
+             "Verify that the ARO-HCP runner image contains the v2 adapter.")
+cases = list(ET.parse(reports[0]).getroot().iter("testcase"))
+expected = "should have all expected conditions with correct status"
+if (len(cases) != 1 or not cases[0].get("name", "").endswith(expected)
+        or any(cases[0].find(tag) is not None for tag in ("skipped", "failure", "error"))):
+    sys.exit(f"Expected one passing HyperShift v2 conditions testcase in {reports[0]}")
+print(f"Verified HyperShift v2 execution: {reports[0]}")
+PY
+fi
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed. Gzip it due to 3mb SHARED_DIR limit.
