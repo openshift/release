@@ -45,7 +45,7 @@ export THANOS_VERIFY_CERTS="false"
 echo "Waiting ${STABILIZATION_PERIOD}s for metrics to stabilize..."
 sleep "${STABILIZATION_PERIOD}"
 
-START_TIME=$(date +%s)
+START_TIME=$(cat "${SHARED_DIR}/netobserv-start-time.txt")
 echo "Measurement window start: $(date -u -d "@${START_TIME}" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -r "${START_TIME}" '+%Y-%m-%dT%H:%M:%SZ')"
 
 sleep "${MEASUREMENT_DURATION}"

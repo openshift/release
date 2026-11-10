@@ -78,6 +78,12 @@ fi
 
 echo "All NetObserv components are Ready."
 
+
+echo "`date +%s`" > "${SHARED_DIR}/netobserv-start-time.txt"
+
+#  let netobserv soak on the cluster
+sleep 1800
+
 # Save component state to artifacts for debugging
 oc get flowcollector/cluster -o json > "${ARTIFACT_DIR}/flowcollector.json" || true
 oc get pods -n "${NETOBSERV_OPERATOR_NAMESPACE}" -o wide > "${ARTIFACT_DIR}/pods-netobserv-operator.txt" || true
