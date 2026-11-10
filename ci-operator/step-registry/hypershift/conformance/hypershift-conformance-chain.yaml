@@ -24,11 +24,14 @@ chain:
       # values, raw log bodies or raw test names.
       aws_failure_diagnostics_capture() {
         local suite_exit_code="${1:-}"
-        local work_dir artifact_out shared_out
+        local work_dir artifact_out shared_context
         work_dir="$(mktemp -d /tmp/aws-failure-diagnostics.XXXXXX)" || return 0
         artifact_out="${ARTIFACT_DIR:-/tmp}/aws-failure-diagnostics"
-        shared_out="${SHARED_DIR:-/tmp}/aws-failure-diagnostics"
-        if ! mkdir -p "${artifact_out}" "${shared_out}" 2>/dev/null; then
+        # The handoff file sits directly in ${SHARED_DIR}: ci-operator persists a
+        # step's shared directory with util.SecretFromDir, which skips
+        # subdirectories, so a nested file would never reach the post step.
+        shared_context="${SHARED_DIR:-/tmp}/aws-failure-diagnostics-test-context.json"
+        if ! mkdir -p "${artifact_out}" 2>/dev/null; then
           rm -rf "${work_dir}" 2>/dev/null
           return 0
         fi
@@ -52,9 +55,16 @@ chain:
 
       Safety contract (enforced by construction, not by redaction of a blob):
         * Only these kinds of values are ever emitted: enum/status codes, AWS region
-          names, availability zones, node names, providerIDs, EC2 instance IDs, AWS
+          names, availability zones, providerIDs, EC2 instance IDs, AWS
           service/operation names, AWS error codes, AWS request IDs, HTTP status
-          codes, RFC3339 timestamps, hashed test identifiers and counters.
+          codes, RFC3339 timestamps, hashed test and node identifiers, and counters.
+          A node's hostname is reduced to a digest rather than carried verbatim:
+          it is an internal name that usually embeds the node's private address
+          and is not needed to act on an AWS lookup failure, while the providerID
+          keeps the correlation that is. Like the test digest, this is
+          pseudonymisation for correlation and not a confidentiality control: the
+          digest is unsalted and the hostname space is small, so a reader who
+          knows the naming scheme can recover the name.
         * Every emitted string is matched against a strict allowlist pattern first; a
           value that does not match is dropped and replaced by a status code. The
           patterns are shaped after the AWS identifiers they accept, so neither free
@@ -160,7 +170,11 @@ chain:
 
 
       def env_region(name):
-          """Report an environment variable as a region name or as a status only."""
+          """Report an environment variable as a region name or as a status only.
+
+          A value that is not a region is never echoed: the variable may hold
+          anything at all.
+          """
           raw = os.environ.get(name)
           if raw is None:
               return {"status": "unset", "value": None}
@@ -172,6 +186,7 @@ chain:
 
 
       def classify_test(name):
+          """Map a raw test name onto a TEST_CLASSES enum, never emitting the name."""
           for needles, enum_value in TEST_CLASSES:
               if all(needle in name for needle in needles):
                   return enum_value
@@ -179,11 +194,16 @@ chain:
 
 
       def digest(name):
+          """Return a short stable pseudonym for a name that is not emitted raw."""
           return hashlib.sha256(name.encode("utf-8", "replace")).hexdigest()[:12]
 
 
       def parse_aws_error(text):
-          """Extract allowlisted AWS API error fields from a failure message."""
+          """Extract allowlisted AWS API error fields from a failure message.
+
+          Returns None when the text is not recognisable as an AWS API error, so
+          an unrelated failure contributes nothing at all to the document.
+          """
           if not text:
               return None
           text = text[:MAX_FAILURE_TEXT]
@@ -345,6 +365,15 @@ chain:
 
 
       def collect_nodes(nodes_file, notes):
+          """Summarise the cluster's nodes from a name/providerID listing.
+
+          The node name is reduced to a digest. It is an internal hostname that
+          usually embeds the node's private address, it is not needed to act on
+          an AWS lookup failure, and the instance ID carried in the providerID is
+          the correlation key that is. The digest keeps records correlatable
+          without carrying the name; it is not a confidentiality control, because
+          it is unsalted over a small space.
+          """
           nodes = []
           truncated = False
           try:
@@ -373,7 +402,7 @@ chain:
                       region = RE_AZ.match(zone).group(1)
               nodes.append(
                   {
-                      "name": name,
+                      "name_digest": digest(name) if name else None,
                       "provider_id": provider_id,
                       "instance_id": instance_id,
                       "availability_zone": zone,
@@ -389,6 +418,7 @@ chain:
 
 
       def read_region_file(path, notes, missing_note):
+          """Read a file expected to hold a single AWS region name."""
           try:
               with open(path, "r", encoding="utf-8", errors="replace") as handle:
                   value = allow(handle.read(), RE_REGION)
@@ -400,6 +430,7 @@ chain:
 
 
       def read_cluster_config_region(path, notes):
+          """Read the cluster's configured region from the provisioning record."""
           try:
               with open(path, "r", encoding="utf-8", errors="replace") as handle:
                   document = json.load(handle)
@@ -464,6 +495,11 @@ chain:
 
 
       def region_evidence(args, notes):
+          """Collect the region values in play, each labelled configured or observed.
+
+          Nothing here states which region the test process resolved; that is
+          reported as unknown, because it is not observable from this step.
+          """
           lease = os.environ.get("LEASED_RESOURCE")
           if lease is None:
               lease_region = {"status": "unset", "value": None}
@@ -518,6 +554,11 @@ chain:
 
 
       def region_consistency(evidence, nodes):
+          """Compare the recorded region values with each other.
+
+          A divergent result says the recorded values disagree. It does not
+          establish which region the test process actually used.
+          """
           node_regions = {node["region"] for node in nodes if node["region"]}
           cluster_regions = set(node_regions)
           for value in (
@@ -558,6 +599,7 @@ chain:
 
 
       def main(argv=None):
+          """Assemble the context document and write it to --output."""
           parser = argparse.ArgumentParser(add_help=True)
           parser.add_argument("--junit-dir", required=True)
           parser.add_argument("--nodes-file", required=True)
@@ -621,7 +663,7 @@ chain:
           --captured-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           --output "${work_dir}/test-context.json" 2>"${work_dir}/capture.err"; then
           cp "${work_dir}/test-context.json" "${artifact_out}/test-context.json" 2>/dev/null || true
-          cp "${work_dir}/test-context.json" "${shared_out}/test-context.json" 2>/dev/null || true
+          cp "${work_dir}/test-context.json" "${shared_context}" 2>/dev/null || true
           echo "aws-failure-diagnostics: wrote ${artifact_out}/test-context.json"
         else
           # The stderr file is deliberately neither printed nor kept.
@@ -1002,8 +1044,11 @@ chain:
       default: "false"
       documentation: |-
         When "true" and the suite fails, write an allowlisted AWS failure context
-        document to ${ARTIFACT_DIR}/aws-failure-diagnostics/test-context.json and to
-        ${SHARED_DIR}/aws-failure-diagnostics/test-context.json for a later post step.
+        document to ${ARTIFACT_DIR}/aws-failure-diagnostics/test-context.json, and a
+        copy to ${SHARED_DIR}/aws-failure-diagnostics-test-context.json for a later
+        post step. The handoff file is at the top level of ${SHARED_DIR} because
+        ci-operator persists that directory with util.SecretFromDir, which skips
+        subdirectories.
         The capture is bounded and best effort and never changes the suite exit status.
         It records AWS request/error IDs, node providerIDs and region evidence only;
         no credentials, environment values, log bodies or raw test names.

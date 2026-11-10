@@ -26,12 +26,27 @@ The capture helper has to live inside the conformance step, because
 JUnit output. `extract.py` pulls the shipped text out of the chain so the tests
 exercise exactly what runs in CI rather than a copy that could drift.
 
+The handoff to the post step is a single file at the top level of
+`${SHARED_DIR}`, `aws-failure-diagnostics-test-context.json`. ci-operator does
+not share a filesystem between steps: at the end of a step the entrypoint
+wrapper persists `${SHARED_DIR}` with `util.SecretFromDir`
+(openshift/ci-tools `pkg/util/secret.go`), which reads the directory one level
+deep and skips every entry that is a directory, and the next step receives that
+Secret mounted as its own `${SHARED_DIR}`. A file in a subdirectory is dropped,
+with only a warning in the producing step's own log, and never reaches the next
+step. `simulate_shared_dir_transport` in the test runner reproduces those
+semantics, so the handoff is exercised across the boundary rather than by
+handing the post step the producer's own directory.
+
 ## Covered behaviour
 
 * request ID, error code, HTTP status, service, operation, instance ID and
   per-test timestamps extracted from JUnit `<failure>` text, including XML
   entity escapes;
-* node names, providerIDs, instance IDs, zones and regions;
+* providerIDs, instance IDs, zones and regions, with the node's hostname
+  reduced to a stable digest so the name is not carried verbatim while the
+  providerID keeps the correlation. The digest is unsalted over a small space,
+  so it is pseudonymisation for correlation, not a confidentiality control;
 * configured versus observed region evidence, each with its provenance, and an
   explicit "unknown" for the region the test process actually resolved;
 * credential-chain provability, and the resulting `unknown` account-match
@@ -52,5 +67,11 @@ exercise exactly what runs in CI rather than a copy that could drift.
   CLI;
 * bounded output, malformed and missing inputs, the gate-disabled path, the
   passing-suite path and preservation of the original suite exit status;
-* sentinel secrets, account IDs and ARNs placed in the fixtures must not appear
-  in any artifact, stdout or stderr.
+* the handoff crossing a simulated shared-directory transport, with the
+  subdirectory layout kept as a negative control that must be dropped;
+* a polluted but benign AWS environment being reported as an unprovable
+  credential chain rather than hidden, with no inherited value echoed;
+* a DTD straddling the scanner's 1 MiB chunk boundary, which exercises the
+  carry between reads;
+* sentinel secrets, account IDs, ARNs and node hostnames placed in the fixtures
+  must not appear in any artifact, stdout or stderr.

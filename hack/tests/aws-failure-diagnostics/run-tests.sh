@@ -32,6 +32,8 @@ SENTINELS=(
   "arn:aws:iam::"
   "hunter2"
   "eyJhbGciOiJSUzI1NiIs"
+  "ip-10-0-107-53"
+  "compute.internal"
 )
 
 PASS=0
@@ -173,6 +175,12 @@ check_eq "emits a stable truncated test digest" "12" \
 check_eq "captures node providerIDs" "2" "$(jq -r '.node_count' "${OUT}")"
 check_eq "parses the node instance id and zone" "i-027aae04cdd9c7837 us-west-2a us-west-2" \
   "$(jq -r '.nodes[0] | "\(.instance_id) \(.availability_zone) \(.region)"' "${OUT}")"
+check_eq "the node hostname is reduced to a digest" "12" \
+  "$(jq -r '.nodes[0].name_digest | length' "${OUT}")"
+check_eq "the raw node hostname is not a field at all" "false" \
+  "$(jq -r '.nodes[0] | has("name")' "${OUT}")"
+check_eq "no node hostname appears anywhere in the document" "0" \
+  "$(grep -cF -e 'ip-10-0-107-53' -e 'compute.internal' "${OUT}" || true)"
 check_eq "records only the region component of the lease" "us-east-2" \
   "$(jq -r '.region_evidence.configured.lease_region.value' "${OUT}")"
 check_eq "records the observed infrastructure region" "us-west-2" \
@@ -220,7 +228,10 @@ check_no_sentinels "no sentinel reaches the document from the environment" "${OU
 
 # A credentials file outside the cluster profile is also unprovable.
 OUT_OTHERCRED="${WORK}/context-othercred.json"
-env -u AWS_ACCESS_KEY_ID LEASED_RESOURCE="us-west-2--x-0" \
+env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+  -u AWS_PROFILE -u AWS_DEFAULT_PROFILE -u AWS_WEB_IDENTITY_TOKEN_FILE \
+  -u AWS_CONTAINER_CREDENTIALS_FULL_URI -u AWS_CONTAINER_CREDENTIALS_RELATIVE_URI \
+  LEASED_RESOURCE="us-west-2--x-0" \
   CLUSTER_PROFILE_DIR="/secrets/profile" AWS_SHARED_CREDENTIALS_FILE="/tmp/other/.awscred" \
   python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
     --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
@@ -228,6 +239,43 @@ env -u AWS_ACCESS_KEY_ID LEASED_RESOURCE="us-west-2--x-0" \
 check_eq "a foreign credentials file makes the chain unprovable" \
   "shared-credentials-file-not-cluster-profile" \
   "$(jq -r '.credential_context.unprovable_reason' "${OUT_OTHERCRED}")"
+
+# A polluted but benign AWS environment must be reported, not papered over: the
+# production code reads these variables deliberately, because they outrank the
+# shared credentials file in the SDK chain.
+OUT_POLLUTED="${WORK}/context-polluted-env.json"
+env LEASED_RESOURCE="us-west-2--x-0" \
+  CLUSTER_PROFILE_DIR="/secrets/profile" \
+  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
+  AWS_SESSION_TOKEN="synthetic-session-token-for-tests" \
+  python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
+    --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
+    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_POLLUTED}"
+check_eq "an inherited session token makes the chain unprovable" "false" \
+  "$(jq -r '.credential_context.effective_credential_chain_provable' "${OUT_POLLUTED}")"
+check_eq "the inherited source is named, not hidden" "higher-precedence-credential-source-present" \
+  "$(jq -r '.credential_context.unprovable_reason' "${OUT_POLLUTED}")"
+check_eq "the session token alone is reported as a boolean" "true false" \
+  "$(jq -r '"\(.credential_context.aws_session_token_env_present) \(.credential_context.aws_profile_env_present)"' "${OUT_POLLUTED}")"
+check_eq "no inherited credential value is echoed" "0" \
+  "$(grep -cF 'synthetic-session-token-for-tests' "${OUT_POLLUTED}" || true)"
+
+# The same, with only AWS_PROFILE set, so neither variable can hide a
+# regression in the detection of the other.
+OUT_POLLUTED_PROFILE="${WORK}/context-polluted-profile.json"
+env -u AWS_SESSION_TOKEN LEASED_RESOURCE="us-west-2--x-0" \
+  CLUSTER_PROFILE_DIR="/secrets/profile" \
+  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
+  AWS_PROFILE="synthetic-profile" \
+  python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
+    --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
+    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_POLLUTED_PROFILE}"
+check_eq "an inherited profile alone makes the chain unprovable" "false" \
+  "$(jq -r '.credential_context.effective_credential_chain_provable' "${OUT_POLLUTED_PROFILE}")"
+check_eq "the inherited profile is reported as a boolean" "false true" \
+  "$(jq -r '"\(.credential_context.aws_session_token_env_present) \(.credential_context.aws_profile_env_present)"' "${OUT_POLLUTED_PROFILE}")"
+check_eq "no inherited profile value is echoed" "0" \
+  "$(grep -cF 'synthetic-profile' "${OUT_POLLUTED_PROFILE}" || true)"
 
 # Malformed XML: the broken file is noted, the good file is still parsed.
 OUT_MALFORMED="${WORK}/context-malformed.json"
@@ -336,6 +384,50 @@ check_eq "a DTD behind padding is still refused" "true" \
 check_eq "a padded DTD file yields no errors" "0" \
   "$(jq -r '.aws_api_error_count' "${OUT_DTD_PAD}")"
 
+# A DTD that straddles the scanner's chunk boundary exercises the carry.
+STRADDLE="${WORK}/junit-straddle"
+mkdir -p "${STRADDLE}"
+python3 -I - "${STRADDLE}/junit_straddle.xml" "${PROGRAM}" <<'PYEOF'
+import re
+import sys
+
+
+def constant(source, name):
+    """Read an integer constant out of the shipped capture program."""
+    match = re.search(r"^\s*%s = ([0-9 *+]+)$" % name, source, re.MULTILINE)
+    assert match, "constant %s not found in the capture program" % name
+    return eval(match.group(1))  # pylint: disable=eval-used
+
+
+program = open(sys.argv[2], encoding="utf-8").read()
+boundary = constant(program, "SCAN_CHUNK_BYTES")
+overlap = constant(program, "SCAN_OVERLAP_BYTES")
+
+HEAD = b'<?xml version="1.0"?>\n<!--'
+# No internal subset: "<!ENTITY" would land wholly inside the second chunk and
+# would trip the scan on its own, which would let a carry regression pass.
+TAIL = b'-->\n<!DOCTYPE testsuite SYSTEM "x.dtd">\n<testsuite name="openshift-tests"/>\n'
+assert b"<!ENTITY" not in HEAD + TAIL
+# Split "<!DOCTYPE" across the boundary, leaving four bytes in the first chunk.
+split_at = 4
+assert overlap >= len(b"<!DOCTYPE"), overlap
+pad = boundary - split_at - len(HEAD) - len(b"-->\n")
+data = HEAD + b"x" * pad + TAIL
+assert data.index(b"<!DOCTYPE") == boundary - split_at, data.index(b"<!DOCTYPE")
+with open(sys.argv[1], "wb") as handle:
+    handle.write(data)
+PYEOF
+OUT_STRADDLE="${WORK}/context-doctype-straddle.json"
+env LEASED_RESOURCE="us-west-2--x-0" CLUSTER_PROFILE_DIR="/secrets/profile" \
+  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
+  python3 -I "${PROGRAM}" --junit-dir "${STRADDLE}" --nodes-file "${NODES}" \
+    --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
+    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_STRADDLE}"
+check_eq "a DTD straddling the scan chunk boundary is refused" "true" \
+  "$(jq -r '.capture_notes | index("junit-doctype-rejected") != null' "${OUT_STRADDLE}")"
+check_eq "a straddling DTD file yields no errors" "0" \
+  "$(jq -r '.aws_api_error_count' "${OUT_STRADDLE}")"
+
 # Many junit files: the suite results are scanned first and the bound is noted.
 MANY="${WORK}/junit-many"
 mkdir -p "${MANY}"
@@ -442,13 +534,13 @@ if [[ -s "${ART_ON}/aws-failure-diagnostics/test-context.json" ]]; then
 else
   fail "the capture writes an artifact document"
 fi
-if [[ -s "${SHARED_ON}/aws-failure-diagnostics/test-context.json" ]]; then
+if [[ -s "${SHARED_ON}/aws-failure-diagnostics-test-context.json" ]]; then
   pass "the capture hands the document to SHARED_DIR"
 else
   fail "the capture hands the document to SHARED_DIR"
 fi
 check_eq "the document reaching SHARED_DIR carries the request IDs" "3" \
-  "$(jq -r '[.aws_api_errors[].request_id | select(. != null)] | length' "${SHARED_ON}/aws-failure-diagnostics/test-context.json" 2>/dev/null)"
+  "$(jq -r '[.aws_api_errors[].request_id | select(. != null)] | length' "${SHARED_ON}/aws-failure-diagnostics-test-context.json" 2>/dev/null)"
 check_no_sentinels "no sentinel reaches the capture stdout" "${ART_ON}/stdout.txt"
 check_no_sentinels "no sentinel reaches the capture stderr" "${ART_ON}/stderr.txt"
 check_eq "the capture is not traced by xtrace" "0" \
@@ -512,7 +604,7 @@ env -i PATH="${BADPY}:${PATH}" HOME="${WORK}" AWS_FAILURE_DIAGNOSTICS=true \
 check_eq "a failing extractor does not change the exit status" "42" "$?"
 check_contains "a failing extractor says so and continues" \
   "aws-failure-diagnostics: capture failed, continuing" "$(cat "${ART_BADPY}/stdout.txt")"
-if [[ -s "${SHARED_BADPY}/aws-failure-diagnostics/test-context.json" ]]; then
+if [[ -s "${SHARED_BADPY}/aws-failure-diagnostics-test-context.json" ]]; then
   fail "a failing extractor hands nothing to the post step"
 else
   pass "a failing extractor hands nothing to the post step"
@@ -539,7 +631,7 @@ run_post() {
   local name="$1" caller="$2" reference="$3" provable="$4" env_mode="${5:-normal}"
   local root="${WORK}/post-${name}"
   local shared="${root}/shared" artifacts="${root}/artifacts" profile="${root}/profile"
-  mkdir -p "${shared}/aws-failure-diagnostics" "${artifacts}" "${profile}" "${root}/bin"
+  mkdir -p "${shared}" "${artifacts}" "${profile}" "${root}/bin"
   if [[ "${env_mode}" != "no-credential-file" ]]; then
     printf '[default]\naws_access_key_id = fixture\n' > "${profile}/.awscred"
   fi
@@ -549,7 +641,7 @@ run_post() {
       region_evidence:{configured:{cluster_config_region:{value:"us-west-2"}}},
       region_consistency:{status:"divergent"},
       aws_api_error_count:3}' \
-    > "${shared}/aws-failure-diagnostics/test-context.json"
+    > "${shared}/aws-failure-diagnostics-test-context.json"
   case "${reference}" in
     roles) printf 'arn:aws:iam::123456789012:role/Fixture-Installer-Role\n' > "${shared}/account-roles-arns" ;;
     roles-shared-vpc)
@@ -664,8 +756,8 @@ fi
 
 # Malformed context JSON is tolerated.
 BADCTX="${WORK}/post-badctx"
-mkdir -p "${BADCTX}/shared/aws-failure-diagnostics" "${BADCTX}/artifacts" "${BADCTX}/profile" "${BADCTX}/bin"
-printf 'not json' > "${BADCTX}/shared/aws-failure-diagnostics/test-context.json"
+mkdir -p "${BADCTX}/shared" "${BADCTX}/artifacts" "${BADCTX}/profile" "${BADCTX}/bin"
+printf 'not json' > "${BADCTX}/shared/aws-failure-diagnostics-test-context.json"
 make_aws_stub "${BADCTX}/bin" 123456789012
 env -i PATH="${BADCTX}/bin:${PATH}" HOME="${BADCTX}" SHARED_DIR="${BADCTX}/shared" \
   ARTIFACT_DIR="${BADCTX}/artifacts" CLUSTER_PROFILE_DIR="${BADCTX}/profile" \
@@ -675,6 +767,116 @@ if [[ -e "${BADCTX}/artifacts/aws-failure-diagnostics" ]]; then
   fail "a malformed context writes no artifact"
 else
   pass "a malformed context writes no artifact"
+fi
+
+##############################################################################
+# Shared-directory handoff, across the real transport semantics
+#
+# ci-operator does not share a filesystem between steps. At the end of a step
+# the entrypoint wrapper persists ${SHARED_DIR} with util.SecretFromDir
+# (openshift/ci-tools pkg/util/secret.go), which reads the directory one level
+# deep and skips every entry that is a directory, then the next step receives
+# that Secret mounted as its ${SHARED_DIR}. A file in a subdirectory is
+# therefore dropped, with only a warning in the producing step's own log, and
+# never reaches the next step. These tests reproduce that instead of handing
+# the post step the producer's own directory, which would pass either way.
+##############################################################################
+
+simulate_shared_dir_transport() {
+  # simulate_shared_dir_transport <producer-shared-dir> <consumer-shared-dir>
+  # Mirrors util.SecretFromDir: top level only, regular files only.
+  local src="$1" dst="$2" entry
+  mkdir -p "${dst}"
+  for entry in "${src}"/* "${src}"/.[!.]* "${src}"/..?*; do
+    [[ -e "${entry}" ]] || continue
+    if [[ -d "${entry}" ]]; then
+      continue
+    fi
+    cp "${entry}" "${dst}/$(basename "${entry}")"
+  done
+}
+
+run_handoff() {
+  # run_handoff <name> <producer-shared-dir-writer>
+  local name="$1" layout="$2"
+  local root="${WORK}/handoff-${name}"
+  local produced="${root}/produced" consumed="${root}/consumed"
+  local artifacts="${root}/artifacts" post_artifacts="${root}/post-artifacts"
+  local profile="${root}/profile" bin="${root}/bin"
+  mkdir -p "${produced}" "${artifacts}/junit" "${post_artifacts}" "${profile}" "${bin}"
+  cp "${FIXTURES}/junit-aws-errors/"*.xml "${artifacts}/junit/"
+  printf '[default]\naws_access_key_id = fixture\n' > "${profile}/.awscred"
+  # Written by the provisioning steps, at the top level of SHARED_DIR.
+  printf 'arn:aws:iam::123456789012:role/Fixture-Installer-Role\n' > "${produced}/account-roles-arns"
+  printf '{"region":"us-west-2"}\n' > "${produced}/cluster-config"
+
+  if [[ "${layout}" == "nested" ]]; then
+    # The layout this change originally shipped, kept as a negative control.
+    mkdir -p "${produced}/aws-failure-diagnostics"
+    printf '{"credential_context":{"effective_credential_chain_provable":true}}\n' \
+      > "${produced}/aws-failure-diagnostics/test-context.json"
+  else
+    {
+      echo 'set -x'
+      cat "${WORK}/function.sh"
+      echo 'exit_code=9'
+      cat "${WORK}/gate.sh"
+    } > "${root}/produce.sh"
+    env -i PATH="${STUBS}:${PATH}" HOME="${root}" AWS_FAILURE_DIAGNOSTICS=true \
+      ARTIFACT_DIR="${artifacts}" SHARED_DIR="${produced}" \
+      CLUSTER_PROFILE_DIR="${profile}" \
+      AWS_SHARED_CREDENTIALS_FILE="${profile}/.awscred" \
+      LEASED_RESOURCE="us-east-2--rosa-e2e-01-quota-slice-0" \
+      bash "${root}/produce.sh" > "${root}/produce-stdout.txt" 2> "${root}/produce-stderr.txt"
+    echo "$?" > "${root}/produce-status"
+  fi
+
+  simulate_shared_dir_transport "${produced}" "${consumed}"
+
+  make_aws_stub "${bin}" 123456789012
+  env -i PATH="${bin}:${PATH}" HOME="${root}" \
+    SHARED_DIR="${consumed}" ARTIFACT_DIR="${post_artifacts}" \
+    CLUSTER_PROFILE_DIR="${profile}" REGION="us-west-2" \
+    bash "${POST_STEP}" > "${root}/post-stdout.txt" 2> "${root}/post-stderr.txt"
+  echo "$?" > "${root}/post-status"
+  echo "${root}"
+}
+
+root="$(run_handoff flat flat)"
+check_eq "the producing step still exits with the suite status" "9" \
+  "$(cat "${root}/produce-status")"
+if [[ -s "${root}/consumed/aws-failure-diagnostics-test-context.json" ]]; then
+  pass "the handoff file survives the shared-directory transport"
+else
+  fail "the handoff file survives the shared-directory transport"
+fi
+check_eq "the post step runs the comparison after the transport" "match" \
+  "$(jq -r '.account_match.status' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_eq "the original request IDs cross the boundary" "3" \
+  "$(jq -r '[.test_context.aws_api_errors[].request_id | select(. != null)] | length' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" 2>/dev/null)"
+check_eq "the post step exits zero after the transport" "0" "$(cat "${root}/post-status")"
+check_no_sentinels "no sentinel crosses the transport into the identity report" \
+  "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json"
+check_eq "no node hostname crosses into the identity report" "0" \
+  "$(grep -cF -e 'ip-10-0-107-53' -e 'compute.internal' "${root}/post-artifacts/aws-failure-diagnostics/identity-check.json" || true)"
+check_eq "no node hostname reaches the post step output" "0" \
+  "$(cat "${root}/post-stdout.txt" "${root}/post-stderr.txt" | grep -cF -e 'ip-10-0-107-53' -e 'compute.internal' || true)"
+check_no_sentinels "no node hostname reaches the capture stdout" "${root}/produce-stdout.txt"
+check_no_sentinels "no node hostname reaches the capture stderr" "${root}/produce-stderr.txt"
+
+# Negative control: the subdirectory layout is dropped by the transport, so the
+# post step never runs its comparison. This is what the flat case guards.
+root="$(run_handoff nested nested)"
+if [[ -e "${root}/consumed/aws-failure-diagnostics" ]]; then
+  fail "a subdirectory does not survive the shared-directory transport"
+else
+  pass "a subdirectory does not survive the shared-directory transport"
+fi
+check_eq "a dropped handoff leaves the post step a no-op" "0" "$(cat "${root}/post-status")"
+if [[ -e "${root}/post-artifacts/aws-failure-diagnostics" ]]; then
+  fail "a dropped handoff produces no identity report"
+else
+  pass "a dropped handoff produces no identity report"
 fi
 
 printf '\n%d passed, %d failed\n' "${PASS}" "${FAIL}"

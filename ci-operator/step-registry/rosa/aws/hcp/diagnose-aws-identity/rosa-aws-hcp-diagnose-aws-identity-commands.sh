@@ -28,7 +28,10 @@ set -o nounset
 set -o pipefail
 
 SHARED="${SHARED_DIR:-/nonexistent}"
-CONTEXT_FILE="${SHARED}/aws-failure-diagnostics/test-context.json"
+# The conformance step leaves the handoff at the top level of ${SHARED_DIR}:
+# ci-operator persists that directory with util.SecretFromDir, which skips
+# subdirectories, so a nested path would never arrive here.
+CONTEXT_FILE="${SHARED}/aws-failure-diagnostics-test-context.json"
 OUT_DIR="${ARTIFACT_DIR:-/tmp}/aws-failure-diagnostics"
 AWSCRED="${CLUSTER_PROFILE_DIR:-/nonexistent}/.awscred"
 
@@ -92,11 +95,12 @@ expected_account=""
 reference_source="none"
 reference_status="missing"
 
+# Prints the 12-digit account field of an IAM ARN read from stdin, and nothing
+# else; the ARN itself is never printed. The installer role is preferred, the
+# way the sibling ROSA steps select it, so that in a shared-VPC layout an ARN
+# belonging to the VPC-owning account cannot be mistaken for the account that
+# owns the cluster.
 extract_account_from_arn() {
-  # Prints the 12-digit account field of an IAM ARN read from stdin. The
-  # installer role is preferred, the way the sibling ROSA steps select it, so
-  # that in a shared-VPC layout an ARN belonging to the VPC-owning account
-  # cannot be mistaken for the account that owns the cluster.
   local arns installer
   arns="$(sed -n -E 's#.*(arn:aws[a-zA-Z-]*:iam::[0-9]{12}:[^[:space:]",]*).*#\1#p')"
   installer="$(printf '%s\n' "${arns}" | grep -m1 'Installer-Role' || true)"
