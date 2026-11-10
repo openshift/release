@@ -11,6 +11,10 @@ workflow:
       ENABLE_AUTOSCALING: "true"
       MIN_REPLICAS: "3"
       MAX_REPLICAS: "6"
+      # Scoped to the rosa-e2e Feature:Autoscaling specs. Env on the workflow
+      # step list is silently dropped by the registry resolver for ref steps;
+      # only this map overrides the validate-customer ref's default filter.
+      LABEL_FILTER: "Feature:Autoscaling"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
@@ -40,9 +44,6 @@ workflow:
     # There are no autoscaling platform-plane specs, so the platform step is
     # not run.
     - ref: rosa-e2e-validate-customer
-      env:
-      - name: LABEL_FILTER
-        default: "Feature:Autoscaling"
     post:
     - chain: rosa-cluster-deprovision
       best_effort: true
