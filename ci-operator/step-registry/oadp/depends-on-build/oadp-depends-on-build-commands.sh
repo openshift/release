@@ -106,6 +106,39 @@ fetch_pr_json() {
         curl -sf --connect-timeout 10 --max-time 120 "${CURL_HEADERS[@]}" "${PR_API_URL}" > "${TMP_PR_JSON}" 2>"${TMP_CURL_ERR}"
 }
 
+# Best-effort GitHub API GET for the optional guards below (the dep-PR
+# branch check, the cherry-pick original lookup): direct curl first, then
+# one attempt through the TEST cluster's own egress -- the same two-path
+# shape and reasoning as the description fetch above, because the build
+# farm's shared egress IP is routinely over GitHub's anonymous rate limit
+# while the test cluster's NAT is not. Echoes the response body on
+# success, returns 1 silently on failure; every caller treats a failed
+# metadata fetch as "guard inconclusive, proceed as before" rather than
+# failing the job -- an optional safety check must never be the reason a
+# job goes red.
+gh_api_get() {
+    # $1: full https://api.github.com/... URL
+    local URL="${1}" OUT
+    OUT=$(mktemp)
+    if curl -sf --connect-timeout 10 --max-time 60 --retry 2 --retry-delay 5 "${CURL_HEADERS[@]}" "${URL}" -o "${OUT}" 2>/dev/null; then
+        cat "${OUT}"
+        rm -f "${OUT}"
+        return 0
+    fi
+    if [[ -n "${OO_INSTALL_NAMESPACE:-}" ]]; then
+        local POD
+        POD="depends-on-api-$(date +%s)"
+        if timeout 150 oc run --rm -i --restart=Never --image=curlimages/curl "${POD}" -n "${OO_INSTALL_NAMESPACE}" -- \
+            curl -sf --connect-timeout 10 --max-time 120 "${CURL_HEADERS[@]}" "${URL}" > "${OUT}" 2>/dev/null; then
+            cat "${OUT}"
+            rm -f "${OUT}"
+            return 0
+        fi
+    fi
+    rm -f "${OUT}"
+    return 1
+}
+
 PR_JSON=""
 for MODE in direct via-test-cluster; do
     for ATTEMPT in 1 2 3; do
@@ -159,6 +192,54 @@ DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\
 
 if [[ -z "${DEPENDS_ON_LINES}" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] No Depends-On lines found in PR description -- nothing to resolve"
+
+    # Cherry-pick enrichment: automated cherry-pick PRs (the openshift
+    # cherry-pick robot, GitHub's backport bot) open with a fresh body and
+    # do NOT copy the original PR's description, so any Depends-On lines
+    # the original declared are silently lost -- this step no-ops and the
+    # cherry-pick gets tested alone, which is exactly how a tested-together
+    # pair ships broken. When this body carries standard cherry-pick/backport
+    # wording, fetch the ORIGINAL PR's description once and surface the
+    # Depends-On lines it declares in the log and an artifact: a pointer
+    # for the author/reviewer to re-add the lines to THIS PR's description
+    # (a quick body edit + /test re-runs them). Deliberately NOT acted on
+    # -- only this PR's own description is ever resolved, so the trigger
+    # semantics above are unchanged. Matches both the robot's same-repo
+    # form ("This is an automated cherry-pick of #N") and the cross-repo
+    # backport convention ("Cherry-pick of <org>/<repo>#N"); prose forms
+    # like "cherry-pick of the resolved backport ..." do not match, by
+    # design (the ref must directly follow the wording).
+    CHERRY_REF=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE '(cherry-pick|backport) of (pull request |pr )?[A-Za-z0-9_./-]*#[0-9]+' | grep -oE '([A-Za-z0-9_.-]+/)?[A-Za-z0-9_.-]*#[0-9]+' | head -1 || true)
+    CHERRY_ORIG_REPO="${REPO_OWNER}/${REPO_NAME}"
+    CHERRY_ORIG_PR=""
+    if [[ "${CHERRY_REF}" == */* ]]; then
+        CHERRY_ORIG_REPO="${CHERRY_REF%#*}"
+        CHERRY_ORIG_PR="${CHERRY_REF##*#}"
+    elif [[ -n "${CHERRY_REF}" ]]; then
+        CHERRY_ORIG_PR="${CHERRY_REF##*#}"
+    fi
+    if [[ -n "${CHERRY_ORIG_PR}" ]]; then
+        echo "[$(date --utc +%FT%T.%3NZ)] Body looks like an automated cherry-pick of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} -- checking whether the original PR declared Depends-On lines this body no longer carries"
+        if ORIG_PR_JSON=$(gh_api_get "https://api.github.com/repos/${CHERRY_ORIG_REPO}/pulls/${CHERRY_ORIG_PR}"); then
+            # Same escaped-body extraction as above (the title-vs-body
+            # false-match avoidance applies to the original PR's response
+            # too).
+            ORIG_BODY_ESCAPED=$(printf '%s' "${ORIG_PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
+            ORIG_BODY_ESCAPED=$(printf '%s' "${ORIG_BODY_ESCAPED}" | sed -E 's/^"body": *"//')
+            ORIG_BODY_ESCAPED="${ORIG_BODY_ESCAPED%\"}"
+            ORIG_DEPENDS_ON=$(printf '%s' "${ORIG_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
+            if [[ -n "${ORIG_DEPENDS_ON}" ]]; then
+                echo "[$(date --utc +%FT%T.%3NZ)] WARNING: this cherry-pick carries no Depends-On lines, but the original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares:" >&2
+                printf '%s\n' "${ORIG_DEPENDS_ON}" | sed 's/^/  /' >&2
+                echo "[$(date --utc +%FT%T.%3NZ)] Re-add the line(s) to THIS PR's description and /test <job-name> to have them resolved here -- they are not resolved automatically" >&2
+                { echo "cherry-pick-of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares Depends-On lines missing from this PR's body $(date --utc +%FT%T.%3NZ)"; printf '%s\n' "${ORIG_DEPENDS_ON}"; } >> "${ARTIFACT_DIR}/depends-on-cherrypick-original.txt"
+            else
+                echo "[$(date --utc +%FT%T.%3NZ)] Original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares no Depends-On lines either -- nothing was lost in the cherry-pick"
+            fi
+        else
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not fetch the original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} description -- cherry-pick Depends-On check inconclusive" >&2
+        fi
+    fi
     exit 0
 fi
 
@@ -166,6 +247,7 @@ echo "[$(date --utc +%FT%T.%3NZ)] Found Depends-On line(s):"
 echo "${DEPENDS_ON_LINES}"
 
 RESOLVED_ANY=false
+MISMATCH_SKIPPED=false
 SEEN_URLS=""
 
 while IFS= read -r line; do
@@ -201,6 +283,51 @@ while IFS= read -r line; do
     if [[ -z "${MATCHED_CANDIDATES}" ]]; then
         echo "[$(date --utc +%FT%T.%3NZ)] Depends-On ${DEP_REPO}#${DEP_PR} found, but ${DEP_REPO} is not a configured candidate for this job -- skipping"
         continue
+    fi
+
+    # Branch-mismatch guard: never build a dependency whose PR is based on
+    # a different branch than the one this job tests. All OADP-ecosystem
+    # repos share one branch scheme (oadp-dev + oadp-1.x), so the dep PR's
+    # base branch and this job's PULL_BASE_REF are directly comparable: an
+    # oadp-dev-based dep PR pulled into an oadp-1.6 job would build a
+    # combination that can never ship (dev code inside a release bundle),
+    # and the resulting verdict -- pass OR fail -- says nothing about
+    # either branch. On mismatch the dep is SKIPPED: this job proceeds
+    # against the released, pre-built dependency, i.e. the combination
+    # that actually ships, with a loud warning and a marker artifact
+    # naming the dep and both branches. Best-effort like the description
+    # fetch: if the dep PR's metadata cannot be fetched (or its base
+    # branch cannot be extracted), the guard is inconclusive and the dep
+    # is built as before -- a safety check must never be the reason a job
+    # goes red. This also catches the common cherry-pick foot-gun: a
+    # Depends-On line still pointing at the ORIGINAL (dev-branch) PR after
+    # its change was cherry-picked to the release branch this job tests.
+    # NOT applied in pj-rehearse runs, detected as: the triggering PR
+    # lives in openshift/release itself (no real release-repo job wires
+    # this step) -- a rehearsal's PULL_BASE_REF names the RELEASE repo's
+    # branch, a namespace with no counterpart in the OADP repos' branch
+    # scheme, so every dep would "mismatch" and the positive path could
+    # never be rehearsed.
+    if [[ -n "${PULL_BASE_REF:-}" && "${REPO_OWNER}/${REPO_NAME}" != "openshift/release" ]]; then
+        DEP_BASE_REF=""
+        if DEP_PR_JSON=$(gh_api_get "https://api.github.com/repos/${DEP_REPO}/pulls/${DEP_PR}"); then
+            # The "base" object's "ref" field sits before its nested
+            # user/repo objects in GitHub's payload, so grep -P over the
+            # newline-flattened JSON picks it out (no jq in this image,
+            # same as the body extraction above).
+            DEP_BASE_REF=$(printf '%s' "${DEP_PR_JSON}" | tr -d '\n' \
+                | grep -Po '"base": *\{[^{]*"ref": *"[^"]*"' \
+                | grep -Po '"ref": *"[^"]*"$' \
+                | sed -E 's/^"ref": *"//; s/"$//' || true)
+        fi
+        if [[ -z "${DEP_BASE_REF}" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not determine the base branch of ${DEP_REPO}#${DEP_PR} -- branch-mismatch guard inconclusive, building this dependency as requested" >&2
+        elif [[ "${DEP_BASE_REF}" != "${PULL_BASE_REF}" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: ${DEP_REPO}#${DEP_PR} is based on branch '${DEP_BASE_REF}' but this job tests branch '${PULL_BASE_REF}' of ${REPO_OWNER}/${REPO_NAME} -- building it would test a combination that can never ship, so this dependency is SKIPPED and the job runs against the released ${DEP_REPO} instead; to actually test this dep here, point the Depends-On line at a PR based on '${PULL_BASE_REF}' (e.g. this change's cherry-pick)" >&2
+            echo "branch-mismatch ${DEP_REPO}#${DEP_PR} dep-base=${DEP_BASE_REF} job=${REPO_OWNER}/${REPO_NAME}@${PULL_BASE_REF} $(date --utc +%FT%T.%3NZ)" >> "${ARTIFACT_DIR}/depends-on-branch-mismatch.txt"
+            MISMATCH_SKIPPED=true
+            continue
+        fi
     fi
 
     echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${DEP_REPO}#${DEP_PR} once for $(printf '%s' "${MATCHED_CANDIDATES}" | grep -c .) matching candidate(s)"
@@ -334,5 +461,9 @@ while IFS= read -r line; do
 done <<< "${DEPENDS_ON_LINES}"
 
 if [[ "${RESOLVED_ANY}" != "true" ]]; then
-    echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found, but none matched a configured candidate for this job -- nothing to resolve"
+    if [[ "${MISMATCH_SKIPPED}" == "true" ]]; then
+        echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found and matched, but every matched dependency was skipped by the branch-mismatch guard (see the WARNINGs above and depends-on-branch-mismatch.txt) -- this job tested against the released dependencies"
+    else
+        echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found, but none matched a configured candidate for this job -- nothing to resolve"
+    fi
 fi
