@@ -123,14 +123,23 @@ for NODE_ROLE in $OVS_DOCA_VALIDATE_NODE_ROLES; do
     SELINUX_POLICY=$(debug_node "$NODE" "rpm -q openvswitch-selinux-extra-policy 2>&1 || true")
     echo "openvswitch-selinux-extra-policy: $SELINUX_POLICY"
 
-    # Check 3: OVS advertises the doca datapath type
+    # Check 3: OVS advertises the doca datapath type -- and that the netdev
+    # and system (kernel) datapaths are still registered alongside it. On a
+    # node with no DOCA-capable NIC the expected steady state is all three
+    # ([doca, netdev, system]): the DOCA-enabled binary runs the plain kernel
+    # datapath, so a missing netdev/system would mean the daemon can no
+    # longer switch packets the normal way.
     DATAPATH_OUTPUT=$(debug_node "$NODE" "ovs-vsctl list open_vswitch | grep datapath_types || true")
     echo "$DATAPATH_OUTPUT"
-    if echo "$DATAPATH_OUTPUT" | grep -q "doca"; then
-      record_pass "$LABEL: ovs-vsctl advertises doca datapath type"
+    MISSING_TYPES=""
+    for DT in doca netdev system; do
+      echo "$DATAPATH_OUTPUT" | grep -q "$DT" || MISSING_TYPES="$MISSING_TYPES $DT"
+    done
+    if [ -z "$MISSING_TYPES" ]; then
+      record_pass "$LABEL: datapath_types includes doca, netdev and system"
     else
-      record_fail "$LABEL: ovs-vsctl advertises doca datapath type" \
-        "'doca' not found in datapath_types: $DATAPATH_OUTPUT"
+      record_fail "$LABEL: datapath_types includes doca, netdev and system" \
+        "missing from datapath_types:$MISSING_TYPES -- got: $DATAPATH_OUTPUT"
     fi
 
     # Check 4: offload is disabled -- no DOCA-capable NIC on this cluster, so
@@ -150,6 +159,72 @@ for NODE_ROLE in $OVS_DOCA_VALIDATE_NODE_ROLES; do
           "Expected other_config:$KEY to be false or absent, got: $VALUE"
       fi
     done
+
+    # Check 5: version assertions. Three different numbers are involved and
+    # they are NOT the same: the DOCA release train pinned in the image's
+    # repo URL (e.g. "3.4.1"), the rpm VERSION-RELEASE that train ships
+    # (e.g. 3.4.0040-1.el9), and the OVS version the daemon reports about
+    # itself (external_ids:ovs-version, stamped by ovsdb-server.service at
+    # every start via `ovs-vswitchd --version`). The expected rpm version is
+    # passed in via env so a DOCA bump is a one-line change in the ref.yaml,
+    # not an edit here. The daemon self-report is asserted non-empty rather
+    # than exact: it is written by the ovsdb-server version-stamping step
+    # that historically broke on this image (the libclx_api.so.1 failure),
+    # so an empty value is itself a meaningful regression signal.
+    RPM_VERSION=$(debug_node "$NODE" "rpm -q doca-openvswitch --qf '%{VERSION}-%{RELEASE}'")
+    echo "doca-openvswitch rpm version: $RPM_VERSION"
+    if [ "$RPM_VERSION" = "$OVS_DOCA_EXPECTED_RPM_VERSION" ]; then
+      record_pass "$LABEL: doca-openvswitch rpm version ($RPM_VERSION)"
+    else
+      record_fail "$LABEL: doca-openvswitch rpm version" \
+        "expected $OVS_DOCA_EXPECTED_RPM_VERSION, got: $RPM_VERSION"
+    fi
+
+    OVS_VERSION=$(debug_node "$NODE" "ovs-vsctl get Open_vSwitch . external_ids:ovs-version" | tr -d '"')
+    echo "ovs-version (daemon self-report): $OVS_VERSION"
+    if [ -n "$OVS_VERSION" ]; then
+      record_pass "$LABEL: ovs-version reported by daemon ($OVS_VERSION)"
+    else
+      record_fail "$LABEL: ovs-version reported by daemon" \
+        "external_ids:ovs-version is empty -- ovsdb-server's version stamping failed"
+    fi
+
+    # Check 6: applicative test -- push actual packets through the switch.
+    # Creates an isolated test bridge (deliberately not br-int, so no OVN
+    # interaction), two network namespaces joined by a veth pair, and pings
+    # across it. Proves the doca-openvswitch binary actually forwards
+    # traffic on the kernel datapath, not just that it starts and answers
+    # queries. Cleans up after itself via an EXIT trap even on failure, so
+    # a failing run leaves no bridge, ports or namespaces behind.
+    # shellcheck disable=SC2016  # single-quoted on purpose: runs on the node
+    DATAPATH_TEST='set -e
+BR=br-doca-test
+cleanup() {
+  ovs-vsctl --if-exists del-br "$BR"
+  ip netns del doca-ns-a 2>/dev/null || true
+  ip netns del doca-ns-b 2>/dev/null || true
+  ip link del v-doca-a 2>/dev/null || true
+}
+trap cleanup EXIT
+ovs-vsctl add-br "$BR"
+ip netns add doca-ns-a
+ip netns add doca-ns-b
+ip link add v-doca-a type veth peer name v-doca-b
+ip link set v-doca-a netns doca-ns-a
+ip link set v-doca-b netns doca-ns-b
+ovs-vsctl add-port "$BR" v-doca-a
+ovs-vsctl add-port "$BR" v-doca-b
+ip netns exec doca-ns-a ip addr add 192.0.2.1/30 dev v-doca-a
+ip netns exec doca-ns-b ip addr add 192.0.2.2/30 dev v-doca-b
+ip netns exec doca-ns-a ip link set v-doca-a up
+ip netns exec doca-ns-b ip link set v-doca-b up
+ip netns exec doca-ns-a ping -c 3 -W 2 192.0.2.2'
+    if debug_node "$NODE" "$DATAPATH_TEST"; then
+      record_pass "$LABEL: datapath forwards traffic (veth ping across test bridge)"
+    else
+      record_fail "$LABEL: datapath forwards traffic" \
+        "ping across test bridge failed -- see debug output above"
+    fi
   done
 done
 
@@ -159,4 +234,4 @@ if $FAILED; then
 fi
 
 echo "All ovs-doca node package validation checks passed."
-echo "NOTE: this only validates package/binary presence and that offload is disabled, not functional hardware offload (no DOCA-capable NIC on this cluster)."
+echo "NOTE: this validates package presence and version, daemon health, datapath registration and software (kernel-datapath) traffic forwarding with offload disabled. It does NOT validate hardware offload -- that requires a DOCA-capable NIC, which this cluster does not have."

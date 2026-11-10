@@ -19,12 +19,20 @@ ref:
       roles because the layered image is part of the release payload and so
       lands on every node, control plane included -- validating only workers
       would leave half the cluster unchecked.
+  - name: OVS_DOCA_EXPECTED_RPM_VERSION
+    default: "3.4.0040-1.el9"
+    documentation: |-
+      Exact VERSION-RELEASE of doca-openvswitch expected on the node. Note
+      this is NOT the DOCA release train: DOCA 3.4.1 (the train pinned in
+      the image config's repo URL) ships doca-openvswitch-3.4.0040-1.el9.
+      Bump this together with the repo URL pin whenever the DOCA train
+      changes, or the version assertion will fail.
   documentation: |-
     Validates, per node in the given role(s), that the ovs-doca layered
     RHCOS image built at ci-operator's image-build stage (day0 layering,
     substituted into the release payload via `include_built_images`) is
     actually running -- the image is already booted at install time, there
-    is no day2 rollout to wait on. Runs six read-only assertions via
+    is no day2 rollout to wait on. Runs nine assertions per node via
     `oc debug node/<n> -- chroot /host`:
 
       1. `systemctl is-active openvswitch` -- health gate. Layering OVS into
@@ -41,7 +49,10 @@ ref:
          Datapath name, so this is the image build's explicit `dnf remove`
          being verified, not an rpm guarantee.
       4. `ovs-vsctl list open_vswitch | grep datapath_types` -- the
-         advertised datapath_types list includes `doca`.
+         advertised datapath_types list includes `doca`, `netdev` AND
+         `system`: the DOCA datapath is registered while the userspace and
+         kernel datapaths remain available, which is the expected steady
+         state on a node with no DOCA-capable NIC.
       5. and 6. `other_config:hw-offload` and `other_config:doca-init` are each
          either `false` or absent -- confirms OVS is running like a normal,
          non-offloaded switch. This cluster has no DOCA-capable NIC, so
@@ -50,22 +61,33 @@ ref:
          false (ovs-vswitchd logs "DOCA Disabled - Use other_config:doca-init
          to enable" and never enables the flow API). Absent is therefore the
          expected steady state, and only an explicit `true` is a failure.
+      7. `rpm -q doca-openvswitch --qf '%{VERSION}-%{RELEASE}'` equals
+         OVS_DOCA_EXPECTED_RPM_VERSION -- the installed rpm matches the DOCA
+         train the image was built with. The expected value is an env var
+         because it is NOT the train number itself: DOCA 3.4.1 ships
+         doca-openvswitch-3.4.0040-1.el9.
+      8. `ovs-vsctl get Open_vSwitch . external_ids:ovs-version` is
+         non-empty -- the daemon's self-reported version, stamped by
+         ovsdb-server.service at every start via `ovs-vswitchd --version`.
+         Empty means that stamping step failed, which is exactly how the
+         historical libclx_api.so.1 breakage manifested.
+      9. Applicative datapath test -- creates an isolated test bridge
+         (br-doca-test, not br-int, so no OVN interaction), two network
+         namespaces joined by a veth pair, and pings across it; removes
+         everything afterwards via an EXIT trap. Proves the doca-openvswitch
+         binary actually forwards packets on the kernel datapath, not just
+         that it starts and answers queries.
 
     Also prints, without asserting, whether openvswitch-selinux-extra-policy
     survived the Fast Datapath removal -- see the SELinux gap below.
 
-    IMPORTANT SCOPE NOTE: these checks only prove the DOCA-enabled OVS
-    package/binary is installed and recognized by the running daemon, and
-    that offload is (correctly) disabled. They do NOT prove hardware
+    IMPORTANT SCOPE NOTE: these checks prove the DOCA-enabled OVS
+    package/binary is installed at the expected version and recognized by
+    the running daemon, that offload is (correctly) disabled, and that the
+    switch forwards software-datapath traffic. They do NOT prove hardware
     offload is functional -- that requires a real NVIDIA ConnectX/BlueField
     NIC (ASAP^2/switchdev), which AWS instances do not have. Do not read a
     pass here as "hardware offload works."
-
-    KNOWN GAP: does not assert the installed doca-openvswitch version, only
-    that the package exists. Note for anyone adding that check: the "3.4.1"
-    pinned in the image's repo URL is the DOCA release train, not the rpm
-    version -- DOCA 3.4.1 ships doca-openvswitch-3.4.0040-1.el9. Asserting
-    a literal "3.4.1" against the package version would never match.
 
     KNOWN GAP: does not check SELinux. doca-openvswitch ships no policy
     module of its own, so the node depends on the base image's existing
