@@ -1,0 +1,250 @@
+base_images:
+  aro-hcp-e2e-tests-base:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  cli:
+    name: "5.1"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  manila-csi-driver-operator-test:
+    name: "5.1"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
+  openstack-cinder-csi-driver-operator-test:
+    name: "5.1"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      USER root
+      WORKDIR /go/src/github.com/openshift/hypershift
+      RUN git config --global --add safe.directory /go/src/github.com/openshift/hypershift
+      RUN git fetch --depth=1 https://github.com/openshift/hypershift.git b53d8d7b6ba1769888076815f463cef353723652 && \
+          git checkout --detach b53d8d7b6ba1769888076815f463cef353723652 && \
+          test "$(git rev-parse HEAD)" = b53d8d7b6ba1769888076815f463cef353723652
+      RUN git init /go/src/github.com/Azure/ARO-HCP && \
+          git -C /go/src/github.com/Azure/ARO-HCP fetch --depth=1 https://github.com/Azure/ARO-HCP.git 41f939f11ad73e80e3c641bb9d4c2dd10b30aefc && \
+          git -C /go/src/github.com/Azure/ARO-HCP checkout --detach FETCH_HEAD && \
+          test "$(git -C /go/src/github.com/Azure/ARO-HCP rev-parse HEAD)" = 41f939f11ad73e80e3c641bb9d4c2dd10b30aefc
+    from: src
+    inputs:
+      src:
+        as:
+        - src
+    to: premerge-src
+  - build_args:
+    - name: COMMIT_HASH
+      value: b53d8d7b6ba1769888076815f463cef353723652
+    inputs:
+      premerge-src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/hypershift/.
+      src: {}
+    to: hypershift-operator
+  - build_args:
+    - name: COMMIT_HASH
+      value: b53d8d7b6ba1769888076815f463cef353723652
+    dockerfile_path: Dockerfile.control-plane
+    inputs:
+      premerge-src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/hypershift/.
+      src: {}
+    to: hypershift
+  - build_args:
+    - name: COMMIT_HASH
+      value: b53d8d7b6ba1769888076815f463cef353723652
+    dockerfile_path: Dockerfile.e2e
+    inputs:
+      premerge-src:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/hypershift/.
+      src: {}
+    to: hypershift-tests
+  - dockerfile_literal: |
+      FROM hypershift-tests AS upstream-tests
+      FROM aro-hcp-e2e-tests-base
+      USER root
+      WORKDIR /opt/app-root/src/github.com/Azure
+      RUN rm -rf ARO-HCP
+      COPY aro-hcp-pr/ARO-HCP/ ARO-HCP/
+      WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+      ENV GOFLAGS='-mod=vendor'
+      RUN git merge-base --is-ancestor 41f939f11ad73e80e3c641bb9d4c2dd10b30aefc HEAD
+      RUN make build-hcpctl && \
+          make -C tooling/templatize templatize && \
+          make -C test/ build && \
+          go clean -cache -modcache && rm -f go.work.sum
+      RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+      COPY --from=upstream-tests /hypershift/bin/test-e2e-v2 /usr/local/bin/test-e2e-v2
+      RUN /usr/local/bin/test-e2e-v2 -test.run=^TestE2EV2$ --ginkgo.dry-run --ginkgo.no-color --ginkgo.fail-on-empty --ginkgo.label-filter=hosted-cluster-conditions --e2e.junit-report=/tmp/conditions-selection.xml && \
+          python3 -c 'import xml.etree.ElementTree as E; c=list(E.parse("/tmp/conditions-selection.xml").getroot().iter("testcase")); assert len(c)==1 and c[0].get("name", "").endswith("should have all expected conditions with correct status")' && \
+          rm /tmp/conditions-selection.xml
+    inputs:
+      aro-hcp-e2e-tests-base:
+        as:
+        - aro-hcp-e2e-tests-base
+      hypershift-tests:
+        as:
+        - hypershift-tests
+      premerge-src:
+        paths:
+        - destination_dir: aro-hcp-pr
+          source_path: /go/src/github.com/Azure/ARO-HCP
+      src: {}
+    to: aro-hcp-e2e-tests
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "5.1"
+  initial-50:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "5.0"
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+  latest-50:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+  latest-421:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+  latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "5.1"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.1"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  aro-hcp-e2e-tests:
+    limits:
+      cpu: "8"
+      memory: 20Gi
+    requests:
+      cpu: "8"
+      memory: 20Gi
+  unit:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+    requests:
+      cpu: 4000m
+      memory: 16Gi
+tests:
+- always_run: false
+  as: e2e-aro-hcp-presubmit
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-dev
+    dependencies:
+      HYPERSHIFT_V2_TEST_IMAGE: hypershift-tests
+    env:
+      ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_E2E_SUITE: hypershift-presubmit/parallel
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_VERSION_ID: "5.1"
+      HYPERSHIFT_V2_BINARY: /usr/local/bin/test-e2e-v2
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+      PUSH_CPO_IMAGE: "true"
+    test:
+    - as: record-premerge-inputs
+      commands: |
+        mkdir -p "${ARTIFACT_DIR}"
+        cat > "${ARTIFACT_DIR}/premerge-inputs.json" <<'INPUTS'
+        {
+          "release": {
+            "repo": "openshift/release",
+            "pr": 88591,
+            "head": "c2be601a05ab0a975b8edcf2a6d6b742e4c9bbed"
+          },
+          "hypershift": {
+            "repo": "openshift/hypershift",
+            "pr": 10246,
+            "head": "b53d8d7b6ba1769888076815f463cef353723652"
+          },
+          "aro": {
+            "repo": "Azure/ARO-HCP",
+            "pr": 8018,
+            "head": "41f939f11ad73e80e3c641bb9d4c2dd10b30aefc"
+          },
+          "purpose": "Temporary premerge validation; do not merge this rehearsal configuration."
+        }
+        INPUTS
+      from: aro-hcp-e2e-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - ref: aro-hcp-test-local
+    workflow: aro-hcp-hypershift-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: managed-azure-v2-premerge
