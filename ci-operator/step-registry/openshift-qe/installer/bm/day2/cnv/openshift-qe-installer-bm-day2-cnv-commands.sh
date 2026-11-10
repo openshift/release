@@ -137,7 +137,12 @@ EOF
     exit 1
   fi
 
-  cat << EOF| oc apply -f -
+  # Retry the HyperConverged CR creation to tolerate the conversion webhook
+  # cert not being ready immediately after the CSV reaches Succeeded.
+  elapsed=0
+  hco_apply_timeout=120
+  while true; do
+    if cat << EOF | oc apply -f -
   apiVersion: hco.kubevirt.io/v1beta1
   kind: HyperConverged
   metadata:
@@ -145,6 +150,19 @@ EOF
     namespace: ${CNV_NS}
   spec: {}
 EOF
+    then
+      echo "HyperConverged CR created successfully"
+      break
+    fi
+    if [ "${elapsed}" -ge "${hco_apply_timeout}" ]; then
+      echo "Timed out (${hco_apply_timeout}s) creating HyperConverged CR — conversion webhook cert may not be reconciled"
+      dump_cnv_olm
+      exit 1
+    fi
+    echo "Retrying HyperConverged CR creation (${elapsed}s/${hco_apply_timeout}s)"
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
 
   sleep 20
 
