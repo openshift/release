@@ -748,6 +748,29 @@ tests:
     - ref: openshift-qe-installer-aws-provision-bastion
     test:
     - ref: openshift-qe-bgp-setup-udn-bgp
+    - as: replace-frr-k8s-webhook-image
+      cli: latest
+      commands: |
+        set -euo pipefail
+        WEBHOOK_IMAGE=quay.io/pdiak/frr-k8s:inf
+        oc rollout status -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        # BGP setup is complete; prevent CNO from reverting the test image.
+        oc patch networks.operator.openshift.io cluster --type=merge \
+          -p '{"spec":{"managementState":"Unmanaged"}}'
+        # Unmanaged does not cancel an in-flight reconcile. Wait for the old process to exit.
+        oc delete pod -n openshift-network-operator -l name=network-operator --wait=true --timeout=5m
+        oc rollout status -n openshift-network-operator deployment/network-operator --timeout=5m
+        oc set image -n openshift-frr-k8s deployment/frr-k8s-statuscleaner \
+          frr-k8s-statuscleaner="${WEBHOOK_IMAGE}"
+        oc rollout status -n openshift-frr-k8s deployment/frr-k8s-statuscleaner --timeout=5m
+        test "$(oc get deployment -n openshift-frr-k8s frr-k8s-statuscleaner \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="frr-k8s-statuscleaner")].image}')" = "${WEBHOOK_IMAGE}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 25m
     - ref: openshift-qe-udn-bgp
     workflow: openshift-qe-installer-aws
   timeout: 14h0m0s
