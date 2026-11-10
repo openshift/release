@@ -2,19 +2,33 @@
 
 set -o nounset
 
-export PATH=$PATH:/tmp/bin
+export PATH="/tmp/bin:${PATH}"
 mkdir -p /tmp/bin
 
 echo "$(date -u --rfc-3339=seconds) - Installing tools..."
 
+# Download into a staging directory and publish into /tmp/bin only after the
+# download succeeds and the binary runs, so a failed or partial download
+# cannot shadow the image's jq or oc on PATH.
+download_dir="$(mktemp -d)"
+
 # install jq
 # TODO move to image
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/bin/jq
-chmod ug+x /tmp/bin/jq
+if curl -sL --fail https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > "${download_dir}/jq" &&
+  chmod ug+x "${download_dir}/jq" && "${download_dir}/jq" --version; then
+  mv "${download_dir}/jq" /tmp/bin/jq
+else
+  echo "$(date -u --rfc-3339=seconds) - Failed to install jq; using the image's jq"
+fi
 
 # install newest oc
-curl -L --fail https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-chmod ug+x /tmp/bin/oc
+if (set -o pipefail; curl -L --fail https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C "${download_dir}" oc) &&
+  chmod ug+x "${download_dir}/oc" && "${download_dir}/oc" version --client; then
+  mv "${download_dir}/oc" /tmp/bin/oc
+else
+  echo "$(date -u --rfc-3339=seconds) - Failed to install oc; using the image's oc"
+fi
+rm -rf "${download_dir}"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
