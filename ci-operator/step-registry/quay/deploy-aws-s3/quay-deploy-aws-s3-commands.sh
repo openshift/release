@@ -76,6 +76,135 @@ trap on_exit EXIT
 
 QUAY_NS="quay-enterprise"
 
+# OLM creates bundle-unpack Jobs in the CatalogSource namespace, with the
+# operatorframework.io/bundle-unpack-ref label on both the Job and its Pods.
+# The resource name is a hash of the bundle path, so do not infer it from a
+# name prefix. Keep this collection in the failing deploy step: the post phase
+# deprovisions the target cluster and quay-gather intentionally does not gather
+# the shared openshift-marketplace namespace.
+function archive_olm_bundle_unpack_diagnostics() {
+  local root="${ARTIFACT_DIR}/olm-bundle-unpack"
+  local label="operatorframework.io/bundle-unpack-ref"
+  local catalog_namespace="openshift-marketplace"
+  local timeout_seconds=10
+  local max_jobs=3
+  local max_pods=3
+  local max_containers=3
+  local bundle_ref job pod container containers catalogsource_uid selected_bundle_configmaps
+  local jobs_collected=0
+  local job_events_collected=0
+  local pods_collected=0
+
+  mkdir -p "${root}" || return 0
+
+  # The Subscription, InstallPlans, and CSVs explain the resolution state in
+  # the target Quay namespace. None of these commands reads Secrets.
+  timeout "${timeout_seconds}" oc -n "${QUAY_NS}" get subscription quay-operator -o yaml \
+    > "${root}/subscription.yaml" 2>&1 || true
+  timeout "${timeout_seconds}" oc -n "${QUAY_NS}" get installplan -o yaml \
+    > "${root}/installplans.yaml" 2>&1 || true
+  timeout "${timeout_seconds}" oc -n "${QUAY_NS}" get csv -o yaml \
+    > "${root}/csvs.yaml" 2>&1 || true
+  timeout "${timeout_seconds}" oc -n "${QUAY_NS}" get events \
+    --field-selector='involvedObject.name=quay-operator' --sort-by='.lastTimestamp' \
+    > "${root}/subscription-events.txt" 2>&1 || true
+  timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get catalogsource \
+    "${QUAY_OPERATOR_SOURCE}" -o yaml > "${root}/catalogsource.yaml" 2>&1 || true
+  timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get events \
+    --field-selector="involvedObject.name=${QUAY_OPERATOR_SOURCE}" --sort-by='.lastTimestamp' \
+    > "${root}/catalogsource-events.txt" 2>&1 || true
+
+  # A bundle unpack Job and Pod are labelled with the hash of the ConfigMap
+  # they unpack into, but that label does not name the CatalogSource. OLM gives
+  # the ConfigMap an owner reference to the CatalogSource, so resolve the exact
+  # hash values from that ownership relationship before querying Jobs or Pods.
+  # Newest ConfigMaps are first so the fixed bound prioritizes the active
+  # resolution rather than historical bundles reused by the CatalogSource.
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "jq is unavailable; unable to select bundle unpack resources safely" \
+      > "${root}/bundle-selection-unavailable.txt"
+    return 0
+  fi
+  catalogsource_uid="$(timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get catalogsource \
+    "${QUAY_OPERATOR_SOURCE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
+  selected_bundle_configmaps="$(timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get configmap -o json 2>/dev/null \
+    | jq -c --arg source "${QUAY_OPERATOR_SOURCE}" --arg uid "${catalogsource_uid}" '
+        [.items[]?
+         | select(any(.metadata.ownerReferences[]?; .kind == "CatalogSource" and .name == $source and ($uid == "" or .uid == $uid)))
+         | {name: .metadata.name, created: (.metadata.creationTimestamp // "")}]
+        | sort_by(.created) | reverse
+      ' || true)"
+  if ! jq -e 'type == "array"' >/dev/null 2>&1 <<< "${selected_bundle_configmaps}"; then
+    selected_bundle_configmaps='[]'
+  fi
+  printf '%s\n' "${selected_bundle_configmaps}" > "${root}/selected-bundle-configmaps.json"
+  while IFS= read -r bundle_ref; do
+    [[ -n "${bundle_ref}" ]] || continue
+    if [[ "${jobs_collected}" -ge "${max_jobs}" ]]; then
+      echo "bundle-unpack collection capped at ${max_jobs} references" \
+        > "${root}/bundle-reference-cap.txt"
+      break
+    fi
+    jobs_collected=$((jobs_collected + 1))
+    timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get jobs \
+      -l "${label}=${bundle_ref}" -o json > "${root}/${bundle_ref}-jobs.json" 2>&1 || true
+    timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get pods \
+      -l "${label}=${bundle_ref}" -o json > "${root}/${bundle_ref}-pods.json" 2>&1 || true
+    while IFS= read -r job; do
+      [[ -n "${job}" ]] || continue
+      if [[ "${job_events_collected}" -ge "${max_jobs}" ]]; then
+        echo "bundle-unpack event collection capped at ${max_jobs} Jobs" \
+          > "${root}/job-event-cap.txt"
+        break
+      fi
+      job_events_collected=$((job_events_collected + 1))
+      timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get events \
+        --field-selector="involvedObject.name=${job}" --sort-by='.lastTimestamp' \
+        >> "${root}/${bundle_ref}-job-events.txt" 2>&1 || true
+    done < <(jq -r '.items[]?.metadata.name // empty' "${root}/${bundle_ref}-jobs.json" 2>/dev/null || true)
+
+    while IFS= read -r pod; do
+      [[ -n "${pod}" ]] || continue
+      if [[ "${pods_collected}" -ge "${max_pods}" ]]; then
+        echo "bundle-unpack log collection capped at ${max_pods} Pods" \
+          > "${root}/pod-log-cap.txt"
+        break
+      fi
+      pods_collected=$((pods_collected + 1))
+      timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get events \
+        --field-selector="involvedObject.name=${pod}" --sort-by='.lastTimestamp' \
+        > "${root}/${pod}_events.txt" 2>&1 || true
+      containers="$(jq -r --arg pod "${pod}" '
+          .items[]?
+          | select(.metadata.name == $pod)
+          | .spec
+          | (.initContainers[]?.name, .containers[]?.name)
+        ' "${root}/${bundle_ref}-pods.json" 2>/dev/null | sort -u || true)"
+      local containers_collected=0
+      while IFS= read -r container; do
+        [[ -n "${container}" ]] || continue
+        if [[ "${containers_collected}" -ge "${max_containers}" ]]; then
+          echo "bundle-unpack log collection capped at ${max_containers} containers for ${pod}" \
+            > "${root}/${pod}_container-cap.txt"
+          break
+        fi
+        containers_collected=$((containers_collected + 1))
+        timeout "${timeout_seconds}" oc -n "${catalog_namespace}" logs "${pod}" -c "${container}" \
+          --tail=2000 > "${root}/${pod}_${container}.log" 2>&1 || true
+        timeout "${timeout_seconds}" oc -n "${catalog_namespace}" logs "${pod}" -c "${container}" \
+          --previous --tail=2000 > "${root}/${pod}_${container}_previous.log" 2>&1 || true
+      done <<< "${containers}"
+    done < <(jq -r '.items[]?.metadata.name // empty' "${root}/${bundle_ref}-pods.json" 2>/dev/null || true)
+  done < <(jq -r '.[]?.name // empty' "${root}/selected-bundle-configmaps.json" 2>/dev/null || true)
+
+  if [[ "${jobs_collected}" -eq 0 ]]; then
+    echo "no bundle ConfigMaps owned by CatalogSource ${QUAY_OPERATOR_SOURCE} were found" \
+      > "${root}/no-selected-bundles.txt"
+  fi
+
+  return 0
+}
+
 function archive_pod_info() {
   local ns="${QUAY_NS}"
   echo "Archiving pod status and logs from namespace ${ns}..."
@@ -264,6 +393,7 @@ if [[ "$CSV_READY" != "true" ]]; then
   echo "" >&2
   echo "=== CatalogSource Status ===" >&2
   oc get catalogsource -n openshift-marketplace -o wide 2>&1 || true
+  archive_olm_bundle_unpack_diagnostics
   archive_pod_info
   exit 1
 fi
