@@ -8,7 +8,7 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-{{ ocp_version }}
-{% if test != "e2e-legacy" %}
+{% if test not in ["e2e-legacy", "upgrade-legacy"] %}
 images:
   items:
   - dockerfile_path: Dockerfile
@@ -29,7 +29,7 @@ promotion:
 {% endif %}
 releases:
   latest:
-{% if test == 'upgrade' %}
+{% if test in ['upgrade', 'upgrade-legacy'] %}
     release:
       architecture: amd64
       channel: {{ ocp_channel }}
@@ -51,7 +51,7 @@ resources:
 tests:
 - as: "{{ test_as }}"
   timeout: 4h0m0s
-{% if test != 'upgrade' and quay_version is defined %}
+{% if test not in ['upgrade', 'upgrade-legacy'] and quay_version is defined %}
   # Versioned presubmits must not inherit the deploy step's stable-3.16 default.
   # Master has no Quay version and keeps that existing default behavior.
   steps:

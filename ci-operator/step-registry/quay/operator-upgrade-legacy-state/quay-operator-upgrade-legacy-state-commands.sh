@@ -1,0 +1,194 @@
+#!/bin/bash
+set -euo pipefail
+
+# The Cypress project and its supported API paths live in ci/quay-test-console.
+# Do not enable tracing: this step creates two per-run passwords and persists
+# them only long enough for the post-upgrade verification.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
+ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-operator-upgrade-legacy-state"
+mkdir -p "${ARTIFACT_DIR}"
+PHASE="${QUAY_UPGRADE_LEGACY_STATE_PHASE:-seed}"
+STRICT="${QUAY_UPGRADE_LEGACY_CYPRESS_STRICT:-false}"
+STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
+ROUTE_FILE="${SHARED_DIR}/quayroute"
+
+fail() { echo "ERROR: $*" >&2; exit 1; }
+[[ "${PHASE}" == seed || "${PHASE}" == verify ]] || fail "QUAY_UPGRADE_LEGACY_STATE_PHASE must be seed or verify"
+[[ "${STRICT}" == true || "${STRICT}" == false ]] || fail "QUAY_UPGRADE_LEGACY_CYPRESS_STRICT must be true or false"
+[[ -s "${ROUTE_FILE}" ]] || fail "missing Quay route from quay-operator-upgrade-prepare-e2e"
+ROUTE="$(<"${ROUTE_FILE}")"
+[[ "${ROUTE}" =~ ^https://[^/]+$ ]] || fail "Quay route must be a bare HTTPS endpoint"
+HOST="${ROUTE#https://}"
+
+new_password() {
+  LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 32
+}
+
+register_user() {
+  local username="$1" password="$2" cookies body csrf code
+  cookies="$(mktemp)"
+  body="$(mktemp)"
+  csrf="$(curl -sk -c "${cookies}" "${ROUTE}/csrf_token" | jq -r '.csrf_token // empty' || true)"
+  [[ -n "${csrf}" ]] || { rm -f "${cookies}" "${body}"; fail "could not obtain CSRF token for legacy state user"; }
+  code="$(jq -n --arg username "${username}" --arg password "${password}" \
+    '{username:$username,password:$password,email:($username + "@example.invalid")}' | \
+    curl -sk -o "${body}" -w '%{http_code}' -X POST "${ROUTE}/api/v1/user/" \
+      -b "${cookies}" -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' --data @- || true)"
+  rm -f "${cookies}"
+  [[ "${code}" == 200 ]] || { rm -f "${body}"; fail "registering legacy state user returned HTTP ${code}"; }
+  rm -f "${body}"
+}
+
+write_cypress_spec() {
+  cat > quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js <<'EOF'
+const endpoint = Cypress.env("UPGRADE_ROUTE");
+const owner = Cypress.env("UPGRADE_OWNER");
+const password = Cypress.env("UPGRADE_PASSWORD");
+const member = Cypress.env("UPGRADE_MEMBER");
+const org = Cypress.env("UPGRADE_ORG");
+const repository = Cypress.env("UPGRADE_REPOSITORY");
+const team = Cypress.env("UPGRADE_TEAM");
+const robot = Cypress.env("UPGRADE_ROBOT");
+const phase = Cypress.env("UPGRADE_PHASE");
+let authorization = "";
+
+const request = (method, path, body) => cy.request({
+  method,
+  url: `${endpoint}${path}`,
+  headers: { authorization, "Content-Type": "application/json" },
+  body,
+});
+
+describe("legacy Quay upgrade persisted state", () => {
+  before(() => {
+    // This is the same supported Cypress UI helper used by quay-api-tests to
+    // create a scoped OAuth token. It never writes the token to SHARED_DIR.
+    cy.create_quay_oauth_token(endpoint, owner, password, "upgrade-state").then((token) => {
+      authorization = `Bearer ${token}`;
+    });
+  });
+
+  if (phase === "seed") {
+    it("creates the source persisted state", () => {
+      request("POST", "/api/v1/organization/", { name: org, email: `${org}@example.invalid`, recaptcha_response: "" })
+        .its("status").should("eq", 201);
+      request("POST", "/api/v1/repository", { repo_kind: "image", namespace: org, repository, visibility: "private", description: "legacy upgrade persistence" })
+        .then((response) => {
+          expect(response.status).to.eq(201);
+          expect(response.body.namespace).to.eq(org);
+          expect(response.body.name).to.eq(repository);
+        });
+      request("PUT", `/api/v1/organization/${org}/robots/${robot}`, {})
+        .its("status").should("eq", 201);
+      request("PUT", `/api/v1/organization/${org}/team/${team}`, { name: team, role: "member" })
+        .then((response) => expect(response.status).to.eq(200));
+      request("PUT", `/api/v1/organization/${org}/team/${team}/members/${member}`, {})
+        .then((response) => expect(response.status).to.eq(200));
+      request("PUT", `/api/v1/repository/${org}/${repository}/permissions/team/${team}`, { role: "write" })
+        .then((response) => expect(response.status).to.eq(200));
+    });
+  } else {
+    it("verifies every persisted API state before cleanup", () => {
+      request("GET", `/api/v1/organization/${org}`).then((response) => expect(response.status).to.eq(200));
+      request("GET", `/api/v1/repository/${org}/${repository}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.namespace).to.eq(org);
+        expect(response.body.name).to.eq(repository);
+      });
+      request("GET", `/api/v1/organization/${org}/robots/${robot}`).then((response) => expect(response.status).to.eq(200));
+      request("GET", `/api/v1/organization/${org}/team/${team}/members`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.members.map((item) => item.name)).to.include(member);
+      });
+      request("GET", `/api/v1/repository/${org}/${repository}/permissions/team/${team}`).then((response) => {
+        expect(response.status).to.eq(200);
+        expect(response.body.role).to.eq("write");
+      });
+    });
+    it("cleans up only after successful verification", () => {
+      request("DELETE", `/api/v1/organization/${org}`).then((response) => expect(response.status).to.eq(204));
+    });
+  }
+});
+EOF
+}
+
+run_cypress() {
+  local rc=0 tests
+  (cd quay-api-tests && \
+    CYPRESS_UPGRADE_ROUTE="${ROUTE}" \
+    CYPRESS_UPGRADE_OWNER="${OWNER}" \
+    CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" \
+    CYPRESS_UPGRADE_MEMBER="${MEMBER}" \
+    CYPRESS_UPGRADE_ORG="${ORG}" \
+    CYPRESS_UPGRADE_REPOSITORY="${REPOSITORY}" \
+    CYPRESS_UPGRADE_TEAM="${TEAM}" \
+    CYPRESS_UPGRADE_ROBOT="${ROBOT}" \
+    CYPRESS_UPGRADE_PHASE="${PHASE}" \
+    NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state.cy.js \
+      --reporter mocha-junit-reporter \
+      --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state-[hash].xml" \
+      --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") || rc=$?
+  tests="$(cat "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml 2>/dev/null | grep -o '<testcase' | wc -l || true)"
+  echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}, JUnit test cases: ${tests}"
+  if [[ "${STRICT}" == true ]]; then
+    [[ "${tests}" -gt 0 ]] || fail "legacy upgrade ${PHASE} JUnit output has 0 tests"
+    [[ "${rc}" -eq 0 ]] || fail "legacy upgrade ${PHASE} Cypress failed"
+  fi
+}
+
+if [[ "${PHASE}" == seed ]]; then
+  [[ ! -e "${STATE_FILE}" ]] || fail "legacy state file already exists before seed"
+  suffix="${BUILD_ID:-${UNIQUE_HASH:-$(date +%s)}}"
+  suffix="$(printf '%s' "${suffix}" | tr -cd '0-9' | tail -c 12)"
+  [[ -n "${suffix}" ]] || fail "cannot derive a safe legacy state suffix"
+  OWNER="upgradeowner${suffix}"
+  MEMBER="upgrademember${suffix}"
+  ORG="upgradeorg${suffix}"
+  REPOSITORY="upgraderepo${suffix}"
+  TEAM="upgradeteam${suffix}"
+  ROBOT="upgraderobot${suffix}"
+  OWNER_PASSWORD="$(new_password)"
+  MEMBER_PASSWORD="$(new_password)"
+  register_user "${OWNER}" "${OWNER_PASSWORD}"
+  register_user "${MEMBER}" "${MEMBER_PASSWORD}"
+  umask 077
+  cat >"${STATE_FILE}" <<EOF
+OWNER='${OWNER}'
+OWNER_PASSWORD='${OWNER_PASSWORD}'
+MEMBER='${MEMBER}'
+MEMBER_PASSWORD='${MEMBER_PASSWORD}'
+ORG='${ORG}'
+REPOSITORY='${REPOSITORY}'
+TEAM='${TEAM}'
+ROBOT='${ROBOT}'
+TAG='upgrade-legacy'
+EOF
+  chmod 600 "${STATE_FILE}"
+  write_cypress_spec
+  run_cypress
+  # No shell trace and no credential-containing command output. The image/tag
+  # is validated by the registry API before the OLM channel move continues.
+  skopeo copy --dest-tls-verify=false --dest-creds "${OWNER}:${OWNER_PASSWORD}" \
+    docker://quay.io/quay/clair:latest "docker://${HOST}/${ORG}/${REPOSITORY}:upgrade-legacy" >/dev/null
+  curl -sk --fail -u "${OWNER}:${OWNER_PASSWORD}" "${ROUTE}/v2/${ORG}/${REPOSITORY}/tags/list" \
+    | jq -e '.tags | index("upgrade-legacy") != null' >/dev/null \
+    || fail "pushed source image tag is not present"
+else
+  [[ -s "${STATE_FILE}" ]] || fail "missing persisted legacy state from seed"
+  # The state file is written by this step under mode 0600; it contains only
+  # the per-run users needed to authenticate the source and target checks.
+  # shellcheck disable=SC1090
+  source "${STATE_FILE}"
+  curl -sk --fail -u "${OWNER}:${OWNER_PASSWORD}" "${ROUTE}/v2/${ORG}/${REPOSITORY}/tags/list" \
+    | jq -e '.tags | index("upgrade-legacy") != null' >/dev/null \
+    || fail "persisted image tag is missing after upgrade"
+  write_cypress_spec
+  run_cypress
+  rm -f "${STATE_FILE}"
+fi
+
+rm -f quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
+$WAS_TRACING && set -x

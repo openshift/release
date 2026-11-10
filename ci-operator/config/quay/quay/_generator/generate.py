@@ -56,6 +56,7 @@ JOBS_DIR = GENERATOR_DIR.parents[3] / "jobs" / "quay" / "quay"
 README = "ci-operator/config/quay/quay/_generator/README.md"
 SOURCES = ("nightly", "stable")
 OCP_CHANNELS = ("stable", "candidate")
+UPGRADE_TESTS = ("upgrade", "upgrade-legacy")
 CRON_ALIASES = {
     "daily": "@daily",
     "nightly": "@daily",
@@ -452,30 +453,30 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
             ocp_channel = _job_str_field(job, "ocp_channel", where)
-            if test == "upgrade":
+            if test in UPGRADE_TESTS:
                 if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
                     raise ValueError(f"{where} ocp_channel must be one of {OCP_CHANNELS}, got {ocp_channel!r}")
                 if not upgrade_from:
-                    raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
+                    raise ValueError(f"{where} test {test!r} requires upgrade_from (the n-1 version)")
                 if not re.match(r"^\d+\.\d+$", upgrade_from):
                     raise ValueError(f"{where} upgrade_from must look like 'X.Y', got {upgrade_from!r}")
                 if quay_version is None:
                     raise ValueError(
-                        f"{where} test 'upgrade' requires a quay_version-bearing branch; "
+                        f"{where} test {test!r} requires a quay_version-bearing branch; "
                         f"branch {branch!r} has none"
                     )
                 # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
                 if fips:
-                    raise ValueError(f"{where}.fips is not supported for test: upgrade")
+                    raise ValueError(f"{where}.fips is not supported for test: {test}")
                 if any(cloud != "aws" for cloud in clouds) or storage not in (None, "s3"):
                     raise ValueError(
-                        f"{where} test 'upgrade' supports only aws with s3 storage, "
+                        f"{where} test {test!r} supports only aws with s3 storage, "
                         f"got clouds {clouds!r}, storage {storage!r}"
                     )
             elif upgrade_from is not None:
-                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
+                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade or upgrade-legacy")
             elif ocp_channel is not None:
-                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade")
+                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade or upgrade-legacy")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
                 if database and cloud not in DATABASE_BY_CLOUD:

@@ -17,6 +17,7 @@ CATALOG_NS="${QUAY_UPGRADE_CATALOG_NAMESPACE:-openshift-marketplace}"
 OPERATOR_NS="${QUAY_UPGRADE_OPERATOR_NAMESPACE:-openshift-operators}"
 SUBSCRIPTION="${QUAY_UPGRADE_SUBSCRIPTION_NAME:-quay-operator}"
 TIMEOUT="${QUAY_UPGRADE_CATALOG_TIMEOUT:-10m}"
+ALREADY_INSTALLED="${QUAY_UPGRADE_SOURCE_ALREADY_INSTALLED:-false}"
 
 valid_name() { [[ "$1" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]]; }
 valid_channel() { [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$ ]]; }
@@ -29,6 +30,7 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 
 valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
 valid_channel "${SOURCE_CHANNEL}" || fail "QUAY_UPGRADE_SOURCE_CHANNEL is required and malformed"
+[[ "${ALREADY_INSTALLED}" == "true" || "${ALREADY_INSTALLED}" == "false" ]] || fail "QUAY_UPGRADE_SOURCE_ALREADY_INSTALLED must be true or false"
 for name in "${SOURCE_CATALOG}" "${CATALOG_NS}" "${OPERATOR_NS}" "${SUBSCRIPTION}"; do
   valid_name "${name}" || fail "invalid Kubernetes resource name: ${name}"
 done
@@ -58,6 +60,36 @@ wait_catalog() {
   done
   fail "CatalogSource $1 did not become READY within ${TIMEOUT}"
 }
+
+record_source_identity() {
+  local csv phase actual_source actual_channel actual_image
+  actual_image="$(oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" -o jsonpath='{.spec.image}' 2>/dev/null || true)"
+  [[ "${actual_image}" == "${SOURCE_IMAGE}" ]] || fail "source CatalogSource image does not match the requested immutable source image"
+  csv="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+  phase="$(oc get csv -n "${OPERATOR_NS}" "${csv}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  actual_source="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.spec.source}' 2>/dev/null || true)"
+  actual_channel="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.spec.channel}' 2>/dev/null || true)"
+  [[ -n "${csv}" && "${phase}" == Succeeded ]] || fail "source Quay CSV did not reach Succeeded within ${TIMEOUT}"
+  [[ "${actual_source}" == "${SOURCE_CATALOG}" && "${actual_channel}" == "${SOURCE_CHANNEL}" ]] || fail "Subscription does not match the requested n-1 source identity"
+  printf '%s\n' "${csv}" >"${SHARED_DIR}/quay-upgrade-source.csv"
+  cat >"${SHARED_DIR}/quay-upgrade-source-identity" <<EOF
+catalog_name=${SOURCE_CATALOG}
+catalog_namespace=${CATALOG_NS}
+catalog_image=${SOURCE_IMAGE}
+channel=${SOURCE_CHANNEL}
+subscription_namespace=${OPERATOR_NS}
+subscription_name=${SUBSCRIPTION}
+installed_csv=${csv}
+EOF
+  cp "${SHARED_DIR}/quay-upgrade-source-identity" "${ARTIFACT_DIR}/source-identity.txt"
+  echo "Verified source Quay operator CSV ${csv} from channel ${SOURCE_CHANNEL}."
+}
+
+if [[ "${ALREADY_INSTALLED}" == "true" ]]; then
+  wait_catalog "${SOURCE_CATALOG}"
+  record_source_identity
+  exit 0
+fi
 
 oc get namespace "${CATALOG_NS}" >/dev/null
 oc get namespace "${OPERATOR_NS}" >/dev/null
@@ -103,25 +135,10 @@ spec:
 EOF
 
 deadline=$(( $(date +%s) + WAIT_SECONDS ))
-csv=""
-phase=""
 while (( $(date +%s) < deadline )); do
   csv="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
   phase="$(oc get csv -n "${OPERATOR_NS}" "${csv}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
   [[ -n "${csv}" && "${phase}" == Succeeded ]] && break
   sleep 10
 done
-[[ -n "${csv}" && "${phase}" == Succeeded ]] || fail "source Quay CSV did not reach Succeeded within ${TIMEOUT}"
-
-printf '%s\n' "${csv}" >"${SHARED_DIR}/quay-upgrade-source.csv"
-cat >"${SHARED_DIR}/quay-upgrade-source-identity" <<EOF
-catalog_name=${SOURCE_CATALOG}
-catalog_namespace=${CATALOG_NS}
-catalog_image=${SOURCE_IMAGE}
-channel=${SOURCE_CHANNEL}
-subscription_namespace=${OPERATOR_NS}
-subscription_name=${SUBSCRIPTION}
-installed_csv=${csv}
-EOF
-cp "${SHARED_DIR}/quay-upgrade-source-identity" "${ARTIFACT_DIR}/source-identity.txt"
-echo "Installed source Quay operator CSV ${csv} from channel ${SOURCE_CHANNEL}."
+record_source_identity

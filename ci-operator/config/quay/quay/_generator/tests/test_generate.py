@@ -703,6 +703,62 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
 
 
+def test_legacy_upgrade_cells_are_exact_and_strict() -> None:
+    """Only the four approved OCP 4.22 n-1 edges use the legacy adapter."""
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    expected = {
+        "quay-quay-redhat-3.9__aws-ocp422-s3-upgrade-legacy.yaml": ("3.8", "3.9"),
+        "quay-quay-redhat-3.10__aws-ocp422-s3-upgrade-legacy.yaml": ("3.9", "3.10"),
+        "quay-quay-redhat-3.14__aws-ocp422-s3-upgrade-legacy.yaml": ("3.13", "3.14"),
+        "quay-quay-redhat-3.15__aws-ocp422-s3-upgrade-legacy.yaml": ("3.14", "3.15"),
+    }
+    cells = [cell for cell in expand_cells(yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())) if cell.test == "upgrade-legacy"]
+    assert {(cell.upgrade_from, cell.quay_version, cell.ocp_version) for cell in cells} == {
+        (source, target, "4.22") for source, target in expected.values()
+    }
+    for filename, (source, target) in expected.items():
+        config = by_name[filename]
+        assert "images" not in config
+        (test,) = config["tests"]
+        assert test["as"] == f"from-{source.replace('.', '')}"
+        assert "cron" not in test
+        assert test["always_run"] is False and test["optional"] is True
+        env = test["steps"]["env"]
+        assert env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"].endswith(
+            "sha256:fcebc181f4a760e98981aeb47dc596f601f7582b630c12e8827a8500b086171a"
+        )
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_UPGRADE_LEGACY_CYPRESS_STRICT"] == "true"
+        assert env["QUAY_UPGRADE_SOURCE_ALREADY_INSTALLED"] == "true"
+        assert env["QUAY_UPGRADE_OPERATOR_NAMESPACE"] == "quay-enterprise"
+        assert [step.get("ref") or step.get("chain") for step in test["steps"]["test"]] == [
+            "merge-stage-registry-credentials",
+            "quay-enable-catalogsource-art",
+            "quay-deploy-aws-s3",
+            "quay-operator-upgrade-install-source",
+            "quay-operator-upgrade-prepare-e2e",
+            "quay-operator-upgrade-legacy-state",
+            "quay-operator-upgrade-channel",
+            "quay-operator-upgrade-legacy-state-verify",
+            "quay-test-e2e-legacy",
+            "quay-test-api-legacy",
+        ]
+
+
+@pytest.mark.parametrize(
+    "job",
+    [
+        {"kind": "presubmit", "clouds": ["gcp"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3.8"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3-8"},
+    ],
+)
+def test_legacy_upgrade_rejects_invalid_source_or_platform(job: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        expand_cells(_matrix_with_job(job))
+
+
 @pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
 def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
     results, _retired = generate_all()

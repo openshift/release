@@ -3,7 +3,7 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-{{ build_root_ocp_version }}
-{% if test != "e2e-legacy" %}
+{% if test not in ["e2e-legacy", "upgrade-legacy"] %}
 images:
   items:
   - dockerfile_path: web/Containerfile.playwright
@@ -11,7 +11,7 @@ images:
 {% endif %}
 releases:
   latest:
-{% if test == 'upgrade' %}
+{% if test in ['upgrade', 'upgrade-legacy'] %}
     # The upgrade lane exercises an OLM operator upgrade on a released OpenShift
     # cluster (stable channel, or candidate before the OCP minor is GA), not a
     # nightly OCP payload.
@@ -37,10 +37,10 @@ tests:
 - as: "{{ test_as }}"
   steps:
     env:
-{%- if test != "e2e-legacy" %}
+{%- if test not in ["e2e-legacy", "upgrade-legacy"] %}
       PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
 {%- endif %}
-{% if test != 'upgrade' %}
+{% if test not in ['upgrade', 'upgrade-legacy'] %}
       # The upgrade lane installs n-1 and moves the Subscription channel itself
       # (QUAY_UPGRADE_SOURCE_CHANNEL/QUAY_UPGRADE_TARGET_CHANNEL), so it must not
       # pin a single operator channel. No upgrade step declares this env.

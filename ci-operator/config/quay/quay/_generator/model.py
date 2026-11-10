@@ -185,7 +185,7 @@ class Cell:
         cloud = self.cloud if self.arch == "amd64" else f"{self.cloud}-{self.arch}"
         # The upgrade lane carries the storage token (e.g. aws-ocp422-s3-upgrade) so
         # the variant/filename stays unambiguous across storage backends.
-        if self.test == "upgrade":
+        if self.test in {"upgrade", "upgrade-legacy"}:
             return f"{cloud}-ocp{self.ocp_version_nodot}-{self.storage}-{self.test}"
         return f"{cloud}-ocp{self.ocp_version_nodot}-{self.test}"
 
@@ -193,7 +193,7 @@ class Cell:
     def test_as(self) -> str:
         # The upgrade lane names the job after the n-1 version it upgrades from
         # (e.g. upgrade_from "3.17" -> "from-317"), derived rather than hand-set.
-        if self.test == "upgrade":
+        if self.test in {"upgrade", "upgrade-legacy"}:
             return f"from-{self.upgrade_from_nodot}"
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
