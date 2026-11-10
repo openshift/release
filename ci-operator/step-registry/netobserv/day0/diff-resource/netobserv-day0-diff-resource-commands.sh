@@ -134,7 +134,7 @@ for metric in sorted(metrics_filter):
     without_str = format_metric_value(metric, v_without)
     with_str = format_metric_value(metric, v_with)
     delta_str = format_metric_value(metric, delta)
-    pct_str   = f"{pct:+.1f}%" if pct != float("inf") else "+inf%"
+    pct_str   = f"{pct:+.1f}%" if pct != float("inf") else "N/A"
     lines.append(
         f"  {metric:<40} {without_str:>12} {with_str:>12} {delta_str:>10} {pct_str:>10}"
     )
