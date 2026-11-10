@@ -11,7 +11,7 @@ date -u "+%Y-%m-%dT%H:%M:%SZ"
 [ -f "${SHARED_DIR}/proxy-conf.sh" ] && source "${SHARED_DIR}/proxy-conf.sh"
 
 VAULT_KMS_CONFIG_CRD_URL="https://raw.githubusercontent.com/kevinrizza/vault-kms-plugin-openshift-provider/main/bundle/manifests/kms.openshift.io_vaultkmsconfigs.yaml"
-APISERVER_ENCRYPTION_PATCH='{"spec":{"encryption":{"type":"KMS","kms":{"pluginConfig":{"apiVersion":"kms.openshift.io/v1alpha1","resource":"vaultkmsconfigs","name":"'"${VAULT_KMS_CONFIG_NAME}"'"}}}}}'
+APISERVER_ENCRYPTION_PATCH='{"spec":{"encryption":{"type":"KMS","kms":{"pluginConfig":{"apiVersion":"kms.hashicorp.com/v1","resource":"vaultkmsconfigs","name":"'"${VAULT_KMS_CONFIG_NAME}"'"}}}}}'
 
 # 1. Apply the VaultKMSConfig CRD that the APIServer encryption config
 #    references. Idempotent: etcd-encryption-vault-configure applies the same
