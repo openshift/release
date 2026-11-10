@@ -370,6 +370,31 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     assert "ipi-aws-post" not in post_refs
 
 
+def test_redhat_50_aws_metal_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-5.0__aws-metal-ocp50-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    # Naming derives from the cloud key: variant and as carry the aws-metal token.
+    assert test["as"] == "aws-metal-s3-nightly"
+    assert test["cron"] == "@weekly"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert steps["workflow"] == "ipi-aws"
+    # The only metal-specific input: full physical hosts as workers.
+    assert steps["env"]["COMPUTE_NODE_TYPE"] == "c5.metal"
+    assert steps["env"]["BASE_DOMAIN"] == "quayqe.devcluster.openshift.com"
+    # Like every other ipi-aws cell in this fleet, the lane installs via STS.
+    assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+    assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
+    test_refs = [step["ref"] for step in steps["test"] if "ref" in step]
+    assert "quay-deploy-aws-s3" in test_refs
+    # No Equinix machinery on this lane.
+    assert "dev-scripts" not in config.get("base_images", {})
+
+
 def test_upgrade_requires_upgrade_from() -> None:
     matrix = _matrix_with_job(
         {"cron": "weekly", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade"}
