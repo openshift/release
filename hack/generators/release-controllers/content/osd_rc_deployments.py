@@ -1,4 +1,5 @@
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes, get_oc_volume_mounts
+from job_definition_paths import PLUGIN_CONFIG_DIR
+from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes, get_oc_volume_mounts, get_rc_runtime_env_vars, RC_MEMORY_REQUEST, RC_CPU_REQUEST, GIT_SYNC_MEMORY_REQUEST, GIT_SYNC_CPU_REQUEST
 
 
 def _add_osd_rc_bootstrap(gendoc):
@@ -349,7 +350,8 @@ def _add_osd_rc_deployment(gendoc):
                                                   "--root=/tmp/git-sync",
                                                   "--one-time=true",
                                                   "--depth=1",
-                                                  "--link=release"
+                                                  "--link=release",
+                                                  GIT_SYNC_SPARSE_CHECKOUT_ARG
                                               ],
                                               "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                                               "volumeMounts": [
@@ -357,11 +359,12 @@ def _add_osd_rc_deployment(gendoc):
                                                       "name": "release",
                                                       "mountPath": "/tmp/git-sync"
                                                   }
-                                              ]
+                                              ] + get_git_sync_sparse_checkout_volume_mounts()
                                           }] + get_oc_prepare_container(context),
                     "containers": [
                         {
                             "name": "git-sync",
+                            "resources": {"requests": {"memory": GIT_SYNC_MEMORY_REQUEST, "cpu": GIT_SYNC_CPU_REQUEST}},
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
@@ -369,7 +372,8 @@ def _add_osd_rc_deployment(gendoc):
                                 "--period=30s",
                                 "--root=/tmp/git-sync",
                                 "--max-failures=3",
-                                "--link=release"
+                                "--link=release",
+                                GIT_SYNC_SPARSE_CHECKOUT_ARG
                             ],
                             "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
                             "volumeMounts": [
@@ -377,19 +381,14 @@ def _add_osd_rc_deployment(gendoc):
                                     "name": "release",
                                     "mountPath": "/tmp/git-sync"
                                 }
-                            ],
-                            "resources": {
-                                "requests": {
-                                    "memory": "1Gi",
-                                    "cpu": "0.5",
-                                }
-                            }
+                            ] + get_git_sync_sparse_checkout_volume_mounts(),
                         },
                         *_get_osd_rc_deployment_sidecars(context),
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "11Gi"
+                                    "memory": RC_MEMORY_REQUEST,
+                                    "cpu": RC_CPU_REQUEST
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
@@ -411,8 +410,8 @@ def _add_osd_rc_deployment(gendoc):
                                         "--jira-username=openshift-release-controller-jira-bot@redhat.com",
                                         "--jira-password-file=/etc/jira/bot-password",
                                         '--verify-jira',
-                                        '--plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml',
-                                        '--supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config',
+                                        f'--plugin-config=/var/repo/release/{PLUGIN_CONFIG_DIR}/_plugins.yaml',
+                                        f'--supplemental-plugin-config-dir=/var/repo/release/{PLUGIN_CONFIG_DIR}',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}',
                                         "--manifest-list-mode"
@@ -421,7 +420,7 @@ def _add_osd_rc_deployment(gendoc):
                             'imagePullPolicy': 'Always',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
-                            'env': get_oc_env_vars(),
+                            'env': get_oc_env_vars() + get_rc_runtime_env_vars(),
                             'livenessProbe': {
                                 'httpGet': {
                                     'path': '/healthz',

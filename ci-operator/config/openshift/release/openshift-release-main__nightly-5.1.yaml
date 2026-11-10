@@ -237,6 +237,8 @@ tests:
     workflow: openshift-e2e-aws-single-node
   timeout: 5h0m0s
 - as: e2e-metal-ovn-single-node-customnoupgrade-unified-dns
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
@@ -246,6 +248,46 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        MASTER_DISK=120
+        MASTER_VCPU=16
+        FEATURE_SET=CustomNoUpgrade
+        FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true
+        SNO_BIP_SKIP_DNSMASQ=true
+    workflow: baremetalds-sno
+- as: e2e-metal-ovn-single-node-customnoupgrade-unified-dns-v4v6
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BOOTSTRAP_IN_PLACE=true
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        MASTER_DISK=120
+        MASTER_VCPU=16
+        FEATURE_SET=CustomNoUpgrade
+        FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true
+        SNO_BIP_SKIP_DNSMASQ=true
+    workflow: baremetalds-sno
+- as: e2e-metal-ovn-single-node-customnoupgrade-unified-dns-ipv6
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BOOTSTRAP_IN_PLACE=true
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
         MASTER_MEMORY=32768
         MASTER_DISK=120
@@ -1123,7 +1165,7 @@ tests:
 - as: e2e-external-vsphere-ccm
   cron: 5 0 * * 3
   reporter_config:
-    channel: '#forum-ocp-splat-alerts'
+    channel: '#forum-ocp-platform-external-ci'
     job_states_to_report:
     - failure
     - error
@@ -1501,7 +1543,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-dedicated-serial-techpreview
-  cron: 5 20 * * 0
+  cron: 0 0,8,16 * * *
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
@@ -2267,7 +2309,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-- as: e2e-agent-compact-iso-no-registry
+- as: e2e-agent-compact-iso-no-registry-fips
   capabilities:
   - intranet
   cron: 0 */8 * * *
@@ -2278,6 +2320,8 @@ tests:
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
+        FIPS_MODE=true
+      FIPS_MODE: "true"
     workflow: agent-e2e-generic-conformance-iso-no-registry
 - as: e2e-agent-ha-dualstack-iso-no-registry
   capabilities:
@@ -3032,12 +3076,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-hcp-conformance
-- as: e2e-osd-ccs-gcp
-  cluster: build10
-  cron: 0 0 1 1 *
-  steps:
-    cluster_profile: gcp-qe
-    workflow: osd-ccs-gcp-conformance
 - as: e2e-aws-ovn-upgrade-ipsec
   cron: 31 18 * * 0
   steps:

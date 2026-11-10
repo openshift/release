@@ -19,6 +19,12 @@ ref:
     default: "stable"
     documentation: |-
       GKE release channel. Allowed values: rapid, regular, stable.
+  - name: PSC_SUBNET_COUNT
+    default: "10"
+    documentation: |-
+      Number of PRIVATE_SERVICE_CONNECT subnets to create in the management VPC.
+      Must be at least the number of hosted clusters the job creates, because each
+      ServiceAttachment requires a dedicated PRIVATE_SERVICE_CONNECT subnet.
   - name: HYPERSHIFT_GCP_CI_PROJECT
     default: ""
     documentation: "GCP project ID for persistent HyperShift CI resources (passed to hypershift-install via SHARED_DIR)"
@@ -28,7 +34,8 @@ ref:
   documentation: |-
     This step provisions a GKE Autopilot cluster for use as a HyperShift Control Plane cluster.
     It creates dynamic GCP projects under the CI folder, sets up networking with VPC,
-    Cloud Router, NAT, and PSC subnet, then creates the GKE cluster.
+    Cloud Router, NAT, and PSC subnets (one per hosted cluster, controlled by
+    PSC_SUBNET_COUNT), then creates the GKE cluster.
 
     The cluster profile must contain:
     - ci-folder-id: GCP folder ID where dynamic projects are created

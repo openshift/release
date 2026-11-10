@@ -286,7 +286,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 check_marketplace
-# oc delete catsrc qe-app-registry -n openshift-marketplace || true
+oc delete catsrc qe-app-registry -n openshift-marketplace || true
 create_catalog_source "cluster-logging-operator-registry" "cluster-logging"
 create_catalog_source "loki-operator-registry" "loki"
 

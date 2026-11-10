@@ -198,6 +198,24 @@ def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
     assert custom["tests"][0]["cron"] == "17 3 * * 1"
 
 
+def test_kind_settings_downstream_periodic_reports_failures_to_slack() -> None:
+    downstream = apply_kind_settings({"tests": [{"steps": {}}]}, _phase0_cell())
+    reporter = downstream["tests"][0]["reporter_config"]
+    assert reporter["channel"] == "#team-quay-downstream-interruptions"
+    assert reporter["job_states_to_report"] == ["failure", "error"]
+    assert "{{.Status.URL}}" in reporter["report_template"]
+
+    upstream = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(branch="master", quay_version=None)
+    )
+    assert "reporter_config" not in upstream["tests"][0]
+
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(kind="presubmit", cron=None)
+    )
+    assert "reporter_config" not in presubmit["tests"][0]
+
+
 def test_cron_alias_resolves_to_interval() -> None:
     for alias, interval in (("daily", "@daily"), ("nightly", "@daily"), ("weekly", "@weekly")):
         matrix = _matrix_with_job(
@@ -604,6 +622,22 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     ]
     post = [step.get("ref") or step.get("chain") for step in steps["post"]]
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
+@pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
+def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
+    results, _retired = generate_all()
+    name = f"quay-quay-redhat-{quay}__aws-ocp{ocp.replace('.', '')}-e2e-legacy.yaml"
+    config = {filename: cfg for _group, filename, cfg in results}[name]
+    assert "images" not in config
+    assert config["releases"]["latest"]["candidate"]["version"] == ocp
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    env = test["steps"]["env"]
+    assert env["QUAY_VERSION"] == quay
+    assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
+    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
 
 
 def test_master_presubmit_expands_all_clouds() -> None:

@@ -1,0 +1,45 @@
+ref:
+  as: hypershift-destroy-nested-management-cluster
+  cli: latest
+  env:
+  - name: HYPERSHIFT_NAMESPACE
+    default: clusters
+    documentation: The Namespace where to create the HostedCluster and NodePools
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: 'false'
+    documentation: Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the
+      infra created for the clusters. E.g. For cluster-bot we use the generic CI account
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ''
+    documentation: The cluster's FQDN will be a subdomain of the base domain.
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: centralus
+    documentation: The Azure location for the cluster (only used when CLOUD_PROVIDER=Azure)
+  - name: CLOUD_PROVIDER
+    default: AWS
+    documentation: The cloud provider to use for the management cluster
+  - name: HYPERSHIFT_CLUSTER_ROLE
+    default: ''
+    documentation: Optional role suffix used to select a distinct management cluster.
+  commands: hypershift-destroy-nested-management-cluster-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    group: ops/hypershift-ci-jobs-awscreds
+    collection: hypershift-team
+  - mount_path: /etc/hypershift-kubeconfig
+    group: ops/clusters/hypershift-ci-2
+    collection: hypershift-team
+  - mount_path: /etc/hypershift-kubeconfig-azure
+    group: ops/clusters/azure-hypershift-ci
+    collection: hypershift-team
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+    group: ops/hypershift-ci-jobs-self-managed-azure
+    collection: hypershift-team
+  from_image:
+    namespace: hypershift
+    name: hypershift-operator
+    tag: latest
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m

@@ -6,6 +6,9 @@ ref:
   - collection: ci-claude-code
     group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
+  - collection: ci-claude-code
+    group: codex-openshift-ci
+    mount_path: /var/run/codex-openai-api-key
   - collection: technical-release-team
     group: openshift-trt-agent-gh-app
     mount_path: /var/run/github-token
@@ -27,8 +30,23 @@ ref:
     default: "openshift-ci-prow-agents"
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
-  - name: CLAUDE_MODEL
+  - name: AGENT_MODEL
     default: "claude-opus-4-6"
+    documentation: |-
+      Model used for eval solves. Change this default to change the
+      model for jobs that do not supply an override. gpt-* models use
+      Codex; other models use Claude Code.
+  - name: MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL
+    default: ""
+    documentation: |-
+      Gangway override for the eval solve model. When unset, AGENT_MODEL
+      is used. Pass it via pod_spec_options.envs.
+  - name: OPENAI_API_KEY_PATH
+    default: "/var/run/codex-openai-api-key/token"
+    documentation: |-
+      Path to the OpenAI API key mounted from the codex-openshift-ci
+      secret. Exported as OPENAI_API_KEY only when the Codex harness
+      is selected.
   - name: EVAL_PARALLELISM
     default: "5"
     documentation: |-

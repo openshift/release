@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+  ocp_builder_rhel-9-base-nodejs-openshift-5.1:
     name: builder
     namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.22
+    tag: rhel-9-base-nodejs-openshift-5.1
   ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
@@ -10,7 +10,7 @@ base_images:
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi9/nodejs-22:latest
+      FROM registry.access.redhat.com/ubi9/nodejs-24:latest
       USER root
       RUN mkdir -p /go/src && chmod -R 777 /go
       ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -24,10 +24,10 @@ images:
   - dockerfile_path: Dockerfile.downloads
     to: console-downloads
   - dockerfile_path: Dockerfile.plugins.demo
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: ocp_builder_rhel-9-base-nodejs-openshift-5.1
     to: console-plugin-demo
   - dockerfile_literal: |
-      FROM ocp_builder_rhel-9-base-nodejs-openshift-4.22
+      FROM ocp_builder_rhel-9-base-nodejs-openshift-5.1
       USER root
       RUN dnf install -y \
           alsa-lib atk at-spi2-atk cups-libs libdrm libXcomposite \
@@ -46,7 +46,7 @@ images:
           yarn playwright install chromium
       RUN dnf install -y python3 git jq && dnf clean all
       RUN npm install -g @anthropic-ai/claude-code@2.1.273 && claude --version
-    from: ocp_builder_rhel-9-base-nodejs-openshift-4.22
+    from: ocp_builder_rhel-9-base-nodejs-openshift-5.1
     inputs:
       src:
         paths:
@@ -128,7 +128,7 @@ tests:
     cluster_profile: openshift-org-gcp
     env:
       CONSOLE_FLAKE_AGENT_ENABLED: "true"
-      CONSOLE_FLAKE_DRIVER_SHA256: 9d0a79ca0a5ab3e9847c830822b8383afd7661e931235856ccc22c9e68115a3e
+      CONSOLE_FLAKE_DRIVER_SHA256: 1f894283dd29c7978cf2203cc8b702b7d34634a7ae1b76bd50d5780af42aeccf
       CONSOLE_FLAKE_SKILL_REVISION: main
       CONSOLE_FLAKE_SKILL_SHA256: 8dea3696de872902b10dd642a330dc6eb13aa4477fb2108db4cd5acbc85a8ef0
     post:

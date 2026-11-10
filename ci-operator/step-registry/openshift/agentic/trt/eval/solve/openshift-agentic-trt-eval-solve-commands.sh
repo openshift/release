@@ -39,12 +39,22 @@ export PATH="${HOME}/.local/bin:${PATH}"
 
 # --- Artifact collection ---
 REAL_SHARED_DIR="${SHARED_DIR}"
+PR_METADATA_ROOT=$(mktemp -d "/tmp/eval-pr-metadata.XXXXXX")
 copy_artifacts() {
     echo "Copying artifacts..."
     for case_name in "${CASE_LIST[@]}"; do
         mkdir -p "${ARTIFACT_DIR}/${case_name}"
         if [[ -d "/workspace/${case_name}/artifacts" ]]; then
-            cp "/workspace/${case_name}/artifacts/"* "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+            for artifact in "/workspace/${case_name}/artifacts/"*; do
+                if [[ "${artifact}" == "/workspace/${case_name}/artifacts/pr-description.md" ]]; then
+                    continue
+                fi
+                cp "${artifact}" "${ARTIFACT_DIR}/${case_name}/" 2>/dev/null || true
+            done
+        fi
+        if [[ -f "${PR_METADATA_ROOT}/${case_name}/pr-description.md" ]]; then
+            cp "${PR_METADATA_ROOT}/${case_name}/pr-description.md" \
+                "${ARTIFACT_DIR}/${case_name}/pr-description.md" 2>/dev/null || true
         fi
         if [[ -f "/tmp/eval-otel/${case_name}.claude-otel.jsonl" ]]; then
             cp "/tmp/eval-otel/${case_name}.claude-otel.jsonl" "${ARTIFACT_DIR}/${case_name}/claude-otel.jsonl"
@@ -79,6 +89,7 @@ for case_name in "${CASE_LIST[@]}"; do
         done
         cp "${REAL_SHARED_DIR}/gh-fork-token" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/gh-upstream-token" "${CASE_SHARED}/"
+        cp "${REAL_SHARED_DIR}/trt-init-model.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/trt-telemetry.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-auth.sh" "${CASE_SHARED}/"
         cp "${REAL_SHARED_DIR}/github-app-token-outputs" "${CASE_SHARED}/"
@@ -90,6 +101,7 @@ for case_name in "${CASE_LIST[@]}"; do
 
         export SHARED_DIR="${CASE_SHARED}"
         export WORKDIR="${CASE_WORKDIR}"
+        export PR_METADATA_DIR="${PR_METADATA_ROOT}/${case_name}"
         export EVAL_MODE=true
         /opt/scripts/solve.sh
 
@@ -147,33 +159,69 @@ if [[ -s "${OTEL_COMBINED}" ]]; then
     METRICS_TMP=$(mktemp)
     python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
         "${OTEL_COMBINED}" "${METRICS_TMP}" || true
-    if jq -e '.rows[0].model' "${METRICS_TMP}" >/dev/null 2>&1; then
-        jq '
+    if ! CODEX_USAGE=$(
+        # shellcheck disable=SC1091
+        source "${REAL_SHARED_DIR}/trt-telemetry.sh"
+        codex_otel_usage "${OTEL_COMBINED}"
+    ); then
+        CODEX_USAGE=""
+    fi
+    if [[ -z "${CODEX_USAGE}" ]]; then
+        CODEX_USAGE='{"models":{}}'
+    fi
+    if jq -e '.rows[0]' "${METRICS_TMP}" >/dev/null 2>&1; then
+        jq --arg configured "${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-${AGENT_MODEL:-}}" \
+           --argjson usage "${CODEX_USAGE}" '
+          def first_nonempty: map(select(type == "string" and length > 0)) | first // "";
           .rows[0] as $r
-          | ($r.total_cost_usd | tonumber) as $cost
-          | {
-              model: $r.model,
-              agent: "claude-code",
-              agent_version: $r.claude_code_version,
-              duration_s: (($r.duration_ms | tonumber) / 1000),
-              cost_usd: $cost,
-              num_turns: ($r.num_turns | tonumber),
-              exit_code: ($r.is_error | tonumber),
-              token_usage: {
+          | ($usage.models // {}) as $models
+          | (if $usage.cost_from_metric then ([$models[] | .cost // 0] | add // 0) else ($r.total_cost_usd | tonumber) end) as $cost
+          | (if ($models | has($configured)) then $configured
+             elif ($r.model | length) > 0 then $r.model
+             elif ($models | length) > 0 then ($models | to_entries | max_by(.value.input + .value.cache_read) | .key)
+             else $configured end) as $model
+          | (if ($model | startswith("gpt-")) then "codex" else "claude-code" end) as $harness
+          | (if $harness == "codex" then ([$usage.version, $r.codex_version, $r.claude_code_version] | first_nonempty) else ([$r.claude_code_version] | first_nonempty) end) as $version
+          | (if ($models | has($model)) then $models[$model].turns else ($r.num_turns | tonumber) end) as $turns
+          | (if ($models | has($model)) then $models[$model].input else ($r.input_tokens | tonumber) end) as $input
+          | (if ($models | has($model)) then $models[$model].output else ($r.output_tokens | tonumber) end) as $output
+          | (if ($models | has($model)) then $models[$model].cache_read else ($r.cache_read_input_tokens | tonumber) end) as $cache_read
+          | (if ($models | has($model)) then $models[$model].cache_create else ($r.cache_creation_input_tokens | tonumber) end) as $cache_create
+          | (if ($models | length) > 0 then
+              ($models | to_entries | map({
+                key: .key,
+                value: {
+                  input: .value.input,
+                  output: .value.output,
+                  cache_read: .value.cache_read,
+                  cache_create: .value.cache_create,
+                  cost_usd: (if $usage.cost_from_metric then (.value.cost // 0) elif .key == $model then $cost else 0 end)
+                }
+              }) | from_entries)
+            else
+              {($model): {
                 input: ($r.input_tokens | tonumber),
                 output: ($r.output_tokens | tonumber),
                 cache_read: ($r.cache_read_input_tokens | tonumber),
-                cache_create: ($r.cache_creation_input_tokens | tonumber)
+                cache_create: ($r.cache_creation_input_tokens | tonumber),
+                cost_usd: $cost
+              }}
+            end) as $per_model
+          | {
+              model: $model,
+              agent: $harness,
+              agent_version: $version,
+              duration_s: (($r.duration_ms | tonumber) / 1000),
+              cost_usd: $cost,
+              num_turns: $turns,
+              exit_code: ($r.is_error | tonumber),
+              token_usage: {
+                input: $input,
+                output: $output,
+                cache_read: $cache_read,
+                cache_create: $cache_create
               },
-              per_model_usage: {
-                ($r.model): {
-                  input: ($r.input_tokens | tonumber),
-                  output: ($r.output_tokens | tonumber),
-                  cache_read: ($r.cache_read_input_tokens | tonumber),
-                  cache_create: ($r.cache_creation_input_tokens | tonumber),
-                  cost_usd: $cost
-                }
-              }
+              per_model_usage: $per_model
             }
         ' "${METRICS_TMP}" > "${REAL_SHARED_DIR}/eval-solve-run-result.json"
         cp "${REAL_SHARED_DIR}/eval-solve-run-result.json" "${ARTIFACT_DIR}/eval-solve-run-result.json"

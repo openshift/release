@@ -56,7 +56,7 @@ images:
     - arm64
     dockerfile_literal: |
       FROM hypershift-operator
-      RUN yum install -y jq && yum clean all
+      RUN yum install -y jq httpd-tools && yum clean all
     from: hypershift-operator
     to: hypershift-cli
 promotion:
@@ -133,10 +133,10 @@ resources:
   verify:
     limits:
       cpu: 4000m
-      memory: 8Gi
+      memory: 16Gi
     requests:
       cpu: 4000m
-      memory: 8Gi
+      memory: 16Gi
 tests:
 - as: verify
   capabilities:
@@ -180,6 +180,33 @@ tests:
       NODEPOOL_N2_VERSION: "4.22"
       NODEPOOL_N3_VERSION: "4.21"
       NODEPOOL_N4_VERSION: "4.20"
+    post:
+    - ref: hypershift-analyze-e2e-failure
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    workflow: hypershift-azure-aks-e2e
+- always_run: false
+  as: e2e-aks-autonode
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestKarpenter
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      HYPERSHIFT_AZURE_KARPENTER_IDENTITY: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+      NODEPOOL_N1_VERSION: "5.0"
+      NODEPOOL_N2_VERSION: "4.22"
+      NODEPOOL_N3_VERSION: "4.21"
+      NODEPOOL_N4_VERSION: "4.20"
+      TECH_PREVIEW_NO_UPGRADE: "true"
     post:
     - ref: hypershift-analyze-e2e-failure
     - chain: cucushift-installer-rehearse-azure-aks-deprovision
@@ -234,6 +261,24 @@ tests:
       ARO_HCP_DEPLOY_ENV: ci01
       MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
     workflow: aro-hcp-hypershift-e2e
+- always_run: false
+  as: e2e-aro-hcp-presubmit
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      ARO_HCP_E2E_SUITE: hypershift-presubmit/parallel
+      ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
+      ARO_HCP_OPENSHIFT_VERSION_ID: "5.1"
+      MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
+      PUSH_CPO_IMAGE: "true"
+    workflow: aro-hcp-hypershift-e2e
 - as: e2e-aks-override
   capabilities:
   - arm64
@@ -286,6 +331,17 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
+  as: e2e-v2-aws-backuprestore-cross-cluster
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore-cross-cluster
 - always_run: false
   as: e2e-kubevirt-metal-ovn-backuprestore
   capabilities:
@@ -657,22 +713,6 @@ tests:
     - env: OPENSTACK_CLOUD
       resource_type: openstack-vh-mecha-central-quota-slice
     workflow: hypershift-openstack-aws-conformance
-- always_run: false
-  as: e2e-aws-autonode
-  capabilities:
-  - arm64
-  optional: true
-  steps:
-    cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_LATEST: release:multi-latest
-      OCP_IMAGE_PREVIOUS: release:multi-initial
-    env:
-      AWS_MULTI_ARCH: "true"
-      CI_TESTS_RUN: ^TestKarpenter
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-nested
 - always_run: false
   as: e2e-aws-autonode-standalone-ko
   capabilities:

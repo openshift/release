@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `openshift-priv-image-building-jobs-failing` |
 | **Cluster** | `app.ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `openshift-priv-image-building-jobs-failing` |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `openshift-priv-image-building-jobs-failing` |
 | **Severity** | `critical` |
 
 This alert fires when an `openshift-priv` image-building job has a poor 12h success ratio while its corresponding public `openshift` image-building job remains healthy.

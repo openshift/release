@@ -2,6 +2,25 @@
 
 set -eux
 
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+    echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+    exit 1
+  fi
+  export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+  if [[ ! -s "${KUBECONFIG}" ]]; then
+    echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+    exit 1
+  fi
+fi
+
+# Registry env defaults are literal strings, so resolve the Prow job ID marker
+# here. Explicit owner IDs without the marker are left unchanged.
+if [[ "${HYPERSHIFT_EXTERNAL_DNS_TXT_OWNER_ID:-}" == *'${PROW_JOB_ID}'* ]]; then
+  : "${PROW_JOB_ID:?PROW_JOB_ID is required to resolve the ExternalDNS TXT owner ID}"
+  HYPERSHIFT_EXTERNAL_DNS_TXT_OWNER_ID="${HYPERSHIFT_EXTERNAL_DNS_TXT_OWNER_ID//\$\{PROW_JOB_ID\}/${PROW_JOB_ID}}"
+fi
+
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
@@ -181,6 +200,17 @@ case "${CLOUD_PROVIDER}" in
       EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-provider aws --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials"
     fi
 
+    AWS_EXTERNAL_DNS_ARGS="--external-dns-provider=aws \
+      --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
+      --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com"
+    if [[ -n "${HYPERSHIFT_EXTERNAL_DNS_TXT_OWNER_ID}" ]]; then
+      if ! echo "${INSTALL_HELP}" | grep -q -- '--external-dns-txt-owner-id'; then
+        echo "The hypershift CLI does not support --external-dns-txt-owner-id" >&2
+        exit 1
+      fi
+      AWS_EXTERNAL_DNS_ARGS="${AWS_EXTERNAL_DNS_ARGS} --external-dns-txt-owner-id=${HYPERSHIFT_EXTERNAL_DNS_TXT_OWNER_ID}"
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
     --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
@@ -190,9 +220,7 @@ case "${CLOUD_PROVIDER}" in
     --private-platform=AWS \
     --aws-private-creds=/etc/hypershift-pool-aws-credentials/credentials \
     --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
-    --external-dns-provider=aws \
-    --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
-    --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+    ${AWS_EXTERNAL_DNS_ARGS} \
     --wait-until-available \
     ${EXTRA_ARGS}
     ;;
@@ -315,11 +343,11 @@ esac
 set +x
 
 # Query the actual deployed operator from the management cluster.
-# Prefer the explicit management_cluster_kubeconfig written by the nested-management-cluster
-# setup chain; fall back to the default KUBECONFIG (covers 2-tier root-management-cluster
-# workflows where management_cluster_kubeconfig does not exist).
+# Role-specific installs keep the management cluster kubeconfig selected above.
+# Without a role, prefer the kubeconfig written by the nested-management-cluster
+# setup chain and fall back to the default KUBECONFIG.
 VERIFY_KUBECONFIG="${KUBECONFIG:-}"
-if [[ -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
+if [[ -z "${HYPERSHIFT_CLUSTER_ROLE:-}" && -f "${SHARED_DIR}/management_cluster_kubeconfig" ]]; then
   VERIFY_KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 fi
 

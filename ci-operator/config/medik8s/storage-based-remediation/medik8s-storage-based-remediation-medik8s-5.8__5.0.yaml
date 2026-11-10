@@ -63,17 +63,20 @@ tests:
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_DUMP_FAILED_TESTS: "true"
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
+      EXTRA_MG_ARGS: --image=quay.io/medik8s/must-gather:latest
       ODF_OPERATOR_CHANNEL: stable-5.0
       ODF_VERSION_MAJOR_MINOR: "5.0"
       TEST_NAME: e2e-system-tests-sbr-daily-aws-odf
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - as: build-and-install-sbr
       cli: latest
@@ -271,6 +274,7 @@ tests:
         echo '==> Run system-tests (sbr-operator)'
         make -C /tmp/system-tests run-tests
       env:
+      - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE

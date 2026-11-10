@@ -20,6 +20,7 @@ fi
 : "${LOCATION:?LOCATION must be set directly, via Gangway override, or by SELECTED_LOCATION in the runtime slot export file}"
 
 export AZURE_TOKEN_CREDENTIALS=prod
+export TEMPLATIZE_USE_PREBUILT=1
 
 # NOTE: this config will be only partially accurate on public envs
 make -C config render-partial-config \

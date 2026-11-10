@@ -113,6 +113,31 @@ cluster_groups:
 dptp_collection: test-platform-infra
 
 bundles:
+  # Authentication-only pilot. Seed the two role ARN fields before deploying.
+  - name: cluster-secrets-gcp-aws-federation-pilot
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: gcp-aws-federation-pilot
+        fields:
+          - name: hub_role_arn
+          - name: target_role_arn
+    sync_to_cluster: true
+    targets:
+      - cluster: build07
+        namespace: ci
+
+  - name: kmm-quay-push
+    gsm_secrets:
+      - collection: kernel-module-management
+        group: kmm-quay-push
+        fields:
+          - name: quay-auth
+            as: kmm-pull-secret
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [non_app_ci]
+        namespace: ci
+
   - name: gce-sa-credentials-gcs-publisher
     gsm_secrets:
       - collection: test-platform-infra
@@ -2460,7 +2485,7 @@ bundles:
     targets:
       - cluster: build01  # todo: change to cluster_groups: [non_app_ci]
         namespace: ci
-  
+
   - name: hypershift-workload-credentials
     gsm_secrets:
       - collection: test-platform-infra
@@ -7856,6 +7881,62 @@ bundles:
     gsm_secrets:
     - collection: test-platform-infra
       fields:
+      - as: insights-live.yaml
+        name: insights-live--dot--yaml
+      group: insights-ci-account
+    - collection: shiftstack-secrets
+      fields:
+      - as: .awscred
+        name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-rackspace
+    - collection: shiftstack-secrets
+      fields:
+      - name: ssh-privatekey
+      - name: ssh-publickey
+      group: ci-job-ssh-key
+    name: cluster-secrets-openstack-rackspace
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: test-platform-infra
+      fields:
       - as: ca-cert.pem
         name: ca-cert--dot--pem
       - as: clouds.yaml
@@ -12014,7 +12095,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: openshift-crt-sonar-tokens
     gsm_secrets:
       - collection: crt
@@ -12212,7 +12293,7 @@ bundles:
     targets:
       - cluster_groups: [ build_farm ]
         namespace: test-credentials
- 
+
   - name: release-watcher-bot-token
     gsm_secrets:
       - collection: crt
@@ -13329,6 +13410,20 @@ bundles:
         namespace: ci
         type: kubernetes.io/dockerconfigjson
 
+  - name: registry-push-credentials-quay-io-openshift-eng-kit
+    gsm_secrets:
+      - collection: openshift-eng-kit
+        group: quay
+        fields:
+          - name: robot-account
+            as: config.json
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: core-ci
+        namespace: ci
+
   - name: registry-push-credentials-quay.io-ovirt
     gsm_secrets:
       - collection: test-platform-infra
@@ -14017,6 +14112,17 @@ bundles:
       - cluster: core-ci
         namespace: ship-status
       - cluster: core-ci
+        namespace: ci
+
+  - name: slack-bot-jira-automation
+    gsm_secrets:
+      - collection: test-platform-infra
+        group: slack-bot-jira-automation
+        fields:
+          - token
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
         namespace: ci
 
   - name: slack-credentials-dptp-bot-alpha
@@ -15693,3 +15799,15 @@ bundles:
     targets:
       - cluster_groups: [build_farm]
         namespace: test-credentials
+
+  - name: crt-redhat-acm-tenant-stone-prd-rh01-kubeconfig
+    gsm_secrets:
+      - collection: hypershift-team
+        group: ci-release
+        fields:
+          - name: crt-redhat-acm-tenant-stone-prd-rh01-kubeconfig
+            as: kubeconfig
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci-release
