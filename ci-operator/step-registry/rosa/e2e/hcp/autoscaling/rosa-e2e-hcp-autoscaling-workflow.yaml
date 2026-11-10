@@ -41,9 +41,12 @@ workflow:
     # label (no Area or Platform labels), so this LABEL_FILTER is its sole
     # selector: the slow, node-provisioning spec must not run in the general
     # matrix rows (Area:DataPlane || Area:CustomerFeatures, Platform:HCP).
-    # There are no autoscaling platform-plane specs, so the platform step is
-    # not run.
     - ref: rosa-e2e-validate-customer
+    # Platform plane with its default Area:ManagementPlane filter: there are
+    # no autoscaling platform-plane specs, but the row still verifies the
+    # management-plane view (HCP namespaces, NodePool CRs, RouteMonitors) of
+    # an autoscaling-enabled cluster.
+    - ref: rosa-e2e-validate-platform
     post:
     - chain: rosa-cluster-deprovision
       best_effort: true
@@ -64,8 +67,10 @@ workflow:
     is removed, with the bounds also verified on the hypershift NodePool CR on
     the management cluster (mc-kubeconfig from rosa-backplane-login).
 
-    The platform plane is not run: there are no autoscaling platform-plane
-    specs. The autoscaling spec is routed exclusively by its
+    The platform plane runs with its default Area:ManagementPlane filter:
+    there are no autoscaling platform-plane specs, but the row verifies the
+    management-plane view of an autoscaling-enabled cluster. The autoscaling
+    spec is routed exclusively by its
     Feature:Autoscaling label (it carries no Area or Platform labels), so it
     runs only in this workflow and not in the general matrix rows; it skips on
     clusters whose default node pool has no autoscaling. The customer plane
