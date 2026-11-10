@@ -40,6 +40,29 @@ export TEMPLATIZE_USE_PREBUILT=1
 # This block prepares the environment to run the tests in.
 # It runs against INFRA_SUBSCRIPTION.
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
+if [[ -n "${HYPERSHIFT_V2_BINARY:-}" ]]; then
+    if [[ ! -x "${HYPERSHIFT_V2_BINARY}" ]]; then
+        echo "Missing executable HYPERSHIFT_V2_BINARY: ${HYPERSHIFT_V2_BINARY}" >&2
+        exit 1
+    fi
+    # Keep management access separate from the service kubeconfig used below.
+    export HYPERSHIFT_V2_MANAGEMENT_KUBECONFIG="${PWD}/hypershift-v2-mgmt.kubeconfig"
+    make -C dev-infrastructure/ mgmt.aks.kubeconfig.pipeline \
+      MGMT_KUBECONFIG_FILE=../hypershift-v2-mgmt.kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
+    chmod 600 "${HYPERSHIFT_V2_MANAGEMENT_KUBECONFIG}"
+
+    mkdir -p "${ARTIFACT_DIR}"
+    go version -m "${HYPERSHIFT_V2_BINARY}" > "${ARTIFACT_DIR}/hypershift-v2-build-info.txt"
+    ho_image=$(yq -r ".clouds.dev.environments.${DEPLOY_ENV}.defaults.hypershift.image | .registry + \"/\" + .repository + \"@\" + .digest" "${SHARED_DIR}/hypershift-image-overrides.yaml")
+    jq -n \
+      --arg test_runner_image "${ARO_HCP_TEST_RUNNER_IMAGE}" \
+      --arg test_binary_sha256 "$(sha256sum "${HYPERSHIFT_V2_BINARY}" | cut -d ' ' -f 1)" \
+      --arg pull_refs "${PULL_REFS:-}" \
+      --arg ho_image "${ho_image}" \
+      --arg cpo_image "${CPO_IMAGE_OVERRIDE:?CPO image override is required for HyperShift v2}" \
+      '{test_runner_image: $test_runner_image, test_binary_sha256: $test_binary_sha256, pull_refs: $pull_refs, ho_image: $ho_image, cpo_image: $cpo_image}' \
+      > "${ARTIFACT_DIR}/hypershift-v2-provenance.json"
+fi
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
 export KUBECONFIG=kubeconfig
 export AZURE_TOKEN_CREDENTIALS=prod
