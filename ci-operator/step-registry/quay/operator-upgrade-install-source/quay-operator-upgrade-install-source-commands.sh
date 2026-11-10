@@ -118,7 +118,16 @@ spec:
 EOF
 fi
 wait_catalog "${SOURCE_CATALOG}"
-[[ -z "${RELEASED_CATALOG}" ]] || preflight_channels "${SOURCE_CATALOG}" "${SOURCE_CHANNEL}" "${TARGET_CHANNEL}"
+if [[ -n "${RELEASED_CATALOG}" ]]; then
+  # The target channel lives in the released catalog only when the upgrade step
+  # has no target image (explicit or the ART FBC digest); otherwise the target
+  # catalog is that image and the released catalog may lack the target channel.
+  if [[ -z "${QUAY_UPGRADE_TARGET_CATALOG_IMAGE:-}" && ! -s "${SHARED_DIR}/quay_index_image" ]]; then
+    preflight_channels "${SOURCE_CATALOG}" "${SOURCE_CHANNEL}" "${TARGET_CHANNEL}"
+  else
+    preflight_channels "${SOURCE_CATALOG}" "${SOURCE_CHANNEL}"
+  fi
+fi
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
