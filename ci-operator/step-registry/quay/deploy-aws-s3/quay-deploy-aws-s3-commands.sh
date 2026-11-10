@@ -127,7 +127,8 @@ function archive_olm_bundle_unpack_diagnostics() {
   fi
   catalogsource_uid="$(timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get catalogsource \
     "${QUAY_OPERATOR_SOURCE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || true)"
-  selected_bundle_configmaps="$(timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get configmap -o json 2>/dev/null \
+  selected_bundle_configmaps="$(timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get configmap -o json \
+    2> "${root}/catalog-configmaps.err" \
     | jq -c --arg source "${QUAY_OPERATOR_SOURCE}" --arg uid "${catalogsource_uid}" '
         [.items[]?
          | select(any(.metadata.ownerReferences[]?; .kind == "CatalogSource" and .name == $source and ($uid == "" or .uid == $uid)))
@@ -147,9 +148,11 @@ function archive_olm_bundle_unpack_diagnostics() {
     fi
     jobs_collected=$((jobs_collected + 1))
     timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get jobs \
-      -l "${label}=${bundle_ref}" -o json > "${root}/${bundle_ref}-jobs.json" 2>&1 || true
+      -l "${label}=${bundle_ref}" -o json \
+      > "${root}/${bundle_ref}-jobs.json" 2> "${root}/${bundle_ref}-jobs.err" || true
     timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get pods \
-      -l "${label}=${bundle_ref}" -o json > "${root}/${bundle_ref}-pods.json" 2>&1 || true
+      -l "${label}=${bundle_ref}" -o json \
+      > "${root}/${bundle_ref}-pods.json" 2> "${root}/${bundle_ref}-pods.err" || true
     while IFS= read -r job; do
       [[ -n "${job}" ]] || continue
       if [[ "${job_events_collected}" -ge "${max_jobs}" ]]; then
