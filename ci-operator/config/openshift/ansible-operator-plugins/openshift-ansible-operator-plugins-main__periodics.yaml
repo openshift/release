@@ -113,9 +113,44 @@ tests:
         chmod 755 /tmp/bin/osv-scanner
 
         git config --global --add safe.directory "$(pwd)"
+        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+          export GITHUB_TOKEN=$("$GITHUB_TOKEN_COMMAND")
+          export GH_TOKEN="$GITHUB_TOKEN"
+          git config --local --replace-all credential.helper ''
+          git config --local --add credential.helper '!gh auth git-credential'
+          git remote set-url origin https://github.com/openshift/ansible-operator-plugins.git
+          FIXTURE_SHA=df84195670e6de5bdf2252925556130691d04294
+          REHEARSAL_BASE=oape-987-security-rehearsal-v1421-v1423-20261110104254
+          git fetch https://github.com/neha037/ansible-operator-plugins.git "refs/heads/${REHEARSAL_BASE}"
+          [[ "$(git rev-parse FETCH_HEAD)" == "$FIXTURE_SHA" ]]
+          git fetch https://github.com/operator-framework/ansible-operator-plugins.git \
+            refs/tags/v1.42.1:refs/tags/v1.42.1 refs/tags/v1.42.3:refs/tags/v1.42.3
+          [[ "$(git show "$FIXTURE_SHA:UPSTREAM-VERSION" | tr -d '[:space:]')" == v1.42.1 ]]
+          git merge-base --is-ancestor refs/tags/v1.42.1 "$FIXTURE_SHA"
+          if git merge-base --is-ancestor refs/tags/v1.42.3 "$FIXTURE_SHA"; then exit 1; fi
+          existing=$(git ls-remote origin "refs/heads/$REHEARSAL_BASE")
+          [[ -z "$existing" || "${existing%%[[:space:]]*}" == "$FIXTURE_SHA" ]]
+          if [[ -z "$existing" ]]; then git push origin "$FIXTURE_SHA:refs/heads/$REHEARSAL_BASE"; fi
+          git fetch origin "refs/heads/${REHEARSAL_BASE}:refs/remotes/origin/${REHEARSAL_BASE}"
+          git checkout -B "$REHEARSAL_BASE" "origin/$REHEARSAL_BASE"
+          export REBASE_BRANCH="$REHEARSAL_BASE"
+          export OVERRIDE_TAG=v1.42.3
+        fi
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
-        ./hack/auto-rebase.sh
+        rebase_status=0
+        ./hack/auto-rebase.sh || rebase_status=$?
+        if [[ "${JOB_NAME:-}" == rehearse-* ]]; then
+          export GH_TOKEN=$("$GITHUB_TOKEN_COMMAND")
+          pr=$(gh pr list --repo openshift/ansible-operator-plugins --state all \
+            --head "v1.42.3-rebase-${REBASE_BRANCH}" --base "$REBASE_BRANCH" --json number --jq '.[0].number // empty')
+          if [[ -n "$pr" ]]; then
+            gh api --method PATCH "repos/openshift/ansible-operator-plugins/pulls/$pr" \
+              -f title='[Rehearsal] Rebase v1.42.1 to v1.42.3 with Go security gates' --silent
+            printf 'Rehearsal PR: https://github.com/openshift/ansible-operator-plugins/pull/%s\n' "$pr"
+          fi
+        fi
+        exit "$rebase_status"
       credentials:
       - mount_path: /var/run/github-app
         name: openshift-app-platform-shift-github-bot
