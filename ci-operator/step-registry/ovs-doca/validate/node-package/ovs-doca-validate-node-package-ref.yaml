@@ -32,7 +32,7 @@ ref:
     RHCOS image built at ci-operator's image-build stage (day0 layering,
     substituted into the release payload via `include_built_images`) is
     actually running -- the image is already booted at install time, there
-    is no day2 rollout to wait on. Runs nine assertions per node via
+    is no day2 rollout to wait on. Runs eight assertions per node via
     `oc debug node/<n> -- chroot /host`:
 
       1. `systemctl is-active openvswitch` -- health gate. Layering OVS into
@@ -66,20 +66,21 @@ ref:
          train the image was built with. The expected value is an env var
          because it is NOT the train number itself: DOCA 3.4.1 ships
          doca-openvswitch-3.4.0040-1.el9.
-      8. `ovs-vsctl get Open_vSwitch . external_ids:ovs-version` is
-         non-empty -- the daemon's self-reported version, stamped by
-         ovsdb-server.service at every start via `ovs-vswitchd --version`.
-         Empty means that stamping step failed, which is exactly how the
-         historical libclx_api.so.1 breakage manifested.
-      9. Applicative datapath test -- creates an isolated test bridge
+      8. Applicative datapath test -- creates an isolated test bridge
          (br-doca-test, not br-int, so no OVN interaction), two network
          namespaces joined by a veth pair, and pings across it; removes
          everything afterwards via an EXIT trap. Proves the doca-openvswitch
          binary actually forwards packets on the kernel datapath, not just
          that it starts and answers queries.
 
-    Also prints, without asserting, whether openvswitch-selinux-extra-policy
-    survived the Fast Datapath removal -- see the SELinux gap below.
+    Also prints, without asserting:
+      - whether openvswitch-selinux-extra-policy survived the Fast Datapath
+        removal -- see the SELinux gap below.
+      - external_ids:ovs-version (the daemon's self-reported version), with
+        the full external_ids map when the key is absent. Rehearsal
+        2120102581920337920 showed the key is not stamped even on a healthy
+        cluster, so it is a correlation aid, not an assertion; the rpm NEVRA
+        check above is the authoritative version validation.
 
     IMPORTANT SCOPE NOTE: these checks prove the DOCA-enabled OVS
     package/binary is installed at the expected version and recognized by
