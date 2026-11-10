@@ -17,6 +17,7 @@ hcp version
 # The management cluster hosts both the HCP control plane pods and the KubeVirt VMs (worker nodes).
 echo "$(date) Targeting management cluster kubeconfig"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+sleep 10
 
 # Enable wildcard DNS routes so guest *.apps routes resolve through the management ingress
 oc patch ingresscontroller -n openshift-ingress-operator default \
