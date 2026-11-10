@@ -2,17 +2,20 @@
 
 set -euo pipefail
 
+readonly status_context="${E2E_STATUS_CONTEXT:-e2e/platform}"
 readonly target_org="openshift-online"
 readonly target_repo="gcp-hcp-infra"
 readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
+# Present when the run does not test a gcp-hcp-infra commit; gcp-hcp-finalize-commit-status skips too
+readonly skip_status_path="${SHARED_DIR}/gcp-hcp-skip-commit-status"
 
 if [[ -z "${JOB_SPEC:-}" ]]; then
   echo "ERROR: JOB_SPEC is required to resolve the tested commit" >&2
   exit 1
 fi
 
-target_ref="$(jq -cer --arg org "${target_org}" --arg repo "${target_repo}" '
+target_ref="$(jq -cr --arg org "${target_org}" --arg repo "${target_repo}" '
   .type as $job_type
   |
   [
@@ -25,13 +28,41 @@ target_ref="$(jq -cer --arg org "${target_org}" --arg repo "${target_repo}" '
         "_prow_only_periodic_ref": ($job_type == "periodic" and ($refs | length) == 1)
       }
     elif ($target_refs | length) == 0 then
-      error("target repository not found in JOB_SPEC")
+      null
     else
       error("target repository appears more than once in JOB_SPEC")
     end
 ' <<<"${JOB_SPEC}")"
 
+# Jobs from component repositories (e.g. a gecko e2e-platform presubmit) do not
+# include gcp-hcp-infra in JOB_SPEC: their gcp-hcp-infra-src is the latest
+# gcp-hcp-infra main promoted to the ci namespace. Test the commit that image
+# was built from, and leave gcp-hcp-infra's commit statuses alone: the run tests
+# the component pull request, not that commit.
+if [[ "${target_ref}" == "null" ]]; then
+  if [[ ! -x scripts/e2e-render.sh ]] || ! tested_sha="$(git rev-parse HEAD 2>/dev/null)" ||
+    [[ ! "${tested_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ERROR: unable to resolve the ${target_org}/${target_repo} commit in gcp-hcp-infra-src" >&2
+    exit 1
+  fi
+  printf '%s\n' "${tested_sha}" >"${tested_sha_path}"
+  touch "${skip_status_path}"
+  echo "${target_org}/${target_repo} is not under test; testing its promoted main (${tested_sha}) and skipping the ${status_context} commit status"
+  exit 0
+fi
+
 pull_count="$(jq -r '(.pulls // []) | length' <<<"${target_ref}")"
+
+# A gcp-hcp-infra pull request added to another repository's job (/testwith from
+# a component pull request) is not what the job's gcp-hcp-infra-src image was
+# built from, so Terraform would render main while ArgoCD pinned the PR. Run
+# /testwith from the gcp-hcp-infra pull request instead, which builds the image
+# from it and adds the component pull requests.
+if (( pull_count > 0 )) && [[ "$(jq -r '._prow_primary_ref == true or .workdir == true' <<<"${target_ref}")" != "true" ]]; then
+  echo "ERROR: ${target_org}/${target_repo} pull requests can only be tested from their own jobs." >&2
+  echo "From the ${target_repo} pull request, run: /testwith ${target_org}/${target_repo}/main/e2e-platform <component-org>/<component-repo>#<number>" >&2
+  exit 1
+fi
 if (( pull_count > 1 )); then
   echo "ERROR: multiple pull refs found for the target repository" >&2
   exit 1
@@ -75,14 +106,14 @@ fi
 
 readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
 printf '%s\n' "${tested_sha}" >"${tested_sha_path}"
-payload="$(jq -cn --arg target_url "${target_url}" '{
+payload="$(jq -cn --arg target_url "${target_url}" --arg context "${status_context}" '{
   state: "pending",
-  context: "e2e/platform",
+  context: $context,
   description: "GCP HCP platform E2E test is running",
   target_url: $target_url
 }')"
 
-echo "Posting pending e2e/platform status to ${target_org}/${target_repo}@${tested_sha}"
+echo "Posting pending ${status_context} status to ${target_org}/${target_repo}@${tested_sha}"
 curl \
   --fail-with-body \
   --silent \
@@ -99,4 +130,4 @@ curl \
   --data "${payload}" \
   "https://api.github.com/repos/${target_org}/${target_repo}/statuses/${tested_sha}" \
   >/dev/null
-echo "GitHub accepted the pending e2e/platform status"
+echo "GitHub accepted the pending ${status_context} status"

@@ -1,0 +1,39 @@
+chain:
+  as: upi-conf-vsphere-multi-vcenter
+  steps:
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-vsphere-check
+  - ref: ipi-conf-vsphere-check-vcm
+  - ref: upi-conf-vsphere-zones
+  - ref: upi-conf-vsphere-vcm
+  - ref: upi-conf-vsphere-dns
+  - ref: upi-conf-vsphere-ova
+  - ref: upi-conf-vsphere-ova-vcm
+  env:
+  - name: POOL_COUNT
+    default: "3"
+    documentation: >-
+      The number of pools (failure domains) to request in the single VCM lease covering
+      all vCenters.
+  - name: MIN_VCENTERS
+    default: "2"
+    documentation: >-
+      The minimum number of distinct vCenters the lease's pools must span so the cluster
+      genuinely exercises the multi-vCenter platform.  MAX_VCENTERS keeps its step default
+      of 3, so the lease spans 2 or 3 vCenters depending on what VCM has available.
+  - name: POOLS
+    default: ""
+    documentation: >-
+      Must remain empty: this chain uses the single-lease POOL_COUNT path rather than
+      requesting one lease per pool.
+  - name: DEFAULT_NETWORK_TYPE
+    default: "single-tenant"
+    documentation: Preserve the network type used by the UPI zones chain this chain mirrors.
+  documentation: >-
+    This chain generates the files necessary to deploy a vSphere UPI cluster whose
+    failure domains span multiple vCenters.  It requests all pools through a single
+    VCM lease (POOL_COUNT with MIN_VCENTERS) instead of one lease per pool.  It
+    creates an install-config.yaml using the ipi-conf-vsphere chain.  Then it uses
+    that file to create the Ignition, metadata.json, and kubeconfig files.
+    These files are copied to the shared dir for future consumption.

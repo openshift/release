@@ -13,12 +13,15 @@ ref:
     requests:
       cpu: 100m
       memory: 256Mi
-  timeout: 35m0s
+  timeout: 60m0s
   grace_period: 5m0s
   best_effort: true
   documentation: |-
-    Cleans up a failed or timed-out on-demand HostedCluster test in a persistent
-    customer project. Uses only the exact per-run cluster, nodepool, and infra
-    IDs written to SHARED_DIR by the Ginkgo test. Skips when the test passed or
-    did not record a cluster name. Never targets regional or management
-    projects. Runs before the environment commit status is finalized.
+    Verifies cleanup after every on-demand HostedCluster test, including a
+    successful Ginkgo run. Waits for the exact per-run nodepool and cluster to
+    disappear, removes any remaining worker VMs with matching cluster and infra
+    labels or metadata in the customer project, then destroys the test network
+    and IAM.
+    Never targets regional or management projects. Best effort lets the final
+    status step run even after a cleanup failure; that step fails the job and
+    commit status when cleanup was not verified.

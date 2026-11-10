@@ -70,11 +70,6 @@ function print_failing_pod_logs() {
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
-#Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
@@ -351,7 +346,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -359,8 +353,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -424,13 +416,37 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+# Unmanaged DB fragments from quay-database-intg-* steps. At most one should
+# exist; the first match wins.
+DATABASE_CONFIG_FRAGMENT=""
+for candidate in \
+	"${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
+	"${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
+do
+	if [[ -s "${candidate}" ]]; then
+		DATABASE_CONFIG_FRAGMENT="${candidate}"
+		break
+	fi
+done
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
+	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+	POSTGRES_MANAGED="false"
+fi
+
 # Merge caller-provided extra config if set
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
-	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
-	# Strip field-group keys for components this CR keeps managed. The operator
-	# injects those values; leaving them in configBundleSecret blocks rollout.
+	merge_config_fragment extra_config.yaml
+fi
+
+# Strip field-group keys for components this CR keeps managed. The operator
+# injects those values; leaving them in configBundleSecret blocks rollout.
+# Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
+# merged above. Only run when overlays may have injected managed-component keys.
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" || -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
 	yq -i '
 		del(
 			.FEATURE_SECURITY_SCANNER,
@@ -446,13 +462,14 @@ if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 			.REPO_MIRROR_TLS_VERIFY,
 			.BUILDLOGS_REDIS,
 			.USER_EVENTS_REDIS,
-			.DB_URI,
-			.DB_CONNECTION_ARGS,
 			.SERVER_HOSTNAME,
 			.PREFERRED_URL_SCHEME,
 			.EXTERNAL_TLS_TERMINATION
 		)
 	' config.yaml
+	if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+		yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
+	fi
 fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
@@ -493,14 +510,21 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
   sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
 
-  oc create secret generic -n quay-enterprise config-bundle-secret \
-    --from-file config.yaml=./config.yaml \
-    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
-    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+  secret_args=(
+    --from-file config.yaml=./config.yaml
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert"
+    --from-file ssl.key="${SHARED_DIR}/ssl.key"
     --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+  )
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  secret_args=(--from-file config.yaml=./config.yaml)
 fi
+
+# configBundleSecret name. The GCP SQL handling (client certs in the bundle
+# and the postgresql-client-certs name) returns with the GCP database lane.
+CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
+
+oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -510,12 +534,14 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: ${CONFIG_BUNDLE_SECRET_NAME}
   components:
   - kind: objectstorage
     managed: false
   - kind: monitoring
     managed: false
+  - kind: postgres
+    managed: ${POSTGRES_MANAGED}
   - kind: horizontalpodautoscaler
     managed: false
   - kind: quay
@@ -537,36 +563,6 @@ for i in $(seq 1 90); do
     echo "Quay is ready (after $((i * 10))s)" >&2
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    quay_ca_bundle="$(mktemp)"
-    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
-      cat /etc/pki/tls/certs/ca-bundle.crt > "${quay_ca_bundle}"
-    fi
-    if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
-      cat "${SHARED_DIR}/ssl.cert" >> "${quay_ca_bundle}"
-    else
-      ingress_cert_secret=$(oc -n openshift-ingress-operator get ingresscontroller default \
-        -o jsonpath='{.spec.defaultCertificate.name}' 2>/dev/null || true)
-      ingress_cert_secret="${ingress_cert_secret:-router-certs-default}"
-      oc -n openshift-ingress get secret "${ingress_cert_secret}" \
-        -o jsonpath='{.data.tls\.crt}' | base64 --decode >> "${quay_ca_bundle}"
-    fi
-    initialize_payload="$(mktemp)"
-    chmod 600 "${initialize_payload}"
-    jq -n --arg username "${QUAY_USERNAME}" --arg password "${QUAY_PASSWORD}" \
-      --arg email "${QUAY_EMAIL}" \
-      '{username: $username, password: $password, email: $email, access_token: true}' \
-      > "${initialize_payload}"
-    if ! curl --fail --silent --show-error --cacert "${quay_ca_bundle}" \
-      -X POST "${quay_route}/api/v1/user/initialize" \
-      --header 'Content-Type: application/json' --data-binary "@${initialize_payload}" \
-      | jq -er '.access_token | select(type == "string" and length > 0)' \
-          > "${SHARED_DIR}/quay_oauth2_token"; then
-      echo "Failed to initialize the Quay user or obtain an access token" >&2
-      exit 1
-    fi
-    chmod 600 "${SHARED_DIR}/quay_oauth2_token"
-    rm -f "${initialize_payload}" "${quay_ca_bundle}"
     archive_pod_info
     exit 0
   fi

@@ -345,13 +345,24 @@ CONFIG = {
     'aro-hcp-dev-shard2-slot': {},
     'aro-hcp-dev-shard3-slot': {},
     'aro-hcp-dev-hypershift-westus3-slot': {},
+    'aro-hcp-dev-shard4-slot': {},
+    'aro-hcp-dev-shard5-slot': {},
+    'aro-hcp-dev-shard6-slot': {},
+    'aro-hcp-dev-shard7-slot': {},
+    'aro-hcp-dev-shard8-slot': {},
+    'aro-hcp-dev-shard9-slot': {},
+    'aro-hcp-dev-shard10-slot': {},
     'aro-hcp-int-shard0-slot': {},
     'aro-hcp-int-westus3-shard0-slot': {},
     'aro-hcp-prod-shard0-slot': {},
     'aro-hcp-prod-shard1-slot': {},
+    'aro-hcp-prod-shard2-slot': {},
+    'aro-hcp-prod-shard3-slot': {},
+    'aro-hcp-prod-shard4-slot': {},
+    'aro-hcp-prod-shard5-slot': {},
     'aro-hcp-prod-testtenant-slot': {},
     'aro-hcp-stg-shard0-slot': {},
-    'aro-hcp-stg-westus3-shard0-slot': {},
+    'aro-hcp-stg-shard1-slot': {},
     'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
     'aro-hcp-msi-mock-cs-sp-dev': {},
@@ -469,6 +480,9 @@ CONFIG = {
         'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
+    'openstack-rackspace-quota-slice': {
+        'default': 1,
+    },
     'ovirt-quota-slice': {},
     'ovirt-upgrade-quota-slice': {},
     'ovirt-clusterbot-quota-slice': {
@@ -636,7 +650,7 @@ CONFIG = {
         'us-west-2': 15,
     },
     'gitops-aws-quota-slice': {
-        'us-west-2': 20
+        'us-west-2': 30
     },
     'che-aws-quota-slice': {
         # us-east-2 is reserved for the air-gapped clusters
@@ -692,6 +706,9 @@ CONFIG = {
         'us-east-2': 25,
         'us-west-1': 25,
         'us-west-2': 25,
+    },
+    'odf-ibmcloud-quota-slice': {
+        'us-east': 25,
     },
     'aws-ip-pools-us-east-1': {
         'default': 256,
@@ -794,8 +811,8 @@ for i in range(3):
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
 
-for i in range(1):        
-    for j in range(4):    
+for i in range(1):
+    for j in range(4):
         CONFIG['power-s2s-quota-slice']['power-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
@@ -876,8 +893,22 @@ for i in range(5):
     CONFIG['aro-hcp-dev-shard2-slot']['aro-hcp-dev-shard2-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(5):
     CONFIG['aro-hcp-dev-shard3-slot']['aro-hcp-dev-shard3-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(1):
+for i in range(2):
     CONFIG['aro-hcp-dev-hypershift-westus3-slot']['aro-hcp-dev-hypershift-westus3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(30):
+    CONFIG['aro-hcp-dev-shard4-slot']['aro-hcp-dev-shard4-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard5-slot']['aro-hcp-dev-shard5-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard6-slot']['aro-hcp-dev-shard6-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard7-slot']['aro-hcp-dev-shard7-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard8-slot']['aro-hcp-dev-shard8-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard9-slot']['aro-hcp-dev-shard9-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(5):
+    CONFIG['aro-hcp-dev-shard10-slot']['aro-hcp-dev-shard10-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-int-shard0-slot']['aro-hcp-int-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
@@ -886,18 +917,26 @@ for i in range(3):
     CONFIG['aro-hcp-prod-shard0-slot']['aro-hcp-prod-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(3):
     CONFIG['aro-hcp-prod-shard1-slot']['aro-hcp-prod-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard2-slot']['aro-hcp-prod-shard2-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard3-slot']['aro-hcp-prod-shard3-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard4-slot']['aro-hcp-prod-shard4-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(3):
+    CONFIG['aro-hcp-prod-shard5-slot']['aro-hcp-prod-shard5-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(4):
     CONFIG['aro-hcp-prod-testtenant-slot']['aro-hcp-prod-testtenant-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
     CONFIG['aro-hcp-stg-shard0-slot']['aro-hcp-stg-shard0-slot-{i:0>2}'.format(i=i)] = 1
 for i in range(1):
-    CONFIG['aro-hcp-stg-westus3-shard0-slot']['aro-hcp-stg-westus3-shard0-slot-{i:0>2}'.format(i=i)] = 1
-for i in range(1):
+    CONFIG['aro-hcp-stg-shard1-slot']['aro-hcp-stg-shard1-slot-{i:0>2}'.format(i=i)] = 1
+for i in range(52):
     CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
-for i in range(20):
+for i in range(50):
     CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
-for i in range(40):
+for i in range(100):
     CONFIG['aro-hcp-arm-helper-sp-dev']['aro-hcp-arm-helper-sp-dev-{}'.format(i)] = 1
 
 CLUSTER_PROFILE_SETS_CONFIG = {

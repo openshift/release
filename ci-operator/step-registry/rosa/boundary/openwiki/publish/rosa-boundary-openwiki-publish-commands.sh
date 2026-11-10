@@ -10,8 +10,8 @@ production_job=${TARGET_PERIODIC_JOB:?}
 git check-ref-format --branch "$base" >/dev/null
 git check-ref-format --branch "$branch" >/dev/null
 case "${JOB_NAME:-}" in
-  "$production_job") dry_run=false ;;
-  rehearse-*-"$production_job") dry_run=true ;;
+  "$production_job") ;;
+  rehearse-*-"$production_job") echo 'OpenWiki rehearsals are disabled for shared credentials.' >&2; exit 1 ;;
   *) echo "Refusing to publish from unexpected job: ${JOB_NAME:-<unset>}" >&2; exit 1 ;;
 esac
 app_id_file=/var/run/rosa-boundary-github-app-id/github-app-app-id
@@ -26,68 +26,60 @@ if [[ ! -s "$patch_file" ]]; then
   exit "$update_status"
 fi
 
-if [[ "$dry_run" == false ]]; then
-  for file in "$app_id_file" "$installation_id_file" "$private_key_file"; do
-    if [[ ! -s "$file" ]]; then
-      echo "Missing GitHub App credential at ${file}" >&2
-      exit 1
-    fi
-  done
+for file in "$app_id_file" "$installation_id_file" "$private_key_file"; do
+  if [[ ! -s "$file" ]]; then
+    echo "Missing GitHub App credential at ${file}" >&2
+    exit 1
+  fi
+done
 
-  now=$(date +%s)
-  header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-  payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' \
-    "$((now - 60))" "$((now + 540))" "$(cat "$app_id_file")" \
-    | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-  signature=$(printf '%s' "${header}.${payload}" \
-    | openssl dgst -sha256 -sign "$private_key_file" \
-    | openssl base64 -A | tr '+/' '-_' | tr -d '=')
-  jwt="${header}.${payload}.${signature}"
-  export GITHUB_TOKEN
-  GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
-    -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' \
-    --data "$(jq -nc --arg repository "${repo#*/}" '{repositories:[$repository],permissions:{contents:"write",pull_requests:"write"}}')" \
-    "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
-    | jq -er '.token')
-fi
+now=$(date +%s)
+header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' \
+  "$((now - 60))" "$((now + 540))" "$(cat "$app_id_file")" \
+  | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+signature=$(printf '%s' "${header}.${payload}" \
+  | openssl dgst -sha256 -sign "$private_key_file" \
+  | openssl base64 -A | tr '+/' '-_' | tr -d '=')
+jwt="${header}.${payload}.${signature}"
+export GITHUB_TOKEN
+# Stateless ghs_ tokens may contain dots and hyphens; forbid characters that
+# could inject headers through a curl config while checking the granted scope.
+GITHUB_TOKEN=$(curl -fsS -X POST -H "Authorization: Bearer ${jwt}" \
+  -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' \
+  --data "$(jq -nc --arg repository "${repo#*/}" '{repositories:[$repository],permissions:{contents:"write",pull_requests:"write"}}')" \
+  "https://api.github.com/app/installations/$(cat "$installation_id_file")/access_tokens" \
+  | jq -er --arg repo "$repo" '
+      select(.repository_selection == "selected" and
+        (.repositories | length) == 1 and .repositories[0].full_name == $repo and
+        .permissions.contents == "write" and .permissions.pull_requests == "write" and
+        ((.permissions | keys - ["contents", "metadata", "pull_requests"]) | length) == 0 and
+        (.permissions.metadata == null or .permissions.metadata == "read") and
+        (.token | type) == "string" and (.token | test("^ghs_[A-Za-z0-9_.-]+$"))) | .token
+    ')
 
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
-if [[ "$dry_run" == false ]]; then
-  cat > "$workdir/askpass" <<'EOF'
+cat > "$workdir/askpass" <<'EOF'
 #!/usr/bin/env bash
 case "$1" in
   *Username*) printf '%s\n' x-access-token ;;
   *Password*) printf '%s\n' "$GITHUB_TOKEN" ;;
 esac
 EOF
-  chmod 700 "$workdir/askpass"
-  export GIT_ASKPASS="$workdir/askpass" GIT_TERMINAL_PROMPT=0
-fi
+chmod 700 "$workdir/askpass"
+export GIT_ASKPASS="$workdir/askpass" GIT_TERMINAL_PROMPT=0
+unset GIT_TRACE GIT_TRACE_PACKET GIT_TRACE_CURL GIT_TRACE_CURL_NO_DATA GIT_CURL_VERBOSE \
+  GIT_TRACE2 GIT_TRACE2_EVENT GIT_TRACE2_PERF GIT_TRACE_SETUP GIT_TRACE_PERFORMANCE
 
 # Do not reuse the worktree the model was allowed to modify. Only apply its
 # generated docs patch to a clean clone with no agent-controlled git hooks.
-if [[ "$dry_run" == true ]]; then
-  git clone --branch "$base" "${SHARED_DIR}/openwiki-source.bundle" "$workdir/repo"
-else
-  git clone "https://github.com/${repo}.git" "$workdir/repo"
-fi
+git clone --branch "$base" "https://github.com/${repo}.git" "$workdir/repo"
 cd "$workdir/repo"
 git config user.name 'OpenShift CI Bot'
 git config user.email 'ci-bot@redhat.com'
-if [[ "$dry_run" == true ]]; then
-  # The prepare step already checked the PR and recorded its base choice.
-  # Do not create a GitHub token or call the PR API during rehearsal.
-  base_branch=$(cat "${SHARED_DIR}/openwiki-base-branch")
-  case "$base_branch" in
-    "$base") existing_pr='' ;;
-    "$branch") existing_pr=rehearsal ;;
-    *) echo 'Unexpected OpenWiki base branch.' >&2; exit 1 ;;
-  esac
-else
-  existing_pr=$(gh pr list --repo "$repo" --base "$base" --head "$branch" \
-    --state open --json number --jq '.[0].number // empty')
-fi
+existing_pr=$(gh pr list --repo "$repo" --base "$base" --head "$branch" \
+  --state open --json number --jq '.[0].number // empty')
 if [[ -n "$existing_pr" ]]; then
   git fetch origin "$branch"
   git switch -c "$branch" "origin/${branch}"
@@ -126,12 +118,6 @@ git -c core.whitespace=-blank-at-eol diff --cached --check -- \
   ':(glob)openwiki/*.md' ':(glob)openwiki/**/*.md'
 git diff --cached --check -- \
   ':(exclude,glob)openwiki/*.md' ':(exclude,glob)openwiki/**/*.md'
-if [[ "$dry_run" == true ]]; then
-  echo 'Rehearsal dry run: patch applies cleanly; skipping commit, push, and PR creation.'
-  git diff --cached --stat
-  exit "$update_status"
-fi
-
 openwiki_version=$(cat "${SHARED_DIR}/openwiki-version")
 model_id=$(cat "${SHARED_DIR}/openwiki-model-id")
 provider=$(cat "${SHARED_DIR}/openwiki-provider")

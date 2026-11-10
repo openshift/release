@@ -44,6 +44,15 @@ fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 export CLUSTER_ID OCM_ENV="${OCM_LOGIN_ENV}"
 
+# AWS credentials for specs that validate cloud resources directly (e.g. the
+# KMS key health spec queries the KMS API). Mirrors rosa-e2e-validate-customer.
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+  export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
+  export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
+fi
+
 # OCM credentials for the suite's BeforeSuite (config.Load requires OCM_TOKEN or
 # OCM_CLIENT_ID/OCM_CLIENT_SECRET to open the SDK connection; specs also query OCM
 # directly). Read from the cluster profile, never echoed. Mirrors rosa-e2e-test.
@@ -82,6 +91,7 @@ else
 fi
 
 GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e-platform.xml" "--ginkgo.v")
+LABEL_FILTER="${PLATFORM_LABEL_FILTER:-${LABEL_FILTER:-}}"
 log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")

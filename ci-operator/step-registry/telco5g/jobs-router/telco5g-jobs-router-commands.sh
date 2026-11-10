@@ -24,6 +24,9 @@ echo "export REPO_NAME=${REPO_NAME:-''}" >> "$MAINENV"
 echo "export PULL_URL=${PULL_URL:-''}" >> "$MAINENV"
 echo "export PR_URLS=${PR_URLS:-''}" >> "$MAINENV"
 echo "export PULL_BASE_REF=${PULL_BASE_REF:-''}" >> "$MAINENV"
+echo "# Reconnect instead of failing the play when SSH to the lab hosts drops for a while" >> "$MAINENV"
+echo "export ANSIBLE_SSH_RETRIES=15" >> "$MAINENV"
+echo "export ANSIBLE_TIMEOUT=30" >> "$MAINENV"
 echo "#######################################################" >> "$MAINENV"
 
 if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then

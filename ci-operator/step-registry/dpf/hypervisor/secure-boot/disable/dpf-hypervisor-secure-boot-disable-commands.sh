@@ -1,0 +1,1 @@
+../enable/dpf-hypervisor-secure-boot-enable-commands.sh

@@ -1,6 +1,8 @@
 apiVersion: build.openshift.io/v1
 kind: BuildConfig
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: deck-history-bucket
   namespace: ci
 spec:
@@ -22,7 +24,7 @@ spec:
     type: Dockerfile
     dockerfile: |
       FROM registry.ci.openshift.org/ci/deck:upstream AS upstream
-      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-4.22 AS build
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-5.0 AS build
       USER 0
       ENV CGO_ENABLED=0 \
           GOMAXPROCS=2 \
@@ -67,6 +69,8 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: trigger-deck-history-bucket-build
   namespace: ci
 spec:

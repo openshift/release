@@ -88,7 +88,7 @@ All RHDH CI clusters provisioned on AWS or Azure must carry cost-allocation tags
 
 ### Where Tags Go by Provisioning Method
 
-**Hive pool install-configs** (`clusters/hosted-mgmt/hive/pools/rhdh/*.yaml`):
+**Hive pool install-configs** (`clusters/hosted-mgmt/hive-pools-rhdh/*.yaml`):
 - YAML map under `platform.aws.userTags` inside the install-config Secret.
 - Must include `propagateUserTags: true`.
 - Do NOT add tags to `_clusterpool.yaml` files — those are Kubernetes labels for Hive/Prow pool matching, not AWS cost tags.

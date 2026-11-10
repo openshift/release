@@ -3,6 +3,7 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: prowjob-dispatcher
   name: prowjob-dispatcher
@@ -18,6 +19,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: prowjob-dispatcher
   name: prowjob-dispatcher
@@ -25,12 +27,17 @@ metadata:
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "8080"
+    service.beta.openshift.io/serving-cert-secret-name: prowjob-dispatcher-observation-tls
 spec:
   ports:
   - name: main
     port: 8080
     protocol: TCP
     targetPort: 8080
+  - name: observation
+    port: 8443
+    protocol: TCP
+    targetPort: observation
   selector:
     app: prow
     component: prowjob-dispatcher
@@ -39,12 +46,16 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: prowjob-dispatcher
   namespace: ci
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: prowjob-dispatcher-overrides
   namespace: ci
 rules:
@@ -71,6 +82,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: prowjob-dispatcher-overrides
   namespace: ci
 roleRef:
@@ -87,6 +100,7 @@ kind: Deployment
 metadata:
   name: prowjob-dispatcher
   labels:
+    ci.openshift.io/gitops-managed: 'true'
     app: prow
     component: prowjob-dispatcher
   namespace: ci
@@ -155,9 +169,15 @@ spec:
         - --minimum-job-demand=1
         - --dispatch-override-namespace=ci
         - --control-api-token-path=/etc/dispatcher-control/token
+        - --observation-api-listen-address=:8443
+        - --observation-api-service-account=ci/dispatcher-dashboard
+        - --observation-api-tls-cert-file=/etc/dispatcher-observation-tls/tls.crt
+        - --observation-api-tls-key-file=/etc/dispatcher-observation-tls/tls.key
         - --dispatch-command-channel-id=$(DISPATCH_COMMAND_CHANNEL_ID)
         - --enable-runtime-capacity=true
         - --enable-runtime-drain=true
+        - --max-runtime-override-ttl=48h
+        - --max-runtime-drain-ttl=48h
         - --enable-runtime-capability-scope=true
         - --scheduler-propagation-bound=3m
         - --enable-legacy-event-endpoint=false
@@ -177,19 +197,26 @@ spec:
         ports:
         - name: main
           containerPort: 8080
+        - name: observation
+          containerPort: 8443
         readinessProbe:
           httpGet:
             path: /readyz
             port: main
           initialDelaySeconds: 5
           periodSeconds: 10
+          timeoutSeconds: 10
         livenessProbe:
           httpGet:
             path: /healthz
             port: main
           initialDelaySeconds: 10
           periodSeconds: 30
+          timeoutSeconds: 10
         volumeMounts:
+        - mountPath: /etc/dispatcher-observation-tls
+          name: dispatcher-observation-tls
+          readOnly: true
         - mountPath: /etc/dispatcher-control
           name: dispatcher-control
           readOnly: true
@@ -225,6 +252,9 @@ spec:
         - name: release
           mountPath: /tmp/git-sync
       volumes:
+      - name: dispatcher-observation-tls
+        secret:
+          secretName: prowjob-dispatcher-observation-tls
       - name: dispatcher-control
         secret:
           secretName: prowjob-dispatcher-control
@@ -245,3 +275,31 @@ spec:
       - name: token
         secret:
           secretName: github-credentials-openshift-bot
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: prowjob-dispatcher-observation
+  namespace: ci
+spec:
+  podSelector:
+    matchLabels:
+      app: prow
+      component: prowjob-dispatcher
+  policyTypes:
+  - Ingress
+  ingress:
+  # Preserve existing scheduling, control, and monitoring traffic.
+  - ports:
+    - port: 8080
+      protocol: TCP
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prow
+          component: dispatcher-dashboard
+    ports:
+    - port: 8443
+      protocol: TCP

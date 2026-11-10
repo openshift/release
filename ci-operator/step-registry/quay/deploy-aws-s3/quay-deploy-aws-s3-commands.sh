@@ -4,6 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# On baremetalds (bare-metal) clusters the API and ingress routes
+# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
+# proxy. Source it when present so the Quay route calls below can connect; cloud
+# jobs have no such file and skip this (no-op).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/proxy-conf.sh"
+  # The bastion squid proxy only allows the cluster's own domains, so Terraform's
+  # public provider registry must bypass it and use the CI pod's direct egress
+  # (AWS APIs already bypass via amazonaws.com in NO_PROXY). Without this,
+  # `terraform init` gets HTTP 403 Forbidden from squid for registry.terraform.io.
+  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}registry.terraform.io,releases.hashicorp.com"
+  export no_proxy="${no_proxy:+${no_proxy},}registry.terraform.io,releases.hashicorp.com"
+fi
+
 command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
 
 if [ "${MAP_TESTS}" = "true" ]; then
@@ -122,11 +137,6 @@ function print_failing_pod_logs() {
     done
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
-
-#Get the credentials and Email of new Quay User
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
 
 # Create AWS S3 storage bucket. Names are globally unique; $RANDOM (0-32767)
 # collides with leftover quay-tests buckets that use the same quayprowci prefix.
@@ -302,7 +312,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -310,8 +319,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -355,7 +362,7 @@ FEATURE_OTEL_TRACING: false
 EOF
 
 # Merge a config fragment into config.yaml with list-append semantics ('*+',
-# not '*': this is what keeps today's effective SUPER_USERS [quay, admin]).
+# not '*', so a fragment's lists extend the defaults instead of replacing them).
 # Validate first so a present-but-malformed fragment fails the step clearly
 # instead of corrupting config.yaml.
 function merge_config_fragment() {
@@ -367,7 +374,7 @@ function merge_config_fragment() {
 	yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml "${fragment}"
 }
 
-# Merge order: Mailpit fragment -> OTel fragment -> explicit QUAY_EXTRA_CONFIG,
+# Merge order: Mailpit -> OTel -> unmanaged database -> QUAY_EXTRA_CONFIG,
 # so an explicit override still wins over the service-owned fragments. A
 # missing fragment is a silent no-op, leaving the disabled default above.
 if [[ -s "${SHARED_DIR}/quay-mail-config.yaml" ]]; then
@@ -380,6 +387,25 @@ if [[ -s "${SHARED_DIR}/quay-otel-config.yaml" ]]; then
 	merge_config_fragment "${SHARED_DIR}/quay-otel-config.yaml"
 fi
 
+# Unmanaged DB fragments from quay-database-intg-* steps. At most one should
+# exist; the first match wins.
+DATABASE_CONFIG_FRAGMENT=""
+for candidate in \
+	"${SHARED_DIR}/quay-database-aws-rds-config.yaml" \
+	"${SHARED_DIR}/quay-database-azure-postgres-config.yaml"
+do
+	if [[ -s "${candidate}" ]]; then
+		DATABASE_CONFIG_FRAGMENT="${candidate}"
+		break
+	fi
+done
+POSTGRES_MANAGED="true"
+if [[ -n "${DATABASE_CONFIG_FRAGMENT}" ]]; then
+	echo "Merging unmanaged database config fragment ${DATABASE_CONFIG_FRAGMENT} into defaults..."
+	merge_config_fragment "${DATABASE_CONFIG_FRAGMENT}"
+	POSTGRES_MANAGED="false"
+fi
+
 if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
 	echo "Merging extra Quay config into defaults..."
 	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
@@ -388,8 +414,8 @@ fi
 
 # Strip field-group keys for components this CR keeps managed. The operator
 # injects those values; leaving them in configBundleSecret blocks rollout.
-# Runs unconditionally now: a no-op on the defaults block when no overlay
-# above added any of these keys.
+# Keep DB_URI / DB_CONNECTION_ARGS when an unmanaged database fragment was
+# merged above; otherwise strip them so the operator manages postgres.
 yq -i '
 	del(
 		.FEATURE_SECURITY_SCANNER,
@@ -405,13 +431,14 @@ yq -i '
 		.REPO_MIRROR_TLS_VERIFY,
 		.BUILDLOGS_REDIS,
 		.USER_EVENTS_REDIS,
-		.DB_URI,
-		.DB_CONNECTION_ARGS,
 		.SERVER_HOSTNAME,
 		.PREFERRED_URL_SCHEME,
 		.EXTERNAL_TLS_TERMINATION
 	)
 ' config.yaml
+if [[ "${POSTGRES_MANAGED}" == "true" ]]; then
+	yq -i 'del(.DB_URI, .DB_CONNECTION_ARGS)' config.yaml
+fi
 
 # Build support requires unmanaged TLS plus a virtual builder. When enabled, the
 # quay-provisioning-{tls,builder} steps have already written the
@@ -455,14 +482,21 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
   sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
 
-  oc create secret generic -n quay-enterprise config-bundle-secret \
-    --from-file config.yaml=./config.yaml \
-    --from-file ssl.cert="${SHARED_DIR}/ssl.cert" \
-    --from-file ssl.key="${SHARED_DIR}/ssl.key" \
+  secret_args=(
+    --from-file config.yaml=./config.yaml
+    --from-file ssl.cert="${SHARED_DIR}/ssl.cert"
+    --from-file ssl.key="${SHARED_DIR}/ssl.key"
     --from-file extra_ca_cert_build_cluster.crt="${SHARED_DIR}/build_cluster.crt"
+  )
 else
-  oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
+  secret_args=(--from-file config.yaml=./config.yaml)
 fi
+
+# configBundleSecret name. The GCP SQL handling (client certs in the bundle
+# and the postgresql-client-certs name) returns with the GCP database lane.
+CONFIG_BUNDLE_SECRET_NAME="config-bundle-secret"
+
+oc create secret generic -n quay-enterprise "${CONFIG_BUNDLE_SECRET_NAME}" "${secret_args[@]}"
 
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
@@ -472,12 +506,14 @@ metadata:
   name: quay
   namespace: quay-enterprise
 spec:
-  configBundleSecret: config-bundle-secret
+  configBundleSecret: ${CONFIG_BUNDLE_SECRET_NAME}
   components:
   - kind: objectstorage
     managed: false
   - kind: monitoring
     managed: false
+  - kind: postgres
+    managed: ${POSTGRES_MANAGED}
   - kind: horizontalpodautoscaler
     managed: false
   - kind: quay
@@ -500,9 +536,6 @@ for i in $(seq 1 90); do
     QL_INSTALL_STATUS="passed"
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    curl -k -X POST $quay_route/api/v1/user/initialize --header 'Content-Type: application/json' \
-         --data '{ "username": "'$QUAY_USERNAME'", "password": "'$QUAY_PASSWORD'", "email": "'$QUAY_EMAIL'", "access_token": true }' | jq '.access_token' | tr -d '"' | tr -d '\n' > "$SHARED_DIR"/quay_oauth2_token || true
     archive_pod_info
     exit 0
   fi

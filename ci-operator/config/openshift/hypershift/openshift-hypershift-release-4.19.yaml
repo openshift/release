@@ -126,20 +126,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
-- as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
-  steps:
-    cluster_profile: hypershift-aks
-    dependencies:
-      OCP_IMAGE_N1: release:n1minor
-      OCP_IMAGE_N2: release:n2minor
-      OCP_IMAGE_N3: release:n3minor
-      OCP_IMAGE_N4: release:n4minor
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: centralus
-    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
   - arm64
@@ -266,12 +252,6 @@ tests:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14
     workflow: hypershift-kubevirt-baremetalds-conformance
-- always_run: false
-  as: e2e-azure-aks-ovn-conformance
-  optional: true
-  steps:
-    cluster_profile: hypershift-aks
-    workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

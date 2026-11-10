@@ -106,12 +106,20 @@ postsubmits:
       - args:
         - --config=./core-services/prow/02_config/_labels.yaml
         - --confirm=true
-        - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,openshift-eng
-        - --token=/etc/github/oauth
-        - --endpoint=http://ghproxy
+        - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,openshift-eng,openshift-online
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-graphql-endpoint=http://ghproxy/graphql
         - --debug
         command:
         - /ko-app/label_sync
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
         image: quay.io/openshift/ci:ci_label-sync_latest
         imagePullPolicy: Always
         name: ""
@@ -120,12 +128,12 @@ postsubmits:
             cpu: 500m
         volumeMounts:
         - mountPath: /etc/github
-          name: token
+          name: github-app-credentials
           readOnly: true
       volumes:
-      - name: token
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-prow-github-app
   - agent: kubernetes
     branches:
     - ^main$

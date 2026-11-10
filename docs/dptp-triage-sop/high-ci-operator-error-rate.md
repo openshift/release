@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `high-ci-operator-error-rate` |
 | **Cluster** | `app.ci` |
-| **Rule group** | `ci-operator-error` in [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) |
+| **Rule group** | `ci-operator-error` in [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) |
 | **Severity** | `critical` |
 | **Related** | [`high-ci-operator-infra-error-rate.md`](high-ci-operator-infra-error-rate.md) — infra-correlated variant (multi-job gate + lower rate threshold). |
 

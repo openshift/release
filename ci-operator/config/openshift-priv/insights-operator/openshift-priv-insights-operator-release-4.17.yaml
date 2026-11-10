@@ -22,6 +22,7 @@ promotion:
   - name: "4.17"
     namespace: ocp-priv
 prowgen:
+  enable_secrets_store_csi_driver: true
   private: true
 releases:
   initial:
@@ -79,7 +80,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not UI and not slow and not periodic_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_pr_checks_4.17
+        pytest.sh -k "not tp_only and not UI and not slow and not periodic_only" --junitxml=$(pwd)/test-report.xml
       credentials:
       - collection: insights-qa
         group: pull-secret
@@ -105,9 +106,6 @@ tests:
       - collection: insights-operator-secrets
         group: insights-ocm-token
         mount_path: /secret/ocm-access/
-      - collection: insights-operator-secrets
-        group: insights-rp-token
-        mount_path: /secret/insights-rp-access/
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -121,8 +119,6 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -143,7 +139,6 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "not UI and techpreview" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.17
       credentials:
       - collection: insights-qa
         group: pull-secret
@@ -169,9 +164,6 @@ tests:
       - collection: insights-operator-secrets
         group: insights-ocm-token
         mount_path: /secret/ocm-access/
-      - collection: insights-operator-secrets
-        group: insights-rp-token
-        mount_path: /secret/insights-rp-access/
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -185,8 +177,6 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
       from: insights-operator-tests
       resources:
         requests:

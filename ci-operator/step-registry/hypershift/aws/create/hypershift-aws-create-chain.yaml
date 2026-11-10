@@ -1,9 +1,19 @@
 chain:
   as: hypershift-aws-create
+  env:
+  - name: HYPERSHIFT_CLUSTER_ROLE
+    default: ''
+  - name: KUBECONFIG
+    default: ${SHARED_DIR}/kubeconfig
   steps:
   - as: create-hostedcluster
     cli: latest
     env:
+    - name: HYPERSHIFT_CLUSTER_ROLE
+      default: ''
+      documentation: Optional management cluster role used to select a role-specific kubeconfig.
+    - name: KUBECONFIG
+      default: ${SHARED_DIR}/kubeconfig
     - name: GUEST_FEATURE_SET
       default: ""
       documentation: |
@@ -76,7 +86,18 @@ chain:
         If true, enable ETCD encryption by specifying --kms-key-arn="$(cat "${SHARED_DIR}/aws_kms_key_arn")".
     - name: HYPERSHIFT_DYNAMIC_DNS
       default: ""
-      documentation: "Set dynamic dns for kube-apiserver"
+      documentation: |-
+        Legacy: pins the kube-apiserver DNS name to a fixed, pre-provisioned record. Only
+        the openshift-tests-private 4.19-4.21 jobs still set it; prefer
+        HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN, which derives a name unique to the job run.
+    - name: HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN
+      default: ""
+      documentation: |-
+        If set and HYPERSHIFT_DYNAMIC_DNS is empty, the kube-apiserver DNS name is derived
+        per job run as kas-<cluster-name>.<HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN>, so that
+        concurrent runs never share a DNS record. The derived name is not configurable from
+        outside. Whichever name is used, it is written to ${SHARED_DIR}/kas_dns_name for
+        later steps to update and clean up the record.
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
@@ -91,6 +112,18 @@ chain:
       documentation: "The CNI provider to use for the cluster. Supported values: cilium, calico"
     commands: |-
       set -exuo pipefail
+      if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+        if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+          echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+          exit 1
+        fi
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+        if [[ ! -s "${KUBECONFIG}" ]]; then
+          echo "Management cluster kubeconfig ${KUBECONFIG} is missing or empty" >&2
+          exit 1
+        fi
+      fi
+
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
 
@@ -175,8 +208,17 @@ chain:
         COMMAND+=(--kms-key-arn="$(cat ${SHARED_DIR}/aws_kms_key_arn)")
       fi
       
-      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
-        COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+      # The derived name is held in a shell local, not in HYPERSHIFT_DYNAMIC_DNS, to keep
+      # it clear that it is generated here rather than configured from outside. The env
+      # var is only the legacy fixed-record override.
+      kas_dns_name="${HYPERSHIFT_DYNAMIC_DNS}"
+      if [[ -z $kas_dns_name && -n $HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN ]]; then
+        kas_dns_name="kas-${CLUSTER_NAME}.${HYPERSHIFT_DYNAMIC_DNS_BASE_DOMAIN}"
+      fi
+
+      if [[ -n $kas_dns_name ]]; then
+        COMMAND+=(--kas-dns-name="${kas_dns_name}")
+        echo "${kas_dns_name}" > "${SHARED_DIR}/kas_dns_name"
       fi
 
       if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
@@ -236,9 +278,8 @@ chain:
           num_zones=$(echo "${HC_ZONES}" | tr ',' '\n' | wc -l)
           num_nodes_expected=$((replicas_per_np * num_zones))
           export num_nodes_expected
-          export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
           set +e
-          timeout 25m bash -c '
+          KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" timeout 25m bash -c '
             while true; do
               num_nodes=$(oc get nodes --no-headers | wc -l)
               if (( num_nodes == num_nodes_expected )); then

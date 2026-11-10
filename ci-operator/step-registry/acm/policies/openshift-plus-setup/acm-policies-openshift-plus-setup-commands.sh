@@ -130,7 +130,18 @@ sleep 60
 
 git clone https://github.com/stolostron/policy-collection.git
 
-cd policy-collection/deploy/ 
+# Record the checked-out policy-collection revision so run evidence can
+# attribute policy content (the lane consumes this fork's main unpinned;
+# deploy.sh publishes a Channel/Subscription against the remote URL, so the
+# clone HEAD is the only locally observable revision - the deployed content
+# is whatever the remote main resolves at reconciliation time, which can
+# differ if main moves in between). INTEROP-9646.
+cd policy-collection
+echo "POLICY_COLLECTION_CHECKOUT_SHA=$(git rev-parse HEAD)"
+echo "POLICY_COLLECTION_ORIGIN=$(git config --get remote.origin.url)"
+cd ..
+
+cd policy-collection/deploy/
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus-setup
 
 echo "$(oc get policies -A)"

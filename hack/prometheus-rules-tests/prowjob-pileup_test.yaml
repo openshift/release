@@ -1,0 +1,71 @@
+# promtool unit tests for TriggeredProwJobsPileup / SchedulingProwJobsPileup.
+# Verifies the sustained-pileup semantics (min_over_time, not a max_over_time peak
+# detector): the alert fires only when the queue stays above the threshold for the
+# whole 5m window (one held firing for a continuous pileup), and a transient spike
+# that drains within the window does NOT fire.
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. Sustained pileup: triggered stays at 600 (>450) -> fires.
+  - interval: 1m
+    input_series:
+      - series: 'prowjobs{job="prow-controller-manager", state="triggered"}'
+        values: '600x15'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: TriggeredProwJobsPileup
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'Triggered prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low=600). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.'
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak'
+
+  # 2. Transient burst: baseline 60 with a single spike to 700 -> min_over_time stays
+  #    low -> does NOT fire (this is the flapping the peak-detector produced).
+  - interval: 1m
+    input_series:
+      - series: 'prowjobs{job="prow-controller-manager", state="triggered"}'
+        values: '60x4 700 60x15'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: TriggeredProwJobsPileup
+        exp_alerts: []
+
+  # 3. Resolve: sustained 600 (fires) then drains to 60 -> resolves after keep_firing_for.
+  - interval: 1m
+    input_series:
+      - series: 'prowjobs{job="prow-controller-manager", state="triggered"}'
+        values: '600x10 60x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: TriggeredProwJobsPileup
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'Triggered prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low=600). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak|SOP>.'
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#triggered-peak'
+      - eval_time: 25m
+        alertname: TriggeredProwJobsPileup
+        exp_alerts: []
+
+  # 4. Scheduling sustained above 300 -> fires (warning).
+  - interval: 1m
+    input_series:
+      - series: 'prowjobs{job="prow-controller-manager", state="scheduling"}'
+        values: '400x15'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: SchedulingProwJobsPileup
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              message: 'Scheduling prowjobs have stayed above the configured threshold for the last 5 minutes (sustained pileup that is not draining; low=400). Follow <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak|SOP>.'
+              runbook_url: 'https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/prow-job-state-pileup.md#scheduling-peak'
