@@ -86,7 +86,7 @@ spec:
                                 no more than 253 characters, contain only lowercase
                                 alphanumeric characters, ''-'' or ''.'', and start
                                 and end with an alphanumeric character'
-                              rule: self.matches('^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*$')
+                              rule: self.matches('^[a-z0-9]([a-z0-9\\-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9\\-]*[a-z0-9])?)*$')
                         required:
                         - name
                         type: object
@@ -148,7 +148,7 @@ spec:
                             no more than 253 characters, contain only lowercase alphanumeric
                             characters, ''-'' or ''.'', and start and end with an
                             alphanumeric character'
-                          rule: self.matches('^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*$')
+                          rule: self.matches('^[a-z0-9]([a-z0-9\\-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9\\-]*[a-z0-9])?)*$')
                     required:
                     - name
                     type: object
@@ -168,7 +168,7 @@ spec:
                         more than 253 characters, contain only lowercase alphanumeric
                         characters, ''-'' or ''.'', and start and end with an alphanumeric
                         character'
-                      rule: self.matches('^[a-z0-9]([a-z0-9\-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]*[a-z0-9])?)*$')
+                      rule: self.matches('^[a-z0-9]([a-z0-9\\-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9\\-]*[a-z0-9])?)*$')
                 type: object
               vaultAddress:
                 description: |-
