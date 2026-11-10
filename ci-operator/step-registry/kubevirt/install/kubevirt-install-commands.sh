@@ -43,7 +43,9 @@ read_gangway_cnv_env_from_prow() {
   fi
 }
 
-read_gangway_cnv_env_from_prow
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" != "redhat-operators" ]]; then
+  read_gangway_cnv_env_from_prow
+fi
 CNV_PRERELEASE_CATALOG_IMAGE="${CNV_PRERELEASE_CATALOG_IMAGE:-}"
 CNV_SUBSCRIPTION_CHANNEL="${CNV_SUBSCRIPTION_CHANNEL:-}"
 
