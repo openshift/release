@@ -8,15 +8,12 @@ WORKDIR=$(mktemp -d)
 MANIFEST="${WORKDIR}/release.json"
 CATALOG_NAMESPACE=openshift-marketplace
 LOGIC_CATALOG=osl-rc-logic
+SERVERLESS_PACKAGE=serverless-operator
+SERVERLESS_CHANNEL=stable
+SERVERLESS_SOURCE=redhat-operators
+SERVERLESS_SOURCE_NAMESPACE=openshift-marketplace
 
 trap 'rm -rf "${WORKDIR}"' EXIT
-
-set_serverless_defaults() {
-    SERVERLESS_PACKAGE=serverless-operator
-    SERVERLESS_CHANNEL=stable
-    SERVERLESS_SOURCE=redhat-operators
-    SERVERLESS_SOURCE_NAMESPACE=openshift-marketplace
-}
 
 validate_release_json() {
     if ! jq -s -e '
@@ -362,7 +359,6 @@ validate_release_json
 
 require_registry_credentials "${BREW_REGISTRY}" registry_brew.json
 require_registry_credentials "${STAGE_REGISTRY}" registry_stage.json
-set_serverless_defaults
 
 RHDH_VERSION=$(jq -r '.rhdhVersion' "${MANIFEST}")
 OCP_VERSION=$(jq -r '.ocpVersion' "${MANIFEST}")
@@ -419,6 +415,9 @@ wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" 
 
 export E2E_COLLECT_COVERAGE=false RHDH_VERSION
 OVERLAYS_COMMIT=b1320a680060f03ccaf7c88405125589e38f3fc4
+if [[ "${JOB_TYPE:-}" == postsubmit ]]; then
+    OVERLAYS_COMMIT="${PULL_BASE_SHA:?PULL_BASE_SHA is required for release postsubmits}"
+fi
 OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
 git init "${WORKDIR}/rhdh-plugin-export-overlays"
 git -C "${WORKDIR}/rhdh-plugin-export-overlays" remote add origin "${OVERLAYS_REPO}"
