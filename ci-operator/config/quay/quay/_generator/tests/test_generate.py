@@ -156,6 +156,35 @@ def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
     assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
 
 
+def test_playwright_ref_mode_uses_step_defaults_and_keeps_full_test_steps() -> None:
+    """The matrix must not force strict ref resolution or remove Playwright phases."""
+    results, _retired = generate_all()
+    upgrade_chains = {
+        "quay-operator-upgrade-seed",
+        "quay-operator-upgrade-verify",
+        "quay-operator-upgrade-functional",
+    }
+
+    checked_installs = 0
+    checked_upgrades = 0
+    for group, _filename, config in results:
+        for cell, test in zip(group, config["tests"], strict=True):
+            if cell.test not in {"e2e-install", "upgrade"}:
+                continue
+            steps = test["steps"]
+            assert "PLAYWRIGHT_REF_MODE" not in steps["env"]
+            refs = {step.get("ref") or step.get("chain") for step in steps["test"]}
+            if cell.test == "e2e-install":
+                assert "quay-test-e2e" in refs
+                checked_installs += 1
+            else:
+                assert upgrade_chains <= refs
+                checked_upgrades += 1
+
+    assert checked_installs > 0
+    assert checked_upgrades > 0
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
