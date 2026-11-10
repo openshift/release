@@ -861,6 +861,10 @@ printf '%s\n' "${WORKER_ZONES[@]}" >"${SHARED_DIR}/aro-hcp-worker-zones"
 write_state
 
 WORKER_INSTALL_START=$(date +%s)
+# The wait-ready step runs after the RP node-pool requests have completed.
+# Persist the request start so nodes_ready measures the worker provisioning
+# interval instead of only the final guest-readiness polling interval.
+printf '%s\n' "${WORKER_INSTALL_START}" > "${SHARED_DIR}/aro-hcp-worker-nodes-install-start"
 log_step "Submitting worker node pool create requests concurrently: ${NODEPOOL_NAMES}."
 declare -A NODEPOOL_INSTALL_STARTS
 NODEPOOL_CREATE_PIDS=()

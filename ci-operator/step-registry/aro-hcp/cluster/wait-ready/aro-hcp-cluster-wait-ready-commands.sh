@@ -120,7 +120,18 @@ az aro hcp -h >/dev/null
 
 timeout_seconds=$(duration_to_seconds "${READY_WAIT_TIMEOUT}")
 deadline=$((SECONDS + timeout_seconds))
-nodes_ready_start=$(date +%s)
+nodes_ready_start=""
+if [[ -s "${SHARED_DIR}/aro-hcp-worker-nodes-install-start" ]]; then
+  nodes_ready_start=$(tr -d '[:space:]' < "${SHARED_DIR}/aro-hcp-worker-nodes-install-start")
+fi
+if [[ ! "${nodes_ready_start}" =~ ^[0-9]+$ ]]; then
+  # Keep compatibility with metadata produced before the persisted start
+  # timestamp was introduced.
+  nodes_ready_start=$(date +%s)
+  echo "Worker node-pool start timestamp unavailable; measuring node readiness from this step." >&2
+else
+  echo "Measuring worker node readiness from epoch ${nodes_ready_start}."
+fi
 rp_cluster_ready=false
 rp_nodepools_ready=false
 guest_api_ready=false
@@ -128,6 +139,7 @@ cluster_version_ready=false
 cluster_operators_ready=false
 guest_pods_ready=false
 worker_nodes_ready=false
+worker_nodes_ready_at=""
 
 # Check the hosted control-plane RP state and record its completion timer.
 check_rp_cluster() {
@@ -277,6 +289,7 @@ check_worker_nodes() {
   fi
   if [[ "${desired}" == "0" ]]; then
     worker_nodes_ready=true
+    worker_nodes_ready_at=$(date +%s)
     echo "No worker nodes requested; worker-node readiness is complete."
     return 0
   fi
@@ -284,6 +297,10 @@ check_worker_nodes() {
   echo "Schedulable Ready workers=${ready}/${desired}"
   if [[ "${desired}" =~ ^[0-9]+$ ]] && (( desired > 0 && ready >= desired )); then
     worker_nodes_ready=true
+    if [[ -z "${worker_nodes_ready_at}" ]]; then
+      worker_nodes_ready_at=$(date +%s)
+      echo "All expected worker nodes first observed Ready at epoch ${worker_nodes_ready_at}."
+    fi
     return 0
   fi
   return 1
@@ -355,7 +372,10 @@ while (( SECONDS < deadline )); do
       [[ "${worker_ready}" =~ ^[0-9]+$ ]] && workers_ready_seconds="${worker_ready}"
     fi
     (( workers_ready_seconds > 0 )) && record_timer nodepool_ready_seconds "${workers_ready_seconds}"
-    record_timer nodes_ready "$((now - nodes_ready_start))"
+    nodes_ready_at="${worker_nodes_ready_at:-${now}}"
+    nodes_ready_seconds=$((nodes_ready_at - nodes_ready_start))
+    (( nodes_ready_seconds < 0 )) && nodes_ready_seconds=0
+    record_timer nodes_ready "${nodes_ready_seconds}"
     ensure_install_timers
     install_state_total=$(jq '[.timers.install // {} | to_entries[] | select(.key | IN("claim", "waiting", "validating", "pending", "installing")) | (.value | tonumber? // 0)] | add // 0' "${CLUSTER_CONFIG_FILE}")
     if [[ "${install_state_total}" == "0" && "${control_plane_ready_seconds}" -gt 0 ]]; then
