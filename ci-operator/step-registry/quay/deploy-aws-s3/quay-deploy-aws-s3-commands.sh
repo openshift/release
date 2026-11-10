@@ -76,15 +76,16 @@ trap on_exit EXIT
 
 QUAY_NS="quay-enterprise"
 
-# OLM creates bundle-unpack Jobs in the CatalogSource namespace, with the
-# operatorframework.io/bundle-unpack-ref label on both the Job and its Pods.
-# The resource name is a hash of the bundle path, so do not infer it from a
-# name prefix. Keep this collection in the failing deploy step: the post phase
-# deprovisions the target cluster and quay-gather intentionally does not gather
-# the shared openshift-marketplace namespace.
+# OLM names an unpack Job after its ConfigMap. Every supported OLM release
+# labels the Job with operatorframework.io/bundle-unpack-ref; 4.14-4.19 Pods
+# instead have the Job controller label, while 4.20+ adds the bundle label to
+# the Pod template. Post gather-extra also snapshots marketplace resources, but
+# this best-effort timeout capture can see OCP 5.0 Jobs/Pods before their
+# 300-second finished-Job TTL removes them; it cannot guarantee their presence.
 function archive_olm_bundle_unpack_diagnostics() {
   local root="${ARTIFACT_DIR}/olm-bundle-unpack"
-  local label="operatorframework.io/bundle-unpack-ref"
+  local job_label="operatorframework.io/bundle-unpack-ref"
+  local pod_job_label="batch.kubernetes.io/job-name"
   local catalog_namespace="openshift-marketplace"
   local timeout_seconds=10
   local max_jobs=3
@@ -114,10 +115,10 @@ function archive_olm_bundle_unpack_diagnostics() {
     --field-selector="involvedObject.name=${QUAY_OPERATOR_SOURCE}" --sort-by='.lastTimestamp' \
     > "${root}/catalogsource-events.txt" 2>&1 || true
 
-  # A bundle unpack Job and Pod are labelled with the hash of the ConfigMap
-  # they unpack into, but that label does not name the CatalogSource. OLM gives
-  # the ConfigMap an owner reference to the CatalogSource, so resolve the exact
-  # hash values from that ownership relationship before querying Jobs or Pods.
+  # The bundle-unpack Job label is the hash of the ConfigMap it unpacks, but
+  # does not name the CatalogSource. OLM gives that ConfigMap an owner reference
+  # to the CatalogSource, so resolve the exact hash values before querying Jobs
+  # and their Pods by the Job controller label.
   # Newest ConfigMaps are first so the fixed bound prioritizes the active
   # resolution rather than historical bundles reused by the CatalogSource.
   if ! command -v jq >/dev/null 2>&1; then
@@ -148,10 +149,10 @@ function archive_olm_bundle_unpack_diagnostics() {
     fi
     jobs_collected=$((jobs_collected + 1))
     timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get jobs \
-      -l "${label}=${bundle_ref}" -o json \
+      -l "${job_label}=${bundle_ref}" -o json \
       > "${root}/${bundle_ref}-jobs.json" 2> "${root}/${bundle_ref}-jobs.err" || true
     timeout "${timeout_seconds}" oc -n "${catalog_namespace}" get pods \
-      -l "${label}=${bundle_ref}" -o json \
+      -l "${pod_job_label}=${bundle_ref}" -o json \
       > "${root}/${bundle_ref}-pods.json" 2> "${root}/${bundle_ref}-pods.err" || true
     while IFS= read -r job; do
       [[ -n "${job}" ]] || continue
@@ -194,8 +195,6 @@ function archive_olm_bundle_unpack_diagnostics() {
         containers_collected=$((containers_collected + 1))
         timeout "${timeout_seconds}" oc -n "${catalog_namespace}" logs "${pod}" -c "${container}" \
           --tail=2000 > "${root}/${pod}_${container}.log" 2>&1 || true
-        timeout "${timeout_seconds}" oc -n "${catalog_namespace}" logs "${pod}" -c "${container}" \
-          --previous --tail=2000 > "${root}/${pod}_${container}_previous.log" 2>&1 || true
       done <<< "${containers}"
     done < <(jq -r '.items[]?.metadata.name // empty' "${root}/${bundle_ref}-pods.json" 2>/dev/null || true)
   done < <(jq -r '.[]?.name // empty' "${root}/selected-bundle-configmaps.json" 2>/dev/null || true)

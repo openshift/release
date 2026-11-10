@@ -2,11 +2,12 @@
 # Opt-in mock for OLM bundle-unpack diagnostic collection. No Make or CI target
 # invokes it; run `bash hack/test-quay-deploy-aws-s3-olm-diagnostics.sh`.
 # It covers successful queries with warnings, CatalogSource ownership filtering,
-# resource and log bounds, and missing or failing resource queries.
+# exact Job/Pod selectors, resource and log bounds, and missing or failing
+# resource queries. Set COLLECTOR_SCRIPT to check a historical collector.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-script="${repo_root}/ci-operator/step-registry/quay/deploy-aws-s3/quay-deploy-aws-s3-commands.sh"
+script="${COLLECTOR_SCRIPT:-${repo_root}/ci-operator/step-registry/quay/deploy-aws-s3/quay-deploy-aws-s3-commands.sh}"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 
@@ -33,6 +34,10 @@ case " $* " in
     printf 'Warning: configmap query succeeded with a warning\n' >&2
     ;;
   *" get jobs "*)
+    case " $* " in
+      *" -l operatorframework.io/bundle-unpack-ref=bundle-new "*|*" -l operatorframework.io/bundle-unpack-ref=bundle-mid "*|*" -l operatorframework.io/bundle-unpack-ref=bundle-old "*) ;;
+      *) printf 'unexpected jobs selector: %s\n' "$*" >&2; exit 1 ;;
+    esac
     if [[ "${MOCK_SCENARIO}" == failing ]]; then
       printf 'jobs query failed\n' >&2
       exit 1
@@ -41,6 +46,10 @@ case " $* " in
     printf 'Warning: jobs query succeeded with a warning\n' >&2
     ;;
   *" get pods "*)
+    case " $* " in
+      *" -l batch.kubernetes.io/job-name=bundle-new "*|*" -l batch.kubernetes.io/job-name=bundle-mid "*|*" -l batch.kubernetes.io/job-name=bundle-old "*) ;;
+      *) printf 'unexpected pods selector: %s\n' "$*" >&2; exit 1 ;;
+    esac
     if [[ "${MOCK_SCENARIO}" == failing ]]; then
       printf 'pods query failed\n' >&2
       exit 1
@@ -58,7 +67,13 @@ case " $* " in
     printf 'Warning: pods query succeeded with a warning\n' >&2
     ;;
   *" get events "*) printf 'events\n' ;;
-  *" logs "*) printf 'collected logs for %s\n' "$*" ;;
+  *" logs "*)
+    if [[ " $* " == *" --previous "* ]]; then
+      printf 'unexpected previous log request: %s\n' "$*" >&2
+      exit 1
+    fi
+    printf 'collected logs for %s\n' "$*"
+    ;;
   *" get subscription "*|*" get installplan "*|*" get csv "*) printf 'kind: List\n' ;;
   *)
     printf 'unexpected oc invocation: %s\n' "$*" >&2
@@ -101,6 +116,7 @@ test -f "${root}/bundle-pod-one_main-one.log"
 test -f "${root}/bundle-pod-two_init-two.log"
 test -f "${root}/bundle-pod-two_main-two.log"
 test ! -e "${root}/bundle-pod-one_main-two.log"
+test ! -e "${root}/bundle-pod-one_main-one_previous.log"
 test -f "${root}/pod-log-cap.txt"
 test ! -e "${root}/bundle-pod-excess_main-excess.log"
 test -f "${root}/bundle-reference-cap.txt"
