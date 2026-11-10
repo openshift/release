@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
+# hcpctl is built in-place by Containerfile.e2e (make build-hcpctl) and is not
+# installed to a standard bin directory, so add its build output to PATH.
+export PATH="${PWD}/tooling/hcpctl:${PATH}"
+
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
 # Skip if provisioning never completed — there are no cluster logs to gather.
