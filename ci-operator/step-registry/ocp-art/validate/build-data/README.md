@@ -1,6 +1,6 @@
 # Build-data validation
 
-The optional ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
+The required ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
 configuration pattern:
 
 ```text
@@ -16,8 +16,9 @@ The first pass covers every existing ACM and MCE release branch:
 - ACM: `2.11`, `2.13`, `2.14`, `2.15`, `2.16`, `2.17`, `5.0`, `5.1`.
 - MCE: `2.6`, `2.8`, `2.9`, `2.10`, `2.11`, `2.17`, `5.0`, `5.1`.
 
-All 16 jobs remain optional while baseline findings are corrected. Each additional
-branch needs its own CI configuration referencing the same workflow. New y-streams
+All 16 jobs are required for PRs that change metadata matched by `run_if_changed`.
+Validation failures block merging. Each additional branch needs its own CI
+configuration referencing the same workflow. New y-streams
 are not automatically onboarded to the job. A `__periodics.yaml` variant is only
 needed for scheduled runs. Tide merge policy and branch protection are separate.
 
