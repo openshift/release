@@ -52,8 +52,6 @@ else
     echo "Found PR #${PR_NUM}"
 fi
 
-require_session_metrics_extractor
-
 # --- Workspace setup ---
 WORKDIR="${WORKDIR:-/workspace}"
 cd "${WORKDIR}"

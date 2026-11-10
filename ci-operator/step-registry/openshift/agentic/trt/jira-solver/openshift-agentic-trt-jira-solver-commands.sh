@@ -31,7 +31,6 @@ solver_cleanup() {
 trap solver_cleanup EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
-require_session_metrics_extractor
 
 load_github_tokens
 configure_github_git_credentials

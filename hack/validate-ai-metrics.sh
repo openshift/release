@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Validates that every step-registry command script which runs a *billable* AI
 # coding-agent call (Claude or Codex) also emits session-cost metrics, so its
-# provider/API spend is reported on the CI cost dashboards
+# Vertex/API spend is reported on the CI cost dashboards
 # (BigQuery claude_session_metrics table).
 #
 # Rationale: agents invoked without emitting claude-session-metrics-autodl.json
@@ -16,8 +16,12 @@ set -euo pipefail
 #                  to a downstream step via ${SHARED_DIR}/claude-otel*, OR it is
 #                  explicitly allowlisted below.
 #
-# Scope note: agentic-ci meters both Claude and Codex harnesses. Direct Codex
-# calls remain out of scope because they do not run the collector/extractor.
+# Scope note: only Claude spend is metered today — extract_metrics.py reads the
+# Claude-specific claude_code.cost.usage OTEL, and Codex cost is not collected.
+# `agentic-ci run` can drive either harness but is treated as billable here
+# because it is how Claude is metered. If/when Codex cost capture lands, extend
+# BILLABLE_RE to catch direct `codex exec/-p/--print` calls too; the script is
+# named generically for that reason.
 
 base_dir="${1:-}"
 
@@ -43,8 +47,9 @@ is_allowlisted() {
   return 1
 }
 
-# A billable AI invocation we can meter today: `agentic-ci run` (Claude or
-# Codex via the OTEL collector) or a direct `claude -p/--print`.
+# A billable AI invocation we can meter today: `agentic-ci run` (Claude via the
+# OTEL collector) or a direct `claude -p/--print`. Codex is intentionally out of
+# scope until its cost is collected (see the scope note above).
 BILLABLE_RE='agentic-ci[[:space:]]+run|claude[[:space:]]+(-p|--print)'
 
 # Evidence that a script emits (or defers emission of) session metrics.
@@ -83,12 +88,12 @@ while IFS= read -r -d '' script; do
 done < <(find "${registry_dir}" -name '*-commands.sh' -print0)
 
 if [[ ${#missing[@]} -gt 0 ]]; then
-  echo "ERROR: the following step-registry scripts run a billable AI agent but do not emit session-cost metrics:"
+  echo "ERROR: the following step-registry scripts run a billable Claude agent but do not emit session-cost metrics:"
   printf '  - %s\n' "${missing[@]}"
   cat <<'EOF'
 
-Each of these invokes a Claude or Codex agent (via `agentic-ci run` or a direct
-`claude -p/--print` call) that incurs provider/API cost, but produces no
+Each of these invokes a Claude agent (via `agentic-ci run` or a direct
+`claude -p/--print` call) that spends money on Vertex, but produces no
 claude-session-metrics-autodl.json, so the spend is invisible on the CI cost
 dashboards.
 

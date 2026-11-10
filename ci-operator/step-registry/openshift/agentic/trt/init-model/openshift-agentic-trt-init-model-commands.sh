@@ -182,16 +182,6 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
 
-require_session_metrics_extractor() {
-    if [[ ! -f "${EXTRACT_METRICS}" ]] \
-        || ! grep -qF -- "--prompt-file" "${EXTRACT_METRICS}" \
-        || ! grep -qF -- "agentic_ci.codex.cost.usage" "${EXTRACT_METRICS}" \
-        || ! grep -qF -- "_producer_key" "${EXTRACT_METRICS}"; then
-        echo "ERROR: session metrics extractor lacks required prompt, Codex, or producer support" >&2
-        return 1
-    fi
-}
-
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 else
@@ -1191,8 +1181,8 @@ finalize_session_metrics() {
         rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    if ! require_session_metrics_extractor; then
-        echo "Warning: incompatible session metrics extractor, skipping publication"
+    if [[ ! -f "${EXTRACT_METRICS}" ]]; then
+        echo "Warning: extract_metrics.py not found, skipping session metrics"
         rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi

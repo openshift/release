@@ -16,11 +16,7 @@ load_github_tokens
 configure_github_git_credentials
 
 # --- Read case list ---
-mapfile -t CASE_LIST < <(sed '/^[[:space:]]*$/d' "${SHARED_DIR}/eval-cases")
-if [[ ${#CASE_LIST[@]} -eq 0 ]]; then
-    echo "ERROR: eval-cases contains no cases" >&2
-    exit 1
-fi
+mapfile -t CASE_LIST < "${SHARED_DIR}/eval-cases"
 MAX_PARALLEL="${EVAL_PARALLELISM:-5}"
 echo "Cases (${#CASE_LIST[@]}): ${CASE_LIST[*]} | Parallelism: ${MAX_PARALLEL}"
 
