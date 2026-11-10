@@ -62,15 +62,21 @@ wait_catalog() {
 }
 
 record_source_identity() {
-  local csv phase actual_source actual_channel actual_image
+  local csv phase actual_source actual_channel actual_image actual_version actual_minor expected_minor
   actual_image="$(oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" -o jsonpath='{.spec.image}' 2>/dev/null || true)"
   [[ "${actual_image}" == "${SOURCE_IMAGE}" ]] || fail "source CatalogSource image does not match the requested immutable source image"
   csv="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
   phase="$(oc get csv -n "${OPERATOR_NS}" "${csv}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  actual_version="$(oc get csv -n "${OPERATOR_NS}" "${csv}" -o jsonpath='{.spec.version}' 2>/dev/null || true)"
   actual_source="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.spec.source}' 2>/dev/null || true)"
   actual_channel="$(oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" -o jsonpath='{.spec.channel}' 2>/dev/null || true)"
   [[ -n "${csv}" && "${phase}" == Succeeded ]] || fail "source Quay CSV did not reach Succeeded within ${TIMEOUT}"
   [[ "${actual_source}" == "${SOURCE_CATALOG}" && "${actual_channel}" == "${SOURCE_CHANNEL}" ]] || fail "Subscription does not match the requested n-1 source identity"
+  [[ "${SOURCE_CHANNEL}" =~ ^stable-([0-9]+\.[0-9]+)$ ]] || fail "source channel must be stable-X.Y to verify the observed CSV version"
+  expected_minor="${BASH_REMATCH[1]}"
+  [[ "${actual_version}" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]] || fail "source CSV ${csv} has missing or malformed spec.version"
+  actual_minor="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+  [[ "${actual_minor}" == "${expected_minor}" ]] || fail "source CSV ${csv} version ${actual_version} does not match expected minor ${expected_minor}"
   printf '%s\n' "${csv}" >"${SHARED_DIR}/quay-upgrade-source.csv"
   cat >"${SHARED_DIR}/quay-upgrade-source-identity" <<EOF
 catalog_name=${SOURCE_CATALOG}
@@ -80,6 +86,8 @@ channel=${SOURCE_CHANNEL}
 subscription_namespace=${OPERATOR_NS}
 subscription_name=${SUBSCRIPTION}
 installed_csv=${csv}
+installed_version=${actual_version}
+installed_minor=${actual_minor}
 EOF
   cp "${SHARED_DIR}/quay-upgrade-source-identity" "${ARTIFACT_DIR}/source-identity.txt"
   echo "Verified source Quay operator CSV ${csv} from channel ${SOURCE_CHANNEL}."
