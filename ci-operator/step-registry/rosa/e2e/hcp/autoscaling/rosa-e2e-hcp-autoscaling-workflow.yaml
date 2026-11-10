@@ -15,6 +15,10 @@ workflow:
       # step list is silently dropped by the registry resolver for ref steps;
       # only this map overrides the validate-customer ref's default filter.
       LABEL_FILTER: "Feature:Autoscaling"
+      # The workflow env map applies to every step declaring the parameter, so
+      # LABEL_FILTER would leak into the platform step (whose filter falls
+      # back to LABEL_FILTER). Pin the platform plane to its area selection.
+      PLATFORM_LABEL_FILTER: "Area:ManagementPlane"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
