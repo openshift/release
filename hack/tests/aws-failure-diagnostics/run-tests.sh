@@ -243,39 +243,85 @@ check_eq "a foreign credentials file makes the chain unprovable" \
 # A polluted but benign AWS environment must be reported, not papered over: the
 # production code reads these variables deliberately, because they outrank the
 # shared credentials file in the SDK chain.
+#
+# These two cases assert exactly which credential source the capture saw, so
+# they are run with env -i: an inherited variable would either contradict the
+# assertion outright or, worse, satisfy "unprovable" for an unrelated reason and
+# mask a regression in detecting the source under test. That is not
+# hypothetical, because a CI pod can itself export
+# AWS_CONTAINER_CREDENTIALS_FULL_URI.
+run_capture_isolated() {
+  # run_capture_isolated <output> [EXTRA_VAR=VALUE ...]
+  local output="$1"
+  shift
+  env -i PATH="${PATH}" HOME="${WORK}" \
+    LEASED_RESOURCE="us-west-2--x-0" \
+    CLUSTER_PROFILE_DIR="/secrets/profile" \
+    AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
+    "$@" \
+    python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
+      --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
+      --captured-at "2026-11-06T05:30:01Z" --output "${output}"
+}
+
 OUT_POLLUTED="${WORK}/context-polluted-env.json"
-env LEASED_RESOURCE="us-west-2--x-0" \
-  CLUSTER_PROFILE_DIR="/secrets/profile" \
-  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
-  AWS_SESSION_TOKEN="synthetic-session-token-for-tests" \
-  python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
-    --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
-    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_POLLUTED}"
+run_capture_isolated "${OUT_POLLUTED}" AWS_SESSION_TOKEN="synthetic-session-token-for-tests"
 check_eq "an inherited session token makes the chain unprovable" "false" \
   "$(jq -r '.credential_context.effective_credential_chain_provable' "${OUT_POLLUTED}")"
 check_eq "the inherited source is named, not hidden" "higher-precedence-credential-source-present" \
   "$(jq -r '.credential_context.unprovable_reason' "${OUT_POLLUTED}")"
 check_eq "the session token alone is reported as a boolean" "true false" \
   "$(jq -r '"\(.credential_context.aws_session_token_env_present) \(.credential_context.aws_profile_env_present)"' "${OUT_POLLUTED}")"
+check_eq "the session token case sees no other credential source" "false false false false" \
+  "$(jq -r '.credential_context | "\(.aws_container_credentials_env_present) \(.aws_access_key_id_env_present) \(.aws_secret_access_key_env_present) \(.aws_web_identity_token_file_env_present)"' "${OUT_POLLUTED}")"
 check_eq "no inherited credential value is echoed" "0" \
   "$(grep -cF 'synthetic-session-token-for-tests' "${OUT_POLLUTED}" || true)"
 
 # The same, with only AWS_PROFILE set, so neither variable can hide a
 # regression in the detection of the other.
 OUT_POLLUTED_PROFILE="${WORK}/context-polluted-profile.json"
-env -u AWS_SESSION_TOKEN LEASED_RESOURCE="us-west-2--x-0" \
-  CLUSTER_PROFILE_DIR="/secrets/profile" \
-  AWS_SHARED_CREDENTIALS_FILE="/secrets/profile/.awscred" \
-  AWS_PROFILE="synthetic-profile" \
-  python3 -I "${PROGRAM}" --junit-dir "${FIXTURES}/junit-aws-errors" --nodes-file "${NODES}" \
-    --infra-region-file "${INFRA}" --cluster-config "${CLUSTER_CONFIG}" --test-exit-code 1 \
-    --captured-at "2026-11-06T05:30:01Z" --output "${OUT_POLLUTED_PROFILE}"
+run_capture_isolated "${OUT_POLLUTED_PROFILE}" AWS_PROFILE="synthetic-profile"
 check_eq "an inherited profile alone makes the chain unprovable" "false" \
   "$(jq -r '.credential_context.effective_credential_chain_provable' "${OUT_POLLUTED_PROFILE}")"
 check_eq "the inherited profile is reported as a boolean" "false true" \
   "$(jq -r '"\(.credential_context.aws_session_token_env_present) \(.credential_context.aws_profile_env_present)"' "${OUT_POLLUTED_PROFILE}")"
+check_eq "the profile case sees no other credential source" "false false false false" \
+  "$(jq -r '.credential_context | "\(.aws_container_credentials_env_present) \(.aws_access_key_id_env_present) \(.aws_secret_access_key_env_present) \(.aws_web_identity_token_file_env_present)"' "${OUT_POLLUTED_PROFILE}")"
 check_eq "no inherited profile value is echoed" "0" \
   "$(grep -cF 'synthetic-profile' "${OUT_POLLUTED_PROFILE}" || true)"
+
+# Regression for the isolation itself: re-run both cases with deliberately
+# conflicting benign synthetic AWS variables exported by the caller, and require
+# the same credential context. Each case is pinned against literal flags first,
+# so a capture that failed to run cannot make the comparison pass by leaving two
+# empty strings. The subshell keeps the pollution off the rest of the suite; the
+# assertions run outside it so the counters survive.
+OUT_IMMUNE_TOKEN="${WORK}/context-immune-token.json"
+OUT_IMMUNE_PROFILE="${WORK}/context-immune-profile.json"
+(
+  export AWS_PROFILE="conflicting-synthetic-profile"
+  export AWS_DEFAULT_PROFILE="conflicting-synthetic-default-profile"
+  export AWS_SESSION_TOKEN="conflicting-synthetic-session-token"
+  export AWS_ACCESS_KEY_ID="conflicting-synthetic-key-id"
+  export AWS_SECRET_ACCESS_KEY="conflicting-synthetic-secret"
+  export AWS_WEB_IDENTITY_TOKEN_FILE="/tmp/conflicting-synthetic-token-file"
+  export AWS_CONTAINER_CREDENTIALS_FULL_URI="http://127.0.0.1:1/conflicting-synthetic"
+  run_capture_isolated "${OUT_IMMUNE_TOKEN}" AWS_SESSION_TOKEN="synthetic-session-token-for-tests"
+  run_capture_isolated "${OUT_IMMUNE_PROFILE}" AWS_PROFILE="synthetic-profile"
+)
+OVERRIDE_FLAGS='.credential_context | "\(.aws_session_token_env_present) \(.aws_profile_env_present) \(.aws_access_key_id_env_present) \(.aws_secret_access_key_env_present) \(.aws_web_identity_token_file_env_present) \(.aws_container_credentials_env_present)"'
+check_eq "the session token case keeps its flags under a conflicting caller environment" \
+  "true false false false false false" "$(jq -r "${OVERRIDE_FLAGS}" "${OUT_IMMUNE_TOKEN}")"
+check_eq "the profile case keeps its flags under a conflicting caller environment" \
+  "false true false false false false" "$(jq -r "${OVERRIDE_FLAGS}" "${OUT_IMMUNE_PROFILE}")"
+check_eq "the session token case is immune to a conflicting caller environment" \
+  "$(jq -S -c '.credential_context' "${OUT_POLLUTED}")" \
+  "$(jq -S -c '.credential_context' "${OUT_IMMUNE_TOKEN}")"
+check_eq "the profile case is immune to a conflicting caller environment" \
+  "$(jq -S -c '.credential_context' "${OUT_POLLUTED_PROFILE}")" \
+  "$(jq -S -c '.credential_context' "${OUT_IMMUNE_PROFILE}")"
+check_eq "no conflicting caller value is echoed" "0" \
+  "$(cat "${OUT_IMMUNE_TOKEN}" "${OUT_IMMUNE_PROFILE}" | grep -cF 'conflicting-synthetic' || true)"
 
 # Malformed XML: the broken file is noted, the good file is still parsed.
 OUT_MALFORMED="${WORK}/context-malformed.json"
