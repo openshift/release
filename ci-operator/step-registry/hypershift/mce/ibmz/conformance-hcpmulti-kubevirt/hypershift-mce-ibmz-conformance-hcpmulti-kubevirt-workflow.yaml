@@ -12,7 +12,7 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     pre:
-    # ── Management cluster: multi-arch (s390x control plane + amd64/arm64 worker) ──
+    # ── Management cluster: multi-arch (s390x control plane + s390x/amd64 worker) ──
     # Same pre steps as the openshift-e2e-libvirt-heterogeneous-vpn workflow
     - ref: upi-libvirt-cleanup-heterogeneous-pre
     - chain: upi-conf-libvirt-heterogeneous
@@ -46,14 +46,15 @@ workflow:
       CONTROL_COUNT: "3"
       COMPUTE_COUNT: "1"
       CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
-      # MetalLB pool = <mgmt node subnet>.56-57 → 192.168.1.56-57 (lease 0-0) / 192.168.3.56-57 (lease 0-1)
       METALLB_POOL_HOST_START: "56"
       METALLB_POOL_HOST_END: "57"
       DOMAIN_MEMORY: "63356"   # 64 GiB
       DOMAIN_VCPUS: "16"       # 16 vCPUs
       VOLUME_CAPACITY: "200G"  # 200 GB root disk (s390x nodes)
-      DOMAIN_DISK_SIZE: "200G"  # 200 GB root disk (amd64/arm64 additional worker)
+      DOMAIN_DISK_SIZE: "200G"  # 200 GB root disk (amd64 additional worker)
       SKIP_MONITOR_TEST: "true"
+      # Tests skipped due to known limitations in nested-virtualization on IBM Z libvirt CI environment or non-applicable standalone OCP features (e.g. NFS recycling, DeploymentConfigs, sample API aggregators)
+      # Document - why these tests are skipped: https://docs.google.com/document/d/1lykZUnXFoXW_kcBp3i-V7qGjwBTiwIFRgArTRLL0nho/edit?usp=sharing
       TEST_SKIPS: >-
         etcd leader changes are not excessive\|
         Kubectl client Simple pod should support exec through an HTTP proxy\|
