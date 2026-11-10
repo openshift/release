@@ -897,6 +897,7 @@ agentic_ci() {
     return $rc
 }
 
+# Fallback per-model usage for evals when extract_metrics cannot produce a row.
 # Token totals come from Codex response.completed events. Dollar amounts come
 # from agentic_ci.codex.cost.usage when agentic-ci has written that metric. Prints JSON:
 #   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
@@ -921,6 +922,10 @@ session_id = ""
 cost_from_metric = False
 cumulative_costs = {}
 
+CODEX_COST_ALIASES = {
+    "codex.cost.usage": "agentic_ci.codex.cost.usage",
+}
+
 
 def attribute_value(value):
     if not isinstance(value, dict):
@@ -931,13 +936,35 @@ def attribute_value(value):
     return None
 
 
+def canonical_structure(value):
+    """Return a stable representation of structured OTLP producer identity."""
+    if isinstance(value, dict):
+        return {key: canonical_structure(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        items = [canonical_structure(item) for item in value]
+        return sorted(items, key=lambda item: json.dumps(
+            item, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ))
+    return value
+
+
+def producer_key(value):
+    """Serialize resource or instrumentation-scope identity deterministically."""
+    return json.dumps(
+        canonical_structure(value or {}),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
 def as_int(attrs, key):
     raw = attrs.get(key)
     if raw is None or raw == "":
         return 0
     try:
         return int(float(raw))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0
 
 
@@ -947,6 +974,11 @@ def point_attributes(point):
         key = attr.get("key")
         if key:
             attrs[key] = attribute_value(attr.get("value"))
+    attrs_key = tuple(sorted(attrs.items()))
+    try:
+        hash(attrs_key)
+    except TypeError:
+        return None
     return attrs
 
 
@@ -959,7 +991,7 @@ def point_number(point):
         return None
     try:
         value = float(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(value):
         return None
@@ -981,8 +1013,9 @@ with open(path) as handle:
             for resource in payload.get("resourceMetrics", []):
                 for scope in resource.get("scopeMetrics", []):
                     for metric in scope.get("metrics", []):
-                        if metric.get("name") not in (
-                                "agentic_ci.codex.cost.usage", "codex.cost.usage"):
+                        name = CODEX_COST_ALIASES.get(
+                            metric.get("name", ""), metric.get("name", ""))
+                        if name != "agentic_ci.codex.cost.usage":
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
                         for point in data.get("dataPoints", []):
@@ -990,10 +1023,26 @@ with open(path) as handle:
                             if amount is None:
                                 continue
                             attrs = point_attributes(point)
+                            if attrs is None:
+                                continue
                             model = str(attrs.get("model") or "unknown")
                             if ("sum" in metric
                                     and data.get("aggregationTemporality") == 2):
-                                key = (model, str(point.get("startTimeUnixNano", "")))
+                                resource_identity = {
+                                    "resource": resource.get("resource", {}),
+                                    "schemaUrl": resource.get("schemaUrl", ""),
+                                }
+                                scope_identity = {
+                                    "scope": scope.get("scope", {}),
+                                    "schemaUrl": scope.get("schemaUrl", ""),
+                                }
+                                key = (
+                                    name,
+                                    producer_key(resource_identity),
+                                    producer_key(scope_identity),
+                                    model,
+                                    str(point.get("startTimeUnixNano", "")),
+                                )
                                 try:
                                     timestamp = int(point.get("timeUnixNano", 0) or 0)
                                 except (TypeError, ValueError):
@@ -1038,7 +1087,7 @@ with open(path) as handle:
                     models[model]["cache_read"] += as_int(attrs, "cached_token_count")
                     models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
 
-for (model, _start), (_timestamp, amount) in cumulative_costs.items():
+for (_name, _resource, _scope, model, _start), (_timestamp, amount) in cumulative_costs.items():
     models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
 
 print(json.dumps({

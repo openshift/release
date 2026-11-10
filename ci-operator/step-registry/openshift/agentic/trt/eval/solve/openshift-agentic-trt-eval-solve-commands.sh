@@ -202,7 +202,7 @@ with open(sys.argv[1]) as handle:
                         raw = point.get("asDouble", point.get("asInt"))
                         try:
                             observed = math.isfinite(float(raw))
-                        except (TypeError, ValueError):
+                        except (TypeError, ValueError, OverflowError):
                             observed = False
                         if not observed:
                             continue
@@ -211,12 +211,17 @@ with open(sys.argv[1]) as handle:
                             for attr in point.get("attributes", [])
                             if attr.get("key")
                         }
+                        try:
+                            hash(tuple(sorted(attrs.items())))
+                        except TypeError:
+                            continue
                         model = str(attrs.get("model") or "unknown")
                         if name == "claude_code.cost.usage":
                             cost_models.add(model)
                         else:
                             token_models.add(model)
 print(json.dumps({
+    "present": bool(cost_models or token_models),
     "observed": bool(cost_models),
     "complete": bool(cost_models and token_models.issubset(cost_models)),
 }))
@@ -239,7 +244,7 @@ for case_name in "${CASE_LIST[@]}"; do
     METRICS_TMP=$(mktemp)
     METRICS_TEMP_FILES+=("${METRICS_TMP}")
     CODEX_USAGE='{"cost_from_metric":false,"models":{}}'
-    CLAUDE_COST_STATUS='{"observed":false,"complete":false}'
+    CLAUDE_COST_STATUS='{"present":false,"observed":false,"complete":false}'
 
     if [[ -s "${CASE_OTEL}" ]]; then
         if ! python3 /opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py \
@@ -287,47 +292,56 @@ for case_name in "${CASE_LIST[@]}"; do
           ((.rows[0] | type) == "object") as $has_row
           | (if $has_row then .rows[0] else {} end) as $r
           | ($usage.models // {}) as $models
-          | (($models | length) > 0) as $is_codex
-          | (if $is_codex
-             then ($usage.cost_from_metric == true)
-             else ($claude_cost_status.observed == true) end) as $cost_any_observed
-          | (if $is_codex
-             then (($usage.cost_from_metric == true) and ([$models[] | has("cost")] | all))
-             else ($claude_cost_status.complete == true) end) as $cost_observed
-          | (if ($models | has($configured)) then $configured
-             elif ($r.model | type == "string" and length > 0) then $r.model
+          | (($models | length) > 0) as $codex_present
+          | ($claude_cost_status.present == true) as $claude_present
+          | ($usage.cost_from_metric == true) as $codex_cost_observed
+          | (($usage.cost_from_metric == true)
+             and ([$models[] | has("cost")] | all)) as $codex_cost_complete
+          | ($codex_cost_observed or ($claude_cost_status.observed == true)) as $cost_any_observed
+          | ($cost_any_observed
+             and (($codex_present | not) or $codex_cost_complete)
+             and (($claude_present | not) or ($claude_cost_status.complete == true))) as $cost_observed
+          | (if ($r.model | type == "string" and length > 0) then $r.model
+             elif ($models | has($configured)) then $configured
              elif ($models | length) > 0 then
                ($models | to_entries | max_by((.value.input // 0) + (.value.cache_read // 0)) | .key)
              elif ($configured | length) > 0 then $configured
              else "unknown" end) as $model
-          | (if $is_codex then "codex" else "claude-code" end) as $harness
-          | (if $is_codex
+          | (if ($model | startswith("gpt-")) then "codex" else "claude-code" end) as $harness
+          | (if $harness == "codex"
              then ([$usage.version, $r.codex_version, $r.claude_code_version] | first_nonempty)
              else ([$r.claude_code_version] | first_nonempty) end) as $version
-          | (if $is_codex
+          # A valid extractor row is authoritative for normalized session-wide
+          # totals. codex_otel_usage is only the malformed-JSONL fallback and
+          # the source of per-model detail.
+          | (if $has_row
+             then ($r.num_turns | number_or_zero)
+             elif $codex_present
              then ([$models[] | .turns // 0] | add // 0)
-             else ($r.num_turns | number_or_zero) end) as $turns
-          | (if $is_codex
+             else 0 end) as $turns
+          | (if $has_row
+             then {
+               input: ($r.input_tokens | number_or_zero),
+               output: ($r.output_tokens | number_or_zero),
+               cache_read: ($r.cache_read_input_tokens | number_or_zero),
+               cache_create: ($r.cache_creation_input_tokens | number_or_zero)
+             }
+             elif $codex_present
              then {
                input: ([$models[] | .input // 0] | add // 0),
                output: ([$models[] | .output // 0] | add // 0),
                cache_read: ([$models[] | .cache_read // 0] | add // 0),
                cache_create: ([$models[] | .cache_create // 0] | add // 0)
              }
-             else {
-               input: ($r.input_tokens | number_or_zero),
-               output: ($r.output_tokens | number_or_zero),
-               cache_read: ($r.cache_read_input_tokens | number_or_zero),
-               cache_create: ($r.cache_creation_input_tokens | number_or_zero)
-             } end) as $tokens
+             else {input: 0, output: 0, cache_read: 0, cache_create: 0} end) as $tokens
           | (if $cost_any_observed
-             then (((if $is_codex
-                      then ([$models[] | .cost // 0] | add // 0)
-                      else ($r.total_cost_usd | number_or_zero) end) * 1000000
+             then (((if $has_row
+                      then ($r.total_cost_usd | number_or_zero)
+                      else ([$models[] | .cost // 0] | add // 0) end) * 1000000
                     | round) / 1000000)
              else 0 end) as $observed_cost
           | (if $cost_observed then $observed_cost else null end) as $cost
-          | (if $is_codex
+          | (if $codex_present
              then ($models | to_entries | map({
                key: .key,
                value: {
@@ -345,7 +359,7 @@ for case_name in "${CASE_LIST[@]}"; do
                cost_usd: $cost,
                observed_cost_usd: $observed_cost
              })} end) as $per_model
-          | (if $is_codex
+          | (if $codex_present
              then ($models | to_entries | map({key: .key, value: (.value.turns // 0)}) | from_entries)
              else {($model): $turns} end) as $per_model_turns
           | {

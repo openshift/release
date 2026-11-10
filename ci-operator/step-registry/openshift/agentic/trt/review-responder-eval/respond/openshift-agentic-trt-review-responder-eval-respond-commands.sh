@@ -91,24 +91,30 @@ if [[ -s "${OTEL_LOG}" ]]; then
     if [[ -z "${CODEX_USAGE}" ]]; then
         CODEX_USAGE='{"models":{}}'
     fi
+    if ! jq -e 'type == "object" and ((.models // {}) | type == "object")' \
+        <<< "${CODEX_USAGE}" >/dev/null 2>&1; then
+        CODEX_USAGE='{"models":{}}'
+    fi
     if jq -e '.rows[0]' "${METRICS_TMP}" >/dev/null 2>&1; then
         jq --arg configured "${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-${AGENT_MODEL:-}}" \
            --argjson usage "${CODEX_USAGE}" '
           def first_nonempty: map(select(type == "string" and length > 0)) | first // "";
           .rows[0] as $r
           | ($usage.models // {}) as $models
-          | (if $usage.cost_from_metric then ([$models[] | .cost // 0] | add // 0) else ($r.total_cost_usd | tonumber) end) as $cost
-          | (if ($models | has($configured)) then $configured
-             elif ($r.model | length) > 0 then $r.model
+          # extract_metrics owns normalized session-wide accounting. The
+          # fallback parser supplies only per-model detail and identity.
+          | ($r.total_cost_usd | tonumber) as $cost
+          | (if ($r.model | length) > 0 then $r.model
+             elif ($models | has($configured)) then $configured
              elif ($models | length) > 0 then ($models | to_entries | max_by(.value.input + .value.cache_read) | .key)
              else $configured end) as $model
           | (if ($model | startswith("gpt-")) then "codex" else "claude-code" end) as $harness
           | (if $harness == "codex" then ([$usage.version, $r.codex_version, $r.claude_code_version] | first_nonempty) else ([$r.claude_code_version] | first_nonempty) end) as $version
-          | (if ($models | has($model)) then $models[$model].turns else ($r.num_turns | tonumber) end) as $turns
-          | (if ($models | has($model)) then $models[$model].input else ($r.input_tokens | tonumber) end) as $input
-          | (if ($models | has($model)) then $models[$model].output else ($r.output_tokens | tonumber) end) as $output
-          | (if ($models | has($model)) then $models[$model].cache_read else ($r.cache_read_input_tokens | tonumber) end) as $cache_read
-          | (if ($models | has($model)) then $models[$model].cache_create else ($r.cache_creation_input_tokens | tonumber) end) as $cache_create
+          | ($r.num_turns | tonumber) as $turns
+          | ($r.input_tokens | tonumber) as $input
+          | ($r.output_tokens | tonumber) as $output
+          | ($r.cache_read_input_tokens | tonumber) as $cache_read
+          | ($r.cache_creation_input_tokens | tonumber) as $cache_create
           | (if ($models | length) > 0 then
               ($models | to_entries | map({
                 key: .key,
