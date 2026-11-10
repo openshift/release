@@ -32,11 +32,11 @@ def attributes(values):
     return [{"key": key, "value": any_value(value)} for key, value in values.items()]
 
 
-def cost_metric(name, amount, start, timestamp, model, broken=False):
+def cost_metric(name, amount, start, timestamp, model, broken=None):
     """Build one cumulative cost point."""
     attrs = {"model": model}
-    if broken:
-        attrs["broken"] = []
+    if broken is not None:
+        attrs["broken"] = broken
     value_key = "asDouble" if isinstance(amount, float) else "asInt"
     return {"name": name, "sum": {"aggregationTemporality": 2, "dataPoints": [{
         value_key: amount,
@@ -46,13 +46,13 @@ def cost_metric(name, amount, start, timestamp, model, broken=False):
     }]}}
 
 
-def resource(producer, metrics):
+def resource(producer, metrics, scope_name="synthetic-scope"):
     """Wrap metrics with stable resource and instrumentation-scope identity."""
     return {
         "resource": {"attributes": attributes({"service.name": producer})},
         "schemaUrl": "resource-schema",
         "scopeMetrics": [{
-            "scope": {"name": "synthetic-scope", "version": "1"},
+            "scope": {"name": scope_name, "version": "1"},
             "schemaUrl": "scope-schema",
             "metrics": metrics,
         }],
@@ -128,11 +128,16 @@ class TrtMetricsTests(unittest.TestCase):
                 cost_metric("agentic_ci.codex.cost.usage", 4, "resume", "4", "gpt-primary"),
                 cost_metric("agentic_ci.codex.cost.usage", 1.25, "helper", "1", "gpt-helper"),
                 cost_metric("agentic_ci.codex.cost.usage", 10**400, "bad", "1", "overflow"),
-                cost_metric("agentic_ci.codex.cost.usage", 8, "bad-attrs", "1", "broken", True),
+                cost_metric("agentic_ci.codex.cost.usage", "NaN", "bad", "2", "nan"),
+                cost_metric("agentic_ci.codex.cost.usage", 8, "bad-list", "1", "broken-list", []),
+                cost_metric("agentic_ci.codex.cost.usage", 8, "bad-dict", "1", "broken-dict", {}),
             ]),
             resource("producer-b", [
                 cost_metric("agentic_ci.codex.cost.usage", 3, "same", "3", "gpt-primary"),
             ]),
+            resource("producer-a", [
+                cost_metric("agentic_ci.codex.cost.usage", 0.5, "same", "3", "gpt-primary"),
+            ], scope_name="synthetic-scope-b"),
         ]}}
         logs = {"path": "/v1/logs", "payload": {"resourceLogs": [{"scopeLogs": [{
             "logRecords": [
@@ -146,13 +151,15 @@ class TrtMetricsTests(unittest.TestCase):
     def test_otel_usage_handles_aliases_producers_malformed_input_and_models(self):
         usage, stderr = self.fixture_usage()
         models = usage["codex"]["models"]
-        self.assertEqual(models["gpt-primary"]["cost"], 9.0)
+        self.assertEqual(models["gpt-primary"]["cost"], 9.5)
         self.assertEqual(models["gpt-helper"]["cost"], 1.25)
         self.assertEqual(models["gpt-primary"]["turns"], 1)
         self.assertEqual(models["gpt-primary"]["input"], 47)
         self.assertEqual(models["gpt-helper"]["turns"], 1)
         self.assertNotIn("overflow", models)
-        self.assertNotIn("broken", models)
+        self.assertNotIn("nan", models)
+        self.assertNotIn("broken-list", models)
+        self.assertNotIn("broken-dict", models)
         self.assertIn("skipped 1 Codex response events", stderr)
 
     def run_jq(self, program, document, usage, exit_code=0):
@@ -170,7 +177,7 @@ class TrtMetricsTests(unittest.TestCase):
         usage, _stderr = self.fixture_usage()
         row = {
             "model": "gpt-primary", "claude_code_version": "synthetic-version",
-            "duration_ms": "12000", "is_error": "0", "total_cost_usd": "10.250000",
+            "duration_ms": "12000", "is_error": "0", "total_cost_usd": "10.750000",
             "num_turns": "2", "input_tokens": "51", "output_tokens": "6",
             "cache_read_input_tokens": "3", "cache_creation_input_tokens": "1",
         }
@@ -179,12 +186,12 @@ class TrtMetricsTests(unittest.TestCase):
         for program in (solve, review):
             with self.subTest(consumer="solve" if program == solve else "review"):
                 result = self.run_jq(program, {"rows": [row]}, usage)
-                self.assertEqual(result["cost_usd"], 10.25)
+                self.assertEqual(result["cost_usd"], 10.75)
                 self.assertEqual(result["num_turns"], 2)
                 self.assertEqual(result["token_usage"], {
                     "input": 51, "output": 6, "cache_read": 3, "cache_create": 1})
                 fallback = self.run_jq(program, {"rows": []}, usage)
-                self.assertEqual(fallback["cost_usd"], 10.25)
+                self.assertEqual(fallback["cost_usd"], 10.75)
                 self.assertEqual(fallback["num_turns"], 2)
 
         partial = json.loads(json.dumps(usage))
@@ -192,7 +199,7 @@ class TrtMetricsTests(unittest.TestCase):
         result = self.run_jq(solve, {"rows": [row]}, partial, exit_code=23)
         self.assertFalse(result["cost_observed"])
         self.assertIsNone(result["cost_usd"])
-        self.assertEqual(result["observed_cost_usd"], 10.25)
+        self.assertEqual(result["observed_cost_usd"], 10.75)
         self.assertEqual(result["exit_code"], 23)
 
         zero = json.loads(json.dumps(usage))
@@ -210,6 +217,25 @@ class TrtMetricsTests(unittest.TestCase):
         result = self.run_jq(solve, {"rows": [zero_row]}, missing)
         self.assertFalse(result["cost_observed"])
         self.assertIsNone(result["cost_usd"])
+
+    def test_malformed_line_keeps_valid_two_dollar_fallback(self):
+        """Both real eval jq consumers retain valid usage after a bad JSONL line."""
+        metrics = {"path": "/v1/metrics", "payload": {"resourceMetrics": [
+            resource("producer", [
+                cost_metric("agentic_ci.codex.cost.usage", 2, "start", "1", "gpt-primary"),
+            ]),
+        ]}}
+        logs = {"path": "/v1/logs", "payload": {"resourceLogs": [{"scopeLogs": [{
+            "logRecords": [response("gpt-primary", 3, 4)],
+        }]}]}}
+        usage, _stderr = self.run_usage(["{malformed", metrics, logs])
+        solve = jq_program(SOLVE, '--argjson exit_code "${CASE_EXIT_CODE}" \'\n')
+        review = jq_program(RESPOND, '--argjson otel_usage "${OTEL_USAGE}" \'\n')
+        for program in (solve, review):
+            result = self.run_jq(program, {"rows": []}, usage)
+            self.assertEqual(result["cost_usd"], 2)
+            self.assertEqual(result["num_turns"], 1)
+            self.assertIsNone(result["duration_s"])
 
     def test_two_case_aggregation_keeps_per_case_costs(self):
         program = heredoc(SOLVE, "aggregate_eval_run_result")
@@ -337,6 +363,10 @@ class TrtMetricsTests(unittest.TestCase):
         self.assertIn("METRICS_TEMP_FILES", solve[cleanup_start:cleanup_end])
 
         judge = JUDGE.read_text()
+        self.assertLess(judge.index('rm -f "${RUN_DIR}/run_result.json"'),
+                        judge.index('cp "${SHARED_DIR}/eval-solve-run-result.json"'))
+        self.assertLess(judge.index('cp "${SHARED_DIR}/eval-solve-run-result.json"'),
+                        judge.index("prow-agent-eval judge"))
         self.assertLess(judge.index("prow-agent-eval judge"),
                         judge.index("verify_eval_costs \"${RUN_DIR}"))
         self.assertLess(judge.index("if [[ ${JUDGE_STATUS} -ne 0 ]]"),
