@@ -73,6 +73,26 @@ function save_cos_terraform_state() {
   ) || true
 }
 
+function run_cos_terraform() {
+  terraform "$@" &
+  wait "$!"
+}
+
+# shellcheck disable=SC2329
+function on_interrupt() {
+  local exit_code="$1"
+  local child
+  # Prow can send INT followed by TERM. A second interrupt would force
+  # Terraform to quit before it finishes saving its state.
+  trap '' INT TERM
+  for child in $(jobs -p); do
+    kill -INT "${child}" 2>/dev/null || true
+  done
+  wait || true
+  # The EXIT handler now archives state after Terraform has stopped.
+  exit "${exit_code}"
+}
+
 # shellcheck disable=SC2329
 function on_exit() {
   local ec=$?
@@ -85,6 +105,8 @@ function on_exit() {
   exit "${ec}"
 }
 trap on_exit EXIT
+trap 'on_interrupt 130' INT
+trap 'on_interrupt 143' TERM
 
 QUAY_NS="quay-enterprise"
 
@@ -247,7 +269,7 @@ output "cos_endpoint" {
 }
 EOF
 
-terraform init
+run_cos_terraform init
 export TF_VAR_ibmcloud_api_key="${IBMCLOUD_API_KEY}"
 export TF_VAR_cos_region="${COS_REGION}"
 
@@ -259,12 +281,12 @@ for _ in 1 2 3 4 5; do
   export TF_VAR_cos_bucket_name="${QUAY_COS_BUCKET}"
   export TF_VAR_cos_instance_name="${COS_INSTANCE_NAME}"
   tf_apply_rc=0
-  terraform apply -auto-approve || tf_apply_rc=$?
+  run_cos_terraform apply -auto-approve || tf_apply_rc=$?
   if [[ "${tf_apply_rc}" -eq 0 ]]; then
     break
   fi
   echo "terraform apply failed with exit code ${tf_apply_rc}; retrying with a new bucket name" >&2
-  terraform destroy -auto-approve || true
+  run_cos_terraform destroy -auto-approve || true
 done
 
 save_cos_terraform_state
