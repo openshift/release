@@ -101,3 +101,16 @@ ref:
     unmerged oadp-operator PR's e2e test code runs in its job. Named/
     structured generically so any future job can declare more candidates
     without any change here.
+    A dep PR based on a different branch than the job's own branch
+    (PULL_BASE_REF; the OADP repos share the oadp-dev + oadp-1.x scheme,
+    so the names compare directly) is never built: it is skipped with a
+    loud warning and a depends-on-branch-mismatch.txt artifact, and the
+    job proceeds against the released, pre-built dependency -- the
+    combination that actually ships. Best-effort (an inconclusive
+    metadata fetch builds the dep as before), and not applied to
+    pj-rehearse runs (whose PULL_BASE_REF names the release repo's own
+    branch). When a triggering PR carries cherry-pick/backport wording
+    but no Depends-On lines of its own, the original PR's declared
+    Depends-On lines are surfaced in the log and a
+    depends-on-cherrypick-original.txt artifact -- a pointer to re-add
+    them to this PR's description, never resolved automatically.
