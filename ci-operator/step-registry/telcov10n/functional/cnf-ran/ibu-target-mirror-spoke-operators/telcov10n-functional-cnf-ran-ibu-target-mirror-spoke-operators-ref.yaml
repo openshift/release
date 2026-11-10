@@ -1,0 +1,47 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibu-target-mirror-spoke-operators
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibu-target-mirror-spoke-operators-commands.sh
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: TARGET_SPOKE_VERSION
+      default: "4.18"
+      documentation: OCP version of the spoke clusters managed by the target hub (the version spokes run before IBU upgrade)
+    - name: TARGET_SPOKE_OPERATORS
+      default: |
+        [
+          {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
+          {"name":"ptp-operator","catalog":"redhat-operators-ptp-art","fbc_iib_repo":"ose-ptp-rhel9-operator","nsname":"openshift-ptp","channel":"stable","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
+          {"name":"sriov-network-operator","catalog":"redhat-operators-sriov-art","fbc_iib_repo":"ose-sriov-network-rhel9-operator","nsname":"openshift-sriov-network-operator","channel":"stable","og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
+          {"name":"cluster-logging","catalog":"redhat-operators","nsname":"openshift-logging","channel":"stable-6.1","og_name":"cluster-logging","subscription_name":"cluster-logging","og_spec":{"targetNamespaces":[]}},
+          {"name":"local-storage-operator","fbc_iib_repo":"ose-local-storage-rhel9-operator","catalog":"redhat-operators-storage-art","nsname":"openshift-local-storage","channel":"stable","og_name":"local-operator-group","subscription_name":"local-storage-operator","deploy_default_config":false,"ns_labels":{"workload.openshift.io/allowed":"management"}},
+          {"name":"lifecycle-agent","catalog":"lifecycle-agent-fbc","og_name":"global-operators","nsname":"openshift-operators","fbc_iib_repo":"latest","channel":"stable","deploy_default_config":false,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/telco-5g-tenant/lifecycle-agent-fbc-4-18"},
+          {"name":"redhat-oadp-operator","catalog":"oadp-fbc","fbc_iib_repo":"oadp-1.4__v4.18__oadp-rhel9-operator","art_fbc":true,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc","nsname":"openshift-adp","channel":"stable-1.4","og_name":"openshift-adp","subscription_name":"redhat-oadp-operator","deploy_default_config":false,"og_spec":{"targetNamespaces":[]}}
+        ]
+    - name: VERSION
+      default: "4.20"
+      documentation: OCP version of the seed spokes (the upgrade destination version — mirrored alongside target spoke operators)
+    - name: SPOKE_OPERATORS
+      default: |
+        [
+          {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
+          {"name":"ptp-operator","catalog":"redhat-operators-ptp-art","fbc_iib_repo":"ose-ptp-rhel9-operator","nsname":"openshift-ptp","channel":"stable","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
+          {"name":"sriov-network-operator","catalog":"redhat-operators-sriov-art","fbc_iib_repo":"ose-sriov-network-rhel9-operator","nsname":"openshift-sriov-network-operator","channel":"stable","og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
+          {"name":"cluster-logging","catalog":"redhat-operators","nsname":"openshift-logging","channel":"stable-6.2","og_name":"cluster-logging","subscription_name":"cluster-logging","og_spec":{"targetNamespaces":[]}},
+          {"name":"local-storage-operator","fbc_iib_repo":"ose-local-storage-rhel9-operator","catalog":"redhat-operators-storage-art","nsname":"openshift-local-storage","channel":"stable","og_name":"local-operator-group","subscription_name":"local-storage-operator","deploy_default_config":false,"ns_labels":{"workload.openshift.io/allowed":"management"}},
+          {"name":"lifecycle-agent","catalog":"lifecycle-agent-fbc","og_name":"global-operators","nsname":"openshift-operators","fbc_iib_repo":"latest","channel":"stable","deploy_default_config":false,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/telco-5g-tenant/lifecycle-agent-fbc-4-20"},
+          {"name":"redhat-oadp-operator","catalog":"oadp-fbc","fbc_iib_repo":"oadp-1.5__v4.20__oadp-rhel9-operator","art_fbc":true,"ocp_operator_mirror_fbc_image_base":"quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc","nsname":"openshift-adp","channel":"stable-1.5","og_name":"openshift-adp","subscription_name":"redhat-oadp-operator","deploy_default_config":false,"og_spec":{"targetNamespaces":[]}}
+        ]
+      documentation: Spoke operators to mirror to the target hub's disconnected registry (at VERSION, the seed/upgrade destination version)
+  documentation: |-
+    Mirror spoke operators to the IBU target hub (kni-qe-109) disconnected registry.
+    Mirrors both TARGET_SPOKE_VERSION (pre-upgrade) and VERSION (post-upgrade/seed) operators
+    so the target hub registry has everything needed for the IBU upgrade.
+    Reads cluster identity from ${SHARED_DIR}/cluster_name written by the ibu-target-hub-deploy step.

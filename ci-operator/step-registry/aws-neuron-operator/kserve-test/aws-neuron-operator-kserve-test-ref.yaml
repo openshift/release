@@ -1,0 +1,28 @@
+ref:
+  as: aws-neuron-operator-kserve-test
+  from: eco-gotests
+  grace_period: 10m
+  commands: aws-neuron-operator-kserve-test-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 45m
+  env:
+  - name: ECO_HWACCEL_NEURON_KSERVE_MODEL_NAME
+    default: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    documentation: HuggingFace model to deploy via KServe InferenceService.
+  - name: ECO_HWACCEL_NEURON_KSERVE_VLLM_IMAGE
+    default: "registry.redhat.io/rhaiis/vllm-neuron-rhel9:3"
+    documentation: vLLM Neuron container image for the ServingRuntime.
+  - name: ECO_HWACCEL_NEURON_KSERVE_NAMESPACE
+    default: "neuron-inference"
+    documentation: Namespace where KServe resources are deployed.
+  - name: ECO_HWACCEL_NEURON_KSERVE_TENSOR_PARALLEL_SIZE
+    default: "1"
+    documentation: Tensor parallel size for KServe vLLM Neuron runtime.
+  documentation: |-
+    Runs KServe inference tests using eco-gotests on a ROSA HCP cluster
+    where the KServe stack (Service Mesh, Serverless, RHOAI) is already
+    installed. Deploys a vllm-neuron ServingRuntime and InferenceService,
+    validates inference endpoint responds correctly.

@@ -1,0 +1,55 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: ocp
+prowgen:
+  expose: true
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: tools-unit
+  commands: make test-gospel
+  container:
+    from: src
+- as: lint
+  commands: env && GOLANGCI_LINT_CACHE=/tmp/golangci-lint GOFLAGS="" make lint
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: security
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: valorflow
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-eng
+  repo: valorflow

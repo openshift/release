@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-upgrade-vsphere-storage-data
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-stableinitial
+    - ref: storage-data-create
+    test:
+    - ref: openshift-e2e-test
+    - ref: storage-data-check
+    post:
+    - ref: storage-data-destroy
+    - chain: ipi-vsphere-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+      STORAGE_WORKLOAD_COUNT: "50" # Number of StatefulSets.
+  documentation: |-
+    The Openshift E2E vSphere storage data workflow upgrades OCP cluster with some StatefulSets running, checking the StatefulSets retain their data during upgrade.

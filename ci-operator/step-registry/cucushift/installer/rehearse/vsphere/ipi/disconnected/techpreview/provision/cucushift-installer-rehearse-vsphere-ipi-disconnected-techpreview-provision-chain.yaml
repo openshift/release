@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-vsphere-ipi-disconnected-techpreview-provision
+  steps:
+  - chain: ipi-conf-vsphere
+  - ref: ipi-conf-techpreview-do-not-use
+  - ref: ipi-install-rbac
+  - chain: vsphere-provision-bastionhost
+  - ref: mirror-images-by-oc-adm-in-bastion
+  - ref: ipi-conf-mirror
+  - ref: ipi-install-install
+  - ref: ipi-install-vsphere-registry
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  env:
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  - name: PULL_THROUGH_CACHE
+    default: "disabled"
+    documentation: |-
+      Register DNS for mirror registry.
+  documentation: |-
+    Create an IPI cluster on vSphere with feature gate for QE e2e tests. For 4.10, 4.11 and 4.12 it covers ccm, and ccm GA in 4.13 so it is not needed for cloud team in 4.13.

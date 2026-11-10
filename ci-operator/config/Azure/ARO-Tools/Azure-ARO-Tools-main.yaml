@@ -1,0 +1,31 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.22
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+test_binary_build_commands: dnf install -y graphviz jq
+tests:
+- as: verify
+  commands: |
+    set -euo pipefail
+    export HOME=/tmp
+    unset GOFLAGS
+    make tidy
+    if [[ -n "$(git status --short)" ]]; then
+      echo "there are some modified files, rerun 'make tidy' to update them and check the changes in"
+      git status
+      exit 1
+    fi
+    make lint
+    make test
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-Tools

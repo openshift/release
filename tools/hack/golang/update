@@ -1,0 +1,56 @@
+#!/bin/bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Tools are tools that most projects will reuse and are therefore vendored
+tools=( import-verifier gotest2junit changelog )
+# Files is an array that consumers are expected to modify themselves
+files=( hack/lib/constants.sh hack/import-restrictions.json Makefile )
+exclude=( update package.spec README.md OWNERS )
+printf "%s\n" "${files[@]}"    > "${TMPDIR}/files"
+printf "%s\n" "${exclude[@]}" >> "${TMPDIR}/files"
+
+if [[ -z "${1-}" ]]; then
+  echo "error: Usage is: update DST_REPO [PACKAGE_NAME]" 1>&2
+  exit 1
+fi
+dst="${1}"
+if [[ ! -d "${dst}" ]]; then
+  echo "error: Destination does not exist, please specify a valid destination" 1>&2
+  exit 1
+fi
+
+# Copy core contents
+rsync "${src}/" "${dst}/" -r --executability "--exclude-from=${TMPDIR}/files"
+
+# Copy core tools
+for tool in ${tools[@]}; do
+  rsync "${src}/../../${tool}" "${dst}/tools/" -r --executability --delete
+done
+
+# update the tools to use the COPY we made for dependencies
+find "${dst}/tools" -name "*.go" | xargs sed -i -e "s|github.com/openshift/origin|${2}|g" -e "s|github.com/openshift/release|${2}|g"
+
+# Copy specific files only once
+for file in ${files[@]}; do
+  if [[ ! -f "${dst}/${file}" ]]; then
+    mkdir -p "$( dirname "${file}" )"
+    cp "${src}/${file}" "${dst}/$( dirname "${file}" )"
+  fi
+done
+
+# Create spec file
+spec=( "${dst}"/*.spec )
+if [[ ! -f "${spec}" ]]; then
+  if [[ -z "${2-}" ]]; then
+    echo "error: package name is required when creating spec file, call: update DST_REPO [PACKAGE_NAME]" 1>&2
+    exit 1
+  fi
+  package_name="${2}"
+
+  sed -e "s|package_name TODO|package_name ${package_name}|" "${src}/package.spec" > "${dst}/${package_name}.spec"
+fi

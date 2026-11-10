@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-vsphere-csi-hybrid
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-hybrid-env
+    - ref: storage-conf-csi-vsphere
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post-hybrid
+    env:
+      # for storage-conf-csi-vsphere and openshift-e2e-test
+      TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-vsphere.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E vSphere `csi` hybrid environment workflow executes the `openshift/csi` end-to-end test suite on vSphere CSI driver that was installed during cluster setup.

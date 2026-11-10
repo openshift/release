@@ -1,0 +1,438 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+log(){
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+}
+
+CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+
+cluster_id=$(cat "${SHARED_DIR}/cluster-id")
+
+HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
+CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
+# Channel group discovery queries. This step only discovers when UPGRADE_CHANNEL is empty,
+# so it is always UPGRADE_CHANNEL_PREFIX; it stays "<not queried>" for an explicit channel
+# or target, or a Z-stream upgrade, so the artifact never names an unqueried group.
+DISCOVERY_CHANNEL_GROUP="<not queried>"
+UPGRADE_START_EPOCH=""
+UPGRADE_START_ISO=""
+UPGRADE_FROM_VERSION=""
+
+# Capture sanitized ClusterOperator/node health before upgrade for gap-analysis Check #13.
+# Relies on Prow's ambient KUBECONFIG from SHARED_DIR/kubeconfig. Node hostnames and
+# network fields are omitted from published artifacts. Restore proxy before every return
+# so later rosa CLI calls are not stuck on the cluster proxy.
+write_pre_upgrade_snapshot() {
+  local kube="${SHARED_DIR}/kubeconfig"
+  if declare -F set_proxy >/dev/null; then
+    set_proxy
+  fi
+  if [[ ! -f "${kube}" ]]; then
+    log "No kubeconfig in SHARED_DIR; skipping pre-upgrade ClusterOperator snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! oc whoami --request-timeout=30s &>/dev/null; then
+    log "WARNING: kubeconfig is not usable; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  if ! mkdir -p "${ARTIFACT_DIR}"; then
+    log "WARNING: cannot create ARTIFACT_DIR; skipping pre-upgrade snapshot"
+    if declare -F unset_proxy >/dev/null; then
+      unset_proxy
+    fi
+    return 0
+  fi
+  oc get co -o wide --request-timeout=60s > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.txt" 2>/dev/null || true
+  oc get co -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      name: .metadata.name,
+      available: (([.status.conditions[]? | select(.type=="Available") | .status] | first) // ""),
+      degraded: (([.status.conditions[]? | select(.type=="Degraded") | .status] | first) // ""),
+      progressing: (([.status.conditions[]? | select(.type=="Progressing") | .status] | first) // ""),
+      version: ((.status.versions[]? | select(.name=="operator") | .version) // "")
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-clusteroperators.json"
+  oc get nodes -o json --request-timeout=60s 2>/dev/null | jq '{
+    items: [.items[] | {
+      ready: (([.status.conditions[]? | select(.type=="Ready") | .status] | first) // ""),
+      schedulable: ((.spec.unschedulable // false) | not)
+    }]
+  }' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json" || echo '{"items":[]}' > "${ARTIFACT_DIR}/pre-upgrade-nodes.json"
+  local cluster_version=""
+  cluster_version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' --request-timeout=30s 2>/dev/null || true)"
+  jq -n \
+    --arg cluster_version "${cluster_version}" \
+    --arg captured_at "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+    --arg phase "pre-upgrade" \
+    '{cluster_version: $cluster_version, captured_at: $captured_at, phase: $phase}' \
+    > "${ARTIFACT_DIR}/pre-upgrade-metadata.json" || true
+  log "Wrote pre-upgrade ClusterOperator snapshot for gap-analysis Check #13"
+  if declare -F unset_proxy >/dev/null; then
+    unset_proxy
+  fi
+}
+
+# Write upgrade-metrics.json with duration and the resolved target version. Best-effort;
+# does not fail the step. Prefer available_version from get_cluster_upgrade_path.
+write_upgrade_metrics() {
+  if [[ -z "${UPGRADE_START_EPOCH}" ]]; then
+    return 0
+  fi
+  local end_epoch end_iso duration
+  end_epoch="$(date +%s)"
+  end_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  duration=$((end_epoch - UPGRADE_START_EPOCH))
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  jq -n \
+    --arg start "${UPGRADE_START_ISO}" \
+    --arg end_time "${end_iso}" \
+    --argjson start_epoch "${UPGRADE_START_EPOCH}" \
+    --argjson end_epoch "${end_epoch}" \
+    --argjson duration_seconds "${duration}" \
+    --arg from_version "${UPGRADE_FROM_VERSION:-}" \
+    --arg to_version "${available_version:-${UPGRADED_TO_VERSION:-}}" \
+    '{
+      start: $start,
+      end: $end_time,
+      start_epoch: $start_epoch,
+      end_epoch: $end_epoch,
+      duration_seconds: $duration_seconds,
+      from_version: $from_version,
+      to_version: $to_version
+    }' > "${ARTIFACT_DIR}/upgrade-metrics.json" || true
+  log "Wrote upgrade-metrics.json duration_seconds=${duration}"
+}
+trap 'write_upgrade_metrics || true' EXIT
+
+# Record Cluster Configurations
+cluster_config_file="${SHARED_DIR}/cluster-config"
+function record_cluster() {
+  if [ $# -eq 2 ]; then
+    location="."
+    key=$1
+    value=$2
+  else
+    location=".$1"
+    key=$2
+    value=$3
+  fi
+
+  payload=$(cat $cluster_config_file)
+  if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
+    echo $payload | jq "$location += {\"$key\":$value}" > $cluster_config_file
+  else
+    echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
+  fi
+}
+
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        log "setting the proxy"
+        log "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        log "no proxy setting."
+    fi
+}
+
+function unset_proxy () {
+    if test -s "${SHARED_DIR}/unset-proxy.sh" ; then
+        log "unset the proxy"
+        log "source ${SHARED_DIR}/unset-proxy.sh"
+        source "${SHARED_DIR}/unset-proxy.sh"
+    else
+        log "no proxy setting found."
+    fi
+}
+
+# Print the HCP Y-streams (X.Y) offered by DISCOVERY_CHANNEL_GROUP, version-sorted and
+# de-duplicated. That is the group of the channel the cluster will be moved to, so a
+# stream existing only there (a candidate release absent from the stable install catalog)
+# is still a reachable target. Null and non-X.Y ids are dropped, so a malformed response
+# yields an empty list. Returns non-zero when the ROSA query fails, so callers can fail
+# closed instead of guessing.
+list_available_y_streams() {
+  local raw
+  raw=$(rosa list versions --channel-group "${DISCOVERY_CHANNEL_GROUP}" --hosted-cp -o json) || return 1
+  # `.raw_id // empty` drops a null or absent raw_id that a bare `.[].raw_id` would render
+  # as the string "null" and turn into a bogus "<prefix>-null" channel.
+  echo "${raw}" | jq -r '.[].raw_id // empty' | cut -d '.' -f1,2 \
+    | { grep -E '^[0-9]+\.[0-9]+$' || true; } | sort -Vu
+}
+
+# Print the oldest Y-stream in the list that is strictly newer than the cluster's current
+# version, comparing with `sort -V` so a major boundary (4.22 -> 5.0) needs no minor-number
+# arithmetic. Returns non-zero (printing nothing) when no newer stream exists, so the
+# caller can fail closed rather than re-running the same version or downgrading.
+next_y_stream_after() {
+  local current_version="$1" y_stream_list="$2"
+  local current_stream stream older
+  current_stream=$(echo "${current_version}" | cut -d '.' -f1,2)
+  if [[ ! "${current_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    return 1
+  fi
+  while IFS= read -r stream; do
+    # Skip blanks and anything that is not a well-formed X.Y stream, so a malformed
+    # discovery response can never be selected as an upgrade target.
+    if [[ ! "${stream}" =~ ^[0-9]+\.[0-9]+$ || "${stream}" == "${current_stream}" ]]; then
+      continue
+    fi
+    older=$(printf '%s\n%s\n' "${current_stream}" "${stream}" | sort -V | head -n1)
+    if [[ "${older}" == "${current_stream}" ]]; then
+      echo "${stream}"
+      return 0
+    fi
+  done <<< "$(printf '%s\n' "${y_stream_list}" | sort -V)"
+  return 1
+}
+
+# Record how the upgrade channel was chosen, including on the failure paths, so an early
+# exit is still diagnosable from the job artifacts. Publishes only version strings and the
+# channel prefix: no cluster or account identifiers, no credentials and no raw command
+# output. Never aborts the step.
+write_target_selection_diagnostics() {
+  local current_stream="$1" target="$2" channel="$3" streams="$4"
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    return 0
+  fi
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  if ! {
+    printf 'discovery_channel_group: %s\n' "${DISCOVERY_CHANNEL_GROUP}"
+    printf 'current_y_stream: %s\n' "${current_stream}"
+    printf 'selected_target: %s\n' "${target:-<none>}"
+    printf 'selected_channel: %s\n' "${channel:-<none>}"
+    printf 'available_y_streams: %s\n' "$(printf '%s' "${streams}" | tr '\n' ' ')"
+  } > "${ARTIFACT_DIR}/upgrade-target-selection.txt"; then
+    log "WARNING: failed to write upgrade-target-selection.txt"
+  fi
+}
+
+function get_cluster_upgrade_path () {
+  current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+  available_versions=$(rosa list upgrade -c $cluster_id -ojson)
+  available_version=""
+  if [[ "$available_versions" != *"There are no available upgrades"* ]]; then
+    current_prefix=$(echo "$current_version" | awk -F. '{print $1"."$2}')
+    if [[ -n $available_versions ]]; then
+      clean_data=$(echo "$available_versions" | sed 's/[][",]//g')
+      readarray -t versionsList <<< "$(echo "$clean_data" | sed '/^[[:space:]]*$/d' | awk '{$1=$1;print}')"
+      readarray -t sorted_versions < <(printf "%s\n" "${versionsList[@]}" | sort -rV)
+      log "Available upgrade versions: ${sorted_versions[*]}"
+
+      if [[ "$Z_STREAM_UPGRADE" == "true" ]]; then
+        for ver in "${sorted_versions[@]}"; do
+          if [[ "$ver" =~ ^${current_prefix}\. ]]; then
+            available_version=$ver
+            log "Z Stream Upgrade version: ($available_version)"
+            break
+          fi
+        done
+      else
+        target_prefix=${UPGRADED_TO_VERSION:-}
+        if [[ -n "$target_prefix" ]]; then
+          for ver in "${sorted_versions[@]}"; do
+            if [[ "$ver" =~ ^${target_prefix}\. ]]; then
+              available_version=$ver
+              log "Y Stream Upgrade version: ($available_version)"
+              break
+            fi
+          done
+        else
+          for ver in "${sorted_versions[@]}"; do
+            if [[ ! "$ver" =~ ^${current_prefix}\. ]]; then
+              available_version=$ver
+              log "Y Stream Upgrade version: ($available_version)"
+              break
+            fi
+          done
+        fi
+      fi
+    fi
+  fi
+}
+
+
+function upgrade_cluster_to () {
+  available_version=$1
+  start_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+  log "Upgrade the cluster $cluster_id to $available_version"
+  echo "rosa upgrade cluster -y -m auto --version $available_version -c $cluster_id" 
+  start_time=$(date +"%s")
+  while true; do
+    if (( $(date +"%s") - $start_time >= 1800 )); then
+      log "error: Timed out while waiting for the previous upgrade schedule to be removed."
+      exit 1
+    fi
+
+    rosa upgrade cluster -y -m auto --version $available_version -c $cluster_id  1>"/tmp/update_info.txt" 2>&1 || true
+    upgrade_info=$(cat "/tmp/update_info.txt")
+    if [[ "$upgrade_info" == *"There is already"* ]]; then
+      log "Waiting for the previous upgrade schedule to be removed."
+      sleep 120
+    else
+      log -e "$upgrade_info"
+      if [[ "$upgrade_info" == *"ERR:"* ]] || [[ "$upgrade_info" == *"failed to schedule"* ]]; then
+        log "error: Upgrade scheduling failed. Aborting instead of waiting."
+        mkdir -p "${ARTIFACT_DIR}" || true
+        echo "$upgrade_info" > "${ARTIFACT_DIR}/upgrade-schedule-error.txt"
+        exit 1
+      fi
+      break
+    fi
+  done
+
+  # Monitor cluster
+  start_time=$(date +"%s")
+  while true; do
+    sleep 120
+    log "Wait for the cluster upgrading finished ..."
+    current_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+    if [[ "$current_version" == "$available_version" ]]; then
+      record_cluster "timers.ocp_upgrade" "${available_version}" $(( $(date +"%s") - "${start_time}" ))
+      log "Upgrade the cluster $cluster_id from $start_version to the openshift version $available_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
+      break
+    fi
+
+    if (( $(date +"%s") - $start_time >= $CP_UPGRADE_TIMEOUT )); then
+      log "error: Timed out while waiting for the cluster upgrading to be ready"
+      set_proxy
+      oc get clusteroperators
+      exit 1
+    fi
+  done
+
+}
+
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
+# hold on before upgrading cluster
+start_time=$(date +"%s")
+echo "$(date): Beginning to wait: ${HOLD_TIME_BEFORE_UPGRADE} seconds"
+while true; do
+  current_time=$(date +"%s")
+  if (( "${current_time}" - "${start_time}" < "${HOLD_TIME_BEFORE_UPGRADE}" )); then
+    sleep 60
+    echo "Hold on before upgrading cluster: $(date)"
+  else
+    break
+  fi
+done
+
+# Log in
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+ROSA_TOKEN=$(read_profile_file "ocm-token")
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  log "Logging into ${OCM_LOGIN_ENV} with SSO credentials using rosa cli"
+  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${ROSA_TOKEN}" ]]; then
+  log "Logging into ${OCM_LOGIN_ENV} with offline token using rosa cli"
+  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+else
+  log "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
+  exit 1
+fi
+
+HOSTED_CP=$(rosa describe cluster -c $cluster_id -o json | jq -r '.hypershift.enabled')
+if [[ "$HOSTED_CP" != "true" ]]; then
+  log "error: This step is only for ROSA HCP clusters, but the cluster $cluster_id is not HCP."
+  exit 1
+fi
+
+init_version=$(rosa describe cluster -c $cluster_id -o json | jq -r '.openshift_version')
+UPGRADE_FROM_VERSION="${init_version}"
+write_pre_upgrade_snapshot
+UPGRADE_START_EPOCH="$(date +%s)"
+UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
+UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
+UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
+# Auto-derive the upgrade channel when it is not explicitly set and this is not a
+# Z-stream upgrade. Precedence: an explicit UPGRADED_TO_VERSION wins, otherwise discovery
+# picks the next Y-stream after the cluster's current version from the
+# UPGRADE_CHANNEL_PREFIX channel group -- the same group the channel is built from, so a
+# candidate-only stream missing from the stable install catalog is still reachable. The
+# channel only opens the hop: get_cluster_upgrade_path below remains the authority on
+# which version is actually taken.
+current_y_stream=$(echo "$init_version" | cut -d '.' -f1,2)
+if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
+  if [[ -n "${UPGRADED_TO_VERSION}" ]]; then
+    # An explicit target pins the hop, so no discovery runs: get_cluster_upgrade_path
+    # filters the recommendations by UPGRADED_TO_VERSION, and a channel for any other
+    # stream could not contain it (the step would report "No available version for
+    # upgrade" and exit 0 without upgrading). A catalog query failure must likewise not
+    # abort a hop the job already specified in full.
+    #
+    # The target must be major.minor: that filter matches with a trailing separator, so a
+    # patch-level value such as 4.18.7 can never match. Reject it rather than narrowing it
+    # silently, so the misconfiguration is visible.
+    if [[ ! "${UPGRADED_TO_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: UPGRADED_TO_VERSION='${UPGRADED_TO_VERSION}' must be a major.minor Y-stream such as 4.18; a patch-level or malformed value cannot be matched against the recommended upgrades."
+      exit 1
+    fi
+    next_y_stream="${UPGRADED_TO_VERSION}"
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
+    log "Upgrade channel from explicit UPGRADED_TO_VERSION ${UPGRADED_TO_VERSION}: ${UPGRADE_CHANNEL}"
+  else
+    DISCOVERY_CHANNEL_GROUP="${UPGRADE_CHANNEL_PREFIX}"
+    if ! y_stream_list=$(list_available_y_streams); then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: could not list versions for channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
+      exit 1
+    fi
+    if [[ -z "${y_stream_list}" ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: no Y-streams available in channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
+      exit 1
+    fi
+    if ! next_y_stream=$(next_y_stream_after "${init_version}" "${y_stream_list}"); then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+      log "Error: no Y-stream newer than ${init_version} in channel group ${DISCOVERY_CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+      exit 1
+    fi
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
+    log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+  fi
+fi
+write_target_selection_diagnostics "${current_y_stream}" "${next_y_stream:-}" "${UPGRADE_CHANNEL}" "${y_stream_list:-}"
+if [[ -n "${UPGRADE_CHANNEL}" ]]; then
+  log "Changing cluster channel to ${UPGRADE_CHANNEL}"
+  rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"
+  sleep 60
+fi
+
+upgraded_to_version=$init_version
+get_cluster_upgrade_path
+
+if [ -n "$available_version" ]; then
+  upgrade_cluster_to $available_version
+  upgraded_to_version=$available_version
+  log "Upgrade control plane from $init_version to $upgraded_to_version"
+else
+  log "No available version for upgrade from $init_version"
+fi
+
+echo "$upgraded_to_version" > "${SHARED_DIR}/upgraded_to_version"
+log "Control plane upgraded to $upgraded_to_version"
+ 

@@ -1,0 +1,79 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: tls13-adherence-all
+  capabilities:
+  - intranet
+  cron: 0 10 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: openshift-workload-availability
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
+      PQC_CHECK: "false"
+      SCAN_NAMESPACE: openshift-workload-availability
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+      TLS_13_ENABLE_TLS_ADHERENCE: "true"
+      TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    test:
+    - chain: medik8s-setup
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+- as: tls-pqc-readiness-all
+  capabilities:
+  - intranet
+  cron: 0 10 * * 3
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      INSTALL_NAMESPACE: openshift-workload-availability
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation,self-node-remediation,node-healthcheck-operator,node-maintenance-operator,machine-deletion-remediation,storage-based-remediation
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-workload-availability
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+    test:
+    - chain: medik8s-setup
+    - ref: tls-13
+    - ref: tls-scanner-run
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: rhwa-system-tests
+  variant: "5.0"

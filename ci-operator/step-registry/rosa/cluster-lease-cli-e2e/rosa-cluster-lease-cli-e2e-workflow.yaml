@@ -1,0 +1,42 @@
+workflow:
+  as: rosa-cluster-lease-cli-e2e
+  steps:
+    env:
+      OCM_LOGIN_ENV: staging
+      LEASE_TYPE: classic-sts
+    pre:
+      - ref: rosa-cluster-lease-checkout
+    test:
+      - ref: rosa-operator-e2e
+    post:
+      - ref: rosa-operator-cleanup
+      - ref: rosa-cluster-lease-checkin
+  documentation: |-
+    Checks out a pre-provisioned ROSA cluster from the lease inventory,
+    runs an e2e test binary against the cluster, cleans up, then returns
+    the cluster to the inventory.
+
+    This is a variant of rosa-cluster-lease-e2e-workflow designed for
+    CLI tools, agents, and other non-operator components that do NOT
+    require PKO-based operator installation. It skips the
+    rosa-operator-install step so no OPERATOR_IMAGE or OPERATOR_PKO_IMAGE
+    dependencies are needed.
+
+    The component is expected to already be deployed on the target cluster
+    (e.g. by its managing operator). This workflow simply checks out a
+    cluster, runs the pre-compiled e2e test binary from the operator-e2e
+    image, and returns the cluster.
+
+    Required env vars:
+      OPERATOR_NAME: short name used for log collection (e.g. ocm-agent-operator)
+
+    Optional overrides:
+      OPERATOR_DEPLOYMENT_NAME: defaults to OPERATOR_NAME
+      OPERATOR_NAMESPACE: defaults to openshift-OPERATOR_NAME
+      OPERATOR_CRDS: comma-separated CRDs for cleanup ownership reset
+      GINKGO_FOCUS: filter to specific test suite
+      LEASE_TYPE: cluster type filter (default: classic-sts)
+      LEASE_ENV: OCM environment filter (e.g. integration, staging; default: any)
+      LEASE_REGION: region filter (default: any)
+      LEASE_VERSION: version filter (default: any)
+      LEASE_CHECKOUT_TIMEOUT_MINUTES: max wait time (default: 30)

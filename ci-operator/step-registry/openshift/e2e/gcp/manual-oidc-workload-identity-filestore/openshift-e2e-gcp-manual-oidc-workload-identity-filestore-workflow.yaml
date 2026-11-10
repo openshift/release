@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-gcp-manual-oidc-workload-identity-filestore
+  steps:
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-gcp-oidc-creds-provision
+    - chain: ipi-install
+    - chain: ipi-gcp-pre-manual-oidc-workload-identity-filestore
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-gcp-post-manual-oidc-workload-identity-filestore
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-filestore.yaml
+      TEST_SUITE: openshift/csi
+      # We have a low quota, 20 volumes can exist at a time. Do not run too many tests in parallel.
+      TEST_ARGS: --max-parallel-tests 3 --timeout 30m
+  documentation: |-
+    The Openshift E2E GCP workflow executes the common end-to-end test with user defined OIDC provider and service
+    accounts on GCP Filestore operator.

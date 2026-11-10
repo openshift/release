@@ -1,0 +1,235 @@
+base_images:
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - dockerfile_path: cmd/trainer-controller-manager/Dockerfile.odh
+    to: trainer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tls-scan-pqc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: kubeflow-system
+    post:
+    - chain: gather
+    test:
+    - as: deploy-e2e-and-prepare-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # The progression NetworkPolicy only permits metrics traffic from a
+        # controller pod labelled app.kubernetes.io/component=controller. The
+        # generic manager overlay uses component=manager, so render a targeted
+        # CI overlay that aligns the Trainer Deployment and Service selectors
+        # with the RHAI label before the resources are first created.
+        manager_overlay="$(mktemp -d manifests/overlays/tls-scan-manager.XXXXXX)"
+        cat > "${manager_overlay}/kustomization.yaml" <<'EOF'
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+        - ../manager
+        patches:
+        - target:
+            group: apps
+            version: v1
+            kind: Deployment
+            name: kubeflow-trainer-controller-manager
+          patch: |-
+            - op: replace
+              path: /spec/selector/matchLabels/app.kubernetes.io~1component
+              value: controller
+            - op: replace
+              path: /spec/template/metadata/labels/app.kubernetes.io~1component
+              value: controller
+        - target:
+            version: v1
+            kind: Service
+            name: kubeflow-trainer-controller-manager
+          patch: |-
+            - op: replace
+              path: /spec/selector/app.kubernetes.io~1component
+              value: controller
+        EOF
+
+        oc apply --server-side -k "${manager_overlay}"
+
+        # The ODH controller image resolves the OpenShift cluster TLS profile
+        # at startup and watches it for changes.
+        oc apply --server-side -f - <<'EOF'
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-tls-profile
+        rules:
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          resourceNames:
+          - cluster
+          verbs:
+          - get
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          verbs:
+          - list
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-tls-profile
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-tls-profile
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+        ---
+        # The generic manager overlay does not include the RHAI progression
+        # permissions from manifests/rhoai/rbac_progression_patch.yaml. Grant
+        # them additively for this E2E job instead of modifying the shared
+        # tls-scanner-run step.
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: trainer-rhai-e2e
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - create
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: trainer-rhai-e2e
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: trainer-rhai-e2e
+        subjects:
+        - kind: ServiceAccount
+          name: kubeflow-trainer-controller-manager
+          namespace: kubeflow-system
+        EOF
+
+        # Fail immediately if the controller cannot start its NetworkPolicy
+        # informer or read pods for progression tracking.
+        controller_sa="system:serviceaccount:kubeflow-system:kubeflow-trainer-controller-manager"
+        oc auth can-i list pods --all-namespaces --as="${controller_sa}"
+        oc auth can-i list networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i watch networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+        oc auth can-i create networkpolicies.networking.k8s.io \
+          --all-namespaces --as="${controller_sa}"
+
+        oc -n kubeflow-system set image \
+          deployment/kubeflow-trainer-controller-manager \
+          manager="${TRAINER_IMAGE}"
+
+        # The RHAI E2E suite exercises TrainJob progression tracking, which is
+        # guarded by an alpha feature gate and disabled by default.
+        oc -n kubeflow-system patch \
+          deployment/kubeflow-trainer-controller-manager \
+          --type=json \
+          -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--feature-gates=TrainJobStatus=true"}]'
+
+        actual_image="$(oc -n kubeflow-system get \
+          deployment/kubeflow-trainer-controller-manager \
+          -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].image}')"
+        if [[ "${actual_image}" != "${TRAINER_IMAGE}" ]]; then
+          echo "expected manager image ${TRAINER_IMAGE}, got ${actual_image}" >&2
+          exit 1
+        fi
+
+        oc -n kubeflow-system rollout status \
+          deployment/kubeflow-trainer-controller-manager --timeout=10m
+
+        # The Trainer manager overlay applies the separate JobSet controller.
+        # Wait for both controller deployments before starting the E2E suite.
+        oc -n kubeflow-system wait --for=condition=Available \
+          deployment --all --timeout=10m
+
+        oc apply --server-side -k manifests/overlays/runtimes
+
+        # The Flux runtime is an E2E-only example and is not included in the
+        # default runtimes overlay. Trainer's standard E2E setup installs it
+        # separately before running the suite.
+        oc apply --server-side -f examples/flux/flux-runtime.yaml
+        oc get clustertrainingruntime/flux-distributed
+
+        # The builder image defaults to -mod=vendor, but Trainer does not
+        # vendor its dependencies.
+        export GOFLAGS=''
+        make test-e2e
+      dependencies:
+      - env: TRAINER_IMAGE
+        name: trainer
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h15m0s
+    - ref: tls-scanner-run
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: trainer

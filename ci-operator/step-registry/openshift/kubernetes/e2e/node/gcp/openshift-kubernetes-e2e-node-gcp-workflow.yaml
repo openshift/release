@@ -1,0 +1,23 @@
+workflow:
+  as: openshift-kubernetes-e2e-node-gcp
+  steps:
+    pre:
+      - ref: gcp-crio-provision-vpc
+      - ref: gcp-crio-provision-buildhost
+    test:
+      - ref: openshift-kubernetes-e2e-node-test
+    post:
+      - ref: gcp-crio-deprovision-buildhost
+      - ref: gcp-crio-deprovision-vpc
+    env:
+      # RHCOS 10 boot image from openshift/installer data/data/coreos/coreos-rhel-10.json (main).
+      IMAGE_NAME: "rhcos-10-2-20260423-0-gcp-x86-64"
+      IMAGE_PROJECT: "rhcos-cloud"
+      USE_IGNITION: "true"
+      # XFS reports inodes proportional to the disk size; the Summary API test expects
+      # at most 1e8, which a 200GB disk exceeds (~104M).
+      BOOT_DISK_SIZE: "100GB"
+  documentation: |-
+    The Kubernetes node E2E workflow provisions a single RHCOS GCP VM (no OpenShift cluster), installs
+    CRI-O on it like the upstream FCOS CRI-O node e2e jobs, and runs test/e2e_node built from the
+    openshift/kubernetes fork against it over SSH.

@@ -1,0 +1,52 @@
+ref:
+  as: sandboxed-containers-operator-testsuites-osc
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-testsuites-osc-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 130m0s
+  grace_period: 10m0s
+  # Environment variables follow the TESTS_<SUITE_NAME>_<PARAMETER> convention
+  # shared by all OSC test suites (see the testsuites AGENTS.md).
+  env:
+  - name: TESTS_OSC_ENABLE
+    default: "false"
+    documentation: |-
+      Enable-gate for the OSC golang e2e suite (skip-by-default).
+      "true"        -> the step runs the tests.
+      "false"/unset -> the step writes a skipped JUnit and exits 0.
+  - name: TESTS_OSC_FOCUS
+    default: ""
+    documentation: |-
+      Ginkgo focus passed to `go test` as -ginkgo.focus (e.g. a single test ID
+      like "66108"). Empty runs the whole suite.
+  - name: TESTS_OSC_TIMEOUT
+    default: "120m"
+    documentation: |-
+      Value passed to `go test -timeout`. Must stay below the ref `timeout`
+      (130m) so the runner has time to publish results before the step is killed.
+  - name: TESTS_OSC_REPO
+    default: "https://github.com/openshift/sandboxed-containers-operator"
+    documentation: |-
+      Repository providing the golang e2e tests under test/e2e. Point this at a
+      fork to try out test changes before they merge.
+  - name: TESTS_OSC_REPO_REF
+    default: "devel"
+    documentation: |-
+      Branch, tag or full commit SHA of TESTS_OSC_REPO to check out. Set it to
+      a release branch (e.g. osc-release-v1.11) to run that release's tests, or
+      to a tag/SHA to pin the suite against drift on devel.
+  documentation: |-
+    Run the OSC golang (Ginkgo v2) e2e tests from the test/e2e directory of
+    TESTS_OSC_REPO (by default openshift/sandboxed-containers-operator at
+    devel) against a cluster that already has the Sandboxed Containers Operator
+    installed and the osc-config configmap present (created earlier by the
+    env-cm step).
+
+    The step runs on the src image, which provides the Go toolchain and git; oc
+    is injected via cli and symlinked as kubectl. The suite is executed with
+    `go test` and emits JUnit via -ginkgo.junit-report; results are copied to
+    the artifacts directory so prow indexes them.
