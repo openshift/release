@@ -217,6 +217,58 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: publish-cluster-access
+      cli: latest
+      commands: |
+        # Copy cluster credentials into the job artifacts so the cluster can
+        # be reached manually during the hold-cluster step below. Artifacts
+        # are synced to GCS continuously while the job runs, so the files are
+        # downloadable from the job's artifact browser (spyglass "Artifacts"
+        # tab) while the cluster is still up. Nothing sensitive is printed
+        # into the build log itself (No-Sensitive-Data-In-Logs).
+        for f in kubeconfig kubeadmin-password; do
+          if [ -s "${SHARED_DIR}/${f}" ]; then
+            cp "${SHARED_DIR}/${f}" "${ARTIFACT_DIR}/${f}"
+            echo "published ${f} to job artifacts"
+          else
+            echo "${f} not found in SHARED_DIR"
+          fi
+        done
+      from: src
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    - as: hold-cluster
+      cli: latest
+      commands: |
+        # Hold the cluster up for manual debugging after the validation steps
+        # have run; the deprovision/post chain only starts after this step
+        # finishes. The prow default job timeout is 24h, so the hold fits
+        # comfortably alongside the ~1.5h install+validate runtime.
+        echo "Validation finished; holding the cluster for ${OVS_DOCA_CLUSTER_HOLD_MINUTES} minutes."
+        echo ""
+        echo "To work on the cluster from your laptop:"
+        echo "  1. Open this job in prow and download the artifacts 'kubeconfig' and 'kubeadmin-password' (Artifacts tab / spyglass)."
+        echo "  2. export KUBECONFIG=\$PWD/kubeconfig"
+        echo "  3. oc get nodes   (names are intentionally not printed into this log)"
+        echo "  4. Root shell on any worker (or master) node:"
+        echo "       oc debug node/<name> -- chroot /host"
+        echo "     Direct SSH is not available: IPI nodes live in private subnets with no"
+        echo "     public IPs and no bastion. 'oc debug node/' is the supported access path"
+        echo "     and gives a root shell on the host."
+        echo "  5. Alternatively, username/password login:"
+        echo "       oc login --server <api-url-from-kubeconfig> -u kubeadmin -p \$(cat kubeadmin-password)"
+        echo ""
+        sleep $(( OVS_DOCA_CLUSTER_HOLD_MINUTES * 60 ))
+      env:
+      - name: OVS_DOCA_CLUSTER_HOLD_MINUTES
+        default: "60"
+      from: src
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
