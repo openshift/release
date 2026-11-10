@@ -185,6 +185,18 @@ def test_playwright_ref_mode_uses_step_defaults_and_keeps_full_test_steps() -> N
     assert checked_upgrades > 0
 
 
+@pytest.mark.parametrize(
+    ("ocp_version", "sts", "expected"),
+    [("4.12", True, "false"), ("4.13", True, "false"), ("4.14", True, None), ("4.13", False, None)],
+)
+def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
+    ocp_version: str, sts: bool, expected: str | None
+) -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(env, "clouds/aws.yaml.j2", _phase0_cell(ocp_version=ocp_version, sts=sts).context())
+    assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
