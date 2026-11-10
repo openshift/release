@@ -93,11 +93,11 @@ rejects it.
 
 The Helm nightly periodic runs the ordinary overlays E2E suite unless Gangway
 sets `MULTISTAGE_PARAM_OVERRIDE_OSL_MODE` to `rc`. An RC run also requires
-`MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON` and
-`MULTISTAGE_PARAM_OVERRIDE_OVERLAYS_SHA` in `pod_spec_options.envs`. Pass the
-complete manifest as one JSON string and the overlays branch commit as a
-40-character SHA. These overrides contain no credentials. Brew and stage
-credentials remain in the separate `openshift-qe/mirror-registry` mount.
+`MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON` in `pod_spec_options.envs`. Pass the
+complete manifest as one JSON string. The RC step fetches the current tip of
+the overlays branch selected by the periodic and logs its commit SHA. The
+overrides contain no credentials; Brew and stage credentials remain in the
+separate `openshift-qe/mirror-registry` mount.
 
 See the [Gangway REST API guide](https://docs.ci.openshift.org/how-tos/triggering-prowjobs-via-rest/)
 for authentication and `pod_spec_options.envs`. The configured branches are
@@ -112,19 +112,16 @@ for authentication and `pod_spec_options.envs`. The configured branches are
 Scheduled runs keep the ordinary nightly test. An RC run needs no pull request.
 Future branches need the RC test added to their nightly ci-operator config.
 
-Create the request with the current overlays `main` SHA and the manifest:
+Create the request with the manifest:
 
 ```bash
 OVERLAYS_BRANCH=main # or release-2.1
-OVERLAYS_SHA=$(git ls-remote https://github.com/redhat-developer/rhdh-plugin-export-overlays.git "refs/heads/${OVERLAYS_BRANCH}" | cut -f1)
-[[ "$OVERLAYS_SHA" =~ ^[0-9a-f]{40}$ ]]
-jq -n --arg branch "$OVERLAYS_BRANCH" --arg overlays_sha "$OVERLAYS_SHA" --rawfile release_json "$MANIFEST" '{
+jq -n --arg branch "$OVERLAYS_BRANCH" --rawfile release_json "$MANIFEST" '{
   job_name: ("periodic-ci-redhat-developer-rhdh-plugin-export-overlays-" + $branch + "-e2e-ocp-helm-nightly"),
   job_execution_type: "1",
   pod_spec_options: {envs: {
     MULTISTAGE_PARAM_OVERRIDE_OSL_MODE: "rc",
-    MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON: $release_json,
-    MULTISTAGE_PARAM_OVERRIDE_OVERLAYS_SHA: $overlays_sha
+    MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON: $release_json
   }}
 }' > /tmp/osl-rc-gangway.json
 ```

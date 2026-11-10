@@ -352,11 +352,11 @@ if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON:-}" ]]; then
 fi
 printf '%s\n' "${MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON}" > "${MANIFEST}"
 validate_release_json
-OVERLAYS_COMMIT="${MULTISTAGE_PARAM_OVERRIDE_OVERLAYS_SHA:-}"
-if [[ ! "${OVERLAYS_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "ERROR: provide a 40-character overlays commit SHA through Gangway" >&2
-    exit 1
-fi
+OVERLAYS_BRANCH=$(jq -r '.extra_refs[]? | select(.org == "redhat-developer" and .repo == "rhdh-plugin-export-overlays") | .base_ref' <<<"${JOB_SPEC:-}")
+case "${OVERLAYS_BRANCH}" in
+    main|release-2.1) ;;
+    *) echo "ERROR: expected one overlays main or release-2.1 branch in JOB_SPEC" >&2; exit 1 ;;
+esac
 
 require_registry_credentials "${BREW_REGISTRY}" registry_brew.json
 require_registry_credentials "${STAGE_REGISTRY}" registry_stage.json
@@ -418,8 +418,9 @@ export E2E_COLLECT_COVERAGE=false RHDH_VERSION
 OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
 git init "${WORKDIR}/rhdh-plugin-export-overlays"
 git -C "${WORKDIR}/rhdh-plugin-export-overlays" remote add origin "${OVERLAYS_REPO}"
-git -C "${WORKDIR}/rhdh-plugin-export-overlays" fetch --depth 1 origin "${OVERLAYS_COMMIT}"
+git -C "${WORKDIR}/rhdh-plugin-export-overlays" fetch --depth 1 origin "refs/heads/${OVERLAYS_BRANCH}"
 git -C "${WORKDIR}/rhdh-plugin-export-overlays" checkout --detach FETCH_HEAD
+echo "Testing overlays ${OVERLAYS_BRANCH} at $(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)"
 cd "${WORKDIR}/rhdh-plugin-export-overlays"
 TEST_EXIT=0
 oc create serviceaccount tester-sa-2 -n default >/dev/null 2>&1 || true
