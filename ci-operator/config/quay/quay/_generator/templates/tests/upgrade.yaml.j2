@@ -6,7 +6,9 @@
    _e2e-install.defaults.j2 so a change there reaches both lanes.
    source: stable is the released-operator flavour for branches without the
    Playwright suite: both channels come from the cluster's redhat-operators
-   catalog, and release-owned API refs seed and verify instead of Playwright. #}
+   catalog, and release-owned API refs seed and verify instead of Playwright.
+   upgrade_target: nightly keeps that n-1 install but upgrades to the ART FBC
+   build of n, resolved by quay-enable-catalogsource-art. #}
 {% import "tests/_e2e-install.defaults.j2" as d %}
 tests:
 - timeout: 6h0m0s
@@ -20,6 +22,10 @@ tests:
       QUAY_UPGRADE_SOURCE_CHANNEL: "stable-{{ upgrade_from }}"
 {%- if source == "stable" %}
       QUAY_UPGRADE_CATALOG_SOURCE: redhat-operators
+{%- if upgrade_target == "nightly" %}
+      QUAY_INDEX_IMAGE_REPO: "{{ index_image_repo }}"
+      QUAY_INDEX_IMAGE_TAG: "{{ index_image_tag }}"
+{%- endif %}
 {%- else %}
       PLAYWRIGHT_N_GIT_BRANCH: "{{ branch }}"
       PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "redhat-{{ upgrade_from }}"
@@ -44,7 +50,7 @@ tests:
       ENABLE_BUILD_SUPPORT: "true"
     test:
     - ref: merge-stage-registry-credentials
-{%- if source != "stable" %}
+{%- if source != "stable" or upgrade_target == "nightly" %}
     - ref: quay-enable-catalogsource-art
 {%- endif %}
     - ref: quay-operator-upgrade-install-source

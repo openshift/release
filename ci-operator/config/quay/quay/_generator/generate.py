@@ -91,6 +91,7 @@ JOB_KEYS = {
     "dualstack",
     "storage",
     "upgrade_from",
+    "upgrade_target",
     "ocp_channel",
     "sts",
     "database",
@@ -503,6 +504,13 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
             ocp_channel = _job_str_field(job, "ocp_channel", where)
+            upgrade_target = _job_str_field(job, "upgrade_target", where)
+            if upgrade_target is not None and (
+                test != "upgrade" or source != "stable" or upgrade_target != "nightly"
+            ):
+                raise ValueError(
+                    f"{where} upgrade_target: nightly is only valid for test: upgrade with source: stable"
+                )
             if test == "upgrade":
                 if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
                     raise ValueError(f"{where} ocp_channel must be one of {OCP_CHANNELS}, got {ocp_channel!r}")
@@ -564,6 +572,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         dualstack=dualstack,
                         storage_override=storage,
                         upgrade_from=upgrade_from,
+                        upgrade_target=upgrade_target,
                         database=database,
                         ocp_channel=ocp_channel or "stable",
                         variant_override=variant,
