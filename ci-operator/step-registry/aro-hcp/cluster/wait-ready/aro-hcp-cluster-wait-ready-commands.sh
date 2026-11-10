@@ -221,12 +221,15 @@ check_cluster_version() {
   return 1
 }
 
-# Check that all guest cluster operators are available and healthy.
+# Check that guest cluster operators are available and healthy. The console
+# operator is intentionally excluded because ARO-HCP does not require it for
+# the readiness gate used by these performance jobs.
 check_cluster_operators() {
   local json bad
   json=$(KUBECONFIG="${KUBECONFIG_FILE}" oc get clusteroperators -o json 2>/dev/null || true)
   [[ -n "${json}" ]] || { echo "Waiting for ClusterOperators."; return 1; }
   bad=$(jq -r '.items[] |
+    select(.metadata.name != "console") |
     select((any(.status.conditions[]?; .type == "Available" and .status == "True") | not) or
            any(.status.conditions[]?; .type == "Progressing" and .status == "True") or
            any(.status.conditions[]?; .type == "Degraded" and .status == "True")) |
