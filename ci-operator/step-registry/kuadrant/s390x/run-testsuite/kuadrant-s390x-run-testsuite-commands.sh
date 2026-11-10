@@ -447,13 +447,12 @@ PATCH_EOF
 #     control-plane update: retry until a new reconcile span appears.
 #     dataplane tracing: send x-request-id (OCP Istio omits it on the response)
 #       and force the tracing client through Gateway LB IP + Host header
-#       (*.apps ingress returns 200/401/429). rhcl-mc2 12/12: Jaeger does not
-#       return traces when the primary search service is kuadrant-filter /
-#       wasm-shim + request_id. Look up via authorino (auth+RL) or limitador
-#       (RL-only; no gateway service on OCP-managed Istio) with
-#       guid:x-request-id. Keep process assertions on kuadrant-filter.
-#       wasm-shim:s390x-be-fix is already on the operator. Do not restore
-#       static empty-header GET /get.
+#       (*.apps ingress returns 200/401/429). rhcl-mc2 12/12 used Jaeger v1
+#       authorino + guid:x-request-id (trace-global tag search). CI testsuite
+#       main uses Jaeger v3: query.service_name then client-side attributes on
+#       returned spans only. OCP-managed Istio has no gateway span, so guid
+#       lives on kuadrant-filter. Search kuadrant-filter + guid:x-request-id
+#       (not authorino, not request_id). Do not restore static empty /get.
 #     GatewayClass: prefer istio over openshift-default (OCP 4.22 always has
 #       openshift-default; upstream picks it and leaves TRLP report + tracing
 #       on OpenShift's gateway controller instead of OSSM3).
@@ -955,62 +954,53 @@ def client(route, hostname, gateway):  # pylint: disable=unused-argument
 
 
 def patch_dataplane_tracing_jaeger_lookup() -> None:
-    """rhcl-mc2 12/12: Jaeger search via authorino/limitador, not kuadrant-filter.
+    """CI Jaeger v3: search kuadrant-filter + guid:x-request-id.
 
-    Primary service=kuadrant-filter|wasm-shim + request_id returns 0 traces even
-    when the span exists. Same request_id works as authorino + guid:x-request-id.
-    RL-only has no AuthPolicy; OCP-managed Istio has no {label}.kuadrant gateway
-    traces, so search limitador instead.
+    Local 12/12 used v1 authorino + guid (trace-global tags). CI get_traces
+    queries query.service_name then filters attributes on returned spans only.
+    OCP-managed Istio has no gateway span; guid:x-request-id is on
+    kuadrant-filter. authorino + guid and kuadrant-filter + request_id both
+    returned [] on job 2120046044870873088.
     """
-    replacements = [
-        (
-            Path("testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py"),
-            "authorino",
-        ),
-        (
-            Path(
-                "testsuite/tests/singlecluster/tracing/data_plane_tracing/"
-                "test_kuadrant_tracing_rate_limit_only.py"
-            ),
-            "limitador",
+    paths = [
+        Path("testsuite/tests/singlecluster/tracing/data_plane_tracing/test_kuadrant_tracing.py"),
+        Path(
+            "testsuite/tests/singlecluster/tracing/data_plane_tracing/"
+            "test_kuadrant_tracing_rate_limit_only.py"
         ),
     ]
-    old_attrs = (
-        'service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}'
+    old_needles = [
+        'service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}',
+        'service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id}',
+        'service="authorino", min_processes=min_procs, attributes={"guid:x-request-id": request_id}',
+        'service="authorino", min_processes=min_procs, attributes={"request_id": request_id}',
+        'service="limitador", min_processes=min_procs, attributes={"guid:x-request-id": request_id}',
+        'service="limitador", min_processes=min_procs, attributes={"request_id": request_id}',
+        'service="wasm-shim", min_processes=min_procs, attributes={"request_id": request_id}',
+        'service="wasm-shim", min_processes=min_procs, attributes={"guid:x-request-id": request_id}',
+    ]
+    new_attrs = (
+        'service="kuadrant-filter", min_processes=min_procs, '
+        'attributes={"guid:x-request-id": request_id}'
     )
-    old_tags = (
-        'service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id}'
-    )
-    old_attrs_ws = '''tracing.get_traces(
-            service="kuadrant-filter", min_processes=min_procs, attributes={"request_id": request_id}
-        )'''
-    old_tags_ws = '''tracing.get_traces(
-            service="kuadrant-filter", min_processes=min_procs, tags={"request_id": request_id}
-        )'''
-    for path, service in replacements:
+    for path in paths:
         if not path.exists():
             print(f"SKIP {path} missing")
             continue
         text = path.read_text()
-        if "guid:x-request-id" in text:
+        if new_attrs in text:
             print(f"SKIP {path.name} Jaeger lookup already patched")
             continue
-        new_attrs = (
-            f'service="{service}", min_processes=min_procs, '
-            f'attributes={{"guid:x-request-id": request_id}}'
-        )
-        new_call = f'''tracing.get_traces(
-            service="{service}", min_processes=min_procs, attributes={{"guid:x-request-id": request_id}}
-        )'''
-        n = text.count(old_attrs) + text.count(old_tags) + text.count(old_attrs_ws) + text.count(old_tags_ws)
-        text = text.replace(old_attrs_ws, new_call)
-        text = text.replace(old_tags_ws, new_call)
-        text = text.replace(old_attrs, new_attrs)
-        text = text.replace(old_tags, new_attrs)
+        n = 0
+        for old in old_needles:
+            c = text.count(old)
+            if c:
+                text = text.replace(old, new_attrs)
+                n += c
         if n == 0:
-            print(f"WARN {path.name} kuadrant-filter get_traces not found")
+            print(f"WARN {path.name} get_traces lookup needle not found")
             continue
-        _write(path, text, f"dataplane tracing Jaeger lookup {service} ({path.name}, {n})")
+        _write(path, text, f"dataplane tracing Jaeger lookup kuadrant-filter+guid ({path.name}, {n})")
 
 
 def patch_dns_delegate() -> None:
@@ -2070,9 +2060,9 @@ if p.exists():
         print('egress-bk already present or no backend name')
 PY
 "
-CONTAINER_SCRIPT+="# Dataplane tracing: rhcl-mc2 12/12 looked up authorino + guid:x-request-id
-# (not kuadrant-filter/wasm-shim + request_id). The in-job patcher applies that.
-echo '=== Jaeger lookup via authorino/limitador + guid:x-request-id ==='
+CONTAINER_SCRIPT+="# Dataplane tracing: CI Jaeger v3 needs kuadrant-filter + guid:x-request-id
+# (v1 authorino+guid is trace-global; v3 attribute filter is span-local).
+echo '=== Jaeger lookup via kuadrant-filter + guid:x-request-id ==='
 "
 CONTAINER_SCRIPT+="
 # CFSSL: Dockerfile.s390x installs /usr/bin/cfssl; re-install if the baked image is older.
@@ -2259,7 +2249,7 @@ spec:
         image: ${TESTSUITE_S390X_IMAGE}
         # Always: same tag (stablev1) may be rebuilt; avoid stale node cache.
         imagePullPolicy: Always
-        # Sized for PYTEST_FLAGS=-n4 (xdist workers share this container).
+        # Sized for PYTEST_FLAGS=-n0 (serial). Keep headroom if someone re-enables -n4.
         resources:
           requests:
             cpu: "4"

@@ -33,9 +33,8 @@ ref:
       make. Default "main" always fetches current origin/main at Job start
       (the s390x image bake is 5682b36 / Jul 2026). Pin a SHA to freeze a
       rehearsal. Set to "none" to keep the baked image tree. Dataplane tracing
-      looks up traces via authorino (auth+RL) or limitador (RL-only) with
-      guid:x-request-id; Jaeger does not return kuadrant-filter/wasm-shim as
-      the primary search service.
+      looks up traces via kuadrant-filter + guid:x-request-id (CI Jaeger v3
+      filters attributes on the queried service's spans only).
   - name: TESTSUITE_RUN_AS_USER
     default: "65532"
     documentation: |-
@@ -55,10 +54,11 @@ ref:
       Namespace created on the target cluster to host the test-runner Job, its
       config Secret (dynaconf settings + admin kubeconfig) and resolver ConfigMap.
   - name: PYTEST_FLAGS
-    default: "-n4"
+    default: "-n0"
     documentation: |-
-      Extra pytest flags passed to make targets via the `flags` variable (e.g. "-n4"
-      for pytest-xdist workers on s390x). Pair with enough in-cluster Job CPU.
+      Extra pytest flags passed to make targets via the `flags` variable.
+      Use "-n0" on s390x so tests do not race a shared Istio/wasm dataplane
+      (parallel -n4 produced a different 503/timeout module each run).
       The step always appends -p no:playwright and
       --ignore=testsuite/tests/singlecluster/ui (no s390x Playwright wheels;
       those tests are not part of the 450-collected kuadrant suite). After a
