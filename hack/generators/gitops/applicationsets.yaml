@@ -19,11 +19,6 @@ applicationsets:
         destination:
           name: app.ci
           namespace: openshift-gitops
-        ignoreDifferences:
-        - group: ''
-          kind: PersistentVolumeClaim
-          jsonPointers:
-          - /spec/volumeName
         project: app-ci
         source:
           directory:
@@ -41,7 +36,6 @@ applicationsets:
           syncOptions:
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
     templatePatch: |
       {{- if eq .path.basename "supplemental-ci-images" }}
@@ -53,7 +47,6 @@ applicationsets:
           syncOptions:
             - CreateNamespace=true
             - PruneLast=true
-            - RespectIgnoreDifferences=true
       {{- end }}
 - filename: appset-cluster-build-coredns.yaml
   name: appset-cluster-build-coredns
@@ -100,7 +93,6 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
 - filename: appset-cluster-build-shared.yaml
   name: appset-cluster-build-shared
@@ -152,17 +144,6 @@ applicationsets:
         destination:
           name: '{{.name}}'
           namespace: openshift-gitops
-        ignoreDifferences:
-        - group: rbac.authorization.k8s.io
-          jsonPointers:
-          - /rules
-          kind: ClusterRole
-          name: ci-admins-aggregated
-        - group: '*'
-          jsonPointers:
-          - /imagePullSecrets
-          - /secrets
-          kind: ServiceAccount
         project: build-clusters-common
         source:
           directory:
@@ -181,7 +162,6 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
 - filename: appset-cluster-build.yaml
   name: appset-cluster-build
@@ -226,15 +206,6 @@ applicationsets:
         destination:
           name: '{{.name}}'
           namespace: openshift-gitops
-        ignoreDifferences:
-        - group: machine.openshift.io
-          kind: MachineSet
-          jqPathExpressions:
-          - .spec.template.spec.providerSpec.value.ami
-        - group: machine.openshift.io
-          kind: MachineSet
-          jqPathExpressions:
-          - .spec.template.spec.providerSpec.value.disks[]?.image
         project: build-clusters
         sources:
         - directory:
@@ -253,7 +224,6 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
 - filename: appset-cluster-core-ci.yaml
   name: appset-cluster-core-ci
@@ -289,7 +259,6 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
 - filename: appset-cluster-hosted-mgmt.yaml
   name: appset-cluster-hosted-mgmt
@@ -315,20 +284,6 @@ applicationsets:
         destination:
           name: hosted-mgmt
           namespace: openshift-gitops
-        ignoreDifferences:
-        - group: hive.openshift.io
-          jsonPointers:
-          - /spec/hibernationConfig
-          kind: ClusterPool
-        - group: rbac.authorization.k8s.io
-          jsonPointers:
-          - /rules
-          kind: ClusterRole
-          name: ci-admins-aggregated
-        - group: machine.openshift.io
-          kind: MachineSet
-          jqPathExpressions:
-          - .spec.template.spec.providerSpec.value.ami
         project: hosted-mgmt
         source:
           directory:
@@ -347,7 +302,6 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
 - filename: appset-cluster-hosted-mgmt2.yaml
   name: appset-cluster-hosted-mgmt2
   spec:
@@ -370,20 +324,6 @@ applicationsets:
         destination:
           name: hosted-mgmt2
           namespace: openshift-gitops
-        ignoreDifferences:
-        - group: hive.openshift.io
-          jsonPointers:
-          - /spec/hibernationConfig
-          kind: ClusterPool
-        - group: rbac.authorization.k8s.io
-          jsonPointers:
-          - /rules
-          kind: ClusterRole
-          name: ci-admins-aggregated
-        - group: machine.openshift.io
-          kind: MachineSet
-          jqPathExpressions:
-          - .spec.template.spec.providerSpec.value.ami
         project: hosted-mgmt2
         source:
           directory:
@@ -402,5 +342,4 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
-          - RespectIgnoreDifferences=true
           - ServerSideApply=true
