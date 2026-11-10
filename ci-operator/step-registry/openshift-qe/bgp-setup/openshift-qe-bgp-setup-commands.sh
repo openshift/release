@@ -92,55 +92,76 @@ enable_frr_and_route_advertisements() {
   wait_for_network_operator_rollout
 }
 
-# Point CNO at a custom frr-k8s image, e.g. a fork build with extra webhook
-# instrumentation. Must run before the FRR feature is enabled so the rendered
-# daemonset and statuscleaner deployment pick the image up.
-override_frr_k8s_image() {
-  if [[ -z "${FRR_K8S_IMAGE:-}" ]]; then
-    return
-  fi
-
-  echo "=== Override frr-k8s image with ${FRR_K8S_IMAGE} ==="
-  oc set env deployment/network-operator -n openshift-network-operator \
-    "FRR_K8S_IMAGE=${FRR_K8S_IMAGE}"
-  oc rollout status deployment/network-operator \
-    -n openshift-network-operator --timeout=5m
-}
-
-# Expose the statuscleaner pprof endpoint so the FRRConfiguration validating
-# webhook can be profiled live while a scale workload runs.
-enable_frr_k8s_webhook_pprof() {
-  if [[ "${FRR_K8S_WEBHOOK_PERF:-false}" != "true" ]]; then
-    return
-  fi
-
-  echo "=== Enable frr-k8s statuscleaner pprof endpoint ==="
-
-  # CNO re-applies the statuscleaner Deployment on every sync and would drop the
-  # extra arg. FRR and Route Advertisements have rolled out by now, so hold the
-  # operator for the rest of the run.
+# CNO keeps applying operands for a while after managementState is set to
+# Unmanaged: a sync that started before the patch still renders frr-k8s and
+# rewrites the statuscleaner Deployment afterwards. In the 300-CUDN rehearsal
+# the operator rewrote the Deployment five seconds after ours, silently
+# dropping both the pprof arg and the image override; and because the rewrite
+# restored a pod template whose ReplicaSet was already complete, "oc rollout
+# status" reported success against pods that never carried the change. Hold the
+# operator and wait for the Deployment to settle before touching it.
+hold_frr_k8s_operator() {
   oc patch Network.operator.openshift.io cluster --type=merge \
     -p='{"spec":{"managementState":"Unmanaged"}}'
   oc wait co/network --for=condition=Progressing=False --timeout=5m || true
 
-  if ! oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s >/dev/null 2>&1; then
-    echo "ERROR: deployment/frr-k8s-statuscleaner not found; FRR must be enabled first" >&2
-    exit 1
-  fi
+  local previous="" current="" stable=0 start=${SECONDS}
+  while (( stable < 3 )); do
+    if (( SECONDS - start > 180 )); then
+      echo "WARN: deployment/frr-k8s-statuscleaner is still changing after 3m; continuing" >&2
+      return
+    fi
+    current=$(oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s \
+      -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null) || current=""
+    if [[ -n "${current}" && "${current}" == "${previous}" ]]; then
+      stable=$((stable + 1))
+    else
+      stable=0
+    fi
+    previous="${current}"
+    sleep 5
+  done
+}
 
-  # CNO may already have rendered the statuscleaner from the release image, so
-  # pin the requested frr-k8s image here now that CNO is unmanaged. Apply the
-  # image and the pprof arg in one patch: two sequential changes trigger two
-  # rollouts, and the probe below used to race a replacement pod that had not
-  # started its pprof listener yet.
-  #
-  # The pprof arg must be prepended, not appended: CNO renders
-  # "--frrk8s-selector=..." followed by a bare "$(LOG_LEVEL)" positional
-  # argument, and Go's flag.Parse stops at the first non-flag token. Anything
-  # after that token (including a trailing --pprof-bind-address) is silently
-  # ignored and the listener never starts.
-  local deployment_json patch pprof_arg
-  pprof_arg="--pprof-bind-address=127.0.0.1:6060"
+# Pin the rendered frr-k8s daemonset to the requested fork build. The image is
+# set on the operand rather than through the network-operator Deployment's
+# environment: that Deployment is owned by the cluster-version-operator, which
+# reverts the extra env var within minutes and makes CNO re-render every
+# frr-k8s workload from the payload image again.
+pin_frr_k8s_daemonset_image() {
+  local image="${1}" current
+  current=$(oc get daemonset/frr-k8s -n openshift-frr-k8s -o json \
+    | jq -r '[.spec.template.spec.containers[] | .image] | unique | join(",")')
+  if [[ "${current}" == "${image}" ]]; then
+    echo "daemonset/frr-k8s already runs ${image}"
+    return
+  fi
+  echo "Pinning daemonset/frr-k8s to ${image}"
+  oc set image daemonset/frr-k8s -n openshift-frr-k8s "*=${image}"
+  oc rollout status daemonset/frr-k8s -n openshift-frr-k8s --timeout=15m
+}
+
+# True when the statuscleaner Deployment still carries the requested image and
+# pprof arg. CNO rewrites this Deployment from its own render, so the state has
+# to be re-checked after every rollout instead of being assumed.
+statuscleaner_spec_matches() {
+  local image="${1}" pprof_arg="${2}"
+  oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s -o json 2>/dev/null | jq -e \
+    --arg image "${image}" --arg pprof_arg "${pprof_arg}" '
+      any(.spec.template.spec.containers[];
+          .name == "frr-k8s-statuscleaner"
+          and any((.args // [])[]; . == $pprof_arg)
+          and ($image == "" or .image == $image))' >/dev/null
+}
+
+# Add the pprof arg and, when requested, the fork image to the statuscleaner
+# Deployment. The arg must be prepended, not appended: CNO renders
+# "--frrk8s-selector=..." followed by a bare "$(LOG_LEVEL)" positional
+# argument, and Go's flag.Parse stops at the first non-flag token. Anything
+# after that token (including a trailing --pprof-bind-address) is silently
+# ignored and the listener never starts.
+patch_statuscleaner_for_profile() {
+  local image="${1}" pprof_arg="${2}" deployment_json patch
   deployment_json=$(oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s -o json)
 
   if ! jq -e 'any(.spec.template.spec.containers[]?; .name == "frr-k8s-statuscleaner")' \
@@ -149,9 +170,7 @@ enable_frr_k8s_webhook_pprof() {
     exit 1
   fi
 
-  patch=$(jq -c \
-    --arg image "${FRR_K8S_IMAGE:-}" \
-    --arg pprof_arg "${pprof_arg}" '
+  patch=$(jq -c --arg image "${image}" --arg pprof_arg "${pprof_arg}" '
       (.spec.template.spec.containers | to_entries
         | map(select(.value.name == "frr-k8s-statuscleaner")) | first) as $c
       | ($c.key | tostring) as $i
@@ -174,74 +193,97 @@ enable_frr_k8s_webhook_pprof() {
            end)
         ]' <<<"${deployment_json}")
 
-  if [[ "${patch}" != "[]" ]]; then
-    echo "Patching deployment/frr-k8s-statuscleaner: ${patch}"
-    oc patch deployment/frr-k8s-statuscleaner -n openshift-frr-k8s \
-      --type=json -p="${patch}"
-  else
-    echo "statuscleaner already uses the requested image and pprof bind address"
+  if [[ "${patch}" == "[]" ]]; then
+    echo "deployment/frr-k8s-statuscleaner already runs ${image:-the payload image} with ${pprof_arg}"
+    return
   fi
 
-  if ! oc rollout status deployment/frr-k8s-statuscleaner -n openshift-frr-k8s --timeout=10m; then
-    echo "ERROR: statuscleaner rollout did not complete" >&2
-    oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s -o json \
-      | jq '{revision: .metadata.annotations["deployment.kubernetes.io/revision"],
-             containers: [.spec.template.spec.containers[] | {name, image, args}]}' >&2 || true
-    oc get pods -n openshift-frr-k8s -l component=frr-k8s-statuscleaner -o wide >&2 || true
-    oc describe deployment frr-k8s-statuscleaner -n openshift-frr-k8s 2>&1 | tail -40 >&2 || true
-    exit 1
-  fi
+  echo "Patching deployment/frr-k8s-statuscleaner: ${patch}"
+  oc patch deployment/frr-k8s-statuscleaner -n openshift-frr-k8s \
+    --type=json -p="${patch}"
+}
 
-  # Only probe the pod backing the Deployment's current revision. After a
-  # rollout, older ReplicaSets can still have Running (terminating) pods that
-  # were never restarted with the pprof arg, and .items[0] may pick one of them.
-  local revision deployment_uid rs_uid pod attempt last_error last_pod
+# Name of the Ready pod backing the Deployment's current revision, so a probe
+# never lands on a stale ReplicaSet that is still terminating.
+statuscleaner_current_pod() {
+  local revision deployment_uid rs_uid
   revision=$(oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s \
-    -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}')
+    -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' 2>/dev/null) || return 1
   deployment_uid=$(oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s \
-    -o jsonpath='{.metadata.uid}')
-  rs_uid=$(oc get replicasets -n openshift-frr-k8s -o json \
+    -o jsonpath='{.metadata.uid}' 2>/dev/null) || return 1
+  [[ -n "${revision}" && -n "${deployment_uid}" ]] || return 1
+  rs_uid=$(oc get replicasets -n openshift-frr-k8s -o json 2>/dev/null \
     | jq -r --arg rev "${revision}" --arg deploy_uid "${deployment_uid}" '
         [.items[]
          | select(.metadata.deletionTimestamp == null)
          | select(.metadata.annotations["deployment.kubernetes.io/revision"] == $rev)
          | select(any(.metadata.ownerReferences[]?; .uid == $deploy_uid))]
-        | .[0].metadata.uid // empty')
-  if [[ -z "${rs_uid}" ]]; then
-    echo "ERROR: no ReplicaSet found for deployment/frr-k8s-statuscleaner revision ${revision}" >&2
-    oc get replicasets -n openshift-frr-k8s -o wide >&2 || true
+        | .[0].metadata.uid // empty') || return 1
+  [[ -n "${rs_uid}" ]] || return 1
+  oc get pods -n openshift-frr-k8s -l component=frr-k8s-statuscleaner \
+    --field-selector=status.phase=Running -o json 2>/dev/null \
+    | jq -r --arg rs_uid "${rs_uid}" '
+        [.items[]
+         | select(.metadata.deletionTimestamp == null)
+         | select(any(.metadata.ownerReferences[]?; .uid == $rs_uid))
+         | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))]
+        | .[0].metadata.name // empty'
+}
+
+# Expose the statuscleaner pprof endpoint so the FRRConfiguration validating
+# webhook can be profiled live while a scale workload runs.
+enable_frr_k8s_webhook_pprof() {
+  if [[ "${FRR_K8S_WEBHOOK_PERF:-false}" != "true" ]]; then
+    return
+  fi
+
+  echo "=== Enable frr-k8s statuscleaner pprof endpoint ==="
+
+  if ! oc get deployment/frr-k8s-statuscleaner -n openshift-frr-k8s >/dev/null 2>&1; then
+    echo "ERROR: deployment/frr-k8s-statuscleaner not found; FRR must be enabled first" >&2
     exit 1
   fi
-  last_error=""
-  last_pod=""
+
+  hold_frr_k8s_operator
+
+  local image="${FRR_K8S_IMAGE:-}"
+  local pprof_arg="--pprof-bind-address=127.0.0.1:6060"
+  local attempt probe last_error="" pod=""
 
   # The frr-k8s image is alpine, so busybox wget is the portable way to prove
-  # the pprof listener answers from inside the container network namespace. The
-  # listener may bind slightly after the pod reports Ready, so retry instead of
-  # failing on the first connection error.
-  for attempt in $(seq 1 60); do
-    pod=$(oc get pods -n openshift-frr-k8s -l component=frr-k8s-statuscleaner \
-      --field-selector=status.phase=Running -o json \
-      | jq -r --arg rs_uid "${rs_uid}" '
-          [.items[]
-           | select(.metadata.deletionTimestamp == null)
-           | select(any(.metadata.ownerReferences[]?; .uid == $rs_uid))
-           | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))]
-          | .[0].metadata.name // empty' 2>/dev/null) || pod=""
-    if [[ -z "${pod}" ]]; then
+  # the pprof listener answers from inside the container network namespace.
+  # CNO can still rewrite the operand shortly after the patch lands, so treat a
+  # completed rollout as a hint only: re-check the Deployment spec and the pod
+  # that is actually serving, and re-apply if the operator reverted us.
+  for attempt in $(seq 1 6); do
+    if [[ -n "${image}" ]]; then
+      pin_frr_k8s_daemonset_image "${image}"
+    fi
+    patch_statuscleaner_for_profile "${image}" "${pprof_arg}"
+    oc rollout status deployment/frr-k8s-statuscleaner -n openshift-frr-k8s --timeout=10m || true
+
+    for probe in $(seq 1 60); do
+      if ! statuscleaner_spec_matches "${image}" "${pprof_arg}"; then
+        echo "WARN: deployment/frr-k8s-statuscleaner was rewritten after our patch (attempt ${attempt})" >&2
+        break
+      fi
+      pod=$(statuscleaner_current_pod) || pod=""
+      if [[ -z "${pod}" ]]; then
+        sleep 2
+        continue
+      fi
+      if last_error=$(oc exec -n openshift-frr-k8s "${pod}" -c frr-k8s-statuscleaner -- \
+          wget -q -O /dev/null http://127.0.0.1:6060/debug/pprof/ 2>&1); then
+        echo "frr-k8s statuscleaner pprof endpoint ready (pod ${pod}, attempt ${attempt})"
+        return
+      fi
       sleep 2
-      continue
-    fi
-    last_pod="${pod}"
-    if last_error=$(oc exec -n openshift-frr-k8s "${pod}" -c frr-k8s-statuscleaner -- \
-        wget -q -O /dev/null http://127.0.0.1:6060/debug/pprof/ 2>&1); then
-      echo "frr-k8s statuscleaner pprof endpoint ready (pod ${pod}, attempt ${attempt})"
-      return
-    fi
-    sleep 2
+    done
+    echo "WARN: pprof endpoint not reachable yet (attempt ${attempt}, last probe error: ${last_error:-none})" >&2
+    sleep 15
   done
 
-  echo "ERROR: pprof endpoint is not reachable in frr-k8s-statuscleaner after 60 attempts (revision ${revision}, replicaset ${rs_uid}, last pod ${last_pod:-none})" >&2
+  echo "ERROR: pprof endpoint is not reachable in frr-k8s-statuscleaner after 6 attempts" >&2
   if [[ -n "${last_error}" ]]; then
     echo "last probe error: ${last_error}" >&2
   fi
@@ -249,13 +291,13 @@ enable_frr_k8s_webhook_pprof() {
     | jq '{revision: .metadata.annotations["deployment.kubernetes.io/revision"],
            containers: [.spec.template.spec.containers[] | {name, image, args}]}' >&2 || true
   oc get pods -n openshift-frr-k8s -l component=frr-k8s-statuscleaner -o wide >&2 || true
-  if [[ -n "${last_pod}" ]]; then
+  if [[ -n "${pod}" ]]; then
     # Deployment args are unexpanded templates; show what the process really got.
-    oc exec -n openshift-frr-k8s "${last_pod}" -c frr-k8s-statuscleaner -- \
+    oc exec -n openshift-frr-k8s "${pod}" -c frr-k8s-statuscleaner -- \
       cat /proc/1/cmdline 2>/dev/null | tr '\0' ' ' >&2 || true
     echo >&2
-    oc describe pod -n openshift-frr-k8s "${last_pod}" >&2 || true
-    oc logs -n openshift-frr-k8s "${last_pod}" -c frr-k8s-statuscleaner --tail=50 >&2 || true
+    oc describe pod -n openshift-frr-k8s "${pod}" >&2 || true
+    oc logs -n openshift-frr-k8s "${pod}" -c frr-k8s-statuscleaner --tail=50 >&2 || true
   fi
   exit 1
 }
@@ -638,7 +680,6 @@ if [[ "${NETWORK_WORKLOAD}" == "evpn" ]]; then
   setup_evpn_cluster_prereqs
 fi
 
-override_frr_k8s_image
 setup_common_cluster_bgp
 enable_frr_k8s_webhook_pprof
 
