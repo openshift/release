@@ -19,15 +19,20 @@ if [[ -s "${SHARED_DIR}/quay_index_image" ]]; then
 fi
 TARGET_CHANNEL="${QUAY_UPGRADE_TARGET_CHANNEL:-}"
 TARGET_CATALOG="${QUAY_UPGRADE_TARGET_CATALOG_NAME:-quay-upgrade-target}"
-# Released-catalog mode: source and target are the same existing cluster
-# CatalogSource (e.g. redhat-operators); only the Subscription channel moves.
+# Released-catalog mode: the n-1 source is an existing cluster CatalogSource
+# (e.g. redhat-operators). The target is that same catalog (only the Subscription
+# channel moves) unless a target image is set or an ART FBC digest was resolved,
+# in which case the target is that image (released n-1 -> ART n).
 RELEASED_CATALOG="${QUAY_UPGRADE_CATALOG_SOURCE:-}"
 if [[ -n "${RELEASED_CATALOG}" ]]; then
   SOURCE_CATALOG="${RELEASED_CATALOG}"
-  TARGET_CATALOG="${RELEASED_CATALOG}"
   SOURCE_IMAGE=""
-  TARGET_IMAGE=""
+  if [[ -z "${TARGET_IMAGE}" ]]; then
+    TARGET_CATALOG="${RELEASED_CATALOG}"
+  fi
 fi
+SAME_CATALOG=false
+[[ -n "${RELEASED_CATALOG}" && -z "${TARGET_IMAGE}" ]] && SAME_CATALOG=true
 CATALOG_NS="${QUAY_UPGRADE_CATALOG_NAMESPACE:-openshift-marketplace}"
 OPERATOR_NS="${QUAY_UPGRADE_OPERATOR_NAMESPACE:-openshift-operators}"
 SUBSCRIPTION="${QUAY_UPGRADE_SUBSCRIPTION_NAME:-quay-operator}"
@@ -47,6 +52,8 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 
 if [[ -z "${RELEASED_CATALOG}" ]]; then
   valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
+fi
+if [[ "${SAME_CATALOG}" == false ]]; then
   valid_digest_image "${TARGET_IMAGE}" || fail "QUAY_UPGRADE_TARGET_CATALOG_IMAGE must be image@sha256:<64 hex>"
 fi
 valid_channel "${SOURCE_CHANNEL}" || fail "QUAY_UPGRADE_SOURCE_CHANNEL is required and malformed"
@@ -141,7 +148,7 @@ pre_version="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpat
 target_minor="${TARGET_CHANNEL##*-}"
 echo "Pre-upgrade QuayRegistry currentVersion: ${pre_version:-<none>}; target minor: ${target_minor}"
 
-if [[ -n "${RELEASED_CATALOG}" ]]; then
+if [[ "${SAME_CATALOG}" == true ]]; then
   wait_catalog "${TARGET_CATALOG}"
   preflight_channels "${TARGET_CATALOG}" "${SOURCE_CHANNEL}" "${TARGET_CHANNEL}"
   oc patch subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" --type merge \
