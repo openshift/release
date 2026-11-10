@@ -10,13 +10,12 @@ fi
 date -u "+%Y-%m-%dT%H:%M:%SZ"
 [ -f "${SHARED_DIR}/proxy-conf.sh" ] && source "${SHARED_DIR}/proxy-conf.sh"
 
-VAULT_KMS_CONFIG_CRD_URL="https://raw.githubusercontent.com/kevinrizza/vault-kms-plugin-openshift-provider/main/bundle/manifests/kms.openshift.io_vaultkmsconfigs.yaml"
 APISERVER_ENCRYPTION_PATCH='{"spec":{"encryption":{"type":"KMS","kms":{"pluginConfig":{"apiVersion":"kms.hashicorp.com/v1","resource":"vaultkmsconfigs","name":"'"${VAULT_KMS_CONFIG_NAME}"'"}}}}}'
 
-# 1. Apply the VaultKMSConfig CRD that the APIServer encryption config
-#    references. Idempotent: etcd-encryption-vault-configure applies the same
-#    manifest in the setup chain.
-curl -fsSL "${VAULT_KMS_CONFIG_CRD_URL}" | oc apply -f -
+# 1. Verify the VaultKMSConfig CRD the APIServer encryption config references.
+#    It is applied by etcd-encryption-vault-configure in the setup chain this
+#    step requires; do not fetch anything from external sources here.
+oc wait --for=condition=Established crd/vaultkmsconfigs.kms.hashicorp.com --timeout=5m
 
 # 2. Let the cluster settle after installation before patching the APIServer
 #    config, so the patch does not race transient API instability and no retry
