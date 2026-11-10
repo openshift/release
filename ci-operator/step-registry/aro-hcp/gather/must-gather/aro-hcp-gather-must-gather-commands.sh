@@ -20,9 +20,11 @@ fi
 
 KUSTO_NAME=$(yq '.kusto.kustoName' "${SHARED_DIR}/config.yaml")
 KUSTO_REGION=$(yq '.kusto.location' "${SHARED_DIR}/config.yaml")
+SVC_RESOURCE_GROUP=$(yq '.svc.rg' "${SHARED_DIR}/config.yaml")
 
 echo "KUSTO_NAME: ${KUSTO_NAME}"
 echo "KUSTO_REGION: ${KUSTO_REGION}"
+echo "SVC_RESOURCE_GROUP: ${SVC_RESOURCE_GROUP}"
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
@@ -46,6 +48,7 @@ if ! hcpctl must-gather query \
   --kusto "${KUSTO_NAME}" \
   --region "${KUSTO_REGION}" \
   --subscription-id "${INFRA_SUBSCRIPTION_ID}" \
+  --resource-group "${SVC_RESOURCE_GROUP}" \
   --timestamp-min "${TIMESTAMP_MIN}" \
   --limit 2000 \
   --output-path "${MUST_GATHER_DIR}"; then
