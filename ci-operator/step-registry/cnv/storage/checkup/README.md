@@ -61,9 +61,12 @@ instead of creating a temporary snapshot of the same source PVC for each clone.
 The failed AWS run selected `gp3-csi`, whose StorageProfile reported
 `cloneStrategy=snapshot` and `dataImportCronSourceFormat=pvc`; its managed
 DataSources referenced PVCs.
-This AWS-specific configuration needs a ten-VM rehearsal; the other cloud jobs
-keep their existing boot-source configuration. The separate VM snapshot and
-restore checks remain required.
+The other cloud jobs keep their existing boot-source configuration. The separate
+VM snapshot and restore checks remain required. Ten-VM rehearsals passed on
+[AWS](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2119749852416970752),
+[Azure](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2119749854933553152),
+and [GCP](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-gcp/2119749857445941248)
+with the longer checkup budgets described below.
 
 For ODF or HPP, insert backend installation and default-class configuration
 before checkup preparation. A workflow `pre` override replaces the entire list;
@@ -123,14 +126,15 @@ still be written.
 Job status reads retry transient API failures until the Job deadline and retain
 the last complete Job document in the artifacts.
 
-The shared defaults remain three minutes per VMI operation, ten minutes for the
-checkup, and 900 seconds for the Job. Each cloud source job supplies longer budgets:
+The cloud jobs now trial the shared default budgets. Their previous ten-VM
+rehearsals passed with 20 minutes per VMI operation, 30 minutes for the checkup,
+and 2100 seconds for the Job. The new values require a rehearsal:
 
 | Input | Cloud job value |
 | --- | --- |
-| `CHECKUP_VMI_TIMEOUT` | `20m` |
-| `CHECKUP_TIMEOUT` | `30m` |
-| `CHECKUP_JOB_TIMEOUT_SECONDS` | `2100` (35 minutes) |
+| `CHECKUP_VMI_TIMEOUT` | `3m` |
+| `CHECKUP_TIMEOUT` | `10m` |
+| `CHECKUP_JOB_TIMEOUT_SECONDS` | `900` (15 minutes) |
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
@@ -142,8 +146,11 @@ hit the same limit. AWS advises
 The shipped checkup has no setting to space its VM creation requests. A
 [four-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408)
 passed within the 30-minute checkup budget. The AWS snapshot-backed boot-source
-setup moves source snapshot creation into the preparation phase; the ten-VM
-checkup still has a 30-minute deadline.
+setup moves source snapshot creation into the preparation phase. A later ten-VM
+rehearsal completed the checkup in 317 seconds with the 30-minute budget. The
+default ten-minute budget was tried before this setup and failed while the first
+PVC-backed golden-image snapshot was pending; it has not yet been tested with the
+snapshot-backed boot source.
 Each parent job retains a five-hour limit, including installation and teardown.
 
 ### Collected artifacts
@@ -185,9 +192,9 @@ selection, and ten checkup VMs. Their schedules are staggered in UTC:
 | GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Daily 09:00 |
 
 The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
-build is selected separately. Reduced-VM rehearsals confirmed driver selection,
-snapshot/restore behavior, and post-step cleanup. The ten-VM setting still
-needs a rehearsal on each platform before it is treated as validated.
+build is selected separately. Ten-VM rehearsals confirmed driver selection,
+snapshot/restore behavior, and post-step cleanup on all three platforms with the
+previous 30-minute checkup budget. The shorter default budgets are a new trial.
 The GCP PD coverage story [CNV-72113](https://redhat.atlassian.net/browse/CNV-72113)
 provides platform test context; [CNV-99261](https://redhat.atlassian.net/browse/CNV-99261)
 tracks its integration with this shared CNV checkup. Confirm the final
