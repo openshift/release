@@ -1003,6 +1003,23 @@ tests:
     env:
       MULTI_NIC_IPI: "true"
     workflow: openshift-e2e-vsphere
+- as: hold-vsphere-ipi-ocpstrat-1826
+  cron: 0 13 * * 2
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: ipi-vsphere
+  timeout: 9h0m0s
 - as: e2e-external-vsphere-ccm
   cron: 26 13 * * 2
   reporter_config:
