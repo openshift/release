@@ -234,7 +234,11 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   but intentionally builds no Playwright image. Its Cypress state refs default
   strict mode off for compatibility; the generated upgrade lane explicitly
   sets strict mode true, requiring a nonzero JUnit count and a zero Cypress
-  exit code. Existing `e2e-legacy` install lanes are unchanged.
+  exit code. Its standalone no-network runtime contract wrappers live under
+  `tests/runtime-contracts/`, outside the step registry so they cannot be parsed
+  as CI refs. Cypress console and JUnit text are redacted; screenshots and videos
+  are removed rather than treated as safely redactable. Existing `e2e-legacy`
+  install lanes are unchanged.
   `FEATURE_ROBOT_API_TOKENS` is added for Quay 5.0 and later.
 - **`upgrade`**: installs a released OCP (`releases.latest` is a stable
   `release`, not the nightly payload) and moves the Subscription channel itself,

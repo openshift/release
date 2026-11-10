@@ -3,7 +3,7 @@
 # and target scripts run against a local oc mock; no cluster mutation occurs.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../../step-registry/quay/operator-upgrade-install-source" && pwd)"
 SOURCE="${ROOT}/quay-operator-upgrade-install-source-commands.sh"
 TARGET="${ROOT}/../operator-upgrade-channel/quay-operator-upgrade-channel-commands.sh"
 tmp="$(mktemp -d)"

@@ -1359,6 +1359,21 @@ def test_rehearsal_catalog_pin_keys_must_be_used_by_versioned_matrix() -> None:
         expand_cells(matrix)
 
 
+def test_legacy_upgrade_requires_its_rehearsal_catalog_pin() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade-legacy",
+            "upgrade_from": "3.11",
+            "upgrade_source_catalog_pullspec": "quay.io/example/catalog@sha256:" + "a" * 64,
+        }
+    )
+    with pytest.raises(ValueError, match="rehearsal_catalog_pins\\['4.22'\\]"):
+        expand_cells(matrix)
+
+
 def test_kind_must_be_periodic_or_presubmit() -> None:
     matrix = _matrix_with_job(
         {

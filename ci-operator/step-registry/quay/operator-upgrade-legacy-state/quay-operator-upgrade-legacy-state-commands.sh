@@ -9,12 +9,21 @@ set +x
 
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-operator-upgrade-legacy-state"
 mkdir -p "${ARTIFACT_DIR}"
+umask 077
 PHASE="${QUAY_UPGRADE_LEGACY_STATE_PHASE:-seed}"
 STRICT="${QUAY_UPGRADE_LEGACY_CYPRESS_STRICT:-false}"
 STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
+PRESERVE_STATE=false
+RAW_CYPRESS_OUTPUT=""
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
+cleanup_sensitive_runtime() {
+  rm -f "${RAW_CYPRESS_OUTPUT}" quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+  [[ "${PRESERVE_STATE}" == true ]] || rm -f "${STATE_FILE}"
+}
+trap cleanup_sensitive_runtime EXIT
 new_legacy_password() {
   local password
   # tr exits with SIGPIPE once head has received the requested bytes. Capture
@@ -42,6 +51,26 @@ strict_junit_success() {
     tests=$((tests + $(grep -o '<testcase[[:space:]>]' "${file}" | wc -l)))
   done
   (( tests > 0 ))
+}
+scrub_cypress_text() {
+  local -
+  set +x
+  sed -u -E \
+    -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1<redacted:authorization>|Ig' \
+    -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1<redacted:csrf>|Ig' \
+    -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1<redacted:session>|g' \
+    -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1<redacted:value>#Ig' \
+    | sed -u -e "s|${OWNER_PASSWORD}|<redacted:password>|g" -e "s|${MEMBER_PASSWORD}|<redacted:password>|g"
+}
+sanitize_cypress_artifacts() {
+  local file
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+  shopt -s nullglob
+  for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml; do
+    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp"; return 1; }
+    mv "${file}.tmp" "${file}"
+  done
+  shopt -u nullglob
 }
 registry_tag_present() {
   local route="$1" owner="$2" password="$3" organization="$4" repository="$5"
@@ -154,7 +183,8 @@ EOF
 run_cypress() {
   local rc=0
   rm -f "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml
-  (cd quay-api-tests && \
+  RAW_CYPRESS_OUTPUT="$(mktemp "${ARTIFACT_DIR}/cypress-output.XXXXXX")" || return 1
+  if (cd quay-api-tests && \
     CYPRESS_UPGRADE_ROUTE="${ROUTE}" \
     CYPRESS_UPGRADE_OWNER="${OWNER}" \
     CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" \
@@ -167,7 +197,15 @@ run_cypress() {
     NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state.cy.js \
       --reporter mocha-junit-reporter \
       --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state-[hash].xml" \
-      --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") || rc=$?
+      --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"
+  rm -f "${RAW_CYPRESS_OUTPUT}"
+  RAW_CYPRESS_OUTPUT=""
+  sanitize_cypress_artifacts || return 1
   echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}"
   if [[ "${STRICT}" == true ]]; then
     [[ "${rc}" -eq 0 ]] || fail "legacy upgrade ${PHASE} Cypress failed"
@@ -213,6 +251,7 @@ EOF
     "docker://${HOST}/${ORG}/${REPOSITORY}:upgrade-legacy" >/dev/null
   registry_tag_present "${ROUTE}" "${OWNER}" "${OWNER_PASSWORD}" "${ORG}" "${REPOSITORY}" \
     || fail "pushed source image tag is not present"
+  PRESERVE_STATE=true
 else
   [[ -s "${STATE_FILE}" ]] || fail "missing persisted legacy state from seed"
   # The state file is written by this step under mode 0600; it contains only
@@ -226,5 +265,4 @@ else
   rm -f "${STATE_FILE}"
 fi
 
-rm -f quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
 restore_trace "${WAS_TRACING}"

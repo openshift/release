@@ -488,6 +488,11 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                 raise ValueError(f"{where} ocp_channel is only valid for test: upgrade or upgrade-legacy")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
+                if test == "upgrade-legacy" and ocp not in rehearsal_catalog_pins:
+                    raise ValueError(
+                        f"{where} test 'upgrade-legacy' requires "
+                        f"global_defaults.rehearsal_catalog_pins[{ocp!r}]"
+                    )
                 if database and cloud not in DATABASE_BY_CLOUD:
                     raise ValueError(
                         f"{where}.database: true is not supported for cloud {cloud!r}; "

@@ -7,10 +7,17 @@ set -euo pipefail
 set +x
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}/quay-operator-upgrade-legacy-state-verify"
 mkdir -p "${ARTIFACT_DIR}"
+umask 077
 STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
 STRICT="${QUAY_UPGRADE_LEGACY_CYPRESS_STRICT:-false}"
+RAW_CYPRESS_OUTPUT=""
 fail() { echo "ERROR: $*" >&2; exit 1; }
+cleanup_sensitive_runtime() {
+  rm -f "${RAW_CYPRESS_OUTPUT}" "${STATE_FILE}" quay-api-tests/cypress/e2e/upgrade_legacy_state_verify.cy.js
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+}
+trap cleanup_sensitive_runtime EXIT
 strict_junit_success() {
   local pattern="$1" files=() file tests=0
   shopt -s nullglob
@@ -25,6 +32,26 @@ strict_junit_success() {
     tests=$((tests + $(grep -o '<testcase[[:space:]>]' "${file}" | wc -l)))
   done
   (( tests > 0 ))
+}
+scrub_cypress_text() {
+  local -
+  set +x
+  sed -u -E \
+    -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1<redacted:authorization>|Ig' \
+    -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1<redacted:csrf>|Ig' \
+    -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1<redacted:session>|g' \
+    -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1<redacted:value>#Ig' \
+    | sed -u -e "s|${OWNER_PASSWORD}|<redacted:password>|g" -e "s|${MEMBER_PASSWORD}|<redacted:password>|g"
+}
+sanitize_cypress_artifacts() {
+  local file
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+  shopt -s nullglob
+  for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml; do
+    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp"; return 1; }
+    mv "${file}.tmp" "${file}"
+  done
+  shopt -u nullglob
 }
 registry_tag_present() {
   local route="$1" owner="$2" password="$3" organization="$4" repository="$5"
@@ -72,10 +99,18 @@ EOF
 
 rc=0
 rm -f "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml
-(cd quay-api-tests && CYPRESS_UPGRADE_ROUTE="${ROUTE}" CYPRESS_UPGRADE_OWNER="${OWNER}" CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" CYPRESS_UPGRADE_MEMBER="${MEMBER}" CYPRESS_UPGRADE_ORG="${ORG}" CYPRESS_UPGRADE_REPOSITORY="${REPOSITORY}" CYPRESS_UPGRADE_TEAM="${TEAM}" CYPRESS_UPGRADE_ROBOT="${ROBOT}" NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state_verify.cy.js --reporter mocha-junit-reporter --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-[hash].xml" --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") || rc=$?
+RAW_CYPRESS_OUTPUT="$(mktemp "${ARTIFACT_DIR}/cypress-output.XXXXXX")" || fail "could not create Cypress output file"
+if (cd quay-api-tests && CYPRESS_UPGRADE_ROUTE="${ROUTE}" CYPRESS_UPGRADE_OWNER="${OWNER}" CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" CYPRESS_UPGRADE_MEMBER="${MEMBER}" CYPRESS_UPGRADE_ORG="${ORG}" CYPRESS_UPGRADE_REPOSITORY="${REPOSITORY}" CYPRESS_UPGRADE_TEAM="${TEAM}" CYPRESS_UPGRADE_ROBOT="${ROBOT}" NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state_verify.cy.js --reporter mocha-junit-reporter --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-[hash].xml" --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
+  rc=0
+else
+  rc=$?
+fi
+scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"
+rm -f "${RAW_CYPRESS_OUTPUT}"
+RAW_CYPRESS_OUTPUT=""
+sanitize_cypress_artifacts || fail "could not sanitize Cypress artifacts"
 echo "Legacy upgrade verification Cypress run: exit code ${rc}"
 [[ "${STRICT}" == false || "${rc}" -eq 0 ]] || fail "legacy upgrade verification Cypress failed"
 [[ "${STRICT}" == false ]] || strict_junit_success "${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-*.xml" \
   || fail "legacy upgrade verification JUnit output is missing, empty, malformed, skipped, or failed"
-rm -f "${STATE_FILE}" quay-api-tests/cypress/e2e/upgrade_legacy_state_verify.cy.js
 restore_trace "${WAS_TRACING}"
