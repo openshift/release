@@ -14,11 +14,12 @@ tests:
       #   target channel = stable-<quay_version>, source channel = stable-<upgrade_from>.
       QUAY_UPGRADE_TARGET_CHANNEL: "{{ operator_channel }}"
       QUAY_UPGRADE_SOURCE_CHANNEL: "stable-{{ upgrade_from }}"
-      # Static upgrade-lane settings (not version-specific). No PLAYWRIGHT_N*_GIT_BRANCH:
-      # with strict mode each phase clones the suite at the commit label of the quay-app
-      # image deployed at that point (n-1 for seed, n after the upgrade), as e2e-install
-      # does. Strict already refuses a derived or fallback ref, so it replaces the
-      # upgrade chains' PLAYWRIGHT_REQUIRE_EXPLICIT_REF guard, which needs a branch.
+      # The n-1 seed runs the redhat-<upgrade_from> branch tip, so it creates the
+      # fixtures the newest verify specs expect. The n phases (verify, functional) set
+      # no branch: strict mode clones the suite at the deployed n quay-app image's
+      # commit label, as e2e-install does. Strict refuses a derived or fallback ref, so
+      # it replaces the chains' PLAYWRIGHT_REQUIRE_EXPLICIT_REF guard, which needs a branch.
+      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "redhat-{{ upgrade_from }}"
       PLAYWRIGHT_USE_IMAGE_TESTS: "false"
 {%- if source == "nightly" %}
       PLAYWRIGHT_REF_MODE: strict
