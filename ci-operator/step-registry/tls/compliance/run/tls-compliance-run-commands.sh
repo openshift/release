@@ -222,6 +222,13 @@ ${ARGS_YAML}          securityContext:
                 - ALL
             seccompProfile:
               type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
           volumeMounts:
             - name: results
               mountPath: /results
