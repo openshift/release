@@ -187,9 +187,9 @@ selection, and ten checkup VMs. Their schedules are staggered in UTC:
 
 | Job | Profile | Worker type | Expected CSI provisioner | Schedule |
 | --- | --- | --- | --- | --- |
-| AWS | `openshift-org-aws` | `m8i.4xlarge` | `ebs.csi.aws.com` | Daily 03:00 |
-| Azure | `openshift-org-azure` | `Standard_D16s_v5` | `disk.csi.azure.com` | Daily 06:00 |
-| GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Daily 09:00 |
+| AWS | `openshift-org-aws` | `m8i.4xlarge` | `ebs.csi.aws.com` | Sundays 03:00 UTC |
+| Azure | `openshift-org-azure` | `Standard_D16s_v5` | `disk.csi.azure.com` | Sundays 06:00 UTC |
+| GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Sundays 09:00 UTC |
 
 The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
 build is selected separately. Ten-VM rehearsals confirmed driver selection,
