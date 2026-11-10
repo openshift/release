@@ -72,15 +72,19 @@ ref:
         Sidecar that keeps the scan pod alive after the scan container exits so
         the report can be read out of the shared emptyDir. Override for
         disconnected clusters that cannot pull from registry.access.redhat.com.
+    - name: TLS_COMPLIANCE_OPERATOR_IMAGE
+      default: "quay.io/bapalm/tls-compliance-operator:v1.2.0"
+      documentation: |-
+        Operator image the scan Job runs. The scan pod pulls it from the cluster
+        under test, so no base_images entry is required; override it to pin a
+        different release or a mirrored copy for disconnected clusters. Keep it in
+        sync with TLS_COMPLIANCE_MANIFEST_REF.
     - name: TLS_COMPLIANCE_MANIFEST_REF
       default: "v1.2.0"
       documentation: |-
         Git tag of github.com/sebrandon1/tls-compliance-operator whose CRDs are
-        installed before the scan. Keep this in sync with the
-        tls-compliance-operator-tool base_image tag in the consuming config.
-  dependencies:
-    - env: TLS_COMPLIANCE_OPERATOR_IMAGE
-      name: tls-compliance-operator-tool
+        installed before the scan. Keep this in sync with
+        TLS_COMPLIANCE_OPERATOR_IMAGE.
   resources:
     requests:
       cpu: 100m
@@ -104,11 +108,6 @@ ref:
     build log, written to ARTIFACT_DIR/tls-compliance/summary.txt, and stored in
     ${SHARED_DIR}/tls-compliance-exit-code for later steps.
 
-    The consuming ci-operator config must declare a base_images entry that the
-    tls-compliance-operator-tool dependency resolves to, for example:
-
-      base_images:
-        tls-compliance-operator-tool:
-          name: tls-compliance-operator
-          namespace: bapalm
-          tag: v1.2.0
+    The scan pod pulls the operator image straight from quay.io, so the consuming
+    config does not need a base_images entry. Point TLS_COMPLIANCE_OPERATOR_IMAGE
+    at a mirrored copy for disconnected clusters.

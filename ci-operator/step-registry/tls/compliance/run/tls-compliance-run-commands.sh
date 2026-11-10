@@ -20,7 +20,7 @@ SCANNER_NAMESPACE="${SCANNER_NAMESPACE:-tls-compliance-scan}"
 SCAN_TIMEOUT_SECONDS="${SCAN_TIMEOUT_SECONDS:-1800}"
 KEEPER_IMAGE="${KEEPER_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:latest}"
 MANIFEST_REF="${TLS_COMPLIANCE_MANIFEST_REF:-v1.2.0}"
-SCANNER_IMAGE="${TLS_COMPLIANCE_OPERATOR_IMAGE:?TLS_COMPLIANCE_OPERATOR_IMAGE must be supplied by ci-operator; the consuming config needs a base_images entry named tls-compliance-operator-tool}"
+SCANNER_IMAGE="${TLS_COMPLIANCE_OPERATOR_IMAGE:-quay.io/bapalm/tls-compliance-operator:v1.2.0}"
 
 SCAN_NAMESPACES="${SCAN_NAMESPACES:-}"
 SCAN_ALL_PORTS="${SCAN_ALL_PORTS:-false}"
