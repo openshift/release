@@ -582,12 +582,24 @@ def test_upgrade_stable_flavour() -> None:
     # (3.16) adds the ART catalog step and index env for the n target.
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
-    expected = {
-        "quay-quay-redhat-3.16__aws-ocp419-s3-upgrade.yaml": ("from-315", "4.19", "3.15", "3.16", True),
-        "quay-quay-redhat-3.15__aws-ocp418-s3-upgrade.yaml": ("from-314", "4.18", "3.14", "3.15", False),
-    }
-    for filename, (as_name, ocp, source, target, art_target) in expected.items():
-        config = by_name[filename]
+    (released_cell,) = expand_cells(
+        _matrix_with_job(
+            {
+                "cron": "daily",
+                "source": "stable",
+                "clouds": ["aws"],
+                "ocp": ["4.18"],
+                "test": "upgrade",
+                "upgrade_from": "3.14",
+            },
+            {"branch": "redhat-3.15"},
+        )
+    )
+    cases = [
+        (by_name["quay-quay-redhat-3.16__aws-ocp419-s3-upgrade.yaml"], "from-315", "4.19", "3.15", "3.16", True),
+        (build_config(released_cell, GENERATOR_DIR / "templates"), "from-314", "4.18", "3.14", "3.15", False),
+    ]
+    for config, as_name, ocp, source, target, art_target in cases:
         assert "images" not in config
         assert config["releases"]["latest"] == {
             "release": {"architecture": "amd64", "channel": "stable", "version": ocp}
