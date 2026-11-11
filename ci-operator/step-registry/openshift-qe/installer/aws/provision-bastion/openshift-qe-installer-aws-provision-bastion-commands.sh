@@ -86,6 +86,19 @@ authorize_sg_ingress() {
     --source-group "${source_group}" 2>/dev/null || true
 }
 
+authorize_sg_ingress_cidr() {
+  local group_id=$1
+  local protocol=$2
+  local port=$3
+  local cidr=$4
+  echo "Opening ${protocol}/${port} on ${group_id} from ${cidr}..."
+  aws --region "${REGION}" ec2 authorize-security-group-ingress \
+    --group-id "${group_id}" \
+    --protocol "${protocol}" \
+    --port "${port}" \
+    --cidr "${cidr}" 2>/dev/null || true
+}
+
 configure_evpn_security_groups() {
   local node_sg=$1
   local cp_sg=$2
@@ -111,10 +124,92 @@ configure_evpn_security_groups() {
   echo "EVPN security group rules configured"
 }
 
+# Import probes for routed CUDNs are sourced from addresses in the import CIDR
+# that are not assigned to any AWS network interface. The installer's ICMP rule
+# is scoped to the node and control-plane security groups, and security-group
+# referencing only matches the private addresses of member ENIs, so it never
+# matches those spoofed sources. Authorize the range explicitly on both groups.
+configure_cudn_icmp_ingress() {
+  local node_sg=$1
+  local cp_sg=$2
+  local import_cidr=${UDN_BGP_IMPORT_CIDR:-20.0.0.0/12}
+
+  echo "=== Allowing CUDN import ICMP from ${import_cidr} ==="
+
+  authorize_sg_ingress_cidr "${node_sg}" icmp -1 "${import_cidr}"
+
+  if [[ -n "${cp_sg}" && "${cp_sg}" != "None" ]]; then
+    authorize_sg_ingress_cidr "${cp_sg}" icmp -1 "${import_cidr}"
+  else
+    echo "WARNING: Control-plane security group not found; CUDN import ICMP rule only applied to node SG" >&2
+  fi
+
+  echo "CUDN import ICMP rules configured"
+}
+
+# Allow nodes to route ClusterUserDefinedNetwork (CUDN) traffic whose source or
+# destination addresses are not assigned to their AWS network interfaces.
+# Uses the current oc cluster and AWS credentials in REGION; takes no arguments.
+# Disables and verifies source/destination checking on each existing node's
+# primary ENI, including control-plane nodes. Nodes added later are not covered.
+# Fails on missing nodes, invalid provider IDs, missing ENIs, or failed verification;
+# API errors abort the script under errexit. Earlier updates are not rolled back.
+disable_node_source_dest_checks() {
+  local node_provider_ids node_name provider_id instance_id eni_id source_dest_check attempt
+  node_provider_ids=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.providerID}{"\n"}{end}')
+  if [[ -z "${node_provider_ids}" ]]; then
+    echo "ERROR: No cluster nodes found" >&2
+    return 1
+  fi
+
+  while read -r node_name provider_id; do
+    if [[ "${provider_id}" != aws://*/i-* ]]; then
+      echo "ERROR: Node ${node_name} has an invalid AWS provider ID: ${provider_id}" >&2
+      return 1
+    fi
+    # The final component of an AWS provider ID is the EC2 instance ID.
+    instance_id=${provider_id##*/}
+    # Device index 0 selects the primary ENI used for the node's machine network.
+    eni_id=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+      --filters "Name=attachment.instance-id,Values=${instance_id}" "Name=attachment.device-index,Values=0" \
+      --query 'NetworkInterfaces[0].NetworkInterfaceId' --output text)
+    if [[ -z "${eni_id}" || "${eni_id}" == "None" ]]; then
+      echo "ERROR: No primary ENI found for node ${node_name} (${instance_id})" >&2
+      return 1
+    fi
+
+    echo "Disabling source/destination checking on node ${node_name} primary ENI ${eni_id}"
+    aws --region "${REGION}" ec2 modify-network-interface-attribute \
+      --network-interface-id "${eni_id}" --no-source-dest-check
+    # EC2 reads can briefly return the old value after a successful update.
+    # Check immediately, then retry five times with 5-second waits (25s total
+    # waiting per node, plus API call time). API errors still fail immediately.
+    for attempt in {1..6}; do
+      source_dest_check=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+        --network-interface-ids "${eni_id}" \
+        --query 'NetworkInterfaces[0].SourceDestCheck' --output text)
+      if [[ "${source_dest_check,,}" == "false" ]]; then
+        break
+      fi
+      if (( attempt < 6 )); then
+        sleep 5
+      fi
+    done
+    if [[ "${source_dest_check,,}" != "false" ]]; then
+      echo "ERROR: Source/destination checking remains enabled or unknown on ${eni_id}: ${source_dest_check}" >&2
+      return 1
+    fi
+    echo "Verified node ${node_name} primary ENI ${eni_id}: SourceDestCheck=${source_dest_check}"
+  done <<< "${node_provider_ids}"
+}
+
 echo "=== Provisioning AWS bastion instance ==="
 
 INFRA_ID=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
 echo "Cluster infra ID: ${INFRA_ID}"
+
+# Nodes route traffic for CUDN addresses that are not assigned to their ENIs.
+disable_node_source_dest_checks
 
 # Get a worker node's AWS instance ID
 WORKER_AWS_ID=$(oc get nodes -l node-role.kubernetes.io/worker \
@@ -200,6 +295,7 @@ if [[ -z "${CONTROL_PLANE_SG}" || "${CONTROL_PLANE_SG}" == "None" ]]; then
 fi
 
 configure_evpn_security_groups "${NODE_SG}" "${CONTROL_PLANE_SG}"
+configure_cudn_icmp_ingress "${NODE_SG}" "${CONTROL_PLANE_SG}"
 
 # Authorize SSH from anywhere (for CI pod access)
 aws --region "${REGION}" ec2 authorize-security-group-ingress \
@@ -302,6 +398,29 @@ WORKER_ENI_ID=$(aws --region "${REGION}" ec2 create-network-interface \
 jq --arg eni "${WORKER_ENI_ID}" '.worker_eni_id=$eni' \
   "${RESOURCES_FILE}" > "${RESOURCES_FILE}.tmp" && mv "${RESOURCES_FILE}.tmp" "${RESOURCES_FILE}"
 
+# The instance attribute set above only covers the primary ENI; a secondary ENI
+# has its own SourceDestCheck attribute, which defaults to true. Routed CUDN
+# probes (for example 20.0.0.0/12) are sourced from this ENI's private address,
+# so it must be disabled here as well.
+aws --region "${REGION}" ec2 modify-network-interface-attribute \
+  --network-interface-id "${WORKER_ENI_ID}" --no-source-dest-check
+for _eni_sdc_wait in {1..6}; do
+  worker_source_dest_check=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+    --network-interface-ids "${WORKER_ENI_ID}" \
+    --query 'NetworkInterfaces[0].SourceDestCheck' --output text)
+  if [[ "${worker_source_dest_check,,}" == "false" ]]; then
+    break
+  fi
+  if (( _eni_sdc_wait < 6 )); then
+    sleep 5
+  fi
+done
+if [[ "${worker_source_dest_check,,}" != "false" ]]; then
+  echo "ERROR: Source/destination checking remains enabled or unknown on worker ENI ${WORKER_ENI_ID}: ${worker_source_dest_check}" >&2
+  exit 1
+fi
+echo "Verified worker ENI ${WORKER_ENI_ID}: SourceDestCheck=${worker_source_dest_check}"
+
 aws --region "${REGION}" ec2 attach-network-interface \
   --instance-id "${INSTANCE_ID}" \
   --network-interface-id "${WORKER_ENI_ID}" \
@@ -386,12 +505,14 @@ set -o pipefail
 
 echo "--- Installing system packages ---"
 # iproute: ip/bridge for FRR setup scripts
+# make: build kube-burner-ocp from source in e2e-benchmarking run.sh
 # tar: extract kube-burner-ocp binary in e2e-benchmarking run.sh
 # util-linux: uuidgen used by run.sh when UUID is not preset
 # jq, wget, git: cluster/FRR tooling and repo clone on bastion
+# tcpdump: bastion-side ICMP capture for UDN-BGP diagnostics
 # python3: e2e-benchmarking utils/index.sh (metadata indexing helpers)
 # curl: AL2023 ships curl-minimal (provides /usr/bin/curl); do not install full curl.
-for pkg in iproute jq wget git tar util-linux python3; do
+for pkg in iproute jq wget git make tar util-linux python3 tcpdump; do
   rpm -q "${pkg}" &>/dev/null || dnf install -y "${pkg}"
 done
 if ! command -v curl &>/dev/null; then
@@ -420,6 +541,67 @@ curl -sSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/l
 # Symlink into /usr/local/bin so 'go' is on the default SSH PATH
 ln -sf /usr/local/go/bin/go /usr/local/bin/go
 echo "go: $(go version)"
+
+echo "--- Installing UDN-BGP bastion diagnostics ---"
+install -d -m 0755 /var/lib/udn-bgp-diagnostics
+cat > /usr/local/sbin/udn-bgp-route-dump <<'ROUTE_SCRIPT'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+output=/var/lib/udn-bgp-diagnostics/route-tables.txt
+while true; do
+  printf '\n=== %s main ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show || true
+  printf '\n=== %s all tables ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show table all || true
+  printf '\n=== %s failing-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.1.0.3 || true
+  printf '\n=== %s working-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.2.0.3 || true
+  sleep 5
+done >> "${output}" 2>&1
+ROUTE_SCRIPT
+chmod 0755 /usr/local/sbin/udn-bgp-route-dump
+
+cat > /etc/systemd/system/udn-bgp-route-dump.service <<'ROUTE_UNIT'
+[Unit]
+Description=UDN-BGP bastion routing table sampler
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/udn-bgp-route-dump
+Restart=always
+RestartSec=5s
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ROUTE_UNIT
+
+cat > /etc/systemd/system/udn-bgp-icmp-capture.service <<'ICMP_UNIT'
+[Unit]
+Description=UDN-BGP bastion ICMP capture
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/tcpdump -i any -nn -s 256 -Z root -W 4 -C 10 -w /var/lib/udn-bgp-diagnostics/bastion-icmp.pcap icmp
+Restart=always
+RestartSec=5s
+KillSignal=SIGINT
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ICMP_UNIT
+
+systemctl daemon-reload
+systemctl enable --now udn-bgp-route-dump.service udn-bgp-icmp-capture.service
+systemctl restart udn-bgp-route-dump.service udn-bgp-icmp-capture.service
+systemctl is-active --quiet udn-bgp-route-dump.service
+systemctl is-active --quiet udn-bgp-icmp-capture.service
 
 echo "--- Tool versions ---"
 command -v podman >/dev/null && podman --version

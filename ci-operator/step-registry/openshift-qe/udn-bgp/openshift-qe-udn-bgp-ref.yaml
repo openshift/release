@@ -7,13 +7,29 @@ ref:
   cli: latest
   env:
   - name: ITERATIONS
-    default: "72"
+    default: "300"
     documentation: |-
-      Number of kube-burner iterations for the UDN-BGP workload
+      Number of kube-burner iterations for the UDN-BGP workload.
+  - name: UDN_BGP_LAYER2
+    default: "true"
+    documentation: |-
+      Use Layer2 topology for UDN-BGP CUDNs. Set to "false" to use Layer3.
   - name: E2E_VERSION
     default: "default"
     documentation: |-
       Override the e2e version
+  - name: E2E_REPO
+    default: "https://github.com/cloud-bulldozer/e2e-benchmarking"
+    documentation: |-
+      Override the e2e-benchmarking repository
+  - name: KUBE_BURNER_OCP_REPO
+    default: ""
+    documentation: |-
+      Build kube-burner-ocp from this Git repository instead of downloading a release
+  - name: KUBE_BURNER_OCP_REF
+    default: ""
+    documentation: |-
+      Branch or tag used when KUBE_BURNER_OCP_REPO is set
   - name: KUBE_BURNER_VERSION
     default: "default"
     documentation: |-
@@ -34,6 +50,18 @@ ref:
     default: "false"
     documentation: |-
       Trigger to enable local indexing
+  - name: PPROF
+    default: "false"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: PPROF_INTERVAL
+    default: "0"
+    documentation: |-
+      Interval between pprof collections. Zero collects only at workload start and end.
+  - name: ICMP_CAPTURE_FILTER
+    default: "icmp"
+    documentation: |-
+      BPF filter used by per-node ICMP tcpdump probes. The default captures all ICMP traffic.
   - name: ES_SECRETS_PATH
     default: ""
     documentation: |-
@@ -44,6 +72,7 @@ ref:
       Elasticsearch index for CI metadata written by utils/index.sh.
   commands: openshift-qe-udn-bgp-commands.sh
   timeout: 8h
+  grace_period: 10m
   credentials:
   - collection: ocp-perfscale-cpt
     group: ocp-qe-perfscale-es-creds
@@ -56,3 +85,5 @@ ref:
     This step runs the perfscale udn-bgp kube-burner workload from the external
     FRR bastion on AWS and bare metal so the FRR connectivity pre-check can
     reach the peer address. Requires openshift-qe-bgp-setup-udn-bgp to run first.
+    During the workload, a privileged DaemonSet captures ICMP packets on every
+    node's default-route interface and uploads the pcap files as artifacts.
