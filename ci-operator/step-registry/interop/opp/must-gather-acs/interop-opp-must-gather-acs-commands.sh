@@ -625,6 +625,24 @@ rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
 sub_channel = sub.get("channel") if sub else None
 op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
 op_channel = op_spec.get("channel")
+
+# Target binding (minor finding, thread 4517377052): the OperatorPolicy must
+# target THIS subscription. A policy whose spec.subscription names another
+# subscription re-creates that one on removal, so adopt-vs-duplicate does not
+# apply to rhacs-operator and the precondition cannot be met. A field the
+# policy leaves unset (None) does not constrain, mirroring OLM's defaulting
+# of an omitted target, so only a declared and different value fails. With no
+# single rhacs subscription to bind to, the binding is unknown, not false.
+op_sub_name = op_spec.get("subscriptionName")
+op_sub_namespace = op_spec.get("subscriptionNamespace")
+if sub is None:
+    op_owns_sub = None
+else:
+    op_owns_sub = (
+        (op_sub_name is None or op_sub_name == sub.get("name"))
+        and (op_sub_namespace is None
+             or op_sub_namespace == (sub.get("namespace") or ""))
+    )
 op_compliant = None
 if rhacs_op:
     conds = rhacs_op[0].get("conditions") or []
@@ -696,19 +714,22 @@ terms = {
     "operatorpolicy_compliant": (str(op_compliant).lower()
                                   if op_compliant is not None else "unknown"),
     "operatorpolicy_spec_channel": op_channel or "unknown",
+    "operatorpolicy_targets_subscription": (
+        str(op_owns_sub).lower() if op_owns_sub is not None else "unknown"),
     "acm_csv_version": acm_version or "unknown",
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"),
     "predicate_inputs_classified": str(inputs_classified).lower(),
 }
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
-# subscription with a matching channel, a non-copied CSV in the
-# subscription namespace, and the package resolvable in the
-# subscription's effective catalog source. The two-run aggregation and
-# the named-build comparison live in the ticket rule.
+# subscription (its spec.subscription targets that subscription) with a
+# matching channel, a non-copied CSV in the subscription namespace, and the
+# package resolvable in the subscription's effective catalog source. The
+# two-run aggregation and the named-build comparison live in the ticket rule.
 terms["removal_preconditions_met"] = str(
     inputs_classified
     and terms["operatorpolicy_compliant"] == "true"
+    and terms["operatorpolicy_targets_subscription"] == "true"
     and terms["rhacs_subscription_count"] == "1"
     and terms["rhacs_csv_count"] == "1"
     and terms["rhacs_subscription_channel"] != "unknown"
@@ -789,8 +810,10 @@ PYEOF
 
 # ─── Removal-predicate fixture self-test ────────────────────────────────────
 # Positive control for the removal predicate: evaluates the same term
-# computation against embedded TRUE and FALSE fixtures. Run by setting
-# ACS_EVIDENCE_SELF_TEST=1 (used in the PR rehearsal; exit 22 on failure).
+# computation against embedded TRUE and FALSE fixtures, including the
+# OperatorPolicy target binding (a different subscription fails, an unset
+# field passes through). Run by setting ACS_EVIDENCE_SELF_TEST=1 (used in
+# the PR rehearsal; exit 22 on failure).
 self_test() {
   local tmp _st_failed=0
   tmp=$(mktemp -d)
@@ -885,11 +908,38 @@ FIXTURE
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect operatorpolicy_present false
 
+  # Target binding (thread 4517377052): the policy must name this
+  # subscription. A declared and different target fails the precondition;
+  # a field the policy leaves unset does not constrain (pass-through).
+  echo '[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown", "conditions": [], "channel": "stable", "source": "redhat-operators"}]' > "${tmp}/03-subscription.json"
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "advanced-cluster-management",
+           "subscriptionNamespace": "open-cluster-management",
+           "channel": "stable", "remediationAction": "enforce",
+           "complianceType": "musthave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_targets_subscription false
+  _expect removal_preconditions_met false
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": null, "subscriptionNamespace": null,
+           "channel": "stable", "remediationAction": "enforce",
+           "complianceType": "musthave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_targets_subscription true
+  _expect removal_preconditions_met true
+
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }
