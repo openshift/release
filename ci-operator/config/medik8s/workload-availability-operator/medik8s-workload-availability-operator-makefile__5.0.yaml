@@ -3,9 +3,15 @@ build_root:
     name: builder
     namespace: konveyor
     tag: ubi9-v1.27
+images:
+- dockerfile_path: Dockerfile
+  to: workload-availability-operator
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/rhn_engineering_whayutin/workload-availability-operator:dev
+    with: workload-availability-operator
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -34,7 +40,7 @@ tests:
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-workload-availability
       OO_PACKAGE: workload-availability-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: verify-wao-nmo-install
       cli: latest
