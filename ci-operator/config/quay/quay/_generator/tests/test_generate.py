@@ -587,8 +587,9 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert "QUAY_OPERATOR_CHANNEL" not in env
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    # The n-1 seed runs its branch tip; the n phases run the n image's commit label.
+    # Seed and verify run branch tips; functional runs the n image's commit label.
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_N_VERIFY_GIT_BRANCH"] == "redhat-3.18"
     assert "PLAYWRIGHT_N_GIT_BRANCH" not in env
     assert env["PLAYWRIGHT_REF_MODE"] == "strict"
     # The chains default the guard to "true", which fails any phase without a branch.
