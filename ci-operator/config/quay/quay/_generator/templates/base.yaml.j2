@@ -4,8 +4,9 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-{{ build_root_ocp_version }}
 {#- Lanes without the quay/quay Playwright suite: e2e-legacy and the stable
-    (released-operator) upgrade flavour, whose branches may lack the runner. #}
-{% set playwright = test != "e2e-legacy" and not (test == "upgrade" and source == "stable") %}
+    (released-operator) upgrade flavour, whose branches may lack the runner,
+    unless upgrade_target: nightly runs n's suite (tests/upgrade.yaml.j2). #}
+{% set playwright = test != "e2e-legacy" and not (test == "upgrade" and source == "stable" and upgrade_target != "nightly") %}
 {% if playwright %}
 images:
   items:
