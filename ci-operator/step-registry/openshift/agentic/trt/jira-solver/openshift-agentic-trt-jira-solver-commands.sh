@@ -278,7 +278,9 @@ if [[ ! -s "${PR_BODY_FILE}" ]]; then
 Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
 PR_DEFAULT
 fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+SELECTED_MODEL=$(select_agent_model)
+printf '\n---\nGenerated with %s\n\n<!-- coderabbit-review -->\n' \
+    "${SELECTED_MODEL}" >> "${PR_BODY_FILE}"
 
 BASE_ARGS=()
 if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
