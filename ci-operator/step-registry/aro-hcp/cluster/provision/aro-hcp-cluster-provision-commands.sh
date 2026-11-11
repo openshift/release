@@ -25,29 +25,29 @@ log_step() {
 log_step "Validating provisioning inputs."
 : "${OPENSHIFT_VERSION:?OPENSHIFT_VERSION must be set}"
 
-# When ci-operator resolves a release dependency, OPENSHIFT_VERSION is set to
-# release:latest and ORIGINAL_RELEASE_IMAGE_LATEST contains the exact payload
-# pullspec selected by the release configuration.  ARO accepts the major.minor
-# value in version.id, while nightly builds require the exact payload tag in
-# the experimental control-plane tag.
+# ARO accepts the major.minor value in version.id, while nightly builds require
+# the exact multi-arch payload name in the experimental control-plane tag.
 CONTROL_PLANE_EXACT_VERSION=""
-if [[ "${OPENSHIFT_VERSION}" == "release:latest" ]]; then
-  if [[ -z "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
-    echo "ORIGINAL_RELEASE_IMAGE_LATEST is required when OPENSHIFT_VERSION=release:latest." >&2
+if [[ "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" == "nightly" ]]; then
+  if [[ ! "${OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "OPENSHIFT_VERSION must be X.Y when using the nightly channel." >&2
     exit 1
   fi
-  CONTROL_PLANE_EXACT_VERSION="${ORIGINAL_RELEASE_IMAGE_LATEST##*:}"
-  if [[ ! "${CONTROL_PLANE_EXACT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly ]]; then
-    echo "The resolved release payload is not a nightly build: ${CONTROL_PLANE_EXACT_VERSION}" >&2
+
+  nightly_release_stream="${OPENSHIFT_VERSION}.0-0.nightly-multi"
+  nightly_release_url="https://multi.ocp.releases.ci.openshift.org/api/v1/releasestream/${nightly_release_stream}/latest"
+  nightly_release_json=$(curl --fail --silent --show-error \
+    --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30 \
+    "${nightly_release_url}")
+  CONTROL_PLANE_EXACT_VERSION=$(jq -er \
+    --arg prefix "${nightly_release_stream}-" \
+    '.name | select(type == "string" and startswith($prefix))' \
+    <<<"${nightly_release_json}")
+  if [[ ! "${CONTROL_PLANE_EXACT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly-multi- ]]; then
+    echo "The release API returned an invalid multi-arch nightly build: ${CONTROL_PLANE_EXACT_VERSION}" >&2
     exit 1
   fi
-  if [[ "${CONTROL_PLANE_EXACT_VERSION}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
-    OPENSHIFT_VERSION="${BASH_REMATCH[1]}"
-  else
-    echo "Unable to derive the ARO major.minor version from ${CONTROL_PLANE_EXACT_VERSION}." >&2
-    exit 1
-  fi
-  echo "Resolved Prow nightly payload ${CONTROL_PLANE_EXACT_VERSION} for ARO HCP ${OPENSHIFT_VERSION}."
+  echo "Resolved latest accepted multi-arch nightly ${CONTROL_PLANE_EXACT_VERSION} for ARO HCP ${OPENSHIFT_VERSION}."
 fi
 
 if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
