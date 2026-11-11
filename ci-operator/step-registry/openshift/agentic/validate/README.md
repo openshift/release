@@ -114,10 +114,27 @@ steps in the eventual workflow.
 
 ## Verification
 
-Use temporary Prow rehearsals to check real PR/Jira preparation and live-model
-execution with controlled passing and failing observations. Retain the reports,
-command evidence and job links, then remove the rehearsal configuration.
-Helper test files and permanent rehearsal jobs are not part of this component.
+The manual, optional jobs in
+`ci-operator/config/openshift/release/openshift-release-main__agentic-rehearsal.yaml`
+exercise the runner while this PR is under review:
+
+- `agentic-prepare` uses the preparation reference with the rehearsal's real
+  `JOB_SPEC`. Temporarily put a Jira key in the release PR's title before starting
+  it, then inspect `sources.json` and `validation.md` to confirm that the issue was
+  retrieved and its requirements were preserved. Restore the title after source
+  capture. The runner generates the Markdown from the issue; it does not download
+  an existing `validation.md` attachment.
+- `agentic-observed-pass` and `agentic-observed-fail` exercise the production
+  execution loop and sandbox with the live model and controlled file values.
+  They bypass PR planning and deployment verification. The failing case must
+  publish `overall=fail` and exit nonzero, so its Prow rehearsal is expected to
+  fail. These fixtures do not demonstrate product behavior on an OpenShift cluster.
+
+Trigger these jobs with `/pj-rehearse` on the release PR. The rehearsal image is
+built separately from the branch and must be available as
+`ci/agentic-validation-rehearsal-88469:latest` before the jobs start. Retain reports,
+command evidence and job links, then remove the temporary configuration and image
+resources before merge. No permanent rehearsal jobs are required by the component.
 
 The corporate model's basic completion and tool protocol have been checked live.
 Plan quality, production image publication and a known-broken/fixed scenario on
