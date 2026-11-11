@@ -1,0 +1,57 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- as: install-wao-nmo-daily-aws
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: verify-wao-nmo-install
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+        oc wait --for=condition=Available \
+          deployment/workload-availability-operator-controller-manager \
+          -n openshift-workload-availability --timeout=10m
+        oc get csv -n openshift-workload-availability
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: makefile
+  org: medik8s
+  repo: workload-availability-operator
+  variant: "5.0"
