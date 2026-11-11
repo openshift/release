@@ -94,6 +94,50 @@ spec:
     - kube-apiserver
 EOF
 
+# Workaround for ACM-48279: Allow infrastructure-operator to access kube-apiserver
+# Keep this out of manifest_* so it is not applied before MCE creates its namespace.
+cat > "${SHARED_DIR}/cilium-network-policy-infrastructure-operator-allow-kube-apiserver.yaml" <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: infrastructure-operator-allow-kube-apiserver
+  namespace: multicluster-engine
+spec:
+  endpointSelector:
+    matchLabels:
+      control-plane: infrastructure-operator
+  egress:
+  - toEntities:
+    - kube-apiserver
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+      - port: "6443"
+        protocol: TCP
+EOF
+
+# Workaround for ACM-49941: Allow cross-node ingress to the HCP CLI download pod.
+# Keep this out of manifest_* so it is applied after MCE creates its namespace.
+cat > "${SHARED_DIR}/cilium-network-policy-hcp-cli-download-allow-remote-nodes.yaml" <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: hcp-cli-download-allow-remote-nodes
+  namespace: multicluster-engine
+spec:
+  endpointSelector:
+    matchLabels:
+      app: hcp-cli-download
+  ingress:
+  - fromEntities:
+    - remote-node
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+EOF
+
 cat > "${SHARED_DIR}/manifest_cilium-00-scc-privileged.yaml" <<EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

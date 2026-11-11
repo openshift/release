@@ -5,9 +5,12 @@ set -ex
 function ocp_version() {
     oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
 }
-if [[ ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ^(cnv-prerelease-catalog-source|redhat-operators)$ ]]
+# Versioned CatalogSources use names such as redhat-operators-v4-22.
+REDHAT_OPERATORS_SOURCE_REGEX='^redhat-operators(-v[0-9]+-[0-9]+)?$'
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" != "cnv-prerelease-catalog-source" &&
+      ! "${CNV_SUBSCRIPTION_SOURCE}" =~ ${REDHAT_OPERATORS_SOURCE_REGEX} ]]
 then
-    echo "CNV_SUBSCRIPTION_SOURCE environment variable value '${CNV_SUBSCRIPTION_SOURCE}' not allowed, allowed values are 'redhat-operators' or 'cnv-prerelease-catalog-source'"
+    echo "CNV_SUBSCRIPTION_SOURCE environment variable value '${CNV_SUBSCRIPTION_SOURCE}' not allowed, allowed values are 'redhat-operators', 'redhat-operators-v<major>-<minor>', or 'cnv-prerelease-catalog-source'"
     exit 1
 fi
 
@@ -40,7 +43,7 @@ CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?pro
 CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
-if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
+if [[ "${CNV_SUBSCRIPTION_SOURCE}" =~ ${REDHAT_OPERATORS_SOURCE_REGEX} ]]
 then
   CNV_RELEASE_CHANNEL=stable
 elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
