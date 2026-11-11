@@ -78,52 +78,7 @@ tests:
       timeout: 5m0s
     - ref: cnv-deploy-cnv
     - ref: cnv-storage-checkup-prepare
-    - as: configure-snapshot-boot-sources
-      cli: latest
-      commands: |
-        set -euo pipefail
-        storage_class=$(jq -er '.storage_class' "${SHARED_DIR}/cnv-storage-checkup-context.json")
-        namespace=openshift-virtualization-os-images
-        oc patch storageprofile "${storage_class}" --type=merge \
-          -p '{"spec":{"dataImportCronSourceFormat":"snapshot"}}'
-        for ((attempt=1; attempt<=40; attempt++)); do
-          if oc --request-timeout=30s get storageprofile "${storage_class}" -o json > /tmp/checkup-storage-profile.json &&
-             oc --request-timeout=30s -n "${namespace}" get dataimportcrons -o json > /tmp/checkup-data-import-crons.json &&
-             oc --request-timeout=30s -n "${namespace}" get datasources -o json > /tmp/checkup-data-sources.json &&
-             oc --request-timeout=30s -n "${namespace}" get volumesnapshots -o json > /tmp/checkup-volume-snapshots.json &&
-             jq -e --slurpfile sources /tmp/checkup-data-sources.json \
-               --slurpfile snapshots /tmp/checkup-volume-snapshots.json '
-               (.items | length) > 0 and all(.items[];
-                 . as $cron |
-                 any($cron.status.conditions[]?;
-                   .type == "UpToDate" and .status == "True") and
-                 any($sources[0].items[];
-                   .metadata.name == $cron.spec.managedDataSource and
-                   any(.status.conditions[]?; .type == "Ready" and .status == "True") and
-                   ((.spec.source.snapshot.name // "") as $snapshot |
-                     $snapshot != "" and
-                     any($snapshots[0].items[];
-                       .metadata.name == $snapshot and .status.readyToUse == true))))
-             ' /tmp/checkup-data-import-crons.json > /dev/null &&
-             jq -e '.status.dataImportCronSourceFormat == "snapshot"' \
-               /tmp/checkup-storage-profile.json > /dev/null; then
-            echo "All managed golden images use ready snapshots on ${storage_class}"
-            exit 0
-          fi
-          sleep 30
-        done
-        echo "Golden image DataSources did not switch to ready snapshots" >&2
-        oc -n "${namespace}" get dataimportcrons,datasources,volumesnapshots >&2
-        exit 1
-      from_image:
-        name: cli-jq
-        namespace: ocp
-        tag: latest
-      resources:
-        requests:
-          cpu: 100m
-          memory: 256Mi
-      timeout: 25m0s
+    - ref: cnv-storage-checkup-snapshot-sources
     workflow: cnv-storage-checkup-aws
   timeout: 5h0m0s
 - as: storage-checkup-azure
@@ -191,6 +146,7 @@ tests:
       timeout: 5m0s
     - ref: cnv-deploy-cnv
     - ref: cnv-storage-checkup-prepare
+    - ref: cnv-storage-checkup-snapshot-sources
     workflow: cnv-storage-checkup-azure
   timeout: 5h0m0s
 - as: storage-checkup-gcp
@@ -258,6 +214,7 @@ tests:
       timeout: 5m0s
     - ref: cnv-deploy-cnv
     - ref: cnv-storage-checkup-prepare
+    - ref: cnv-storage-checkup-snapshot-sources
     workflow: cnv-storage-checkup-gcp
   timeout: 5h0m0s
 zz_generated_metadata:

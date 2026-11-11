@@ -24,8 +24,8 @@ explicitly select a valid development image for the rehearsal.
    and CNV-managed golden images. It selects an explicit `CHECKUP_STORAGE_CLASS`,
    otherwise the virtualization default, otherwise the Kubernetes default. A
    missing or ambiguous effective default fails preparation.
-5. The AWS job configures snapshot-backed golden-image sources and waits until
-   their DataSources reference ready snapshots.
+5. `cnv-storage-checkup-snapshot-sources` configures snapshot-backed golden-image
+   sources on each cloud and waits until their DataSources reference ready snapshots.
 6. `cnv-storage-checkup-run` resolves its image from the prepared installed-CSV
    context, creates a dedicated namespace and permissions, and runs the shipped
    checkup through its ConfigMap/Job interface. The Namespace, RBAC, ConfigMap,
@@ -53,20 +53,22 @@ on Azure and GCP. Those reduced runs established functionality but do not
 validate the ten-VM configuration. Worker sizing must account for guest memory,
 virtualization overhead, boot-source imports, and CNV.
 
-The AWS source job asserts the EBS CSI provisioner, then patches the selected
-StorageProfile to use snapshot-backed DataImportCron boot sources. It waits for
-every managed golden-image DataSource to reference a ready VolumeSnapshot before
-running the checkup. CDI can restore many VM volumes from one prepared snapshot
-instead of creating a temporary snapshot of the same source PVC for each clone.
+Each cloud source job asserts its CSI provisioner, then the shared snapshot step
+patches the selected StorageProfile to use snapshot-backed DataImportCron boot
+sources. It waits for every managed golden-image DataSource to reference a ready
+VolumeSnapshot before running the checkup. CDI can restore many VM volumes from
+one prepared snapshot instead of creating a temporary snapshot of the same
+source PVC for each clone.
 The failed AWS run selected `gp3-csi`, whose StorageProfile reported
 `cloneStrategy=snapshot` and `dataImportCronSourceFormat=pvc`; its managed
 DataSources referenced PVCs.
-The other cloud jobs keep their existing boot-source configuration. The separate
-VM snapshot and restore checks remain required. Ten-VM rehearsals passed on
+The separate VM snapshot and restore checks remain required. Ten-VM rehearsals passed on
 [AWS](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2119749852416970752),
 [Azure](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2119749854933553152),
 and [GCP](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-gcp/2119749857445941248)
-with the longer checkup budgets described below.
+with the longer checkup budgets described below. Azure and GCP used their prior
+boot-source configuration in those runs; the shared snapshot-source step needs
+rehearsal on both platforms.
 
 For ODF or HPP, insert backend installation and default-class configuration
 before checkup preparation. A workflow `pre` override replaces the entire list;
