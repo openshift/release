@@ -27,7 +27,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.1"
 resources:
   '*':
     limits:
@@ -36,7 +36,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: rosa-hcp-e2e-staging-stable-4-22
+- as: rosa-hcp-e2e-staging-stable-5-0
   cron: 0 0 31 2 *
   steps:
     allow_best_effort_post_steps: true
@@ -49,22 +49,40 @@ tests:
       HOSTED_CP: "true"
       LABEL_FILTER: Platform:HCP
       OCM_LOGIN_ENV: staging
-      OPENSHIFT_VERSION: "4.22"
+      OPENSHIFT_VERSION: "5.0"
       REGION: us-west-2
       REPLICAS: "3"
     post:
-    - ref: rosa-gap-analysis-api-resources-and-crd
-    - ref: rosa-gap-analysis-critical-alerts
-    - ref: rosa-gap-analysis-cluster-install-delete-metrics
-    - chain: rosa-cluster-deprovision
-    - chain: rosa-sts-oidc-config-delete
-    - ref: rosa-e2e-cleanup-vpc
-    - ref: aws-deprovision-stacks
-    - chain: rosa-gather-hcp-diagnostics
+    - chain: rosa-e2e-hcp-cleanup
     - ref: rosa-operator-restore
     pre:
-    - ref: rosa-operator-push-cpo-image
     - ref: rosa-operator-deploy-pr
+    - chain: rosa-aws-sts-hcp-provision
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: rosa-cluster-credentials-hypershift-mgmt
+    workflow: rosa-e2e-hcp
+  timeout: 3h0m0s
+- as: rosa-hcp-e2e-staging-nightly-5-1-cpo
+  cron: 0 0 31 2 *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-01
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_SECTOR: hypershift-ci
+      ENABLE_BILLING_ACCOUNT: "yes"
+      ENABLE_BYOVPC: "true"
+      HOSTED_CP: "true"
+      LABEL_FILTER: Platform:HCP
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "5.1"
+      REGION: us-west-2
+      REPLICAS: "3"
+    post:
+    - chain: rosa-e2e-hcp-cleanup
+    pre:
+    - ref: rosa-operator-push-cpo-image
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: rosa-sts-oidc-config-create
