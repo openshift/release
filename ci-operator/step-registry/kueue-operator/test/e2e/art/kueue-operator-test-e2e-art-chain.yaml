@@ -1,0 +1,28 @@
+chain:
+  as: kueue-operator-test-e2e-art
+  steps:
+  - ref: cert-manager-install-operator
+  - ref: merge-stage-registry-credentials
+  - ref: kueue-operator-enable-catalogsource-art
+  - ref: kueue-operator-subscription-install
+  - chain: jobset-install
+  - chain: leader-worker-set-install
+  - as: e2e-kueue
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      if test -f "${SHARED_DIR}/env"; then source "${SHARED_DIR}/env"; fi
+      echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE:-}"
+      make e2e-ci-test
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: 4Gi
+  documentation: |-
+    This chain runs the downstream e2e test suite for the Kueue operator against the
+    ART pre-release FBC: the operator is installed by OLM from an ART-built FBC
+    CatalogSource with pre-release digests mirrored from registry.stage.redhat.io,
+    instead of the Konflux-built images used by kueue-operator-test-e2e-downstream.
