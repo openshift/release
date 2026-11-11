@@ -7,15 +7,14 @@ echo "Set bastion SSH configuration"
 PROJECT_DIR=$(mktemp -d)
 export PROJECT_DIR
 
-awk '/^ansible_ssh_private_key: \|/{f=1;next} f && /^  /{sub(/^  /,"");print;next} f{exit}' /var/group_variables/common/all > "${PROJECT_DIR}/temp_ssh_key"
-chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+install -m 600 /var/group_variables/common/all/ansible_ssh_private_key "${PROJECT_DIR}/temp_ssh_key"
 trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
 
 
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
 
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "/var/group_variables/common/bastions" | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "/var/group_variables/common/all" | sed "s/'//g")
+BASTION_IP=$(sed "s/'//g" "/var/host_variables/${CLUSTER_NAME}/bastion/ansible_host")
+BASTION_USER=$(sed "s/'//g" /var/group_variables/common/all/ansible_user)
 
 # Quote local values for the remote Bash command. The quoted heredoc below
 # leaves all variables and command substitutions in its body for the bastion.
@@ -60,7 +59,7 @@ echo "Creating Must Gather"
 export MUSTGATHER_DIR=$(mktemp -d --suffix -must-gather)
 oc adm must-gather --kubeconfig=${SPOKE_KUBECONFIG_PATH} --dest-dir=${MUSTGATHER_DIR}
 
-export NTO_IMAGE=$(oc --kubeconfig ${SPOKE_KUBECONFIG_PATH} get -n openshift-cluster-node-tuning-operator deployment/cluster-node-tuning-operator -o jsonpath=‘{.spec.template.spec.containers[0].image}’)
+export NTO_IMAGE=$(oc --kubeconfig ${SPOKE_KUBECONFIG_PATH} get -n openshift-cluster-node-tuning-operator deployment/cluster-node-tuning-operator -o jsonpath='{.spec.template.spec.containers[0].image}')
 export IMAGE_REGISTRY="quay.io/redhat-user-workloads/telco-5g-tenant/"
 export CNF_TESTS_IMAGE=cnf-tests-4-20:on-pr-2751
 export PERF_TEST_PROFILE=openshift-node-performance-profile
@@ -108,10 +107,14 @@ echo "Download script"
 curl -o /tmp/j2html.py ${script_url}
 
 cd "${OUTPUT_DIR}"
-python3 /tmp/j2html.py --format xml *.xml --output nto_test_report.html 2>/dev/null || echo "No JUnit files found to generate HTML report"
+python3 /tmp/j2html.py --format xml *.xml --output /tmp/artifacts/nto_test_report.html 2>/dev/null || echo "No JUnit files found to generate HTML report"
 EOF
 
 
-# copy artifacs to ArtifactsDir
-scp -i "${PROJECT_DIR}/temp_ssh_key" -r "${BASTION_USER}@${BASTION_IP}:/tmp/artifacts" "${ARTIFACTS_DIR}"
+# copy artifacts to ArtifactsDir
+mkdir -p "${ARTIFACT_DIR}"
+if ! scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+  "${BASTION_USER}@${BASTION_IP}:/tmp/artifacts" "${ARTIFACT_DIR}/"; then
+  echo "WARNING: failed to copy test artifacts from bastion"
+fi
 

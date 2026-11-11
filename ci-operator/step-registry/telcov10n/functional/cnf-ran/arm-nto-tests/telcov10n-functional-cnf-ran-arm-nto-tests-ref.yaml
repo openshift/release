@@ -13,11 +13,11 @@ ref:
       memory: 200Mi
   env:
     - name: CLUSTER_NAME
-      default: "kni-qe-131"
-      documentation: Cluster name for the IBU target hub (spoke master VMs deployed second)
+      default: "kni-qe-130"
+      documentation: Hub cluster name (where the spoke was deployed via ZTP)
     - name: SPOKE_CLUSTER_NAME
       default: "kni-qe-131"
-      documentation: Cluster name for the IBU target hub (spoke master VMs deployed second)
+      documentation: Spoke cluster name (target of the NTO tests)
     - name: NTO_GIT_URL
       default: "https://github.com/openshift/cluster-node-tuning-operator.git"
       documentation: URL of the NTO git repository
@@ -43,7 +43,7 @@ ref:
       mount_path: /var/group_variables/kni-qe-131/nodes
     - namespace: test-credentials
       name: telcov10n-ansible-kni-qe-130-bastion
-      mount_path: /var/host_variables/kni-qe-131/bastion
+      mount_path: /var/host_variables/kni-qe-130/bastion
     - namespace: test-credentials
       name: telcov10n-ansible-kni-qe-131-master0
       mount_path: /var/host_variables/kni-qe-131/master0
@@ -57,9 +57,8 @@ ref:
       name: telcov10n-ansible-hypervisors-helix118
       mount_path: /var/host_variables/kni-qe-131/hypervisor
   documentation: |-
-    Deploy spoke master VMs for both IBU seed and target hubs.
-    Group vars (all, bastions, hypervisors, nodes) and bastion/hypervisor host vars
-    are taken from SHARED_DIR written by the preceding hub-deploy steps.
-    Runs create-spoke-masters.yml twice: first for the seed hub (kni-qe-108),
-    then removes the seed spoke-master0 from inventory and runs again for
-    the target hub (kni-qe-109).
+    Run the NTO (cluster-node-tuning-operator) functional tests against the ARM
+    MNO spoke cluster. Connects to the hub bastion, extracts the spoke
+    kubeconfig from the hub ACM clusterdeployment, clones the NTO repository
+    and runs the ginkgo performance-profile functests (tier-0). Test reports
+    (JUnit/HTML) are copied back to the step artifacts directory.
