@@ -11,11 +11,27 @@ ref:
   - name: CNV_STORAGE_CLASS
     default: "ocs-storagecluster-ceph-rbd-virtualization"
     documentation: ODF storage class for the test VM (must support RWX)
+  - name: ETCD_REJOIN_TIMEOUT
+    default: "720"
+    documentation: |-
+      Seconds to wait for etcd to return to Started on both nodes after the
+      fenced node rejoins as an etcd learner (OCPBUGS-104449). Must exceed one
+      podman-etcd start timeout (10m) so a learner-rejoin sync hang is detected.
   grace_period: 15m0s
-  timeout: 60m0s
+  timeout: 90m0s
   documentation: |-
     Test VM HA on a 2-node TNF cluster with ODF storage.
     Creates a Fedora VM with evictionStrategy LiveMigrate on an RWX PVC,
     fences the node running the VM using pcs stonith, verifies the VM
     migrates to the surviving node, then recovers the fenced node and
     validates cluster health.
+    After recovery it also validates OCPBUGS-104449: the fenced node's reboot
+    makes it rejoin etcd as a learner, running wipe_data_folder_for_learner()
+    in the podman-etcd resource agent. With ODF volumes mounted, the pre-fix
+    bare `sync` could hang in D-state while Ceph was unreachable, timing out
+    the etcd start repeatedly. The step asserts etcd returns to Started on both
+    nodes within ETCD_REJOIN_TIMEOUT and scans the rejoining node's pacemaker
+    journal for the etcd start-timeout (sync-hang) signature; full host logs are
+    persisted separately by the post-phase gather. This lane is the only
+    coverage that exercises that path with ODF present (QE could not reproduce
+    on ODF-less clusters).

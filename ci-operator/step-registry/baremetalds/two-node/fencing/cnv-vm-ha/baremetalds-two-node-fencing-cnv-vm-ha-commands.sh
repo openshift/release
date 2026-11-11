@@ -99,6 +99,83 @@ collect_rbd_diagnostics() {
   echo ""
 }
 
+# Echo the node names (from the arguments) where etcd is Started -- NOT
+# Starting/FAILED/Stopped -- parsed from `pcs status` text on stdin. Only the
+# etcd-clone block is considered, and names are compared literally so master-1
+# does not match master-10.
+parse_etcd_started_nodes() {
+  # A single awk pass: isolate the etcd-clone block by indentation, collect the
+  # nodes reported "Started" in either pcs rendering, and emit those that were
+  # requested (in argument order). "Starting"/"FAILED"/"Stopped" are excluded
+  # because none of them contain the literal word "Started".
+  awk -v want="$*" '
+    # Leading-whitespace width of a line, used to find the block boundary.
+    function indent(line) { match(line, /^[[:space:]]*/); return RLENGTH }
+    # Record a node, ignoring empties.
+    function remember(node) { if (node != "") started[node] = 1 }
+
+    BEGIN { n_want = split(want, want_list, " ") }
+
+    # The etcd-clone header opens the block; remember how far it is indented.
+    /Clone Set:[[:space:]]*etcd-clone/ { block_indent = indent($0); in_block = 1; next }
+
+    # Any line indented no deeper than the header ends the block.
+    in_block && indent($0) <= block_indent { in_block = 0 }
+
+    in_block {
+      # Form 1:  Started: [ master-0 master-1 ]
+      if (match($0, /Started:[[:space:]]*\[[^]]*\]/)) {
+        inside = substr($0, RSTART, RLENGTH)
+        gsub(/^Started:[[:space:]]*\[[[:space:]]*|[[:space:]]*\]$/, "", inside)
+        count = split(inside, list, /[[:space:]]+/)
+        for (i = 1; i <= count; i++) remember(list[i])
+      }
+      # Form 2:  * etcd (...): Started master-0
+      else if (match($0, /Started[[:space:]]+[^][:space:]]+/)) {
+        token = substr($0, RSTART, RLENGTH)
+        sub(/Started[[:space:]]+/, "", token)
+        remember(token)
+      }
+    }
+
+    # Emit the requested nodes that were Started, in argument order.
+    END {
+      for (i = 1; i <= n_want; i++)
+        if (want_list[i] in started) print want_list[i]
+    }
+  '
+}
+
+# Node name(s) where etcd is Started, one per line, from the surviving node's
+# `pcs status` (the single source of truth: it distinguishes Started from
+# Starting/FAILED, which crm_resource --locate does not).
+get_etcd_running_nodes() {
+  local pcs
+  pcs=$(run_on_node "${SURVIVE_NODE}" "pcs status" 2>/dev/null || true)
+  printf '%s\n' "${pcs}" | parse_etcd_started_nodes "${NODE_0}" "${NODE_1}"
+}
+
+# Count etcd start-timeout signatures for node $1 in pacemaker journal text on
+# stdin: controller ("Result of start operation ... Timed Out"), executor
+# ("etcd_start_0 ... timed out"), and "giving up ... timeout" phrasings, each
+# tied to a failure wording so a benign timeout: config value is not counted.
+scan_etcd_start_timeouts() {
+  local node="$1"
+  grep -ciE "start operation for etcd on ${node}.*timed out|etcd_start_0.*timed out|giving up on etcd.*timeout" || true
+}
+
+# Echo the etcd start-timeout count for node $2 from pacemaker journal text on
+# stdin, given the journal read status $1. A non-zero read echoes READ_FAILED so
+# a lost journal is never mistaken for "no timeout".
+etcd_start_timeout_count() {
+  local rc="$1" node="$2"
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "READ_FAILED"
+    return 0
+  fi
+  { grep -i etcd || true; } | scan_etcd_start_timeouts "${node}"
+}
+
 # -------------------------------------------------------------------------
 # Wait for the virtualization StorageClass
 # -------------------------------------------------------------------------
@@ -276,18 +353,27 @@ run_on_node "${SURVIVE_NODE}" \
   "pcs stonith fence ${FENCE_NODE}"
 
 echo "Waiting for pcs to confirm etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}..."
+FENCE_CONFIRMED=false
 for ((i=1; i <= 30; i++)); do
-  PCS_OUT=$(run_on_node "${SURVIVE_NODE}" "pcs status" 2>/dev/null || true)
-  ETCD_SURVIVE=$(echo "${PCS_OUT}" | grep -c "etcd.*Started.*${SURVIVE_NODE}" || true)
-  ETCD_FENCED=$(echo "${PCS_OUT}" | grep -c "etcd.*Stopped" || true)
-  if [[ "${ETCD_SURVIVE}" -ge 1 && "${ETCD_FENCED}" -ge 1 ]]; then
+  RUNNING=$(get_etcd_running_nodes)
+  ETCD_SURVIVE=$(echo "${RUNNING}" | grep -Fxc "${SURVIVE_NODE}" || true)
+  ETCD_FENCED=$(echo "${RUNNING}" | grep -Fxc "${FENCE_NODE}" || true)
+  if [[ "${ETCD_SURVIVE}" -ge 1 && "${ETCD_FENCED}" -eq 0 ]]; then
     echo "pcs confirms etcd running on ${SURVIVE_NODE} and stopped on ${FENCE_NODE}"
-    echo "${PCS_OUT}"
+    run_on_node "${SURVIVE_NODE}" "pcs status" || true
+    FENCE_CONFIRMED=true
     break
   fi
-  echo "Try ${i}/30: etcd on ${SURVIVE_NODE}=${ETCD_SURVIVE}, stopped=${ETCD_FENCED}, waiting..."
+  echo "Try ${i}/30: etcd on ${SURVIVE_NODE}=${ETCD_SURVIVE}, on ${FENCE_NODE}=${ETCD_FENCED}, waiting..."
   sleep 10
 done
+
+if [[ "${FENCE_CONFIRMED}" != "true" ]]; then
+  echo "ERROR: after fencing ${FENCE_NODE}, etcd never settled to running only on ${SURVIVE_NODE} within 30 attempts"
+  run_on_node "${SURVIVE_NODE}" "pcs status" || true
+  collect_rbd_diagnostics "fencing-confirmation-failure"
+  exit 1
+fi
 
 echo "Waiting for ${FENCE_NODE} to become NotReady..."
 oc wait "node/${FENCE_NODE}" --for=condition=Ready=False --timeout=5m || \
@@ -350,6 +436,59 @@ oc wait "node/${NODE_0}" "node/${NODE_1}" --for=condition=Ready --timeout=5m
 echo "All nodes Ready"
 
 run_on_node "${SURVIVE_NODE}" "pcs status" || true
+
+# OCPBUGS-104449: after the fenced node reboots it rejoins etcd as a learner,
+# running wipe_data_folder_for_learner() in the podman-etcd agent. With ODF
+# mounted, a pre-fix bare `sync` there could hang and time out the etcd start.
+echo ""
+echo "=== Validating etcd learner-rejoin on ${FENCE_NODE} ==="
+
+ETCD_REJOIN_TIMEOUT="${ETCD_REJOIN_TIMEOUT:-720}"
+
+# Direct check for the hang: etcd must be Started on both nodes within the timeout.
+echo "--- Waiting up to ${ETCD_REJOIN_TIMEOUT}s for etcd Started on both nodes ---"
+ETCD_REJOINED=false
+REJOIN_DEADLINE=$((SECONDS + ETCD_REJOIN_TIMEOUT))
+while [[ ${SECONDS} -lt ${REJOIN_DEADLINE} ]]; do
+  RUNNING=$(get_etcd_running_nodes)
+  ETCD_ON_FENCE=$(echo "${RUNNING}" | grep -Fxc "${FENCE_NODE}" || true)
+  ETCD_ON_SURVIVE=$(echo "${RUNNING}" | grep -Fxc "${SURVIVE_NODE}" || true)
+  if [[ "${ETCD_ON_FENCE}" -ge 1 && "${ETCD_ON_SURVIVE}" -ge 1 ]]; then
+    echo "etcd is running on both ${FENCE_NODE} and ${SURVIVE_NODE}"
+    ETCD_REJOINED=true
+    break
+  fi
+  echo "$(date): etcd on ${FENCE_NODE}=${ETCD_ON_FENCE}, ${SURVIVE_NODE}=${ETCD_ON_SURVIVE}; waiting..."
+  sleep 20
+done
+
+# Scan the rejoining node's pacemaker journal for the etcd start-timeout
+# signature. The read status is tracked so an SSH/journalctl failure yields
+# READ_FAILED (treated as 0 here) rather than a false "no timeout".
+JOURNAL_RC=0
+PACE_RAW=$(run_on_node "${FENCE_NODE}" "journalctl -u pacemaker -b --no-pager" 2>/dev/null) || JOURNAL_RC=$?
+PACE_ETCD=$(printf '%s\n' "${PACE_RAW}" | grep -i etcd || true)
+TIMED_OUT=$(printf '%s\n' "${PACE_RAW}" | etcd_start_timeout_count "${JOURNAL_RC}" "${FENCE_NODE}")
+if [[ "${TIMED_OUT}" == "READ_FAILED" ]]; then
+  TIMED_OUT=0
+  echo "WARNING: could not read pacemaker journal from ${FENCE_NODE} (rc=${JOURNAL_RC}); start-timeout scan skipped, relying on the etcd-Started check"
+fi
+
+if [[ "${ETCD_REJOINED}" != "true" || "${TIMED_OUT}" -ge 1 ]]; then
+  echo "ERROR: etcd learner-rejoin validation FAILED on ${FENCE_NODE}:"
+  [[ "${ETCD_REJOINED}" != "true" ]] && \
+    echo "  - etcd did not return to Started on both nodes within ${ETCD_REJOIN_TIMEOUT}s"
+  [[ "${TIMED_OUT}" -ge 1 ]] && \
+    echo "  - found ${TIMED_OUT} etcd start timeout(s) (sync hang signature)"
+  echo "--- pacemaker journal (etcd lines, tail) ---"
+  printf '%s\n' "${PACE_ETCD}" | tail -40 || true
+  run_on_node "${SURVIVE_NODE}" "pcs status" || true
+  collect_rbd_diagnostics "etcd-learner-rejoin-failure"
+  exit 1
+fi
+
+echo "=== etcd learner-rejoin completed with ODF present, no sync hang ==="
+echo ""
 
 VMI_FINAL=$(oc get vmi test-vm-ha -n default -o jsonpath='{.status.phase}' 2>/dev/null || true)
 echo "VMI phase after recovery: ${VMI_FINAL:-unknown}"
