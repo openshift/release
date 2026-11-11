@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.23
+    tag: rhel-9-release-golang-1.26-openshift-5.0
 resources:
   '*':
     limits:
@@ -18,9 +18,15 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit
-  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test-coverage
   container:
     from: src
+  secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-codecov-token-lightspeed-otel-collector
+    mount_path: /tmp/secret
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: vet
   commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make vet

@@ -1,0 +1,84 @@
+workflow:
+  as: rosa-e2e-hcp-autoscaling
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      # Provision the default node pool with autoscaling (min 3 / max 6) so
+      # the autoscaling row validates day-1 autoscaling on the default pool.
+      # Both bounds must be multiples of the VPC's private subnet count
+      # (3 for the rosa-e2e shared VPC) or rosa create cluster rejects them.
+      ENABLE_AUTOSCALING: "true"
+      MIN_REPLICAS: "3"
+      MAX_REPLICAS: "6"
+      # Scoped to the rosa-e2e Feature:Autoscaling specs. Env on the workflow
+      # step list is silently dropped by the registry resolver for ref steps;
+      # only this map overrides the validate-customer ref's default filter.
+      LABEL_FILTER: "Feature:Autoscaling"
+      # The workflow env map applies to every step declaring the parameter, so
+      # LABEL_FILTER would leak into the platform step (whose filter falls
+      # back to LABEL_FILTER). Pin the platform plane to its area selection.
+      PLATFORM_LABEL_FILTER: "Area:ManagementPlane"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    - chain: rosa-cluster-provision
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
+    # has provisioned the cluster.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    # wait-ready-nodes is autoscaling-aware: it waits for the default pool's
+    # min replicas, not a fixed REPLICAS count.
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig via backplane
+    # (ROSAENG-67580). The autoscaling spec verifies the NodePool CR
+    # autoScaling bounds on the management cluster when MC access is available.
+    - ref: rosa-backplane-login
+    test:
+    # Scoped to the rosa-e2e Feature:Autoscaling specs: the customer step
+    # drives the default node pool (provisioned with autoscaling by the head)
+    # up to its maximum under resource pressure and back down to its minimum
+    # after workload removal. The spec carries only the Feature:Autoscaling
+    # label (no Area or Platform labels), so this LABEL_FILTER is its sole
+    # selector: the slow, node-provisioning spec must not run in the general
+    # matrix rows (Area:DataPlane || Area:CustomerFeatures, Platform:HCP).
+    - ref: rosa-e2e-validate-customer
+    # Platform plane with its default Area:ManagementPlane filter: there are
+    # no autoscaling platform-plane specs, but the row still verifies the
+    # management-plane view (HCP namespaces, NodePool CRs, RouteMonitors) of
+    # an autoscaling-enabled cluster.
+    - ref: rosa-e2e-validate-platform
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The autoscaling row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-63354): the rosa-CLI head provisions an HCP cluster with
+    autoscaling enabled on the default node pool (min 3 / max 6, a multiple
+    of the shared VPC's 3 private subnets), then the
+    customer validation step runs the rosa-e2e Feature:Autoscaling specs. The
+    default node pool is driven up to its maximum by a CPU-bound workload
+    pinned to the worker nodes and back down to its minimum after the workload
+    is removed, with the bounds also verified on the hypershift NodePool CR on
+    the management cluster (mc-kubeconfig from rosa-backplane-login).
+
+    The platform plane runs with its default Area:ManagementPlane filter:
+    there are no autoscaling platform-plane specs, but the row verifies the
+    management-plane view of an autoscaling-enabled cluster. The autoscaling
+    spec is routed exclusively by its
+    Feature:Autoscaling label (it carries no Area or Platform labels), so it
+    runs only in this workflow and not in the general matrix rows; it skips on
+    clusters whose default node pool has no autoscaling. The customer plane
+    requires corp-network reachability for rosa-backplane-login: run this
+    workflow only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).

@@ -1,6 +1,7 @@
 """Fault injection for eval finalization, reporting, and control flow."""
 
 import contextlib
+import dataclasses
 import json
 from pathlib import Path
 import sys
@@ -209,30 +210,57 @@ class LifecycleTests(support.Fixture):
 
 
 class HarnessPreparationTests(support.Fixture):
-    def test_failed_harness_fetch_has_junit(self):
+    def test_failed_harness_clone_has_junit(self):
         self.change_skill()
-        self.assertNotEqual(self.run_step(FETCH_EXIT="1").returncode, 0)
+        self.assertNotEqual(self.run_step(CLONE_EXIT="1").returncode, 0)
         self.assertEqual(self.claude_calls(), [])
         self.assertEqual(self.junit().attrib["failures"], "1")
         self.assertEqual(json.loads((self.artifacts / "evals-summary.json").read_text())["evals"][0]["status"], "not_run")
         self.assertIn("runner/harness-install.log", self.index())
-        self.assertIn("fake harness fetch failed",
+        self.assertIn("fake harness clone failed",
                       (self.artifacts / "runner/harness-install.log").read_text())
 
-    def test_failed_checkout_or_wrong_harness_revision_has_junit(self):
+    def test_wrong_harness_revision_has_junit(self):
         self.change_skill()
-        for overrides, expected in (({"CHECKOUT_EXIT": "1"}, "fake harness checkout failed"),
-                                    ({"PINNED_REVISION": "wrong"}, "revision mismatch")):
-            with self.subTest(overrides=overrides):
-                self.calls_path.unlink(missing_ok=True)
-                result = self.run_step(**overrides)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(self.claude_calls(), [])
-                self.assertEqual(self.junit().attrib["failures"], "1")
-                self.assertIn(expected, (self.artifacts / "runner/harness-install.log").read_text())
+        result = self.run_step(PINNED_HEAD="wrong")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.claude_calls(), [])
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        install_log = (self.artifacts / "runner/harness-install.log").read_text()
+        self.assertIn("revision mismatch", install_log)
+        # The mismatch must name the revision and both revisions.
+        self.assertIn(f"{self.env['EVAL_HARNESS_REVISION']} resolves to", install_log)
+        self.assertIn("wrong", install_log)
 
 
 class ConfigValidationTests(support.Fixture):
+    def make_fake_harness(self):
+        root = self.root / "standalone-harness"
+        package = root / "agent_eval"
+        package.mkdir(parents=True)
+        (package / "__init__.py").write_text("")
+        (package / "config.py").write_text("""from pathlib import Path
+from types import SimpleNamespace
+import yaml
+def load_raw(path):
+    path = Path(path).resolve()
+    return yaml.safe_load(path.read_text()) or {}, [str(path)]
+class EvalConfig:
+    @classmethod
+    def from_yaml(cls, path):
+        raw, _ = load_raw(path)
+        value = cls()
+        value.models = SimpleNamespace(skill=(raw.get('models') or {}).get('skill'))
+        value.thresholds = raw.get('thresholds', {})
+        value.dataset = SimpleNamespace(path=(raw.get('dataset') or {}).get('path', ''))
+        value.resolve_path = lambda path: Path(path)
+        value.resolve_skill = lambda: (raw.get('execution') or {}).get('skill') or raw.get('skill') or None
+        value.eval_name = lambda: ((raw.get('execution') or {}).get('skill') or raw.get('skill')
+                                   or raw.get('name') or Path(path).stem)
+        return value
+""")
+        return root
+
     def test_invalid_thresholds_fail_before_any_calls(self):
         other = self.make_entry("evals/other.yaml")
         self.write_manifest([self.entry, other])
@@ -286,6 +314,25 @@ class ConfigValidationTests(support.Fixture):
     def test_malformed_resolver_result_is_rejected_by_parent(self):
         with self.assertRaisesRegex(runner.EvalError, "incompatible result schema"):
             config_bridge.validate_resolution_result({}, self.repo, self.entry["config"])
+
+    def test_resolved_skill_reaches_the_plan_through_the_bridge(self):
+        harness = self.make_fake_harness()
+        document = config_bridge.resolve_config(harness, self.repo, self.entry["config"]).as_dict()
+        self.assertEqual(document["skill"], "example:foo")
+        resolved = config_bridge.validate_resolution_result(document, self.repo, self.entry["config"])
+        self.assertEqual((resolved["skill"], resolved["config_chain"]),
+                         ("example:foo", (self.entry["config"],)))
+        for change, message in (({"skill": ""}, "invalid skill"), ({"skill": 7}, "invalid skill"),
+                                ({"schema_version": 2}, "unsupported schema_version")):
+            with self.subTest(change=change), self.assertRaisesRegex(runner.EvalError, message):
+                config_bridge.validate_resolution_result({**document, **change}, self.repo,
+                                                         self.entry["config"])
+        config_py = harness / "agent_eval/config.py"
+        config_py.write_text(config_py.read_text().replace("value.resolve_skill =", "value.unused ="))
+        for name in [name for name in sys.modules if name.split(".")[0] == "agent_eval"]:
+            del sys.modules[name]  # Same checkout root, so the bridge would reuse the cached module.
+        with self.assertRaisesRegex(runner.EvalError, "missing resolve_skill"):
+            config_bridge.resolve_config(harness, self.repo, self.entry["config"])
 
     def test_config_resolver_timeout_is_a_preflight_failure(self):
         self.put("setup.sh", "echo started >> setup-count\n")
@@ -386,3 +433,166 @@ class ConfigValidationTests(support.Fixture):
             with self.subTest(overrides=overrides):
                 self.assertNotEqual(self.run_step(**overrides).returncode, 0)
                 self.assertEqual(self.calls(), [])
+
+
+class RunIdentityTests(support.Fixture):
+    """The run passes only if the harness ran the planned config, model, skill, and cases."""
+
+    def run_behavior(self, behavior):
+        self.calls_path.unlink(missing_ok=True)
+        return self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: behavior}))
+
+    def assert_identity_failure(self, behavior, *fragments):
+        result = self.run_behavior(behavior)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.junit().attrib["failures"], "1")
+        failure = self.junit().find("testcase/failure").attrib["message"]
+        for fragment in fragments:
+            self.assertIn(fragment, failure)
+        self.assertNotIn("regression", self.calls())  # Never scored as if it were the planned run.
+        return failure
+
+    def test_matching_run_passes(self):
+        self.change_skill()
+        for behavior in ("pass", "absolute_chain"):
+            with self.subTest(behavior=behavior):
+                result = self.run_behavior(behavior)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(self.junit().attrib["failures"], "0")
+                self.assertIn("regression", self.calls())
+        recorded = json.loads((self.eval_artifacts() / "run_result.json").read_text())
+        self.assertEqual(recorded["eval_params"]["skill"], "example:foo")
+        self.assertEqual(list(recorded["per_case"]), ["case-001"])
+
+    def test_substituted_fixed_config_fails(self):
+        self.change_skill()  # Observed in CI: the orchestrator scored an edited copy.
+        self.assert_identity_failure(
+            "substituted_config", "harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], "
+            "but the runner planned ['evals/eval-foo.yaml']", "not a copied or edited file")
+
+    def test_extra_extends_chain_file_fails(self):
+        self.change_skill()
+        self.assert_identity_failure(
+            "extra_chain_file", "['evals/extra-base.yaml', 'evals/eval-foo.yaml']")
+
+    def test_missing_extends_chain_file_fails(self):
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        self.put("evals/base.yaml", yaml.safe_dump(config))
+        self.put(self.entry["config"], "extends: base.yaml\nmodels: {skill: overlay-model}\n")
+        self.change_skill()
+        result = self.run_behavior("pass")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.claude_calls()[0]["model"], "overlay-model")
+        self.assert_identity_failure(
+            "missing_chain_file", "harness evaluated config chain ['evals/eval-foo.yaml'], but the "
+            "runner planned ['evals/base.yaml', 'evals/eval-foo.yaml']")
+
+    def test_wrong_model_or_skill_fails(self):
+        self.change_skill()
+        self.assert_identity_failure(
+            "wrong_model", "harness ran model 'other-model', but the runner planned 'model-from-eval'")
+        self.assert_identity_failure(
+            "wrong_skill", "harness ran skill 'other:skill', but the runner planned 'example:foo'")
+
+    def test_missing_case_fails(self):
+        self.put("evals/cases/eval-foo/case-002/input.yaml", "input: y\n")
+        self.change_skill()
+        self.assert_identity_failure("stop_early", "missing ['case-002'], unexpected []")
+
+    def test_full_dataset_expected_set_follows_the_harness_workspace_rule(self):
+        dataset = self.repo / "evals/cases/eval-foo"
+        self.put("evals/cases/eval-foo/.hidden-case/input.yaml", "input: hidden\n")
+        self.put("evals/cases/eval-foo/README.md", "not a case\n")
+        (dataset / "linked-case").symlink_to("case-001", target_is_directory=True)
+        self.change_skill()
+        plan = runner.EvalPlan("evals/eval-foo.yaml", {}, "m", 1, 1, dataset_path=str(dataset))
+        self.assertEqual(runner.planned_cases(plan), {".hidden-case", "case-001", "linked-case"})
+        # A --cases request is the expected set; the harness must not widen or narrow it.
+        self.assertEqual(runner.planned_cases(dataclasses.replace(plan, cases=("case-001",))),
+                         {"case-001"})
+        result = self.run_behavior("pass")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIsNone(self.claude_calls()[0]["cases"])
+        recorded = json.loads((self.eval_artifacts() / "run_result.json").read_text())
+        self.assertEqual(sorted(recorded["per_case"]), [".hidden-case", "case-001", "linked-case"])
+
+    def test_absent_or_unverifiable_fields_fail_closed(self):
+        self.change_skill()
+        for behavior, fragment in (
+                ("drop:eval_params", "no eval_params mapping"),
+                ("drop:eval_params.config_chain", "eval_params.config_chain is missing or invalid"),
+                ("drop:eval_params.execution_mode", "eval_params: None"),
+                ("drop:model", "harness ran model None"),
+                ("drop:eval_params.skill", "harness ran skill None, but the runner planned 'example:foo'"),
+                ("drop:per_case", "run_result.json per_case is missing"),
+                ("batch_mode", "execution_mode 'batch'"),
+                ("summary_mismatch", "summary.yaml per_case does not match the planned cases: "
+                                     "missing [], unexpected ['case-ghost']")):
+            with self.subTest(behavior=behavior):
+                self.assert_identity_failure(behavior, fragment)
+
+    def test_prompt_mode_without_a_skill_passes_and_unset_dataset_fails_before_the_model(self):
+        self.put(self.entry["config"], yaml.safe_dump({
+            "name": "prompt-eval", "execution": {"prompt": "Answer {{ input.question }}"},
+            "models": {"skill": "m"}, "dataset": {"path": "cases/eval-foo"}}))
+        self.change_skill()
+        result = self.run_behavior("pass")  # The harness omits eval_params.skill without one.
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.put(self.entry["config"], "models: {skill: m}\n")
+        result = self.run_behavior("pass")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("dataset.path is unset", self.junit().find("testcase/failure").attrib["message"])
+        self.assertEqual(self.claude_calls(), [])
+
+    def test_full_dataset_run_over_an_empty_dataset_fails_closed(self):
+        # Only a file, no case directories: an empty expectation would accept an
+        # empty per_case, so the run must fail before the orchestrator starts.
+        self.put("evals/cases/empty/README.md", "not a case\n")
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        self.put(self.entry["config"], yaml.safe_dump({**config, "dataset": {"path": "cases/empty"}}))
+        self.change_skill()
+        empty = self.repo / "evals/cases/empty"
+        with self.assertRaisesRegex(runner.EvalError, "contains no case directories"):
+            runner.planned_cases(runner.EvalPlan("c", {}, "m", 1, 1, dataset_path=str(empty)))
+        result = self.run_behavior("pass")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"dataset.path {empty} contains no case directories",
+                      self.junit().find("testcase/failure").attrib["message"])
+        self.assertEqual(self.claude_calls(), [])
+
+
+class CaseSubsetIdentityTests(support.Fixture):
+    """A --cases run passes only if the harness ran exactly the requested cases."""
+
+    def setUp(self):
+        super().setUp()
+        self.enable_case_subsets()
+
+    def test_harness_running_unrequested_cases_fails(self):
+        self.put("evals/cases/foo/case-001/input.yaml", "input: new\n")
+        self.commit()
+        # The orchestrator dropped --cases, so the harness ran the whole dataset.
+        result = self.run_step(BEHAVIORS=json.dumps({self.entry["config"]: "ignore_cases"}))
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.claude_calls()[0]["cases"], ["case-001"])
+        failure = self.junit().find("testcase/failure").attrib["message"]
+        self.assertIn("run_result.json per_case does not match the planned cases: missing [], "
+                      "unexpected ['case-002', 'case-003']", failure)
+        self.assertNotIn("regression", self.calls())
+
+    def test_requested_case_silently_dropped_by_the_harness_fails(self):
+        # workspace.py keeps only existing directories named by --cases and
+        # drops the rest without an error unless nothing matches.
+        self.entry["setup_script"] = "setup.sh"
+        self.put("setup.sh", "rm -r evals/cases/foo/case-003\n")
+        self.write_manifest([self.entry])
+        self.commit()
+        base = self.git("rev-parse", "HEAD").strip()
+        self.put("evals/cases/foo/case-001/input.yaml", "input: new\n")
+        self.put("evals/cases/foo/case-003/input.yaml", "input: new\n")
+        self.commit()
+        result = self.run_step(PULL_BASE_SHA=base)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.claude_calls()[0]["cases"], ["case-001", "case-003"])
+        failure = self.junit().find("testcase/failure").attrib["message"]
+        self.assertIn("missing ['case-003'], unexpected []", failure)

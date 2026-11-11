@@ -23,12 +23,14 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from .eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                              validate_resolution_result)
     from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_config import HARNESS_REVISION, HARNESS_URL, validate_resolution_result
+    from eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                             validate_resolution_result)
     from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
@@ -317,6 +319,100 @@ def verify_result(directory, settings):
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
 
+def planned_cases(plan):
+    """Return the case IDs the harness must execute for this plan.
+
+    Mirrors agent-eval-harness skills/eval-run/scripts/workspace.py (v1.62.3,
+    lines 70-83): every immediate subdirectory of the resolved dataset.path is
+    a case, ``sorted(d for d in cases_dir.iterdir() if d.is_dir())``, so
+    dot-directories and links to directories count and files do not. A
+    nonempty --cases keeps matching names and silently drops unknown IDs; the
+    runner passes only IDs it selected, so that request is the expected set.
+    Called after setup and before the orchestrator starts, so the orchestrator
+    cannot change the expectation by adding or removing case directories.
+    """
+    if plan.cases:
+        return frozenset(plan.cases)
+    if not plan.dataset_path:
+        raise EvalError("dataset.path is unset, so the full-dataset case set cannot be "
+                        "verified; set dataset.path in the eval YAML")
+    try:
+        found = frozenset(path.name for path in Path(plan.dataset_path).iterdir() if path.is_dir())
+    except OSError as error:
+        raise EvalError(f"cannot list dataset.path {plan.dataset_path}: {error}") from error
+    if not found:  # An empty expectation would let an empty per_case pass vacuously.
+        raise EvalError(f"dataset.path {plan.dataset_path} contains no case directories")
+    return found
+
+
+def normalize_recorded_path(repo, item):
+    """Normalize a recorded config_chain entry the way preflight normalized its chain.
+
+    The harness records entries relative to its working directory, or absolute
+    outside it (agent_eval/config.py project_relative); the orchestrator starts
+    in the repository root, so relative entries are resolved from there.
+    """
+    path = Path(item)
+    path = (path if path.is_absolute() else repo / path).resolve()
+    return path.relative_to(repo).as_posix() if path.is_relative_to(repo) else str(path)
+
+
+def _compare_cases(source, executed, expected):
+    if not isinstance(executed, dict) or not all(isinstance(case, str) for case in executed):
+        raise EvalError(f"{source} is missing or is not a mapping of case IDs")
+    missing, unexpected = sorted(expected - executed.keys()), sorted(executed.keys() - expected)
+    if missing or unexpected:
+        raise EvalError(f"{source} does not match the planned cases: missing {missing}, "
+                        f"unexpected {unexpected}; the orchestrator must pass exactly the planned "
+                        "--cases (none for a full-dataset run) and let every case finish")
+
+
+def verify_run_identity(directory, plan, expected_cases, repo):
+    """Require the run to be exactly the config, model, skill, and cases planned.
+
+    The orchestrator can improvise: evaluate an edited copy of the YAML, drop
+    --cases, or stop early. The pinned harness records what it ran in
+    run_result.json (execute.py _build_eval_params and the case-mode
+    aggregate); every field it writes in case mode is required, so a missing
+    field is a contract break that fails the eval rather than passing it.
+    """
+    try:
+        result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
+        summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        raise EvalError(f"missing or invalid harness results: {error}") from error
+    params = result.get("eval_params") if isinstance(result, dict) else None
+    if not isinstance(params, dict):
+        raise EvalError("run_result.json has no eval_params mapping; cannot confirm what the harness ran")
+    modes = (result.get("execution_mode"), params.get("execution_mode"))
+    if modes != ("case", "case"):
+        raise EvalError(f"harness recorded execution_mode {modes[0]!r} (eval_params: {modes[1]!r}); "
+                        "manifest evals are verified only in case mode, which records per-case results")
+
+    chain = params.get("config_chain")
+    if not isinstance(chain, list) or not chain or not all(isinstance(item, str) and item for item in chain):
+        raise EvalError("run_result.json eval_params.config_chain is missing or invalid; "
+                        "cannot confirm which config the harness evaluated")
+    executed_chain = [normalize_recorded_path(repo.resolve(), item) for item in chain]
+    if executed_chain != list(plan.config_chain):
+        raise EvalError(f"harness evaluated config chain {executed_chain}, but the runner planned "
+                        f"{list(plan.config_chain)}; the orchestrator must run the original --config "
+                        "from the repository root, not a copied or edited file")
+    if result.get("model") != plan.model:
+        raise EvalError(f"harness ran model {result.get('model')!r}, but the runner planned "
+                        f"{plan.model!r} from models.skill; the orchestrator must pass --model unchanged")
+    # The harness records eval_params.skill whenever one resolves (execute.py
+    # _build_eval_params); absent means None, which only prompt or multi-step
+    # configs expect.
+    if params.get("skill") != plan.skill:
+        raise EvalError(f"harness ran skill {params.get('skill')!r}, but the runner planned "
+                        f"{plan.skill!r}; the orchestrator must not pass a different --skill")
+
+    _compare_cases("run_result.json per_case", result.get("per_case"), expected_cases)
+    if isinstance(summary, dict) and "per_case" in summary:
+        _compare_cases("summary.yaml per_case", summary["per_case"], expected_cases)
+
+
 def archive(directory, artifacts):
     destination = artifacts / "eval-run.tar"
     temporary = destination.with_suffix(".tmp")
@@ -468,48 +564,58 @@ def remaining(deadline):
     return deadline - time.monotonic()
 
 
+def verified_revisions(verified):
+    """Split captured rev-parse output into (named commit, checked-out HEAD)."""
+    lines = [line.strip() for line in verified.strip().splitlines()]
+    return (lines[0], lines[1]) if len(lines) == 2 else ("", "")
+
+
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Fetch and verify exactly the pinned harness revision."""
+    """Resolve the harness release tag, clone exactly it, and verify the checkout."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
-    install_log.write_text(f"Expected harness revision: {HARNESS_REVISION}\n", encoding="utf-8")
-    steps = (
-        (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
-        (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
-         60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1",
-          "origin", HARNESS_REVISION], 300, "fetch the pinned harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
-         60, "check out the pinned harness revision"),
-    )
-    for args, timeout, action in steps:
-        left = remaining(deadline)
-        if left <= 0:
-            raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached while resolving the harness revision")
+    revision, source = resolve_harness_revision(env, min(30, left))
+    install_log.write_text(f"Expected harness revision: {revision} ({source})\n", encoding="utf-8")
+    # A release tag clones directly, detached at the tag's commit.
+    args = ["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
+            "--branch", revision, HARNESS_URL, str(harness)]
+    action = "clone the resolved harness release"
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    with install_log.open("ab") as output:
+        output.write(("$ " + shlex.join(args) + "\n").encode())
+    try:
+        status = command(args, repo, env, install_log, min(300, left), append=True)
+    except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
-            output.write(("$ " + shlex.join(args) + "\n").encode())
-        try:
-            status = command(args, repo, env, install_log, min(timeout, left), append=True)
-        except subprocess.TimeoutExpired as error:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
-            raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
-        except OSError as error:
-            with install_log.open("ab") as output:
-                output.write(f"{type(error).__name__}: {error}\n".encode())
-            raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
-        if status:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} exited with status {status}\n".encode())
-            raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
+            output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
+        raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
+    except OSError as error:
+        with install_log.open("ab") as output:
+            output.write(f"{type(error).__name__}: {error}\n".encode())
+        raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
+    if status:
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: {action} exited with status {status}\n".encode())
+        raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
 
     left = remaining(deadline)
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        status, actual = command(["git", "-C", str(harness), "rev-parse", "HEAD"],
-                                 repo, env, install_log, min(30, left),
-                                 append=True, capture_output=True)
+        # rev-parse prints one line per argument: the commit the release tag
+        # names, then the checked-out HEAD. Requiring both to be the same
+        # commit verifies the checkout (--branch also accepts a branch name);
+        # the resolved SHA is logged so a run stays traceable to an exact
+        # commit even if a tag moves.
+        status, verified = command(["git", "-C", str(harness), "rev-parse",
+                                    expected_commit_ref(revision), "HEAD"],
+                                   repo, env, install_log, min(30, left),
+                                   append=True, capture_output=True)
     except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
             output.write(f"ERROR: git rev-parse timed out after {error.timeout} seconds\n".encode())
@@ -518,13 +624,14 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         with install_log.open("ab") as output:
             output.write(f"{type(error).__name__}: {error}\n".encode())
         raise EvalError("cannot verify harness revision; see runner/harness-install.log") from error
-    actual = actual.strip()
+    resolved, actual = verified_revisions(verified) if not status else ("", "")
     with install_log.open("ab") as output:
-        output.write(f"Verified harness revision: {actual}\n".encode())
+        output.write(f"Verified harness revision: {resolved or '<unavailable>'}\n".encode())
     if status:
         raise EvalError(f"cannot verify harness revision (exit {status}); see runner/harness-install.log")
-    if actual != HARNESS_REVISION:
-        message = f"harness revision mismatch: expected {HARNESS_REVISION}, got {actual!r}"
+    if not resolved or resolved != actual:
+        message = (f"harness revision mismatch: {revision} resolves to "
+                   f"{resolved or '<unavailable>'!r}, HEAD is {actual or '<unavailable>'!r}")
         with install_log.open("ab") as output:
             output.write(f"ERROR: {message}\n".encode())
         raise EvalError(f"{message}; see runner/harness-install.log")
@@ -553,7 +660,8 @@ def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  #
             cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
             plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
                                   entry.parallelism, entry.max_turns, entry.setup_script,
-                                  tuple(cases), resolved["config_chain"], resolved["eval_name"]))
+                                  tuple(cases), resolved["config_chain"], resolved["eval_name"],
+                                  skill=resolved["skill"], dataset_path=resolved["dataset_path"]))
         except Exception as error:  # pylint: disable=broad-exception-caught
             message = f"{entry.config}: {type(error).__name__}: {error}"
             record.update(status="failed", failure=message)
@@ -634,6 +742,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         run_env["EVAL_SNAPSHOT_DIR"] = snapshot
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached during setup")
+                    expected_cases = planned_cases(plan)
                     invoked = True
                     status = command(["claude", "--model", env.get("CLAUDE_MODEL", "claude-opus-4-6"),
                                       "--plugin-dir", str(harness), "--allowedTools",
@@ -645,6 +754,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
+                    verify_run_identity(directory, plan, expected_cases, repo)
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before regression scoring")
                     # Score the verified physical run through the same harness

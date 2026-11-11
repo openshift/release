@@ -15,15 +15,25 @@ Run the following command from the repository root:
 This generates core-ci alerting manifests in
 [core-ci mixins/prometheus_out](../../core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/).
 
-The separate [legacy app.ci outputs](mixins/prometheus_out/)
-retain their cluster-specific namespace, labels and queries from the last
-pre-move source revision, `2c053f169aa^`; they must not be replaced by copies of
-the core-ci outputs. To regenerate the legacy alerting outputs, extract that
-revision's app.ci mixin directory into a temporary directory, copy the current
+The legacy app.ci `ci-alerts_prometheusrule.yaml` was trimmed to only the alerts
+that cover app.ci-local workloads — `prow-pod-crashlooping`, `NonKubeContainerWaiting`,
+`ciChatBotDown` and `releaseControllerDown` (plus the `github:identity_names`
+recording rule). Every other alert was removed as a duplicate: core-ci's thanos-ruler
+already evaluates those from ci-metrics, so the app.ci copy (evaluated by app.ci's UWM
+Prometheus, which stamps a `namespace="ci"` label) only produced duplicate Slack
+notifications. The four retained alerts stay because core-ci scopes its equivalents to
+`clusterName="core-ci"` and therefore does not cover app.ci series; remove them once
+app.ci's workloads are retired.
+
+These [legacy app.ci outputs](mixins/prometheus_out/) retain their cluster-specific
+namespace, labels and queries from the last pre-move source revision, `2c053f169aa^`;
+they must not be replaced by copies of the core-ci outputs. To regenerate the
+Alertmanager Template, extract that revision's app.ci mixin directory into a temporary
+directory, copy the current
 `_prometheus/{alertmanager_default_receivers,alertmanager,prometheus,ci_absent_alerts}.libsonnet`
-files over the historical copies, and run its Makefile targets
-`ci-alerts_prometheusrule.yaml alertmanager-user-workload-secret_template.yaml`
-using the dashboards-validation image. Copy only those generated outputs back.
+files over the historical copies, and run its Makefile target
+`alertmanager-user-workload-secret_template.yaml`
+using the dashboards-validation image. Copy only that generated output back.
 
 See the [retirement guidance](../../core-ci/ci-monitoring/README.md#retiring-alert-proxy-safely)
 before removing proxy resources or credentials. Applying the Template does not

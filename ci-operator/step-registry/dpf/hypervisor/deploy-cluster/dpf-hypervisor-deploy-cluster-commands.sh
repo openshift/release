@@ -66,6 +66,7 @@ REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
 # Check if target bastion is in maintenance mode
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "test -f /root/${CLUSTER_NAME}/pause"; then
   echo "The cluster is in maintenance mode. Remove the file /root/${CLUSTER_NAME}/pause in the bastion host when the maintenance is over"
+  touch "${ARTIFACT_DIR}/pause"
   exit 1
 fi
 

@@ -1,0 +1,345 @@
+applicationsets:
+- filename: appset-cluster-appci.yaml
+  name: appset-cluster-app-ci
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - git:
+        directories:
+        - path: clusters/app.ci/*
+        repoURL: https://github.com/openshift/release.git
+        revision: main
+    template:
+      metadata:
+        name: app-cluster-app.ci-{{.path.basename}}
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: app.ci
+          namespace: openshift-gitops
+        project: app-ci
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: '{{.path.path}}'
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: true
+            selfHeal: true
+          syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
+    templatePatch: |
+      {{- if eq .path.basename "supplemental-ci-images" }}
+      metadata:
+        annotations:
+          argocd.argoproj.io/compare-options: ServerSideDiff=false
+      spec:
+        syncPolicy:
+          syncOptions:
+            - CreateNamespace=true
+            - PruneLast=true
+      {{- end }}
+- filename: appset-cluster-build-coredns.yaml
+  name: appset-cluster-build-coredns
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - list:
+        elements:
+        - cluster: build05
+          name: build05
+        - cluster: build09
+          name: build09
+        - cluster: build10
+          name: build10
+        - cluster: build11
+          name: build11
+        - cluster: build12
+          name: build12
+    template:
+      metadata:
+        name: app-cluster-{{.cluster}}-coredns
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: '{{.name}}'
+          namespace: openshift-gitops
+        project: build-clusters-coredns
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/coredns/
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: false
+            selfHeal: true
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
+- filename: appset-cluster-build-shared.yaml
+  name: appset-cluster-build-shared
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - matrix:
+        generators:
+        - list:
+            elements:
+            - cluster: build01
+              name: build01
+            - cluster: build02
+              name: build02
+            - cluster: build03
+              name: build03
+            - cluster: build04
+              name: build04
+            - cluster: build05
+              name: build05
+            - cluster: build06
+              name: build06
+            - cluster: build07
+              name: build07
+            - cluster: build08
+              name: build08
+            - cluster: build09
+              name: build09
+            - cluster: build10
+              name: build10
+            - cluster: build11
+              name: build11
+            - cluster: build12
+              name: build12
+            - cluster: build13
+              name: build13
+        - git:
+            directories:
+            - path: clusters/build-clusters/build-shared/*
+            repoURL: https://github.com/openshift/release.git
+            revision: main
+    template:
+      metadata:
+        name: build-shared-{{.cluster}}-{{.path.basename}}
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: '{{.name}}'
+          namespace: openshift-gitops
+        project: build-clusters-common
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: '{{.path.path}}'
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: true
+            selfHeal: true
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
+- filename: appset-cluster-build.yaml
+  name: appset-cluster-build
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - list:
+        elements:
+        - cluster: build01
+          name: build01
+        - cluster: build02
+          name: build02
+        - cluster: build03
+          name: build03
+        - cluster: build04
+          name: build04
+        - cluster: build05
+          name: build05
+        - cluster: build06
+          name: build06
+        - cluster: build07
+          name: build07
+        - cluster: build08
+          name: build08
+        - cluster: build09
+          name: build09
+        - cluster: build10
+          name: build10
+        - cluster: build11
+          name: build11
+        - cluster: build12
+          name: build12
+        - cluster: build13
+          name: build13
+    template:
+      metadata:
+        name: app-cluster-{{.cluster}}
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: '{{.name}}'
+          namespace: openshift-gitops
+        project: build-clusters
+        sources:
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/{{.cluster}}/
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: false
+            selfHeal: true
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
+- filename: appset-cluster-core-ci.yaml
+  name: appset-cluster-core-ci
+  spec:
+    generators:
+    - git:
+        directories:
+        - path: clusters/core-ci/*
+        repoURL: https://github.com/openshift/release.git
+        revision: main
+    template:
+      metadata:
+        name: '{{path.basename}}'
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: core-ci
+        project: core-ci
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: '{{path}}'
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: false
+            selfHeal: false
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
+- filename: appset-cluster-hosted-mgmt.yaml
+  name: appset-cluster-hosted-mgmt
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - git:
+        directories:
+        - path: clusters/hosted-mgmt/*
+        - path: clusters/build-clusters/build-shared/managed
+        - path: clusters/build-clusters/build-shared/ocp
+        repoURL: https://github.com/openshift/release.git
+        revision: main
+    template:
+      metadata:
+        annotations:
+          argocd.argoproj.io/compare-options: ServerSideDiff=false
+        name: hosted-mgmt-{{.path.basename}}
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: hosted-mgmt
+          namespace: openshift-gitops
+        project: hosted-mgmt
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: '{{.path.path}}'
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: false
+            selfHeal: true
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+- filename: appset-cluster-hosted-mgmt2.yaml
+  name: appset-cluster-hosted-mgmt2
+  spec:
+    goTemplate: true
+    goTemplateOptions:
+    - missingkey=error
+    generators:
+    - git:
+        directories:
+        - path: clusters/hosted-mgmt2/*
+        - path: clusters/build-clusters/build-shared/managed
+        - path: clusters/build-clusters/build-shared/ocp
+        repoURL: https://github.com/openshift/release.git
+        revision: main
+    template:
+      metadata:
+        name: hosted-mgmt2-{{.path.basename}}
+        namespace: openshift-gitops
+      spec:
+        destination:
+          name: hosted-mgmt2
+          namespace: openshift-gitops
+        project: hosted-mgmt2
+        source:
+          directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: '{{.path.path}}'
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: main
+        syncPolicy:
+          automated:
+            enabled: true
+            prune: false
+            selfHeal: true
+          syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true
