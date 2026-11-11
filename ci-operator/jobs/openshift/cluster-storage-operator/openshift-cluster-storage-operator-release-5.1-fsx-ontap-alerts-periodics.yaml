@@ -1,0 +1,275 @@
+periodics:
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This job is maintained by hand and is not generated
+      by ci-operator-prowgen. Before starting ci-operator, it selects the newest 5.1.0-0.nightly
+      payload in the Ready, Accepted or Rejected phase rather than only the newest
+      Accepted one. The comments in the container command explain why and how to maintain
+      it. Validate changes with make test-fsx-ontap-alerts-release-selector.
+  cluster: build11
+  cron: 17 3,15 * * *
+  decorate: true
+  decoration_config:
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  extra_refs:
+  - base_ref: release-5.1
+    org: openshift
+    repo: cluster-storage-operator
+    sparse_checkout_files:
+    - .ci-operator.yaml
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+    ci-operator.openshift.io/variant: periodics
+    job-release: "5.1"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-storage-operator-release-5.1-periodics-periodic-e2e-aws-csi-fsx-ontap-alerts
+  reporter_config:
+    slack:
+      channel: '#team-ocp-storage-triage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --enable-secrets-store-csi-driver=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gsm-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=periodic-e2e-aws-csi-fsx-ontap-alerts
+      - --variant=periodics
+      command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        # Hand-maintained Prow job: FSx for NetApp ONTAP storage-path alert periodic.
+        #
+        # Why this job is not generated from ci-operator/config:
+        #   It must install the newest successfully created 5.1 nightly payload, which
+        #   may still be Ready or may have been Rejected, not only the newest Accepted
+        #   one. A ci-operator `candidate` release always resolves the newest Accepted
+        #   payload. ci-operator expands an explicitly chosen payload into the `stable`
+        #   image stream (installer, cli and tests images) only when
+        #   RELEASE_IMAGE_LATEST is set before ci-operator starts. ci-operator-prowgen
+        #   cannot add such a wrapper to a generated job, so this job is kept by hand.
+        #
+        # Maintenance:
+        #   - The job has no ci.openshift.io/generator label, so `make jobs` keeps it
+        #     as is. It is not regenerated from ci-operator/config; edit this file.
+        #   - UNRESOLVED_CONFIG inlines the ci-operator configuration. Keep its base
+        #     images, build root, releases and resources in sync with
+        #     ci-operator/config/openshift/cluster-storage-operator/openshift-cluster-storage-operator-release-5.1__periodics.yaml,
+        #     where the other release-5.1 storage periodics live.
+        #   - Keep container args, env, volumes and service account in sync with the
+        #     generated jobs in openshift-cluster-storage-operator-release-5.1-periodics.yaml.
+        #   - Run `make test-fsx-ontap-alerts-release-selector` after editing this job
+        #     or after `make jobs` changes the generated jobs. It tests this script and
+        #     fails when the job drifts from the generated jobs or from the config.
+        set -euo pipefail
+
+        stream="5.1.0-0.nightly"
+        tags_url="https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${stream}/tags?phase=Ready&phase=Accepted&phase=Rejected"
+
+        # Retry transient failures a bounded number of times; fail on HTTP errors.
+        if ! response="$(curl --fail --silent --show-error --location --connect-timeout 20 --max-time 60 --retry 5 --retry-delay 10 --retry-all-errors "${tags_url}")"; then
+          echo "error: failed to list ${stream} payloads from ${tags_url}" >&2
+          exit 1
+        fi
+
+        # Select the newest timestamped payload in the Ready, Accepted or Rejected
+        # phase. Any unexpected response fails the job; there is no fallback.
+        # The response is passed on file descriptor 3 because stdin holds the program.
+        if ! release_image="$(python3 - "${stream}" 3<<<"${response}" <<'EOF'
+        import datetime
+        import json
+        import os
+        import re
+        import sys
+
+        stream = sys.argv[1]
+        eligible = ("Ready", "Accepted", "Rejected")
+        known = eligible + ("Pending", "Failed")
+
+
+        def fail(message):
+            sys.exit(f"error: {message}")
+
+
+        with os.fdopen(3, encoding="utf-8") as response:
+            raw = response.read()
+        if not raw.strip():
+            fail("empty response from the release controller")
+        try:
+            release = json.loads(raw)
+        except ValueError as err:
+            fail(f"malformed release controller response: {err}")
+        if not isinstance(release, dict):
+            fail("release controller response is not a JSON object")
+        if release.get("name") != stream:
+            fail(f"response is for release stream {release.get('name')!r}, expected {stream!r}")
+        tags = release.get("tags")
+        if not isinstance(tags, list):
+            fail("release controller response has no tags list")
+
+        candidates = []
+        for tag in tags:
+            if not isinstance(tag, dict):
+                fail(f"malformed tag entry {tag!r}")
+            name = tag.get("name")
+            phase = tag.get("phase")
+            if not isinstance(name, str) or not re.fullmatch(re.escape(stream) + r"-\d{4}-\d{2}-\d{2}-\d{6}", name):
+                fail(f"tag {name!r} is not a timestamped {stream} payload")
+            if phase not in known:
+                fail(f"tag {name} has unknown phase {phase!r}")
+            try:
+                created = datetime.datetime.strptime(name[len(stream) + 1:], "%Y-%m-%d-%H%M%S")
+            except ValueError:
+                fail(f"tag {name} has an invalid creation timestamp")
+            if phase in eligible:
+                candidates.append((created, name, phase, tag.get("pullSpec")))
+
+        if not candidates:
+            fail(f"no {stream} payload is Ready, Accepted or Rejected")
+        _, name, phase, pull_spec = max(candidates, key=lambda candidate: candidate[0])
+        if not isinstance(pull_spec, str) or not re.fullmatch(r"[^\s:]+(:[0-9]+)?/[^\s:]+:" + re.escape(name), pull_spec):
+            fail(f"newest eligible tag {name} has an invalid pullSpec {pull_spec!r}")
+        print(f"Selected {name} ({phase}), the newest of {len(candidates)} eligible {stream} payloads", file=sys.stderr)
+        print(pull_spec)
+        EOF
+        )"; then
+          echo "error: could not select a ${stream} payload" >&2
+          exit 1
+        fi
+
+        export RELEASE_IMAGE_LATEST="${release_image}"
+        echo "Using RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}"
+        exec ci-operator "$@"
+      - fsx-ontap-alerts-release-wrapper
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      - name: UNRESOLVED_CONFIG
+        value: |
+          base_images:
+            cluster-storage-operator-test:
+              name: '5.1'
+              namespace: ocp
+              tag: cluster-storage-operator-test
+            dev-scripts:
+              name: test
+              namespace: ocp-kni
+              tag: dev-scripts
+            upi-installer:
+              name: '5.1'
+              namespace: ocp
+              tag: upi-installer
+            vsphere-ci-python:
+              name: vsphere-python
+              namespace: ci
+              tag: latest
+          build_root:
+            from_repository: true
+          releases:
+            initial:
+              candidate:
+                product: ocp
+                stream: nightly
+                version: '5.0'
+            latest:
+              candidate:
+                product: ocp
+                stream: nightly
+                version: '5.1'
+          resources:
+            '*':
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: periodic-e2e-aws-csi-fsx-ontap-alerts
+            steps:
+              cluster_profile: openshift-org-aws
+              env:
+                FEATURE_SET: TechPreviewNoUpgrade
+                TEST_SUITE: cso/storage-path-alerting
+              workflow: openshift-e2e-aws-csi-fsx-ontap-alerts
+          zz_generated_metadata:
+            branch: release-5.1
+            org: openshift
+            repo: cluster-storage-operator
+            variant: periodics
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gsm-credentials
+        name: gsm-sa-key
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: ci-operator-sa-key-spc
+      name: gsm-sa-key
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
