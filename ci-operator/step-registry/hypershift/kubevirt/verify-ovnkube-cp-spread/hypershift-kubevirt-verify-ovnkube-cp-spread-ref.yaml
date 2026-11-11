@@ -1,0 +1,42 @@
+ref:
+  as: hypershift-kubevirt-verify-ovnkube-cp-spread
+  from: cli
+  grace_period: 1m0s
+  timeout: 20m0s
+  env:
+    - name: MCE_VERSION
+      default: ""
+      documentation: |-
+        Version of MCE, if installed. Selects the hosted control plane namespace
+        prefix: local-cluster when set, clusters otherwise.
+    - name: OVNKUBE_CP_ROLLOUT_TIMEOUT
+      default: "10m"
+      documentation: |-
+        How long to wait for the ovnkube-control-plane deployment to roll out
+        before declaring the placement unsatisfiable.
+  commands: hypershift-kubevirt-verify-ovnkube-cp-spread-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Verifies that ovnkube-control-plane can schedule on the management cluster
+    and that its replicas are spread across nodes.
+
+    This exists to make a single-zone management cluster a real test of
+    OCPBUGS-76964. CNO renders pod anti-affinity for ovnkube-control-plane only
+    when the hosted control plane has more than one replica, so the check is a
+    no-op unless CONTROL_PLANE_AVAILABILITY=HighlyAvailable. With a required
+    zone anti-affinity, a cluster whose nodes all share one
+    topology.kubernetes.io/zone value cannot place the second replica and it
+    stays Pending; the rollout wait is what turns that into a job failure
+    rather than something only visible later as a degraded network
+    ClusterOperator.
+
+    It also asserts the replicas occupy distinct nodes, so that relaxing the
+    zone rule cannot silently drop node-level spreading. Zones are logged but
+    not asserted: sharing a zone is the expected outcome on a single-zone
+    cluster.
+
+    Runs against the management cluster, so it must be placed where KUBECONFIG
+    still points at ${SHARED_DIR}/kubeconfig.
