@@ -22,7 +22,7 @@ oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are optional until
 their metadata, source access and RPA baselines have been validated. This includes
 newly created streams whose build metadata or release mappings are not ready yet.
 
-All 61 jobs run for PRs that change metadata matched by `run_if_changed`.
+A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
 The existing 16 ACM/MCE jobs remain required; their validation failures block
 merging. Each additional branch needs its own CI
 configuration referencing the same workflow. New y-streams
