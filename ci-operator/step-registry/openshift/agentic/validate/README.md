@@ -83,6 +83,13 @@ default rejects a 4096-token response allowance because its entire context is
 4096 tokens. The credential is provisioned as
 `test-platform-infra/agent-validation-model/token`.
 
+The same credential group must contain `ca-bundle`, obtained from Red Hat's
+official corporate CA distribution. `VALIDATION_MODEL_CA_FILE` defaults to that
+mounted file. The model client adds it to system trust and continues to verify
+certificates and hostnames. The corporate CA stays in the credential store and
+outside generated command containers. Set this parameter empty when using an
+endpoint that needs only the system CA bundle.
+
 `VALIDATION_TIMEOUT_SECONDS` is measured in **seconds**:
 
 | Phase | Default | Meaning |
@@ -135,6 +142,11 @@ built separately from the branch and must be available as
 `ci/agentic-validation-rehearsal-88469:latest` before the jobs start. Retain reports,
 command evidence and job links, then remove the temporary configuration and image
 resources before merge. No permanent rehearsal jobs are required by the component.
+
+These jobs require the `intranet` capability and are pinned to build03 while
+under review. Corporate endpoint reachability and CA trust must both be present;
+a missing issuer certificate is a runner failure, never a reason to disable TLS
+verification.
 
 The corporate model's basic completion and tool protocol have been checked live.
 Plan quality, production image publication and a known-broken/fixed scenario on

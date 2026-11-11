@@ -18,6 +18,7 @@ import select
 import signal
 import socket
 import socketserver
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -373,7 +374,7 @@ def token_file(name, default, optional=False):
     return value
 
 
-def request_json(url, headers=None, payload=None):
+def request_json(url, headers=None, payload=None, ca_file=None):
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise ValidationError("API endpoints must be HTTPS URLs without credentials")
@@ -383,14 +384,20 @@ def request_json(url, headers=None, payload=None):
         data = json.dumps(payload).encode()
         request_headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=request_headers)
+    handlers = [NoRedirect()]
+    if ca_file:
+        context = ssl.create_default_context()
+        context.load_verify_locations(cafile=ca_file)
+        handlers.append(urllib.request.HTTPSHandler(context=context))
     try:
-        with urllib.request.build_opener(NoRedirect()).open(request, timeout=90) as response:
+        with urllib.request.build_opener(*handlers).open(request, timeout=90) as response:
             result = response.read(MAX_RESPONSE + 1)
     except urllib.error.HTTPError as error:
         # Response bodies can contain credentials or private issue content.
         raise ValidationError(f"API returned HTTP {error.code}") from None
     except (urllib.error.URLError, TimeoutError) as error:
-        raise ValidationError("API request failed or timed out") from error
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        raise ValidationError(f"API request failed ({type(reason).__name__})") from error
     if len(result) > MAX_RESPONSE:
         raise ValidationError("API response exceeds size limit")
     return json.loads(result)
@@ -478,6 +485,7 @@ class Model:  # pylint: disable=too-few-public-methods
         self.url = required("VALIDATION_MODEL_URL")
         self.model = required(f"VALIDATION_{phase.upper()}_MODEL")
         self.token = token_file("VALIDATION_MODEL_TOKEN_FILE", "/var/run/validation-model/token")
+        self.ca_file = os.environ.get("VALIDATION_MODEL_CA_FILE") or None
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
     def request_payload(self, messages, tools):
@@ -505,7 +513,7 @@ class Model:  # pylint: disable=too-few-public-methods
     def complete(self, messages, tools=None):
         payload = self.request_payload(messages, tools)
         headers = {"Authorization": f"Bearer {self.token}"}
-        response = request_json(self.url, headers, payload)
+        response = request_json(self.url, headers, payload, ca_file=self.ca_file)
         self.record_usage(response)
         return model_message(response)
 
