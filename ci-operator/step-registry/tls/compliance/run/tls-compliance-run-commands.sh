@@ -20,7 +20,7 @@ SCANNER_NAMESPACE="${SCANNER_NAMESPACE:-tls-compliance-scan}"
 SCAN_TIMEOUT_SECONDS="${SCAN_TIMEOUT_SECONDS:-1800}"
 KEEPER_IMAGE="${KEEPER_IMAGE:-registry.access.redhat.com/ubi9/ubi-minimal:latest}"
 MANIFEST_REF="${TLS_COMPLIANCE_MANIFEST_REF:-v1.2.0}"
-SCANNER_IMAGE="${TLS_COMPLIANCE_OPERATOR_IMAGE:-quay.io/bapalm/tls-compliance-operator:v1.2.0}"
+SCANNER_IMAGE="${TLS_COMPLIANCE_OPERATOR_IMAGE:-quay.io/bapalm/tls-compliance-operator@sha256:b4f2602bf37decd4dbdbc1b195f440b4c11a0c7c734f9ea5ac2a67290ac1241b}"
 
 SCAN_NAMESPACES="${SCAN_NAMESPACES:-}"
 SCAN_ALL_PORTS="${SCAN_ALL_PORTS:-false}"
