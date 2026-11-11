@@ -136,7 +136,51 @@ done
 # default HOURS_OLD=12 means any role older than 12h is guaranteed to belong
 # to a cluster that has already finished (and been deleted by OCM). No OCM
 # API check is needed — the age threshold is the cluster-liveness proxy.
+
+# Reports how many IAM roles the account holds against the account's own role
+# quota, so the log shows the headroom this cleanup is working against instead
+# of only how many op-gate-stg-* roles it happened to touch.
+#
+# IAM GetAccountSummary returns account-wide totals in a single response, so
+# these numbers need no listing and no pagination. Roles counts every role in
+# the account, not just the op-gate-stg-* prefix handled below, and RolesQuota
+# is the quota the account actually has, which may differ from the documented
+# RolesPerAccount default.
+#
+# This is diagnostic only and strictly best effort:
+#   * bounded to one call with a hard 30s wall-clock limit, so the two calls add
+#     at most 60s to a step whose grace period is 5m;
+#   * every unhappy path -- denied, failed, timed out (exit 124), a `timeout`
+#     binary missing from the image (exit 127), empty, "None" or non-numeric --
+#     prints "unavailable" rather than a zero count, so an absent
+#     iam:GetAccountSummary permission can never be read as "no roles";
+#   * nothing but the two integers and their difference is echoed: no command
+#     output, error text, account identity, ARN, role name or policy. The
+#     2>/dev/null redirect is installed in the child before any error is
+#     written, so even a "command not found" cannot reach the log;
+#   * it never touches overall_exit, so it cannot change the step's result, and
+#     it never gates the cleanup that follows.
+report_iam_role_headroom() {
+  local phase="$1"
+  local summary roles quota usage="unavailable"
+
+  if summary=$(timeout 30 aws iam get-account-summary \
+    --query 'SummaryMap.[Roles,RolesQuota]' --output text 2>/dev/null); then
+    # --output text separates the two values with a tab, but squeeze whitespace
+    # and take the first two fields so a newline-separated rendering parses too.
+    read -r roles quota _ <<< "$(tr -s '[:space:]' ' ' <<< "${summary}")"
+    # Validate before any arithmetic. 10# keeps a value such as "09" out of
+    # octal, which would otherwise abort the expansion with an interpreter error.
+    if [[ "${roles}" =~ ^[0-9]+$ && "${quota}" =~ ^[0-9]+$ ]] && (( 10#${quota} > 0 )); then
+      usage="account_roles=$((10#${roles})) account_quota=$((10#${quota})) headroom=$((10#${quota} - 10#${roles}))"
+    fi
+  fi
+
+  echo "  IAM role usage (${phase}): ${usage}"
+}
+
 echo "=== IAM operator role cleanup (global) ==="
+report_iam_role_headroom "before cleanup"
 echo "  Listing op-gate-stg-* roles older than ${HOURS_OLD}h..."
 
 iam_roles_output=""
@@ -188,6 +232,7 @@ while IFS=$'\t' read -r role_name create_time; do
 done <<< "${iam_roles_output}"
 
 echo "  IAM role cleanup done: deleted=${iam_deleted}, skipped_recent=${iam_skipped}"
+report_iam_role_headroom "after cleanup"
 echo "=== Done: IAM operator roles ==="
 echo ""
 
