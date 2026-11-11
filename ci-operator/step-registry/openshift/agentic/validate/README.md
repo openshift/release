@@ -139,7 +139,7 @@ exercise the runner while this PR is under review:
 
 Trigger these jobs with `/pj-rehearse` on the release PR. The rehearsal image is
 built separately from the branch and must be available as
-`ci/agentic-validation-rehearsal-88469:latest` before the jobs start. Retain reports,
+`ci/agentic-validation-rehearsal-88469:ca-trust` before the jobs start. Retain reports,
 command evidence and job links, then remove the temporary configuration and image
 resources before merge. No permanent rehearsal jobs are required by the component.
 
