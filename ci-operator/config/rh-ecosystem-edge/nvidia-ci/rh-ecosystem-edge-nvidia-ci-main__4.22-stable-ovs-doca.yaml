@@ -211,6 +211,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
       OCP_ARCH: amd64
+      OVS_DOCA_CLUSTER_HOLD_MINUTES: "0"
     test:
     - ref: ovs-doca-validate-node-package
     - as: get-nodes
@@ -229,11 +230,19 @@ tests:
       cli: latest
       commands: |
         # Copy cluster credentials into the job artifacts so the cluster can
-        # be reached manually during the hold-cluster step below. Artifacts
-        # are synced to GCS continuously while the job runs, so the files are
-        # downloadable from the job's artifact browser (spyglass "Artifacts"
-        # tab) while the cluster is still up. Nothing sensitive is printed
-        # into the build log itself (No-Sensitive-Data-In-Logs).
+        # be reached manually during the hold-cluster step below. Controlled
+        # by OVS_DOCA_CLUSTER_HOLD_MINUTES in this config's shared test env:
+        # 0 (default) skips the hold and this publication with it -- there is
+        # no point publishing cluster-admin credentials for a cluster that is
+        # about to be deprovisioned. Artifacts are synced to GCS continuously
+        # while the job runs, so the files are downloadable from the job's
+        # artifact browser (spyglass "Artifacts" tab) while the cluster is
+        # still up. Nothing sensitive is printed into the build log itself
+        # (No-Sensitive-Data-In-Logs).
+        if [ "${OVS_DOCA_CLUSTER_HOLD_MINUTES}" -le 0 ]; then
+          echo "OVS_DOCA_CLUSTER_HOLD_MINUTES=0: no hold requested, skipping credential publication."
+          exit 0
+        fi
         for f in kubeconfig kubeadmin-password; do
           if [ -s "${SHARED_DIR}/${f}" ]; then
             cp "${SHARED_DIR}/${f}" "${ARTIFACT_DIR}/${f}"
@@ -252,11 +261,16 @@ tests:
       commands: |
         # Hold the cluster up for manual debugging after the validation steps
         # have run; the deprovision/post chain only starts after this step
-        # finishes. The prow default job timeout is 24h, so the hold fits
-        # comfortably alongside the ~1.5h install+validate runtime. The
-        # interval is user-pinnable via OVS_DOCA_CLUSTER_HOLD_MINUTES (env
-        # below, default 15) -- set it there to change how long the cluster
-        # stays up for a given rehearsal.
+        # finishes. Controlled by OVS_DOCA_CLUSTER_HOLD_MINUTES in this
+        # config's shared test env: 0 (default) skips the hold entirely and
+        # the cluster goes straight to teardown -- set it to the number of
+        # minutes the cluster should stay up when a debugging window is
+        # wanted. The prow default job timeout is 24h, so any reasonable hold
+        # fits alongside the ~1.5h install+validate runtime.
+        if [ "${OVS_DOCA_CLUSTER_HOLD_MINUTES}" -le 0 ]; then
+          echo "OVS_DOCA_CLUSTER_HOLD_MINUTES=0: no hold requested, releasing cluster to deprovision."
+          exit 0
+        fi
         echo "Validation finished; holding the cluster for ${OVS_DOCA_CLUSTER_HOLD_MINUTES} minutes."
         echo ""
         echo "To work on the cluster from your laptop:"
@@ -284,9 +298,6 @@ tests:
           sleep "$INTERVAL"
         done
         echo "[$(date -u +%H:%M:%S)] hold complete, releasing cluster to deprovision"
-      env:
-      - name: OVS_DOCA_CLUSTER_HOLD_MINUTES
-        default: "15"
       from: src
       resources:
         requests:

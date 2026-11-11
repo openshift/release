@@ -40,7 +40,7 @@ PR. Comment on a PR touching this config:
 ```
 
 Pipeline: image build (~5 min) → AWS IPI install (~45 min) → validation
-(~1 min) → publish credentials → hold → teardown. **Do not push new commits
+(~1 min) → [optional hold, see below] → teardown. **Do not push new commits
 to the PR while a rehearsal is running** — pj-rehearse cancels rehearsal jobs
 when the PR head changes.
 
@@ -67,11 +67,16 @@ the config in the PR — `/pj-rehearse` does not accept per-run overrides.
 | `OVS_DOCA_VALIDATE_NODE_ROLES` | `master worker` | Space-separated node roles to validate. The layered image is in the release payload, so it lands on every node. |
 | `OVS_DOCA_EXPECTED_RPM_VERSION` | `3.4.0040-1.el9` | Exact `VERSION-RELEASE` of `doca-openvswitch` the nodes must have. NOT the DOCA train number — see below. |
 
-### Debugging hold (`hold-cluster`)
+### Debugging hold (opt-in)
 
 | Env | Default | Meaning |
 |-----|---------|---------|
-| `OVS_DOCA_CLUSTER_HOLD_MINUTES` | `15` | Minutes the cluster stays up after validation, for manual work, before the post chain tears it down. The step logs a heartbeat every 5 minutes with the time remaining. |
+| `OVS_DOCA_CLUSTER_HOLD_MINUTES` | `0` (disabled) | Minutes the cluster stays up after validation for manual work, before the post chain tears it down. `0` (the default) skips the hold **and** the credential publication — the cluster goes straight to teardown. Set it to the number of minutes wanted (e.g. `60`) to get a debugging window. |
+
+The hold is **opt-in**: by default the rehearsal validates and tears down with
+no pause. When a hold is requested, the step logs a heartbeat every 5 minutes
+with the time remaining, and the `publish-cluster-access` step (which also
+skips itself at `0`) copies the cluster credentials into the job artifacts.
 
 ### Version pinning
 
@@ -92,9 +97,11 @@ resolved to a digest once per job.
 
 ## Working with the live cluster during the hold
 
-The `publish-cluster-access` step copies `kubeconfig` and `kubeadmin-password`
-into the job artifacts; step artifacts sync to GCS when the step's container
-finishes, so they are downloadable while the hold is running. From the
+Only applicable when `OVS_DOCA_CLUSTER_HOLD_MINUTES` is set to a non-zero
+value. The `publish-cluster-access` step copies `kubeconfig` and
+`kubeadmin-password` into the job artifacts; step artifacts sync to GCS when
+the step's container finishes, so they are downloadable while the hold is
+running. From the
 [prow job view](https://prow.ci.openshift.org/) (Artifacts / spyglass):
 
 ```
