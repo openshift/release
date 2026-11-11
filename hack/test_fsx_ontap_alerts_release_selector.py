@@ -102,9 +102,13 @@ class JobDefinitionTests(unittest.TestCase):
 
     def test_matches_generated_jobs(self):
         # prowgen only updates generated jobs; catch drift in credentials, volumes or args.
+        # Compare with jobs generated from the same config variant: other variants in
+        # the file (for example periodics-integration) pass a different --variant.
+        variant = self.job["labels"]["ci-operator.openshift.io/variant"]
         with GENERATED_JOB_FILE.open(encoding="utf-8") as job_file:
             generated = [job for job in yaml.safe_load(job_file)["periodics"]
-                         if job["labels"].get("ci.openshift.io/generator") == "prowgen"]
+                         if job["labels"].get("ci.openshift.io/generator") == "prowgen"
+                         and job["labels"].get("ci-operator.openshift.io/variant") == variant]
         self.assertTrue(generated, f"no generated jobs in {GENERATED_JOB_FILE}")
         for job in generated:
             with self.subTest(job=job["name"]):
