@@ -2,16 +2,28 @@ ref:
   as: hypershift-generate-test-plan
   from: claude-ai-helpers
   commands: hypershift-generate-test-plan-commands.sh
+  no_kubeconfig: true
   timeout: 20m0s
   env:
-  - name: GENERATE_TEST_PLAN_FROM_PR
-    default: "false"
+  - name: HYPERSHIFT_PLATFORM
+    default: "aws"
     documentation: |-
-      When "true", use Claude to generate a TEST_PLAN YAML from the PR under
-      test and write it to SHARED_DIR/test-plan.yaml for create-guests and
-      run-tests. When "false" (default), this step is a no-op. Skipped if
-      SHARED_DIR/test-plan.yaml already exists (e.g. from an explicit TEST_PLAN
-      via hypershift-write-test-plan).
+      Platform the test plan is generated for. Must match the platform config
+      used by create-guests and run-tests.
+  - name: TARGET_PULL_NUMBER
+    default: ""
+    documentation: |-
+      Generate the plan for this pull request of TARGET_REPO instead of the
+      pull request that triggered the job. For rehearsals, where the triggering
+      pull request is in openshift/release.
+  - name: TARGET_REPO
+    default: "openshift/hypershift"
+    documentation: |-
+      Repository of TARGET_PULL_NUMBER. Ignored unless TARGET_PULL_NUMBER is set.
+  - name: TARGET_BASE_REF
+    default: "main"
+    documentation: |-
+      Base branch of TARGET_PULL_NUMBER. Ignored unless TARGET_PULL_NUMBER is set.
   - name: CLAUDE_CODE_USE_VERTEX
     default: "1"
     documentation: |-
@@ -36,6 +48,10 @@ ref:
     default: "15m"
     documentation: |-
       Timeout for the Claude/agentic-ci invocation (timeout(1) duration).
+  - name: CLAUDE_MAX_TURNS
+    default: "60"
+    documentation: |-
+      Maximum number of agent turns for the Claude invocation.
   resources:
     requests:
       cpu: 500m
@@ -45,10 +61,16 @@ ref:
     group: claude-prow
     mount_path: /var/run/claude-code-service-account
   documentation: |-
-    Optionally generate a HyperShift e2e-v2 TEST_PLAN YAML from the PR under
-    test using Claude. No-ops unless GENERATE_TEST_PLAN_FROM_PR=true.
+    Uses Claude to generate a focused HyperShift e2e-v2 test plan from the pull
+    request under test and writes it to SHARED_DIR/test-plan.yaml for
+    create-guests and run-tests.
 
-    When enabled, clones the PR head, inspects the diff and hypershift source
-    (test plan schema, variants, Ginkgo labels), and writes
-    SHARED_DIR/test-plan.yaml for consumption by create-guests and run-tests.
-    Fails the step if generation or validation fails.
+    Run it as the first pre step, before any cluster exists: a failure is then
+    cheap and SHARED_DIR holds no kubeconfig. A later hypershift-write-test-plan
+    step with an explicit TEST_PLAN overwrites the generated plan.
+
+    The pull request is untrusted input. Claude gets read-only file tools, no
+    shell and no network tools, and is denied the credential mounts. The plan
+    is validated against the schema, the platform's variants and the Ginkgo
+    labels in the checkout before it is published. The step fails if generation
+    or validation fails.
