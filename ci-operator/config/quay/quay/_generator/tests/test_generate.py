@@ -231,6 +231,24 @@ def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     assert presubmit_refs == expected_refs
 
 
+def test_presubmit_upgrade_wires_the_real_playwright_repository() -> None:
+    cell = _phase0_cell(
+        branch="redhat-3.17",
+        quay_version="3.17",
+        kind="presubmit",
+        cron=None,
+        test="upgrade",
+        upgrade_from="3.16",
+        always_run=False,
+        optional=True,
+    )
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    env = config["tests"][0]["steps"]["env"]
+    assert env["PLAYWRIGHT_GIT_REPO"] == "https://github.com/quay/quay.git"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.17"
+
+
 def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
     weekly = apply_kind_settings(
         {"tests": [{"steps": {"cluster_profile": "aws-quay-qe"}}]},

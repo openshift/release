@@ -51,6 +51,14 @@ resources:
 tests:
 - as: "{{ test_as }}"
   timeout: 4h0m0s
+{% if test == "upgrade" %}
+  # The composed modern-upgrade seed/verify refs default their per-phase
+  # repository controls to this value. Keep it in the presubmit base too: a
+  # rehearsal is a real consumer, not a wrapper with an image-only fallback.
+  steps:
+    env:
+      PLAYWRIGHT_GIT_REPO: https://github.com/quay/quay.git
+{% endif %}
 {% if test not in ['upgrade', 'upgrade-legacy'] and quay_version is defined %}
   # Versioned presubmits must not inherit the deploy step's stable-3.16 default.
   # Master has no Quay version and keeps that existing default behavior.

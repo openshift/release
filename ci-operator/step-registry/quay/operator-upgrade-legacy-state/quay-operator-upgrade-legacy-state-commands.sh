@@ -56,11 +56,23 @@ scrub_cypress_text() {
   local -
   set +x
   sed -u -E \
+    -e 's@(Authorization(&quot;|")?[[:blank:]]*:[[:blank:]]*(&quot;|")?([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}@\1<redacted:authorization>@Ig' \
     -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1<redacted:authorization>|Ig' \
     -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1<redacted:csrf>|Ig' \
     -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1<redacted:session>|g' \
     -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1<redacted:value>#Ig' \
     | sed -u -e "s|${OWNER_PASSWORD}|<redacted:password>|g" -e "s|${MEMBER_PASSWORD}|<redacted:password>|g"
+}
+prepare_cypress_dependencies() {
+  # The quay-test-console image contains the checkout but not its installed
+  # Cypress dependencies. This adapter runs before quay-test-api-legacy, the
+  # established consumer that performs this supported installation.
+  (
+    cd quay-api-tests
+    [[ -f package.json ]] || fail "quay-api-tests package.json is missing"
+    npm install --no-audit --no-fund
+    [[ -x node_modules/.bin/cypress ]] || fail "Cypress binary was not installed in quay-api-tests"
+  )
 }
 sanitize_cypress_artifacts() {
   local file
@@ -242,6 +254,7 @@ ROBOT='${ROBOT}'
 TAG='upgrade-legacy'
 EOF
   chmod 600 "${STATE_FILE}"
+  prepare_cypress_dependencies
   write_cypress_spec
   run_cypress
   # No shell trace and no credential-containing command output. The image/tag
@@ -260,6 +273,7 @@ else
   source "${STATE_FILE}"
   registry_tag_present "${ROUTE}" "${OWNER}" "${OWNER_PASSWORD}" "${ORG}" "${REPOSITORY}" \
     || fail "persisted image tag is missing after upgrade"
+  prepare_cypress_dependencies
   write_cypress_spec
   run_cypress
   rm -f "${STATE_FILE}"
