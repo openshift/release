@@ -1,13 +1,26 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
-# TEMPORARY rehearsal aid: hold this step for live debugging until the
-# /tmp/kueue-run-sdk-debug-release marker appears or 4h pass. Remove before merge.
-echo "Holding for live debugging (release with: touch /tmp/kueue-run-sdk-debug-release)"
-deadline=$(( $(date +%s) + 14400 ))
-while [[ ! -f /tmp/kueue-run-sdk-debug-release && $(date +%s) -lt $deadline ]]; do
-    sleep 15
-done
+set -eEuo pipefail
+# TEMPORARY rehearsal aid: on failure, hold this step (and the cluster) for
+# live debugging instead of exiting; remove before merge.
+hold_for_debug() {
+    trap - ERR
+    echo "=== FAILED at line $1 — holding the cluster for live debugging"
+    echo "=== release with: touch /tmp/kueue-run-sdk-debug-release"
+    local deadline=$(( $(date +%s) + 14400 ))
+    while [[ ! -f /tmp/kueue-run-sdk-debug-release && $(date +%s) -lt $deadline ]]; do
+        sleep 15
+    done
+}
+on_error() {
+    trap - ERR
+    echo "=== dumping OLM state for diagnostics"
+    oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
+    oc get csv -A 2>&1 | grep -i kueue || true
+    oc get pods -n openshift-marketplace 2>&1 | grep -i kueue || true
+    hold_for_debug "$1"
+}
+trap 'on_error $LINENO' ERR
 
 # Install the kueue operator from the mirrored registry using operator-sdk,
 # which serves the bundle as a catalog (a plain bundle image cannot be one).
@@ -31,7 +44,7 @@ if [[ "$(head -c 4 "${OPERATOR_SDK_BIN}" | od -An -tx1 | tr -d ' \n')" != "7f454
     exit 1
 fi
 SDK_SHA256=$(sha256sum "${OPERATOR_SDK_BIN}" | awk '{print $1}')
-echo "operator-sdk downloaded: $(stat -c%s "${OPERATOR_SDK_BIN}") bytes, sha256 ${SDK_SHA256:0,16}..."
+echo "operator-sdk downloaded: $(stat -c%s "${OPERATOR_SDK_BIN}") bytes, sha256 ${SDK_SHA256:0:16}..."
 chmod +x "${OPERATOR_SDK_BIN}"
 
 # Download the SDK before setting SSL_CERT_FILE: it replaces the system
@@ -59,7 +72,7 @@ oc label --overwrite ns openshift-kueue-operator security.openshift.io/scc.podSe
 # Wait for the MachineConfigPool rollout triggered by the mirror policies
 echo 'Waiting for the MachineConfigPool to finish rollout...'
 oc wait mcp --all --for=condition=Updating --timeout=5m || true
-oc wait mcp --all --for=condition=Updated --timeout=20m || true
+oc wait mcp --all --for=condition=Updated --timeout=20m
 
 mirror=${BUNDLE_IMAGE%%/*}
 # Image imports need mirror trust independently of the nodes.
@@ -78,6 +91,9 @@ oc create secret generic kueue-mirror-pull-secret -n openshift-kueue-operator \
     --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=/tmp/mirror-auth.json \
     --dry-run=client -o yaml | oc apply -f -
 oc secrets link default kueue-mirror-pull-secret --for=pull -n openshift-kueue-operator
+# operator-sdk extracts the pulled bundle into a temp dir under the CURRENT
+# WORKING DIRECTORY; the step pod starts in the read-only artifacts dir.
+cd /tmp
 "${OPERATOR_SDK_BIN}" version
 "${OPERATOR_SDK_BIN}" run bundle --timeout=15m -n openshift-kueue-operator \
     --skip-tls-verify --security-context-config restricted --pull-secret-name=kueue-mirror-pull-secret \
@@ -94,6 +110,12 @@ for _ in $(seq 1 60); do
     if [[ -n "$pod" ]] && oc get pod "$pod" -n openshift-kueue-operator >/dev/null 2>&1; then break; fi
     sleep 5
 done
+if [[ -z "$pod" ]]; then
+    echo "ERROR: operator-sdk did not create the catalog registry pod in time"
+    oc get catalogsource,subscription,pods -n openshift-kueue-operator 2>&1 || true
+    hold_for_debug "$LINENO"
+    exit 1
+fi
 # Wait until SDK has finished creating and annotating the catalog
 # before replacing its pod, so it cannot overwrite the new address.
 for _ in $(seq 1 60); do
@@ -117,13 +139,8 @@ oc wait pod "$pod" -n openshift-kueue-operator --for=condition=Ready --timeout=3
 ip=$(oc get pod "$pod" -n openshift-kueue-operator -o jsonpath='{.status.podIP}')
 oc patch catalogsource kueue-operator-catalog -n openshift-kueue-operator \
     --type=merge -p "{\"spec\":{\"address\":\"$ip:50051\"}}"
-if ! wait "$sdk_pid"; then
-    echo '=== run bundle failed; dumping OLM state for diagnostics'
-    oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
-    oc get csv -A 2>&1 | grep -i kueue || true
-    oc get pods -n openshift-marketplace 2>&1 | grep -i kueue || true
-    exit 1
-fi
+# On failure, the ERR trap dumps OLM state and holds the cluster for debugging.
+wait "$sdk_pid"
 
 echo 'Waiting for the operator CSV to succeed...'
 for _ in $(seq 1 40); do
