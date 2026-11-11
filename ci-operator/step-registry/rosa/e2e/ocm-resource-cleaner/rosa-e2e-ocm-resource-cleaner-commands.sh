@@ -151,7 +151,8 @@ done
 #   * bounded to one call with a hard 30s wall-clock limit, so the two calls add
 #     at most 60s to a step whose grace period is 5m;
 #   * every unhappy path -- denied, failed, timed out (exit 124), a `timeout`
-#     binary missing from the image (exit 127), empty, "None" or non-numeric --
+#     binary missing from the image (exit 127), empty, "None", non-numeric, a
+#     missing or extra field, or an integer too large for shell arithmetic --
 #     prints "unavailable" rather than a zero count, so an absent
 #     iam:GetAccountSummary permission can never be read as "no roles";
 #   * nothing but the two integers and their difference is echoed: no command
@@ -162,17 +163,31 @@ done
 #     it never gates the cleanup that follows.
 report_iam_role_headroom() {
   local phase="$1"
-  local summary roles quota usage="unavailable"
+  local summary normalized roles quota usage="unavailable"
+  # The whole response must be exactly two decimal fields. Anchoring rejects a
+  # missing field and an extra one alike, rather than keeping the first two and
+  # discarding the rest. Capping each field at 9 digits keeps both values well
+  # inside the integer type the IAM service model declares and inside Bash's
+  # 64-bit arithmetic, so the subtraction below cannot wrap; a longer run of
+  # digits is rejected here, before any arithmetic runs.
+  local two_counts='^([0-9]{1,9}) ([0-9]{1,9})$'
 
   if summary=$(timeout 30 aws iam get-account-summary \
     --query 'SummaryMap.[Roles,RolesQuota]' --output text 2>/dev/null); then
-    # --output text separates the two values with a tab, but squeeze whitespace
-    # and take the first two fields so a newline-separated rendering parses too.
-    read -r roles quota _ <<< "$(tr -s '[:space:]' ' ' <<< "${summary}")"
-    # Validate before any arithmetic. 10# keeps a value such as "09" out of
-    # octal, which would otherwise abort the expansion with an interpreter error.
-    if [[ "${roles}" =~ ^[0-9]+$ && "${quota}" =~ ^[0-9]+$ ]] && (( 10#${quota} > 0 )); then
-      usage="account_roles=$((10#${roles})) account_quota=$((10#${quota})) headroom=$((10#${quota} - 10#${roles}))"
+    # --output text separates the two values with a tab; squeeze whitespace so a
+    # newline-separated rendering parses too, then trim the edges tr leaves.
+    normalized=$(tr -s '[:space:]' ' ' <<< "${summary}")
+    normalized="${normalized# }"
+    normalized="${normalized% }"
+    if [[ "${normalized}" =~ ${two_counts} ]]; then
+      roles="${BASH_REMATCH[1]}"
+      quota="${BASH_REMATCH[2]}"
+      # 10# keeps a value such as "09" out of octal, which would otherwise abort
+      # the expansion with an interpreter error. A zero role count is a real
+      # reading; a zero quota is not.
+      if (( 10#${quota} > 0 )); then
+        usage="account_roles=$((10#${roles})) account_quota=$((10#${quota})) headroom=$((10#${quota} - 10#${roles}))"
+      fi
     fi
   fi
 
