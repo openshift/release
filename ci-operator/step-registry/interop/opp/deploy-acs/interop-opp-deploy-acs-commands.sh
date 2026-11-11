@@ -343,6 +343,7 @@ if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1
   if [[ -n "${_op_status}" ]]; then
     _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
+requested = sys.argv[1] if len(sys.argv) > 1 else ""
 try:
     d = json.load(sys.stdin)
     items = d.get("items", [d])
@@ -353,12 +354,16 @@ try:
         conds = i.get("status", {}).get("conditions", [])
         compliant = any(c.get("type") == "Compliant" and c.get("status") == "True" for c in conds)
         spec_ch = (i.get("spec", {}).get("subscription", {}) or {}).get("channel")
-        out = "true" if compliant and spec_ch else "false"
+        # Self-disable only on a matching channel: an adopted Subscription on a
+        # different channel is not workaround-removal ready, so report the
+        # observed channel and let the install path record the mismatch.
+        if compliant and spec_ch:
+            out = "true" if spec_ch == requested else "withheld " + spec_ch
         break
     print(out)
 except Exception:
     print("false")
-' 2>/dev/null || echo "false")
+' "${ACS_CHANNEL}" 2>/dev/null || echo "false")
     if [[ "${_self_disable}" == "true" ]]; then
       _existing_csv=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
@@ -367,6 +372,10 @@ except Exception:
         _prop "acs_subscription" "adopted"
         exit 0
       fi
+    elif [[ "${_self_disable}" == withheld* ]]; then
+      _policy_ch="${_self_disable#withheld }"
+      echo ">>> NOTE: OperatorPolicy channel '${_policy_ch}' != requested '${ACS_CHANNEL}': self-disable withheld, installing"
+      _prop "channel_self_disable_withheld" "${_policy_ch}!=${ACS_CHANNEL}"
     fi
   fi
 fi
