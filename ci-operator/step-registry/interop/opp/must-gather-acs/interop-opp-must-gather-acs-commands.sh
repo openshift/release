@@ -646,9 +646,20 @@ op_channel = op_spec.get("channel")
 # policy leaves unset (None) does not constrain, mirroring OLM's defaulting
 # of an omitted target, so only a declared and different value fails. With no
 # single rhacs subscription to bind to, the binding is unknown, not false.
+#
+# The no-policy case is separate (finding deep-2-f2): with no OperatorPolicy
+# captured there are no target fields at all, and reading both as "unset, so
+# does not constrain" reported operatorpolicy_targets_subscription=true for a
+# cluster that has no policy to do the targeting. A classified query that
+# found no policy means nothing targets the subscription (false), while a
+# failed capture means the answer is unknown.
 op_sub_name = op_spec.get("subscriptionName")
 op_sub_namespace = op_spec.get("subscriptionNamespace")
-if sub is None:
+if ops_s not in ("ok", "absent"):
+    op_owns_sub = None
+elif not rhacs_op:
+    op_owns_sub = False
+elif sub is None:
     op_owns_sub = None
 else:
     op_owns_sub = (
@@ -901,10 +912,14 @@ FIXTURE
   _expect rhacs_csv_count 0
   _expect removal_preconditions_met false
 
-  # FALSE fixture: no OperatorPolicy (today's 5.0 state).
+  # FALSE fixture: no OperatorPolicy (today's 5.0 state). With the policy
+  # absent there is nothing to target the subscription, so the term is false
+  # rather than true-by-unset-field (finding deep-2-f2).
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
   echo '[]' > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_present false
+  _expect operatorpolicy_targets_subscription false
   _expect removal_preconditions_met false
 
   # Follow-up 1 (per-term gating): a failed ops/subs/csvs query must not
@@ -915,6 +930,7 @@ FIXTURE
   echo "probe_error: operatorpolicy query failed" > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect operatorpolicy_present unknown
+  _expect operatorpolicy_targets_subscription unknown
   _expect rhacs_subscription_count unknown
   _expect rhacs_csv_count unknown
   _expect predicate_inputs_classified false
@@ -954,7 +970,7 @@ FIXTURE
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }
