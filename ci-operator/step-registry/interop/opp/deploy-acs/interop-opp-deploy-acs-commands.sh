@@ -258,8 +258,26 @@ if ! [[ "${ACS_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   exit 2
 fi
 for _v in ACS_INSTALL_TIMEOUT ACS_CSV_WAIT_TIMEOUT; do
-  if ! [[ "${!_v}" =~ ^[0-9]+$ ]] || (( ${!_v} < 1 || ${!_v} > 900 )); then
-    echo "ERROR: ${_v} must be integer seconds in 1..900 (got '${!_v}')"
+  _v_raw="${!_v}"
+  # Bounded to 9 digits so the 10# conversion below cannot wrap a 64-bit
+  # integer into the accepted range.
+  if ! [[ "${_v_raw}" =~ ^[0-9]{1,9}$ ]]; then
+    echo "ERROR: ${_v} must be integer seconds in 1..900 (got '${_v_raw}')"
+    _classify "acs-invalid-input" "${_v} failed validation"
+    exit 2
+  fi
+  # Normalize to decimal and write the value back before any arithmetic
+  # sees it. Bash reads a leading-zero literal as OCTAL: "0600" is 384s, so
+  # an un-normalized value clears this range check at the wrong magnitude,
+  # understates the wait-sum check below (0600 + 0700 evaluates as 832, not
+  # 1300), and hands a wrong number to both phase deadlines and to every log
+  # line. "0900" is worse: (( 0900 )) aborts the script with exit 1 and no
+  # classification. The 10# conversion makes the range check, the wait-sum
+  # check, both phase deadlines, and the log interpolations all read the
+  # decimal seconds the operator wrote.
+  printf -v "${_v}" '%d' "$(( 10#${_v_raw} ))"
+  if (( ${!_v} < 1 || ${!_v} > 900 )); then
+    echo "ERROR: ${_v} must be integer seconds in 1..900 (got '${_v_raw}')"
     _classify "acs-invalid-input" "${_v} failed validation"
     exit 2
   fi
