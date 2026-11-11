@@ -24,6 +24,32 @@ log_step() {
 
 log_step "Validating provisioning inputs."
 : "${OPENSHIFT_VERSION:?OPENSHIFT_VERSION must be set}"
+
+# When ci-operator resolves a release dependency, OPENSHIFT_VERSION is set to
+# release:latest and ORIGINAL_RELEASE_IMAGE_LATEST contains the exact payload
+# pullspec selected by the release configuration.  ARO accepts the major.minor
+# value in version.id, while nightly builds require the exact payload tag in
+# the experimental control-plane tag.
+CONTROL_PLANE_EXACT_VERSION=""
+if [[ "${OPENSHIFT_VERSION}" == "release:latest" ]]; then
+  if [[ -z "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
+    echo "ORIGINAL_RELEASE_IMAGE_LATEST is required when OPENSHIFT_VERSION=release:latest." >&2
+    exit 1
+  fi
+  CONTROL_PLANE_EXACT_VERSION="${ORIGINAL_RELEASE_IMAGE_LATEST##*:}"
+  if [[ ! "${CONTROL_PLANE_EXACT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly ]]; then
+    echo "The resolved release payload is not a nightly build: ${CONTROL_PLANE_EXACT_VERSION}" >&2
+    exit 1
+  fi
+  if [[ "${CONTROL_PLANE_EXACT_VERSION}" =~ ^([0-9]+\.[0-9]+)\. ]]; then
+    OPENSHIFT_VERSION="${BASH_REMATCH[1]}"
+  else
+    echo "Unable to derive the ARO major.minor version from ${CONTROL_PLANE_EXACT_VERSION}." >&2
+    exit 1
+  fi
+  echo "Resolved Prow nightly payload ${CONTROL_PLANE_EXACT_VERSION} for ARO HCP ${OPENSHIFT_VERSION}."
+fi
+
 if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
   echo "REPLICAS must be a positive integer." >&2
   exit 1
@@ -138,6 +164,7 @@ initialize_cluster_config() {
     --arg subscription_id "${SUBSCRIPTION_ID}" \
     --arg version "${OPENSHIFT_VERSION}" \
     --arg channel_group "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" \
+    --arg control_plane_exact_version "${CONTROL_PLANE_EXACT_VERSION}" \
     --arg replicas "${REPLICAS}" \
     --arg provision_shard_id "${ARO_HCP_PROVISION_SHARD_ID:-}" \
     --argjson multi_az "${multi_az_json}" \
@@ -147,7 +174,7 @@ initialize_cluster_config() {
       hypershift: true,
       region: $location,
       version: {major_version: $version, raw_id: $version, channel_group: $channel_group},
-      tags: {},
+      tags: (if $control_plane_exact_version != "" then {"aro-hcp.experimental.cluster.control-plane-exact-version": $control_plane_exact_version} else {} end),
       multi_az: $multi_az,
       disable_scp_checks: false,
       disable_workload_monitoring: false,
@@ -275,6 +302,7 @@ NODEPOOL_NAMES=${NODEPOOL_NAMES}
 KEYVAULT_NAME=${KEYVAULT_NAME}
 KMS_KEY_NAME=${KMS_KEY_NAME}
 CLUSTER_RESOURCE_ID=${CLUSTER_RESOURCE_ID}
+ARO_HCP_CONTROL_PLANE_EXACT_VERSION=${CONTROL_PLANE_EXACT_VERSION}
 EOF
   chmod 600 "${STATE_FILE}"
 }
@@ -493,11 +521,16 @@ record_timer "global_start" "${CONTROL_PLANE_INSTALL_START}"
 record_timer "control_plane_install_start" "${CONTROL_PLANE_INSTALL_START}"
 
 log_step "Submitting the ARO HCP create request."
+CREATE_TAG_ARGS=()
+if [[ -n "${CONTROL_PLANE_EXACT_VERSION}" ]]; then
+  CREATE_TAG_ARGS+=(--tags "aro-hcp.experimental.cluster.control-plane-exact-version=${CONTROL_PLANE_EXACT_VERSION}")
+fi
 az aro hcp cluster create \
   --name "${CLUSTER_NAME}" \
   --resource-group "${CUSTOMER_RG_NAME}" \
   --location "${REGION}" \
   --version "${OPENSHIFT_VERSION}" \
+  --channel-group "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" \
   --subnet-id "${SUBNET_ID}" \
   --vnet-integration-subnet-id "${VNET_INTEGRATION_SUBNET_ID}" \
   --nsg "${NSG_ID}" \
@@ -517,6 +550,7 @@ az aro hcp cluster create \
   --assign-data-plane-operator-identity disk-csi-driver "${MI_ID[dp-disk-csi-driver]}" \
   --assign-data-plane-operator-identity file-csi-driver "${MI_ID[dp-file-csi-driver]}" \
   --assign-data-plane-operator-identity image-registry "${MI_ID[dp-image-registry]}" \
+  "${CREATE_TAG_ARGS[@]}" \
   --only-show-errors
 
 log_step "Polling the ARO RP until the control plane reaches a terminal state."
