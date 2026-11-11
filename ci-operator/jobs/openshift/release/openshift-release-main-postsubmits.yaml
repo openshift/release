@@ -6,23 +6,25 @@ postsubmits:
     cluster: app.ci
     decorate: true
     decoration_config:
+      sparse_checkout_files:
+      - ./ci-operator/config/openshift/ci-tools-standalone
+      - ./ci-operator/step-registry
       timeout: 1h0m0s
     labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
     name: branch-ci-openshift-release-main-prowgen-ci-tools-standalone
-    run_if_changed: ^(ci-operator/config/openshift/ci-tools-standalone/|ci-operator/step-registry/|core-services/prow/_managed-repos\.yaml$|hack/publish-ci-tools-standalone-jobs\.sh$)
+    run_if_changed: ^(ci-operator/config/openshift/ci-tools-standalone/|ci-operator/step-registry/|core-services/prow/_managed-repos\.yaml$)
     spec:
       automountServiceAccountToken: false
       containers:
       - args:
-        - |
-          git fetch origin main
-          git checkout --detach FETCH_HEAD
-          exec bash hack/publish-ci-tools-standalone-jobs.sh /mnt/job-configs
+        - --from-file=ci-operator/config/openshift/ci-tools-standalone/openshift-ci-tools-standalone-main.yaml
+        - --from-file=ci-operator/config/openshift/ci-tools-standalone/openshift-ci-tools-standalone-main__agentic.yaml
+        - --registry=ci-operator/step-registry
+        - --to-dir=/mnt/job-configs/generated
         command:
-        - /bin/bash
-        - -ceu
+        - /usr/bin/ci-operator-prowgen
         image: quay.io/openshift/ci-public:ci_auto-config-brancher_latest
         imagePullPolicy: Always
         name: prowgen
