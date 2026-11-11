@@ -253,7 +253,10 @@ tests:
         # Hold the cluster up for manual debugging after the validation steps
         # have run; the deprovision/post chain only starts after this step
         # finishes. The prow default job timeout is 24h, so the hold fits
-        # comfortably alongside the ~1.5h install+validate runtime.
+        # comfortably alongside the ~1.5h install+validate runtime. The
+        # interval is user-pinnable via OVS_DOCA_CLUSTER_HOLD_MINUTES (env
+        # below, default 15) -- set it there to change how long the cluster
+        # stays up for a given rehearsal.
         echo "Validation finished; holding the cluster for ${OVS_DOCA_CLUSTER_HOLD_MINUTES} minutes."
         echo ""
         echo "To work on the cluster from your laptop:"
@@ -268,10 +271,22 @@ tests:
         echo "  5. Alternatively, username/password login:"
         echo "       oc login --server <api-url-from-kubeconfig> -u kubeadmin -p \$(cat kubeadmin-password)"
         echo ""
-        sleep $(( OVS_DOCA_CLUSTER_HOLD_MINUTES * 60 ))
+        # Heartbeat every 5 minutes so the live log view (and the final
+        # uploaded log) shows the hold is alive and how much time remains --
+        # a bare `sleep` would be N minutes of silence. The sleep is clamped
+        # to the remaining time so short holds do not overshoot their end.
+        END=$(( $(date +%s) + OVS_DOCA_CLUSTER_HOLD_MINUTES * 60 ))
+        while [ "$(date +%s)" -lt "$END" ]; do
+          REMAINING=$(( ( END - $(date +%s) + 59 ) / 60 ))
+          echo "[$(date -u +%H:%M:%S)] cluster still up, ~${REMAINING} min remaining"
+          INTERVAL=$(( END - $(date +%s) ))
+          if [ "$INTERVAL" -gt 300 ]; then INTERVAL=300; fi
+          sleep "$INTERVAL"
+        done
+        echo "[$(date -u +%H:%M:%S)] hold complete, releasing cluster to deprovision"
       env:
       - name: OVS_DOCA_CLUSTER_HOLD_MINUTES
-        default: "60"
+        default: "15"
       from: src
       resources:
         requests:
