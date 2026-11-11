@@ -364,7 +364,11 @@ function check_plugin_gate() {
       /^Status: / { if ($2 != "passed" && plugin != "") print plugin": "$2 }
     ' "${ARTIFACT_DIR}/log-results.txt" 2>/dev/null)
     if [[ -n "${fallback_failed}" ]]; then
-      exit_class=$((exit_class | 1))
+      # Replay stays in the diagnostic text but, consistent with the main
+      # gate below, never sets the plugin-failure bit.
+      if [[ -n "$(printf '%s\n' "${fallback_failed}" | awk '$1 != "80-openshift-tests-replay:"')" ]]; then
+        exit_class=$((exit_class | 1))
+      fi
       plugin_gate_reason="${plugin_gate_reason}; fallback from log-results.txt found non-passed plugin(s): $(echo "${fallback_failed}" | paste -sd'; ' -)"
     fi
 
@@ -597,17 +601,30 @@ ${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ART
 publish_rc=${local_publish_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish.txt\n"
 
-if [[ ${local_publish_rc} -ne 0 ]]; then
-  # A rejected baseline (OPCT's own SLO checks, e.g. OPCT-001 Kubernetes
-  # Conformance pass-rate) and a genuine infra/processing error (e.g. S3
-  # upload failure) both exit nonzero from 'adm baseline publish' -- grep
-  # the literal rejection message (pkg/cmd/adm/baseline/publish.go) to tell
-  # them apart. Per OPCT maintainer direction (Slack 2026-10-26, OPCT-500):
-  # a rejected baseline is OPCT correctly declining a bad conformance
-  # result, not a CI/processing failure, and must not fail the job;
-  # a processing error must.
-  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null &&
-     ! grep -qE 'error (processing results|populating report|saving consolidated summary results|saving report results):' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+# A rejected baseline (OPCT's own SLO checks, e.g. OPCT-001 Kubernetes
+# Conformance pass-rate) and a genuine infra/processing error (e.g. S3
+# upload failure) both exit nonzero from 'adm baseline publish' -- grep
+# the literal rejection message (pkg/cmd/adm/baseline/publish.go) to tell
+# them apart. Per OPCT maintainer direction (Slack 2026-10-26, OPCT-500):
+# a rejected baseline is OPCT correctly declining a bad conformance
+# result, not a CI/processing failure, and must not fail the job;
+# a processing error must.
+#
+# These markers are logged via logrus.Errorf (non-fatal) in publish.go, so
+# the command can still exit 0 even after one fires (e.g. report rendering
+# fails but the archive/summary JSON the uploader needs were already
+# written). Check for them unconditionally, not just when publish_rc != 0,
+# or a real processing error with a successful upload goes undetected.
+if grep -qE 'error (processing results|populating report|saving consolidated summary results|saving report results):' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+  publish_reason="processing_error"
+  show_msg "ERROR: '${OPCT_CLI} adm baseline publish' logged a processing error (exit code ${local_publish_rc}): see log-publish.txt"
+  exit_class=$((exit_class | 2))
+  # Indexer depends on a trustworthy publish -- mark NOT_RUN.
+  indexer_rc="NOT_RUN"
+  emit_summary
+  exit ${exit_class}
+elif [[ ${local_publish_rc} -ne 0 ]]; then
+  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
     publish_reason="rejected"
     show_msg "WARNING: '${OPCT_CLI} adm baseline publish' rejected the baseline (not an infra/processing failure, not failing the job): see log-publish.txt"
   else
