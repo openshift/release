@@ -43,6 +43,43 @@ chain:
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra args to pass to the create cluster aws command"
+    - name: HYPERSHIFT_ETCD_SHARDS
+      default: ""
+      documentation: |
+        YAML list of non-default managed etcd shards, set verbatim as spec.etcd.managed.shards on
+        the HostedCluster. "hypershift create cluster" has no flag for this field, so when the
+        variable is set the manifests are rendered, the list is spliced in and the result is
+        applied. The field is immutable once the HostedCluster exists, which is why it is rendered
+        in at creation rather than patched on afterwards.
+
+        Entries are ManagedEtcdShardSpec, so each one needs name, replicas (1 or 3) and resources,
+        and may set storage (type PersistentVolume or EmptyDir) and scheduling. Use apiGroup: ""
+        for the core group. Requires the EtcdSharding feature gate, so the HyperShift operator must
+        be installed with TECH_PREVIEW_NO_UPGRADE=true, and shards with replicas=3 require
+        HYPERSHIFT_CP_AVAILABILITY_POLICY=HighlyAvailable.
+
+        The topology the performance jobs use, agreed with the performance and scale team, is a
+        three member PersistentVolume backed default shard plus:
+
+          - name: leases
+            replicas: 3
+            resources:
+            - apiGroup: coordination.k8s.io
+              resource: leases
+            storage:
+              type: PersistentVolume
+          - name: events
+            replicas: 1
+            resources:
+            - apiGroup: ""
+              resource: events
+            - apiGroup: events.k8s.io
+              resource: events
+            storage:
+              type: EmptyDir
+
+        Leases get their own highly available shard because they carry the cluster heartbeat, and
+        events get a single EmptyDir shard because they are high churn and disposable.
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
@@ -127,15 +164,38 @@ chain:
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
 
-      support_np_skew() {
+      # Only the render paths below need yq, so it is fetched on demand.
+      ensure_yq() {
+        [[ -x /tmp/yq ]] && return
         curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-        local extra_flags=""
-        extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
-        extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
-        extra_flags+="&& oc apply -f /tmp/hc.yaml"
-        echo "$extra_flags"
       }
-      
+
+      # spec.etcd.managed.shards has no "hypershift create cluster" flag and is
+      # immutable once the HostedCluster exists, so the shards are spliced into
+      # the rendered manifests instead of being patched on after creation.
+      patch_etcd_shards() {
+        [[ -n "$HYPERSHIFT_ETCD_SHARDS" ]] || return 0
+        ensure_yq
+        printf '%s\n' "$HYPERSHIFT_ETCD_SHARDS" > /tmp/etcd-shards.yaml
+        /tmp/yq e -i '(select(.kind == "HostedCluster").spec.etcd.managed.shards) = load("/tmp/etcd-shards.yaml")' "$1"
+      }
+
+      # Renders the manifests, applies the edits that the CLI has no flags for --
+      # the NodePool release image when it is skewed from the control plane, and
+      # any etcd shards -- then applies the result. COMMAND is expanded as an
+      # array rather than through eval so that values containing shell
+      # metacharacters survive.
+      render_and_apply() {
+        local patch_np_skew="$1"
+        ensure_yq
+        "${COMMAND[@]}" --render-sensitive --render > /tmp/hc.yaml
+        if [[ "$patch_np_skew" == "true" ]]; then
+          /tmp/yq e -i "(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"" /tmp/hc.yaml
+        fi
+        patch_etcd_shards /tmp/hc.yaml
+        oc apply -f /tmp/hc.yaml
+      }
+
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       HC_ZONES="${HYPERSHIFT_HC_ZONES}"
       if [[ -z "$HC_ZONES" ]]; then
@@ -227,6 +287,7 @@ chain:
 
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+        patch_etcd_shards "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
 
@@ -251,10 +312,14 @@ chain:
         cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
       fi
 
-      # Execute the command
-      # When using np_skew (different release images), we need eval to properly handle shell operators
+      # Execute the command. Anything that has to be edited into the manifests
+      # forces the render path; otherwise the CLI creates the cluster directly.
+      NP_SKEW=false
       if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-        eval "${COMMAND[*]} $(support_np_skew)"
+        NP_SKEW=true
+      fi
+      if [[ "$NP_SKEW" == "true" || -n "$HYPERSHIFT_ETCD_SHARDS" ]]; then
+        render_and_apply "$NP_SKEW"
       else
         "${COMMAND[@]}"
       fi

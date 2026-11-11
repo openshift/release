@@ -379,6 +379,35 @@ tests:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore-cross-cluster
 - always_run: false
+  as: e2e-v2-aws-backuprestore-etcd-sharding
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_ETCD_SHARDS: |-
+        - name: events
+          replicas: 3
+          resources:
+          - apiGroup: ""
+            resource: events
+          - apiGroup: events.k8s.io
+            resource: events
+          storage:
+            type: EmptyDir
+        - name: leases
+          replicas: 3
+          resources:
+          - apiGroup: coordination.k8s.io
+            resource: leases
+          storage:
+            type: PersistentVolume
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_SUITE: openshift/conformance/parallel/minimal
+    workflow: hypershift-aws-e2e-backuprestore
+- always_run: false
   as: e2e-kubevirt-metal-ovn-backuprestore
   capabilities:
   - intranet

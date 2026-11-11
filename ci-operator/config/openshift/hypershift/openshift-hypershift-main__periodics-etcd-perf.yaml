@@ -1,0 +1,91 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "5.1"
+    namespace: ocp
+    tag: upi-installer
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.1"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.1"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: annotation-churn-standard
+  cron: 20 7 * * 2
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ANNOTATION_CHURN_ITERATIONS: "10"
+      BURST: "200"
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
+      HYPERSHIFT_NODE_COUNT: "24"
+      METRICS_SET: All
+      PATCH_REPLICAS: "50"
+      PATCH_ROUNDS: "100"
+      QPS: "200"
+    test:
+    - chain: hypershift-etcd-perf
+    workflow: hypershift-aws-e2e-cluster
+  timeout: 6h0m0s
+- as: annotation-churn-sharded
+  cron: 20 13 * * 2
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      ANNOTATION_CHURN_ITERATIONS: "10"
+      BURST: "200"
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: HighlyAvailable
+      HYPERSHIFT_ETCD_SHARDS: |-
+        - name: leases
+          replicas: 3
+          resources:
+          - apiGroup: coordination.k8s.io
+            resource: leases
+          storage:
+            type: PersistentVolume
+        - name: events
+          replicas: 1
+          resources:
+          - apiGroup: ""
+            resource: events
+          - apiGroup: events.k8s.io
+            resource: events
+          storage:
+            type: EmptyDir
+      HYPERSHIFT_INSTANCE_TYPE: m5.xlarge
+      HYPERSHIFT_NODE_COUNT: "24"
+      METRICS_SET: All
+      PATCH_REPLICAS: "50"
+      PATCH_ROUNDS: "100"
+      QPS: "200"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    test:
+    - chain: hypershift-etcd-perf
+    workflow: hypershift-aws-e2e-cluster
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: periodics-etcd-perf
