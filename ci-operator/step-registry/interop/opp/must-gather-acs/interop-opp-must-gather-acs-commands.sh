@@ -163,9 +163,15 @@ collect_acs_diagnostics || true
 # credentials, tokens, passwords, or secret refs in operator specs.
 #
 # Capture contract (docs/design/acs-deploy-evidence.md in the
-# opp-interop-testing workspace is the durable authority):
-#   * Every query is classified three ways: present | absent |
-#     probe_error:<rc> — a query failure is never rendered as absence.
+# opp-interop-testing workspace is the durable authority). Scope: the
+# numbered OLM lifecycle captures, steps [1/10] through [10/10].
+#   * Every such query is classified three ways: present | absent |
+#     probe_error:<rc>, so a query failure is never rendered as absence.
+#   * The storage-axis and image captures (11-placementdecisions and 12
+#     through 17) are NOT classified: they end in `2>&1 || true`, so a
+#     failed oc query leaves that artifact's own parser error (a JSON
+#     traceback, not a probe_error marker) and the probe-sanity assertion
+#     does not flag it. Read those artifacts as advisory only.
 #   * Both 08-* packagemanifest files are always written, regardless of
 #     branch.
 #   * Fully-qualified resource types are used wherever ACM CRDs collide
@@ -759,8 +765,10 @@ write_status_properties
 # cannot masquerade as a disagreement (20).
 run_assertions() {
   local failed=0 rc
-  # (a) No evidence file may carry a probe_error or QUERY FAILED marker —
-  #     a failed query must never read as a clean pass (follow-up 1).
+  # (a) No classified evidence file may carry a probe_error or QUERY FAILED
+  #     marker: a failed query must never read as a clean pass (follow-up 1).
+  #     The storage-axis captures (11-placementdecisions, 12 through 17)
+  #     write no marker, so this check does not cover them.
   for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
     if grep -qE "^(probe_error:|QUERY FAILED)" "${f}" 2>/dev/null; then
       echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker — evidence incomplete"
