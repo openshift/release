@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+from typing import Optional
 
 
 class EvalError(Exception):
@@ -39,6 +40,10 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     cases: tuple = ()
     config_chain: tuple = ()
     eval_name: str = ""
+    # Preflight-resolved identity the post-run check compares the run against;
+    # never re-read from the eval YAML after the orchestrator has run.
+    skill: Optional[str] = None
+    dataset_path: Optional[str] = None
 
     @property
     def artifact_name(self):
@@ -134,36 +139,28 @@ HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
 # needs no token; GITHUB_TOKEN is attached when the environment provides one
 # only to lift shared-IP rate limits.
 HARNESS_LATEST_RELEASE = "https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest"
-# Set to an exact release tag or full commit SHA to stop following the latest
-# release, e.g. to bisect a harness regression; empty or unset means latest.
+# Set to an exact release tag to stop following the latest release, e.g. to
+# bisect a harness regression; empty or unset means latest.
 REVISION_OVERRIDE = "EVAL_HARNESS_REVISION"
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
-COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
-RESULT_SCHEMA_VERSION = 2
-
-
-def is_commit_sha(revision):
-    """True when the revision is a full commit SHA rather than a release tag."""
-    return bool(COMMIT_SHA.fullmatch(revision))
+RESULT_SCHEMA_VERSION = 3
 
 
 def validate_harness_revision(revision):
-    """Accept only a release tag or a full commit SHA, never a moving branch.
+    """Accept only a release tag, never a moving branch or a bare commit.
 
-    The value reaches Git refspecs and rev-parse arguments, so anything that
-    is not exactly one of those two shapes is rejected outright.
+    The value reaches git clone --branch and rev-parse arguments, so anything
+    that is not exactly a release tag is rejected outright.
     """
-    if COMMIT_SHA.fullmatch(revision):
-        return revision.lower()
     if RELEASE_TAG.fullmatch(revision):
         return revision
-    raise EvalError(f"harness revision must be a release tag like v1.62.0 or a full "
-                    f"commit SHA, never a branch: {revision!r}")
+    raise EvalError(f"harness revision must be a release tag like v1.62.0, "
+                    f"never a branch or commit SHA: {revision!r}")
 
 
 def expected_commit_ref(revision):
-    """The ref naming the pinned commit: the tag's commit, or the SHA itself."""
-    return revision.lower() if is_commit_sha(revision) else f"refs/tags/{revision}^{{commit}}"
+    """The ref naming the pinned commit: the release tag's commit."""
+    return f"refs/tags/{revision}^{{commit}}"
 
 
 def latest_release_tag(document):
@@ -194,7 +191,7 @@ def resolve_latest_release(env, timeout):
 def resolve_harness_revision(env, timeout):
     """Return the revision this run uses and where it came from.
 
-    REVISION_OVERRIDE pins an exact tag or commit SHA when set (bisecting a
+    REVISION_OVERRIDE pins an exact release tag when set (bisecting a
     harness regression); otherwise the latest published release is resolved,
     so the step never runs the moving main branch, which may be broken.
     """
@@ -205,7 +202,7 @@ def resolve_harness_revision(env, timeout):
 
 
 @dataclass(frozen=True)
-class ResolvedConfig:
+class ResolvedConfig:  # pylint: disable=too-many-instance-attributes
     """The minimal resolved runner settings and structured harness config."""
 
     config: str
@@ -214,6 +211,7 @@ class ResolvedConfig:
     settings: dict
     dataset_path: Optional[str]
     config_chain: tuple
+    skill: Optional[str]
     harness_config: object
 
     def as_dict(self):
@@ -226,6 +224,7 @@ class ResolvedConfig:
             "settings": self.settings,
             "dataset_path": self.dataset_path,
             "config_chain": list(self.config_chain),
+            "skill": self.skill,
         }
 
 
@@ -286,6 +285,24 @@ def _normalize_chain(repo, config_path, chain):
     return tuple(normalized)
 
 
+def _resolve_skill(identity, harness_config):
+    """The skill the harness records as run_result.json eval_params.skill.
+
+    That is the value without a --skill override; None for prompt and
+    multi-step configs, which run no single skill.
+    """
+    resolver = getattr(harness_config, "resolve_skill", None)
+    if not callable(resolver):
+        raise EvalError(f"{identity}: pinned harness EvalConfig is missing resolve_skill()")
+    try:
+        skill = resolver()
+    except Exception as error:
+        raise EvalError(f"{identity}: harness resolve_skill() failed: {type(error).__name__}: {error}") from error
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError(f"{identity}: harness resolve_skill() must return a nonempty string or None")
+    return skill
+
+
 def resolve_config(harness, repo, config):
     """Resolve and validate one original config path using the harness APIs."""
     repo = Path(repo).resolve()
@@ -333,6 +350,7 @@ def resolve_config(harness, repo, config):
         raise EvalError(f"{identity}: harness eval_name() failed: {type(error).__name__}: {error}") from error
     eval_name = validate_eval_name(eval_name, f"{identity}: harness eval_name()")
     config_chain = _normalize_chain(repo, config_path, chain)
+    skill = _resolve_skill(identity, harness_config)
 
     dataset = getattr(harness_config, "dataset", None)
     dataset_value = getattr(dataset, "path", None)
@@ -350,7 +368,7 @@ def resolve_config(harness, repo, config):
             raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
 
     resolved = ResolvedConfig(identity, model, eval_name, {"thresholds": thresholds},
-                              dataset_path, config_chain, harness_config)
+                              dataset_path, config_chain, skill, harness_config)
     try:
         encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
         if json.loads(encoded) != resolved.as_dict():
@@ -363,7 +381,8 @@ def resolve_config(harness, repo, config):
 def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     """Validate the child's result file before it enters an eval plan."""
     if not isinstance(document, dict) or set(document) != {
-            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain"}:
+            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain",
+            "skill"}:
         raise EvalError("config resolver returned an incompatible result schema")
     version = document["schema_version"]
     if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
@@ -402,8 +421,11 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
         if resolved_dataset != cases_path:
             raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
                             "as the harness-resolved dataset.path")
+    skill = document["skill"]
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError("config resolver returned an invalid skill")
     return {"model": model, "eval_name": eval_name, "settings": {"thresholds": thresholds},
-            "dataset_path": dataset_path, "config_chain": tuple(chain)}
+            "dataset_path": dataset_path, "config_chain": tuple(chain), "skill": skill}
 
 
 def _write_result(destination, document):
@@ -462,14 +484,14 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                              resolve_harness_revision, validate_resolution_result)
+    from .eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                              validate_resolution_result)
     from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                             resolve_harness_revision, validate_resolution_result)
+    from eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                             validate_resolution_result)
     from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
@@ -758,6 +780,100 @@ def verify_result(directory, settings):
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
 
+def planned_cases(plan):
+    """Return the case IDs the harness must execute for this plan.
+
+    Mirrors agent-eval-harness skills/eval-run/scripts/workspace.py (v1.62.3,
+    lines 70-83): every immediate subdirectory of the resolved dataset.path is
+    a case, ``sorted(d for d in cases_dir.iterdir() if d.is_dir())``, so
+    dot-directories and links to directories count and files do not. A
+    nonempty --cases keeps matching names and silently drops unknown IDs; the
+    runner passes only IDs it selected, so that request is the expected set.
+    Called after setup and before the orchestrator starts, so the orchestrator
+    cannot change the expectation by adding or removing case directories.
+    """
+    if plan.cases:
+        return frozenset(plan.cases)
+    if not plan.dataset_path:
+        raise EvalError("dataset.path is unset, so the full-dataset case set cannot be "
+                        "verified; set dataset.path in the eval YAML")
+    try:
+        found = frozenset(path.name for path in Path(plan.dataset_path).iterdir() if path.is_dir())
+    except OSError as error:
+        raise EvalError(f"cannot list dataset.path {plan.dataset_path}: {error}") from error
+    if not found:  # An empty expectation would let an empty per_case pass vacuously.
+        raise EvalError(f"dataset.path {plan.dataset_path} contains no case directories")
+    return found
+
+
+def normalize_recorded_path(repo, item):
+    """Normalize a recorded config_chain entry the way preflight normalized its chain.
+
+    The harness records entries relative to its working directory, or absolute
+    outside it (agent_eval/config.py project_relative); the orchestrator starts
+    in the repository root, so relative entries are resolved from there.
+    """
+    path = Path(item)
+    path = (path if path.is_absolute() else repo / path).resolve()
+    return path.relative_to(repo).as_posix() if path.is_relative_to(repo) else str(path)
+
+
+def _compare_cases(source, executed, expected):
+    if not isinstance(executed, dict) or not all(isinstance(case, str) for case in executed):
+        raise EvalError(f"{source} is missing or is not a mapping of case IDs")
+    missing, unexpected = sorted(expected - executed.keys()), sorted(executed.keys() - expected)
+    if missing or unexpected:
+        raise EvalError(f"{source} does not match the planned cases: missing {missing}, "
+                        f"unexpected {unexpected}; the orchestrator must pass exactly the planned "
+                        "--cases (none for a full-dataset run) and let every case finish")
+
+
+def verify_run_identity(directory, plan, expected_cases, repo):
+    """Require the run to be exactly the config, model, skill, and cases planned.
+
+    The orchestrator can improvise: evaluate an edited copy of the YAML, drop
+    --cases, or stop early. The pinned harness records what it ran in
+    run_result.json (execute.py _build_eval_params and the case-mode
+    aggregate); every field it writes in case mode is required, so a missing
+    field is a contract break that fails the eval rather than passing it.
+    """
+    try:
+        result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
+        summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        raise EvalError(f"missing or invalid harness results: {error}") from error
+    params = result.get("eval_params") if isinstance(result, dict) else None
+    if not isinstance(params, dict):
+        raise EvalError("run_result.json has no eval_params mapping; cannot confirm what the harness ran")
+    modes = (result.get("execution_mode"), params.get("execution_mode"))
+    if modes != ("case", "case"):
+        raise EvalError(f"harness recorded execution_mode {modes[0]!r} (eval_params: {modes[1]!r}); "
+                        "manifest evals are verified only in case mode, which records per-case results")
+
+    chain = params.get("config_chain")
+    if not isinstance(chain, list) or not chain or not all(isinstance(item, str) and item for item in chain):
+        raise EvalError("run_result.json eval_params.config_chain is missing or invalid; "
+                        "cannot confirm which config the harness evaluated")
+    executed_chain = [normalize_recorded_path(repo.resolve(), item) for item in chain]
+    if executed_chain != list(plan.config_chain):
+        raise EvalError(f"harness evaluated config chain {executed_chain}, but the runner planned "
+                        f"{list(plan.config_chain)}; the orchestrator must run the original --config "
+                        "from the repository root, not a copied or edited file")
+    if result.get("model") != plan.model:
+        raise EvalError(f"harness ran model {result.get('model')!r}, but the runner planned "
+                        f"{plan.model!r} from models.skill; the orchestrator must pass --model unchanged")
+    # The harness records eval_params.skill whenever one resolves (execute.py
+    # _build_eval_params); absent means None, which only prompt or multi-step
+    # configs expect.
+    if params.get("skill") != plan.skill:
+        raise EvalError(f"harness ran skill {params.get('skill')!r}, but the runner planned "
+                        f"{plan.skill!r}; the orchestrator must not pass a different --skill")
+
+    _compare_cases("run_result.json per_case", result.get("per_case"), expected_cases)
+    if isinstance(summary, dict) and "per_case" in summary:
+        _compare_cases("summary.yaml per_case", summary["per_case"], expected_cases)
+
+
 def archive(directory, artifacts):
     destination = artifacts / "eval-run.tar"
     temporary = destination.with_suffix(".tmp")
@@ -909,13 +1025,6 @@ def remaining(deadline):
     return deadline - time.monotonic()
 
 
-def harness_fetch_targets(revision):
-    """Map a resolved revision to its fetch refspec and checkout target."""
-    if is_commit_sha(revision):  # a bisect pin, fetched as one exact commit
-        return revision, "FETCH_HEAD"
-    return f"refs/tags/{revision}:refs/tags/{revision}", f"refs/tags/{revision}"
-
-
 def verified_revisions(verified):
     """Split captured rev-parse output into (named commit, checked-out HEAD)."""
     lines = [line.strip() for line in verified.strip().splitlines()]
@@ -923,7 +1032,7 @@ def verified_revisions(verified):
 
 
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Resolve the harness revision, fetch exactly it, and verify the checkout."""
+    """Resolve the harness release tag, clone exactly it, and verify the checkout."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
     left = remaining(deadline)
@@ -931,45 +1040,39 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         raise EvalError("step time limit reached while resolving the harness revision")
     revision, source = resolve_harness_revision(env, min(30, left))
     install_log.write_text(f"Expected harness revision: {revision} ({source})\n", encoding="utf-8")
-    fetch_spec, checkout_ref = harness_fetch_targets(revision)
-    steps = (
-        (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
-        (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
-         60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1", "origin", fetch_spec],
-         300, "fetch the resolved harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", checkout_ref],
-         60, "check out the resolved harness revision"),
-    )
-    for args, timeout, action in steps:
-        left = remaining(deadline)
-        if left <= 0:
-            raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    # A release tag clones directly, detached at the tag's commit.
+    args = ["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
+            "--branch", revision, HARNESS_URL, str(harness)]
+    action = "clone the resolved harness release"
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    with install_log.open("ab") as output:
+        output.write(("$ " + shlex.join(args) + "\n").encode())
+    try:
+        status = command(args, repo, env, install_log, min(300, left), append=True)
+    except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
-            output.write(("$ " + shlex.join(args) + "\n").encode())
-        try:
-            status = command(args, repo, env, install_log, min(timeout, left), append=True)
-        except subprocess.TimeoutExpired as error:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
-            raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
-        except OSError as error:
-            with install_log.open("ab") as output:
-                output.write(f"{type(error).__name__}: {error}\n".encode())
-            raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
-        if status:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} exited with status {status}\n".encode())
-            raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
+            output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
+        raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
+    except OSError as error:
+        with install_log.open("ab") as output:
+            output.write(f"{type(error).__name__}: {error}\n".encode())
+        raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
+    if status:
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: {action} exited with status {status}\n".encode())
+        raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
 
     left = remaining(deadline)
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        # rev-parse prints one line per argument: the commit the resolved
-        # revision names, then the checked-out HEAD. Requiring both to be
-        # the same commit verifies the checkout; the resolved SHA is logged
-        # so a run stays traceable to an exact commit even if a tag moves.
+        # rev-parse prints one line per argument: the commit the release tag
+        # names, then the checked-out HEAD. Requiring both to be the same
+        # commit verifies the checkout (--branch also accepts a branch name);
+        # the resolved SHA is logged so a run stays traceable to an exact
+        # commit even if a tag moves.
         status, verified = command(["git", "-C", str(harness), "rev-parse",
                                     expected_commit_ref(revision), "HEAD"],
                                    repo, env, install_log, min(30, left),
@@ -1018,7 +1121,8 @@ def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  #
             cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
             plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
                                   entry.parallelism, entry.max_turns, entry.setup_script,
-                                  tuple(cases), resolved["config_chain"], resolved["eval_name"]))
+                                  tuple(cases), resolved["config_chain"], resolved["eval_name"],
+                                  skill=resolved["skill"], dataset_path=resolved["dataset_path"]))
         except Exception as error:  # pylint: disable=broad-exception-caught
             message = f"{entry.config}: {type(error).__name__}: {error}"
             record.update(status="failed", failure=message)
@@ -1099,6 +1203,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         run_env["EVAL_SNAPSHOT_DIR"] = snapshot
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached during setup")
+                    expected_cases = planned_cases(plan)
                     invoked = True
                     status = command(["claude", "--model", env.get("CLAUDE_MODEL", "claude-opus-4-6"),
                                       "--plugin-dir", str(harness), "--allowedTools",
@@ -1110,6 +1215,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
+                    verify_run_identity(directory, plan, expected_cases, repo)
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before regression scoring")
                     # Score the verified physical run through the same harness

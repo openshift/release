@@ -103,12 +103,13 @@ published release from the public GitHub `releases/latest` API — never the
 moving `main` branch, which may be broken mid-development. The API call uses
 the mounted `GITHUB_TOKEN` when present, only to lift unauthenticated rate
 limits. `EVAL_HARNESS_REVISION` overrides the resolution with an exact release
-tag or full commit SHA, e.g. to bisect a harness regression; unset means
-latest. The runner fetches exactly the resolved revision, verifies the
-checkout is that revision's commit, and uses that checkout for configuration
-resolution, the Claude plugin, and regression scoring. The resolved revision
-and its commit SHA are recorded in `runner/harness-install.log`, so every run
-stays traceable to an exact commit. The runner resolves
+tag such as `v1.62.0`, e.g. to bisect a harness regression across releases;
+unset means latest. Branches and commit SHAs are rejected. The runner makes a
+shallow clone of exactly the resolved tag (`git clone --depth 1 --branch
+<tag>`), verifies the checkout is that tag's commit, and uses that checkout
+for configuration resolution, the Claude plugin, and regression scoring. The
+resolved tag and its commit SHA are recorded in `runner/harness-install.log`,
+so every run stays traceable to an exact commit. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 harness's rules. Resolution happens once, at preflight; the orchestrator runs
@@ -256,6 +257,11 @@ cloned harness's `detect_regressions()` rules; an eval YAML edited during the
 run cannot change its own verdict. Missing summaries or thresholded judges
 still fail the eval. If the step deadline passes before scoring, the eval
 fails as deadline-expired rather than as a scorer timeout.
+Before scoring, `run_result.json` must show that the harness ran exactly the
+preflight-resolved config chain, `models.skill` model, skill, and case set:
+the requested `--cases`, or every subdirectory of `dataset.path` for a full
+run. An edited copy of the config, missing or unexpected cases, a non-`case`
+execution mode, or any absent field fails the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 An unreadable, truncated, or non-mapping `run_result.json` and non-integer

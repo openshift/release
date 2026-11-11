@@ -38,6 +38,12 @@ if [[ -z "${EXTENSION_IMAGE:-}" ]]; then
   exit 1
 fi
 
+# Use the disconnected mirror handoff instead of the source; reject an empty file.
+if [[ -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+  EXTENSION_IMAGE="$(<"${SHARED_DIR}/mirrored_extension_image")"
+  : "${EXTENSION_IMAGE:?Mirrored extension image must not be empty}"
+fi
+
 # Set defaults for optional variables
 EXTENSION_IMAGESTREAM_NAME="${EXTENSION_IMAGESTREAM_NAME:-${EXTENSION_COMPONENT_NAME}-tests}"
 EXTENSION_ADMISSION_NAME="${EXTENSION_ADMISSION_NAME:-${EXTENSION_COMPONENT_NAME}-extensions}"

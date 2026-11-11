@@ -5,7 +5,7 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 releases:
   initial:
     integration:
@@ -36,6 +36,51 @@ resources:
       cpu: 100m
       memory: 10Gi
 tests:
+- always_run: false
+  as: vsphere-disconnected-e2e-ote
+  optional: true
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: vsphere-dis-2
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      ENABLE_IDMS: "yes"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      MIRROR_BIN: oc-mirror
+      PAUSE_IMAGE_ORG: test-org
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: ChkUpgrade\|ConnectedOnly\|Disruptive\|Serial\|\[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/smokerun
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    pre:
+    - chain: windows-e2e-ote-vsphere-disconnected-pre
+    test:
+    - ref: windows-e2e-operator-test-mirror-extension
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        # Set up WMCO and two Windows nodes using the profile SSH key, without
+        # running the source e2e suite. Workflow post steps own cluster cleanup.
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: windows-node-readiness
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: aws-e2e-ote
   optional: true

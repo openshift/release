@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+from typing import Optional
 
 
 class EvalError(Exception):
@@ -32,6 +33,10 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     cases: tuple = ()
     config_chain: tuple = ()
     eval_name: str = ""
+    # Preflight-resolved identity the post-run check compares the run against;
+    # never re-read from the eval YAML after the orchestrator has run.
+    skill: Optional[str] = None
+    dataset_path: Optional[str] = None
 
     @property
     def artifact_name(self):

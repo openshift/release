@@ -8,20 +8,23 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 # Retry wrapper with exponential backoff for transient DNS resolution failures
 # on CI build clusters (e.g. build01 CoreDNS flakes against api.stage.openshift.com).
-# Usage: retry_with_backoff "command to run"
+# Usage: retry_with_backoff "command to run" ["description safe to log"]
+# The description defaults to the command, so callers running commands with
+# embedded credentials (tokens, client secrets) must pass a redacted one.
 retry_with_backoff() {
   local cmd="${1}"
+  local description="${2:-${cmd}}"
   local max_attempts=5
   local delay=10
   local attempt=1
 
   while true; do
-    echo "Attempt ${attempt}/${max_attempts}: ${cmd}" >&2
+    echo "Attempt ${attempt}/${max_attempts}: ${description}" >&2
     if eval "${cmd}"; then
       return 0
     fi
     if [[ ${attempt} -ge ${max_attempts} ]]; then
-      echo "ERROR: All ${max_attempts} attempts exhausted for: ${cmd}" >&2
+      echo "ERROR: All ${max_attempts} attempts exhausted for: ${description}" >&2
       capture_dns_diagnostics
       return 1
     fi
@@ -82,10 +85,12 @@ SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  retry_with_backoff "rosa login --env '${OCM_LOGIN_ENV}' --client-id '${SSO_CLIENT_ID}' --client-secret '${SSO_CLIENT_SECRET}'"
+  retry_with_backoff "rosa login --env '${OCM_LOGIN_ENV}' --client-id '${SSO_CLIENT_ID}' --client-secret '${SSO_CLIENT_SECRET}'" \
+    "rosa login --env '${OCM_LOGIN_ENV}' (SSO credentials redacted)"
 elif [[ -n "${ROSA_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-  retry_with_backoff "rosa login --env '${OCM_LOGIN_ENV}' --token '${ROSA_TOKEN}'"
+  retry_with_backoff "rosa login --env '${OCM_LOGIN_ENV}' --token '${ROSA_TOKEN}'" \
+    "rosa login --env '${OCM_LOGIN_ENV}' (token redacted)"
 else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1

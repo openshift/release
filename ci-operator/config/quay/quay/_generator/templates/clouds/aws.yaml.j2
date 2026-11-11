@@ -4,6 +4,11 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+{%- if sts and ocp_version.split(".") | map("int") | list < [4, 14] %}
+      # ipi-conf-aws-oidc-creds-provision passes `oc adm release extract
+      # --included` by default, and the oc 4.12 and 4.13 clients reject it.
+      EXTRACT_MANIFEST_INCLUDED: "false"
+{%- endif %}
     post:
     - ref: quay-gather-jaeger-traces
     - ref: quay-gather
