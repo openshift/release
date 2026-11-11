@@ -1,7 +1,9 @@
 # Operator overlay OpenShift CI steps
 
 Job `konflux-ring-deployments-conformance-tests` exercises the **development-operator**
-overlay on infra-deployments (not legacy `appstudio-e2e-tests` / `development` preview).
+overlay on infra-deployments (`hack/bootstrap-cluster.sh preview --operator-overlay`).
+This is the covering infra-deployments e2e (legacy `appstudio-e2e-tests` /
+`development` preview without `--operator-overlay` was removed).
 
 ## Layout
 
@@ -26,7 +28,20 @@ Both refs use `from: konflux-overlay-install` and `cli: latest` for `oc`.
 
 ## Credentials
 
-`konflux-ci-secrets-new` → `/usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/` (see `konflux-ci-install-konflux` README for keys).
+`konflux-ci-secrets-new` → `/usr/local/konflux-ci-secrets-new/redhat-appstudio-qe/`. Required keys:
+
+| Key | Purpose |
+|-----|---------|
+| `github-token` | PAT used by the step entrypoints to clone infra-deployments |
+| `github_accounts` | Comma-separated `user:token` pairs for GitHub API access |
+| `default-quay-org-token` | Quay token for the `redhat-appstudio-qe` org (image-controller) |
+| `quay-token` | Base64-encoded Docker config for Quay registry auth |
+| `pac-github-app-id` | GitHub App ID for Pipelines-as-Code |
+| `pac-github-app-private-key` | GitHub App private key (PEM) for Pipelines-as-Code |
+| `pac-github-app-webhook-secret` | Webhook secret for the PAC GitHub App |
+| `smee-channel` | Smee.io channel URL for webhook proxying |
+| `qe-sprayproxy-host` | SprayProxy server URL |
+| `qe-sprayproxy-token` | Bearer token for SprayProxy registration |
 
 ## Testing
 
