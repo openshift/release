@@ -402,6 +402,7 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
 EXTRA_FLAGS+=" --log-level=debug"
+EXTRA_FLAGS+=" --export-worker-count=${ITERATIONS}"
 EXTRA_FLAGS+=" --pprof=${PPROF}"
 if [[ "${PPROF_INTERVAL}" != "0" ]]; then
   EXTRA_FLAGS+=" --pprof-interval=${PPROF_INTERVAL}"
