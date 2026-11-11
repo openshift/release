@@ -416,6 +416,22 @@ for test in "${allTestCasesArr[@]}"; do
 done
 
 if [[ "${_overall_status}" == "PASS" ]]; then
+    # INTEROP-9700: surface all-skipped runs on lanes that require Quay.
+    # When every test case is skipped the step asserted nothing; with
+    # QUAY_EXPECTATION=required that fails the step instead of exiting
+    # green on a skip-only report.
+    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+        typeset -i _non_skipped=0
+        for test in "${allTestCasesArr[@]}"; do
+            if [[ "${testStatus[${test}]}" != "skipped" ]]; then
+                _non_skipped=$((_non_skipped + 1))
+            fi
+        done
+        if (( _non_skipped == 0 )); then
+            echo "ERROR: all test cases skipped with QUAY_EXPECTATION=required; failing the step." >&2
+            exit 1
+        fi
+    fi
     exit 0
 else
     exit 1

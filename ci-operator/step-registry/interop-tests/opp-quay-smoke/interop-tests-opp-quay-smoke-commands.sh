@@ -603,6 +603,12 @@ function Main () {
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "skipped" "Quay not deployed"
         done
+        # INTEROP-9700: on lanes that require Quay a not-deployed Quay fails
+        # the step instead of exiting green on a skip-only report.
+        if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+            echo "ERROR: Quay not deployed with QUAY_EXPECTATION=required; failing the step." >&2
+            exit 1
+        fi
         exit 0
     elif (( discoverRc != 0 )); then
         for t in "${allTests[@]}"; do
