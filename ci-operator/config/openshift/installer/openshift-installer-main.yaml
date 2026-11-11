@@ -815,6 +815,33 @@ tests:
         keyC valueC
     workflow: openshift-e2e-azure-multidisk
 - always_run: false
+  as: azure-il6-bastion-smoke
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_IL6_RESOURCE_GROUP: CI-Azure-IL6-DoNotDelete
+      AZURE_IL6_VNET_CIDR: 10.10.0.0/16
+      AZURE_IL6_VNET_NAME: RHOCP-CI-AzureIL6-virtual-network
+      AZURE_VNET_ADDRESS_PREFIXES: 10.10.0.0/16
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASTION_VM_SIZE: Standard_D4s_v3
+      MIRROR_IN_BASTION: "yes"
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
+      RESOURCE_GROUP: CI-Azure-IL6-DoNotDelete
+      VNET_NAME: RHOCP-CI-AzureIL6-virtual-network
+    post:
+    - ref: azure-il6-deprovision-resources
+    pre:
+    - ref: azure-il6-check-prereqs
+    - ref: azure-il6-provision-subnets
+    - chain: azure-provision-bastionhost
+    - ref: azure-il6-bastion-setup
+    - ref: openshift-cluster-bot-rbac
+    - chain: mirror-images-by-oc-adm
+    test:
+    - ref: azure-il6-az-check
+- always_run: false
   as: e2e-azure-custom-dns-techpreview
   optional: true
   steps:
