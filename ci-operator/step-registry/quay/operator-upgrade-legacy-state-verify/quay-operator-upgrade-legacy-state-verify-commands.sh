@@ -12,8 +12,11 @@ STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
 STRICT="${QUAY_UPGRADE_LEGACY_CYPRESS_STRICT:-false}"
 RAW_CYPRESS_OUTPUT=""
+RAW_CYPRESS_DIR=""
+PUBLISH_CYPRESS_DIR=""
 fail() { echo "ERROR: $*" >&2; exit 1; }
 cleanup_sensitive_runtime() {
+  rm -rf "${RAW_CYPRESS_DIR}" "${PUBLISH_CYPRESS_DIR}"
   rm -f "${RAW_CYPRESS_OUTPUT}" "${STATE_FILE}" quay-api-tests/cypress/e2e/upgrade_legacy_state_verify.cy.js
   rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
 }
@@ -55,17 +58,33 @@ prepare_cypress_dependencies() {
     [[ -x node_modules/.bin/cypress ]] || fail "Cypress binary was not installed in quay-api-tests"
   )
 }
-sanitize_cypress_artifacts() {
-  local file
-  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+publish_sanitized_cypress_artifacts() {
+  local file base
+  PUBLISH_CYPRESS_DIR="$(mktemp -d "${ARTIFACT_DIR}/.quay-sanitized.XXXXXX")" || return 1
+  scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" > "${PUBLISH_CYPRESS_DIR}/cypress-output.log" || return 1
   shopt -s nullglob
-  for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml; do
-    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp" "${file}"; return 1; }
-    mv "${file}.tmp" "${file}" || { rm -f "${file}.tmp" "${file}"; return 1; }
+  for file in "${RAW_CYPRESS_DIR}"/junit_upgrade_legacy_state_verify-*.xml; do
+    base="$(basename "${file}")"
+    scrub_cypress_text < "${file}" > "${PUBLISH_CYPRESS_DIR}/${base}" || return 1
   done
   shopt -u nullglob
+  # The only files moved into ARTIFACT_DIR are complete sanitized reports.
+  mv "${PUBLISH_CYPRESS_DIR}/cypress-output.log" "${ARTIFACT_DIR}/cypress-output.log" || return 1
+  shopt -s nullglob
+  for file in "${PUBLISH_CYPRESS_DIR}"/junit_upgrade_legacy_state_verify-*.xml; do
+    mv "${file}" "${ARTIFACT_DIR}/$(basename "${file}")" || return 1
+  done
+  shopt -u nullglob
+  rm -rf "${PUBLISH_CYPRESS_DIR}"
+  PUBLISH_CYPRESS_DIR=""
+  rm -rf "${RAW_CYPRESS_DIR}"
+  RAW_CYPRESS_DIR=""
+  RAW_CYPRESS_OUTPUT=""
 }
 discard_cypress_artifacts() {
+  rm -rf "${RAW_CYPRESS_DIR}" "${PUBLISH_CYPRESS_DIR}"
+  RAW_CYPRESS_DIR=""
+  PUBLISH_CYPRESS_DIR=""
   rm -f "${RAW_CYPRESS_OUTPUT}" "${ARTIFACT_DIR}"/cypress-output.log \
     "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml \
     "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml.tmp
@@ -119,19 +138,14 @@ EOF
 
 rc=0
 rm -f "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml
-RAW_CYPRESS_OUTPUT="$(mktemp "${ARTIFACT_DIR}/cypress-output.XXXXXX")" || fail "could not create Cypress output file"
-if (cd quay-api-tests && CYPRESS_UPGRADE_ROUTE="${ROUTE}" CYPRESS_UPGRADE_OWNER="${OWNER}" CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" CYPRESS_UPGRADE_MEMBER="${MEMBER}" CYPRESS_UPGRADE_ORG="${ORG}" CYPRESS_UPGRADE_REPOSITORY="${REPOSITORY}" CYPRESS_UPGRADE_TEAM="${TEAM}" CYPRESS_UPGRADE_ROBOT="${ROBOT}" NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state_verify.cy.js --reporter mocha-junit-reporter --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-[hash].xml" --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
+RAW_CYPRESS_DIR="$(mktemp -d "/tmp/quay-upgrade-legacy-state-verify.raw.XXXXXX")" || fail "could not create private Cypress staging directory"
+RAW_CYPRESS_OUTPUT="${RAW_CYPRESS_DIR}/cypress-output.log"
+if (cd quay-api-tests && CYPRESS_UPGRADE_ROUTE="${ROUTE}" CYPRESS_UPGRADE_OWNER="${OWNER}" CYPRESS_UPGRADE_PASSWORD="${OWNER_PASSWORD}" CYPRESS_UPGRADE_MEMBER="${MEMBER}" CYPRESS_UPGRADE_ORG="${ORG}" CYPRESS_UPGRADE_REPOSITORY="${REPOSITORY}" CYPRESS_UPGRADE_TEAM="${TEAM}" CYPRESS_UPGRADE_ROBOT="${ROBOT}" NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state_verify.cy.js --reporter mocha-junit-reporter --reporter-options "mochaFile=${RAW_CYPRESS_DIR}/junit_upgrade_legacy_state_verify-[hash].xml" --config "videosFolder=${RAW_CYPRESS_DIR}/videos,screenshotsFolder=${RAW_CYPRESS_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
   rc=0
 else
   rc=$?
 fi
-if ! scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"; then
-  discard_cypress_artifacts
-  fail "could not sanitize Cypress output"
-fi
-rm -f "${RAW_CYPRESS_OUTPUT}"
-RAW_CYPRESS_OUTPUT=""
-sanitize_cypress_artifacts || { discard_cypress_artifacts; fail "could not sanitize Cypress artifacts"; }
+publish_sanitized_cypress_artifacts || { discard_cypress_artifacts; fail "could not sanitize Cypress artifacts"; }
 echo "Legacy upgrade verification Cypress run: exit code ${rc}"
 [[ "${STRICT}" == false || "${rc}" -eq 0 ]] || fail "legacy upgrade verification Cypress failed"
 [[ "${STRICT}" == false ]] || strict_junit_success "${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-*.xml" \

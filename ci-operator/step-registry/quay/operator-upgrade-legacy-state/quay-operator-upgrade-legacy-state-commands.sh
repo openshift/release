@@ -16,11 +16,15 @@ STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
 PRESERVE_STATE=false
 STATE_OWNED=false
+STATE_TMP=""
 RAW_CYPRESS_OUTPUT=""
+RAW_CYPRESS_DIR=""
+PUBLISH_CYPRESS_DIR=""
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 cleanup_sensitive_runtime() {
-  rm -f "${RAW_CYPRESS_OUTPUT}" quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
+  rm -rf "${RAW_CYPRESS_DIR}" "${PUBLISH_CYPRESS_DIR}"
+  rm -f "${STATE_TMP}" "${RAW_CYPRESS_OUTPUT}" quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
   rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
   if [[ "${STATE_OWNED}" == true && "${PRESERVE_STATE}" != true ]]; then
     rm -f "${STATE_FILE}"
@@ -77,17 +81,34 @@ prepare_cypress_dependencies() {
     [[ -x node_modules/.bin/cypress ]] || fail "Cypress binary was not installed in quay-api-tests"
   )
 }
-sanitize_cypress_artifacts() {
-  local file
-  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
+publish_sanitized_cypress_artifacts() {
+  local file base
+  PUBLISH_CYPRESS_DIR="$(mktemp -d "${ARTIFACT_DIR}/.quay-sanitized.XXXXXX")" || return 1
+  scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" > "${PUBLISH_CYPRESS_DIR}/cypress-output.log" || return 1
   shopt -s nullglob
-  for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml; do
-    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp" "${file}"; return 1; }
-    mv "${file}.tmp" "${file}" || { rm -f "${file}.tmp" "${file}"; return 1; }
+  for file in "${RAW_CYPRESS_DIR}"/junit_upgrade_legacy_state-*.xml; do
+    base="$(basename "${file}")"
+    scrub_cypress_text < "${file}" > "${PUBLISH_CYPRESS_DIR}/${base}" || return 1
   done
   shopt -u nullglob
+  # No raw Cypress path is under ARTIFACT_DIR. Each final move is atomic, so an
+  # interruption can expose only a complete, already-scrubbed report.
+  mv "${PUBLISH_CYPRESS_DIR}/cypress-output.log" "${ARTIFACT_DIR}/cypress-output.log" || return 1
+  shopt -s nullglob
+  for file in "${PUBLISH_CYPRESS_DIR}"/junit_upgrade_legacy_state-*.xml; do
+    mv "${file}" "${ARTIFACT_DIR}/$(basename "${file}")" || return 1
+  done
+  shopt -u nullglob
+  rm -rf "${PUBLISH_CYPRESS_DIR}"
+  PUBLISH_CYPRESS_DIR=""
+  rm -rf "${RAW_CYPRESS_DIR}"
+  RAW_CYPRESS_DIR=""
+  RAW_CYPRESS_OUTPUT=""
 }
 discard_cypress_artifacts() {
+  rm -rf "${RAW_CYPRESS_DIR}" "${PUBLISH_CYPRESS_DIR}"
+  RAW_CYPRESS_DIR=""
+  PUBLISH_CYPRESS_DIR=""
   rm -f "${RAW_CYPRESS_OUTPUT}" "${ARTIFACT_DIR}"/cypress-output.log \
     "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml \
     "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml.tmp
@@ -204,7 +225,8 @@ EOF
 run_cypress() {
   local rc=0
   rm -f "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml
-  RAW_CYPRESS_OUTPUT="$(mktemp "${ARTIFACT_DIR}/cypress-output.XXXXXX")" || return 1
+  RAW_CYPRESS_DIR="$(mktemp -d "/tmp/quay-upgrade-legacy-state.raw.XXXXXX")" || return 1
+  RAW_CYPRESS_OUTPUT="${RAW_CYPRESS_DIR}/cypress-output.log"
   if (cd quay-api-tests && \
     CYPRESS_UPGRADE_ROUTE="${ROUTE}" \
     CYPRESS_UPGRADE_OWNER="${OWNER}" \
@@ -217,19 +239,13 @@ run_cypress() {
     CYPRESS_UPGRADE_PHASE="${PHASE}" \
     NO_COLOR=1 node_modules/.bin/cypress run -b electron --spec cypress/e2e/upgrade_legacy_state.cy.js \
       --reporter mocha-junit-reporter \
-      --reporter-options "mochaFile=${ARTIFACT_DIR}/junit_upgrade_legacy_state-[hash].xml" \
-      --config "videosFolder=${ARTIFACT_DIR}/videos,screenshotsFolder=${ARTIFACT_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
+      --reporter-options "mochaFile=${RAW_CYPRESS_DIR}/junit_upgrade_legacy_state-[hash].xml" \
+      --config "videosFolder=${RAW_CYPRESS_DIR}/videos,screenshotsFolder=${RAW_CYPRESS_DIR}/screenshots") > "${RAW_CYPRESS_OUTPUT}" 2>&1; then
     rc=0
   else
     rc=$?
   fi
-  if ! scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"; then
-    discard_cypress_artifacts
-    return 1
-  fi
-  rm -f "${RAW_CYPRESS_OUTPUT}"
-  RAW_CYPRESS_OUTPUT=""
-  sanitize_cypress_artifacts || { discard_cypress_artifacts; return 1; }
+  publish_sanitized_cypress_artifacts || { discard_cypress_artifacts; return 1; }
   echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}"
   if [[ "${STRICT}" == true ]]; then
     [[ "${rc}" -eq 0 ]] || fail "legacy upgrade ${PHASE} Cypress failed"
@@ -253,8 +269,11 @@ if [[ "${PHASE}" == seed ]]; then
   MEMBER_PASSWORD="$(new_legacy_password)" || fail "could not generate member password"
   register_user "${OWNER}" "${OWNER_PASSWORD}"
   register_user "${MEMBER}" "${MEMBER_PASSWORD}"
-  umask 077
-  cat >"${STATE_FILE}" <<EOF
+  # Write the credential-bearing state to an invocation-owned temporary file.
+  # link(2) publishes it only if the final path did not exist, so this seed can
+  # never claim or overwrite a state file belonging to another invocation.
+  STATE_TMP="$(mktemp "${STATE_FILE}.tmp.XXXXXX")" || fail "could not create private legacy state file"
+  cat >"${STATE_TMP}" <<EOF
 OWNER='${OWNER}'
 OWNER_PASSWORD='${OWNER_PASSWORD}'
 MEMBER='${MEMBER}'
@@ -265,8 +284,11 @@ TEAM='${TEAM}'
 ROBOT='${ROBOT}'
 TAG='upgrade-legacy'
 EOF
-  chmod 600 "${STATE_FILE}"
+  chmod 600 "${STATE_TMP}" || fail "could not secure private legacy state file"
+  ln "${STATE_TMP}" "${STATE_FILE}" || fail "legacy state file appeared before seed could publish it"
   STATE_OWNED=true
+  rm -f "${STATE_TMP}"
+  STATE_TMP=""
   prepare_cypress_dependencies
   write_cypress_spec
   run_cypress
