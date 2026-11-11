@@ -249,16 +249,71 @@ function show_results() {
   fi
 }
 
-# check_plugin_gate validates that every plugin OPCT actually executed
+# extract_intended_plugins prints, one per line, the authoritative set of
+# plugins the run intended to execute, read from the result archive's
+# meta/info.json.
+#
+# This is Sonobuoy's own record of what it loaded for the run, written by
+# pkg/discovery/discovery.go (runInfo.LoadedPlugins, appended from
+# cfg.LoadedPlugins) and declared in pkg/discovery/discovery.go as
+#     LoadedPlugins []string  json:"plugins,omitempty"
+# -- note the on-disk key is "plugins", not "LoadedPlugins". The archive
+# path is meta/info.json (pkg/client/results/reader.go: metadataDir "meta/"
+# + InfoFile "info.json"), the same file OPCT itself reads in
+# internal/opct/summary/result.go getPluginList().
+#
+# The names it contains are the same plugin names used as keys under
+# .provider.plugins in opct-report.json, so the two sets are directly
+# comparable.
+#
+# Returns non-zero when the member is missing, unreadable, or does not parse
+# into a non-empty array of strings.
+function extract_intended_plugins() {
+  local archive="$1"
+  local info_json
+
+  # Sonobuoy writes members without a leading "./", but tolerate both forms
+  # rather than depending on the archiver's path style.
+  info_json=$(tar -xzOf "${archive}" meta/info.json 2>/dev/null) \
+    || info_json=$(tar -xzOf "${archive}" ./meta/info.json 2>/dev/null) \
+    || return 1
+
+  [[ -n "${info_json}" ]] || return 1
+
+  # "plugins" is omitempty, so an absent key means Sonobuoy loaded no
+  # plugins at all -- an anomaly, not an empty-but-valid run.
+  echo "${info_json}" | jq -e -r '
+    .plugins
+    | if type != "array" then error("meta/info.json .plugins is not an array: \(type)") else . end
+    | if length == 0 then error("meta/info.json .plugins is empty") else . end
+    | .[]
+  ' 2>/dev/null || return 1
+}
+
+# check_plugin_gate validates that every plugin the run intended to execute
 # reports stat.result == "passed", reading the structured opct-report.json
 # produced by 'opct report --save-to' -- the same data contract the OPCT
 # web UI consumes (internal/report/data.go ReportFileNameIndexJSON).
 #
-# .provider.plugins is populated only for plugins that produced results
-# (internal/report/data.go populatePluginConformance skips absent plugins),
-# so its key set already reflects run-mode intent -- e.g. upgrade mode
-# omitting plugins 10/20/80 -- without a separate parse of the archive's
-# meta/info.json.
+# The report alone is not sufficient to establish intent. OPCT builds
+# .provider.plugins by iterating a fixed list of known plugins and calling
+# populatePluginConformance for each (internal/report/data.go), which
+# returns early without writing a map entry when the plugin produced no
+# summary:
+#
+#     if pluginSum == nil || pluginSum.Name == "" { return nil }
+#
+# So a plugin that was loaded for the run but crashed hard enough to emit no
+# summary is simply absent from the report, and a gate that only iterates
+# the keys present would pass it silently -- the exact false-green this step
+# exists to prevent. The gate therefore cross-checks the report's key set
+# against the archive's own manifest (see extract_intended_plugins) and
+# treats any intended-but-absent plugin as a plugin failure.
+#
+# Deliberately omitted plugins are not affected: meta/info.json records what
+# Sonobuoy actually loaded for this run, so e.g. upgrade mode genuinely
+# omitting plugins 10/20/80 yields an intended set that already excludes
+# them.
 #
 # Per OPCT maintainer direction (Slack thread G012C6LKVM2/p1793807889222619):
 # gate on the report API's .stat.result, not the raw Sonobuoy status.
@@ -280,10 +335,11 @@ function show_results() {
 # for visibility, but never counted toward pass/fail.
 #
 # Return values (contract):
-#   0 = all executed plugins (excluding Replay) report stat.result == "passed"
-#   1 = valid report parsed, but at least one plugin is non-passed
-#       (plugin failure)
-#   2 = report missing or malformed (processing problem)
+#   0 = every intended plugin (excluding Replay) is present in the report
+#       and reports stat.result == "passed"
+#   1 = valid report parsed, but at least one plugin is non-passed or is
+#       missing from the report entirely (plugin failure)
+#   2 = report or archive manifest missing or malformed (processing problem)
 #
 # The caller must capture the return value directly; using 'if !' would
 # lose the distinction between 1 and 2.
@@ -338,6 +394,36 @@ function check_plugin_gate() {
   }
 
   show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
+
+  # Cross-check the report's key set against the run's own manifest, so a
+  # plugin that was loaded but produced no summary cannot pass by being
+  # absent (see function comment).
+  local intended_plugins
+  if ! intended_plugins=$(extract_intended_plugins "${RESULT_FILE}"); then
+    plugin_gate_reason="unable to read intended plugin set from meta/info.json in ${RESULT_FILE}"
+    show_msg "ERROR: ${plugin_gate_reason}"
+    return 2
+  fi
+
+  show_msg "Intended plugins (from archive meta/info.json): $(echo "${intended_plugins}" | paste -sd' ' -)"
+
+  # Replay is excluded from the gate entirely (see function comment), so it
+  # is not required to be present either.
+  local missing_plugins=()
+  local p
+  while IFS= read -r p; do
+    [[ -n "${p}" ]] || continue
+    [[ "${p}" != "80-openshift-tests-replay" ]] || continue
+    if ! echo "${plugins_json}" | jq -e --arg p "${p}" 'any(.[]; .name == $p)' >/dev/null; then
+      missing_plugins+=("${p}")
+    fi
+  done <<< "${intended_plugins}"
+
+  if [[ ${#missing_plugins[@]} -ne 0 ]]; then
+    plugin_gate_reason="plugin(s) intended by the run but absent from opct-report.json (no results produced): ${missing_plugins[*]}"
+    show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
+    return 1
+  fi
 
   # A plugin passes the gate when its OPCT-computed result is "passed".
   # The Replay plugin is excluded from the gate entirely (see function
