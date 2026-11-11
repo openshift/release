@@ -38,7 +38,10 @@ ref:
     conditions), CSV (phase, reason, message — the operator-reported
     condition text, not the full conditions array), Central CR (specName,
     status, the Available condition only), SecuredCluster CR (status only),
-    PackageManifest (channels, catalogSource), ACM policy compliance
+    PackageManifest (channels, catalogSource, and the selection provenance:
+    both 08-* artifacts come from one inventory query that records each
+    package's catalog, and the per-package capture is selected from the
+    catalog the subscription uses), ACM policy compliance
     verdicts (fully-qualified policies.policy.open-cluster-management.io
     and configurationpolicies.policy.open-cluster-management.io, matching
     their CRD probes: conditions, compliant, per-cluster status), and the
@@ -52,7 +55,9 @@ ref:
     failure is never rendered as absence (a not-registered CRD renders as
     CRD_ABSENT, an API error as QUERY FAILED, and the status properties
     report unknown, not absent, for a failed capture); both 08-*
-    packagemanifest files are always written; cross-artifact agreement
+    packagemanifest files are always written, from a single inventory query
+    over all namespaces, so a package offered by several catalogs cannot be
+    attributed to the wrong one; cross-artifact agreement
     assertions run at the end and fail the step with exit code 20
     (disagreement) or 21 (probe sanity; when several fire, the highest code
     is reported). The storage-axis and image captures (11-placementdecisions

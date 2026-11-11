@@ -275,6 +275,8 @@ print(json.dumps(result, indent=2))
 #    Fully-qualified resource type: with ACM installed, the bare
 #    `subscription` resolves to ACM's subscriptions.apps.open-cluster-
 #    management.io CRD and silently captures the wrong objects.
+#    spec.source and spec.sourceNamespace are captured because step [8/10]
+#    selects the PackageManifest from the catalog this subscription uses.
 echo "[3/10] Subscription (OLM, fully-qualified)..."
 oc get subscriptions.operators.coreos.com -A -o json 2>/dev/null | \
   python3 -c '
@@ -291,7 +293,8 @@ for i in data.get("items", []):
         "installPlanRef": (i.get("status", {}).get("installPlanRef") or {}).get("name"),
         "conditions": i.get("status", {}).get("conditions"),
         "channel": i.get("spec", {}).get("channel"),
-        "source": i.get("spec", {}).get("source")
+        "source": i.get("spec", {}).get("source"),
+        "sourceNamespace": i.get("spec", {}).get("sourceNamespace")
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || \
@@ -335,12 +338,21 @@ print(json.dumps(result, indent=2))
   echo "probe_error: csv query failed" > "${EVIDENCE_DIR}/05-csv.json"
 
 # 6. CRD Established condition for Central
+#    Stdout and stderr are captured separately throughout the capture
+#    section: the parser reads stdout only (a client-side warning or
+#    deprecation notice on stderr must not corrupt the JSON it parses, which
+#    would read as a parse failure and fail the probe-sanity assertion on a
+#    query that succeeded), and the classification below reads the error
+#    text from stderr.
 echo "[6/10] Central CRD..."
-CRD_OUTPUT=$(oc get crd centrals.platform.stackrox.io -o json 2>&1)
+CRD_TMP="$(mktemp)"
+CRD_ERR_TMP="$(mktemp)"
+oc get crd centrals.platform.stackrox.io -o json > "${CRD_TMP}" 2> "${CRD_ERR_TMP}"
 CRD_RC=$?
+CRD_ERR="$(cat "${CRD_ERR_TMP}")"
+rm -f "${CRD_ERR_TMP}"
 if [[ ${CRD_RC} -eq 0 ]]; then
-  echo "${CRD_OUTPUT}" | \
-    python3 -c '
+  python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 conditions = data.get("status", {}).get("conditions", [])
@@ -348,24 +360,29 @@ print(json.dumps({
     "name": data["metadata"]["name"],
     "conditions": conditions
 }, indent=2))
-' > "${EVIDENCE_DIR}/06-central-crd.json" 2>&1 || \
+' < "${CRD_TMP}" > "${EVIDENCE_DIR}/06-central-crd.json" 2>&1 || \
     echo "probe_error: central crd parse failed" > "${EVIDENCE_DIR}/06-central-crd.json"
 else
-  if echo "${CRD_OUTPUT}" | grep -qi "not found"; then
+  if echo "${CRD_ERR}" | grep -qi "not found"; then
     echo "CRD centrals.platform.stackrox.io NOT FOUND" > "${EVIDENCE_DIR}/06-central-crd.json"
   else
-    echo "QUERY FAILED (rc=${CRD_RC}): ${CRD_OUTPUT}" > "${EVIDENCE_DIR}/06-central-crd.json"
+    echo "QUERY FAILED (rc=${CRD_RC}): ${CRD_ERR}" > "${EVIDENCE_DIR}/06-central-crd.json"
   fi
 fi
+rm -f "${CRD_TMP}"
 
 # 7. Central CR — capture name, namespace, spec.name, full status, and the
 #    Available condition explicitly (the acceptance verdict keys on it).
 echo "[7/10] Central CR..."
-CR_OUTPUT=$(oc get centrals.platform.stackrox.io -A -o json 2>&1)
+# Stdout to the parser, stderr to the classifier (see [6/10]).
+CR_TMP="$(mktemp)"
+CR_ERR_TMP="$(mktemp)"
+oc get centrals.platform.stackrox.io -A -o json > "${CR_TMP}" 2> "${CR_ERR_TMP}"
 CR_RC=$?
+CR_ERR="$(cat "${CR_ERR_TMP}")"
+rm -f "${CR_ERR_TMP}"
 if [[ ${CR_RC} -eq 0 ]]; then
-  echo "${CR_OUTPUT}" | \
-    python3 -c '
+  python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -380,27 +397,32 @@ for i in data.get("items", []):
         "available": available,
     })
 print(json.dumps(result, indent=2))
-' > "${EVIDENCE_DIR}/07-central-cr.json" 2>&1 || \
+' < "${CR_TMP}" > "${EVIDENCE_DIR}/07-central-cr.json" 2>&1 || \
     echo "probe_error: central cr parse failed" > "${EVIDENCE_DIR}/07-central-cr.json"
 else
-  if echo "${CR_OUTPUT}" | grep -qi "not found"; then
+  if echo "${CR_ERR}" | grep -qi "not found"; then
     echo "No Central CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07-central-cr.json"
-  elif echo "${CR_OUTPUT}" | grep -qi "doesn't have a resource type"; then
+  elif echo "${CR_ERR}" | grep -qi "doesn't have a resource type"; then
     echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07-central-cr.json"
   else
-    echo "QUERY FAILED (rc=${CR_RC}): ${CR_OUTPUT}" > "${EVIDENCE_DIR}/07-central-cr.json"
+    echo "QUERY FAILED (rc=${CR_RC}): ${CR_ERR}" > "${EVIDENCE_DIR}/07-central-cr.json"
   fi
 fi
+rm -f "${CR_TMP}"
 
 # 7b. SecuredCluster CR — same three-way classification as Central; the
 #     SecuredCluster gap is tracked separately (see INTEROP-9525 child) and
 #     its presence/phase must be observable from the evidence bundle.
 echo "[7b/10] SecuredCluster CR..."
-SC_OUTPUT=$(oc get securedclusters.platform.stackrox.io -A -o json 2>&1)
+# Stdout to the parser, stderr to the classifier (see [6/10]).
+SC_TMP="$(mktemp)"
+SC_ERR_TMP="$(mktemp)"
+oc get securedclusters.platform.stackrox.io -A -o json > "${SC_TMP}" 2> "${SC_ERR_TMP}"
 SC_RC=$?
+SC_ERR="$(cat "${SC_ERR_TMP}")"
+rm -f "${SC_ERR_TMP}"
 if [[ ${SC_RC} -eq 0 ]]; then
-  echo "${SC_OUTPUT}" | \
-    python3 -c '
+  python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -412,55 +434,168 @@ for i in data.get("items", []):
         "status": i.get("status"),
     })
 print(json.dumps(result, indent=2))
-' > "${EVIDENCE_DIR}/07b-securedcluster-cr.json" 2>&1 || \
+' < "${SC_TMP}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json" 2>&1 || \
     echo "probe_error: securedcluster parse failed" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
 else
-  if echo "${SC_OUTPUT}" | grep -qi "not found"; then
+  if echo "${SC_ERR}" | grep -qi "not found"; then
     echo "No SecuredCluster CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
-  elif echo "${SC_OUTPUT}" | grep -qi "doesn't have a resource type"; then
+  elif echo "${SC_ERR}" | grep -qi "doesn't have a resource type"; then
     echo "CRD_ABSENT: securedclusters.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   else
-    echo "QUERY FAILED (rc=${SC_RC}): ${SC_OUTPUT}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
+    echo "QUERY FAILED (rc=${SC_RC}): ${SC_ERR}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   fi
 fi
+rm -f "${SC_TMP}"
 
 # 8. PackageManifest for rhacs-operator — three-way classify (present |
-#    absent | probe_error); both files are ALWAYS written. The previous
+#    absent | probe_error); both files are ALWAYS written. The selection is
+#    scoped to the catalog the subscription actually uses: with the package
+#    offered by more than one catalog, `oc get packagemanifest
+#    rhacs-operator` returns whichever one the server lists first, so the
+#    artifact could describe a catalog the subscription does not subscribe
+#    to and the catalog-binding precondition then fails on evidence that
+#    never looked at the right catalog. The previous
 #    --selector=catalog=redhat-operators form false-negatived on clusters
 #    where the operator installs fine, and the "not in catalog" conclusion
-#    was read from that broken probe.
+#    was read from that broken probe; the catalog is now derived from the
+#    subscription itself (step [3/10]) instead of being hardcoded.
+#    One list query over all namespaces feeds both artifacts, so the
+#    per-package capture and the inventory cannot disagree about what the
+#    cluster offered, and the inventory records each package's catalog for
+#    the agreement assertion below.
 echo "[8/10] PackageManifest..."
-PM_OUTPUT=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o json 2>&1)
-PM_RC=$?
-if [[ ${PM_RC} -eq 0 ]]; then
-  echo "${PM_OUTPUT}" | \
-    python3 -c '
+# The inventory is the largest object captured here and its parser must see
+# JSON only, so stdout goes straight to a file and stderr to the classifier
+# (see [6/10]).
+PM_LIST_TMP="$(mktemp)"
+PM_LIST_ERR_TMP="$(mktemp)"
+oc get packagemanifest -A -o json > "${PM_LIST_TMP}" 2> "${PM_LIST_ERR_TMP}"
+PM_LIST_RC=$?
+PM_LIST_ERR="$(cat "${PM_LIST_ERR_TMP}")"
+rm -f "${PM_LIST_ERR_TMP}"
+if [[ ${PM_LIST_RC} -eq 0 ]]; then
+  PM_PARSE_RC=0
+  python3 - "${EVIDENCE_DIR}" "${PM_LIST_TMP}" <<'PYEOF' || PM_PARSE_RC=$?
 import json, sys
-data = json.load(sys.stdin)
-channels = []
-for ch in data.get("status", {}).get("channels", []):
-    channels.append({
-        "name": ch.get("name"),
-        "currentCSV": ch.get("currentCSV")
+from pathlib import Path
+
+ev = Path(sys.argv[1])
+items = json.loads(Path(sys.argv[2]).read_text()).get("items", [])
+
+rows = []
+for i in items:
+    meta = i.get("metadata") or {}
+    status = i.get("status") or {}
+    name = meta.get("name")
+    if not name:
+        continue
+    rows.append({
+        "name": name,
+        "catalog": status.get("catalogSource") or "",
+        "catalog_ns": (status.get("catalogSourceNamespace")
+                       or meta.get("namespace") or ""),
+        "channels": [
+            {"name": ch.get("name"), "currentCSV": ch.get("currentCSV")}
+            for ch in status.get("channels") or []
+        ],
     })
-print(json.dumps({
-    "name": data["metadata"]["name"],
-    "catalogSource": data.get("status", {}).get("catalogSource"),
-    "catalogSourceNamespace": data.get("status", {}).get("catalogSourceNamespace"),
-    "channels": channels,
-}, indent=2))
-' > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json" 2>&1 || \
-    echo "probe_error: packagemanifest parse failed" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+rows.sort(key=lambda r: (r["name"], r["catalog"], r["catalog_ns"]))
+
+# Full inventory, always written: one line per PackageManifest with the
+# catalog that provides it. Without the catalog column a same-named package
+# in another catalog is indistinguishable from the subscribed one.
+(ev / "08-all-packagemanifests.txt").write_text(
+    "# name\tcatalog\tcatalog-namespace"
+    " (every PackageManifest the cluster lists)\n"
+    + "".join("%s\t%s\t%s\n" % (r["name"], r["catalog"], r["catalog_ns"])
+              for r in rows)
+)
+
+# The subscription's own catalog, from the step [3/10] capture.
+sub_source = sub_source_ns = None
+try:
+    subs = json.loads((ev / "03-subscription.json").read_text())
+    matches = [s for s in subs if s.get("name") == "rhacs-operator"]
+    if len(matches) == 1:
+        sub_source = matches[0].get("source")
+        sub_source_ns = matches[0].get("sourceNamespace")
+except Exception:
+    pass
+
+candidates = [r for r in rows if r["name"] == "rhacs-operator"]
+out = ev / "08-packagemanifest-rhacs.json"
+
+
+def key(r):
+    return "%s/%s" % (r["catalog"] or "<none>", r["catalog_ns"] or "<none>")
+
+
+if sub_source:
+    selected = [r for r in candidates
+                if r["catalog"] == sub_source
+                and (not sub_source_ns
+                     or r["catalog_ns"] == sub_source_ns)]
+    scope = "catalog %s%s" % (
+        sub_source,
+        " in namespace %s" % sub_source_ns if sub_source_ns else "")
+elif len(candidates) <= 1:
+    # No subscription source to filter on, but at most one catalog offers
+    # the package, so there is nothing to disambiguate: select the single
+    # match, or report the absence.
+    selected = candidates
+    scope = "any catalog (the subscription capture names no source)"
+else:
+    # No subscription captured (or none named rhacs-operator) and more than
+    # one catalog offers the package: nothing attributes a catalog, so no
+    # single PackageManifest is claimed. Not an absence: the package exists.
+    selected = []
+    out.write_text(
+        "UNATTRIBUTED: %d PackageManifests named rhacs-operator (%s) and the "
+        "subscription capture names no source to select one; the catalog "
+        "binding is unknown, not absent (successful query)\n"
+        % (len(candidates), ", ".join(key(r) for r in candidates)))
+    sys.exit(0)
+
+others = [r for r in candidates if r not in selected]
+if not selected:
+    out.write_text(
+        "ABSENT: no PackageManifest named rhacs-operator in %s "
+        "(successful query)%s\n"
+        % (scope,
+           "; present in other catalogs: %s" % ", ".join(key(r) for r in others)
+           if others else ""))
+else:
+    pm = selected[0]
+    out.write_text(json.dumps({
+        "name": pm["name"],
+        "catalogSource": pm["catalog"] or None,
+        "catalogSourceNamespace": pm["catalog_ns"] or None,
+        "channels": pm["channels"],
+        "selection": {
+            "mode": ("subscription-catalog" if sub_source
+                     else "single-match"),
+            "subscriptionSource": sub_source,
+            "subscriptionSourceNamespace": sub_source_ns,
+            "candidates": [key(r) for r in candidates],
+        },
+    }, indent=2) + "\n")
+PYEOF
+  if [[ ${PM_PARSE_RC} -ne 0 ]]; then
+    echo "probe_error: packagemanifest inventory parse failed" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+    echo "probe_error: packagemanifest inventory parse failed" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
+  fi
 else
-  if echo "${PM_OUTPUT}" | grep -qi "not found"; then
-    echo "ABSENT: no PackageManifest named rhacs-operator in openshift-marketplace (successful query)" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+  # One query drives both artifacts, so both take the same classification.
+  if echo "${PM_LIST_ERR}" | grep -qi "not found" || \
+     echo "${PM_LIST_ERR}" | grep -qi "doesn't have a resource type"; then
+    echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+    echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
   else
-    echo "QUERY FAILED (rc=${PM_RC}): ${PM_OUTPUT}" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+    echo "QUERY FAILED (rc=${PM_LIST_RC}): ${PM_LIST_ERR}" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+    echo "QUERY FAILED (rc=${PM_LIST_RC}): ${PM_LIST_ERR}" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
   fi
 fi
-# Always written, not only on the failure branch.
-oc get packagemanifest -n openshift-marketplace -o name > "${EVIDENCE_DIR}/08-all-packagemanifests.txt" 2>&1 || \
-  echo "probe_error: packagemanifest list query failed" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
+rm -f "${PM_LIST_TMP}"
 
 # 9/10. ACM policies — capture name, status.conditions, and the compliance
 #      verdicts (status.compliant, status.status[]). Conditions alone are
@@ -793,30 +928,109 @@ run_assertions() {
       failed=21
     fi
   done
-  # (b) Packagemanifest agreement: if the full list names rhacs-operator,
-  #     the per-package capture must classify it present (valid JSON with a
-  #     name field), and vice versa.
+  # (b) Packagemanifest agreement: the per-package capture is selected from
+  #     the catalog the subscription subscribes to, so the inventory must
+  #     list rhacs-operator in that catalog exactly when the capture reports
+  #     it present. A package listed only in other catalogs is consistent
+  #     with a catalog-scoped absence: reported, not failed (the removal
+  #     decision needs to see it, but the artifacts agree).
   python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
 import json, sys
 from pathlib import Path
+
 ev = Path(sys.argv[1])
-listed = "rhacs-operator" in (ev / "08-all-packagemanifests.txt").read_text()
+inv_raw = (ev / "08-all-packagemanifests.txt").read_text()
+if inv_raw.startswith(("probe_error:", "QUERY FAILED")):
+    print("ASSERTION FAILURE (21): 08-all-packagemanifests.txt carries no "
+          "inventory: " + inv_raw.splitlines()[0][:160])
+    sys.exit(21)
+inv = []
+if not inv_raw.startswith("CRD_ABSENT"):
+    for line in inv_raw.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 3:
+            print("ASSERTION FAILURE (21): malformed inventory line: "
+                  + line[:160])
+            sys.exit(21)
+        inv.append(tuple(parts))
+
+# Catalog the subscription subscribes to (step [3/10] capture).
+sub_source = sub_source_ns = None
+try:
+    subs = json.loads((ev / "03-subscription.json").read_text())
+    matches = [s for s in subs if s.get("name") == "rhacs-operator"]
+    if len(matches) == 1:
+        sub_source = matches[0].get("source")
+        sub_source_ns = matches[0].get("sourceNamespace")
+except Exception:
+    pass
+
+
+def in_subscribed_catalog(row):
+    name, catalog, catalog_ns = row
+    if name != "rhacs-operator":
+        return False
+    if sub_source is None:
+        return True  # no known catalog: any listing counts
+    return catalog == sub_source and (not sub_source_ns
+                                      or catalog_ns == sub_source_ns)
+
+
+listed_scoped = any(in_subscribed_catalog(r) for r in inv)
+listed_anywhere = sorted({"%s/%s" % (c, ns) for n, c, ns in inv
+                          if n == "rhacs-operator"})
+scoped_label = "%s/%s" % (sub_source or "<unknown>", sub_source_ns or "<any>")
+
 perpkg_raw = (ev / "08-packagemanifest-rhacs.json").read_text()
-if perpkg_raw.startswith("ABSENT:"):
-    present = False
+if perpkg_raw.startswith(("ABSENT:", "CRD_ABSENT")):
+    present, selection = False, None
+elif perpkg_raw.startswith("UNATTRIBUTED"):
+    # The package exists in several catalogs and no subscription attributes
+    # one: the capture claims no catalog, so only the listing is checkable.
+    present, selection = True, None
+elif perpkg_raw.startswith(("probe_error:", "QUERY FAILED")):
+    print("ASSERTION FAILURE (21): 08-packagemanifest-rhacs.json carries no "
+          "classification: " + perpkg_raw.splitlines()[0][:160])
+    sys.exit(21)
 else:
     try:
         perpkg = json.loads(perpkg_raw)
         present = isinstance(perpkg, dict) and perpkg.get("name") == "rhacs-operator"
+        selection = perpkg if present else None
     except Exception:
-        present = None
+        present, selection = None, None
 if present is None:
-    print("ASSERTION FAILURE (21): 08-packagemanifest-rhacs.json is not valid JSON")
+    print("ASSERTION FAILURE (21): 08-packagemanifest-rhacs.json is not a "
+          "present|absent classification: " + perpkg_raw.splitlines()[0][:160])
     sys.exit(21)
-if listed != present:
-    print(f"ASSERTION FAILURE (20): packagemanifest disagreement — "
-          f"full list contains rhacs-operator={listed}, per-package present={present}")
+if present and selection is None and not listed_anywhere:
+    print("ASSERTION FAILURE (20): packagemanifest disagreement: the capture "
+          "reports an unattributed rhacs-operator PackageManifest but the "
+          "inventory lists none")
     sys.exit(20)
+if present and selection is not None and not listed_scoped:
+    print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
+          "per-package capture reports rhacs-operator present in %s/%s but "
+          "the inventory does not list it in the subscribed catalog %s "
+          "(listed: %s)"
+          % (selection.get("catalogSource"),
+             selection.get("catalogSourceNamespace"), scoped_label,
+             ", ".join(listed_anywhere) or "none"))
+    sys.exit(20)
+if present is False and listed_scoped:
+    print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
+          "per-package capture reports rhacs-operator absent from the "
+          "subscribed catalog %s but the inventory lists it there"
+          % scoped_label)
+    sys.exit(20)
+if present is False and listed_anywhere:
+    print("NOTE: rhacs-operator is not in the subscribed catalog %s but is "
+          "listed in %s; the catalog-scoped absence is consistent and is "
+          "what the removal decision reads"
+          % (scoped_label, ", ".join(listed_anywhere)))
 PYEOF
   # (c) Subscription capture must be OLM objects, not ACM's CRD.
   python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
