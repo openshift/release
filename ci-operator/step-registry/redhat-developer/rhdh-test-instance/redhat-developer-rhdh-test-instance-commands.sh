@@ -41,13 +41,20 @@ done
 
 # Install & login to gh cli
 GH_VERSION=2.49.0
-echo "Installing GitHub CLI version ${GH_VERSION}..."
-curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C /tmp
-if [ ! -f "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" ]; then
+# The step pod can land on either architecture on multi-arch build clusters.
+case "$(uname -m)" in
+    x86_64) GH_ARCH=amd64 ;;
+    aarch64|arm64) GH_ARCH=arm64 ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
+echo "Installing GitHub CLI version ${GH_VERSION} for linux_${GH_ARCH}..."
+GH_DIR="/tmp/gh_${GH_VERSION}_linux_${GH_ARCH}"
+curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" | tar xz -C /tmp
+if [ ! -f "${GH_DIR}/bin/gh" ]; then
     echo "Failed to install GitHub CLI"
     exit 1
 fi
-export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+export PATH="${GH_DIR}/bin:$PATH"
 echo "GitHub CLI installed successfully. Version: $(gh --version)"
 echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
 
