@@ -494,7 +494,7 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-if [[ ${PATCH_INFRA_MANIFEST:-} == "true" ]]; then
+if [[ ${PATCH_INFRA_MANIFEST:-} == "true" || ${PLATFORM_EXTERNAL_CCM_ENABLED:-yes} != "yes" ]]; then
   ### Update platform spec in the infra resource
   echo "Patching infrastructure resource manifest with the 'External' platform type..."
   cat <<EOF >/tmp/infraPlatformSpecPatch.yml
