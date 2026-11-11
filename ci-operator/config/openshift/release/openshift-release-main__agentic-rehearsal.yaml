@@ -17,64 +17,9 @@ tests:
 - as: agentic-prepare
   steps:
     test:
-    - as: openshift-agentic-prepare-validation
-      from: agentic-validation
-      commands: 'export JOB_SPEC=''{"refs": {"org": "openshift", "repo": "cluster-kube-controller-manager-operator",
-        "base_sha": "cd45079d8bb7a391ba0eb3282d9ef75232fe425c", "pulls": [{"number":
-        977, "sha": "cd8e06e5a828f3bed4da98ff469992e9f7877608"}]}}''
-
-        #!/bin/bash
-
-        set -euo pipefail
-
-
-        # Preparation receives Jira/model credentials. Only checked plans and source
-
-        # references enter SHARED_DIR; raw issue bodies, tokens and prompts stay private.
-
-        export VALIDATION_SOURCE_DIR="${PWD}"
-
-        exec python3 /opt/agentic-validation/openshift-agentic-validate-commands.py
-        prepare
-
-        '
-      credentials:
-      - collection: test-platform-infra
-        group: jira-token-dptp-bot
-        mount_path: /var/run/jira-token
-      - collection: test-platform-infra
-        group: agent-validation-model
-        mount_path: /var/run/validation-model
-      env:
-      - name: VALIDATION_MODEL_URL
-        default: https://models.corp.redhat.com/oai/v1/chat/completions
-        documentation: HTTPS Chat Completions endpoint. Redirects are rejected.
-      - name: VALIDATION_PREPARE_MODEL
-        default: granite-3.3-8b-instruct
-        documentation: Planning model; validate compatibility and plan quality before
-          enabling a job.
-      - name: VALIDATION_MODEL_TOKEN_FILE
-        default: /var/run/validation-model/token
-        documentation: Bearer token file; never shared with generated commands.
-      - name: JIRA_USERNAME
-        default: aos-team-dp-testplatform@redhat.com
-        documentation: Jira account for basic authentication.
-      - name: JIRA_TOKEN_FILE
-        default: /var/run/jira-token/password
-        documentation: Jira API token file. Retrieval failure is recorded and PR fallback
-          is attempted.
-      - name: VALIDATION_TIMEOUT_SECONDS
-        default: '600'
-        documentation: Overall preparation deadline in seconds, including source retrieval
-          (600 seconds = 10 minutes).
-      resources:
-        requests:
-          cpu: 100m
-          memory: 512Mi
-      timeout: 12m0s
-      grace_period: 1m0s
+    - ref: openshift-agentic-prepare-validation
   optional: true
-  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+  always_run: false
 - as: agentic-observed-pass
   steps:
     test:
@@ -174,7 +119,7 @@ tests:
       timeout: 12m0s
       grace_period: 2m0s
   optional: true
-  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+  always_run: false
 - as: agentic-observed-fail
   steps:
     test:
@@ -274,7 +219,7 @@ tests:
       timeout: 12m0s
       grace_period: 2m0s
   optional: true
-  run_if_changed: ^ci-operator/(step-registry/openshift/agentic/|config/openshift/release/openshift-release-main__agentic-rehearsal\.yaml$)
+  always_run: false
 zz_generated_metadata:
   org: openshift
   repo: release
