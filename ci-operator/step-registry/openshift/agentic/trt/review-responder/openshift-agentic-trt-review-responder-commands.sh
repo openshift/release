@@ -17,6 +17,19 @@ echo "=== TRT Review Responder ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+
+# No worker has run yet, but still discard the private temporary handoff on
+# early setup exits. on_exit takes over this cleanup once polling is ready.
+review_prompt_cleanup() {
+    local rc=$?
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
+    return "${rc}"
+}
+trap review_prompt_cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
@@ -116,9 +129,14 @@ on_exit() {
         [[ "${rc}" -ne 0 ]] && REVIEW_EXIT="${rc}"
         write_review_metrics || echo "WARNING: failed to write review metrics"
     fi
+    # write_review_metrics normally consumes and removes this file. Retain a
+    # final fallback for abrupt metrics failures after a worker captured it.
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
     if declare -F copy_artifacts >/dev/null; then
-        copy_artifacts
+        copy_artifacts || echo "WARNING: failed to copy review artifacts" >&2
     fi
+    return "${rc}"
 }
 trap on_exit EXIT
 trap 'exit 143' TERM
