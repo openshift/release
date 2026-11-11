@@ -206,10 +206,23 @@ read_profile_file() {
   fi
 }
 
-# Log in
+# Disables tracing to protect sensitive credential and API response data
+disable_tracing() {
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
+}
+
+# Restores tracing to its previous state
+restore_tracing() {
+  $WAS_TRACING && set -x
+}
+
+# Log in - disable tracing to protect credentials
+disable_tracing
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
+restore_tracing
 
 # DNS diagnostics for login endpoints
 log "Running DNS diagnostics for sso.redhat.com..."
@@ -233,26 +246,29 @@ for login_attempt in $(seq 1 ${LOGIN_MAX_RETRIES}); do
   echo "Login attempt ${login_attempt} of ${LOGIN_MAX_RETRIES}..."
 
   set +o errexit
+  disable_tracing
   if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
     echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+    login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --client-id="${SSO_CLIENT_ID}" --client-secret="${SSO_CLIENT_SECRET}" 2>&1)
     login_exit_code=$?
     if [[ ${login_exit_code} -eq 0 ]]; then
-      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>&1)
+      login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --client-id="${SSO_CLIENT_ID}" --client-secret="${SSO_CLIENT_SECRET}" 2>&1)
       login_exit_code=$?
     fi
   elif [[ -n "${ROSA_TOKEN}" ]]; then
     echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-    login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+    login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --token="${ROSA_TOKEN}" 2>&1)
     login_exit_code=$?
     if [[ ${login_exit_code} -eq 0 ]]; then
-      login_output=$(ocm login --url "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}" 2>&1)
+      login_output=$(rosa login --env "${OCM_LOGIN_ENV}" --token="${ROSA_TOKEN}" 2>&1)
       login_exit_code=$?
     fi
   else
+    restore_tracing
     echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
     exit 1
   fi
+  restore_tracing
   set -o errexit
 
   if [[ ${login_exit_code} -eq 0 ]]; then
@@ -334,18 +350,39 @@ if [[ -z "$OPENSHIFT_VERSION" && -n "${VERSION_OFFSET_FROM_LATEST:-}" ]]; then
   log "Resolved version from offset ${offset}: ${OPENSHIFT_VERSION} (available Y-streams: ${y_streams[*]})"
 fi
 
+# If minimum version was discovered, use it to constrain the cluster version
+DISCOVERED_VERSION=""
+if [[ -f "${SHARED_DIR}/minimum-openshift-version" ]]; then
+  DISCOVERED_VERSION=$(cat "${SHARED_DIR}/minimum-openshift-version")
+  if [[ -z "$OPENSHIFT_VERSION" ]]; then
+    OPENSHIFT_VERSION="${DISCOVERED_VERSION}"
+    log "Using minimum discovered version ${OPENSHIFT_VERSION}"
+  else
+    log "Using specified version ${OPENSHIFT_VERSION} (minimum available: ${DISCOVERED_VERSION})"
+  fi
+fi
+
 # If account-roles-create fell back to a different version, use it. This overrides
 # release:latest resolution so the cluster version matches the account roles.
+# Preserve discovered versions when they share the same X.Y stream as the fallback.
 if [[ -f "${SHARED_DIR}/openshift_version" ]]; then
   FALLBACK_VERSION=$(cat "${SHARED_DIR}/openshift_version")
   REQUESTED_MAJOR_MINOR=$(echo "${OPENSHIFT_VERSION}" | cut -d'.' -f1,2)
   FALLBACK_MAJOR_MINOR=$(echo "${FALLBACK_VERSION}" | cut -d'.' -f1,2)
+  DISCOVERED_MAJOR_MINOR=$(echo "${DISCOVERED_VERSION}" | cut -d'.' -f1,2)
+
   if [[ "${REQUESTED_MAJOR_MINOR}" =~ ^[0-9]+\.[0-9]+$ && "${REQUESTED_MAJOR_MINOR}" != "${FALLBACK_MAJOR_MINOR}" ]]; then
     log "ERROR: Requested version ${OPENSHIFT_VERSION} but account-roles fell back to ${FALLBACK_VERSION}. Version ${OPENSHIFT_VERSION} may not be available for this cluster type."
     exit 1
   fi
-  OPENSHIFT_VERSION="${FALLBACK_VERSION}"
-  log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
+
+  # If we have a discovered version with matching X.Y, preserve it; otherwise use fallback
+  if [[ -n "${DISCOVERED_VERSION}" && "${DISCOVERED_MAJOR_MINOR}" == "${FALLBACK_MAJOR_MINOR}" ]]; then
+    log "Using discovered version ${DISCOVERED_VERSION} (account-roles X.Y compatible: ${FALLBACK_VERSION})"
+  else
+    OPENSHIFT_VERSION="${FALLBACK_VERSION}"
+    log "Using version ${OPENSHIFT_VERSION} from account-roles-create step"
+  fi
 fi
 
 # If OPENSHIFT_VERSION is set to "release:latest", look at the environment variable

@@ -1,0 +1,31 @@
+ref:
+  as: rosa-cluster-discover-minimum-version
+  from: rosa-aws-cli
+  commands: rosa-cluster-discover-minimum-version-commands.sh
+  timeout: 15m0s
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: production
+    documentation: OCM environment containing the customer fleet.
+  - name: CHANNEL_GROUP
+    default: stable
+    documentation: ROSA version channel that must contain the discovered exact version.
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Minimum-version discovery currently supports ROSA HCP only.
+  - name: MIN_VERSION_SECTOR
+    default: prod:canary
+    documentation: OSDFM sector whose ready ROSA HCP clusters are inspected.
+  - name: MIN_VERSION_Y_STREAM
+    default: ""
+    documentation: Optional X.Y stream restriction. Empty selects the oldest exact version across the sector.
+  documentation: |-
+    Finds the oldest exact OCP version used by a ready ROSA HCP cluster in the
+    requested OSDFM sector. The version must still be installable. The step
+    writes it to SHARED_DIR/minimum-openshift-version for subsequent account-role
+    creation and cluster provisioning steps.
