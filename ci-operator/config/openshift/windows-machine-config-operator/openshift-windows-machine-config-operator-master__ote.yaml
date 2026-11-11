@@ -599,7 +599,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "3"
       PR_ONLY: "true"
-      TIMEOUT: +1 hour
+      TIMEOUT: +4 hours
     test:
     - as: enable-tls-adherence
       cli: latest
@@ -934,9 +934,59 @@ tests:
     - as: wmco-setup-and-test
       cli: latest
       commands: |
+        # Debug variant only: run the same WMCO setup as the normal job, but
+        # capture the failure context and hold the container open when setup
+        # fails, so the probe Job, its pods and events can be inspected before
+        # the post steps remove the cluster. The original exit status is
+        # preserved, so a failed setup still fails this step and the job.
+        set -uo pipefail
+
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
         export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+
+        failure_dir="${ARTIFACT_DIR:-/tmp}/wmco-setup-failure"
+
+        capture_setup_failure() {
+          mkdir -p "${failure_dir}"
+          oc get jobs --all-namespaces -o wide > "${failure_dir}/jobs.txt" 2>&1 || true
+          oc get pods --all-namespaces -o wide > "${failure_dir}/pods.txt" 2>&1 || true
+          oc get events --all-namespaces --sort-by=.metadata.creationTimestamp > "${failure_dir}/events.txt" 2>&1 || true
+          oc get nodes -o wide > "${failure_dir}/nodes.txt" 2>&1 || true
+          oc get machines -n openshift-machine-api -o wide > "${failure_dir}/machines.txt" 2>&1 || true
+          oc -n openshift-windows-machine-config-operator get pods -o wide > "${failure_dir}/wmco-pods.txt" 2>&1 || true
+          oc -n openshift-windows-machine-config-operator logs deployment/windows-machine-config-operator --all-containers --tail=300 > "${failure_dir}/wmco-operator.log" 2>&1 || true
+
+          local namespace name pod
+          while read -r namespace name; do
+            [ -n "${namespace:-}" ] || continue
+            oc -n "${namespace}" describe job "${name}" >> "${failure_dir}/probe-job.txt" 2>&1 || true
+            for pod in $(oc -n "${namespace}" get pods -o name 2>/dev/null | grep -F "${name}" || true); do
+              oc -n "${namespace}" describe "${pod}" >> "${failure_dir}/probe-job.txt" 2>&1 || true
+              oc -n "${namespace}" logs "${pod}" --all-containers --tail=200 >> "${failure_dir}/probe-logs.txt" 2>&1 || true
+            done
+          done <<< "$(oc get jobs --all-namespaces -o jsonpath='{range .items[*]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep check-ssh-available || true)"
+        }
+
+        hold_for_inspection() {
+          local deadline
+          deadline=$(date -d "${TIMEOUT:-+4 hours}" +%s)
+          echo "WMCO setup failed. Holding until $(date -d "@${deadline}") UTC or /tmp/debug.done."
+          while sleep 1m; do
+            [ -f /tmp/debug.done ] && break
+            [ "$(date +%s)" -lt "${deadline}" ] || break
+          done
+          echo "Leaving the debug hold; exiting with the original setup status."
+        }
+
         hack/run-ci-e2e-test.sh -t setup-only -s
+        setup_status=$?
+        if [ "${setup_status}" -ne 0 ]; then
+          capture_setup_failure
+          if [ -n "${PULL_NUMBER:-}" ]; then
+            hold_for_inspection
+          fi
+        fi
+        exit "${setup_status}"
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
@@ -945,7 +995,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
-      timeout: 2h15m0s
+      timeout: 6h45m0s
     - ref: wait
     - as: wmco-tls-adherence-tests
       cli: latest
