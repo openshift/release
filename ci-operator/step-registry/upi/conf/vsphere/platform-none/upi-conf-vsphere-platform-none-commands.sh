@@ -9,9 +9,13 @@ base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 PLATFORM_TYPE="none: {}"
 if [[ $PLATFORM_NAME != "none" ]]; then
+  CCM_VALUE=""
+  if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
+    CCM_VALUE="External"
+  fi
   PLATFORM_TYPE="external:
     platformName: ${PLATFORM_NAME}
-    cloudControllerManager: External
+    cloudControllerManager: ${CCM_VALUE}
   "
 fi
 
