@@ -494,9 +494,28 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
-if [[ ${PATCH_INFRA_MANIFEST:-} == "true" || ${PLATFORM_EXTERNAL_CCM_ENABLED:-yes} != "yes" ]]; then
+if [[ ${PATCH_INFRA_MANIFEST:-} == "true" ]]; then
   ### Update platform spec in the infra resource
   echo "Patching infrastructure resource manifest with the 'External' platform type..."
+  cat <<EOF >/tmp/infraPlatformSpecPatch.yml
+spec:
+  platformSpec:
+    type: External
+    external:
+      platformName: vSphere
+status:
+  platform: External
+  platformStatus:
+      type: External
+      external: {}
+EOF
+  yq-go m -x -i "manifests/cluster-infrastructure-02-config.yml" "/tmp/infraPlatformSpecPatch.yml"
+
+elif [[ ${PLATFORM_EXTERNAL_CCM_ENABLED:-yes} != "yes" ]]; then
+
+  ### CCM disabled: patch the infra resource with the 'External' platform type instead of
+  ### deploying CCM manifests, so the cluster still reports platform External.
+  echo "CCM disabled: patching infrastructure resource manifest with the 'External' platform type..."
   cat <<EOF >/tmp/infraPlatformSpecPatch.yml
 spec:
   platformSpec:
@@ -810,7 +829,13 @@ spec:
                 operator: Exists
 EOF
 
-cat > "/tmp/vsphere-conf.ini" <<EOF
+fi
+
+### vSphere CSI driver storage is independent of the external CCM choice above, so it is
+### generated whenever we are not deferring entirely to an externally-patched infra manifest.
+if [[ ${PATCH_INFRA_MANIFEST:-} != "true" ]]; then
+
+  cat > "/tmp/vsphere-conf.ini" <<EOF
 [Global]
 cluster-id = "${cluster_name}"
 insecure-flag = true
@@ -821,7 +846,7 @@ port = "443"
 datacenters = "$(basename "${vsphere_datacenter}")"
 EOF
 
-cat >"manifests/99_vsphere_csi_driver_config.yaml"<<-EOF
+  cat >"manifests/99_vsphere_csi_driver_config.yaml"<<-EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -831,8 +856,8 @@ data:
   csi-vsphere.conf: "$(base64 -w0 < /tmp/vsphere-conf.ini)"
 EOF
 
-curl -o "manifests/99_vsphere_csi_driver_namespace.yaml" https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/namespace.yaml
-curl -o "manifests/99_vsphere_csi_driver_manifests.yaml" "https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/vsphere-csi-driver.yaml"
+  curl -o "manifests/99_vsphere_csi_driver_namespace.yaml" https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/namespace.yaml
+  curl -o "manifests/99_vsphere_csi_driver_manifests.yaml" "https://raw.githubusercontent.com/kubernetes-sigs/vsphere-csi-driver/v3.2.0/manifests/vanilla/vsphere-csi-driver.yaml"
 
 fi
 
