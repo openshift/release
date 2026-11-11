@@ -591,9 +591,11 @@ function prepare_qemu_worker() {
   fi
   echo "Copied builder image ${mirrored} to ${worker}" >&2
 
+  # The kubeconfig sets no namespace, so without -n oc debug looks up the CI
+  # pod's own namespace, which does not exist on this cluster.
   for node in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}'); do
     echo "Pre-pulling ${QEMU_IMAGE} on ${node}" >&2
-    oc debug "node/${node}" -- chroot /host podman pull -q --authfile /var/lib/kubelet/config.json "${QEMU_IMAGE}" >&2
+    oc debug -n default "node/${node}" -- chroot /host podman pull -q --authfile /var/lib/kubelet/config.json "${QEMU_IMAGE}" >&2
   done
 }
 
