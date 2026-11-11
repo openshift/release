@@ -1,0 +1,29 @@
+build_root:
+  from_repository: true
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tests:
+- as: frontend-test
+  commands: |
+    nodejs_version=v14.20.0
+    nodejs="node-${nodejs_version}-linux-x64"
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+    export PATH="/tmp/${nodejs}/bin:${PATH}"
+    cd -
+    export npm_config_cache=/tmp/.npm
+    make react-app-test
+  container:
+    from: src
+- as: test-local
+  commands: GOFLAGS= make test-local
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-coo-1.5
+  org: openshift
+  repo: thanos
