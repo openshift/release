@@ -600,7 +600,15 @@ def test_upgrade_stable_flavour() -> None:
         (build_config(released_cell, GENERATOR_DIR / "templates"), "from-314", "4.18", "3.14", "3.15", False),
     ]
     for config, as_name, ocp, source, target, art_target in cases:
-        assert "images" not in config
+        if art_target:
+            # The Playwright refs run from the runner image built from the branch.
+            assert config["images"] == {
+                "items": [
+                    {"dockerfile_path": "web/Containerfile.playwright", "to": "quay-playwright-runner"}
+                ]
+            }
+        else:
+            assert "images" not in config
         assert config["releases"]["latest"] == {
             "release": {"architecture": "amd64", "channel": "stable", "version": ocp}
         }
@@ -624,6 +632,7 @@ def test_upgrade_stable_flavour() -> None:
             assert "PLAYWRIGHT_N_GIT_BRANCH" not in env
             assert env["PLAYWRIGHT_REF_MODE"] == "strict"
             assert env["PLAYWRIGHT_REQUIRE_EXPLICIT_REF"] == "false"
+            assert env["PLAYWRIGHT_GIT_REPO"] == "https://github.com/quay/quay.git"
             assert "QUAY_EXTRA_CONFIG" in env
             assert tail == [
                 "quay-operator-upgrade-seed",
