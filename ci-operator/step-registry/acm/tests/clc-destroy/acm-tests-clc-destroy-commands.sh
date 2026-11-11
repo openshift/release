@@ -16,6 +16,15 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+# INTEROP-9616: explicit missing-kubeconfig handling. When the shared
+# kubeconfig is absent or empty (for example after an evicted earlier
+# phase) there is provably nothing to clean up through it; exit cleanly
+# right away instead of burning the API-retry loop on every oc call.
+if [[ ! -s "${KUBECONFIG}" ]]; then
+    echo "WARNING: ${KUBECONFIG} absent or empty; no cluster to clean up, exiting 0" >&2
+    exit 0
+fi
+
 # Wait for the cluster API server to become reachable.
 # This is a best-effort cleanup step (no errexit), so exit 0 if
 # the API never comes back — we cannot clean up a cluster we
