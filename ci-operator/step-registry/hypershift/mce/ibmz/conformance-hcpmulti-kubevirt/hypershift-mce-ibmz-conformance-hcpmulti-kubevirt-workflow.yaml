@@ -22,7 +22,13 @@ workflow:
 
     # ── Operator installs ─────────────────────────────────────────────────
     # MCE, virt, HPP, MetalLB on mgmt cluster (default $KUBECONFIG → mgmt)
-    - chain: hypershift-mce-ibmz-install-operators-mgmt
+    # Same steps as the hypershift-mce-ibmz-install-operators-mgmt chain, with the MCP pause
+    # inserted right before the KubeVirt install.
+    - ref: hypershift-mce-ibmz-install-metallb-oz
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-ibmz-install-pause-mco
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-ibmz-install-hpp
 
     # ── HCP virt external infra cluster creation ─────────────────────────────────────────────────
     - ref: hypershift-mce-ibmz-create-hcpmulti
