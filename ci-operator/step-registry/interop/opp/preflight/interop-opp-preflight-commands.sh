@@ -267,10 +267,15 @@ function CheckOppCompatibility () {
         # upgrade lanes intentionally install below the target floor
         # (rhacs-operator 4.10 via the versioned channel, openshift/release#87865)
         # and the product-upgrade steps move the operators forward mid-run.
-        # The floors are enforced where they are observable — by the
-        # product-upgrade steps and interop-opp-smoke after the upgrade.
+        # Nothing enforces these floors after the upgrade today: the
+        # product-upgrade steps only require forward progress from the
+        # installed version (no downgrades, no no-forward-path upgrades), and
+        # interop-opp-smoke checks CSV phase, not the floor. An operator left
+        # below the target floor can therefore pass the lanes while this check
+        # reports only a warning. Adding the post-upgrade floor enforcement is
+        # tracked in INTEROP-9553.
         # Gating here reds every upgrade lane at pre-flight on the reviewed
-        # baseline (INTEROP-9553; first seen after #87865 + #87963 combined).
+        # baseline (first seen after #87865 + #87963 combined).
         : "${belowFloor} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
     else
