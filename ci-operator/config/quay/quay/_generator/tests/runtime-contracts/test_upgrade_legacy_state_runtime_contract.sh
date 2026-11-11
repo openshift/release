@@ -81,6 +81,20 @@ case "${JUNIT_KIND:-good}" in
 esac
 [[ "${CYPRESS_RC:-0}" == 0 ]] || exit "${CYPRESS_RC}"
 EOF
+cat >"${tmp}/bin/sed" <<'EOF'
+#!/bin/bash
+if [[ "${MOCK_SED_FAIL:-no}" == yes ]]; then
+  exit 70
+fi
+exec /bin/sed "$@"
+EOF
+cat >"${tmp}/bin/mv" <<'EOF'
+#!/bin/bash
+if [[ "${MOCK_MV_FAIL:-no}" == yes ]]; then
+  exit 71
+fi
+exec /bin/mv "$@"
+EOF
 chmod +x "${tmp}/bin/"*
 
 run_seed() {
@@ -193,6 +207,103 @@ assert_redaction_bypass_mutation_fails() {
   SEED="${original}"
 }
 
+assert_preexisting_state_survives() {
+  local case_dir="${tmp}/preexisting-state" state="${tmp}/expected-state"
+  mkdir -p "${case_dir}/shared" "${case_dir}/artifacts" "${case_dir}/quay-api-tests/cypress/e2e"
+  printf 'sentinel-state-bytes\n' >"${state}"
+  cp "${state}" "${case_dir}/shared/quay-upgrade-legacy-state.env"
+  printf '%s\n' https://quay.test >"${case_dir}/shared/quayroute"
+  set +e
+  (cd "${case_dir}" && SHARED_DIR="${case_dir}/shared" ARTIFACT_DIR="${case_dir}/artifacts" bash "${SEED}") >/dev/null 2>&1
+  local rc=$?
+  set -e
+  [[ "${rc}" -ne 0 ]]
+  cmp "${state}" "${case_dir}/shared/quay-upgrade-legacy-state.env"
+  set +e
+  (cd "${case_dir}" && SHARED_DIR="${case_dir}/shared" ARTIFACT_DIR="${case_dir}/artifacts" bash "${SEED}") >/dev/null 2>&1
+  rc=$?
+  set -e
+  [[ "${rc}" -ne 0 ]]
+  cmp "${state}" "${case_dir}/shared/quay-upgrade-legacy-state.env"
+}
+
+assert_owned_failed_state_is_cleaned() {
+  local case_dir="${tmp}/owned-failure"
+  mkdir -p "${case_dir}/shared" "${case_dir}/artifacts" "${case_dir}/quay-api-tests/cypress/e2e"
+  printf '{"name":"quay-api-tests"}\n' >"${case_dir}/quay-api-tests/package.json"
+  printf '%s\n' https://quay.test >"${case_dir}/shared/quayroute"
+  set +e
+  (cd "${case_dir}" && PATH="${tmp}/bin:${PATH}" SHARED_DIR="${case_dir}/shared" ARTIFACT_DIR="${case_dir}/artifacts" BUILD_ID=12348 \
+    QUAY_UPGRADE_LEGACY_CYPRESS_STRICT=true JUNIT_KIND=good MOCK_NPM_PROVISION=no MOCK_CYPRESS_BIN="${tmp}/bin/node" NPM_INSTALL_LOG="${case_dir}/npm-install.log" \
+    bash "${SEED}") >/dev/null 2>&1
+  local rc=$?
+  set -e
+  [[ "${rc}" -ne 0 ]]
+  [[ ! -e "${case_dir}/shared/quay-upgrade-legacy-state.env" ]]
+}
+
+assert_existing_state_survives_verify_guard() {
+  local case_dir="${tmp}/verify-guard-state" state="${tmp}/verify-guard-expected"
+  mkdir -p "${case_dir}/shared" "${case_dir}/artifacts" "${case_dir}/quay-api-tests/cypress/e2e"
+  cat >"${state}" <<'EOF'
+OWNER='owner'
+OWNER_PASSWORD='state-password'
+MEMBER='member'
+MEMBER_PASSWORD='member-password'
+ORG='organization'
+REPOSITORY='repository'
+TEAM='team'
+ROBOT='robot'
+EOF
+  cp "${state}" "${case_dir}/shared/quay-upgrade-legacy-state.env"
+  printf '%s\n' https://quay.test >"${case_dir}/shared/quayroute"
+  set +e
+  (cd "${case_dir}" && PATH="${tmp}/bin:${PATH}" SHARED_DIR="${case_dir}/shared" ARTIFACT_DIR="${case_dir}/artifacts" \
+    QUAY_UPGRADE_LEGACY_STATE_PHASE=verify MOCK_TOKEN=no bash "${SEED}") >/dev/null 2>&1
+  local rc=$?
+  set -e
+  [[ "${rc}" -ne 0 ]]
+  cmp "${state}" "${case_dir}/shared/quay-upgrade-legacy-state.env"
+}
+
+assert_sanitize_failure_is_fail_closed() {
+  local phase="$1" mode="$2" case_dir script="${SEED}" secret
+  case_dir="${tmp}/sanitize-failure-${phase}-${mode}"
+  set +o pipefail
+  secret="$(LC_ALL=C tr -dc A-Za-z0-9 </dev/urandom | head -c 32)"
+  set -o pipefail
+  mkdir -p "${case_dir}/shared" "${case_dir}/artifacts" "${case_dir}/quay-api-tests/cypress/e2e"
+  printf '{"name":"quay-api-tests"}\n' >"${case_dir}/quay-api-tests/package.json"
+  printf '%s\n' https://quay.test >"${case_dir}/shared/quayroute"
+  if [[ "${phase}" == verify ]]; then
+    script="${VERIFY}"
+    cat >"${case_dir}/shared/quay-upgrade-legacy-state.env" <<EOF
+OWNER='owner'
+OWNER_PASSWORD='${secret}'
+MEMBER='member'
+MEMBER_PASSWORD='${secret}'
+ORG='organization'
+REPOSITORY='repository'
+TEAM='team'
+ROBOT='robot'
+EOF
+  fi
+  set +e
+  (cd "${case_dir}" && PATH="${tmp}/bin:${PATH}" SHARED_DIR="${case_dir}/shared" ARTIFACT_DIR="${case_dir}/artifacts" BUILD_ID=12349 \
+    QUAY_UPGRADE_LEGACY_CYPRESS_STRICT=true JUNIT_KIND=secret CYPRESS_RC=7 CYPRESS_EMIT_SECRET=yes CYPRESS_AUTH_MARKER="${secret}" \
+    MOCK_SED_FAIL="$([[ "${mode}" == sed ]] && echo yes || echo no)" MOCK_MV_FAIL="$([[ "${mode}" == mv ]] && echo yes || echo no)" \
+    MOCK_CYPRESS_BIN="${tmp}/bin/node" NPM_INSTALL_LOG="${case_dir}/npm-install.log" MOCK_SECRET_FILE="${case_dir}/generated-password" \
+    bash "${script}") >/dev/null 2>&1
+  local rc=$?
+  set -e
+  [[ "${rc}" -ne 0 ]]
+  if find "${case_dir}/artifacts" -type f \( -name 'junit_*.xml' -o -name 'cypress-output*' \) -print -quit | grep -q .; then
+    echo "${phase} retained a raw Cypress artifact after sanitizer failure" >&2
+    return 1
+  fi
+  ! grep -R -F -- "${secret}" "${case_dir}/artifacts"
+}
+
 # Positive seed executes the real RNG path, Bearer challenge/token exchange,
 # and strict JUnit gate. The script must exit 0 with tracing disabled.
 run_seed true good 0
@@ -222,4 +333,11 @@ done
 assert_secret_safe_failure seed
 assert_secret_safe_failure verify
 assert_redaction_bypass_mutation_fails
+assert_preexisting_state_survives
+assert_owned_failed_state_is_cleaned
+assert_existing_state_survives_verify_guard
+assert_sanitize_failure_is_fail_closed seed sed
+assert_sanitize_failure_is_fail_closed verify sed
+assert_sanitize_failure_is_fail_closed seed mv
+assert_sanitize_failure_is_fail_closed verify mv
 echo 'legacy state adapter runtime mocks: PASS'

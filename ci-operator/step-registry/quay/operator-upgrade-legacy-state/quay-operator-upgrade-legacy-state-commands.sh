@@ -15,13 +15,16 @@ STRICT="${QUAY_UPGRADE_LEGACY_CYPRESS_STRICT:-false}"
 STATE_FILE="${SHARED_DIR}/quay-upgrade-legacy-state.env"
 ROUTE_FILE="${SHARED_DIR}/quayroute"
 PRESERVE_STATE=false
+STATE_OWNED=false
 RAW_CYPRESS_OUTPUT=""
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 cleanup_sensitive_runtime() {
   rm -f "${RAW_CYPRESS_OUTPUT}" quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js
   rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
-  [[ "${PRESERVE_STATE}" == true ]] || rm -f "${STATE_FILE}"
+  if [[ "${STATE_OWNED}" == true && "${PRESERVE_STATE}" != true ]]; then
+    rm -f "${STATE_FILE}"
+  fi
 }
 trap cleanup_sensitive_runtime EXIT
 new_legacy_password() {
@@ -79,10 +82,16 @@ sanitize_cypress_artifacts() {
   rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
   shopt -s nullglob
   for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml; do
-    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp"; return 1; }
-    mv "${file}.tmp" "${file}"
+    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp" "${file}"; return 1; }
+    mv "${file}.tmp" "${file}" || { rm -f "${file}.tmp" "${file}"; return 1; }
   done
   shopt -u nullglob
+}
+discard_cypress_artifacts() {
+  rm -f "${RAW_CYPRESS_OUTPUT}" "${ARTIFACT_DIR}"/cypress-output.log \
+    "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml \
+    "${ARTIFACT_DIR}"/junit_upgrade_legacy_state-*.xml.tmp
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
 }
 registry_tag_present() {
   local route="$1" owner="$2" password="$3" organization="$4" repository="$5"
@@ -214,10 +223,13 @@ run_cypress() {
   else
     rc=$?
   fi
-  scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"
+  if ! scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"; then
+    discard_cypress_artifacts
+    return 1
+  fi
   rm -f "${RAW_CYPRESS_OUTPUT}"
   RAW_CYPRESS_OUTPUT=""
-  sanitize_cypress_artifacts || return 1
+  sanitize_cypress_artifacts || { discard_cypress_artifacts; return 1; }
   echo "Legacy upgrade ${PHASE} Cypress run: exit code ${rc}"
   if [[ "${STRICT}" == true ]]; then
     [[ "${rc}" -eq 0 ]] || fail "legacy upgrade ${PHASE} Cypress failed"
@@ -254,6 +266,7 @@ ROBOT='${ROBOT}'
 TAG='upgrade-legacy'
 EOF
   chmod 600 "${STATE_FILE}"
+  STATE_OWNED=true
   prepare_cypress_dependencies
   write_cypress_spec
   run_cypress

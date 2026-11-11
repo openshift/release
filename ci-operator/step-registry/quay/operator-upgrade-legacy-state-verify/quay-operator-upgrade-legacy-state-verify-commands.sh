@@ -60,10 +60,16 @@ sanitize_cypress_artifacts() {
   rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
   shopt -s nullglob
   for file in "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml; do
-    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp"; return 1; }
-    mv "${file}.tmp" "${file}"
+    scrub_cypress_text < "${file}" > "${file}.tmp" || { rm -f "${file}.tmp" "${file}"; return 1; }
+    mv "${file}.tmp" "${file}" || { rm -f "${file}.tmp" "${file}"; return 1; }
   done
   shopt -u nullglob
+}
+discard_cypress_artifacts() {
+  rm -f "${RAW_CYPRESS_OUTPUT}" "${ARTIFACT_DIR}"/cypress-output.log \
+    "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml \
+    "${ARTIFACT_DIR}"/junit_upgrade_legacy_state_verify-*.xml.tmp
+  rm -rf "${ARTIFACT_DIR}/videos" "${ARTIFACT_DIR}/screenshots"
 }
 registry_tag_present() {
   local route="$1" owner="$2" password="$3" organization="$4" repository="$5"
@@ -119,10 +125,13 @@ if (cd quay-api-tests && CYPRESS_UPGRADE_ROUTE="${ROUTE}" CYPRESS_UPGRADE_OWNER=
 else
   rc=$?
 fi
-scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"
+if ! scrub_cypress_text < "${RAW_CYPRESS_OUTPUT}" | tee "${ARTIFACT_DIR}/cypress-output.log"; then
+  discard_cypress_artifacts
+  fail "could not sanitize Cypress output"
+fi
 rm -f "${RAW_CYPRESS_OUTPUT}"
 RAW_CYPRESS_OUTPUT=""
-sanitize_cypress_artifacts || fail "could not sanitize Cypress artifacts"
+sanitize_cypress_artifacts || { discard_cypress_artifacts; fail "could not sanitize Cypress artifacts"; }
 echo "Legacy upgrade verification Cypress run: exit code ${rc}"
 [[ "${STRICT}" == false || "${rc}" -eq 0 ]] || fail "legacy upgrade verification Cypress failed"
 [[ "${STRICT}" == false ]] || strict_junit_success "${ARTIFACT_DIR}/junit_upgrade_legacy_state_verify-*.xml" \
