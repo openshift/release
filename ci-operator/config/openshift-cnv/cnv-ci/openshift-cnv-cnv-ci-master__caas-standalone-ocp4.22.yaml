@@ -1,0 +1,271 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: pod-networking-e2e
+  cron: 0 6 * * 2
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-virtualization
+    env:
+      AZURE_COMPUTE_DISK_SIZE: "150"
+      BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D16ads_v6
+      ODF_BACKEND_STORAGE_CLASS: managed-csi
+      ODF_VOLUME_SIZE: "250"
+    post:
+    - as: post-01-gather-nested-cluster
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        if [[ ! -s "${SHARED_DIR}/nested-cluster-kubeconfig" ]]; then
+          echo "Nested-cluster kubeconfig is missing; skipping must-gather"
+          exit 0
+        fi
+        if ! oc get namespace "${TENANT_NAMESPACE}" >/dev/null 2>&1; then
+          echo "Nested-cluster namespace ${TENANT_NAMESPACE} is gone; skipping must-gather"
+          exit 0
+        fi
+        # Keep files unpacked so LeakTK can censor them individually before upload.
+        mkdir -p "${ARTIFACT_DIR}/nested-cluster-must-gather"
+        oc --kubeconfig="${SHARED_DIR}/nested-cluster-kubeconfig" adm must-gather \
+          --dest-dir="${ARTIFACT_DIR}/nested-cluster-must-gather" \
+          --timeout=35m \
+          > "${ARTIFACT_DIR}/nested-cluster-must-gather.log" 2>&1
+      env:
+      - default: caas-project
+        name: TENANT_NAMESPACE
+      from: src
+      grace_period: 10m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 45m0s
+    - as: post-02-delete-nested-cluster
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/delete-nested-cluster.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 45m0s
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-osdisk-disksize
+    - chain: azure-provision-service-principal-minimal-permission
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: ipi-azure-rbac
+    test:
+    - as: install-cnv
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_cnv
+      env:
+      - default: "4.22"
+        name: CNV_VERSION
+      - default: "true"
+        name: PRODUCTION_RELEASE
+      - default: "4.22"
+        name: OCP_VERSION
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 2h0m0s
+    - ref: hypershift-kubevirt-install-odf
+    - as: 01-deploy-caas-infra-standalone
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/deploy-caas-infra-standalone.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 1h0m0s
+    - as: 02-create-nested-cluster
+      cli: latest
+      commands: |
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/create-nested-cluster.sh
+        cp "${ARTIFACT_DIR}/infra-project-admin-kubeconfig" "${SHARED_DIR}/infra-project-admin-kubeconfig"
+        cp "${ARTIFACT_DIR}/nested-cluster-kubeconfig" "${SHARED_DIR}/nested-cluster-kubeconfig"
+      env:
+      - default: tenant-admin
+        documentation: Project-admin identity used to provision the CAAS tenant.
+        name: TENANT_ADMIN_USER
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 3h0m0s
+    - as: 03-add-workers-to-nested-cluster
+      cli: latest
+      commands: |
+        # curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        # mkdir -p /tmp/cnv-ci
+        # tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        # cd /tmp/cnv-ci
+        # INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+        #   NESTED_CLUSTER_KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig" \
+        #   ./hack/caas/add-workers-to-nested-cluster.sh
+        echo "SKIPPED: add-workers-to-nested-cluster (temporary, debugging)"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 2h0m0s
+    - as: 04-test-master-live-migration
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+          NESTED_CLUSTER_KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig" \
+          ./hack/caas/test-master-live-migration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 30m0s
+    - as: 05-test-workload-live-migration
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+          NESTED_CLUSTER_KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig" \
+          ./hack/caas/test-workload-live-migration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 30m0s
+    - as: 06-nested-cluster-conformance-minimal
+      best_effort: true
+      commands: |
+        set -euo pipefail
+        export KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig"
+        TEST_ARTIFACT_DIR="${ARTIFACT_DIR}/conformance-minimal"
+        mkdir -p "${TEST_ARTIFACT_DIR}/junit"
+        openshift-tests run "openshift/conformance/parallel" \
+          --provider '{"type":"baremetal"}' \
+          --run minimal \
+          --max-parallel-tests 10 \
+          --disable-monitor \
+          --output-file "${TEST_ARTIFACT_DIR}/conformance-parallel.log" \
+          --junit-dir "${TEST_ARTIFACT_DIR}/junit" \
+          2> "${TEST_ARTIFACT_DIR}/conformance-parallel.stderr.log"
+      from: tests
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: "3"
+          memory: 600Mi
+      timeout: 4h0m0s
+    - as: 07-nested-cluster-kubevirt-csi-tests
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        ./hack/caas/run-kubevirt-csi-tests.sh "${SHARED_DIR}/nested-cluster-kubeconfig"
+      from: tests
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: "3"
+          memory: 600Mi
+      timeout: 4h0m0s
+    - as: 08-cloud-provider-kubevirt-e2e
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+          ./hack/caas/run-cloud-provider-kubevirt-e2e.sh "${SHARED_DIR}/nested-cluster-kubeconfig"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 30m0s
+    - as: 09-upgrade-nested-cluster
+      cli: latest
+      commands: |
+        set -euo pipefail
+        curl -L https://github.com/rlobillo/cnv-ci/tarball/capoa-kubevirt -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        INFRA_PROJECT_ADMIN_KUBECONFIG="${SHARED_DIR}/infra-project-admin-kubeconfig" \
+          NESTED_CLUSTER_KUBECONFIG="${SHARED_DIR}/nested-cluster-kubeconfig" \
+          ./hack/caas/upgrade-nested-cluster.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+      timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift-cnv
+  repo: cnv-ci
+  variant: caas-standalone-ocp4.22
