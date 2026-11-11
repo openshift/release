@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline fixtures for the delivered step: python3 hack/test_rosa_ocm_fvt_artifacts.py.
 
-Only the ref's commands script is copied into the fixture, matching step delivery.
+The prepare and run refs' commands are delivered through their normal shared path.
 Metadata describes the outer collector identity, not the nested image's identity.
 Scans stop at 128 entries, 16 result locations and 32 reports per location; labels
 omit result names and phase timestamps. Report contents are never read by collection.
@@ -31,7 +31,8 @@ IMAGE_REPOSITORY = "quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/
 
 
 def mock_artifact_command(command, arguments, base, case):
-    output = base / "artifacts/ocm-fvt-results"
+    output_record = base / "output-path"
+    output = Path(output_record.read_text()) if output_record.exists() else base / "artifacts/ocm-fvt-results"
     if command == "find":
         if case == "find-failure" and arguments == [
                 str(output), "-type", "f", "-name", "report.xml", "-print0"]:
@@ -49,7 +50,8 @@ def mock_artifact_command(command, arguments, base, case):
                 "-", str(base / "artifacts"), IMAGE_ID, IMAGE_REPOSITORY]:
             return 95
         if case == "collector-failure" and arguments == [
-                "-", str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
+                str(base / "shared/ocm-fvt-artifacts.py"), "metadata",
+                str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
             return 92
         os.execv(sys.executable, [sys.executable, *arguments])
     raise AssertionError("Unexpected artifact fixture command")
@@ -117,6 +119,9 @@ def mock_command(command, arguments):
         return mock_image_inspection(case)
     if arguments[0] != "run":
         raise AssertionError("Unexpected podman operation")
+    output = Path(next(argument.rsplit(":", 2)[0] for argument in arguments
+                       if argument.endswith(":/ocm-backend-tests/output:z")))
+    (base / "output-path").write_text(str(output), encoding="utf-8")
     if case == "missing":
         output.rmdir()
     elif case == "root-symlink":
@@ -177,6 +182,14 @@ class ArtifactFixture(unittest.TestCase):
                         if line.startswith("  commands: "))
         self.script = self.base / commands
         shutil.copyfile(STEP / commands, self.script)
+        prepare = STEP / "prepare"
+        prepare_ref = (prepare / "rosa-e2e-ocm-fvt-prepare-ref.yaml").read_text(encoding="utf-8")
+        prepare_command = next(line.split(": ", 1)[1] for line in prepare_ref.splitlines()
+                               if line.startswith("  commands: "))
+        delivered_prepare = self.base / prepare_command
+        shutil.copyfile(prepare / prepare_command, delivered_prepare)
+        subprocess.run([sys.executable, str(delivered_prepare)],
+                       env={**os.environ, "SHARED_DIR": str(self.shared)}, check=True)
         for command in ("podman", "cat", "env", "cp", "find", "python3"):
             executable = self.bin / command
             executable.write_text(
@@ -211,6 +224,9 @@ class ArtifactFixture(unittest.TestCase):
         self.assertNotIn(":latest", " ".join(calls[2]))
         self.assertNotIn(".Config.Env", calls[1][calls[1].index("--format") + 1])
         self.assertIn("{{json .ID}}", calls[1][calls[1].index("--format") + 1])
+        output = Path((self.base / "output-path").read_text())
+        self.assertFalse(output.is_relative_to(self.artifacts))
+        self.assertEqual(stat.S_IMODE(output.parent.stat().st_mode), 0o700)
         env_file = Path(calls[-1][calls[-1].index("--env-file") + 1])
         self.assertFalse(env_file.exists(), "EXIT trap must still remove the temporary env file")
         self.assertNotIn(SECRET, result.stdout + result.stderr)
@@ -236,12 +252,16 @@ class ArtifactFixture(unittest.TestCase):
         return json.loads(contents)
 
     def tearDown(self):
-        output = self.artifacts / "ocm-fvt-results"
-        if output.is_dir() and not output.is_symlink():
-            output.chmod(0o700)
-            result = output / "test-result-fixture"
-            if result.is_dir():
-                result.chmod(0o700)
+        record = self.base / "output-path"
+        outputs = [self.artifacts / "ocm-fvt-results"]
+        if record.exists():
+            outputs.append(Path(record.read_text()))
+        for output in outputs:
+            if output.is_dir() and not output.is_symlink():
+                output.chmod(0o700)
+                result = output / "test-result-fixture"
+                if result.is_dir():
+                    result.chmod(0o700)
 
 
 class ArtifactMetadataTests(ArtifactFixture):
