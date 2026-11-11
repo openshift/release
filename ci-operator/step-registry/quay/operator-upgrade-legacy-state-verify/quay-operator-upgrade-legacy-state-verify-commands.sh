@@ -37,12 +37,12 @@ scrub_cypress_text() {
   local -
   set +x
   sed -u -E \
-    -e 's@(Authorization(&quot;|")?[[:blank:]]*:[[:blank:]]*(&quot;|")?([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}@\1<redacted:authorization>@Ig' \
-    -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1<redacted:authorization>|Ig' \
-    -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1<redacted:csrf>|Ig' \
-    -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1<redacted:session>|g' \
-    -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1<redacted:value>#Ig' \
-    | sed -u -e "s|${OWNER_PASSWORD}|<redacted:password>|g" -e "s|${MEMBER_PASSWORD}|<redacted:password>|g"
+    -e 's@(Authorization(&quot;|")?[[:blank:]]*:[[:blank:]]*(&quot;|")?([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}@\1[redacted:authorization]@Ig' \
+    -e 's|(Authorizatio[n]:[[:blank:]]*([A-Za-z]+[[:blank:]]+)?)[A-Za-z0-9._~+/=-]{16,}|\1[redacted:authorization]|Ig' \
+    -e 's|(X-CSRF-Token:[[:blank:]]*)[A-Za-z0-9._~+/=-]+|\1[redacted:csrf]|Ig' \
+    -e 's|(_csrf_token=)[A-Za-z0-9._~+/=-]+|\1[redacted:session]|g' \
+    -e 's#("[A-Za-z0-9_-]*(password|secret|token)(_?(key|code))?"[[:blank:]]*:[[:blank:]]*")([^"\\]|\\.)+#\1[redacted:value]#Ig' \
+    | sed -u -e "s|${OWNER_PASSWORD}|[redacted:password]|g" -e "s|${MEMBER_PASSWORD}|[redacted:password]|g"
 }
 prepare_cypress_dependencies() {
   # Match the supported dependency setup in quay-test-api-legacy. The adapter

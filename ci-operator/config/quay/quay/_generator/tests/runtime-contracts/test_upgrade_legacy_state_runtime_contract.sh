@@ -157,8 +157,16 @@ EOF
   if grep -Eq 'password=[A-Za-z0-9]{32}' "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} leaked a password in JUnit" >&2; return 1; fi
   if grep -Fq "${actual_secret}" "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} leaked its actual password" >&2; return 1; fi
   if grep -Fq "${auth_marker}" "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} leaked an Authorization marker" >&2; return 1; fi
-  if ! grep -Fq '<redacted:password>' "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} did not redact passwords everywhere" >&2; return 1; fi
-  if ! grep -Fq '<redacted:authorization>' "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} did not redact Authorization everywhere" >&2; return 1; fi
+  if ! grep -Fq '[redacted:password]' "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} did not redact passwords everywhere" >&2; return 1; fi
+  if ! grep -Fq '[redacted:authorization]' "${case_dir}/output.log" "${case_dir}/artifacts"/*/cypress-output.log "${case_dir}/artifacts"/*/junit_*.xml; then echo "${phase} did not redact Authorization everywhere" >&2; return 1; fi
+  # The generated password is redacted in a JUnit attribute and the
+  # Authorization marker in text; both remain parseable XML after scrubbing.
+  python3 - "${case_dir}/artifacts"/*/junit_*.xml <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+for report in sys.argv[1:]:
+    ET.parse(report)
+PY
   rm -f "${case_dir}/actual-seed-password"
   [[ ! -e "${case_dir}/shared/quay-upgrade-legacy-state.env" ]]
   [[ ! -e "${case_dir}/quay-api-tests/cypress/e2e/upgrade_legacy_state.cy.js" ]]
