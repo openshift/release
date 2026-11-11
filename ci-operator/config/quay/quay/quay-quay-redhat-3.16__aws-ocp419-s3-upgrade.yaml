@@ -33,6 +33,30 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       ENABLE_BUILD_SUPPORT: "true"
+      PLAYWRIGHT_GREP_INVERT: '@auth:OIDC|@auth:LDAP|@feature:QUOTA_NOTIFICATIONS|@upgrade-seed|@upgrade-verify|@webhook|saves
+        and loads architecture filter with mirror configuration|loads existing architecture
+        filter from saved mirror configuration'
+      PLAYWRIGHT_N_GIT_BRANCH: redhat-3.16
+      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: redhat-3.16
+      PLAYWRIGHT_REF_MODE: strict
+      PLAYWRIGHT_USE_IMAGE_TESTS: "false"
+      PLAYWRIGHT_WORKERS: "4"
+      QUAY_EXTRA_CONFIG: |
+        FEATURE_PROGRAMMATIC_BOOTSTRAP: false
+        FEATURE_USER_METADATA: true
+        FEATURE_IMMUTABLE_TAGS: true
+        FEATURE_QUOTA_NOTIFICATIONS: true
+        FEATURE_EDIT_QUOTA: true
+        FEATURE_CHANGE_TAG_EXPIRATION: true
+        FEATURE_IMAGE_PULL_STATS: false
+        LOG_ARCHIVE_LOCATION: default
+        ACTION_LOG_ARCHIVE_LOCATION: default
+        SESSION_TIMEOUT: 2h
+        DEFAULT_UI: react
+        SUPER_USERS:
+          - admin
+        GLOBAL_READONLY_SUPER_USERS:
+          - readonly
       QUAY_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
       QUAY_INDEX_IMAGE_TAG: quay-3.16__v4.19__quay-rhel9-operator
       QUAY_UPGRADE_CATALOG_SOURCE: redhat-operators
@@ -57,10 +81,11 @@ tests:
     - ref: quay-provisioning-storage-s3
     - ref: quay-install-external-storage
     - ref: quay-operator-upgrade-prepare-e2e
-    - ref: quay-create-admin-user
-    - ref: quay-operator-upgrade-seed-api
+    - chain: quay-operator-upgrade-seed
     - ref: quay-operator-upgrade-channel
-    - ref: quay-operator-upgrade-verify-api
+    - chain: quay-operator-upgrade-verify
+    - chain: quay-operator-upgrade-functional
+    - ref: quay-operator-upgrade-report
     workflow: ipi-aws
   timeout: 6h0m0s
 zz_generated_metadata:

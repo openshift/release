@@ -4,12 +4,13 @@
    base.yaml.j2), and the OCP e2e releases block is unused. QUAY_EXTRA_CONFIG and
    PLAYWRIGHT_GREP_INVERT are shared with the e2e-install lane via
    _e2e-install.defaults.j2 so a change there reaches both lanes.
-   source: stable is the released-operator flavour for branches without the
-   Playwright suite: both channels come from the cluster's redhat-operators
-   catalog, and release-owned API refs seed and verify instead of Playwright.
-   upgrade_target: nightly keeps that n-1 install but upgrades to the ART FBC
-   build of n, resolved by quay-enable-catalogsource-art. #}
+   source: stable is the released-operator flavour: both channels come from the
+   cluster's redhat-operators catalog, and release-owned API refs seed and verify
+   instead of Playwright. upgrade_target: nightly keeps that n-1 install but
+   upgrades to the ART FBC build of n, resolved by quay-enable-catalogsource-art,
+   and runs n's Playwright suite in every phase, the n-1 seed included. #}
 {% import "tests/_e2e-install.defaults.j2" as d %}
+{%- set playwright = source != "stable" or upgrade_target == "nightly" %}
 tests:
 - timeout: 6h0m0s
   steps:
@@ -26,13 +27,14 @@ tests:
       QUAY_INDEX_IMAGE_REPO: "{{ index_image_repo }}"
       QUAY_INDEX_IMAGE_TAG: "{{ index_image_tag }}"
 {%- endif %}
-{%- else %}
+{%- endif %}
+{%- if playwright %}
       PLAYWRIGHT_N_GIT_BRANCH: "{{ branch }}"
-      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "redhat-{{ upgrade_from }}"
+      PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH: "{{ branch if source == "stable" else "redhat-" ~ upgrade_from }}"
       # Static upgrade-lane settings (not version-specific). The per-phase repos
       # default to PLAYWRIGHT_GIT_REPO (base.yaml.j2), so only branches differ.
       PLAYWRIGHT_USE_IMAGE_TESTS: "false"
-{%- if source == "nightly" %}
+{%- if source == "nightly" or upgrade_target == "nightly" %}
       PLAYWRIGHT_REF_MODE: strict
 {%- endif %}
       # Shared by seed, verify, and functional Playwright phases (steps.env).
@@ -40,9 +42,7 @@ tests:
       # Reaches only the functional phase: the seed/verify refs do not declare it,
       # and this quarantine excludes their @upgrade-seed/@upgrade-verify specs.
       PLAYWRIGHT_GREP_INVERT: '{{ d.playwright_grep_invert }}'
-      # Feature flags the Playwright suite expects; several are unknown to the
-      # older releases the stable flavour installs, whose SUPER_USERS default
-      # (admin) is enough for the API refs.
+      # Feature flags the Playwright suite expects, applied at the n-1 install.
       QUAY_EXTRA_CONFIG: |
 {{ d.quay_extra_config(quay_version=quay_version | default("")) | indent(8, true) }}
 {%- endif %}
@@ -50,7 +50,7 @@ tests:
       ENABLE_BUILD_SUPPORT: "true"
     test:
     - ref: merge-stage-registry-credentials
-{%- if source != "stable" or upgrade_target == "nightly" %}
+{%- if playwright %}
     - ref: quay-enable-catalogsource-art
 {%- endif %}
     - ref: quay-operator-upgrade-install-source
@@ -61,7 +61,9 @@ tests:
     - ref: quay-provisioning-storage-s3
     - ref: quay-install-external-storage
     - ref: quay-operator-upgrade-prepare-e2e
-{%- if source == "stable" %}
+{#- Playwright's global-setup signs in as admin/password, so it cannot share a
+    server with quay-create-admin-user's random-password admin. #}
+{%- if not playwright %}
     - ref: quay-create-admin-user
     - ref: quay-operator-upgrade-seed-api
     - ref: quay-operator-upgrade-channel

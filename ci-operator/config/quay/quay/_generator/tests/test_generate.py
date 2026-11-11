@@ -577,9 +577,10 @@ def test_upgrade_nightlies() -> None:
 
 
 def test_upgrade_stable_flavour() -> None:
-    # source: stable upgrades the released operator from redhat-operators and seeds
-    # and verifies through the API refs: no Playwright. upgrade_target: nightly
-    # (3.16) adds the ART catalog step and index env for the n target.
+    # source: stable upgrades the released operator from redhat-operators. Without
+    # upgrade_target it seeds and verifies through the API refs, no Playwright.
+    # upgrade_target: nightly (3.16) adds the ART catalog step and index env for
+    # the n target and runs n's Playwright suite in every phase, the seed included.
     results, _retired = generate_all()
     by_name = {filename: config for _group, filename, config in results}
     (released_cell,) = expand_cells(
@@ -611,22 +612,35 @@ def test_upgrade_stable_flavour() -> None:
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
         assert env["QUAY_UPGRADE_CATALOG_SOURCE"] == "redhat-operators"
-        assert not [key for key in env if key.startswith("PLAYWRIGHT_")]
-        assert not {"QUAY_OPERATOR_SOURCE", "QUAY_EXTRA_CONFIG"} & set(env)
+        assert "QUAY_OPERATOR_SOURCE" not in env
         refs = [s.get("ref") or s.get("chain") for s in test["steps"]["test"]]
+        tail = refs[refs.index("quay-operator-upgrade-prepare-e2e") + 1 :]
         if art_target:
             assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
             assert refs[:2] == ["merge-stage-registry-credentials", "quay-enable-catalogsource-art"]
+            # Both Playwright phases use the n branch: redhat-3.15 has no suite.
+            assert env["PLAYWRIGHT_N_GIT_BRANCH"] == f"redhat-{target}"
+            assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == f"redhat-{target}"
+            assert env["PLAYWRIGHT_REF_MODE"] == "strict"
+            assert "QUAY_EXTRA_CONFIG" in env
+            assert tail == [
+                "quay-operator-upgrade-seed",
+                "quay-operator-upgrade-channel",
+                "quay-operator-upgrade-verify",
+                "quay-operator-upgrade-functional",
+                "quay-operator-upgrade-report",
+            ]
         else:
             assert "QUAY_INDEX_IMAGE_TAG" not in env
             assert "quay-enable-catalogsource-art" not in refs
-        assert refs[refs.index("quay-operator-upgrade-prepare-e2e"):] == [
-            "quay-operator-upgrade-prepare-e2e",
-            "quay-create-admin-user",
-            "quay-operator-upgrade-seed-api",
-            "quay-operator-upgrade-channel",
-            "quay-operator-upgrade-verify-api",
-        ]
+            assert not [key for key in env if key.startswith("PLAYWRIGHT_")]
+            assert "QUAY_EXTRA_CONFIG" not in env
+            assert tail == [
+                "quay-create-admin-user",
+                "quay-operator-upgrade-seed-api",
+                "quay-operator-upgrade-channel",
+                "quay-operator-upgrade-verify-api",
+            ]
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
