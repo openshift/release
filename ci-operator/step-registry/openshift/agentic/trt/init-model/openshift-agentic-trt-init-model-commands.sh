@@ -1450,12 +1450,13 @@ validate_agent_branch() {
     fi
 }
 
-# publish_agent_pr <pr-title> [default-pr-body]
+# publish_agent_pr <pr-title> [default-pr-body] [attribution]
 #   Pushes the branch to the fork, creates the PR, copies the PR body to
 #   SHARED_DIR. Sets PR_URL, PR_NUM.
 publish_agent_pr() {
     local pr_title="$1"
     local default_pr_body="${2:-}"
+    local attribution="${3:-}"
 
     git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
     echo "Branch pushed: ${BRANCH_NAME}"
@@ -1468,16 +1469,18 @@ publish_agent_pr() {
         fi
     fi
 
-    local harness
-    harness=$(agentic_harness) || {
-        echo "ERROR: Failed to determine agentic harness"
-        exit 1
-    }
-    local tagline="[Claude Code](https://claude.com/claude-code)"
-    if [[ "${harness}" == "codex" ]]; then
-        tagline="[Codex](https://openai.com/codex/)"
+    if [[ -z "${attribution}" ]]; then
+        local harness
+        harness=$(agentic_harness) || {
+            echo "ERROR: Failed to determine agentic harness"
+            exit 1
+        }
+        attribution="[Claude Code](https://claude.com/claude-code)"
+        if [[ "${harness}" == "codex" ]]; then
+            attribution="[Codex](https://openai.com/codex/)"
+        fi
     fi
-    printf '\n---\nGenerated with %s\n\n<!-- coderabbit-review -->\n' "${tagline}" >> "${PR_BODY_FILE}"
+    printf '\n---\nGenerated with %s\n\n<!-- coderabbit-review -->\n' "${attribution}" >> "${PR_BODY_FILE}"
 
     local base_args=()
     if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
