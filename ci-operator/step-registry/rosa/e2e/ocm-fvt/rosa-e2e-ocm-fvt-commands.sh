@@ -287,6 +287,7 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   )
 fi
 
+ocm_fvt_started="$(date +%s)"
 ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-results"
 mkdir -p "${ocm_fvt_output}"
 chmod 1777 "${ocm_fvt_output}"
@@ -411,6 +412,57 @@ podman run \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
+
+python3 - "${ocm_fvt_output}" "${SHARED_DIR}" "${ocm_fvt_started}" <<'PY' 2>/dev/null || true
+import configparser
+import json
+import os
+from pathlib import Path
+import re
+import time
+
+output, shared = Path(os.sys.argv[1]), Path(os.sys.argv[2])
+names = set()
+identifiers = set()
+outcome = "invalid_or_incomplete_recording"
+try:
+    if output.is_symlink():
+        raise ValueError("invalid output")
+    for index, profile in enumerate(output.iterdir()):
+        if index >= 128:
+            raise ValueError("too many profiles")
+        recording = profile / "cluster.ini"
+        if profile.is_symlink() or recording.is_symlink() or not recording.is_file():
+            continue
+        if recording.stat().st_size > 65536:
+            raise ValueError("oversized recording")
+        parser = configparser.ConfigParser(strict=True)
+        parser.read_string("[recording]\n" + recording.read_text(encoding="utf-8"))
+        for section_name in parser:
+            if section_name.lower() not in ("recording", "cluster"):
+                continue
+            section = parser[section_name]
+            if section.get("id"):
+                if not re.fullmatch(r"[a-z0-9]{20,64}", section["id"]):
+                    raise ValueError("invalid id")
+                identifiers.add(section["id"])
+            if section.get("name"):
+                if not re.fullmatch(r"[a-z][a-z0-9-]{1,61}[a-z0-9]", section["name"]):
+                    raise ValueError("invalid name")
+                names.add(section["name"])
+            if max(len(names), len(identifiers)) > 32:
+                raise ValueError("too many identities")
+    outcome = "ok"
+except (OSError, ValueError, configparser.Error):
+    names.clear()
+    identifiers.clear()
+descriptor = os.open(shared / "ocm-fvt-diagnostic-identity.json",
+                     os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+with os.fdopen(descriptor, "w", encoding="utf-8") as manifest:
+    json.dump({"run": os.environ.get("BUILD_ID"), "job": os.environ.get("JOB_NAME"),
+               "started": int(os.sys.argv[3]), "finished": time.time(),
+               "names": sorted(names), "ids": sorted(identifiers), "outcome": outcome}, manifest)
+PY
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
 
 (
