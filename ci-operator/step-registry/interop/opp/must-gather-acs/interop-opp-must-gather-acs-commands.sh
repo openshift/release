@@ -466,13 +466,20 @@ oc get packagemanifest -n openshift-marketplace -o name > "${EVIDENCE_DIR}/08-al
 #      verdicts (status.compliant, status.status[]). Conditions alone are
 #      always null on these objects; the compliance verdict is the field
 #      that answers "was the policy reconciled".
+#      Both captures use the fully-qualified resource type, matching their
+#      CRD probes: the bare `policy` kind is also registered by other API
+#      groups (for example Kyverno's policies.kyverno.io), and the same
+#      bare-kind collision is what made the Subscription capture collect
+#      ACM objects instead of OLM's. A qualified type can only resolve to
+#      the CRD probed above, so a capture failure means a real query
+#      failure, not the wrong resource type.
 echo "[9/10] ACM policies..."
 # Three-way CRD guard (capture contract): exists → capture; NotFound →
 # CRD_ABSENT; any other failure → probe_error (never render as absence).
 POLICY_CRD_OUTPUT=$(oc get crd policies.policy.open-cluster-management.io 2>&1)
 POLICY_CRD_RC=$?
 if [[ ${POLICY_CRD_RC} -eq 0 ]]; then
-  oc get policy -A -o json 2>/dev/null | \
+  oc get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
 data = json.load(sys.stdin)
@@ -500,7 +507,7 @@ fi
 CONFIGPOLICY_CRD_OUTPUT=$(oc get crd configurationpolicies.policy.open-cluster-management.io 2>&1)
 CONFIGPOLICY_CRD_RC=$?
 if [[ ${CONFIGPOLICY_CRD_RC} -eq 0 ]]; then
-  oc get configurationpolicy -A -o json 2>/dev/null | \
+  oc get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
 import json, sys
 data = json.load(sys.stdin)
