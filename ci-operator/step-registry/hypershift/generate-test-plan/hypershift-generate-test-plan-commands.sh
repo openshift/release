@@ -16,6 +16,8 @@ EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
 OTEL_LOG="${ARTIFACT_DIR}/claude-otel.jsonl"
 
 # run_claude_metered <prompt> <stream_json_out> [extra claude args...]
+# Runs Claude through agentic-ci so OTEL cost/token telemetry is captured.
+# Writes the stream-json output to <stream_json_out> and returns Claude's exit code.
 run_claude_metered() {
   local prompt="$1"; shift
   local out_file="$1"; shift
@@ -44,6 +46,8 @@ run_claude_metered() {
   return $rc
 }
 
+# emit_session_metrics [stream_json_out]
+# Best-effort: writes the session metrics autodl file from the collected OTEL data.
 emit_session_metrics() {
   local stream_log="${1:-}"
   [ -s "${OTEL_LOG}" ] || { echo "No OTEL data collected; skipping session metrics"; return 0; }
@@ -97,6 +101,15 @@ else
 fi
 git checkout --quiet "${HEAD_SHA}"
 echo "Analyzing ${HEAD_SHA} against base ${BASE_SHA}"
+
+# Remove symlinks that resolve outside the checkout, so a pull request cannot
+# use one to point Claude's file tools at a path outside the repository.
+find "${REPO_DIR}" -type l -print0 | while IFS= read -r -d '' link; do
+  if [[ "$(realpath -m "${link}")" != "${REPO_DIR}/"* ]]; then
+    echo "Removing symlink that leaves the checkout: ${link#"${REPO_DIR}/"}"
+    rm -f "${link}"
+  fi
+done
 
 if [[ "${BASE_SHA}" == "${HEAD_SHA}" ]]; then
   echo "ERROR: ${HEAD_SHA} has no changes relative to its base (already merged?)"
@@ -209,6 +222,7 @@ result_path, out_path, platform, repo = sys.argv[1:5]
 
 
 def fail(msg):
+    """Report an invalid plan and exit non-zero."""
     print(f"ERROR: invalid test plan: {msg}", file=sys.stderr)
     sys.exit(1)
 
@@ -224,6 +238,7 @@ except json.JSONDecodeError as e:
 
 
 def check_keys(obj, where, required, optional=()):
+    """Require obj to be an object with all required keys and no unknown ones."""
     if not isinstance(obj, dict):
         fail(f"{where} must be an object")
     unknown = set(obj) - set(required) - set(optional)
@@ -235,6 +250,7 @@ def check_keys(obj, where, required, optional=()):
 
 
 def check_string(obj, key, where, allow_empty=False):
+    """Require obj[key] to be a string, non-empty unless allow_empty."""
     if not isinstance(obj[key], str) or (not obj[key] and not allow_empty):
         fail(f"{where}.{key} must be a non-empty string")
 
@@ -252,6 +268,7 @@ groups = []
 
 
 def check_group(group, where, lane):
+    """Validate one test group and record its name and its variant's lane."""
     check_keys(group, where, ("name", "variant", "labelFilter"), ("skip",))
     for key in ("name", "variant", "labelFilter"):
         check_string(group, key, where)
@@ -286,15 +303,18 @@ if not groups:
     fail("testMatrix has no test groups")
 
 # Variants must be defined by the platform's ClusterSpecs.
+# A plan with an unknown variant only fails in create-guests, after the
+# management cluster exists, so fail here if the variants cannot be determined.
 platform_file = os.path.join(repo, "test/e2e/v2/lifecycle", f"{platform}.go")
-if os.path.isfile(platform_file):
-    source = open(platform_file, encoding="utf-8", errors="replace").read()
-    known_variants = set(re.findall(r'\bVariant:\s*"([^"]+)"', source))
-    unknown = sorted({g["variant"] for g in groups} - known_variants)
-    if known_variants and unknown:
-        fail(f"unknown variants: {', '.join(unknown)} (known: {', '.join(sorted(known_variants))})")
-else:
-    print(f"WARNING: {platform_file} not found; variants are not checked here", file=sys.stderr)
+if not os.path.isfile(platform_file):
+    fail(f"cannot check variants: {platform_file} not found")
+with open(platform_file, encoding="utf-8", errors="replace") as f:
+    known_variants = set(re.findall(r'\bVariant:\s*"([^"]+)"', f.read()))
+if not known_variants:
+    fail(f"cannot check variants: no Variant definitions found in {platform_file}")
+unknown = sorted({g["variant"] for g in groups} - known_variants)
+if unknown:
+    fail(f"unknown variants: {', '.join(unknown)} (known: {', '.join(sorted(known_variants))})")
 
 # Every label in a labelFilter must exist as a string literal in the e2e-v2 tree.
 literals = set()
