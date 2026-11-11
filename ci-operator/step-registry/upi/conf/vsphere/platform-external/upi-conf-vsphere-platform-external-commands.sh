@@ -511,7 +511,7 @@ status:
 EOF
   yq-go m -x -i "manifests/cluster-infrastructure-02-config.yml" "/tmp/infraPlatformSpecPatch.yml"
 
-elif [[ ${PLATFORM_EXTERNAL_CCM_ENABLED:-yes} != "yes" ]]; then
+elif [[ ${PLATFORM_EXTERNAL_CCM_ENABLED-yes} != "yes" ]]; then
 
   ### CCM disabled: patch the infra resource with the 'External' platform type instead of
   ### deploying CCM manifests, so the cluster still reports platform External.
