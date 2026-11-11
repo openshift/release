@@ -22,7 +22,7 @@ load_sibling = support.load_sibling
 class LifecycleTests(support.Fixture):
     def test_interruption_during_harness_preparation_finishes_reports(self):
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         with mock.patch.object(runner, "command",
                                side_effect=runner.Interrupted("interrupted by signal 15")):
             self.assertEqual(runner.run_evals(self.repo, entries, files,
@@ -37,7 +37,7 @@ class LifecycleTests(support.Fixture):
 
     def test_initial_report_failure_during_preparation_is_non_success(self):
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = runner.write_summary
         failed = False
 
@@ -61,7 +61,7 @@ class LifecycleTests(support.Fixture):
         self.write_manifest([self.entry, other])
         self.change_skill()
         self.artifacts.mkdir()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = getattr(runner, action)
         injected = False
 
@@ -110,7 +110,7 @@ class LifecycleTests(support.Fixture):
                     fixture.write_manifest([fixture.entry, other])
                     fixture.change_skill()
                     fixture.artifacts.mkdir()
-                    entries, files = runner.select_manifest_entries(fixture.repo, fixture.env)
+                    entries, files = fixture.select_entries()
                     with mock.patch.object(runner, action, side_effect=error):
                         if isinstance(error, runner.Interrupted):
                             self.assertEqual(runner.run_evals(fixture.repo, entries, files,
@@ -129,7 +129,7 @@ class LifecycleTests(support.Fixture):
     def test_unexpected_metrics_failure_is_nonfatal(self):
         self.change_skill()
         self.artifacts.mkdir()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = runner.command
 
         def fail_metrics(args, *rest, **kwargs):
@@ -190,7 +190,7 @@ class LifecycleTests(support.Fixture):
     def test_deadline_reached_after_verification_is_reported_as_the_step_limit(self):
         self.artifacts.mkdir()
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         verified = False
         verify, clock = runner.verify_result, runner.remaining
 
@@ -339,7 +339,7 @@ class EvalConfig:
         self.entry["setup_script"] = "setup.sh"
         self.write_manifest([self.entry])
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         env = {**self.env, "RESOLVER_SLEEP": "60"}
         self.artifacts.mkdir()
         with mock.patch.object(runner, "CONFIG_RESOLUTION_TIMEOUT", 0.05):

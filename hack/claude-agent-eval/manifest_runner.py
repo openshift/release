@@ -25,13 +25,15 @@ try:  # Package imports for repository tooling; direct imports for the CI bundle
     from .eval_report import render_report
     from .eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
                               validate_resolution_result)
-    from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
+    from .eval_changes import changed_files
+    from .eval_plan import EvalError, EvalPlan, artifact_name, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
     from eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
                              validate_resolution_result)
-    from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
+    from eval_changes import changed_files
+    from eval_plan import EvalError, EvalPlan, artifact_name, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
 
@@ -823,16 +825,21 @@ def interrupted(signum, _frame):
     raise Interrupted(f"interrupted by signal {signum}")
 
 
-def select_manifest_entries(repo, env):
-    """Validate manifest and diff inputs, then select only explicit triggers."""
+def select_manifest_entries(repo, env, *, github=None):
+    """Validate manifest and PR change inputs, then select only explicit triggers.
+
+    Changed files come from Prow's JOB_SPEC and the GitHub pull request files
+    API, never from Git history in the checkout; github injects the API client.
+    """
     if env.get("EVAL_DISCOVER") or env.get("EVAL_CONFIG", "eval.yaml") not in ("", "eval.yaml"):
         raise EvalError("the manifest workflow does not accept EVAL_DISCOVER or explicit EVAL_CONFIG")
     if env.get("EVAL_EXTRA_ARGS"):
         raise EvalError("EVAL_EXTRA_ARGS is not supported in manifest mode; settings belong in the manifest/eval YAML")
-    if env.get("JOB_TYPE", "presubmit") != "presubmit":
-        raise EvalError("manifest mode currently supports PR runs only (periodic/manual are follow-on work)")
+    if env.get("JOB_TYPE", "presubmit") not in ("presubmit", "batch"):
+        raise EvalError("manifest mode currently supports PR runs only: presubmit and batch jobs "
+                        "(periodic/manual are follow-on work)")
     entries = load_manifest(repo)
-    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if any(e.run == "pr" for e in entries) else []
+    files = changed_files(env, github) if any(e.run == "pr" for e in entries) else []
     return select_evals(entries, files), files
 
 
