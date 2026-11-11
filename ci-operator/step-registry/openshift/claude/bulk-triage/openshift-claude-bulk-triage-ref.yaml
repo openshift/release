@@ -7,8 +7,8 @@ ref:
     group: claude-openshift-ci
     mount_path: /var/run/claude-code-service-account
   - collection: openshift-qse
-    group: openshift-qse-managers-bot
-    mount_path: /var/run/qse-bot-managers
+    group: openshift-qse-jira-sa
+    mount_path: /var/run/qse-jira-sa
   - collection: openshift-qse
     group: claude-bulk-triage-dpcr-token
     mount_path: /var/run/dpcr-token
@@ -59,18 +59,25 @@ ref:
     default: "openshift-ci-prow-agents"
   - name: GOOGLE_APPLICATION_CREDENTIALS
     default: "/var/run/claude-code-service-account/google-token"
-  - name: JIRA_EMAIL_PATH
-    default: "/var/run/qse-bot-managers/jira-email"
+  - name: JIRA_CLIENT_ID_PATH
+    default: "/var/run/qse-jira-sa/jira-client-id"
     documentation: |-
-      Path to the Atlassian account email from the openshift-qse-bot-managers
-      credential. The commands script reads it and exports JIRA_USERNAME for
-      the skill's JIRA reads and writes (triage links, comments, new bugs).
-  - name: JIRA_PAT_PATH
-    default: "/var/run/qse-bot-managers/jira-pat"
+      Path to the OAuth client ID of the service-account credential in the
+      openshift-qse-jira-sa secret. The commands script reads it and
+      exports JIRA_CLIENT_ID for the skill's JIRA reads and writes (triage
+      links, comments, new bugs).
+  - name: JIRA_CLIENT_SECRET_PATH
+    default: "/var/run/qse-jira-sa/jira-client-secret"
     documentation: |-
-      Path to the JIRA API token (PAT) from the openshift-qse-bot-managers
-      credential. The commands script reads it and exports JIRA_API_TOKEN for
-      the skill's JIRA reads and writes (triage links, comments, new bugs).
+      Path to the OAuth client secret of the service-account credential in
+      the openshift-qse-jira-sa secret. The commands script reads it and
+      exports JIRA_CLIENT_SECRET for the skill's JIRA reads and writes.
+  - name: JIRA_CLOUD_ID
+    default: "2b9e35e3-6bd3-4cec-b838-f4249ee02432"
+    documentation: |-
+      Atlassian cloud ID of the JIRA site (redhat.atlassian.net, as published
+      at https://redhat.atlassian.net/_edge/tenant_info). Service-account
+      requests go to https://api.atlassian.com/ex/jira/<cloud ID>.
   - name: DPCR_TOKEN_PATH
     default: "/var/run/dpcr-token/token"
     documentation: |-
@@ -100,7 +107,7 @@ ref:
     root-cause buckets, deep-dives artifacts, creates/updates Sippy triage
     records (linking regressions to existing JIRA bugs) using the DPCR
     service-account token, and writes a markdown duty report to the
-    artifacts directory. JIRA access (openshift-qse-bot-managers) is
+    artifacts directory. JIRA access (openshift-qse-jira-sa) is
     read-write: the skill files new JIRA bugs, comments on bugs, and
     appends Component Readiness triage links as the service account.
     Release blockers and new Sippy labels/symptoms remain report
