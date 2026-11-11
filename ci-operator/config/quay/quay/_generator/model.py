@@ -240,6 +240,13 @@ class Cell:
             "fips": self.fips,
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
+            # Explicit immutable test refs supersede strict image-label
+            # resolution. This keeps the generated env free of a contradictory
+            # PLAYWRIGHT_REF_MODE setting when a shipment job pins its suite.
+            "playwright_explicit_ref": bool(
+                self.env.get("PLAYWRIGHT_GIT_BRANCH")
+                or self.env.get("PLAYWRIGHT_N_GIT_BRANCH")
+            ),
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

@@ -89,10 +89,26 @@ EOF
 echo "Waiting for Mailpit rollout..."
 oc rollout status deployment/mailpit -n "${QUAY_NS}" --timeout=5m
 
-# Expose the HTTP API via an edge-terminated route. The Playwright pod trusts it
-# because the test step sets NODE_TLS_REJECT_UNAUTHORIZED=0 for the run.
-oc create route edge mailpit --service=mailpit --port=http -n "${QUAY_NS}" \
-  --insecure-policy=Redirect --dry-run=client -o yaml | oc apply -f -
+# Expose the HTTP API via an edge-terminated route. Use an explicit manifest
+# because older oc clients can serialize `oc create route --dry-run=client` as
+# apiVersion v1 instead of route.openshift.io/v1. The Playwright pod trusts the
+# route because the test step sets NODE_TLS_REJECT_UNAUTHORIZED=0 for the run.
+cat <<EOF | oc apply -f -
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mailpit
+  namespace: ${QUAY_NS}
+spec:
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: mailpit
+EOF
 
 MAILPIT_HOST=""
 for _ in $(seq 1 30); do
