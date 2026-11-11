@@ -82,6 +82,21 @@ _junit_start=$(date +%s)
 _junit_done=0
 _props="${ARTIFACT_DIR:-/tmp}/acs-deploy-properties.txt"
 
+# --- Shared work deadline (single wall-clock authority) ---
+# ref.yaml: timeout 30m (1800s) − grace_period 150s = 1650s of work. Setup,
+# precondition, both waits, classification, and diagnostics all charge
+# against this ONE deadline, so a slow setup or an oc request that straddles
+# a poll deadline cannot push classification/JUnit past the work budget (and
+# so cannot leave TERM to record StepTerminated in place of acs-csv-timeout).
+# Reserves subtracted from the deadline when capping a phase:
+#   _diag_reserve        bounded diagnostics (4 x 20s request-timeout) + JUnit
+#   _oc_overrun_reserve  one in-flight 20s oc request at a phase deadline
+# Phase deadlines are capped at _work_deadline - both reserves.
+_work_budget=1650
+_diag_reserve=120
+_oc_overrun_reserve=25
+_work_deadline=$(( _junit_start + _work_budget ))
+
 # _classify <type> <detail> — record the failure classification (first
 # match wins; called in precedence order by the detection code).
 _classify() {
@@ -205,6 +220,16 @@ _prop() {
   echo "$1=${2:-unknown}" >> "${_props}"
 }
 
+# _clamp_deadline <epoch>: cap a phase deadline at the shared work deadline
+# minus the diagnostics and one-in-flight-request reserves. An oc request
+# started just before the returned deadline (<=20s) therefore finishes before
+# _work_deadline - _diag_reserve, leaving that reserve for classification,
+# diagnostics, and JUnit. Prints the (possibly lowered) deadline.
+_clamp_deadline() {
+  local _cap=$(( _work_deadline - _diag_reserve - _oc_overrun_reserve ))
+  if (( $1 > _cap )); then printf '%s' "${_cap}"; else printf '%s' "$1"; fi
+}
+
 # --- Diagnostics: bounded (last 50 events, <=256KiB/object, <=2MiB total) ---
 _dump_diagnostics() {
   echo ">>> DIAG: Subscription (OLM, fully-qualified):"
@@ -245,7 +270,11 @@ done
 # waits are sequential and each independently bounded, so the SUM must
 # multiply out — per-variable 1..900 alone admits 900s + 900s = 1800s of
 # waits, overrunning the budget so TERM records StepTerminated instead
-# of the acs-csv-timeout classification.
+# of the acs-csv-timeout classification. This check is the fail-fast half
+# of the contract (reject absurd configs with exit 2); the runtime half is
+# _work_deadline above, which charges elapsed setup and caps both phase
+# deadlines so the arithmetic holds regardless of setup slowness or an
+# in-flight oc request that finishes after a poll deadline.
 if (( ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT > 1230 )); then
   echo "ERROR: ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT must be ≤ 1230s (work budget 1650s − overhead 180s − precondition 120s − diagnostics 120s); got $((ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT))s"
   _classify "acs-invalid-input" "wait sum ${ACS_CSV_WAIT_TIMEOUT}s + ${ACS_INSTALL_TIMEOUT}s exceeds the step work budget"
@@ -460,7 +489,11 @@ typeset csvName=""
 typeset -i query_failures=0
 typeset -i csv_deadline csv_now csv_left csv_diag_at
 typeset -i csv_elapsed=0
-csv_deadline=$(( $(date +%s) + ACS_CSV_WAIT_TIMEOUT ))
+_csv_want=$(( $(date +%s) + ACS_CSV_WAIT_TIMEOUT ))
+csv_deadline=$(_clamp_deadline "${_csv_want}")
+if (( csv_deadline < _csv_want )); then
+  echo ">>> NOTE: CSV-name wait clamped to $(( csv_deadline - $(date +%s) ))s (requested ${ACS_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+fi
 csv_diag_at=$(( $(date +%s) + 30 ))
 while [[ -z "${csvName}" ]]; do
     csv_now=$(date +%s)
@@ -524,7 +557,11 @@ _prop "csv_name" "${csvName}"
 #     inside the single ACS_INSTALL_TIMEOUT budget.
 typeset -i install_deadline install_left
 typeset csv_probe_out=""
-install_deadline=$(( $(date +%s) + ACS_INSTALL_TIMEOUT ))
+_install_want=$(( $(date +%s) + ACS_INSTALL_TIMEOUT ))
+install_deadline=$(_clamp_deadline "${_install_want}")
+if (( install_deadline < _install_want )); then
+  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( install_deadline - $(date +%s) ))s (requested ${ACS_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+fi
 while :; do
     if csv_probe_out=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o name 2>&1); then
         break

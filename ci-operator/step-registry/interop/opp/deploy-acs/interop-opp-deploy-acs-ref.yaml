@@ -31,15 +31,15 @@ ref:
     acs-deploy-properties.txt. Durable authority: opp-interop-testing
     docs/design/acs-deploy-evidence.md.
 
-    Timeout budget (must multiply out when checked): timeout 30m (1800s) −
-    grace 150s = 1650s work; overhead 180s + precondition ≤120s (3 × 20s
-    request-timeout + 50s backoff) + CSV-name wait 600s + CSV-Succeeded wait
-    600s + diagnostics ≤120s (bounded: last 50 events, ≤256KiB/object) =
-    1620s ≤ 1650s, margin 30s. TERM path: JUnit emitted first (≤10s).
-    Every oc call carries --request-timeout=20s. Input validation enforces
-    the sum: ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT ≤ 1230s (1650 −
-    180 − 120 − 120), so no admissible configuration can overrun the work
-    budget with sequential waits.
+    Timeout budget. Input validation enforces the wait SUM (fail-fast, exit
+    2): ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT ≤ 1230s. A shared work
+    deadline of 1650s (timeout 30m − grace 150s) is the runtime authority:
+    elapsed setup and precondition charge against it, and each phase deadline
+    is capped at the deadline minus 145s (diagnostics ≤120s + one in-flight
+    oc request ≤25s). Classification (acs-csv-timeout) and JUnit therefore
+    complete without relying on setup staying under a fixed allowance or on
+    every oc request returning before its phase deadline. Every oc call
+    carries --request-timeout=20s. TERM path: JUnit emitted first.
   env:
     - default: stable
       documentation: |-
