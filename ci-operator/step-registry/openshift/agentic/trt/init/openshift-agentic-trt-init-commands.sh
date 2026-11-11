@@ -6,10 +6,14 @@ set -o pipefail
 
 echo "=== TRT Init ==="
 
-# --- Gangway override ---
+# --- Gangway overrides ---
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY:-}" ]]; then
     echo "Applying Gangway override: JIRA_ISSUE_KEY=${MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY}"
     JIRA_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_JIRA_ISSUE_KEY}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_PLANNING_ISSUE_KEY:-}" ]]; then
+    echo "Applying Gangway override: PLANNING_ISSUE_KEY=${MULTISTAGE_PARAM_OVERRIDE_PLANNING_ISSUE_KEY}"
+    PLANNING_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_PLANNING_ISSUE_KEY}"
 fi
 
 [[ -n "${JIRA_ISSUE_KEY:-}" ]] || { echo "ERROR: JIRA_ISSUE_KEY is required."; exit 1; }
@@ -36,5 +40,20 @@ curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
 }
 
 echo "Summary: $(jq -r '.fields.summary // "No summary"' "${SHARED_DIR}/jira-issue.json")"
+
+# --- Optionally fetch planning subtask ---
+if [[ -n "${PLANNING_ISSUE_KEY:-}" ]]; then
+    echo "Planning subtask: ${PLANNING_ISSUE_KEY}"
+    echo "${PLANNING_ISSUE_KEY}" > "${SHARED_DIR}/planning-issue-key"
+
+    echo "Fetching planning subtask details from Jira..."
+    curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
+        "https://redhat.atlassian.net/rest/api/2/issue/${PLANNING_ISSUE_KEY}?fields=summary,description,status,labels,comment,issuetype,priority" \
+        > "${SHARED_DIR}/planning-issue.json" || {
+        echo "ERROR: Failed to fetch planning subtask ${PLANNING_ISSUE_KEY} from Jira."; exit 1;
+    }
+
+    echo "Planning summary: $(jq -r '.fields.summary // "No summary"' "${SHARED_DIR}/planning-issue.json")"
+fi
 
 echo "=== TRT Init Complete ==="
