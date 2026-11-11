@@ -163,8 +163,9 @@ this pull request changes.
 4. Build the plan from groups of the default TestMatrix(): keep the groups
    that are relevant and drop the rest. Keep each group's name, variant and
    skip value, and keep the order of steps inside a sequential group. You may
-   narrow a labelFilter to the relevant labels. Use only variants and labels
-   that exist in the repository.
+   narrow a labelFilter to a subset of that group's own labels, but never add
+   a label to a group or move a label to another group. A plan with a group
+   that is not in the default TestMatrix() is rejected.
 5. If the change is broad, touches shared code, or you cannot tell what it
    affects, return the complete default TestMatrix().
 
@@ -286,8 +287,10 @@ def check_group(group, where, lane):
     groups.append(group)
 
 
-parallel = matrix.get("parallel") or []
-sequential = matrix.get("sequential") or []
+# A missing field is an empty list; a present field must be a list, because
+# the plan is published as returned.
+parallel = matrix.get("parallel", [])
+sequential = matrix.get("sequential", [])
 if not isinstance(parallel, list) or not isinstance(sequential, list):
     fail("testMatrix.parallel and testMatrix.sequential must be lists")
 for i, group in enumerate(parallel):
@@ -309,12 +312,41 @@ platform_file = os.path.join(repo, "test/e2e/v2/lifecycle", f"{platform}.go")
 if not os.path.isfile(platform_file):
     fail(f"cannot check variants: {platform_file} not found")
 with open(platform_file, encoding="utf-8", errors="replace") as f:
-    known_variants = set(re.findall(r'\bVariant:\s*"([^"]+)"', f.read()))
+    platform_source = f.read()
+known_variants = set(re.findall(r'\bVariant:\s*"([^"]+)"', platform_source))
 if not known_variants:
     fail(f"cannot check variants: no Variant definitions found in {platform_file}")
 unknown = sorted({g["variant"] for g in groups} - known_variants)
 if unknown:
     fail(f"unknown variants: {', '.join(unknown)} (known: {', '.join(sorted(known_variants))})")
+
+
+
+def filter_labels(label_filter):
+    """Return the label terms of a Ginkgo label filter expression."""
+    return re.findall(r"[^\s()!&|,]+", label_filter)
+
+
+# A generated group must be a group of the platform's default matrix: same name,
+# same variant, and no labels the default group does not run. This keeps tests
+# on the cluster variant they need, so Claude can only drop or narrow groups.
+default_groups = {}
+for name, variant, label_source in re.findall(
+        r'\bName:\s*"([^"]+)",\s*Variant:\s*"([^"]+)",\s*LabelFilter:\s*((?:"[^"]*"\s*\+?\s*)+)',
+        platform_source):
+    labels = set(filter_labels("".join(re.findall(r'"([^"]*)"', label_source))))
+    default_groups.setdefault(name, []).append((variant, labels))
+if not default_groups:
+    fail(f"cannot check groups: no default test groups found in {platform_file}")
+for group in groups:
+    candidates = default_groups.get(group["name"])
+    if not candidates:
+        fail(f"group {group['name']!r} is not in the default test matrix "
+             f"(known: {', '.join(sorted(default_groups))})")
+    labels = set(filter_labels(group["labelFilter"]))
+    if not any(group["variant"] == variant and labels <= allowed for variant, allowed in candidates):
+        expected = "; ".join(f"variant {v!r} with labels {', '.join(sorted(a))}" for v, a in candidates)
+        fail(f"group {group['name']!r} does not match the default test matrix, which has {expected}")
 
 # Every label in a labelFilter must exist as a string literal in the e2e-v2 tree.
 literals = set()
@@ -324,7 +356,7 @@ for root, _, files in os.walk(os.path.join(repo, "test/e2e/v2")):
             with open(os.path.join(root, name), encoding="utf-8", errors="replace") as f:
                 literals.update(re.findall(r'"([^"\\\n]+)"', f.read()))
 for group in groups:
-    for label in re.findall(r"[^\s()!&|,]+", group["labelFilter"]):
+    for label in filter_labels(group["labelFilter"]):
         if not re.fullmatch(r"[A-Za-z0-9._-]+", label):
             fail(f"group {group['name']!r}: unsupported labelFilter term {label!r}")
         if label not in literals:
