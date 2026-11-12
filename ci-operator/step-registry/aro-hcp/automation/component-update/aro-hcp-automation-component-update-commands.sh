@@ -20,9 +20,6 @@ set +o xtrace
 # Security: Trap to ensure xtrace is never accidentally enabled
 trap 'set +o xtrace' DEBUG
 
-# ShellCheck directives
-# shellcheck disable=SC2034  # Unused variables are exported for external tools
-
 # Environment variable defaults (overridable via ref.yaml)
 VERBOSITY=${VERBOSITY:-1}
 
