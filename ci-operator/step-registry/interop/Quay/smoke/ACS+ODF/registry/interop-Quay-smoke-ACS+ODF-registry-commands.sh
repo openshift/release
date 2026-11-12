@@ -30,7 +30,10 @@ echo ">>> PHASE: initialization"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
-typeset junitFile="${ARTIFACT_DIR}/junit_quay_interop.xml"
+# Raw suite name and file name carry the step identity; ExitTrap
+# post-processing renames the suite (LP_IO__ET_PPP__NEW_TS_NAME) and
+# merges this file into junit--interop-Quay-smoke-ACS+ODF-registry.xml.
+typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-ACS+ODF-registry.xml"
 typeset imageTag=''
 imageTag="${BUILD_ID:-$(date +%s)}"
 
@@ -78,7 +81,7 @@ function GenerateJunit () {
     cat > "${junitFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="interop-tests-opp-quay-smoke" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
+  <testsuite name="interop-Quay-smoke-ACS+ODF-registry" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
 EOF
 
     for t in "${allTests[@]}"; do
@@ -88,11 +91,11 @@ EOF
         escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-tests-opp-quay-smoke\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -122,7 +125,25 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
-trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
+# Post-process the JUnit XML for Component Readiness routing.  Guarded on
+# purpose: this runs from the EXIT trap, and an unloaded helper (download
+# failure) or a post-processing failure must not overwrite the script's
+# exit status (the unguarded call fails the trap with 127 and turns a
+# passing run into a failure).  The merged file name is passed explicitly:
+# the library default (jUnit.xml) is not picked up by the prow JUnit viewer
+# (lowercase junit prefix required) and collides with other steps in
+# shared storage.
+PostProcessJunit () {
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        ExitTrap--PostProcessPrep junit--interop-Quay-smoke-ACS+ODF-registry.xml ||
+            echo "WARNING: junit post-processing failed" >&2
+    else
+        echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
+    fi
+    true
+}
+
+trap '_opp_cleanup; GenerateJunit; _propagate_junit; PostProcessJunit' EXIT
 
 function DiscoverQuay () {
     typeset registryJson="" discoverErr=""
@@ -227,6 +248,11 @@ function PreflightCheck () {
 function CreateTestOrg () {
     typeset xtraceOn=false
     [[ "${-}" == *x* ]] && xtraceOn=true
+    # xtrace off for the whole function: the [[ ]] emptiness checks on
+    # QUAY_TOKEN below expand the credential into the trace log, and the
+    # scrub patterns in _opp_cleanup do not cover those forms (the log is
+    # copied into the public artifact dir when the step fails).
+    set +x
 
     if [[ -z "${QUAY_TOKEN}" && -n "${QUAY_PASSWORD}" ]]; then
         typeset cookieFile="/tmp/quay-cookies.txt"
@@ -237,7 +263,6 @@ function CreateTestOrg () {
         if [[ -n "${csrf}" ]]; then
             typeset signinResult=''
             typeset signinPayload=''
-            set +x
             signinPayload="$(python3 -c "
 import json, sys
 print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
@@ -249,7 +274,6 @@ print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
                 -d "${signinPayload}" 2>/dev/null)" || signinResult=""
             QUAY_TOKEN="$(echo "${signinResult}" | \
                 python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)" || QUAY_TOKEN=""
-            "${xtraceOn}" && set -x
         fi
         rm -f "${cookieFile}"
         export QUAY_TOKEN
@@ -259,7 +283,6 @@ print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
         echo "WARNING: No Quay token available; org creation may fail" >&2
     fi
 
-    set +x
     curl -sk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
         -H "Authorization: Bearer ${QUAY_TOKEN}" \
         -H "Content-Type: application/json" \
@@ -279,16 +302,20 @@ function RunPushPull () {
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
 
+    # xtrace off: the [[ ]] emptiness check below and the auth file
+    # contents expand QUAY_TOKEN / QUAY_PASSWORD into the trace log, and
+    # the scrub patterns in _opp_cleanup do not cover those forms.
+    typeset xtraceOn=false
+    [[ "${-}" == *x* ]] && xtraceOn=true
+    set +x
     if [[ -z "${QUAY_TOKEN}" && -z "${QUAY_PASSWORD}" ]]; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
         return 1
     fi
 
     typeset registryAuth=''
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x
     if [[ -n "${QUAY_TOKEN}" ]]; then
         registryAuth="$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)"
     else
@@ -546,12 +573,14 @@ function RunAcsScan () {
     [[ "${-}" == *x* ]] && xtraceOn=true
     set +x
     acsPassword="$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || acsPassword=""
-    "${xtraceOn}" && set -x
+    # xtrace still off: the check below expands the password
     if [[ -z "${acsPassword}" ]]; then
+        "${xtraceOn}" && set -x
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "skipped" "ACS admin password not available" "${elapsed}"
         return 0
     fi
+    "${xtraceOn}" && set -x
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
