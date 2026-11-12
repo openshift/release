@@ -183,7 +183,7 @@ CONFIG = {
         'eu-west-1': 10
     },
     'aws-pipelines-performance-quota-slice': {
-        'eu-west-1': 10
+        'eu-west-1': 20
     },
     'aws-rhdh-performance-quota-slice': {
         'eu-west-1': 10
