@@ -30,9 +30,10 @@ _propagate_junit () {
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
 #   - JUnit XML is generated on exit (via trap) regardless of test results
-#   - Script always exits 0 to allow subsequent Prow test steps to run
-#   - Individual test failures are visible in Prow UI via JUnit reporting
-#
+#   - The script exits 1 when any test case fails, 0 otherwise; per-case
+#     results are visible in the Prow UI via JUnit reporting.  The step is
+#     configured with best_effort: true, so a non-zero exit does not block
+#     subsequent Prow test steps from running.
 ################################################################################
 
 # cd to writable directory
@@ -142,11 +143,11 @@ function RunTestCase1 () {
     : "====== Test Case 1: Deploy OPP Application ======"
 
     # Download jq
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
+    curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
     chmod +x /tmp/jq
 
     # Clone and deploy
-    git clone https://github.com/stolostron/policy-collection.git || return 1
+    git clone --depth 1 https://github.com/stolostron/policy-collection.git || return 1
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
@@ -231,6 +232,12 @@ json.dump(bc,sys.stdout,indent=2)
 
     : "Deployment is available"
 
+    # Capture the exact image reference the deployment runs, so the ACS
+    # query in Test Case 2 matches this deployment's image and not any
+    # other image with a similar name.
+    typeset -g deployedImage=''
+    deployedImage="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{.spec.template.spec.containers[0].image}')" || deployedImage=''
+
     # Collect final status
     oc get build,po,deployment -n e2e-opp || true
     oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=6} n>0{print; n--}'
@@ -253,8 +260,32 @@ function RunTestCase2 () {
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
     set -x
 
-    # Query ACS for httpd-example image
-    typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
+    # Query ACS for the image deployed by Test Case 1.  Match on the
+    # namespace-qualified repository (registry host and path, tag/digest
+    # stripped) so an older build of the same application does not satisfy
+    # the check.
+    typeset deployedRepo='httpd-example'
+    if [[ -n "${deployedImage:-}" ]]; then
+        deployedRepo="$(printf '%s' "${deployedImage}" | cut -d'@' -f1 | sed 's/:[^/:]*$//')"
+    fi
+    typeset jqFilter=".images[] | select(.name | contains(\"${deployedRepo}\"))"
+
+    # TLS verification for the ACS Central API: prefer the service CA
+    # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
+    # fall back to -k with a warning when the route certificate cannot be
+    # verified with it, so an unknown certificate does not hard-fail the
+    # test.
+    typeset -a acsTlsOpts=( -k )
+    typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
+    if [[ -f "${saCaBundle}" ]]; then
+        typeset tlsProbe=''
+        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping" 2>/dev/null)" || tlsProbe='000'
+        if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
+            acsTlsOpts=( --cacert "${saCaBundle}" )
+        else
+            : "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS"
+        fi
+    fi
 
     typeset -i retries=10
     typeset -i retryInterval=30
@@ -267,7 +298,7 @@ function RunTestCase2 () {
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
         # Disable xtrace to protect ACS password in curl arguments
         set +x
-        httpdImageJson=$(curl -s -k -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}")
+        httpdImageJson=$(curl -s "${acsTlsOpts[@]}" -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}")
         set -x
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         if [ "${imageId}" != "" ]; then
@@ -290,12 +321,15 @@ function RunTestCase2 () {
 # Test Execution Setup
 ################################################################################
 # Load ExitTrap library for Component Readiness JUnit remapping
-# Per Best Practices: Use exact pattern from library documentation
+# Per Best Practices: Use exact pattern from library documentation.
+# The URL is pinned to a specific commit (instead of refs/heads/main) so a
+# push to the library's default branch cannot silently change what runs
+# in CI; bump the pin deliberately when picking up library changes.
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 # Set trap to generate JUnit XML and remap for Component Readiness
