@@ -416,7 +416,75 @@ fi
 # neither field), and the installer never backfills this on upgrade, so deleting
 # it here from the pre-bootstrap manifest reproduces that persistent state
 # without fighting any later immutability/admission checks on a live cluster.
+#
+# Before deleting it, rewrite openshift-config/cloud-provider-config from the
+# installer-rendered YAML into the legacy INI format, using the exact
+# server/datacenter/datastore/folder values the installer resolved for this
+# install's sole failure domain. No installer version in active use renders
+# cloud-provider-config as INI anymore -- a fresh install always emits YAML
+# there, regardless of install-config schema -- so stripping alone produces a
+# config-format/Infra-CR combination (new-format config + legacy-shaped
+# Infra) that cannot occur on a real cluster, and leaves
+# vmware-vsphere-csi-driver-operator with no source of datastore/topology
+# data at all: a storage ClusterOperator that never leaves Degraded, which
+# keeps the install itself from ever completing (SPLAT-3028). Real
+# UPI/pre-4.13 clusters have always carried this data in the INI [Workspace]
+# section instead; a real 4.12-origin cluster upgraded through day-2
+# multi-vCenter GA confirms cloud-provider-config stays INI, untouched since
+# original install, and that storage stays Available in that exact state.
 if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - rewriting cloud-provider-config as legacy INI (SPLAT-3028)"
+  infra_manifest="manifests/cluster-infrastructure-02-config.yml"
+  ccm_manifest="manifests/cloud-provider-config.yaml"
+
+  vsphere_fd_server=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
+  vsphere_fd_datacenter=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
+  vsphere_fd_datastore_path=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
+  vsphere_fd_folder=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
+  [[ "${vsphere_fd_server}" == "null" ]] && vsphere_fd_server=""
+  [[ "${vsphere_fd_datacenter}" == "null" ]] && vsphere_fd_datacenter=""
+  [[ "${vsphere_fd_datastore_path}" == "null" ]] && vsphere_fd_datastore_path=""
+  [[ "${vsphere_fd_folder}" == "null" ]] && vsphere_fd_folder=""
+  vsphere_fd_datastore="${vsphere_fd_datastore_path##*/}"
+
+  if [[ -z "${vsphere_fd_server}" || -z "${vsphere_fd_datacenter}" || -z "${vsphere_fd_datastore}" ]]; then
+    echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
+    exit 1
+  fi
+
+  vsphere_cm_name=$(yq-go r "${ccm_manifest}" "metadata.name")
+  vsphere_cm_namespace=$(yq-go r "${ccm_manifest}" "metadata.namespace")
+
+  vsphere_folder_line=""
+  if [[ -n "${vsphere_fd_folder}" ]]; then
+    vsphere_folder_line="    folder = \"${vsphere_fd_folder}\""
+  else
+    echo "WARNING: no topology.folder resolved for this failure domain; omitting 'folder' from the legacy [Workspace] section" >&2
+  fi
+
+  cat > "${ccm_manifest}" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${vsphere_cm_name}
+  namespace: ${vsphere_cm_namespace}
+data:
+  config: |
+    [Global]
+    secret-name = "vsphere-creds"
+    secret-namespace = "kube-system"
+    insecure-flag = "1"
+
+    [Workspace]
+    server = "${vsphere_fd_server}"
+    datacenter = "${vsphere_fd_datacenter}"
+    default-datastore = "${vsphere_fd_datastore}"
+${vsphere_folder_line}
+
+    [VirtualCenter "${vsphere_fd_server}"]
+    datacenters = "${vsphere_fd_datacenter}"
+EOF
+
   echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
   yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.vcenters"
   yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.failureDomains"

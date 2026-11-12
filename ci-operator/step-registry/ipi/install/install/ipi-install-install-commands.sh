@@ -708,6 +708,89 @@ function get_yq() {
   return 0
 }
 
+# legacyize_vsphere_cloud_provider_config rewrites the installer-rendered
+# openshift-config/cloud-provider-config manifest from the current YAML
+# format into the legacy INI format, using the exact server/datacenter/
+# datastore/folder values the installer itself resolved for this install's
+# sole failure domain. It must run before strip_vsphere_failure_domains
+# deletes that failure domain data from the Infrastructure manifest, since
+# that data is the only source for these values once it's gone.
+#
+# This exists because no installer version in active use renders
+# cloud-provider-config as INI anymore -- a fresh install always emits YAML
+# there, regardless of install-config schema -- so STRIP_VSPHERE_FAILURE_DOMAINS
+# alone produces a config-format/Infra-CR combination (new-format config +
+# legacy-shaped Infra) that cannot occur on a real cluster, and leaves
+# vmware-vsphere-csi-driver-operator with no source of datastore/topology
+# data at all: a storage ClusterOperator that never leaves Degraded, which
+# keeps the install itself from ever completing (SPLAT-3028). Real
+# UPI/pre-4.13 clusters have always carried this data in the INI [Workspace]
+# section instead; a real 4.12-origin cluster upgraded through day-2
+# multi-vCenter GA confirms cloud-provider-config stays INI, untouched since
+# original install, and that storage stays Available in that exact state.
+function legacyize_vsphere_cloud_provider_config() {
+  local dir=${1}
+
+  if ! get_yq; then
+    echo "ERROR: yq is unavailable; cannot rewrite cloud-provider-config as legacy INI" >&2
+    exit 1
+  fi
+
+  local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
+  local ccm_manifest="${dir}/manifests/cloud-provider-config.yaml"
+
+  local server datacenter datastore_path datastore folder
+  server=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
+  datacenter=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
+  datastore_path=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
+  folder=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
+  [[ "${server}" == "null" ]] && server=""
+  [[ "${datacenter}" == "null" ]] && datacenter=""
+  [[ "${datastore_path}" == "null" ]] && datastore_path=""
+  [[ "${folder}" == "null" ]] && folder=""
+  datastore="${datastore_path##*/}"
+
+  if [[ -z "${server}" || -z "${datacenter}" || -z "${datastore}" ]]; then
+    echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
+    exit 1
+  fi
+
+  local cm_name cm_namespace
+  cm_name=$(/tmp/yq r "${ccm_manifest}" "metadata.name")
+  cm_namespace=$(/tmp/yq r "${ccm_manifest}" "metadata.namespace")
+
+  local folder_line=""
+  if [[ -n "${folder}" ]]; then
+    folder_line="    folder = \"${folder}\""
+  else
+    echo "WARNING: no topology.folder resolved for this failure domain; omitting 'folder' from the legacy [Workspace] section" >&2
+  fi
+
+  echo "$(date -u --rfc-3339=seconds) - rewriting cloud-provider-config as legacy INI (SPLAT-3028)"
+  cat > "${ccm_manifest}" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${cm_name}
+  namespace: ${cm_namespace}
+data:
+  config: |
+    [Global]
+    secret-name = "vsphere-creds"
+    secret-namespace = "kube-system"
+    insecure-flag = "1"
+
+    [Workspace]
+    server = "${server}"
+    datacenter = "${datacenter}"
+    default-datastore = "${datastore}"
+${folder_line}
+
+    [VirtualCenter "${server}"]
+    datacenters = "${datacenter}"
+EOF
+}
+
 # strip_vsphere_failure_domains deletes vcenters/failureDomains from the
 # generated Infrastructure manifest, simulating a cluster installed without
 # vSphere failure domain information (SPLAT-3028). Per the openshift/api
@@ -1134,6 +1217,7 @@ EOF
     fi
 
     if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+      legacyize_vsphere_cloud_provider_config "${dir}"
       strip_vsphere_failure_domains "${dir}"
     fi
     ;;
