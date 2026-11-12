@@ -40,18 +40,20 @@ tests:
         # architecture and RHCOS 10 (via the osImageStream: rhel-10
         # install-config parameter consumed by ipi-conf as OS_IMAGE_STREAM).
         # Counts only -- node names are never printed
-        # (No-Sensitive-Data-In-Logs).
+        # (No-Sensitive-Data-In-Logs). All oc calls are wrapped in timeout so
+        # a hung API connection can never wedge the whole job (prow's default
+        # timeout is 24h).
         set -o pipefail
         echo "Node arch | osImage (counts):"
-        oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{" | "}{.status.nodeInfo.osImage}{"\n"}{end}' | sort | uniq -c
-        BAD=$(oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{": "}{.status.nodeInfo.osImage}{"\n"}{end}' | grep -vcE '^arm64: Red Hat Enterprise Linux CoreOS 10' || true)
+        timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{" | "}{.status.nodeInfo.osImage}{"\n"}{end}' | sort | uniq -c
+        BAD=$(timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{": "}{.status.nodeInfo.osImage}{"\n"}{end}' | grep -vcE '^arm64: Red Hat Enterprise Linux CoreOS 10' || true)
         if [ "${BAD}" -eq 0 ]; then
           echo "PASS: all nodes are arm64 running RHCOS 10"
         else
           echo "FAIL: ${BAD} node(s) not arm64/RHCOS 10 -- see breakdown above"
           exit 1
         fi
-      from: src
+      from: cli
       resources:
         requests:
           cpu: 100m

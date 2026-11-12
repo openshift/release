@@ -113,15 +113,21 @@ for NODE_ROLE in $OVS_DOCA_VALIDATE_NODE_ROLES; do
       record_pass "$LABEL: stock openvswitch removed"
     fi
 
-    # Diagnostic only, deliberately not asserted. doca-openvswitch ships no
-    # SELinux policy of its own, so the node relies on whatever policy the
-    # base image already carries. openvswitch-selinux-extra-policy is not
-    # matched by the removal glob above, but dnf's clean_requirements_on_remove
-    # may still drop it as an orphaned dependency of openvswitch3.x. Whether
-    # its absence actually breaks anything is unconfirmed, so print it for
-    # correlation against any AVC denials instead of guessing at a verdict.
-    SELINUX_POLICY=$(debug_node "$NODE" "rpm -q openvswitch-selinux-extra-policy 2>&1 || true")
+    # Diagnostic only, deliberately not asserted by default: whether
+    # openvswitch-selinux-extra-policy survived the Fast Datapath removal (or
+    # was installed deliberately, as the el10 variant does). Pass
+    # OVS_DOCA_EXPECTED_SELINUX_POLICY to turn this into an assertion on an
+    # exact NEVRA.
+    SELINUX_POLICY=$(debug_node "$NODE" "rpm -q openvswitch-selinux-extra-policy 2>&1 || echo not-installed")
     echo "openvswitch-selinux-extra-policy: $SELINUX_POLICY"
+    if [ -n "${OVS_DOCA_EXPECTED_SELINUX_POLICY:-}" ]; then
+      if [ "$SELINUX_POLICY" = "$OVS_DOCA_EXPECTED_SELINUX_POLICY" ]; then
+        record_pass "$LABEL: openvswitch-selinux-extra-policy ($SELINUX_POLICY)"
+      else
+        record_fail "$LABEL: openvswitch-selinux-extra-policy" \
+          "expected $OVS_DOCA_EXPECTED_SELINUX_POLICY, got: $SELINUX_POLICY"
+      fi
+    fi
 
     # Check 3: OVS advertises the doca datapath type -- and that the netdev
     # and system (kernel) datapaths are still registered alongside it. On a
@@ -194,6 +200,35 @@ for NODE_ROLE in $OVS_DOCA_VALIDATE_NODE_ROLES; do
       debug_node "$NODE" "ovs-vsctl get Open_vSwitch . external_ids" || true
     else
       echo "ovs-version (daemon self-report): $OVS_VERSION"
+    fi
+
+    # DOCA build banner: `ovs-vswitchd --version` on DOCA 3.5+ builds prints a
+    # "DOCA x.y" line (e.g. "DOCA 3.5.0098") -- a direct proof that the running
+    # binary is the DOCA-enabled build, stronger than the rpm name alone.
+    # Always printed; asserted only when OVS_DOCA_EXPECTED_BANNER is set
+    # (older trains like 3.4 do not print the line, so the el9 variant leaves
+    # it unset).
+    OVS_VSWITCHD_VERSION=$(debug_node "$NODE" "ovs-vswitchd --version 2>&1" | tr '\n' ' ')
+    echo "ovs-vswitchd: $OVS_VSWITCHD_VERSION"
+    if [ -n "${OVS_DOCA_EXPECTED_BANNER:-}" ]; then
+      if echo "$OVS_VSWITCHD_VERSION" | grep -q "$OVS_DOCA_EXPECTED_BANNER"; then
+        record_pass "$LABEL: ovs-vswitchd reports $OVS_DOCA_EXPECTED_BANNER"
+      else
+        record_fail "$LABEL: ovs-vswitchd reports $OVS_DOCA_EXPECTED_BANNER" \
+          "banner not found in: $OVS_VSWITCHD_VERSION"
+      fi
+    fi
+
+    # Collectx payload regression check: the ovsdb-server.service drop-in must
+    # have restored the stashed /var/opt/mellanox payload at boot (ostree
+    # discards /var). If this file is missing, ovs-vswitchd cannot load
+    # libclx_api.so.1 -- usually caught earlier by the service health gate,
+    # but this names the root cause directly.
+    if debug_node "$NODE" "test -e /var/opt/mellanox/collectx/lib/libclx_api.so.1"; then
+      record_pass "$LABEL: collectx payload restored at boot"
+    else
+      record_fail "$LABEL: collectx payload restored at boot" \
+        "/var/opt/mellanox/collectx/lib/libclx_api.so.1 is missing -- the ovsdb-server ExecStartPre restore did not run"
     fi
 
     # Check 6: applicative test -- push actual packets through the switch.
