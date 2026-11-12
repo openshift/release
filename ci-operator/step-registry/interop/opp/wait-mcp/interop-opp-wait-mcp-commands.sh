@@ -204,6 +204,7 @@ typeset -i _renderChurnCount=0
 typeset _lastGenPrint=""
 typeset -i _signatureRepeat=0
 typeset -i _bundleCollected=0
+typeset -i _vetoStreakHit=0
 _lastSignatureReason=""
 typeset -i extensionsApplied=0
 typeset -i pollsSinceLastExtension=0
